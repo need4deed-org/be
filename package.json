@@ -6,7 +6,6 @@
   "devDependencies": {
     "@types/node": "^22.13.10",
     "nodemon": "^3.1.10",
-    "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
   },
@@ -18,7 +17,7 @@
   },
   "scripts": {
     "start": "ts-node src/index.ts",
-    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev": "DB_HOST=db nodemon --exec ts-node src/index.ts",
     "typeorm": "typeorm-ts-node-commonjs"
   }
 }
