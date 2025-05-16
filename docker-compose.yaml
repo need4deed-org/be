@@ -1,0 +1,22 @@
+services:
+  be:
+    container_name: be
+    build:
+      context: .
+    image: be:dev
+    ports:
+      - 5000:5000
+    volumes:
+      - .:/app
+
+  db:
+    container_name: db
+    image: postgres:latest
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
