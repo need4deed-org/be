@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.git
+.vscode
+yarn-debug.log*
+yarn-error.log*
+.env
+
+# database
+*.sqlite
+db_data
