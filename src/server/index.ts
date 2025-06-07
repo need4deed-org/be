@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from "fastify";
+import avatarRoutes from "./routes/avatars";
 import userRoutes from "./routes/users";
 
 export const server: FastifyInstance = Fastify({
@@ -6,6 +7,7 @@ export const server: FastifyInstance = Fastify({
 });
 
 server.register(userRoutes, { prefix: "/users" });
+server.register(avatarRoutes, { prefix: "/avatars" });
 
 export const start = async () => {
   try {
