@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "change-case": "^5.4.4",
+    "class-validator": "^0.14.2",
     "fastify": "^5.3.3",
+    "fastify-plugin": "^5.0.1",
     "pg": "^8.14.1",
+    "pino-pretty": "^13.0.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "0.3.24"
   },
