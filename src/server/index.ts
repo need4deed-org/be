@@ -1,13 +1,24 @@
 import Fastify, { FastifyInstance } from "fastify";
-import avatarRoutes from "./routes/avatars";
-import userRoutes from "./routes/users";
+
+import typeormPlugin from "./plugins/typeorm";
+import accountRoutes from "./routes/account";
+import personRoutes from "./routes/person";
+import { RoutePrefix } from "./types";
 
 export const server: FastifyInstance = Fastify({
-  logger: true,
+  logger: {
+    transport: {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+      },
+    },
+  },
 });
 
-server.register(userRoutes, { prefix: "/users" });
-server.register(avatarRoutes, { prefix: "/avatars" });
+server.register(typeormPlugin);
+server.register(accountRoutes, { prefix: RoutePrefix.ACCOUNT });
+server.register(personRoutes, { prefix: RoutePrefix.PERSON });
 
 export const start = async () => {
   try {

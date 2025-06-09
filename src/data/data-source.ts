@@ -2,8 +2,8 @@ import { snakeCase } from "change-case";
 import "reflect-metadata";
 import { DataSource, DefaultNamingStrategy } from "typeorm";
 
-import { Avatar } from "./entity/Avatar";
-import { User } from "./entity/User";
+import { Account } from "./entity/account";
+import { Person } from "./entity/person";
 
 class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
   tableName(className: string, customTableName: string | undefined): string {
@@ -74,7 +74,7 @@ export const AppDataSource = new DataSource({
   database: "postgres",
   synchronize: true,
   logging: false,
-  entities: [User, Avatar],
+  entities: [Account, Person],
   migrations: [],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
