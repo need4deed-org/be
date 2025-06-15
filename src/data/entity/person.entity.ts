@@ -6,7 +6,7 @@ import {
   Length,
 } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { Account } from "./account"; // Ensure this import is correct
+import { User } from "./user.entity"; // Ensure this import is correct
 
 @Entity()
 export class Person {
@@ -50,8 +50,8 @@ export class Person {
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
 
-  @OneToMany(() => Account, (account) => account.person)
-  accounts: Account[];
+  @OneToMany(() => User, (user) => user.person)
+  users: User[];
 }
 
 export type PersonType = Person;
@@ -61,7 +61,7 @@ export type PersonCreateType = Omit<
 >;
 export type PersonUpdateType = Partial<PersonCreateType> & { id: number };
 export type PersonResponseType = Omit<Person, "accounts"> & {
-  accounts: Account[];
+  users: User[];
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 };

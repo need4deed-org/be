@@ -2,13 +2,13 @@ import { JWT } from "@fastify/jwt";
 import "fastify";
 import { Repository } from "typeorm";
 
-import { Account } from "../../data/entity/account";
-import { Person } from "../../data/entity/person";
+import { Person } from "../../data/entity/person.entity";
+import { User } from "../../data/entity/user.entity";
 
 declare module "fastify" {
   interface FastifyInstance {
     db: {
-      accountRepository: Repository<Account>;
+      accountRepository: Repository<User>;
       personRepository: Repository<Person>;
     };
     jwt: JWT;

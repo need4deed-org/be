@@ -1,6 +1,6 @@
-import { existingPersonSchema, newPersonSchema } from "./person";
+import { existingPersonSchema, newPersonSchema } from "./person.schema";
 
-export const createAccountBodySchema = {
+export const createUserBodySchema = {
   type: "object",
   required: ["email", "person"], // 'person' is now a required nested object
   properties: {
@@ -21,7 +21,7 @@ export const createAccountBodySchema = {
   additionalProperties: false,
 };
 
-export const accountResponseSchema = {
+export const userResponseSchema = {
   type: "object",
   properties: {
     id: { type: "number" },

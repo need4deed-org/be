@@ -1,11 +1,12 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { Person, PersonCreateType } from "../../data/entity/person";
+
+import { Person, PersonCreateType } from "../../data/entity/person.entity";
 import {
   newPersonSchema,
   personResponseSchema,
-} from "../../data/schema/person";
+} from "../../data/schema/person.schema";
 
 async function personRoutes(
   fastify: FastifyInstance,
@@ -115,8 +116,7 @@ async function personRoutes(
   );
 }
 
-// Export wrapped with fp and declare dependency on typeorm-plugin
 export default fp(personRoutes, {
-  name: "person-routes", // Give it a name
-  dependencies: ["typeorm-plugin"], // Declare dependency on typeorm-plugin
+  name: "person-routes",
+  dependencies: ["typeorm-plugin"],
 });

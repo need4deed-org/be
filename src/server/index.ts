@@ -1,8 +1,8 @@
 import Fastify, { FastifyInstance } from "fastify";
 
 import typeormPlugin from "./plugins/typeorm";
-import accountRoutes from "./routes/account";
 import personRoutes from "./routes/person";
+import userRoutes from "./routes/user";
 import { RoutePrefix } from "./types";
 
 export const server: FastifyInstance = Fastify({
@@ -17,7 +17,7 @@ export const server: FastifyInstance = Fastify({
 });
 
 server.register(typeormPlugin);
-server.register(accountRoutes, { prefix: RoutePrefix.ACCOUNT });
+server.register(userRoutes, { prefix: RoutePrefix.USER });
 server.register(personRoutes, { prefix: RoutePrefix.PERSON });
 
 export const start = async () => {
