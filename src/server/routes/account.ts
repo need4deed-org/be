@@ -97,16 +97,14 @@ async function accountRoutes(
               .send({ message: `Person with ID ${personData.id} not found.` });
           }
         } else {
-          // Case 2: person.id is NOT provided - create a new person
           const newPerson = new Person();
-          newPerson.firstName = personData.firstName!; // Schema ensures these are present if id is not
+          newPerson.firstName = personData.firstName!;
           newPerson.lastName = personData.lastName!;
           newPerson.middleName = personData.middleName || null;
           newPerson.email = personData.email || null;
           newPerson.phone = personData.phone || null;
           newPerson.address = personData.address || null;
 
-          // Validate the new Person entity using class-validator
           const errors = await validate(newPerson);
           if (errors.length > 0) {
             fastify.log.error("New Person entity validation errors:", errors);
@@ -122,19 +120,17 @@ async function accountRoutes(
             resolvedPerson = await personRepository.save(newPerson);
           } catch (error) {
             fastify.log.error("Error creating new person:", error);
-            // Handle potential unique constraints for person (e.g., email) if applicable
             return reply
               .status(500)
               .send({ message: "Failed to create new person." });
           }
         }
-        request.resolvedPerson = resolvedPerson; // Attach the resolved/created person to the request
+        request.resolvedPerson = resolvedPerson;
       },
     },
     async (request, reply) => {
       const { email, password, isActive, role, language, timezone } =
         request.body;
-      // const accountRepository = request.db.accountRepository;
       const accountRepository = request.server.db.accountRepository;
       if (!accountRepository) {
         fastify.log.error("accountRepository is undefined!");
@@ -143,17 +139,17 @@ async function accountRoutes(
           .send({ message: "Internal Server Error: DB not loaded" });
       }
 
-      const resolvedPerson = request.resolvedPerson!; // Guaranteed by preHandler
+      const resolvedPerson = request.resolvedPerson!;
 
       const newAccount = new Account();
       newAccount.email = email;
-      if (password) newAccount.password = password; // In a real app, hash this!
+      if (password) newAccount.password = password;
       if (typeof isActive === "boolean") newAccount.isActive = isActive;
       if (role) newAccount.role = role;
       if (language) newAccount.language = language;
       if (timezone) newAccount.timezone = timezone;
-      newAccount.person = resolvedPerson; // Link the resolved/created Person object
-      newAccount.personId = resolvedPerson.id; // Also set the foreign key ID
+      newAccount.person = resolvedPerson;
+      newAccount.personId = resolvedPerson.id;
 
       // Validate the Account entity using class-validator
       const errors = await validate(newAccount);
@@ -178,7 +174,6 @@ async function accountRoutes(
       } catch (error: any) {
         fastify.log.error("Error creating account:", error);
         if (error.code === "23505" && error.detail.includes("email")) {
-          // Assuming email is unique for Account
           return reply
             .status(409)
             .send({ message: "Account with this email already exists." });
@@ -193,5 +188,5 @@ async function accountRoutes(
 
 export default fp(accountRoutes, {
   name: "account-routes",
-  dependencies: ["typeorm-plugin"], // Ensure TypeORM plugin is loaded first});
+  dependencies: ["typeorm-plugin"],
 });
