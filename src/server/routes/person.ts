@@ -1,14 +1,13 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin"; // <--- Import fastify-plugin
+import fp from "fastify-plugin";
 import { Person, PersonCreateType } from "../../data/entity/person";
 import {
   newPersonSchema,
   personResponseSchema,
 } from "../../data/schema/person";
-// import { AppDataSource } from "../../data/data-source"; // <-- No longer needed if using fastify.db
 
-async function personRoutes( // Changed from userRoutes for clarity with file name
+async function personRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
@@ -22,7 +21,7 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
           message: { type: "string" },
           data: {
             type: "array",
-            items: personResponseSchema, // Use the new response schema for array items
+            items: personResponseSchema,
           },
         },
         required: ["message", "data"],
@@ -31,26 +30,24 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
   };
 
   fastify.get(prefixedPath, { schema }, async (request, reply) => {
-    // Use the decorated repository
     const persons = await fastify.db.personRepository.find();
     return { message: "List of persons", data: persons };
   });
 
   fastify.get(`${prefixedPath}/:id`, { schema }, async (request, reply) => {
     const personId = (request.params as { id: string }).id;
-    const parsedPersonId = parseInt(personId); // Add parsing and validation for safety
+    const parsedPersonId = parseInt(personId);
     if (isNaN(parsedPersonId) || parsedPersonId <= 0) {
       return reply.status(400).send({ message: "Invalid person ID provided." });
     }
 
-    // Use the decorated repository
     const person = await fastify.db.personRepository.findOne({
       where: { id: parsedPersonId },
     });
     return {
       message: person
-        ? `Details for person ${personId}` // Changed from user for consistency
-        : `Person ${personId} not found`, // Changed from user
+        ? `Details for person ${personId}`
+        : `Person ${personId} not found`,
       data: [person],
     };
   });
@@ -61,9 +58,9 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
     prefixedPath,
     {
       schema: {
-        body: newPersonSchema, // Use your existing JSON Schema for the request body
+        body: newPersonSchema,
         response: {
-          201: personResponseSchema, // Use the new response schema for success
+          201: personResponseSchema,
           400: {
             type: "object",
             properties: {
@@ -78,7 +75,7 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
     },
     async (request, reply) => {
       const personRepository = request.server.db.personRepository;
-      const personData = request.body; // Fastify has already validated this against newPersonSchema
+      const personData = request.body;
 
       const newPerson = new Person();
       newPerson.firstName = personData.firstName;
@@ -88,7 +85,6 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
       newPerson.phone = personData.phone || null;
       newPerson.address = personData.address || null;
 
-      // Use class-validator for validating the actual Person entity instance
       const errors = await validate(newPerson);
       if (errors.length > 0) {
         fastify.log.error(
@@ -103,7 +99,7 @@ async function personRoutes( // Changed from userRoutes for clarity with file na
 
       try {
         const savedPerson = await personRepository.save(newPerson);
-        reply.status(201).send(savedPerson); // Fastify validates this response against personResponseSchema
+        reply.status(201).send(savedPerson);
       } catch (error: any) {
         fastify.log.error("Error creating person:", error);
         if (error.code === "23505" && error.detail.includes("email")) {
