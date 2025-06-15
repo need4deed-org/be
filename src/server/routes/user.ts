@@ -3,34 +3,35 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
 import { AppDataSource } from "../../data/data-source";
-import { Account } from "../../data/entity/account";
-import { Person, PersonUpdateType } from "../../data/entity/person";
+import { Person, PersonUpdateType } from "../../data/entity/person.entity";
+import { User } from "../../data/entity/user.entity";
 import {
-  accountResponseSchema,
-  createAccountBodySchema,
-} from "../../data/schema/account";
+  createUserBodySchema,
+  userResponseSchema,
+} from "../../data/schema/user.schema";
+import { hashPassword } from "../../data/utils";
 
-async function accountRoutes(
+async function userRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
   const prefixedPath = options.prefix || "/account";
 
   fastify.get(prefixedPath, async (request, reply) => {
-    const accounts = await AppDataSource.manager.find(Account);
-    return { message: "List of accounts", data: accounts };
+    const users = await AppDataSource.manager.find(User);
+    return { message: "List of users", data: users };
   });
 
   fastify.get(prefixedPath + "/:id", async (request, reply) => {
-    const accountId = (request.params as { id: string }).id;
-    const account = await AppDataSource.manager.findOne(Account, {
-      where: { id: parseInt(accountId) },
+    const userId = (request.params as { id: string }).id;
+    const user = await AppDataSource.manager.findOne(User, {
+      where: { id: parseInt(userId) },
     });
     return {
-      message: account
-        ? `Details for account ${accountId}`
-        : `Account ${accountId} not found`,
-      data: account,
+      message: user
+        ? `Details for account ${userId}`
+        : `Account ${userId} not found`,
+      data: user,
     };
   });
 
@@ -44,14 +45,14 @@ async function accountRoutes(
       timezone?: string;
       person: PersonUpdateType;
     };
-    Reply: Account | { message: string; errors?: any };
+    Reply: User | { message: string; errors?: any };
   }>(
     prefixedPath,
     {
       schema: {
-        body: createAccountBodySchema,
+        body: createUserBodySchema,
         response: {
-          201: accountResponseSchema,
+          201: userResponseSchema,
           400: {
             type: "object",
             properties: {
@@ -141,52 +142,52 @@ async function accountRoutes(
 
       const resolvedPerson = request.resolvedPerson!;
 
-      const newAccount = new Account();
-      newAccount.email = email;
-      if (password) newAccount.password = password;
-      if (typeof isActive === "boolean") newAccount.isActive = isActive;
-      if (role) newAccount.role = role;
-      if (language) newAccount.language = language;
-      if (timezone) newAccount.timezone = timezone;
-      newAccount.person = resolvedPerson;
-      newAccount.personId = resolvedPerson.id;
+      const newUser = new User();
+      newUser.email = email;
+      if (password) newUser.password = await hashPassword(password);
+      if (typeof isActive === "boolean") newUser.isActive = isActive;
+      if (role) newUser.role = role;
+      if (language) newUser.language = language;
+      if (timezone) newUser.timezone = timezone;
+      newUser.person = resolvedPerson;
+      newUser.personId = resolvedPerson.id;
 
       // Validate the Account entity using class-validator
-      const errors = await validate(newAccount);
+      const errors = await validate(newUser);
       if (errors.length > 0) {
-        fastify.log.error("Account entity validation errors:", errors);
+        fastify.log.error("User entity validation errors:", errors);
         return reply.status(400).send({
-          message: "Validation failed for account data",
+          message: "Validation failed for newUser data",
           errors: errors.flatMap((err) => Object.values(err.constraints || {})),
         });
       }
 
       try {
-        const savedAccount = await accountRepository.save(newAccount);
+        const savedUser = await accountRepository.save(newUser);
         // To ensure the 'person' relation is loaded in the response,
         // we might need to explicitly load it or return a fresh find.
         // For simplicity, we'll return the savedAccount, but be aware TypeORM
         // might not load relations by default after save.
         // If `savedAccount.person` is `undefined`, fetch it:
-        savedAccount.person = savedAccount.person || resolvedPerson;
+        savedUser.person = savedUser.person || resolvedPerson;
 
-        reply.status(201).send(savedAccount);
+        reply.status(201).send(savedUser);
       } catch (error: any) {
         fastify.log.error("Error creating account:", error);
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
             .status(409)
-            .send({ message: "Account with this email already exists." });
+            .send({ message: "User with this email already exists." });
         }
         reply.status(500).send({
-          message: "Failed to create account due to an internal error.",
+          message: "Failed to create user due to an internal error.",
         });
       }
     },
   );
 }
 
-export default fp(accountRoutes, {
-  name: "account-routes",
+export default fp(userRoutes, {
+  name: "user-routes",
   dependencies: ["typeorm-plugin"],
 });

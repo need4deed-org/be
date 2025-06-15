@@ -1,5 +1,5 @@
 export enum RoutePrefix {
-  ACCOUNT = "/account",
+  USER = "/user",
   PERSON = "/person",
   AUTH = "/auth",
   HEALTH_CHECK = "/health-check",
