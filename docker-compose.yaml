@@ -3,6 +3,8 @@ services:
     container_name: be
     build:
       context: .
+      args:
+        NODE_ENV: ${NODE_ENV}
     image: be:dev
     ports:
       - 5000:5000
