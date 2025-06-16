@@ -1,5 +1,9 @@
 FROM node:20-alpine
 
+ARG NODE_ENV
+
+ENV NODE_ENV=${NODE_ENV}
+
 WORKDIR /app
 
 RUN apk update && apk add --no-cache curl
