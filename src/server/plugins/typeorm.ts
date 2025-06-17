@@ -12,11 +12,11 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
 
     // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
-      accountRepository: AppDataSource.getRepository(User),
+      userRepository: AppDataSource.getRepository(User),
       personRepository: AppDataSource.getRepository(Person),
     });
 
-    if (!fastify.db.accountRepository || !fastify.db.personRepository) {
+    if (!fastify.db.userRepository || !fastify.db.personRepository) {
       fastify.log.error(
         "ERROR: Repositories were not correctly initialized on fastify.db",
       );
