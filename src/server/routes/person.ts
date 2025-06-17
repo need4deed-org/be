@@ -7,12 +7,15 @@ import {
   newPersonSchema,
   personResponseSchema,
 } from "../../data/schema/person.schema";
+import { responseErrors } from "../../data/schema/responseErrors";
+import { Role } from "../../data/types";
+import { RoutePrefix } from "../types";
 
 async function personRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || "/person";
+  const prefixedPath = options.prefix || RoutePrefix.PERSON;
 
   const schema = {
     response: {
@@ -27,34 +30,85 @@ async function personRoutes(
         },
         required: ["message", "data"],
       },
+      ...responseErrors,
     },
   };
 
-  fastify.get(prefixedPath, { schema }, async (request, reply) => {
-    const persons = await fastify.db.personRepository.find();
-    return { message: "List of persons", data: persons };
-  });
-
-  fastify.get(`${prefixedPath}/:id`, { schema }, async (request, reply) => {
-    const personId = (request.params as { id: string }).id;
-    const parsedPersonId = parseInt(personId);
-    if (isNaN(parsedPersonId) || parsedPersonId <= 0) {
-      return reply.status(400).send({ message: "Invalid person ID provided." });
-    }
-
-    const person = await fastify.db.personRepository.findOne({
-      where: { id: parsedPersonId },
-    });
-    return {
-      message: person
-        ? `Details for person ${personId}`
-        : `Person ${personId} not found`,
-      data: [person],
+  fastify.get<{
+    Reply: {
+      message: string;
+      data?: Array<Person>;
     };
-  });
+  }>(
+    prefixedPath,
+    { schema, onRequest: [fastify.authenticate({ role: Role.ADMIN })] },
+    async (request, reply) => {
+      try {
+        const personRepository = fastify.db.personRepository;
+        const persons = await personRepository.find();
+        return { message: "List of persons", data: persons };
+      } catch (error) {
+        fastify.log.error(`Error fetching persons: ${error}`);
+        return reply.status(500).send({
+          message: "Internal server error.",
+        });
+      }
+    },
+  );
+
+  fastify.get(
+    `${prefixedPath}/:id`,
+    { schema, onRequest: [fastify.authenticate()] },
+    async (request, reply) => {
+      try {
+        const personId = (request.params as { id: string }).id;
+        const parsedPersonId = Number(personId);
+        if (isNaN(parsedPersonId) || parsedPersonId <= 0) {
+          return reply
+            .status(400)
+            .send({ message: "Invalid person ID provided." });
+        }
+
+        const user = await fastify.db.userRepository.findOne({
+          where: { id: request.user.id },
+        });
+
+        if (!user) {
+          throw new Error(
+            `Error fetching person ${parsedPersonId}: user ${request.user.id} not found`,
+          );
+        }
+
+        if (user.role !== Role.ADMIN && user.personId !== parsedPersonId) {
+          return reply
+            .status(403)
+            .send({ message: "Insufficient permissions." });
+        }
+
+        const person = await fastify.db.personRepository.findOne({
+          where: { id: parsedPersonId },
+        });
+
+        if (!person) {
+          return reply
+            .status(404)
+            .send(`Person id:${parsedPersonId} not found.`);
+        }
+
+        return {
+          message: `Details for person ${personId}`,
+          data: [person],
+        };
+      } catch (error) {
+        fastify.log.error(`Authentication error: ${error.message}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
 
   fastify.post<{
     Body: PersonCreateType;
+    Reply: { message: string; errors?: string[]; data?: Person };
   }>(
     prefixedPath,
     {
@@ -62,15 +116,7 @@ async function personRoutes(
         body: newPersonSchema,
         response: {
           201: personResponseSchema,
-          400: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              errors: { type: "array", items: { type: "string" } },
-            },
-          },
-          409: { type: "object", properties: { message: { type: "string" } } },
-          500: { type: "object", properties: { message: { type: "string" } } },
+          ...responseErrors,
         },
       },
     },
@@ -100,7 +146,10 @@ async function personRoutes(
 
       try {
         const savedPerson = await personRepository.save(newPerson);
-        reply.status(201).send(savedPerson);
+        reply.status(201).send({
+          message: "Successfully created a new person",
+          data: savedPerson,
+        });
       } catch (error: any) {
         fastify.log.error("Error creating person:", error);
         if (error.code === "23505" && error.detail.includes("email")) {
@@ -109,7 +158,7 @@ async function personRoutes(
             .send({ message: "Person with this email already exists." });
         }
         reply.status(500).send({
-          message: "Failed to create person due to an internal error.",
+          message: "Internal server error.",
         });
       }
     },
