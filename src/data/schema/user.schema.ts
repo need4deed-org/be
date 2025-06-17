@@ -21,17 +21,62 @@ export const createUserBodySchema = {
   additionalProperties: false,
 };
 
+export const userLoginSchema = {
+  type: "object",
+  properties: {
+    email: { type: "string" },
+    password: { type: "string" },
+  },
+  required: ["email", "password"],
+};
+
+export const userLoginResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "object",
+      properties: {
+        token: { type: "string" },
+      },
+    },
+  },
+};
+
+const userAttrs = {
+  id: { type: "number" },
+  email: { type: "string" },
+  isActive: { type: "boolean" },
+  role: { type: "string" },
+  language: { type: "string" },
+  timezone: { type: "string" },
+  createdAt: { type: "string", format: "date-time" },
+  updatedAt: { type: "string", format: "date-time" },
+};
+
 export const userResponseSchema = {
   type: "object",
   properties: {
-    id: { type: "number" },
-    email: { type: "string" },
-    isActive: { type: "boolean" },
-    role: { type: "string" },
-    language: { type: "string" },
-    timezone: { type: "string" },
-    createdAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time" },
+    ...userAttrs,
+    personId: { type: "number" },
+  },
+  required: [
+    "id",
+    "email",
+    "isActive",
+    "role",
+    "language",
+    "timezone",
+    "createdAt",
+    "updatedAt",
+    "personId",
+  ],
+};
+
+export const userResponseSchemaIncludePerson = {
+  type: "object",
+  properties: {
+    ...userAttrs,
     person: {
       type: "object",
       properties: {
