@@ -12,6 +12,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { verifyPassword } from "../utils";
 import { Person } from "./person.entity";
 
 @Entity()
@@ -24,7 +25,7 @@ export class User {
   @IsEmail()
   email: string;
 
-  @Column({ nullable: true })
+  @Column()
   @IsOptional()
   @IsString()
   password: string;
@@ -45,15 +46,24 @@ export class User {
   @IsString()
   timezone: string;
 
-  @ManyToOne(() => Person, (person) => person.users)
+  @ManyToOne(() => Person, (person) => person.users, {
+    nullable: true,
+  })
   @JoinColumn({ name: "personId" })
   person: Person;
 
-  @Column()
+  @Column({ nullable: true })
   personId: number;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
+
+  async checkPassword(password: string): Promise<boolean> {
+    if (!this.password) {
+      return false;
+    }
+    return verifyPassword(password, this.password);
+  }
 }
