@@ -2,17 +2,19 @@ import { JWT } from "@fastify/jwt";
 import "fastify";
 import { Repository } from "typeorm";
 
+import { onRequestHookHandler } from "fastify";
 import { Person } from "../../data/entity/person.entity";
 import { User } from "../../data/entity/user.entity";
+import { AuthOptions } from "./auth";
 
 declare module "fastify" {
   interface FastifyInstance {
     db: {
-      accountRepository: Repository<User>;
+      userRepository: Repository<User>;
       personRepository: Repository<Person>;
     };
     jwt: JWT;
-    authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void>;
+    authenticate(opts?: AuthOptions): onRequestHookHandler;
   }
   interface FastifyRequest {
     resolvedPerson?: Person; // Optional resolved person for account creation
