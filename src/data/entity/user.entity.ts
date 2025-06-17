@@ -4,7 +4,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Length,
 } from "class-validator";
 import {
   Column,
@@ -13,23 +12,23 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import { Person } from "./person";
+import { verifyPassword } from "../utils";
+import { Person } from "./person.entity";
 
 @Entity()
-export class Account {
+export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true }) // Assuming email is unique for an account
+  @Column({ unique: true })
   @IsNotEmpty()
   @IsEmail()
   email: string;
 
-  @Column({ nullable: true })
+  @Column()
   @IsOptional()
   @IsString()
-  @Length(8, 50) // Example password length
-  password: string; // In a real app, this would be hashed!
+  password: string;
 
   @Column({ default: false })
   @IsBoolean()
@@ -47,15 +46,24 @@ export class Account {
   @IsString()
   timezone: string;
 
-  @ManyToOne(() => Person, (person) => person.accounts)
-  @JoinColumn({ name: "personId" }) // This explicitly names the FK column
+  @ManyToOne(() => Person, (person) => person.users, {
+    nullable: true,
+  })
+  @JoinColumn({ name: "personId" })
   person: Person;
 
-  @Column() // This column will store the ID of the related Person
-  personId: number; // Required to save the foreign key
+  @Column({ nullable: true })
+  personId: number;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
+
+  async checkPassword(password: string): Promise<boolean> {
+    if (!this.password) {
+      return false;
+    }
+    return verifyPassword(password, this.password);
+  }
 }
