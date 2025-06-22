@@ -115,22 +115,23 @@ async function personRoutes(
       schema: {
         body: newPersonSchema,
         response: {
-          201: personResponseSchema,
+          201: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: personResponseSchema,
+            },
+            required: ["message", "data"],
+          },
           ...responseErrors,
         },
       },
     },
     async (request, reply) => {
-      const personRepository = request.server.db.personRepository;
+      const personRepository = fastify.db.personRepository;
       const personData = request.body;
 
-      const newPerson = new Person();
-      newPerson.firstName = personData.firstName;
-      newPerson.lastName = personData.lastName;
-      newPerson.middleName = personData.middleName || null;
-      newPerson.email = personData.email || null;
-      newPerson.phone = personData.phone || null;
-      newPerson.address = personData.address || null;
+      const newPerson = new Person(personData);
 
       const errors = await validate(newPerson);
       if (errors.length > 0) {
@@ -146,18 +147,18 @@ async function personRoutes(
 
       try {
         const savedPerson = await personRepository.save(newPerson);
-        reply.status(201).send({
+        return reply.status(201).send({
           message: "Successfully created a new person",
           data: savedPerson,
         });
-      } catch (error: any) {
-        fastify.log.error("Error creating person:", error);
+      } catch (error) {
+        fastify.log.error(`Error creating person: ${error}`);
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
             .status(409)
             .send({ message: "Person with this email already exists." });
         }
-        reply.status(500).send({
+        return reply.status(500).send({
           message: "Internal server error.",
         });
       }
