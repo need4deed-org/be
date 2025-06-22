@@ -8,3 +8,9 @@ temp/
 # database
 *.sqlite
 db_data
+
+# .env
+.env
+
+# dev stuff
+dev.*

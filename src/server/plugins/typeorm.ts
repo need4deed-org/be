@@ -1,37 +1,22 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import { Repository } from "typeorm";
 
 import { AppDataSource } from "../../data/data-source";
-import { Account } from "../../data/entity/account";
-import { Person } from "../../data/entity/person";
-
-declare module "fastify" {
-  interface FastifyInstance {
-    db: {
-      accountRepository: Repository<Account>;
-      personRepository: Repository<Person>;
-    };
-  }
-  interface FastifyRequest {
-    resolvedPerson?: Person; // Optional resolved person for account creation
-    personId?: number; // Optional foreign key ID for the Person entity
-  }
-}
+import { Person } from "../../data/entity/person.entity";
+import { User } from "../../data/entity/user.entity";
 
 const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
   try {
-    // Initialize TypeORM Data Source
     await AppDataSource.initialize();
-    console.log("TypeORM Data Source has been initialized!");
+    fastify.log.info("TypeORM Data Source has been initialized!");
 
     // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
-      accountRepository: AppDataSource.getRepository(Account),
+      userRepository: AppDataSource.getRepository(User),
       personRepository: AppDataSource.getRepository(Person),
     });
 
-    if (!fastify.db.accountRepository || !fastify.db.personRepository) {
+    if (!fastify.db.userRepository || !fastify.db.personRepository) {
       fastify.log.error(
         "ERROR: Repositories were not correctly initialized on fastify.db",
       );
@@ -42,12 +27,12 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
     fastify.addHook("onClose", async (instance) => {
       if (AppDataSource.isInitialized) {
         await AppDataSource.destroy();
-        console.log("TypeORM Data Source has been closed.");
+        fastify.log.info("TypeORM Data Source has been closed.");
       }
     });
   } catch (err) {
-    console.error("Error during TypeORM Data Source initialization:", err);
-    throw err; // Rethrow to prevent server from starting without DB
+    fastify.log.error("Error during TypeORM Data Source initialization:", err);
+    throw err; // prevent server from starting without DB
   }
 };
 

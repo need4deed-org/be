@@ -41,6 +41,6 @@ export const personResponseSchema = {
     createdAt: { type: "string", format: "date-time" }, // Assuming ISO 8601 string
     updatedAt: { type: "string", format: "date-time" },
   },
-  required: ["id", "firstName", "lastName", "createdAt", "updatedAt"], // Adjust required based on your entity
-  additionalProperties: false, // Disallow extra properties in the response
+  required: ["id", "firstName", "lastName", "createdAt", "updatedAt"],
+  additionalProperties: false,
 };
