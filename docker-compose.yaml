@@ -5,7 +5,7 @@ services:
       context: .
       args:
         NODE_ENV: ${NODE_ENV}
-        JWT_SECRET: ${JWT_SECRET:"some fucking gibberish"}
+        JWT_SECRET: ${JWT_SECRET:-"some fucking gibberish"}
     image: be:dev
     ports:
       - 5000:5000
