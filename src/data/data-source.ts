@@ -2,6 +2,8 @@ import { snakeCase } from "change-case";
 import "reflect-metadata";
 import { DataSource, DefaultNamingStrategy } from "typeorm";
 
+import FieldTranslation from "./entity/field_translation.entity";
+import Language from "./entity/language.entity";
 import { Person } from "./entity/person.entity";
 import { User } from "./entity/user.entity";
 
@@ -74,7 +76,7 @@ export const AppDataSource = new DataSource({
   database: "postgres",
   synchronize: true,
   logging: false,
-  entities: [User, Person],
+  entities: [User, Person, Language, FieldTranslation],
   migrations: [],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
