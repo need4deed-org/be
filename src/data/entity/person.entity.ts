@@ -10,6 +10,12 @@ import { User } from "./user.entity"; // Ensure this import is correct
 
 @Entity()
 export class Person {
+  constructor(person?: Partial<Person>) {
+    if (person) {
+      Object.assign(this, person);
+    }
+  }
+
   @PrimaryGeneratedColumn()
   id: number;
 

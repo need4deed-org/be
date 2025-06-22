@@ -17,6 +17,12 @@ import { Person } from "./person.entity";
 
 @Entity()
 export class User {
+  constructor(user?: Partial<User>) {
+    if (user) {
+      Object.assign(this, user);
+    }
+  }
+
   @PrimaryGeneratedColumn()
   id: number;
 
