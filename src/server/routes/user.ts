@@ -151,13 +151,7 @@ async function userRoutes(
               .send({ message: `Person with ID ${personData.id} not found.` });
           }
         } else {
-          const newPerson = new Person();
-          newPerson.firstName = personData.firstName!;
-          newPerson.lastName = personData.lastName!;
-          newPerson.middleName = personData.middleName || null;
-          newPerson.email = personData.email || null;
-          newPerson.phone = personData.phone || null;
-          newPerson.address = personData.address || null;
+          const newPerson = new Person(personData);
 
           const errors = await validate(newPerson);
           if (errors.length > 0) {
