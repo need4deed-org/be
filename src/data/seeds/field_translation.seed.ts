@@ -5,6 +5,10 @@ import FieldTranslation from "../entity/field_translation.entity";
 import Language from "../entity/language.entity";
 import { readJsonAsync } from "../utils";
 
+const entityLanguageName = "Language";
+const isoCodeEN = "en";
+const isoCodeDE = "de";
+
 interface LanguageInUseJSON {
   id: string;
   title: { en: string; de: string };
@@ -21,8 +25,8 @@ async function seedLanguagesInUse(
   )) as LanguageInUseJSON[];
 
   const existingLanguageTranslations = await fieldTranslationRepository.find({
-    where: { entityName: "Language" },
-    relations: ["language"],
+    where: { entityName: entityLanguageName },
+    relations: [entityLanguageName],
   });
 
   const existingLanguageTranslationsSet = new Set(
@@ -40,27 +44,31 @@ async function seedLanguagesInUse(
       id: isoCode,
       title: { en, de },
     } = languageTranslation;
-    if (!existingLanguageTranslationsSet.has(`en_${en}`)) {
+    if (!existingLanguageTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const language = await languageRepository.findOne({
         where: { isoCode },
       });
-      const translationEN = new FieldTranslation();
-      translationEN.translation = en;
-      translationEN.entityName = "Language";
-      translationEN.entityId = language.id;
-      translationEN.language = langEN;
-      translationsForInsert.push(translationEN);
+      if (language) {
+        const translationEN = new FieldTranslation();
+        translationEN.translation = en;
+        translationEN.entityName = entityLanguageName;
+        translationEN.entityId = language.id;
+        translationEN.language = langEN;
+        translationsForInsert.push(translationEN);
+      }
     }
-    if (!existingLanguageTranslationsSet.has(`de_${de}`)) {
+    if (!existingLanguageTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const language = await languageRepository.findOne({
         where: { isoCode },
       });
-      const translationDE = new FieldTranslation();
-      translationDE.translation = de;
-      translationDE.entityName = "Language";
-      translationDE.entityId = language.id;
-      translationDE.language = langDE;
-      translationsForInsert.push(translationDE);
+      if (language) {
+        const translationDE = new FieldTranslation();
+        translationDE.translation = de;
+        translationDE.entityName = entityLanguageName;
+        translationDE.entityId = language.id;
+        translationDE.language = langDE;
+        translationsForInsert.push(translationDE);
+      }
     }
   }
 
@@ -89,13 +97,13 @@ export async function seedFieldTranslation(
   }
 
   const langEN = await languageRepository.findOne({
-    where: { isoCode: "en" },
+    where: { isoCode: isoCodeEN },
   });
   if (!langEN) {
     throw new Error("English language is missing.");
   }
   const langDE = await languageRepository.findOne({
-    where: { isoCode: "de" },
+    where: { isoCode: isoCodeDE },
   });
   if (!langDE) {
     throw new Error("German language is missing.");
