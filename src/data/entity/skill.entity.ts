@@ -10,7 +10,7 @@ export default class Skill {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   @IsNotEmpty()
   @IsString()
   @Length(100)
