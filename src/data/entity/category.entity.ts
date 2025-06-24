@@ -13,16 +13,11 @@ export default class Category {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   @IsNotEmpty()
   @IsString()
   @Length(100)
   title: string;
-
-  @Column({ nullable: true })
-  @IsString()
-  @Length(512)
-  description?: string;
 
   @OneToMany(() => Activity, (activity) => activity.category)
   activities: Activity[];
