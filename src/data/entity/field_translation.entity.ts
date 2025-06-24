@@ -31,6 +31,9 @@ export default class FieldTranslation {
   @JoinColumn({ name: "language_id" })
   language: Language;
 
+  @Column({ nullable: true })
+  languageId: number;
+
   @Column()
   @IsNotEmpty()
   @IsString()
