@@ -1,0 +1,56 @@
+[
+  {
+    "id": "de-lng-support",
+    "title": {
+      "en": "German Language Support",
+      "de": "Deutsche Unterstützung"
+    },
+    "description": {
+      "en": "Fluent in German? Support refugees by teaching german at language cafes and tutoring privately or in groups.",
+      "de": "Sprichst du fließend Deutsch? Unterstütze Geflüchtete, indem du in Sprachcafés unterrichtest oder Nachhilfe gibst – privat oder in Gruppen."
+    }
+  },
+  {
+    "id": "child-care",
+    "title": { "en": "Childcare", "de": "Kinderbetreuung" },
+    "description": {
+      "en": "We are looking for volunteers to support children in refugee accommodation centers by assisting in daycare or helping with homework. Experience with children is a plus!",
+      "de": "Hilf Kindern in Unterkünften – bei der Betreuung am Tag oder den Hausaufgaben. Erfahrung mit Kindern ist ein Plus!"
+    }
+  },
+  {
+    "id": "skills-based",
+    "title": {
+      "en": "Skills Based Volunteering",
+      "de": "Ehrenamt mit Fachkenntnissen"
+    },
+    "description": {
+      "en": "Some opportunities may offer a chance to use your special expertise, such as bike repair, gardening, musical skills, or organizational savvy.",
+      "de": "Nutze deine Fähigkeiten – z. B. Fahrradreparatur, Gartenarbeit oder Musik."
+    }
+  },
+  {
+    "id": "events",
+    "title": { "en": "Events", "de": "Veranstaltungen" },
+    "description": {
+      "en": "Occasionally events require unique support from volunteers. These might be festivals, dinners, outings, cultural activities, a day of setting up a clothes sorting station, gardening, or a workshop.",
+      "de": "Manche Events brauchen extra Hilfe – Festivals, Ausflüge, Gartenarbeit oder Kleiderkammer einrichten."
+    }
+  },
+  {
+    "id": "sport-activities",
+    "title": { "en": "Sport activities", "de": "Sportliche Aktivitäten" },
+    "description": {
+      "en": "We are always looking for volunteers either for tandem, clothes sorting or to help organize sports activities for children, teenagers or adults in accommodation centers.",
+      "de": "Hilf mit Kleiderkammer, Tandem oder Sportangebote für Kinder, Jugendliche oder Erwachsene in Unterkünften zu organisieren."
+    }
+  },
+  {
+    "id": "accompanying",
+    "title": { "en": "Accompany a Refugee", "de": "Flüchtlingen begleiten" },
+    "description": {
+      "en": "Fluent in German and a second language? Support individuals in dealing with bureaucracy at appointments - going with them to the doctor, Job Centre or otherwise.",
+      "de": "Sprichst du fließend Deutsch und eine weitere Sprache? Begleite Geflüchtete zu Ämtern, Ärzt:innen oder anderen Terminen."
+    }
+  }
+]
