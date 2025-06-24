@@ -19,11 +19,10 @@ export default class Category {
   @Length(100)
   title: string;
 
-  @Column()
-  @IsNotEmpty()
+  @Column({ nullable: true })
   @IsString()
   @Length(512)
-  description: string;
+  description?: string;
 
   @OneToMany(() => Activity, (activity) => activity.category)
   activities: Activity[];
