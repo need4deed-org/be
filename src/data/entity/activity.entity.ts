@@ -26,7 +26,7 @@ export default class Activity {
   @ManyToOne(() => Category, (category) => category.activities, {
     nullable: true,
   })
-  @JoinColumn({ name: "categoryId" })
+  @JoinColumn({ name: "category_id" })
   category: Category;
 
   @Column({ nullable: true })
