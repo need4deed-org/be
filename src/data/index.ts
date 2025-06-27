@@ -1,13 +1,13 @@
 import { AppDataSource } from "./data-source";
-import { seedFieldTranslation } from "./seeds/field_translation.seed";
-import { seedLanguage } from "./seeds/language.seed";
+import { seed } from "./seeds/seed";
 
 AppDataSource.initialize()
   .then(() => {
-    seedLanguage(AppDataSource);
-    seedFieldTranslation(AppDataSource);
+    seed();
   })
   .catch((error) => {
     console.log(error);
-    throw Error(error);
+    throw Error(
+      `Error occurred while initializing DataSource: ${error.message}`,
+    );
   });

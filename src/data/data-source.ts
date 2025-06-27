@@ -2,9 +2,12 @@ import { snakeCase } from "change-case";
 import "reflect-metadata";
 import { DataSource, DefaultNamingStrategy } from "typeorm";
 
+import Activity from "./entity/activity.entity";
+import Category from "./entity/category.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import Language from "./entity/language.entity";
 import { Person } from "./entity/person.entity";
+import Skill from "./entity/skill.entity";
 import { User } from "./entity/user.entity";
 
 class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
@@ -76,7 +79,15 @@ export const AppDataSource = new DataSource({
   database: "postgres",
   synchronize: true,
   logging: false,
-  entities: [User, Person, Language, FieldTranslation],
+  entities: [
+    User,
+    Person,
+    Language,
+    FieldTranslation,
+    Category,
+    Activity,
+    Skill,
+  ],
   migrations: [],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
