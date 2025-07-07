@@ -33,3 +33,6 @@ export const seedSkillFile = path.join(
 );
 
 export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
+
+export const authAccessTokenCookieName = "access";
+export const authRefreshTokenCookieName = "refresh";
