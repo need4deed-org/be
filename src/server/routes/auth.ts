@@ -1,11 +1,18 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import { authAccessTokenCookieName } from "../../config/constants";
 import { responseErrors } from "../../data/schema/responseErrors";
 import {
   userLoginResponseSchema,
   userLoginSchema,
 } from "../../data/schema/user.schema";
 import { RoutePrefix } from "../types";
+
+const accessCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "none" as boolean | "none" | "lax" | "strict",
+};
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -66,10 +73,13 @@ async function authRoutes(
           throw new Error("No token.");
         }
 
-        reply.status(200).send({
-          message: "Login successful.",
-          data: { token },
-        });
+        reply
+          .status(200)
+          .setCookie(authAccessTokenCookieName, token, accessCookieOptions)
+          .send({
+            message: "Login successful.",
+            data: { token },
+          });
       } catch (error) {
         fastify.log.error(`Authentication error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
