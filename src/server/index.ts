@@ -1,8 +1,10 @@
+import cookie from "@fastify/cookie";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
 
 import { defaultFrom } from "../config/constants";
 import { getMailerConfigForSES, getSesClient } from "../services";
+import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
@@ -31,6 +33,8 @@ export const start = async () => {
     fastify.register(jwtPlugin, {
       secret: process.env.JWT_SECRET || generateRandomString(64),
     });
+    fastify.register(cors, corsOptions);
+    fastify.register(cookie);
     fastify.register(fastifyMailer, getMailerConfigForSES(getSesClient()));
     fastify.register(emailPlugin, { provider: "ses", defaultFrom });
     fastify.register(healthRoutes, { prefix: RoutePrefix.HEALTH_CHECK });
