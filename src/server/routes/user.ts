@@ -10,6 +10,7 @@ import {
   createUserBodySchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
+  userVerifyEmailSchema,
 } from "../../data/schema/user.schema";
 import { Role } from "../../data/types";
 import { hashPassword } from "../../data/utils";
@@ -20,7 +21,6 @@ async function userRoutes(
   options: FastifyPluginOptions,
 ) {
   const prefixedPath = options.prefix || RoutePrefix.USER;
-
   fastify.get<{
     Reply: {
       message: string;
@@ -101,6 +101,86 @@ async function userRoutes(
       } catch (error) {
         fastify.log.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.post<{ Body: { token: string } }>(
+    prefixedPath + RoutePrefix.VERIFY_EMAIL,
+    {
+      schema: {
+        body: userVerifyEmailSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              verified: { type: "boolean" },
+            },
+            required: ["message", "verified"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const token = request.body.token;
+
+      const userRepository = fastify.db.userRepository;
+      if (!userRepository) {
+        fastify.log.error("userRepository is not initialized!");
+        return reply.status(500).send({ message: "Internal Server Error." });
+      }
+
+      if (!token) {
+        return reply
+          .status(400)
+          .send({ message: "Token is required for email verification." });
+      }
+
+      let decodedToken: { email: string };
+      try {
+        decodedToken = await fastify.jwt.verify(token);
+      } catch (error) {
+        fastify.log.error(`JWT verification failed: ${error}`);
+        return reply.status(400).send({ message: "Invalid or expired token." });
+      }
+
+      const email = decodedToken?.email;
+
+      if (!email) {
+        return reply.status(400).send({ message: "Invalid token format." });
+      }
+
+      try {
+        const user = await userRepository.findOne({
+          where: { email },
+        });
+
+        if (!user) {
+          fastify.log.warn(`User with email ${email} not found.`);
+          return reply.status(400).send({ message: "Invalid token." });
+        }
+
+        if (user.isActive) {
+          return reply.status(200).send({
+            message: "Email is already verified.",
+            verified: true,
+          });
+        }
+
+        user.isActive = true;
+        await userRepository.save(user);
+
+        return reply.status(200).send({
+          message: "Email verified successfully.",
+          verified: true,
+        });
+      } catch (error) {
+        fastify.log.error(`Error verifying email: ${error}`);
+        return reply.status(500).send({
+          message: "Failed to verify email due to an internal error.",
+        });
       }
     },
   );
