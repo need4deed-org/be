@@ -6,6 +6,11 @@ services:
       args:
         NODE_ENV: ${NODE_ENV}
         JWT_SECRET: ${JWT_SECRET:-"some fucking gibberish"}
+        AWS_SES_REGION: ${AWS_SES_REGION}
+        AWS_SES_ACCESS_KEY_ID: ${AWS_SES_ACCESS_KEY_ID}
+        AWS_SES_SECRET_ACCESS_KEY: ${AWS_SES_SECRET_ACCESS_KEY}
+    env_file:
+      - .env
     image: be:dev
     ports:
       - 5000:5000
