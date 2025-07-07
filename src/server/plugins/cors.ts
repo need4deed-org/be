@@ -8,7 +8,9 @@ export const corsOptions = {
     if (!origin) return cb(null, true);
 
     // Allow specific origins
-    const allowedOrigins = ["http://vmpub:3000", "http://vmpriv:3000"];
+    const allowedOrigins = (process.env.CORS_ORIGINS || "")
+      .split(",")
+      .map((o) => o.trim());
 
     if (allowedOrigins.includes(origin)) {
       cb(null, true);
@@ -18,5 +20,5 @@ export const corsOptions = {
   },
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
+  credentials: (process.env.CORS_CREDENTIALS || "false") === "true",
 };
