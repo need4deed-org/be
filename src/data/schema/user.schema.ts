@@ -30,6 +30,14 @@ export const userLoginSchema = {
   required: ["email", "password"],
 };
 
+export const userVerifyEmailSchema = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+  },
+  required: ["token"],
+};
+
 export const userLoginResponseSchema = {
   type: "object",
   properties: {
