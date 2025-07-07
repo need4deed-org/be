@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.840.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.0.1",
     "@fastify/jwt": "^9.1.0",
     "bcrypt": "^6.0.0",
     "change-case": "4",
