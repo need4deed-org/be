@@ -2,6 +2,7 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
+// import { defaultFrom } from "../../config/constants";
 import { Person, PersonUpdateType } from "../../data/entity/person.entity";
 import { User } from "../../data/entity/user.entity";
 import { responseErrors } from "../../data/schema/responseErrors";
@@ -177,8 +178,7 @@ async function userRoutes(
       },
     },
     async (request, reply) => {
-      const { email, password, isActive, role, language, timezone } =
-        request.body;
+      const { email, password, role, language, timezone } = request.body;
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
         fastify.log.error("userRepository is undefined!");
@@ -192,7 +192,7 @@ async function userRoutes(
       const newUser = new User();
       newUser.email = email;
       if (password) newUser.password = await hashPassword(password);
-      if (typeof isActive === "boolean") newUser.isActive = isActive;
+      newUser.isActive = false;
       if (role) newUser.role = role;
       if (language) newUser.language = language;
       if (timezone) newUser.timezone = timezone;
@@ -210,16 +210,26 @@ async function userRoutes(
       }
 
       try {
+        newUser.person = resolvedPerson;
         const savedUser = await userRepository.save(newUser);
-        // To ensure the 'person' relation is loaded in the response,
-        // we might need to explicitly load it or return a fresh find.
-        // For simplicity, we'll return the savedAccount, but be aware TypeORM
-        // might not load relations by default after save.
-        // If `savedAccount.person` is `undefined`, fetch it:
-        savedUser.person = savedUser.person || resolvedPerson;
+
+        // send verification email.
+        const emailMessageId = await fastify.emailService.send({
+          to: email,
+          subject: "Account Created",
+          text: "Your account has been created successfully. Please verify your email.",
+          html: `<p>Your account has been created successfully. Please verify your email.</p>`,
+        });
+        fastify.log.debug(
+          `userRoutes:POST:emailMessageId: ${JSON.stringify(
+            emailMessageId,
+            null,
+            2,
+          )}`,
+        );
 
         reply.status(201).send(savedUser);
-      } catch (error: any) {
+      } catch (error) {
         fastify.log.error("Error creating account:", error);
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
