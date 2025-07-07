@@ -31,3 +31,5 @@ export const seedSkillFile = path.join(
   ...publicFixturesFromHere,
   "skills.json",
 );
+
+export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
