@@ -126,28 +126,30 @@ async function userRoutes(
     async (request, reply) => {
       const token = request.body.token;
 
+      const userRepository = fastify.db.userRepository;
+      if (!userRepository) {
+        fastify.log.error("userRepository is not initialized!");
+        return reply.status(500).send({ message: "Internal Server Error." });
+      }
+
       if (!token) {
         return reply
           .status(400)
           .send({ message: "Token is required for email verification." });
       }
 
-      const decodedToken: { email: string } = fastify.jwt.decode(token);
-      if (!decodedToken || typeof decodedToken !== "object") {
-        return reply.status(400).send({ message: "Invalid token format." });
+      let decodedToken: { email: string };
+      try {
+        decodedToken = await fastify.jwt.verify(token);
+      } catch (error) {
+        fastify.log.error(`JWT verification failed: ${error}`);
+        return reply.status(400).send({ message: "Invalid or expired token." });
       }
 
-      const email = decodedToken.email;
+      const email = decodedToken?.email;
 
       if (!email) {
-        return reply
-          .status(400)
-          .send({ message: "Token does not contain an email." });
-      }
-
-      const userRepository = fastify.db.userRepository;
-      if (!userRepository) {
-        fastify.log.error("userRepository is not initialized!");
+        return reply.status(400).send({ message: "Invalid token format." });
       }
 
       try {
@@ -156,9 +158,8 @@ async function userRoutes(
         });
 
         if (!user) {
-          return reply
-            .status(404)
-            .send({ message: `User with email ${email} not found.` });
+          fastify.log.warn(`User with email ${email} not found.`);
+          return reply.status(400).send({ message: "Invalid token." });
         }
 
         if (user.isActive) {
