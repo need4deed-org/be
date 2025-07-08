@@ -21,6 +21,21 @@ export const createUserBodySchema = {
   additionalProperties: false,
 };
 
+export const refreshAccessSchema = {
+  type: ["object", "null"],
+  properties: {
+    refresh: { type: "string" },
+  },
+};
+
+export const refreshAccessResponseSchema = {
+  type: "object",
+  properties: {
+    access: { type: "string" },
+  },
+  required: ["access"],
+};
+
 export const userLoginSchema = {
   type: "object",
   properties: {
