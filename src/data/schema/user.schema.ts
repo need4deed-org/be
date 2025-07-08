@@ -45,8 +45,10 @@ export const userLoginResponseSchema = {
     data: {
       type: "object",
       properties: {
-        token: { type: "string" },
+        access: { type: "string" },
+        refresh: { type: "string" },
       },
+      required: ["access", "refresh"],
     },
   },
 };

@@ -2,6 +2,7 @@ import fastifyJwt from "@fastify/jwt";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
+import { accessCookieName, cookieOptions } from "../../config/constants";
 import { Role } from "../../data/types";
 import { AuthOptions } from "../types";
 
@@ -11,6 +12,10 @@ async function jwtPlugin(
 ) {
   fastify.register(fastifyJwt, {
     secret: options.secret,
+    cookie: {
+      cookieName: accessCookieName,
+      ...cookieOptions,
+    },
   });
 
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
@@ -21,7 +26,12 @@ async function jwtPlugin(
         const userId = request.user?.id;
         fastify.log.debug(`jwtPlugin:authenticated: ${userId}}`);
 
-        const user = await fastify.db.userRepository.findOne({
+        const userRepository = fastify.db.userRepository;
+        if (!userRepository) {
+          throw new Error("User repository is not initialized.");
+        }
+
+        const user = await userRepository.findOne({
           where: { id: userId },
         });
 
@@ -58,10 +68,6 @@ async function jwtPlugin(
       }
     };
   });
-
-  fastify.log.debug(
-    "JWT plugin loaded and Fastify instance decorated with `jwt` and `authenticate`.",
-  );
 }
 
 export default fp(jwtPlugin, {
