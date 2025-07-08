@@ -32,4 +32,17 @@ export const seedSkillFile = path.join(
   "skills.json",
 );
 
+export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+export const accessCookieName = "access";
+export const refreshCookieName = "refresh";
+export const cookieOptions = {
+  signed: (process.env.SIGN_COOKIES || "false") === "true",
+  httpOnly: true,
+  secure: (process.env.NODE_ENV || "development") === "production",
+  sameSite: "none" as boolean | "none" | "lax" | "strict",
+  path: "/",
+};
+
 export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
