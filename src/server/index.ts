@@ -30,11 +30,11 @@ export const fastify: FastifyInstance = Fastify({
 export const start = async () => {
   try {
     fastify.register(typeormPlugin);
+    fastify.register(cookie);
     fastify.register(jwtPlugin, {
       secret: process.env.JWT_SECRET || generateRandomString(64),
     });
     fastify.register(cors, corsOptions);
-    fastify.register(cookie);
     fastify.register(fastifyMailer, getMailerConfigForSES(getSesClient()));
     fastify.register(emailPlugin, { provider: "ses", defaultFrom });
     fastify.register(healthRoutes, { prefix: RoutePrefix.HEALTH_CHECK });
