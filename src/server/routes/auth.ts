@@ -1,5 +1,12 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import {
+  ACCESS_LIFESPAN_MS,
+  accessCookieName,
+  cookieOptions,
+  REFRESH_LIFESPAN_MS,
+  refreshCookieName,
+} from "../../config/constants";
 import { responseErrors } from "../../data/schema/responseErrors";
 import {
   userLoginResponseSchema,
@@ -18,7 +25,11 @@ async function authRoutes(
       email: string;
       password: string;
     };
-    Reply: { message: string; data?: { token: string }; errors?: any };
+    Reply: {
+      message: string;
+      data?: { access: string; refresh: string };
+      errors?: any;
+    };
   }>(
     prefixedPath + RoutePrefix.LOGIN,
     {
@@ -60,15 +71,37 @@ async function authRoutes(
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
-        const token = fastify.jwt.sign({ id: user.id, email: user.email });
+        const userPayload = { id: user.id, email: user.email };
 
-        if (!token) {
-          throw new Error("No token.");
+        const access = fastify.jwt.sign(userPayload, {
+          expiresIn: `${ACCESS_LIFESPAN_MS}`,
+        });
+
+        if (!access) {
+          throw new Error("No token generated.");
         }
 
-        reply.status(200).send({
+        const refresh = fastify.jwt.sign(userPayload, {
+          expiresIn: `${REFRESH_LIFESPAN_MS}`,
+        });
+
+        if (!refresh) {
+          throw new Error("No token generated.");
+        }
+
+        reply.setCookie(accessCookieName, access, {
+          ...cookieOptions,
+          expires: new Date(Date.now() + ACCESS_LIFESPAN_MS),
+        });
+
+        reply.setCookie(refreshCookieName, refresh, {
+          ...cookieOptions,
+          expires: new Date(Date.now() + REFRESH_LIFESPAN_MS),
+        });
+
+        return reply.status(200).send({
           message: "Login successful.",
-          data: { token },
+          data: { access, refresh },
         });
       } catch (error) {
         fastify.log.error(`Authentication error: ${error.message}`);
