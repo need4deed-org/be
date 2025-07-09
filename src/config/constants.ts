@@ -32,8 +32,13 @@ export const seedSkillFile = path.join(
   "skills.json",
 );
 
+export const urlEmailVerification =
+  process.env.URL_EMAIL_VERIFICATION ||
+  "https://app.need4deed.org/verify-email";
+
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24h in milliseconds
 
 export const accessCookieName = "access";
 export const refreshCookieName = "refresh";
