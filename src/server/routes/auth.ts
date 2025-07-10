@@ -16,12 +16,6 @@ import {
 } from "../../data/schema/user.schema";
 import { RoutePrefix } from "../types";
 
-const accessCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "none" as boolean | "none" | "lax" | "strict",
-};
-
 async function authRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
