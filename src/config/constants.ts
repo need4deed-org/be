@@ -46,8 +46,13 @@ export const cookieOptions = {
   signed: (process.env.SIGN_COOKIES || "false") === "true",
   httpOnly: true,
   secure: (process.env.NODE_ENV || "development") === "production",
-  sameSite: "none" as boolean | "none" | "lax" | "strict",
+  sameSite: ((process.env.NODE_ENV || "development") === "production"
+    ? "none"
+    : "lax") as boolean | "none" | "lax" | "strict",
   path: "/",
 };
 
 export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
+
+export const authAccessTokenCookieName = "access";
+export const authRefreshTokenCookieName = "refresh";
