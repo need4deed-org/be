@@ -14,6 +14,7 @@ import {
 } from "../../data/schema/user.schema";
 import { Role } from "../../data/types";
 import { hashPassword } from "../../data/utils";
+import { sendVerificationEmail } from "../../services";
 import { RoutePrefix } from "../types";
 
 async function userRoutes(
@@ -293,20 +294,7 @@ async function userRoutes(
         newUser.person = resolvedPerson;
         const savedUser = await userRepository.save(newUser);
 
-        // send verification email.
-        const emailMessageId = await fastify.emailService.send({
-          to: email,
-          subject: "Account Created",
-          text: "Your account has been created successfully. Please verify your email.",
-          html: `<p>Your account has been created successfully. Please verify your email.</p>`,
-        });
-        fastify.log.debug(
-          `userRoutes:POST:emailMessageId: ${JSON.stringify(
-            emailMessageId,
-            null,
-            2,
-          )}`,
-        );
+        sendVerificationEmail({ fastify, user: savedUser });
 
         reply.status(201).send(savedUser);
       } catch (error) {
