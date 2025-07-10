@@ -21,7 +21,12 @@ async function jwtPlugin(
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
       try {
-        await request.jwtVerify();
+        try {
+          await request.jwtVerify();
+        } catch (error) {
+          reply.status(401);
+          throw new Error("Authorization failed.");
+        }
 
         const userId = request.user?.id;
         fastify.log.debug(`jwtPlugin:authenticated: ${userId}}`);
@@ -36,10 +41,12 @@ async function jwtPlugin(
         });
 
         if (!user) {
+          reply.status(404);
           throw new Error("User not found.");
         }
 
         if (user.role === Role.ADMIN) {
+          reply.status(200);
           return;
         }
 
@@ -50,19 +57,21 @@ async function jwtPlugin(
         );
 
         if (role && role !== user.role) {
+          reply.status(403);
           throw new Error("Permission denied");
         }
 
         if (allowSelf) {
           const requestParamId = (request.params as { id?: string }).id;
           if (String(userId) !== requestParamId) {
+            reply.status(403);
             throw new Error("Permission denied");
           }
         }
       } catch (error) {
         fastify.log.warn(`JWT verification failed: ${error.message}`); // Log the warning
-        reply.code(401).send({
-          message: "Authentication failed.",
+        reply.send({
+          message: `Authentication failed: ${error.message}`,
           error: error.message,
         });
       }
