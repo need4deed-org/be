@@ -45,7 +45,7 @@ export const refreshCookieName = "refresh";
 export const cookieOptions = {
   signed: (process.env.SIGN_COOKIES || "false") === "true",
   httpOnly: true,
-  secure: true,
+  secure: (process.env.NODE_ENV || "development") === "production",
   sameSite: ((process.env.NODE_ENV || "development") === "production"
     ? "none"
     : "lax") as boolean | "none" | "lax" | "strict",
