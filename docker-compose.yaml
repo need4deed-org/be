@@ -6,12 +6,6 @@ services:
       args:
         NODE_ENV: ${NODE_ENV}
         JWT_SECRET: ${JWT_SECRET:-"some fucking gibberish"}
-        AWS_SES_REGION: ${AWS_SES_REGION}
-        AWS_SES_ACCESS_KEY_ID: ${AWS_SES_ACCESS_KEY_ID}
-        AWS_SES_SECRET_ACCESS_KEY: ${AWS_SES_SECRET_ACCESS_KEY}
-        AWS_SES_FROM_EMAIL: ${AWS_SES_FROM_EMAIL}
-        CORS_ORIGINS: ${CORS_ORIGINS}
-        CORS_CREDENTIALS: ${CORS_CREDENTIALS}
     env_file:
       - .env
     image: be:dev

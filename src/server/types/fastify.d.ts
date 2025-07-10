@@ -26,9 +26,14 @@ declare module "@fastify/jwt" {
   // It's crucial to extend the original FastifyJWT interface here
   // so that your custom 'payload' and 'user' types merge correctly
   // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
+  type TokenType = "access" | "refresh" | "verify";
   interface FastifyJWT {
     // Payload type when signing a token (`reply.jwtSign(payload)`)
-    payload: { id: number; email: string };
+    payload: {
+      id: number;
+      email: string;
+      type?: TokenType;
+    };
     // User type that will be attached to `request.user` after `request.jwtVerify()`
     user: {
       id: number;
