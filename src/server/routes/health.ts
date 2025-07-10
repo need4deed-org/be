@@ -24,9 +24,16 @@ async function healthRoutes(
   };
 
   fastify.get(prefixedPath, { schema }, async (request, reply) => {
-    return reply.status(200).send({
-      message: "Need4Deed API v1 is up and running.",
-    });
+    try {
+      return reply.status(200).send({
+        message: "Need4Deed API v1 is up and running.",
+      });
+    } catch (error) {
+      fastify.log.error(`Health check error: ${error}`);
+      return reply.status(500).send({
+        message: "Internal server error.",
+      });
+    }
   });
 }
 
