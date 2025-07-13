@@ -6,9 +6,10 @@ import Activity from "./entity/activity.entity";
 import Category from "./entity/category.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import Language from "./entity/language.entity";
-import { Person } from "./entity/person.entity";
+import Person from "./entity/person.entity";
+import Profile from "./entity/profile.entity";
 import Skill from "./entity/skill.entity";
-import { User } from "./entity/user.entity";
+import User from "./entity/user.entity";
 
 class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
   tableName(className: string, customTableName: string | undefined): string {
@@ -87,6 +88,7 @@ export const AppDataSource = new DataSource({
     Category,
     Activity,
     Skill,
+    Profile,
   ],
   migrations: [],
   subscribers: [],
