@@ -42,7 +42,7 @@ export default class Profile {
   profileActivity: ProfileActivity[];
 
   @OneToMany(() => ProfileSkill, (profileSkill) => profileSkill.profile)
-  profileSkill: ProfileActivity[];
+  profileSkill: ProfileSkill[];
 
   @OneToMany(
     () => ProfileLanguage,
