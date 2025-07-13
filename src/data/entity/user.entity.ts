@@ -13,10 +13,10 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { verifyPassword } from "../utils";
-import { Person } from "./person.entity";
+import Person from "./person.entity";
 
 @Entity()
-export class User {
+export default class User {
   constructor(user?: Partial<User>) {
     if (user) {
       Object.assign(this, user);

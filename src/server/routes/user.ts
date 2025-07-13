@@ -3,8 +3,8 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
 // import { defaultFrom } from "../../config/constants";
-import { Person, PersonUpdateType } from "../../data/entity/person.entity";
-import { User } from "../../data/entity/user.entity";
+import Person, { PersonUpdateType } from "../../data/entity/person.entity";
+import User from "../../data/entity/user.entity";
 import { responseErrors } from "../../data/schema/responseErrors";
 import {
   createUserBodySchema,
