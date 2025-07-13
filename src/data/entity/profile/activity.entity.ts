@@ -4,8 +4,10 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import ProfileActivity from "../m2m/profile-activity";
 import Category from "./category.entity";
 
 @Entity()
@@ -31,4 +33,10 @@ export default class Activity {
 
   @Column({ nullable: true })
   categoryId: number;
+
+  @OneToMany(
+    () => ProfileActivity,
+    (profileActivity) => profileActivity.activity,
+  )
+  profileActivities: ProfileActivity[];
 }
