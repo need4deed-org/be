@@ -38,5 +38,5 @@ export default class Activity {
     () => ProfileActivity,
     (profileActivity) => profileActivity.activity,
   )
-  profileActivities: ProfileActivity[];
+  profileActivity: ProfileActivity[];
 }
