@@ -7,9 +7,9 @@ import {
   seedSkillFile,
 } from "../../config/constants";
 import FieldTranslation from "../entity/field_translation.entity";
-import Language from "../entity/language.entity";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
+import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
 import { readJsonAsync } from "../utils";
 

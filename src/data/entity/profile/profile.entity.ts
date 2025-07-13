@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import ProfileActivity from "../m2m/profile-activity";
+import ProfileLanguage from "../m2m/profile-language";
 import ProfileSkill from "../m2m/profile-skill";
 import Category from "./category.entity";
 
@@ -42,4 +43,10 @@ export default class Profile {
 
   @OneToMany(() => ProfileSkill, (profileSkill) => profileSkill.profile)
   profileSkill: ProfileActivity[];
+
+  @OneToMany(
+    () => ProfileLanguage,
+    (profileLanguage) => profileLanguage.profile,
+  )
+  profileLanguage: ProfileLanguage[];
 }
