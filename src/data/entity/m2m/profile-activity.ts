@@ -19,7 +19,7 @@ export default class ProfileActivity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Profile, (profile) => profile.profileActivities, {
+  @ManyToOne(() => Profile, (profile) => profile.profileActivity, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "profile_id" })
@@ -28,11 +28,12 @@ export default class ProfileActivity {
   @Column()
   profileId: number;
 
-  @ManyToOne(() => Activity, (activity) => activity.profileActivities, {
+  @ManyToOne(() => Activity, (activity) => activity.profileActivity, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "activity_id" })
   activity: Activity;
+
   @Column()
   activityId: number;
 }
