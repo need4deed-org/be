@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 
 import { seedSkillFile } from "../../config/constants";
-import Skill from "../entity/skill.entity";
+import Skill from "../entity/profile/skill.entity";
 import { readJsonAsync } from "../utils";
 
 interface SkillJSON {

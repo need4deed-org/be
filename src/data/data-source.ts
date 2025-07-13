@@ -2,13 +2,13 @@ import { snakeCase } from "change-case";
 import "reflect-metadata";
 import { DataSource, DefaultNamingStrategy } from "typeorm";
 
-import Activity from "./entity/activity.entity";
-import Category from "./entity/category.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import Language from "./entity/language.entity";
 import Person from "./entity/person.entity";
-import Profile from "./entity/profile.entity";
-import Skill from "./entity/skill.entity";
+import Activity from "./entity/profile/activity.entity";
+import Category from "./entity/profile/category.entity";
+import Profile from "./entity/profile/profile.entity";
+import Skill from "./entity/profile/skill.entity";
 import User from "./entity/user.entity";
 
 class SnakeCaseNamingStrategy extends DefaultNamingStrategy {

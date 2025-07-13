@@ -1,5 +1,6 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+
 import Activity from "./activity.entity";
 
 @Entity()
