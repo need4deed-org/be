@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import Language from "./language.entity";
+import Language from "./profile/language.entity";
 
 @Entity()
 @Index(["language", "entityName", "entityId", "fieldName"], {
