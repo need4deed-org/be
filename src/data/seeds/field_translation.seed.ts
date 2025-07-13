@@ -6,11 +6,11 @@ import {
   seedLanguageInUseFile,
   seedSkillFile,
 } from "../../config/constants";
-import Activity from "../entity/activity.entity";
-import Category from "../entity/category.entity";
 import FieldTranslation from "../entity/field_translation.entity";
 import Language from "../entity/language.entity";
-import Skill from "../entity/skill.entity";
+import Activity from "../entity/profile/activity.entity";
+import Category from "../entity/profile/category.entity";
+import Skill from "../entity/profile/skill.entity";
 import { readJsonAsync } from "../utils";
 
 const entityLanguageName = "Language";
