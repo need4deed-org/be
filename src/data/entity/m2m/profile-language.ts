@@ -1,3 +1,4 @@
+import { LangProficiency } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -5,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+
 import Language from "../profile/language.entity";
 import Profile from "../profile/profile.entity";
 
@@ -18,6 +20,13 @@ export default class ProfileLanguage {
 
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({
+    nullable: true,
+    type: "enum",
+    enum: LangProficiency,
+  })
+  proficiency: LangProficiency;
 
   @ManyToOne(() => Profile, (profile) => profile.profileLanguage, {
     onDelete: "CASCADE",
