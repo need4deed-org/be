@@ -21,6 +21,7 @@
     "fastify": "^5.3.3",
     "fastify-mailer": "^2.3.1",
     "fastify-plugin": "^5.0.1",
+    "need4deed-sdk": "github:need4deed-org/sdk",
     "nodemailer": "^7.0.4",
     "pg": "^8.14.1",
     "pino-pretty": "^13.0.0",
