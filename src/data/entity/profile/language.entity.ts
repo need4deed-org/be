@@ -1,5 +1,6 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import ProfileLanguage from "../m2m/profile-language";
 
 @Entity()
 export default class Language {
@@ -22,4 +23,10 @@ export default class Language {
   @IsString()
   @Length(100)
   title: string;
+
+  @OneToMany(
+    () => ProfileLanguage,
+    (profileLanguage) => profileLanguage.language,
+  )
+  profileLanguage: ProfileLanguage[];
 }

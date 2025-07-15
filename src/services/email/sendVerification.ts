@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 
 import { TokenType } from "@fastify/jwt";
 import { urlEmailVerification } from "../../config/constants";
-import { User } from "../../data/entity/user.entity";
+import User from "../../data/entity/user.entity";
 import { getEmailService } from "./helpers";
 
 export async function sendVerificationEmail({

@@ -6,10 +6,10 @@ import {
   Length,
 } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { User } from "./user.entity"; // Ensure this import is correct
+import User from "./user.entity"; // Ensure this import is correct
 
 @Entity()
-export class Person {
+export default class Person {
   constructor(person?: Partial<Person>) {
     if (person) {
       Object.assign(this, person);

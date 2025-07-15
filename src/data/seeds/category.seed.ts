@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 
 import { seedCategoryFile } from "../../config/constants";
-import Category from "../entity/category.entity";
+import Category from "../entity/profile/category.entity";
 import { readJsonAsync } from "../utils";
 
 interface CategoryJSON {

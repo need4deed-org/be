@@ -2,7 +2,7 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
-import { Person, PersonCreateType } from "../../data/entity/person.entity";
+import Person, { PersonCreateType } from "../../data/entity/person.entity";
 import {
   newPersonSchema,
   personResponseSchema,

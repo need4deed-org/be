@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 
 import { seedLanguageFile } from "../../config/constants";
-import Language from "../entity/language.entity";
+import Language from "../entity/profile/language.entity";
 import { readJsonAsync } from "../utils";
 
 interface LanguageJSON {

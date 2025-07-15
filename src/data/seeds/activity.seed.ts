@@ -1,8 +1,8 @@
 import { DataSource } from "typeorm";
 
 import { seedActivityFile } from "../../config/constants";
-import Activity from "../entity/activity.entity";
-import Category from "../entity/category.entity";
+import Activity from "../entity/profile/activity.entity";
+import Category from "../entity/profile/category.entity";
 import { readJsonAsync } from "../utils";
 
 interface ActivityJSON {
