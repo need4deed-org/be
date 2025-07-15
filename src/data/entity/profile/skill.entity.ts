@@ -1,13 +1,11 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import Activity from "./activity.entity";
+import ProfileSkill from "../m2m/profile-skill";
 
 @Entity()
-export default class Category {
-  constructor(category?: Partial<Category>) {
-    if (category) {
-      Object.assign(this, category);
-    }
+export default class Skill {
+  constructor(title: string) {
+    this.title = title;
   }
 
   @PrimaryGeneratedColumn()
@@ -19,6 +17,6 @@ export default class Category {
   @Length(100)
   title: string;
 
-  @OneToMany(() => Activity, (activity) => activity.category)
-  activities: Activity[];
+  @OneToMany(() => ProfileSkill, (profileSkill) => profileSkill.skill)
+  profileSkill: ProfileSkill[];
 }

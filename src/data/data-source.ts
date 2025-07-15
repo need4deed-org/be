@@ -1,74 +1,18 @@
-import { snakeCase } from "change-case";
 import "reflect-metadata";
-import { DataSource, DefaultNamingStrategy } from "typeorm";
+import { DataSource } from "typeorm";
 
-import Activity from "./entity/activity.entity";
-import Category from "./entity/category.entity";
 import FieldTranslation from "./entity/field_translation.entity";
-import Language from "./entity/language.entity";
-import { Person } from "./entity/person.entity";
-import Skill from "./entity/skill.entity";
-import { User } from "./entity/user.entity";
-
-class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
-  tableName(className: string, customTableName: string | undefined): string {
-    return customTableName ? customTableName : snakeCase(className);
-  }
-
-  columnName(
-    propertyName: string,
-    customName: string | undefined,
-    embeddedPrefixes: string[],
-  ): string {
-    if (customName) {
-      return customName;
-    }
-
-    return snakeCase(propertyName);
-  }
-
-  relationName(propertyName: string): string {
-    return snakeCase(propertyName);
-  }
-
-  joinColumnName(relationName: string, referencedColumnName: string): string {
-    return snakeCase(relationName + "_" + referencedColumnName);
-  }
-
-  joinTableName(
-    firstTableName: string,
-    secondTableName: string,
-    firstPropertyName: string,
-    secondPropertyName: string,
-  ): string {
-    return snakeCase(
-      firstTableName +
-        "_" +
-        secondTableName +
-        "_" +
-        firstPropertyName +
-        "_" +
-        secondPropertyName,
-    );
-  }
-
-  joinTableColumnName(
-    tableName: string,
-    propertyName: string,
-    columnName?: string,
-  ): string {
-    return snakeCase(
-      tableName + "_" + (columnName ? columnName : propertyName),
-    );
-  }
-
-  classTableInheritanceParentColumnName(
-    parentTableName: any,
-    parentTableIdPropertyName: any,
-  ): string {
-    return snakeCase(`${parentTableName}_${parentTableIdPropertyName}`);
-  }
-}
+import ProfileActivity from "./entity/m2m/profile-activity";
+import ProfileLanguage from "./entity/m2m/profile-language";
+import ProfileSkill from "./entity/m2m/profile-skill";
+import Person from "./entity/person.entity";
+import Activity from "./entity/profile/activity.entity";
+import Category from "./entity/profile/category.entity";
+import Language from "./entity/profile/language.entity";
+import Profile from "./entity/profile/profile.entity";
+import Skill from "./entity/profile/skill.entity";
+import User from "./entity/user.entity";
+import SnakeCaseNamingStrategy from "./lib/snake-case";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -87,6 +31,10 @@ export const AppDataSource = new DataSource({
     Category,
     Activity,
     Skill,
+    Profile,
+    ProfileActivity,
+    ProfileSkill,
+    ProfileLanguage,
   ],
   migrations: [],
   subscribers: [],

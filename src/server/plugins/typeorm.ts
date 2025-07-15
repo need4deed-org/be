@@ -2,8 +2,8 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
 import { AppDataSource } from "../../data/data-source";
-import { Person } from "../../data/entity/person.entity";
-import { User } from "../../data/entity/user.entity";
+import Person from "../../data/entity/person.entity";
+import User from "../../data/entity/user.entity";
 
 const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
   try {
