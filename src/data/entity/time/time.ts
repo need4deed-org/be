@@ -13,7 +13,7 @@ export default class Time {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
   info: string;
