@@ -13,12 +13,12 @@ export default class Timeslot {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
   description: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
   rrule: string;
@@ -28,7 +28,7 @@ export default class Timeslot {
   @IsDate()
   start: Date;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsDate()
   end: Date;
