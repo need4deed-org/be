@@ -31,7 +31,7 @@ function isValidPLZ(plz: string, city?: string) {
 
 function isPostcodeInAllowedAreas(
   postcode: string,
-  countryCode,
+  countryCode: Country,
   allowedAreas?: string[],
 ): boolean {
   switch (countryCode) {
