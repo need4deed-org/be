@@ -15,6 +15,12 @@ export default class Postcode {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ type: "numeric", precision: 10, scale: 7, nullable: true })
+  longitude?: number;
+
+  @Column({ type: "numeric", precision: 9, scale: 7, nullable: true })
+  latitude?: number;
+
   @Column()
   @IsNotEmpty()
   @IsPostcode(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM])
