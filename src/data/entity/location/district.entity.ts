@@ -1,5 +1,6 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import DistrictPostcode from "../m2m/district-postcode";
 import LocationDistrict from "../m2m/location-district";
 
 @Entity()
@@ -24,4 +25,10 @@ export default class District {
     (locationDistrict) => locationDistrict.district,
   )
   locationDistrict: LocationDistrict[];
+
+  @OneToMany(
+    () => DistrictPostcode,
+    (districtPostcode) => districtPostcode.district,
+  )
+  districtPostcode: DistrictPostcode[];
 }
