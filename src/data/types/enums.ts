@@ -5,7 +5,7 @@ export enum Role {
   ADMIN = "admin",
 }
 
-export const Country = Lang;
+export { Lang as Country };
 
 // this will go to sdk
 export enum GermanCity {
