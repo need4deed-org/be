@@ -44,10 +44,8 @@ function isPostcodeInAllowedAreas(
   }
 }
 
-@ValidatorConstraint({ async: false }) // 'async: true' if your validation involves asynchronous operations (e.g., database lookups)
-export class IsGermanPostcodeConstraint
-  implements ValidatorConstraintInterface
-{
+@ValidatorConstraint({ async: false })
+export class IsPostcodeConstraint implements ValidatorConstraintInterface {
   /**
    * This method contains the core validation logic.
    * It returns true if the value is valid, false otherwise.
@@ -56,7 +54,7 @@ export class IsGermanPostcodeConstraint
    */
   validate(code: string, args: ValidationArguments) {
     const [countryCode, allowedAreas] = args.constraints as [
-      string,
+      Country,
       string[] | undefined,
     ];
 
@@ -74,7 +72,7 @@ export class IsGermanPostcodeConstraint
 }
 
 export function IsPostcode(
-  countryCode: string,
+  countryCode: Country,
   allowedAreas?: string[],
   validationOptions?: ValidationOptions,
 ) {
@@ -82,9 +80,9 @@ export function IsPostcode(
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
-      options: validationOptions, // Pass any options provided by the user
+      options: validationOptions,
       constraints: [countryCode, allowedAreas],
-      validator: IsGermanPostcodeConstraint,
+      validator: IsPostcodeConstraint,
     });
   };
 }
