@@ -3,6 +3,7 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 import { IsPostcode } from "../../../services/validators/custom";
 import { Country, GermanCity } from "../../types";
+import DistrictPostcode from "../m2m/district-postcode";
 import LocationPostcode from "../m2m/location-postcode";
 
 @Entity()
@@ -32,4 +33,10 @@ export default class Postcode {
     (locationPostcode) => locationPostcode.postcode,
   )
   locationPostcode: LocationPostcode[];
+
+  @OneToMany(
+    () => DistrictPostcode,
+    (districtPostcode) => districtPostcode.postcode,
+  )
+  districtPostcode: DistrictPostcode[];
 }

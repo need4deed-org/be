@@ -6,8 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import Time from "../time/time";
-import Timeslot from "../time/timeslot";
+import Time from "../time/time.entity";
+import Timeslot from "../time/timeslot.entity";
 
 @Entity()
 export default class TimeTimeslot {
