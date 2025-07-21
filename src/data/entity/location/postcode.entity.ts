@@ -1,8 +1,9 @@
 import { IsNotEmpty } from "class-validator";
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 import { IsPostcode } from "../../../services/validators/custom";
 import { Country, GermanCity } from "../../types";
+import LocationPostcode from "../m2m/location-postcode";
 
 @Entity()
 export default class Postcode {
@@ -25,4 +26,10 @@ export default class Postcode {
   @IsNotEmpty()
   @IsPostcode(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM])
   value: string;
+
+  @OneToMany(
+    () => LocationPostcode,
+    (locationPostcode) => locationPostcode.postcode,
+  )
+  locationPostcode: LocationPostcode[];
 }
