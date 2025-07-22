@@ -7,6 +7,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import Deal from "../deal.entity";
 import ProfileActivity from "../m2m/profile-activity";
 import ProfileLanguage from "../m2m/profile-language";
 import ProfileSkill from "../m2m/profile-skill";
@@ -49,4 +50,7 @@ export default class Profile {
     (profileLanguage) => profileLanguage.profile,
   )
   profileLanguage: ProfileLanguage[];
+
+  @OneToMany(() => Deal, (deal) => deal.profile)
+  deal: Deal[];
 }
