@@ -5,6 +5,7 @@ import { IsPostcode } from "../../../services/validators/custom";
 import { Country, GermanCity } from "../../types";
 import DistrictPostcode from "../m2m/district-postcode";
 import LocationPostcode from "../m2m/location-postcode";
+import Address from "./address.entity";
 
 @Entity()
 export default class Postcode {
@@ -39,4 +40,7 @@ export default class Postcode {
     (districtPostcode) => districtPostcode.postcode,
   )
   districtPostcode: DistrictPostcode[];
+
+  @OneToMany(() => Address, (address) => address.postcode)
+  address: Address[];
 }
