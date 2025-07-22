@@ -1,5 +1,6 @@
 import { IsOptional, IsString } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import Deal from "../deal.entity";
 import TimeTimeslot from "../m2m/time-timeslot";
 
 @Entity()
@@ -20,4 +21,7 @@ export default class Time {
 
   @OneToMany(() => TimeTimeslot, (timeTimeslot) => timeTimeslot.time)
   timeTimeslot: TimeTimeslot[];
+
+  @OneToMany(() => Deal, (deal) => deal.time)
+  deal: Deal[];
 }
