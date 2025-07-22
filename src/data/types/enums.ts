@@ -19,3 +19,8 @@ export enum LocationType {
   ADDRESS = "address",
   GEOLOCATION = "geolocation",
 }
+
+export enum DealType {
+  VOLUNTEER = "volunteer",
+  OPPORTUNITY = "opportunity",
+}
