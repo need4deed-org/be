@@ -1,6 +1,7 @@
 import { IsOptional, IsString } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { LocationType } from "../../types";
+import LocationAddress from "../m2m/location-address";
 import LocationDistrict from "../m2m/location-district";
 import LocationPostcode from "../m2m/location-postcode";
 
@@ -39,4 +40,10 @@ export default class Location {
     (locationDistrict) => locationDistrict.location,
   )
   locationDistrict: LocationDistrict[];
+
+  @OneToMany(
+    () => LocationAddress,
+    (locationAddress) => locationAddress.location,
+  )
+  locationAddress: LocationAddress[];
 }
