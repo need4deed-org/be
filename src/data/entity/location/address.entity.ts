@@ -32,7 +32,7 @@ export default class Address {
   @Length(200)
   street: string;
 
-  @ManyToOne(() => Postcode, (postcode) => postcode.districtPostcode, {
+  @ManyToOne(() => Postcode, (postcode) => postcode.address, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "postcode_id" })
