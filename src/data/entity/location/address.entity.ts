@@ -1,0 +1,49 @@
+import { IsNotEmpty, IsString, Length } from "class-validator";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import LocationAddress from "../m2m/location-address";
+import Postcode from "./postcode.entity";
+
+@Entity()
+export default class Address {
+  constructor(address?: Partial<Address>) {
+    if (address) {
+      Object.assign(this, address);
+    }
+  }
+
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ nullable: true })
+  @IsString()
+  @Length(100)
+  title: string;
+
+  @Column()
+  @IsNotEmpty()
+  @IsString()
+  @Length(200)
+  street: string;
+
+  @ManyToOne(() => Postcode, (postcode) => postcode.districtPostcode, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "postcode_id" })
+  postcode: Postcode;
+
+  @Column()
+  postcodeId: number;
+
+  @OneToMany(
+    () => LocationAddress,
+    (locationAddress) => locationAddress.address,
+  )
+  locationAddress: LocationAddress[];
+}
