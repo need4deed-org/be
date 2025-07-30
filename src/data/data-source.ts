@@ -15,6 +15,9 @@ import ProfileActivity from "./entity/m2m/profile-activity";
 import ProfileLanguage from "./entity/m2m/profile-language";
 import ProfileSkill from "./entity/m2m/profile-skill";
 import TimeTimeslot from "./entity/m2m/time-timeslot";
+import Agent from "./entity/opportunity/agent.entity";
+import Opportunity from "./entity/opportunity/opportunity.entity";
+import Organization from "./entity/organization.entity";
 import Person from "./entity/person.entity";
 import Activity from "./entity/profile/activity.entity";
 import Category from "./entity/profile/category.entity";
@@ -36,29 +39,32 @@ export const AppDataSource = new DataSource({
   synchronize: true,
   logging: false,
   entities: [
-    User,
-    Person,
-    Language,
-    FieldTranslation,
-    Category,
     Activity,
-    Skill,
+    Address,
+    Agent,
+    Category,
     Deal,
+    District,
+    DistrictPostcode,
+    FieldTranslation,
+    Language,
+    Location,
+    LocationAddress,
+    LocationDistrict,
+    LocationPostcode,
+    Opportunity,
+    Organization,
+    Person,
     Profile,
     ProfileActivity,
-    ProfileSkill,
     ProfileLanguage,
-    Time,
-    Timeslot,
-    TimeTimeslot,
-    Location,
+    ProfileSkill,
     Postcode,
-    District,
-    Address,
-    DistrictPostcode,
-    LocationPostcode,
-    LocationDistrict,
-    LocationAddress,
+    Skill,
+    Time,
+    TimeTimeslot,
+    Timeslot,
+    User,
   ],
   migrations: [],
   subscribers: [],
