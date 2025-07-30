@@ -24,3 +24,8 @@ export enum DealType {
   VOLUNTEER = "volunteer",
   OPPORTUNITY = "opportunity",
 }
+
+export enum OpportunityType {
+  VOLUNTEERING = "volunteering",
+  ACCOMPANYING = "accompanying",
+}
