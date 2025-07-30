@@ -8,6 +8,8 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import LocationAddress from "../m2m/location-address";
+import Organization from "../organization.entity";
+import Person from "../person.entity";
 import Postcode from "./postcode.entity";
 
 @Entity()
@@ -46,4 +48,10 @@ export default class Address {
     (locationAddress) => locationAddress.address,
   )
   locationAddress: LocationAddress[];
+
+  @OneToMany(() => Person, (person) => person.address)
+  person: Person[];
+
+  @OneToMany(() => Organization, (organization) => organization.address)
+  organization: Organization[];
 }
