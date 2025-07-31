@@ -11,6 +11,7 @@ import Location from "./location/location.entity";
 import Opportunity from "./opportunity/opportunity.entity";
 import Profile from "./profile/profile.entity";
 import Time from "./time/time.entity";
+import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
 export default class Deal {
@@ -59,4 +60,7 @@ export default class Deal {
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
   opportunity: Opportunity[];
+
+  @OneToMany(() => Volunteer, (volunteer) => volunteer.deal)
+  volunteer: Volunteer[];
 }
