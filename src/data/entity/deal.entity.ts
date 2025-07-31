@@ -3,10 +3,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { DealType } from "../types";
 import Location from "./location/location.entity";
+import Opportunity from "./opportunity/opportunity.entity";
 import Profile from "./profile/profile.entity";
 import Time from "./time/time.entity";
 
@@ -54,4 +56,7 @@ export default class Deal {
 
   @Column()
   locationId: number;
+
+  @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
+  opportunity: Opportunity[];
 }
