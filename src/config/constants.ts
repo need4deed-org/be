@@ -2,6 +2,12 @@ import * as path from "path";
 
 const publicFixturesFromHere = ["..", "..", "public", "fixtures"];
 
+export const seedPLZFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "PLZs.json",
+);
+
 export const seedLanguageFile = path.join(
   __dirname,
   ...publicFixturesFromHere,
