@@ -33,6 +33,12 @@ export default class Opportunity {
   @IsString()
   info: string;
 
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  createdAt: Date;
+
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  updatedAt: Date;
+
   @ManyToOne(() => Deal)
   @JoinColumn({ name: "deal_id" })
   deal: Deal;
