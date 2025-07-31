@@ -16,6 +16,7 @@ import {
 import Address from "./location/address.entity";
 import Organization from "./organization.entity";
 import User from "./user.entity"; // Ensure this import is correct
+import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
 export default class Person {
@@ -74,6 +75,9 @@ export default class Person {
 
   @OneToMany(() => Organization, (organization) => organization.person)
   organization: Organization[];
+
+  @OneToMany(() => Volunteer, (volunteer) => volunteer.person)
+  volunteer: Volunteer[];
 }
 
 export type PersonType = Person;
