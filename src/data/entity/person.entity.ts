@@ -5,7 +5,16 @@ import {
   IsString,
   Length,
 } from "class-validator";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import Address from "./location/address.entity";
+import Organization from "./organization.entity";
 import User from "./user.entity"; // Ensure this import is correct
 
 @Entity()
@@ -45,19 +54,26 @@ export default class Person {
   @Length(7, 20) // Example phone length validation
   phone: string | null;
 
-  @Column({ nullable: true })
-  @IsOptional()
-  @IsString()
-  address: string | null;
-
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
 
+  @ManyToOne(() => Address, (address) => address.person, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "address_id" })
+  address: Address;
+
+  @Column()
+  addressId: number;
+
   @OneToMany(() => User, (user) => user.person)
   users: User[];
+
+  @OneToMany(() => Organization, (organization) => organization.person)
+  organization: Organization[];
 }
 
 export type PersonType = Person;
