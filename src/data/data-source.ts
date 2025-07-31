@@ -27,6 +27,7 @@ import Skill from "./entity/profile/skill.entity";
 import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import User from "./entity/user.entity";
+import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 
 export const AppDataSource = new DataSource({
@@ -65,6 +66,7 @@ export const AppDataSource = new DataSource({
     TimeTimeslot,
     Timeslot,
     User,
+    Volunteer,
   ],
   migrations: [],
   subscribers: [],
