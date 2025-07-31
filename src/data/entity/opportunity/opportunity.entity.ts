@@ -25,7 +25,6 @@ export default class Opportunity {
     type: "enum",
     enum: OpportunityType,
     nullable: false,
-    default: OpportunityType,
   })
   type: OpportunityType;
 

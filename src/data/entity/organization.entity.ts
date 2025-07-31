@@ -69,5 +69,5 @@ export default class Organization {
   personId: number;
 
   @OneToMany(() => Agent, (agent) => agent.organization)
-  opportunity: Agent[];
+  agent: Agent[];
 }
