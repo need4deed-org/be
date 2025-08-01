@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 
 import Deal from "./entity/deal.entity";
+import EventN4D from "./entity/event/event.entity";
+import EventTranslation from "./entity/event/event_translation.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
@@ -47,6 +49,8 @@ export const AppDataSource = new DataSource({
     Deal,
     District,
     DistrictPostcode,
+    EventN4D,
+    EventTranslation,
     FieldTranslation,
     Language,
     Location,
