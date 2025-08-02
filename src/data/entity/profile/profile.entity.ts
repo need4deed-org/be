@@ -29,7 +29,9 @@ export default class Profile {
   @IsString()
   info: string;
 
-  @ManyToOne(() => Category)
+  @ManyToOne(() => Category, (category) => category.profile, {
+    nullable: true,
+  })
   @JoinColumn({ name: "category_id" })
   category: Category;
 
