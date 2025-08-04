@@ -11,7 +11,7 @@ import {
 import Language from "../profile/language.entity";
 import EventTranslation from "./event_translation.entity";
 
-@Entity()
+@Entity({ name: "event_n4d" })
 export default class EventN4D {
   constructor(event?: Partial<EventN4D>) {
     if (event) {
@@ -23,13 +23,13 @@ export default class EventN4D {
   id: number;
 
   @Column({ type: "boolean", default: false })
-  active: boolean;
+  isActive: boolean;
 
   @Column({ type: "timestamptz" })
   date: Date;
 
   @Column({ type: "timestamptz", nullable: true })
-  date_end?: Date;
+  dateEnd?: Date;
 
   @Column({ type: "enum", enum: EventN4DType, default: EventN4DType.PARTY })
   type: EventN4DType;
@@ -38,19 +38,19 @@ export default class EventN4D {
   pic?: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  location_link?: string;
+  locationLink?: string;
 
   @Column({ type: "varchar", length: 256 })
-  rsvp_link: string;
+  rsvpLink: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  followup_link?: string;
+  followupLink?: string;
 
   @Column({ type: "varchar", length: 256 })
   address: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  host_name?: string;
+  hostName?: string;
 
   @ManyToOne(() => Language, (language) => language.eventn4d)
   @JoinColumn({ name: "language_id" })
@@ -61,7 +61,7 @@ export default class EventN4D {
 
   @OneToMany(
     () => EventTranslation,
-    (event_translation) => event_translation.eventn4d,
+    (eventTranslation) => eventTranslation.eventn4d,
   )
-  event_translation: EventTranslation[];
+  eventTranslation: EventTranslation[];
 }

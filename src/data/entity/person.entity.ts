@@ -15,6 +15,7 @@ import {
 } from "typeorm";
 import Address from "./location/address.entity";
 import Organization from "./organization.entity";
+import Testimonial from "./testimonial.entity";
 import User from "./user.entity"; // Ensure this import is correct
 import Volunteer from "./volunteer/volunteer.entity";
 
@@ -78,6 +79,9 @@ export default class Person {
 
   @OneToMany(() => Volunteer, (volunteer) => volunteer.person)
   volunteer: Volunteer[];
+
+  @OneToMany(() => Testimonial, (testimonial) => testimonial.person)
+  testimonial: Testimonial[];
 }
 
 export type PersonType = Person;
