@@ -26,6 +26,7 @@ import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
 import Profile from "./entity/profile/profile.entity";
 import Skill from "./entity/profile/skill.entity";
+import Testimonial from "./entity/testimonial.entity";
 import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import User from "./entity/user.entity";
@@ -66,6 +67,7 @@ export const AppDataSource = new DataSource({
     ProfileSkill,
     Postcode,
     Skill,
+    Testimonial,
     Time,
     TimeTimeslot,
     Timeslot,
