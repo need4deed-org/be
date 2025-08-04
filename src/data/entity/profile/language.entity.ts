@@ -3,6 +3,7 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import EventN4D from "../event/event.entity";
 import EventTranslation from "../event/event_translation.entity";
 import ProfileLanguage from "../m2m/profile-language";
+import Testimonial from "../testimonial.entity";
 
 @Entity()
 export default class Language {
@@ -35,9 +36,12 @@ export default class Language {
   @OneToMany(() => EventN4D, (eventn4d) => eventn4d.language)
   eventn4d: EventN4D[];
 
+  @OneToMany(() => Testimonial, (testimonial) => testimonial.language)
+  testimonial: Testimonial[];
+
   @OneToMany(
     () => EventTranslation,
-    (event_translation) => event_translation.language,
+    (eventTranslation) => eventTranslation.language,
   )
-  event_translation: EventTranslation[];
+  eventTranslation: EventTranslation[];
 }
