@@ -37,7 +37,7 @@ export default class Language {
 
   @OneToMany(
     () => EventTranslation,
-    (event_translation) => event_translation.language,
+    (eventTranslation) => eventTranslation.language,
   )
-  event_translation: EventTranslation[];
+  eventTranslation: EventTranslation[];
 }

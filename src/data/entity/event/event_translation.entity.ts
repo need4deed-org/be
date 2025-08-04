@@ -27,40 +27,40 @@ export default class EventTranslation {
   subtitle?: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  menu_title?: string;
+  menuTitle?: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  time_str?: string;
+  timeStr?: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  location_comment?: string;
+  locationComment?: string;
 
   @Column({ type: "text", nullable: false })
   description: string;
 
   @Column({ type: "varchar", length: 512, nullable: false })
-  short_description: string;
+  shortDescription: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  additional_title?: string;
+  additionalTitle?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  additional_info?: any;
+  additionalInfo?: any;
 
   @Column({ type: "text", nullable: true })
   outro?: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  followup_text?: string;
+  followupText?: string;
 
-  @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.event_translation)
+  @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.eventTranslation)
   @JoinColumn({ name: "eventn4d_id" })
   eventn4d: EventN4D;
 
   @Column({ nullable: true })
   eventn4dId: number;
 
-  @ManyToOne(() => Language, (language) => language.event_translation)
+  @ManyToOne(() => Language, (language) => language.eventTranslation)
   @JoinColumn({ name: "language_id" })
   language: Language;
 
