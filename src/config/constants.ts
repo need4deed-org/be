@@ -1,6 +1,6 @@
 import * as path from "path";
 
-const publicFixturesFromHere = ["..", "..", "public", "fixtures"];
+const publicFixturesFromHere = ["..", "..", "public", "data"];
 
 export const seedPLZFile = path.join(
   __dirname,
