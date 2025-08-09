@@ -2,7 +2,8 @@ import json
 import sys
 import uuid
 
-from utils import get_list
+from utils import (get_email, get_list, get_name_fields, get_string_or_null,
+                   get_timeslot_data)
 
 
 class Volunteer:
@@ -20,59 +21,13 @@ class Volunteer:
         if not self.volunteer or not isinstance(self.volunteer, dict):
             return None
         
-        def get_name_fields(name):
-            """
-            Extracts the name from the volunteer dictionary.
-            Handles both 'Name' and 'name' keys.
-            """
-            name_fields = {
-                "first_name": None,
-                "last_name": None,
-                "middle_name": None,
-            }
-            if not isinstance(name, str):
-                return name_fields
-            
-            names = name.split(" ")
-
-            if not names:
-                return name_fields
-            
-            name_fields["first_name"] = names[0]
-
-            if len(names) == 2:
-                name_fields["last_name"] = names[1]
-                return name_fields
-            
-            if len(names) > 2:
-                name_fields["last_name"] = names[-1]
-                name_fields["middle_name"] = " ".join(names[1:-1])
-
-            return name_fields
-
-        def get_email(email):
-            """
-            Extracts the email from the volunteer dictionary.
-            Handles both 'E-mail' and 'email' keys.
-            """
-            if not isinstance(email, str):
-                return None
-            
-            email = email.strip().lower()
-            if "@" in email:
-                if email.startswith("mailto:"):
-                    email = email[7:]
-                return email
-            
-            return None
-        
         return {
             "id": uuid.uuid4().hex,
             **get_name_fields(self.volunteer.get("Name", "")),
-            "email": get_email(self.volunteer.get("E-mail")),
-            "phone": self.volunteer.get("Phone Number"),
+            "email": get_email(self.volunteer.get("E-mail", "")),
+            "phone": get_string_or_null(self.volunteer.get("Phone Number", "")),
+            "address": {"postcode": get_string_or_null(self.volunteer.get("Post code", ""))},
         }
-
 
     def get_deal_data(self):
         """
@@ -100,25 +55,11 @@ class Volunteer:
             """
             Extracts time data from the volunteer dictionary.
             """
-            def get_timeslot_data(timeslot):
-                """
-                Extracts timeslot data from a string.
-                """
-                day, *slots = timeslot.split(" ")
-                if not day:
-                    return None
-                
-                if not slots:
-                    return [day, None]
-                
-                return [day, [slot.strip() for slot in slots if slot.strip() and slot.strip() != "|"]]
-            
             timeslots = [get_timeslot_data(timeslot.strip()) for timeslot in self.volunteer.get("Days", "").split(",")]
 
             return {
                 "id": uuid.uuid4().hex,
-                "timeslots": get_list(timeslots),
-            }
+                "timeslots": get_list(timeslots),            }
         
         def get_location_data():
             """
@@ -153,7 +94,7 @@ def get_volunteer(volunteer):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python fill-volunteers.py <path_to_volunteer_json>")
+        print(f"Usage: python {sys.argv[0]} <path_to_volunteer_json>")
         sys.exit(1)
 
     try:
