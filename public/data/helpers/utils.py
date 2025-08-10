@@ -68,3 +68,43 @@ def get_timeslot_data(timeslot):
         return {"day": day, "daytime": []}
     
     return {"day": day, "daytime": [slot.strip() for slot in slots if slot.strip() and slot.strip() != "|"]}
+
+def is_convertible_to_int(s):
+    try:
+        int(s)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def get_address(address):
+    """
+    Extracts address data from a string.
+    examples:
+        "Albert-Kuntz-Straße 63, 12627"
+        "Albrechtstraße 81a 12167 Berlin"
+        "Albrechtstraße 81a, 12167 Berlin"
+        "Am Beelitzhof 12, 14, 14a-c, 16, 16a-c, 14129"
+        "Askanierring 70A-K / Schülerbergstraße 9-11"
+        "Columbiadamm 10, Hangar 1-3, 12101"
+        "Seehausener Str. 47, 49, 13057"
+    """
+    if not isinstance(address, str) or len(address.strip()) == 0:
+        return None
+    
+    address = address.strip()
+    parts = [part.strip() for part in address.split(",")]
+    postcode = None
+
+    if "berlin" in parts[-1].lower():
+        parts[-1] = parts[-1].lower()
+        parts[-1] = parts[-1].replace("berlin", "").strip()
+    
+    if len(parts[-1]) == 5 and is_convertible_to_int(parts[-1]) and len(parts) > 0:
+        postcode = parts[-1]
+        parts.pop()
+
+    return {
+        "street": " ".join(parts),
+        "city": "Berlin",
+        "postcode": postcode,
+    }
