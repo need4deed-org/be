@@ -29,3 +29,19 @@ export enum OpportunityType {
   VOLUNTEERING = "volunteering",
   ACCOMPANYING = "accompanying",
 }
+
+export enum AgentOperatorType {
+  ORGANIZATION = "organization",
+  PERSON = "person",
+}
+
+export enum AgentType {
+  RAC = "RAC",
+}
+
+export enum TranslationEntityType {
+  ACTIVITY = "ACTIVITY",
+  SKILL = "SKILL",
+  CATEGORY = "CATEGORY",
+  LANGUAGE = "LANGUAGE",
+}
