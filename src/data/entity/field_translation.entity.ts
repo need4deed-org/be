@@ -8,10 +8,11 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
+import { TranslationEntityType } from "../types";
 import Language from "./profile/language.entity";
 
 @Entity()
-@Index(["language", "entityName", "entityId", "fieldName"], {
+@Index(["language", "entityType", "entityId", "fieldName"], {
   unique: true,
 })
 export default class FieldTranslation {
@@ -38,7 +39,7 @@ export default class FieldTranslation {
   @IsNotEmpty()
   @IsString()
   @MaxLength(100)
-  entityName: string;
+  entityType: TranslationEntityType;
 
   @Column()
   @IsNotEmpty()
