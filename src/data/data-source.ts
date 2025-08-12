@@ -9,6 +9,7 @@ import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
 import Location from "./entity/location/location.entity";
 import Postcode from "./entity/location/postcode.entity";
+import AgentPostcode from "./entity/m2m/agent-postcode";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import LocationAddress from "./entity/m2m/location-address";
 import LocationDistrict from "./entity/m2m/location-district";
@@ -46,6 +47,7 @@ export const AppDataSource = new DataSource({
     Activity,
     Address,
     Agent,
+    AgentPostcode,
     Category,
     Deal,
     District,

@@ -1,12 +1,6 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  PrimaryGeneratedColumn,
-} from "typeorm";
-import Organization from "../organization.entity";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { AgentOperatorType, AgentType } from "../../types";
+import AgentPostcode from "../m2m/agent-postcode";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
@@ -20,14 +14,25 @@ export default class Agent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Organization, (organization) => organization.agent, {
-    onDelete: "CASCADE",
+  @Column()
+  title: string;
+
+  @Column({
+    type: "enum",
+    enum: AgentType,
+    nullable: false,
+    default: AgentType.RAC,
   })
-  @JoinColumn({ name: "person_id" })
-  organization: Organization;
+  type: AgentType;
 
   @Column()
-  organizationId: number;
+  operatorType: AgentOperatorType;
+
+  @Column()
+  operatorId: number;
+
+  @OneToMany(() => AgentPostcode, (agentPostcode) => agentPostcode.agent)
+  agentPostcode: AgentPostcode[];
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.agent)
   opportunity: Opportunity[];

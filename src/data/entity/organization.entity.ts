@@ -10,11 +10,9 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
-  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
 import Address from "./location/address.entity";
-import Agent from "./opportunity/agent.entity";
 import Person from "./person.entity";
 
 @Entity()
@@ -67,7 +65,4 @@ export default class Organization {
 
   @Column()
   personId: number;
-
-  @OneToMany(() => Agent, (agent) => agent.organization)
-  agent: Agent[];
 }
