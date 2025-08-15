@@ -1,6 +1,5 @@
 import json
 import sys
-import uuid
 
 from utils import (get_email, get_list, get_name_fields, get_string_or_null,
                    get_timeslot_data)
@@ -22,7 +21,6 @@ class Volunteer:
             return None
         
         return {
-            "id": uuid.uuid4().hex,
             **get_name_fields(self.volunteer.get("Name", "")),
             "email": get_email(self.volunteer.get("E-mail", "")),
             "phone": get_string_or_null(self.volunteer.get("Phone Number", "")),
@@ -45,7 +43,7 @@ class Volunteer:
             languages = [get_list(activity.strip().split(" ")) for activity in self.volunteer.get("Languages", "").split(",")]
 
             return {
-                "id": uuid.uuid4().hex,
+                "info": get_string_or_null(self.volunteer.get("Comments", "")),
                 "activities": get_list(activities),
                 "skills": get_list(skills),
                 "languages": get_list(languages),
@@ -58,8 +56,8 @@ class Volunteer:
             timeslots = [get_timeslot_data(timeslot.strip()) for timeslot in self.volunteer.get("Days", "").split(",")]
 
             return {
-                "id": uuid.uuid4().hex,
-                "timeslots": get_list(timeslots),            }
+                "timeslots": get_list(timeslots),
+            }
         
         def get_location_data():
             """
@@ -70,12 +68,23 @@ class Volunteer:
             return {"districts": get_list(districts)}
         
         return {
-            "id": uuid.uuid4().hex,
             "type": "volunteer",
             "profile": get_profile_data(),
             "time": get_time_data(),
             "location": get_location_data(),
         }
+    
+    def get_cgc(self):
+        """
+        Extracts certificate of good conduct status from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Certificate of good conduct", ""))
+    
+    def get_vaccination(self):
+        """
+        Extracts vaccination status from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Measles vacc", ""))
     
 def get_volunteer(volunteer):
     """
@@ -86,7 +95,8 @@ def get_volunteer(volunteer):
 
     volunteer_instance = Volunteer(volunteer)
     return {
-        "id": uuid.uuid4().hex,
+        "statusVaccination": volunteer_instance.get_vaccination(),
+        "statusCGC": volunteer_instance.get_cgc(),
         "person": volunteer_instance.get_person_data(),
         "deal": volunteer_instance.get_deal_data(),
     }
