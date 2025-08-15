@@ -29,7 +29,7 @@ export async function seedSkill(dataSource: DataSource): Promise<void> {
       return result;
     }
     try {
-      const newSkill = new Skill(id);
+      const newSkill = new Skill({ title: id });
       result.push(newSkill);
     } catch (error) {
       throw new Error(`Error creating new skill ${id}: ${error.message}`);
