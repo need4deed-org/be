@@ -7,9 +7,10 @@ import Testimonial from "../testimonial.entity";
 
 @Entity()
 export default class Language {
-  constructor(isoCode: string, title: string) {
-    this.isoCode = isoCode;
-    this.title = title;
+  constructor(language?: Partial<Language>) {
+    if (language) {
+      Object.assign(this, language);
+    }
   }
 
   @PrimaryGeneratedColumn()
