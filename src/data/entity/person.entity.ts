@@ -68,7 +68,7 @@ export default class Person {
   @JoinColumn({ name: "address_id" })
   address: Address;
 
-  @Column()
+  @Column({ nullable: true })
   addressId: number;
 
   @OneToMany(() => User, (user) => user.person)

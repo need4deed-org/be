@@ -25,6 +25,7 @@ export default class ProfileLanguage {
     nullable: true,
     type: "enum",
     enum: LangProficiency,
+    default: LangProficiency.ADVANCED,
   })
   proficiency: LangProficiency;
 
