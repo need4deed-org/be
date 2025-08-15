@@ -31,7 +31,7 @@ export async function seedLanguage(dataSource: DataSource): Promise<void> {
         return result;
       }
       try {
-        const newLanguage = new Language(iso_code, title);
+        const newLanguage = new Language({ isoCode: iso_code, title });
         result.push(newLanguage);
       } catch (error) {
         throw new Error(
