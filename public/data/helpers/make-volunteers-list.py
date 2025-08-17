@@ -69,10 +69,17 @@ class Volunteer:
         
         return {
             "type": "volunteer",
+            "postcode": get_string_or_null(str(self.volunteer.get("Post code"))),
             "profile": get_profile_data(),
             "time": get_time_data(),
             "location": get_location_data(),
         }
+    
+    def get_info(self):
+        """
+        Extracts certificate of good conduct status from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Coordinator Comments", ""))
     
     def get_cgc(self):
         """
@@ -97,6 +104,7 @@ def get_volunteer(volunteer):
     return {
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
+        "info": volunteer_instance.get_info(),
         "person": volunteer_instance.get_person_data(),
         "deal": volunteer_instance.get_deal_data(),
     }
