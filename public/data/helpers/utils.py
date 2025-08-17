@@ -3,7 +3,7 @@ def get_name_fields(name):
     Extracts the names from the string.
     """
     name_fields = {
-        "firstName": None,
+        "firstName": "",
         "lastName": None,
         "middleName": None,
     }
