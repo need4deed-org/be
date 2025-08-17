@@ -39,7 +39,7 @@ export async function seedActivity(dataSource: DataSource): Promise<void> {
         return result;
       }
       try {
-        const newActivity = new Activity(id);
+        const newActivity = new Activity({ title: id });
         const categoryObject = categories.find((cat) => cat.title === category);
         if (!categoryObject) {
           throw new Error(`Error: category ${category} not found.`);

@@ -8,6 +8,7 @@ import {
 } from "typeorm";
 import { DealType } from "../types";
 import Location from "./location/location.entity";
+import Postcode from "./location/postcode.entity";
 import Opportunity from "./opportunity/opportunity.entity";
 import Profile from "./profile/profile.entity";
 import Time from "./time/time.entity";
@@ -36,6 +37,12 @@ export default class Deal {
   })
   @JoinColumn({ name: "profile_id" })
   profile: Profile;
+
+  @ManyToOne(() => Postcode, (postcode) => postcode.deal, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "postcode_id" })
+  postcode: Postcode;
 
   @Column()
   postcodeId: number;

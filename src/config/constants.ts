@@ -7,6 +7,11 @@ export const seedPLZFile = path.join(
   ...publicFixturesFromHere,
   "PLZs.json",
 );
+export const seedDistrictFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "districts-berlin.json",
+);
 
 export const seedLanguageFile = path.join(
   __dirname,
@@ -36,6 +41,12 @@ export const seedSkillFile = path.join(
   __dirname,
   ...publicFixturesFromHere,
   "skills.json",
+);
+
+export const seedVolunteersFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "volunteers.json",
 );
 
 export const urlEmailVerification =

@@ -12,8 +12,10 @@ import Category from "./category.entity";
 
 @Entity()
 export default class Activity {
-  constructor(title: string) {
-    this.title = title;
+  constructor(activity?: Partial<Activity>) {
+    if (activity) {
+      Object.assign(this, activity);
+    }
   }
 
   @PrimaryGeneratedColumn()
