@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { DocumentStatusType } from "../../types";
 import Deal from "../deal.entity";
 import Person from "../person.entity";
 
@@ -24,6 +25,20 @@ export default class Volunteer {
   @IsOptional()
   @IsString()
   info: string;
+
+  @Column({
+    type: "enum",
+    enum: DocumentStatusType,
+    default: DocumentStatusType.UNDEFINED,
+  })
+  statusVaccination: DocumentStatusType;
+
+  @Column({
+    type: "enum",
+    enum: DocumentStatusType,
+    default: DocumentStatusType.UNDEFINED,
+  })
+  statusCGC: DocumentStatusType;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;

@@ -3,23 +3,23 @@ def get_name_fields(name):
     Extracts the names from the string.
     """
     name_fields = {
-        "first_name": None,
-        "last_name": None,
-        "middle_name": None,
+        "firstName": "",
+        "lastName": None,
+        "middleName": None,
     }
     if not isinstance(name, str) or len(name.strip()) == 0:
         return name_fields
     
     names = [item.strip() for item in name.split(" ") if item.strip()]
     
-    name_fields["first_name"] = names[0]
+    name_fields["firstName"] = names[0]
     if len(names) == 2:
-        name_fields["last_name"] = names[1]
+        name_fields["lastName"] = names[1]
         return name_fields
     
     if len(names) > 2:
-        name_fields["last_name"] = names[-1]
-        name_fields["middle_name"] = " ".join(names[1:-1])
+        name_fields["lastName"] = names[-1]
+        name_fields["middleName"] = " ".join(names[1:-1])
 
     return name_fields
 

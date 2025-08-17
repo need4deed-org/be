@@ -4,8 +4,10 @@ import ProfileSkill from "../m2m/profile-skill";
 
 @Entity()
 export default class Skill {
-  constructor(title: string) {
-    this.title = title;
+  constructor(skill?: Partial<Skill>) {
+    if (skill) {
+      Object.assign(this, skill);
+    }
   }
 
   @PrimaryGeneratedColumn()

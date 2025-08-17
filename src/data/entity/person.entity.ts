@@ -36,14 +36,14 @@ export default class Person {
   firstName: string;
 
   @Column({ nullable: true })
-  @IsOptional() // middleName is optional
+  @IsOptional()
   @IsString()
   middleName: string | null;
 
-  @Column()
-  @IsNotEmpty()
+  @Column({ nullable: true })
+  @IsOptional()
   @IsString()
-  lastName: string;
+  lastName: string | null;
 
   @Column({ nullable: true })
   @IsOptional()
@@ -68,7 +68,7 @@ export default class Person {
   @JoinColumn({ name: "address_id" })
   address: Address;
 
-  @Column()
+  @Column({ nullable: true })
   addressId: number;
 
   @OneToMany(() => User, (user) => user.person)
