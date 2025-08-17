@@ -24,10 +24,10 @@ export default class Profile {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  info: string;
+  info: string | null;
 
   @ManyToOne(() => Category, (category) => category.profile, {
     nullable: true,
@@ -36,7 +36,7 @@ export default class Profile {
   category: Category;
 
   @Column({ nullable: true })
-  categoryId: number;
+  categoryId: number | null;
 
   @OneToMany(
     () => ProfileActivity,
