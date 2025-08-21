@@ -4,6 +4,7 @@ import fp from "fastify-plugin";
 import { AppDataSource } from "../../data/data-source";
 import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
+import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 
 const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
   try {
@@ -14,6 +15,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
     fastify.decorate("db", {
       userRepository: AppDataSource.getRepository(User),
       personRepository: AppDataSource.getRepository(Person),
+      volunteerRepository: AppDataSource.getRepository(Volunteer),
     });
 
     if (!fastify.db.userRepository || !fastify.db.personRepository) {

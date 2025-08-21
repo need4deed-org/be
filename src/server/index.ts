@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth";
 import healthRoutes from "./routes/health";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
+import volunteerRoutes from "./routes/volunteer";
 import { RoutePrefix } from "./types";
 import { generateRandomString } from "./utils";
 
@@ -41,6 +42,7 @@ export const start = async () => {
     fastify.register(authRoutes, { prefix: RoutePrefix.AUTH });
     fastify.register(userRoutes, { prefix: RoutePrefix.USER });
     fastify.register(personRoutes, { prefix: RoutePrefix.PERSON });
+    fastify.register(volunteerRoutes, { prefix: RoutePrefix.VOLUNTEER });
 
     await fastify.ready();
 

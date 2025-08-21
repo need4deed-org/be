@@ -5,6 +5,7 @@ import { Repository } from "typeorm";
 import { onRequestHookHandler } from "fastify";
 import { Person } from "../../data/entity/person.entity";
 import { User } from "../../data/entity/user.entity";
+import { Volunteer } from "../../data/entity/volunteer.entity";
 import { AuthOptions } from "./auth";
 
 declare module "fastify" {
@@ -12,6 +13,7 @@ declare module "fastify" {
     db: {
       userRepository: Repository<User>;
       personRepository: Repository<Person>;
+      volunteerRepository: Repository<Volunteer>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
