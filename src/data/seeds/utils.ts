@@ -85,19 +85,19 @@ export function getStartEnd(startEnd: string): { start: Date; end: Date } {
     Nicht: null,
     verfügbar: null,
     available: null,
-    "8:00 - 10:00": { startHour: 8, endHour: 10 },
-    "10:00 - 12:00": { start: 10, end: 12 },
-    "14:00 - 16:00": { startHour: 14, endHour: 16 },
-    "16:00 - 18:00": { startHour: 16, endHour: 18 },
-    "18:00 - 20:00": { startHour: 18, endHour: 20 },
-    "14-17": { startHour: 14, endHour: 17 },
-    "17-20": { startHour: 17, endHour: 20 },
-    "11-14": { startHour: 11, endHour: 14 },
-    "08-11": { startHour: 8, endHour: 11 },
-    morning: { startHour: 8, endHour: 10 },
-    noon: { start: 11, end: 13 },
-    afternoon: { start: 14, end: 16 },
-    evening: { start: 17, end: 20 },
+    "8:00 - 10:00": { startHour: 8, endHour: 11 }, // 8-11
+    "10:00 - 12:00": { startHour: 11, endHour: 14 }, // 11-14
+    "14:00 - 16:00": { startHour: 14, endHour: 17 }, // 14-17
+    "16:00 - 18:00": { startHour: 14, endHour: 17 }, // 14-17
+    "18:00 - 20:00": { startHour: 17, endHour: 20 }, // 17-20
+    "08-11": { startHour: 8, endHour: 11 }, // 8-11
+    "14-17": { startHour: 14, endHour: 17 }, // 14-17
+    "17-20": { startHour: 17, endHour: 20 }, // 17-20
+    "11-14": { startHour: 11, endHour: 14 }, // 11-14
+    morning: { startHour: 8, endHour: 11 }, // 8-11
+    noon: { startHour: 11, endHour: 14 }, // 11-14
+    afternoon: { startHour: 14, endHour: 17 }, // 14-17
+    evening: { startHour: 17, endHour: 20 }, // 17-20
   };
 
   if (!map[startEnd]) {
