@@ -5,19 +5,7 @@ import { serialize } from "../../services";
 import { volunteerSerializer } from "../../services/serializers/volunteerSerializer";
 import { volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
-import { Hour, RoutePrefix, VolunteerAPI } from "../types";
-
-const dummyVolunteer: VolunteerAPI = {
-  name: "XYN",
-  phone: "123",
-  email: "a@b.cc",
-  nativeLanguages: ["XUJ"],
-  fluentLanguages: ["XUJ"],
-  intermediateLanguages: ["XUJ"],
-  availability: [{ day: "ByDay.SU", daytime: [Hour.H07, Hour.H19] }],
-  activities: ["xnr", "xyn", "xuj"],
-  skills: ["xnr", "xyn", "xuj"],
-} as unknown as VolunteerAPI;
+import { RoutePrefix, VolunteerAPI } from "../types";
 
 async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -85,7 +73,7 @@ async function volunteerRoutes(
 
       return reply.send({
         message: `Volunteers page ${page}`,
-        data: [dummyVolunteer],
+        data,
       });
     },
   );
