@@ -7,6 +7,8 @@ import { volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix, VolunteerAPI } from "../types";
 
+const defaultTake = 12;
+
 async function volunteerRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
@@ -40,41 +42,46 @@ async function volunteerRoutes(
       },
     },
     async (request, reply) => {
-      const page = parseInt(request.query.page) || 1;
-      const take = parseInt(request.query.limit) || 12;
+      const page = Math.abs(parseInt(request.query.page)) || 1;
+      const take = Math.abs(parseInt(request.query.limit)) || defaultTake;
       const skip = (page - 1) * take;
 
-      const volunteerRepository = fastify.db.volunteerRepository;
+      try {
+        const volunteerRepository = fastify.db.volunteerRepository;
 
-      const volunteers = await volunteerRepository.find({
-        skip,
-        take,
-        relations: [
-          "person",
-          "person.address",
-          "person.address.postcode",
-          "deal",
-          "deal.postcode",
-          "deal.profile",
-          "deal.profile.profileActivity.activity",
-          "deal.profile.profileSkill.skill",
-          "deal.profile.profileLanguage.language",
-          "deal.time",
-          "deal.time.timeTimeslot.timeslot",
-          "deal.location",
-          "deal.location.locationPostcode.postcode",
-          "deal.location.locationDistrict.district",
-          "deal.location.locationAddress.address",
-          "deal.location.locationAddress.address.postcode",
-        ],
-      });
+        const volunteers = await volunteerRepository.find({
+          skip,
+          take,
+          relations: [
+            "person",
+            "person.address",
+            "person.address.postcode",
+            "deal",
+            "deal.postcode",
+            "deal.profile",
+            "deal.profile.profileActivity.activity",
+            "deal.profile.profileSkill.skill",
+            "deal.profile.profileLanguage.language",
+            "deal.time",
+            "deal.time.timeTimeslot.timeslot",
+            "deal.location",
+            "deal.location.locationPostcode.postcode",
+            "deal.location.locationDistrict.district",
+            "deal.location.locationAddress.address",
+            "deal.location.locationAddress.address.postcode",
+          ],
+        });
 
-      const data = serialize(volunteers, volunteerSerializer);
+        const data = serialize(volunteers, volunteerSerializer);
 
-      return reply.send({
-        message: `Volunteers page ${page}`,
-        data,
-      });
+        return reply.status(200).send({
+          message: `Volunteers page ${page}`,
+          data,
+        });
+      } catch (error) {
+        fastify.log.error(`Error fetching volunteers: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
     },
   );
 }
