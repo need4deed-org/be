@@ -2,7 +2,9 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 
 import { AppDataSource } from "../../data/data-source";
+import FieldTranslation from "../../data/entity/field_translation.entity";
 import Person from "../../data/entity/person.entity";
+import Language from "../../data/entity/profile/language.entity";
 import User from "../../data/entity/user.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 
@@ -16,6 +18,8 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
       userRepository: AppDataSource.getRepository(User),
       personRepository: AppDataSource.getRepository(Person),
       volunteerRepository: AppDataSource.getRepository(Volunteer),
+      languageRepository: AppDataSource.getRepository(Language),
+      fieldTranslationRepository: AppDataSource.getRepository(FieldTranslation),
     });
 
     if (!fastify.db.userRepository || !fastify.db.personRepository) {
