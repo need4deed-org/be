@@ -3,9 +3,11 @@ import "fastify";
 import { Repository } from "typeorm";
 
 import { onRequestHookHandler } from "fastify";
-import { Person } from "../../data/entity/person.entity";
-import { User } from "../../data/entity/user.entity";
-import { Volunteer } from "../../data/entity/volunteer.entity";
+import FieldTranslation from "../../data/entity/field_translation.entity";
+import Person from "../../data/entity/person.entity";
+import Language from "../../data/entity/profile/language.entity";
+import User from "../../data/entity/user.entity";
+import Volunteer from "../../data/entity/volunteer.entity";
 import { AuthOptions } from "./auth";
 
 declare module "fastify" {
@@ -14,6 +16,8 @@ declare module "fastify" {
       userRepository: Repository<User>;
       personRepository: Repository<Person>;
       volunteerRepository: Repository<Volunteer>;
+      languageRepository: Repository<Language>;
+      fieldTranslationRepository: Repository<FieldTranslation>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
