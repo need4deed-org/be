@@ -64,9 +64,11 @@ function getLanguages(
 ) {
   return profileLanguage
     .filter((pl) => pl.proficiency === proficiency)
-    .map((pl) => pl.language.title);
+    .map((pl) => pl.language.translation || pl.language.title);
 }
 
 function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems.map((pa) => pa[entityName].title);
+  return profileItems.map(
+    (pa) => pa[entityName].translation || pa[entityName].title,
+  );
 }
