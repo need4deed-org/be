@@ -41,4 +41,6 @@ export default class Activity {
     (profileActivity) => profileActivity.activity,
   )
   profileActivity: ProfileActivity[];
+
+  translation: string;
 }

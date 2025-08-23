@@ -21,4 +21,6 @@ export default class Skill {
 
   @OneToMany(() => ProfileSkill, (profileSkill) => profileSkill.skill)
   profileSkill: ProfileSkill[];
+
+  translation: string;
 }
