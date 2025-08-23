@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
-import { responseErrors } from "../../data/schema/responseErrors";
+import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 
 async function healthRoutes(

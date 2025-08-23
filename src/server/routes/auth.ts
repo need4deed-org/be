@@ -7,13 +7,13 @@ import {
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../config/constants";
-import { responseErrors } from "../../data/schema/responseErrors";
+import { responseErrors } from "../schema/responseErrors";
 import {
   refreshAccessResponseSchema,
   refreshAccessSchema,
   userLoginResponseSchema,
   userLoginSchema,
-} from "../../data/schema/user.schema";
+} from "../schema/user.schema";
 import { RoutePrefix } from "../types";
 
 async function authRoutes(

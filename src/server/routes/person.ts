@@ -3,12 +3,9 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
-import {
-  newPersonSchema,
-  personResponseSchema,
-} from "../../data/schema/person.schema";
-import { responseErrors } from "../../data/schema/responseErrors";
 import { Role } from "../../data/types";
+import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
+import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 
 async function personRoutes(

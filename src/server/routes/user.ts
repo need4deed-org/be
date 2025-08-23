@@ -2,19 +2,18 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
-// import { defaultFrom } from "../../config/constants";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
-import { responseErrors } from "../../data/schema/responseErrors";
+import { Role } from "../../data/types";
+import { hashPassword } from "../../data/utils";
+import { sendVerificationEmail } from "../../services";
+import { responseErrors } from "../schema/responseErrors";
 import {
   createUserBodySchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
-} from "../../data/schema/user.schema";
-import { Role } from "../../data/types";
-import { hashPassword } from "../../data/utils";
-import { sendVerificationEmail } from "../../services";
+} from "../schema/user.schema";
 import { RoutePrefix } from "../types";
 
 async function userRoutes(
