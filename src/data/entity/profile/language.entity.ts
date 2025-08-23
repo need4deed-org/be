@@ -45,4 +45,6 @@ export default class Language {
     (eventTranslation) => eventTranslation.language,
   )
   eventTranslation: EventTranslation[];
+
+  translation: string;
 }

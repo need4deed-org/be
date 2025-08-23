@@ -1,3 +1,4 @@
+import { Lang } from "need4deed-sdk";
 import * as crypto from "node:crypto";
 
 /**
@@ -22,4 +23,26 @@ export function generateRandomString(length) {
   const numBytes = Math.ceil(length / 2);
   const buffer = crypto.randomBytes(numBytes);
   return buffer.toString("hex").slice(0, length); // Slice to ensure exact length if odd
+}
+
+/**
+ * Converts a given ISO 639-1 language code string into a validated `Lang` enum member.
+ *
+ * This function normalizes the input `isoCode` to lowercase and checks if it exists
+ * within the predefined `Lang` enum values. If a match is found, it returns the
+ * validated `Lang` code; otherwise, it returns `null`.
+ *
+ * @param {string} isoCode - The ISO 639-1 language code to validate (e.g., "en", "ES", "fr").
+ * @returns {Lang | null} The validated `Lang` code if it's a supported language, otherwise `null`.
+ */
+export function getLanguageCode(isoCode: string): Lang | null {
+  if (typeof isoCode !== "string") {
+    return null;
+  }
+  const isoCodeNormalized = isoCode.toLowerCase();
+  if (isoCodeNormalized in Object.values(Lang)) {
+    return isoCodeNormalized as Lang;
+  }
+
+  return null;
 }
