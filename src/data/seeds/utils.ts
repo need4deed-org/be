@@ -79,7 +79,9 @@ export function getDocumentStatus(status: string): DocumentStatusType {
   return statusMap[status] || DocumentStatusType.UNDEFINED;
 }
 
-export function getStartEnd(startEnd: string): { start: Date; end: Date } {
+export function getStartEnd(
+  startEnd: string,
+): { start: Date; end: Date } | null {
   const map = {
     not: null,
     Nicht: null,
