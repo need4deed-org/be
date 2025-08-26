@@ -57,3 +57,10 @@ export interface VolunteerAPI {
   activities: string[];
   skills: string[];
 }
+
+export enum OccasionalType {
+  UNDEFINED = "undefined",
+  WEEKENDS = "weekends",
+  WEEKDAYS = "weekdays",
+  OCCASIONALLY = "occasionally",
+}
