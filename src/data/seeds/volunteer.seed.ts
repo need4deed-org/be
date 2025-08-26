@@ -1,6 +1,7 @@
 import { LangProficiency } from "need4deed-sdk";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
+import { OccasionalType } from "../../server/types";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
@@ -247,26 +248,47 @@ async function createDeal(
   await timeRepository.save(time);
 
   for (const { day, daytime } of dealData.time.timeslots) {
-    for (const startEnd of daytime) {
-      const timeframe = getStartEnd(startEnd);
+    let rrule: string | null = null;
+    if (day !== "Occasional") {
+      rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
+      for (const startEnd of daytime) {
+        const timeframe = getStartEnd(startEnd);
 
-      if (timeframe) {
-        const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
-        let timeslot = await repositoryTimeslot.findOne({ where: { rrule } });
-        if (!timeslot) {
-          timeslot = new Timeslot({
-            rrule,
-            ...getStartEnd(startEnd),
+        if (timeframe) {
+          let timeslot = await repositoryTimeslot.findOne({
+            where: { rrule, ...timeframe },
           });
-          await repositoryTimeslot.save(timeslot);
-        }
+          if (!timeslot) {
+            timeslot = new Timeslot({
+              rrule,
+              ...timeframe,
+            });
+            await repositoryTimeslot.save(timeslot);
+          }
 
-        const timeTimeslot = new TimeTimeslot({
-          time,
-          timeslot,
-        });
-        await timeTimeslotRepository.save(timeTimeslot);
+          const timeTimeslot = new TimeTimeslot({
+            time,
+            timeslot,
+          });
+          await timeTimeslotRepository.save(timeTimeslot);
+        }
       }
+    } else {
+      let occasional = OccasionalType.UNDEFINED;
+      if (daytime.includes("Weekends") && daytime.includes("Weekdays")) {
+        occasional = OccasionalType.OCCASIONALLY;
+      } else if (daytime.includes("Weekends")) {
+        occasional = OccasionalType.WEEKENDS;
+      } else if (daytime.includes("Weekdays")) {
+        occasional = OccasionalType.WEEKDAYS;
+      }
+      const timeslot = new Timeslot({ occasional });
+      await repositoryTimeslot.save(timeslot);
+      const timeTimeslot = new TimeTimeslot({
+        time,
+        timeslot,
+      });
+      await timeTimeslotRepository.save(timeTimeslot);
     }
   }
 
