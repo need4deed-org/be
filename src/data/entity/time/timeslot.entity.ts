@@ -1,5 +1,6 @@
 import { IsDate, IsNotEmpty, IsOptional, IsString } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { OccasionalType } from "../../../server/types";
 import TimeTimeslot from "../m2m/time-timeslot";
 
 @Entity()
@@ -32,6 +33,14 @@ export default class Timeslot {
   @IsOptional()
   @IsDate()
   end: Date;
+
+  @Column({
+    nullable: true,
+    type: "enum",
+    enum: OccasionalType,
+  })
+  @IsOptional()
+  occasional: OccasionalType;
 
   @OneToMany(() => TimeTimeslot, (timeTimeslot) => timeTimeslot.timeslot)
   timeTimeslot: TimeTimeslot[];
