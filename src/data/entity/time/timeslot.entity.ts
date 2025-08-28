@@ -1,4 +1,4 @@
-import { IsDate, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsDate, IsOptional, IsString } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { OccasionalType } from "../../../server/types";
 import TimeTimeslot from "../m2m/time-timeslot";
@@ -24,8 +24,8 @@ export default class Timeslot {
   @IsString()
   rrule: string;
 
-  @Column()
-  @IsNotEmpty()
+  @Column({ nullable: true })
+  @IsOptional()
   @IsDate()
   start: Date;
 
