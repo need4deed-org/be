@@ -248,9 +248,8 @@ async function createDeal(
   await timeRepository.save(time);
 
   for (const { day, daytime } of dealData.time.timeslots) {
-    let rrule: string | null = null;
     if (day !== "Occasional") {
-      rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
+      const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
       for (const startEnd of daytime) {
         const timeframe = getStartEnd(startEnd);
 
@@ -295,7 +294,7 @@ async function createDeal(
   const location = new Location();
   await locationRepository.save(location);
 
-  for (const title of dealData.location.districts) {
+  for (let title of dealData.location.districts) {
     let district = await districtRepository.findOne({ where: { title } });
     if (!district) {
       district = new District({ title });
