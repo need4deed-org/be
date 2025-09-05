@@ -45,12 +45,3 @@ export enum TranslationEntityType {
   CATEGORY = "CATEGORY",
   LANGUAGE = "LANGUAGE",
 }
-
-export enum DocumentStatusType {
-  UNDEFINED = "undefined",
-  YES = "yes",
-  NO = "no",
-  ASKED_TO_APPLY = "asked_to_apply",
-  APPLIED_SELF = "applied_self",
-  APPLIED_N4D = "applied_n4d",
-}

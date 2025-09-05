@@ -1,7 +1,11 @@
-import { LangProficiency } from "need4deed-sdk";
+import {
+  DocumentStatusType,
+  LangProficiency,
+  OccasionalType,
+} from "need4deed-sdk";
 import { DataSource, EntityManager, Repository } from "typeorm";
+
 import { seedVolunteersFile } from "../../config/constants";
-import { OccasionalType } from "../../server/types";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
@@ -20,7 +24,7 @@ import Skill from "../entity/profile/skill.entity";
 import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
-import { DealType, DocumentStatusType } from "../types";
+import { DealType } from "../types";
 import { categorize, readJsonAsync } from "../utils";
 import {
   getDocumentStatus,

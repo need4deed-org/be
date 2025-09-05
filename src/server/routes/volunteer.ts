@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import { ApiVolunteerGetList } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
 import { Repository } from "typeorm";
@@ -11,7 +12,7 @@ import { serialize } from "../../services";
 import { volunteerSerializer } from "../../services/serializers/volunteerSerializer";
 import { volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
-import { RoutePrefix, VolunteerAPI } from "../types";
+import { RoutePrefix } from "../types";
 import { getLanguageCode } from "../utils";
 
 const defaultTake = 12;
@@ -30,7 +31,7 @@ async function volunteerRoutes(
     };
     Reply: {
       message: string;
-      data?: Array<VolunteerAPI>;
+      data?: Array<ApiVolunteerGetList>;
     };
   }>(
     prefixedPath,
@@ -85,6 +86,7 @@ async function volunteerRoutes(
         await addTranslatedFields(fastify, volunteers, isoCode);
 
         const data = serialize(volunteers, volunteerSerializer);
+        fastify.log.debug(`Serialized volunteers data: ${data}`);
 
         return reply.status(200).send({
           message: `Volunteers page ${page}`,
