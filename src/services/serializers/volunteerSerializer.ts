@@ -1,15 +1,19 @@
-import { LangProficiency } from "need4deed-sdk";
+import {
+  ApiVolunteerGetList,
+  ByDay,
+  Daytime,
+  Hour,
+  LangProficiency,
+} from "need4deed-sdk";
+
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { ByDay, Daytime, Hour, VolunteerAPI } from "../../server/types";
 
-export function volunteerSerializer(volunteer: Volunteer): VolunteerAPI {
+export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
   return {
     name: getName(volunteer.person),
-    phone: volunteer.person.phone,
-    email: volunteer.person.email,
     nativeLanguages: getLanguages(
       volunteer.deal.profile.profileLanguage,
       LangProficiency.NATIVE,
@@ -25,6 +29,7 @@ export function volunteerSerializer(volunteer: Volunteer): VolunteerAPI {
     availability: getAvailability(volunteer.deal.time.timeTimeslot),
     activities: getTitles(volunteer.deal.profile.profileActivity, "activity"),
     skills: getTitles(volunteer.deal.profile.profileSkill, "skill"),
+    locations: getTitles(volunteer.deal.location.locationDistrict, "district"),
   };
 }
 
@@ -53,9 +58,9 @@ function getAvailability(timeTimeslot: TimeTimeslot[]) {
 }
 
 function getName(person: Person) {
-  return `${person.firstName}${
+  return `${person.firstName ?? ""}${
     person.middleName ? " " + person.middleName : ""
-  } ${person.lastName}`.trim();
+  } ${person.lastName ?? ""}`.trim();
 }
 
 function getLanguages(

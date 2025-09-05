@@ -1,17 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$ref": "#/definitions/VolunteerAPI",
+  "$ref": "#/definitions/ApiVolunteerGetList",
   "definitions": {
-    "VolunteerAPI": {
+    "ApiVolunteerGetList": {
       "type": "object",
       "properties": {
         "name": {
-          "type": "string"
-        },
-        "phone": {
-          "type": "string"
-        },
-        "email": {
           "type": "string"
         },
         "nativeLanguages": {
@@ -113,17 +107,22 @@
           "items": {
             "type": "string"
           }
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "name",
-        "phone",
-        "email",
         "nativeLanguages",
         "fluentLanguages",
         "intermediateLanguages",
         "availability",
         "activities",
+        "locations",
         "skills"
       ],
       "additionalProperties": false
