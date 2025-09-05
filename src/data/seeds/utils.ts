@@ -1,8 +1,9 @@
+import { DocumentStatusType } from "need4deed-sdk";
 import { Repository } from "typeorm";
+
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
-import { DocumentStatusType } from "../types";
 
 export async function getLanguage(
   title: string,
