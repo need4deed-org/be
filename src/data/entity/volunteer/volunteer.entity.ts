@@ -1,4 +1,6 @@
 import { IsOptional, IsString } from "class-validator";
+import { DocumentStatusType } from "need4deed-sdk";
+
 import {
   Column,
   Entity,
@@ -6,7 +8,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import { DocumentStatusType } from "../../types";
 import Deal from "../deal.entity";
 import Person from "../person.entity";
 

@@ -1,6 +1,7 @@
 import { IsDate, IsOptional, IsString } from "class-validator";
+import { OccasionalType } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import { OccasionalType } from "../../../server/types";
+
 import TimeTimeslot from "../m2m/time-timeslot";
 
 @Entity()
