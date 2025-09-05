@@ -1,8 +1,11 @@
-import { DocumentStatusType, LangProficiency } from "need4deed-sdk";
+import {
+  DocumentStatusType,
+  LangProficiency,
+  OccasionalType,
+} from "need4deed-sdk";
 import { DataSource, EntityManager, Repository } from "typeorm";
 
 import { seedVolunteersFile } from "../../config/constants";
-import { OccasionalType } from "../../server/types";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
