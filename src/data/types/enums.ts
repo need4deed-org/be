@@ -40,8 +40,9 @@ export enum AgentType {
 }
 
 export enum TranslationEntityType {
-  ACTIVITY = "ACTIVITY",
-  SKILL = "SKILL",
-  CATEGORY = "CATEGORY",
-  LANGUAGE = "LANGUAGE",
+  NONE = "none",
+  ACTIVITY = "activity",
+  SKILL = "skill",
+  CATEGORY = "category",
+  LANGUAGE = "language",
 }
