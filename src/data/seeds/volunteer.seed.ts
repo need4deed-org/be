@@ -3,7 +3,7 @@ import {
   LangProficiency,
   OccasionalType,
 } from "need4deed-sdk";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
 
 import { seedVolunteersFile } from "../../config/constants";
 import Deal from "../entity/deal.entity";
@@ -25,13 +25,8 @@ import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { DealType } from "../types";
-import { categorize, readJsonAsync } from "../utils";
-import {
-  getDocumentStatus,
-  getEnumValue,
-  getLanguage,
-  getStartEnd,
-} from "./utils";
+import { categorize, getStartEnd, readJsonAsync } from "../utils";
+import { getDocumentStatus, getEnumValue, getLanguage } from "./utils";
 
 interface ProfileJSON {
   info: string;
@@ -252,14 +247,16 @@ async function createDeal(
   await timeRepository.save(time);
 
   for (const { day, daytime } of dealData.time.timeslots) {
+    const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
+    let occasional: OccasionalType | null = null;
+    let timeslot: Timeslot;
     if (day !== "Occasional") {
-      const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
       for (const startEnd of daytime) {
         const timeframe = getStartEnd(startEnd);
 
         if (timeframe) {
-          let timeslot = await repositoryTimeslot.findOne({
-            where: { rrule, ...timeframe },
+          timeslot = await repositoryTimeslot.findOne({
+            where: { rrule, ...timeframe, occasional: IsNull() },
           });
           if (!timeslot) {
             timeslot = new Timeslot({
@@ -268,16 +265,10 @@ async function createDeal(
             });
             await repositoryTimeslot.save(timeslot);
           }
-
-          const timeTimeslot = new TimeTimeslot({
-            time,
-            timeslot,
-          });
-          await timeTimeslotRepository.save(timeTimeslot);
         }
       }
     } else {
-      let occasional = OccasionalType.UNDEFINED;
+      occasional = OccasionalType.UNDEFINED;
       if (daytime.includes("Weekends") && daytime.includes("Weekdays")) {
         occasional = OccasionalType.OCCASIONALLY;
       } else if (daytime.includes("Weekends")) {
@@ -285,8 +276,14 @@ async function createDeal(
       } else if (daytime.includes("Weekdays")) {
         occasional = OccasionalType.WEEKDAYS;
       }
-      const timeslot = new Timeslot({ occasional });
+      timeslot = await repositoryTimeslot.findOne({
+        where: { occasional, rrule: IsNull(), start: IsNull(), end: IsNull() },
+      });
+      timeslot = new Timeslot({ occasional });
       await repositoryTimeslot.save(timeslot);
+    }
+
+    if (timeslot) {
       const timeTimeslot = new TimeTimeslot({
         time,
         timeslot,
