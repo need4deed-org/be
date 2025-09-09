@@ -1,19 +1,24 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { ApiVolunteerGetList } from "need4deed-sdk";
+import { ApiVolunteerGetList, VolunteerFormData } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
 import { Repository } from "typeorm";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { TranslationEntityType } from "../../data/types";
-import { serialize } from "../../services";
-import { volunteerSerializer } from "../../services/serializers/volunteerSerializer";
-import { volunteerResponseSchema } from "../schema";
+import { Id, TranslationEntityType } from "../../data/types";
+import {
+  parseFormData,
+  serialize,
+  volunteerFormParser,
+  volunteerSerializer,
+} from "../../services";
+import { volunteerFormSchema, volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import { getLanguageCode } from "../utils";
+import { writeVolunteer } from "../utils/writeVolunteer";
 
 const defaultTake = 12;
 
@@ -86,7 +91,6 @@ async function volunteerRoutes(
         await addTranslatedFields(fastify, volunteers, isoCode);
 
         const data = serialize(volunteers, volunteerSerializer);
-        fastify.log.debug(`Serialized volunteers data: ${data}`);
 
         return reply.status(200).send({
           message: `Volunteers page ${page}`,
@@ -94,6 +98,58 @@ async function volunteerRoutes(
         });
       } catch (error) {
         fastify.log.error(`Error fetching volunteers: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.post<{
+    Querystring: {
+      language: string;
+    };
+    Body: VolunteerFormData;
+    Reply: {
+      message: string;
+      data?: { id: Id };
+    };
+  }>(
+    prefixedPath,
+    {
+      schema: {
+        body: volunteerFormSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: {
+                type: "object",
+                properties: { id: { type: ["string", "number"] } },
+                required: ["id"],
+              },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      fastify.log.debug(`endpoint:POST: ${JSON.stringify(request.body)}`);
+      try {
+        const volunteer = await parseFormData(
+          request.body,
+          volunteerFormParser,
+        );
+
+        const id = await writeVolunteer(volunteer);
+
+        return reply.status(200).send({
+          message: "Volunteer stored.",
+          data: { id },
+        });
+      } catch (error) {
+        fastify.log.error(`Error writing volunteer: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
