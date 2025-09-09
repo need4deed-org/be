@@ -5,3 +5,6 @@ export * from "./user.schema";
 import volunteerSchemaJson from "./volunteer-api.json";
 export const volunteerResponseSchema =
   volunteerSchemaJson.definitions.ApiVolunteerGetList;
+
+import volunteerFormSchemaJson from "./volunteer-form.json";
+export const volunteerFormSchema = volunteerFormSchemaJson;
