@@ -19,6 +19,7 @@ import { volunteerFormSchema, volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import { getLanguageCode } from "../utils";
+import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
 
 const defaultTake = 12;
@@ -143,9 +144,15 @@ async function volunteerRoutes(
           volunteerFormParser,
         );
 
-        await parseFormData(request.body.leadFrom, leadFromParser);
+        const leads = await parseFormData(
+          request.body.leadFrom,
+          leadFromParser,
+        );
 
         const id = await writeVolunteer(volunteer);
+        if (id) {
+          await updateLeads(leads);
+        }
 
         return reply.status(200).send({
           message: "Volunteer stored.",
