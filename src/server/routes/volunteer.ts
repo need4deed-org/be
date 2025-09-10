@@ -9,6 +9,7 @@ import Language from "../../data/entity/profile/language.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { Id, TranslationEntityType } from "../../data/types";
 import {
+  leadFromParser,
   parseFormData,
   serialize,
   volunteerFormParser,
@@ -141,6 +142,8 @@ async function volunteerRoutes(
           request.body,
           volunteerFormParser,
         );
+
+        await parseFormData(request.body.leadFrom, leadFromParser);
 
         const id = await writeVolunteer(volunteer);
 
