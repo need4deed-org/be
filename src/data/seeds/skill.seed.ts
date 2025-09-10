@@ -40,6 +40,6 @@ export async function seedSkill(dataSource: DataSource): Promise<void> {
   try {
     await skillRepository.insert(skillsForInsert);
   } catch (error) {
-    throw new Error(`Error inserting activities: ${error.message}`);
+    throw new Error(`Error inserting skills: ${error.message}`);
   }
 }
