@@ -27,24 +27,11 @@ export async function getProfileEntityByTitle<
   m2mEntity: new (args: unknown) => M,
   key?: keyof M,
 ): Promise<M | null> {
-  const repository = AppDataSource.getRepository(entity);
-  let instance = await repository.findOneBy({ title: entityTitle });
-  if (!instance && entityType !== TranslationEntityType.NONE) {
-    const fieldTranslationRepository =
-      AppDataSource.getRepository(FieldTranslation);
-
-    const translation = await fieldTranslationRepository.findOne({
-      where: {
-        entityType: entityType,
-        translation: entityTitle,
-      },
-    });
-    if (translation) {
-      instance = await repository.findOneBy({
-        id: translation.entityId,
-      });
-    }
-  }
+  const instance = await getInstanceByTranslation(
+    entityTitle,
+    entity,
+    entityType,
+  );
 
   if (instance) {
     const profileEntity = new m2mEntity({
@@ -68,4 +55,37 @@ export async function getTimeslot(
   }
 
   return timeslot;
+}
+
+export async function getInstanceByTranslation<
+  E extends new (args: unknown) => { id: number; title: string },
+>(
+  entityTitle: string,
+  entity: E,
+  entityType: TranslationEntityType,
+): Promise<InstanceType<E> | null> {
+  const repository = AppDataSource.getRepository(entity);
+  let instance = await repository.findOneBy({ title: entityTitle });
+  if (!instance && entityType !== TranslationEntityType.NONE) {
+    const fieldTranslationRepository =
+      AppDataSource.getRepository(FieldTranslation);
+
+    const translation = await fieldTranslationRepository.findOne({
+      where: {
+        entityType: entityType,
+        translation: entityTitle,
+      },
+    });
+    if (translation) {
+      instance = await repository.findOneBy({
+        id: translation.entityId,
+      });
+    }
+  }
+
+  if (instance) {
+    return instance as InstanceType<E>;
+  }
+
+  return null;
 }
