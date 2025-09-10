@@ -8,22 +8,27 @@
         "name": {
           "type": "string"
         },
-        "nativeLanguages": {
+        "languages": {
           "type": "array",
           "items": {
-            "type": "string"
-          }
-        },
-        "fluentLanguages": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "intermediateLanguages": {
-          "type": "array",
-          "items": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "proficiency": {
+                "type": "string",
+                "enum": [
+                  "beginner",
+                  "intermediate",
+                  "advanced",
+                  "fluent",
+                  "native"
+                ]
+              },
+              "additionalProperties": false
+            },
+            "required": ["title", "proficiency"]
           }
         },
         "availability": {
@@ -117,9 +122,7 @@
       },
       "required": [
         "name",
-        "nativeLanguages",
-        "fluentLanguages",
-        "intermediateLanguages",
+        "languages",
         "availability",
         "activities",
         "locations",
