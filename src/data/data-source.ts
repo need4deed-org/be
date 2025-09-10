@@ -5,6 +5,7 @@ import Deal from "./entity/deal.entity";
 import EventN4D from "./entity/event/event.entity";
 import EventTranslation from "./entity/event/event_translation.entity";
 import FieldTranslation from "./entity/field_translation.entity";
+import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
 import Location from "./entity/location/location.entity";
@@ -56,6 +57,7 @@ export const AppDataSource = new DataSource({
     EventTranslation,
     FieldTranslation,
     Language,
+    LeadFrom,
     Location,
     LocationAddress,
     LocationDistrict,
