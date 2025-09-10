@@ -43,6 +43,12 @@ export const seedSkillFile = path.join(
   "skills.json",
 );
 
+export const seedLeadFromFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "leads.json",
+);
+
 export const seedVolunteersFile = path.join(
   __dirname,
   ...publicFixturesFromHere,
