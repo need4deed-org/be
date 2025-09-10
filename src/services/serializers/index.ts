@@ -1,3 +1,4 @@
+export * from "./dealParser";
 export * from "./parseFormData";
 export * from "./serialize";
 export * from "./volunteerFormParser";
