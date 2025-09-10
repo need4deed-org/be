@@ -27,7 +27,8 @@
           "$ref": "#/definitions/DocumentStatusType"
         },
         "leadFrom": {
-          "type": "string"
+          "type": "array",
+          "items": { "$ref": "#/definitions/OptionId" }
         },
         "schedule": {
           "type": "array",
