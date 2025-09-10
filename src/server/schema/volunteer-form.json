@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/VolunteerFormData",
+  "definitions": {
+    "VolunteerFormData": {
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "$ref": "#/definitions/OptionId"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "number"
+        },
+        "goodConductCertificate": {
+          "$ref": "#/definitions/DocumentStatusType"
+        },
+        "measlesVaccination": {
+          "$ref": "#/definitions/DocumentStatusType"
+        },
+        "leadFrom": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "number"
+              },
+              {
+                "$ref": "#/definitions/OptionId"
+              }
+            ]
+          }
+        },
+        "districts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OptionId"
+          }
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OptionId"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OptionId"
+          }
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ApiLanguage"
+          }
+        },
+        "comments": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fullName",
+        "phone",
+        "email",
+        "postcode",
+        "goodConductCertificate",
+        "measlesVaccination",
+        "leadFrom",
+        "schedule",
+        "districts",
+        "activities",
+        "skills",
+        "languages",
+        "comments"
+      ],
+      "additionalProperties": false
+    },
+    "Id": {
+      "type": ["string", "number"]
+    },
+    "DocumentStatusType": {
+      "type": "string",
+      "enum": [
+        "undefined",
+        "yes",
+        "no",
+        "asked_to_apply",
+        "applied_self",
+        "applied_n4d"
+      ]
+    },
+    "OptionId": {
+      "type": ["string", "number"]
+    },
+    "ApiLanguage": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "proficiency": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
+        },
+        "additionalProperties": false
+      },
+      "required": ["title", "proficiency"]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, Length } from "class-validator";
+import { IsString, Length } from "class-validator";
 import {
   Column,
   Entity,
@@ -28,8 +28,7 @@ export default class Address {
   @Length(100)
   title: string;
 
-  @Column()
-  @IsNotEmpty()
+  @Column({ nullable: true })
   @IsString()
   @Length(200)
   street: string;
