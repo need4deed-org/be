@@ -4,9 +4,11 @@ import {
   seedActivityFile,
   seedCategoryFile,
   seedLanguageInUseFile,
+  seedLeadFromFile,
   seedSkillFile,
 } from "../../config/constants";
 import FieldTranslation from "../entity/field_translation.entity";
+import LeadFrom from "../entity/lead.entity";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
@@ -273,30 +275,57 @@ async function seedSkills(
         )
       : [],
   );
+}
+
+async function seedLeeds(
+  fieldTranslationRepository: Repository<FieldTranslation>,
+  leadFromRepository: Repository<LeadFrom>,
+  langEN: Language,
+  langDE: Language,
+) {
+  const leads = await leadFromRepository.find();
+
+  const leadTranslations = (await readJsonAsync(
+    seedLeadFromFile,
+  )) as OptionJSON[];
+
+  const existingLeads = await fieldTranslationRepository.find({
+    where: { entityType: TranslationEntityType.LEAD },
+    relations: ["language"],
+  });
+
+  const existingLeadFromTranslationsSet = new Set(
+    existingLeads
+      ? existingLeads.map(
+          (translation) =>
+            `${translation.language.isoCode}_${translation.translation}`,
+        )
+      : [],
+  );
 
   const translationsForInsert: FieldTranslation[] = [];
-  for (const skillTranslation of skillTranslations) {
+  for (const skillTranslation of leadTranslations) {
     const {
       id,
       title: { en, de },
     } = skillTranslation;
 
-    const skill = skills.find((_skill) => _skill.title === id);
+    const lead = leads.find((_lead) => _lead.title === id);
 
-    if (!existingSkillTranslationsSet.has(`${isoCodeEN}_${en}`)) {
+    if (!existingLeadFromTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
       translationEN.translation = en;
-      translationEN.entityType = TranslationEntityType.SKILL;
-      translationEN.entityId = skill.id;
+      translationEN.entityType = TranslationEntityType.LEAD;
+      translationEN.entityId = lead.id;
       translationEN.languageId = langEN.id;
       translationsForInsert.push(translationEN);
     }
 
-    if (!existingSkillTranslationsSet.has(`${isoCodeDE}_${de}`)) {
+    if (!existingLeadFromTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const translationDE = new FieldTranslation();
       translationDE.translation = de;
-      translationDE.entityType = TranslationEntityType.SKILL;
-      translationDE.entityId = skill.id;
+      translationDE.entityType = TranslationEntityType.LEAD;
+      translationDE.entityId = lead.id;
       translationDE.languageId = langDE.id;
       translationsForInsert.push(translationDE);
     }
@@ -364,4 +393,12 @@ export async function seedFieldTranslation(
 
   const skillRepository = dataSource.getRepository(Skill);
   await seedSkills(fieldTranslationRepository, skillRepository, langEN, langDE);
+
+  const leadFromRepository = dataSource.getRepository(LeadFrom);
+  await seedLeeds(
+    fieldTranslationRepository,
+    leadFromRepository,
+    langEN,
+    langDE,
+  );
 }

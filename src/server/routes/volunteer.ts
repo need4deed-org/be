@@ -3,12 +3,9 @@ import fp from "fastify-plugin";
 import { ApiVolunteerGetList, VolunteerFormData } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
-import { Repository } from "typeorm";
-import FieldTranslation from "../../data/entity/field_translation.entity";
-import Language from "../../data/entity/profile/language.entity";
-import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { Id, TranslationEntityType } from "../../data/types";
+import { Id } from "../../data/types";
 import {
+  leadFromParser,
   parseFormData,
   serialize,
   volunteerFormParser,
@@ -17,7 +14,8 @@ import {
 import { volunteerFormSchema, volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
-import { getLanguageCode } from "../utils";
+import { addTranslatedFields, getLanguageCode } from "../utils";
+import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
 
 const defaultTake = 12;
@@ -88,7 +86,7 @@ async function volunteerRoutes(
           ],
         });
 
-        await addTranslatedFields(fastify, volunteers, isoCode);
+        await addTranslatedFields(volunteers, isoCode);
 
         const data = serialize(volunteers, volunteerSerializer);
 
@@ -142,7 +140,15 @@ async function volunteerRoutes(
           volunteerFormParser,
         );
 
+        const leads = await parseFormData(
+          request.body.leadFrom,
+          leadFromParser,
+        );
+
         const id = await writeVolunteer(volunteer);
+        if (id) {
+          await updateLeads(leads);
+        }
 
         return reply.status(200).send({
           message: "Volunteer stored.",
@@ -160,56 +166,3 @@ export default fp(volunteerRoutes, {
   name: "volunteer-routes",
   dependencies: ["typeorm-plugin"],
 });
-
-async function addTranslatedFields(
-  fastify: FastifyInstance,
-  volunteers: Volunteer[],
-  isoCode: Lang,
-) {
-  let language: Language;
-  let languageRepository: Repository<Language>;
-  let fieldTranslationRepository: Repository<FieldTranslation>;
-  try {
-    fieldTranslationRepository = fastify.db.fieldTranslationRepository;
-    languageRepository = fastify.db.languageRepository;
-    language = await languageRepository.findOne({ where: { isoCode } });
-    if (!language) {
-      throw new Error(`Language ${isoCode} not found.`);
-    }
-  } catch (error) {
-    fastify.log.error(`Error loading language: ${error}`);
-    throw new Error(error.message);
-  }
-  for (const volunteer of volunteers) {
-    for (const pl of volunteer.deal.profile.profileLanguage) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: TranslationEntityType.LANGUAGE,
-          entityId: pl.language.id,
-        },
-      });
-      pl.language.translation = translation?.translation;
-    }
-    for (const pa of volunteer.deal.profile.profileActivity) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: TranslationEntityType.ACTIVITY,
-          entityId: pa.activity.id,
-        },
-      });
-      pa.activity.translation = translation?.translation;
-    }
-    for (const ps of volunteer.deal.profile.profileSkill) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: TranslationEntityType.SKILL,
-          entityId: ps.skill.id,
-        },
-      });
-      ps.skill.translation = translation?.translation;
-    }
-  }
-}
