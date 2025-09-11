@@ -34,6 +34,7 @@ import Timeslot from "./entity/time/timeslot.entity";
 import User from "./entity/user.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
+import { getLoggingForDataSource } from "./utils";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -43,7 +44,7 @@ export const AppDataSource = new DataSource({
   password: "postgres",
   database: "postgres",
   synchronize: true,
-  logging: false,
+  // logging: false,
   entities: [
     Activity,
     Address,
@@ -81,4 +82,6 @@ export const AppDataSource = new DataSource({
   migrations: [],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
+  logging: getLoggingForDataSource(process.env.NODE_ENV),
+  logger: "advanced-console",
 });
