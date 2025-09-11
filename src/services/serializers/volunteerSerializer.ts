@@ -1,10 +1,4 @@
-import {
-  ApiVolunteerGetList,
-  ByDay,
-  Daytime,
-  Hour,
-  LangProficiency,
-} from "need4deed-sdk";
+import { ApiVolunteerGetList, ByDay, Daytime, Hour } from "need4deed-sdk";
 
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
@@ -14,18 +8,7 @@ import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
   return {
     name: getName(volunteer.person),
-    nativeLanguages: getLanguages(
-      volunteer.deal.profile.profileLanguage,
-      LangProficiency.NATIVE,
-    ),
-    fluentLanguages: getLanguages(
-      volunteer.deal.profile.profileLanguage,
-      LangProficiency.FLUENT,
-    ),
-    intermediateLanguages: getLanguages(
-      volunteer.deal.profile.profileLanguage,
-      LangProficiency.INTERMEDIATE,
-    ),
+    languages: getLanguages(volunteer.deal.profile.profileLanguage),
     availability: getAvailability(volunteer.deal.time.timeTimeslot),
     activities: getTitles(volunteer.deal.profile.profileActivity, "activity"),
     skills: getTitles(volunteer.deal.profile.profileSkill, "skill"),
@@ -63,13 +46,11 @@ function getName(person: Person) {
   } ${person.lastName ?? ""}`.trim();
 }
 
-function getLanguages(
-  profileLanguage: ProfileLanguage[],
-  proficiency: LangProficiency,
-) {
-  return profileLanguage
-    .filter((pl) => pl.proficiency === proficiency)
-    .map((pl) => pl.language.translation || pl.language.title);
+function getLanguages(profileLanguage: ProfileLanguage[]) {
+  return profileLanguage.map((pl) => ({
+    title: pl.language.translation || pl.language.title,
+    proficiency: pl.proficiency,
+  }));
 }
 
 function getTitles<T>(profileItems: T[], entityName: string) {

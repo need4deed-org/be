@@ -39,9 +39,9 @@ export function getLanguageCode(isoCode: string): Lang | null {
   if (typeof isoCode !== "string") {
     return null;
   }
-  const isoCodeNormalized = isoCode.toLowerCase();
-  if (isoCodeNormalized in Object.values(Lang)) {
-    return isoCodeNormalized as Lang;
+  const isoCodeNormalized = isoCode.toLowerCase() as Lang;
+  if (Object.values(Lang).includes(isoCodeNormalized)) {
+    return isoCodeNormalized;
   }
 
   return null;

@@ -1,0 +1,46 @@
+import { DataSource } from "typeorm";
+
+import { seedLeadFromFile } from "../../config/constants";
+import LeadFrom from "../entity/lead.entity";
+import { readJsonAsync } from "../utils";
+
+interface LeadJSON {
+  id: string;
+  count: number;
+}
+
+export async function seedLeadFrom(dataSource: DataSource): Promise<void> {
+  if (!dataSource) {
+    throw new Error("DataSource is not initialized.");
+  }
+
+  const leadFromRepository = dataSource.getRepository(LeadFrom);
+  if (!leadFromRepository) {
+    throw new Error("Skill entity is not initialized.");
+  }
+
+  const leads = (await readJsonAsync(seedLeadFromFile)) as LeadJSON[];
+
+  const existingLeads = new Set(
+    (await leadFromRepository.find()).map((lead) => lead.title),
+  );
+
+  const leadsForInsert = leads.reduce((result: LeadFrom[], { id, count }) => {
+    if (existingLeads.has(id)) {
+      return result;
+    }
+    try {
+      const newLeadFrom = new LeadFrom({ title: id, count });
+      result.push(newLeadFrom);
+    } catch (error) {
+      throw new Error(`Error creating new lead ${id}: ${error.message}`);
+    }
+    return result;
+  }, []);
+
+  try {
+    await leadFromRepository.insert(leadsForInsert);
+  } catch (error) {
+    throw new Error(`Error inserting leads: ${error.message}`);
+  }
+}
