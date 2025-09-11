@@ -271,7 +271,7 @@ async function createDeal(
       for (const dayTimeItem of daytime) {
         const occasional = getEnumValue<OccasionalType>(
           OccasionalType,
-          dayTimeItem as OccasionalType,
+          dayTimeItem.toLowerCase() as OccasionalType,
         );
         if (!occasional) {
           console.warn(
@@ -343,7 +343,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     .select("v.id")
     .getCount();
   if (count !== 0) {
-    dataSource.logger.log("info", "Skipping seeding volunteers.");
+    dataSource.logger.log("log", "Skipping seeding volunteers.");
     return;
   }
 
@@ -374,7 +374,8 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       });
       await volunteerRepository.save(newVolunteer);
     } catch (error) {
-      console.error(
+      dataSource.logger.log(
+        "log",
         `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${error.message}`,
       );
     }
