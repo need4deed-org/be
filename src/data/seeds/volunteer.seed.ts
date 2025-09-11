@@ -268,19 +268,30 @@ async function createDeal(
         }
       }
     } else {
-      occasional = OccasionalType.UNDEFINED;
-      if (daytime.includes("Weekends") && daytime.includes("Weekdays")) {
-        occasional = OccasionalType.OCCASIONALLY;
-      } else if (daytime.includes("Weekends")) {
-        occasional = OccasionalType.WEEKENDS;
-      } else if (daytime.includes("Weekdays")) {
-        occasional = OccasionalType.WEEKDAYS;
+      for (const dayTimeItem of daytime) {
+        const occasional = getEnumValue<OccasionalType>(
+          OccasionalType,
+          dayTimeItem as OccasionalType,
+        );
+        if (!occasional) {
+          console.warn(
+            `Occasional type ${dayTimeItem} not recognized. Skipping.`,
+          );
+          continue;
+        }
+        timeslot = await repositoryTimeslot.findOne({
+          where: {
+            occasional,
+            rrule: IsNull(),
+            start: IsNull(),
+            end: IsNull(),
+          },
+        });
+        if (!timeslot) {
+          timeslot = new Timeslot({ occasional });
+        }
+        await repositoryTimeslot.save(timeslot);
       }
-      timeslot = await repositoryTimeslot.findOne({
-        where: { occasional, rrule: IsNull(), start: IsNull(), end: IsNull() },
-      });
-      timeslot = new Timeslot({ occasional });
-      await repositoryTimeslot.save(timeslot);
     }
 
     if (timeslot) {
