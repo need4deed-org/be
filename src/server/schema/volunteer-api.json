@@ -94,8 +94,13 @@
                     "maxItems": 2
                   },
                   {
-                    "type": "string",
-                    "enum": ["weekends", "weekdays"]
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["weekends", "weekdays"]
+                    },
+                    "minItems": 1,
+                    "maxItems": 1
                   }
                 ]
               }
