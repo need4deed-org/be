@@ -1,4 +1,11 @@
-import { ApiVolunteerGetList, ByDay, Daytime, Hour } from "need4deed-sdk";
+import {
+  ApiVolunteerGetList,
+  Availability,
+  ByDay,
+  Daytime,
+  Hour,
+  Occasionally,
+} from "need4deed-sdk";
 
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
@@ -41,13 +48,13 @@ function getByDay(rrule: string): ByDay {
   if (!rrule) {
     throw new Error("RRule is required to get ByDay");
   }
-  const byDayPos = rrule?.indexOf("BYDAY") + 6;
+  const byDayPos = rrule.indexOf("BYDAY") + 6;
   if (byDayPos < 6) {
     return null;
   }
-  const byDay = rrule?.slice(byDayPos, byDayPos + 2);
+  const byDay = rrule.slice(byDayPos, byDayPos + 2);
   if (!(byDay in ByDay)) {
-    return null;
+    throw new Error("RRule BYDAY value is not recognized");
   }
   return ByDay[byDay];
 }
@@ -60,12 +67,22 @@ function getHour(date: Date): Hour {
   return Hour[hour];
 }
 
-function getAvailability(timeTimeslot: TimeTimeslot[]) {
-  return timeTimeslot.map(({ timeslot }) => {
-    return {
-      day: getByDay(timeslot.rrule),
-      daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
-    };
+function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
+  return timeTimeslot.map(({ timeslot }): Availability => {
+    if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
+      return {
+        day: getByDay(timeslot.rrule),
+        daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
+      };
+    }
+    if (timeslot?.occasional) {
+      return {
+        day: Occasionally.OCCASIONALLY,
+        daytime: [timeslot.occasional],
+      };
+    }
+
+    throw new Error("Timeslot is missing required fields");
   });
 }
 
