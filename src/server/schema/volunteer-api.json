@@ -5,6 +5,9 @@
     "ApiVolunteerGetList": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": ["number", "string"]
+        },
         "name": {
           "type": "string"
         },
@@ -121,6 +124,7 @@
         }
       },
       "required": [
+        "id",
         "name",
         "languages",
         "availability",
