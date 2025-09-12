@@ -34,6 +34,7 @@ async function volunteerRoutes(
     };
     Reply: {
       message: string;
+      count?: number;
       data?: Array<ApiVolunteerGetList>;
     };
   }>(
@@ -45,6 +46,7 @@ async function volunteerRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
+              count: { type: "number" },
               data: { type: "array", items: volunteerResponseSchema },
             },
             required: ["message", "data"],
@@ -63,7 +65,7 @@ async function volunteerRoutes(
       try {
         const volunteerRepository = fastify.db.volunteerRepository;
 
-        const volunteers = await volunteerRepository.find({
+        const [volunteers, count] = await volunteerRepository.findAndCount({
           skip,
           take,
           relations: [
@@ -92,6 +94,7 @@ async function volunteerRoutes(
 
         return reply.status(200).send({
           message: `Volunteers page ${page}`,
+          count,
           data,
         });
       } catch (error) {
