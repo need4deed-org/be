@@ -5,6 +5,9 @@
     "ApiVolunteerGetList": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": ["number", "string"]
+        },
         "name": {
           "type": "string"
         },
@@ -91,8 +94,13 @@
                     "maxItems": 2
                   },
                   {
-                    "type": "string",
-                    "enum": ["weekends", "weekdays"]
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["weekends", "weekdays"]
+                    },
+                    "minItems": 1,
+                    "maxItems": 1
                   }
                 ]
               }
@@ -121,6 +129,7 @@
         }
       },
       "required": [
+        "id",
         "name",
         "languages",
         "availability",
