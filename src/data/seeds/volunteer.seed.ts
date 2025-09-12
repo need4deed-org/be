@@ -3,7 +3,7 @@ import {
   LangProficiency,
   OccasionalType,
 } from "need4deed-sdk";
-import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
+import { DataSource, IsNull, Repository } from "typeorm";
 
 import { seedVolunteersFile } from "../../config/constants";
 import Deal from "../entity/deal.entity";
@@ -71,10 +71,10 @@ interface VolunteerJSON {
 let postcodeGetter: (value: string) => Promise<Postcode>;
 
 function getRepository<T>(
-  entityManager: EntityManager,
+  dataSource: DataSource,
   entity: new () => T,
 ): Repository<T> {
-  const repository = entityManager.getRepository(entity);
+  const repository = dataSource.getRepository(entity);
   if (!repository) {
     throw new Error(`${entity.name} entity is not initialized.`);
   }
@@ -107,14 +107,14 @@ async function getPostcodeGetter(dataSource: DataSource) {
 
 async function getOrCreateAddress(
   addressData: AddressJSON,
-  entityManager: EntityManager,
+  dataSource: DataSource,
 ): Promise<Address> {
   const postcode = postcodeGetter
     ? await postcodeGetter(addressData.postcode?.toString())
     : null;
 
   const addressRepository: Repository<Address> = getRepository(
-    entityManager,
+    dataSource,
     Address,
   );
   const existingAddress = await addressRepository.findOne({
@@ -135,10 +135,10 @@ async function getOrCreateAddress(
 
 async function getOrCreatePerson(
   personData: PersonJSON,
-  entityManager: EntityManager,
+  dataSource: DataSource,
 ): Promise<Person> {
   const personRepository: Repository<Person> = getRepository(
-    entityManager,
+    dataSource,
     Person,
   );
   const existingPerson = await personRepository.findOne({
@@ -157,7 +157,7 @@ async function getOrCreatePerson(
   });
 
   if (personData.address) {
-    const address = await getOrCreateAddress(personData.address, entityManager);
+    const address = await getOrCreateAddress(personData.address, dataSource);
     person.address = address;
   }
 
@@ -167,31 +167,25 @@ async function getOrCreatePerson(
 
 async function createDeal(
   dealData: DealJSON,
-  entityManager: EntityManager,
+  dataSource: DataSource,
 ): Promise<Deal> {
-  const activityRepository = getRepository(entityManager, Activity);
-  const profileRepository = getRepository(entityManager, Profile);
-  const profileActivityRepository = getRepository(
-    entityManager,
-    ProfileActivity,
-  );
-  const skillRepository = getRepository(entityManager, Skill);
-  const profileSkillRepository = getRepository(entityManager, ProfileSkill);
-  const languageRepository = getRepository(entityManager, Language);
-  const profileLanguageRepository = getRepository(
-    entityManager,
-    ProfileLanguage,
-  );
-  const timeRepository = getRepository(entityManager, Time);
-  const repositoryTimeslot = getRepository(entityManager, Timeslot);
-  const timeTimeslotRepository = getRepository(entityManager, TimeTimeslot);
-  const locationRepository = getRepository(entityManager, Location);
-  const districtRepository = getRepository(entityManager, District);
+  const activityRepository = getRepository(dataSource, Activity);
+  const profileRepository = getRepository(dataSource, Profile);
+  const profileActivityRepository = getRepository(dataSource, ProfileActivity);
+  const skillRepository = getRepository(dataSource, Skill);
+  const profileSkillRepository = getRepository(dataSource, ProfileSkill);
+  const languageRepository = getRepository(dataSource, Language);
+  const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
+  const timeRepository = getRepository(dataSource, Time);
+  const repositoryTimeslot = getRepository(dataSource, Timeslot);
+  const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
+  const locationRepository = getRepository(dataSource, Location);
+  const districtRepository = getRepository(dataSource, District);
   const locationDistrictRepository = getRepository(
-    entityManager,
+    dataSource,
     LocationDistrict,
   );
-  const dealRepository = getRepository(entityManager, Deal);
+  const dealRepository = getRepository(dataSource, Deal);
 
   const postcode = await postcodeGetter(dealData.postcode);
 
@@ -204,7 +198,7 @@ async function createDeal(
   for (const title of dealData.profile.activities) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
-      console.log(`Activity ${title} not found. Skipping.`);
+      dataSource.logger.log("warn", `Activity ${title} not found. Skipping.`);
       continue;
     }
     categoryIds.push(activity.categoryId);
@@ -218,7 +212,7 @@ async function createDeal(
   for (const title of dealData.profile.skills) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
-      console.log(`Skill ${title} not found. Skipping.`);
+      dataSource.logger.log("warn", `Skill ${title} not found. Skipping.`);
       continue;
     }
     const profileSkill = new ProfileSkill({ profile, skill });
@@ -229,7 +223,7 @@ async function createDeal(
     const language = await getLanguage(title, languageRepository);
     const proficiency = getEnumValue(LangProficiency, level);
     if (!language) {
-      console.log(`Language ${title} not found. Skipping.`);
+      dataSource.logger.log("warn", `Language ${title} not found. Skipping.`);
       continue;
     }
 
@@ -247,10 +241,9 @@ async function createDeal(
   await timeRepository.save(time);
 
   for (const { day, daytime } of dealData.time.timeslots) {
-    const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
-    let occasional: OccasionalType | null = null;
     let timeslot: Timeslot;
     if (day !== "Occasional") {
+      const rrule = `FREQ=WEEKLY;BYDAY=${day.slice(0, 2).toUpperCase()};`;
       for (const startEnd of daytime) {
         const timeframe = getStartEnd(startEnd);
 
@@ -264,23 +257,37 @@ async function createDeal(
               ...timeframe,
             });
             await repositoryTimeslot.save(timeslot);
+            await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
           }
         }
       }
     } else {
-      occasional = OccasionalType.UNDEFINED;
-      if (daytime.includes("Weekends") && daytime.includes("Weekdays")) {
-        occasional = OccasionalType.OCCASIONALLY;
-      } else if (daytime.includes("Weekends")) {
-        occasional = OccasionalType.WEEKENDS;
-      } else if (daytime.includes("Weekdays")) {
-        occasional = OccasionalType.WEEKDAYS;
+      for (const dayTimeItem of daytime) {
+        const occasional = getEnumValue<OccasionalType>(
+          OccasionalType,
+          dayTimeItem.toLowerCase() as OccasionalType,
+        );
+        if (!occasional) {
+          dataSource.logger.log(
+            "warn",
+            `Occasional type ${dayTimeItem} not recognized. Skipping.`,
+          );
+          continue;
+        }
+        timeslot = await repositoryTimeslot.findOne({
+          where: {
+            occasional,
+            rrule: IsNull(),
+            start: IsNull(),
+            end: IsNull(),
+          },
+        });
+        if (!timeslot) {
+          timeslot = new Timeslot({ occasional });
+          await repositoryTimeslot.save(timeslot);
+          await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
+        }
       }
-      timeslot = await repositoryTimeslot.findOne({
-        where: { occasional, rrule: IsNull(), start: IsNull(), end: IsNull() },
-      });
-      timeslot = new Timeslot({ occasional });
-      await repositoryTimeslot.save(timeslot);
     }
 
     if (timeslot) {
@@ -323,7 +330,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
   }
 
   const volunteerRepository = getRepository(
-    dataSource as unknown as EntityManager,
+    dataSource as unknown as DataSource,
     Volunteer,
   );
 
@@ -332,7 +339,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     .select("v.id")
     .getCount();
   if (count !== 0) {
-    dataSource.logger.log("info", "Skipping seeding volunteers.");
+    dataSource.logger.log("log", "Skipping seeding volunteers.");
     return;
   }
 
@@ -344,15 +351,9 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
 
   volunteers.forEach(async (volunteer) => {
     try {
-      const person = await getOrCreatePerson(
-        volunteer.person,
-        dataSource as unknown as EntityManager,
-      );
+      const person = await getOrCreatePerson(volunteer.person, dataSource);
 
-      const deal = await createDeal(
-        volunteer.deal,
-        dataSource as unknown as EntityManager,
-      );
+      const deal = await createDeal(volunteer.deal, dataSource);
 
       const newVolunteer = new Volunteer({
         statusCGC: getDocumentStatus(volunteer.statusCGC),
@@ -363,7 +364,8 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       });
       await volunteerRepository.save(newVolunteer);
     } catch (error) {
-      console.error(
+      dataSource.logger.log(
+        "log",
         `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${error.message}`,
       );
     }
