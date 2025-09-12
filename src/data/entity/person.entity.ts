@@ -56,6 +56,11 @@ export default class Person {
   @Length(7, 20) // Example phone length validation
   phone: string | null;
 
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  avatarUrl: string | null;
+
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
 
