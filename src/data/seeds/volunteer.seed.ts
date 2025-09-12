@@ -68,6 +68,8 @@ interface VolunteerJSON {
   deal: DealJSON;
 }
 
+const noGenderAvatarUrl = "all_genders_avatar.png";
+
 let postcodeGetter: (value: string) => Promise<Postcode>;
 
 function getRepository<T>(
@@ -83,9 +85,7 @@ function getRepository<T>(
 
 async function getPostcodeGetter(dataSource: DataSource) {
   const postcodeRepository = dataSource.getRepository(Postcode);
-  if (!postcodeRepository) {
-    throw new Error("Postcode entity is not initialized.");
-  }
+
   let postcode12345 = await postcodeRepository.findOne({
     where: { value: "12345" },
   });
@@ -154,8 +154,8 @@ async function getOrCreatePerson(
     lastName: personData.lastName,
     email: personData.email,
     phone: personData.phone,
+    avatarUrl: noGenderAvatarUrl,
   });
-
   if (personData.address) {
     const address = await getOrCreateAddress(personData.address, dataSource);
     person.address = address;

@@ -11,6 +11,9 @@
         "name": {
           "type": "string"
         },
+        "avatarUrl": {
+          "type": "string"
+        },
         "languages": {
           "type": "array",
           "items": {
@@ -131,6 +134,7 @@
       "required": [
         "id",
         "name",
+        "avatarUrl",
         "languages",
         "availability",
         "activities",
