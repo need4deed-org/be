@@ -68,6 +68,8 @@ interface VolunteerJSON {
   deal: DealJSON;
 }
 
+const noGenderAvatarUrl = "all_genders_avatar.png";
+
 let postcodeGetter: (value: string) => Promise<Postcode>;
 
 function getRepository<T>(
@@ -154,8 +156,8 @@ async function getOrCreatePerson(
     lastName: personData.lastName,
     email: personData.email,
     phone: personData.phone,
+    avatarUrl: noGenderAvatarUrl,
   });
-
   if (personData.address) {
     const address = await getOrCreateAddress(personData.address, dataSource);
     person.address = address;
