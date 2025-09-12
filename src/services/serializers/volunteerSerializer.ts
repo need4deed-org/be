@@ -17,6 +17,7 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
     const name = getName(volunteer.person);
+    const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time.timeTimeslot);
     const activities = getTitles(
@@ -31,6 +32,7 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
     return {
       id,
       name,
+      avatarUrl,
       languages,
       availability,
       activities,
