@@ -54,7 +54,6 @@ async function emailPlugin(
         return info;
       } catch (error) {
         fastify.log.error(`Failed to send email: ${error.message}`);
-        throw error;
       }
     },
   });
