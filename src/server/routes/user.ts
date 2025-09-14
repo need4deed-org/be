@@ -194,6 +194,7 @@ async function userRoutes(
       language?: string;
       timezone?: string;
       person: PersonUpdateType;
+      resolvedPerson: Partial<Person>;
     };
     Reply: User | { message: string; errors?: any };
   }>(
@@ -232,9 +233,9 @@ async function userRoutes(
               .send({ message: `Person with ID ${personData.id} not found.` });
           }
         } else {
-          const newPerson = new Person(personData);
+          resolvedPerson = new Person(personData);
 
-          const errors = await validate(newPerson);
+          const errors = await validate(resolvedPerson);
           if (errors.length > 0) {
             fastify.log.error("New Person entity validation errors:", errors);
             return reply.status(400).send({
@@ -244,40 +245,38 @@ async function userRoutes(
               ),
             });
           }
-
-          try {
-            resolvedPerson = await personRepository.save(newPerson);
-          } catch (error) {
-            fastify.log.error(`Error creating new person: ${error}`);
-            return reply
-              .status(500)
-              .send({ message: "Failed to create new person." });
-          }
         }
         request.resolvedPerson = resolvedPerson;
       },
     },
     async (request, reply) => {
-      const { email, password, role, language, timezone } = request.body;
+      const {
+        email,
+        password: passwordPlain,
+        role,
+        language,
+        timezone,
+      } = request.body;
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
-        fastify.log.error("userRepository is undefined!");
+        fastify.log.error("Repository is undefined!");
         return reply
           .status(500)
           .send({ message: "Internal Server Error: DB not loaded" });
       }
 
-      const resolvedPerson = request.resolvedPerson!;
-
-      const newUser = new User();
-      newUser.email = email;
-      if (password) newUser.password = await hashPassword(password);
-      newUser.isActive = false;
-      if (role) newUser.role = role;
-      if (language) newUser.language = language;
-      if (timezone) newUser.timezone = timezone;
-      newUser.person = resolvedPerson;
-      newUser.personId = resolvedPerson.id;
+      const person = request.resolvedPerson;
+      const password = await hashPassword(passwordPlain);
+      const isActive = false;
+      const newUser = new User({
+        email,
+        password,
+        role,
+        isActive,
+        language,
+        timezone,
+        person,
+      });
 
       // Validate the Account entity using class-validator
       const errors = await validate(newUser);
@@ -290,14 +289,15 @@ async function userRoutes(
       }
 
       try {
-        newUser.person = resolvedPerson;
         const savedUser = await userRepository.save(newUser);
 
         sendVerificationEmail({ fastify, user: savedUser });
 
         reply.status(201).send(savedUser);
       } catch (error) {
-        fastify.log.error("Error creating account:", error);
+        fastify.log.error(
+          `Error creating user: ${JSON.stringify(error, null, 4)}`,
+        );
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
             .status(409)
