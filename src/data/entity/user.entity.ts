@@ -54,6 +54,7 @@ export default class User {
 
   @ManyToOne(() => Person, (person) => person.users, {
     nullable: true,
+    cascade: true,
   })
   @JoinColumn({ name: "personId" })
   person: Person;
