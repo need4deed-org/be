@@ -289,9 +289,7 @@ async function userRoutes(
       }
 
       try {
-        fastify.log.debug(`POST /user: ${JSON.stringify(newUser, null, 4)}`);
         const savedUser = await userRepository.save(newUser);
-        fastify.log.debug(`POST /user: ${JSON.stringify(savedUser, null, 4)}`);
 
         sendVerificationEmail({ fastify, user: savedUser });
 
