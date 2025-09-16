@@ -16,6 +16,7 @@ import { fastify } from "../../server";
 export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
+    const status = volunteer.status;
     const name = getName(volunteer.person);
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
@@ -31,6 +32,7 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
     );
     return {
       id,
+      status,
       name,
       avatarUrl,
       languages,
