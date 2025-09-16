@@ -96,6 +96,15 @@ export function getVolunteerStatus(status: string): VolunteerStateType {
   return VolunteerStateType.MATCHED;
 }
 
+export async function getCount<R>(repository: Repository<R>): Promise<number> {
+  const count = await repository
+    .createQueryBuilder("r")
+    .select("r.id")
+    .getCount();
+
+  return count;
+}
+
 const districts = {
   Mitte: "",
   "Friedrichshain-Kreuzberg": "",

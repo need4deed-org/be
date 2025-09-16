@@ -28,6 +28,7 @@ import Volunteer from "../entity/volunteer/volunteer.entity";
 import { DealType } from "../types";
 import { categorize, getStartEnd, readJsonAsync } from "../utils";
 import {
+  getCount,
   getDocumentStatus,
   getEnumValue,
   getLanguage,
@@ -341,10 +342,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     Volunteer,
   );
 
-  const count = await volunteerRepository
-    .createQueryBuilder("v")
-    .select("v.id")
-    .getCount();
+  const count = await getCount(volunteerRepository);
   if (count !== 0) {
     dataSource.logger.log("log", "Skipping seeding volunteers.");
     return;
