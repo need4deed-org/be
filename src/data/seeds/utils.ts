@@ -85,15 +85,30 @@ export function getVolunteerStatus(status: string): VolunteerStateType {
     return VolunteerStateType.NEW;
   }
 
+  if (status.includes("Temp Inactive")) {
+    return VolunteerStateType.TEMP_INACTIVE;
+  }
+
   if (status.includes("Inactive")) {
-    return VolunteerStateType.STALE;
+    return VolunteerStateType.INACTIVE;
+  }
+  if (status.includes("Accompany")) {
+    return VolunteerStateType.ACTIVE_ACCOMPANY;
   }
 
   if (status.includes("Active")) {
-    return VolunteerStateType.ACTIVE;
+    return VolunteerStateType.ACTIVE_REGULAR;
   }
 
-  return VolunteerStateType.MATCHED;
+  if (status.includes("Matched")) {
+    return VolunteerStateType.MATCHED;
+  }
+
+  if (status.includes("Sent Opportunities List")) {
+    return VolunteerStateType.OPPORTUNITY_SENT;
+  }
+
+  return VolunteerStateType.TO_REMATCH;
 }
 
 export async function getCount<R>(repository: Repository<R>): Promise<number> {
