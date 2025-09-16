@@ -2,6 +2,7 @@ import {
   DocumentStatusType,
   LangProficiency,
   OccasionalType,
+  VolunteerStateType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
 
@@ -61,6 +62,7 @@ interface PersonJSON {
   address: AddressJSON;
 }
 interface VolunteerJSON {
+  status: VolunteerStateType;
   statusCGC: DocumentStatusType;
   statusVaccination: DocumentStatusType;
   info: string;
@@ -356,6 +358,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       const deal = await createDeal(volunteer.deal, dataSource);
 
       const newVolunteer = new Volunteer({
+        status: getVolunteerStatus(volunteer.status),
         statusCGC: getDocumentStatus(volunteer.statusCGC),
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
         info: volunteer.info || "",
