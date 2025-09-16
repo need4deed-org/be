@@ -2,6 +2,7 @@ import { DataSource } from "typeorm";
 
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
+import { getCount } from "./utils";
 
 export async function seedUser(dataSource: DataSource) {
   const personAdmin = new Person({
@@ -37,5 +38,18 @@ export async function seedUser(dataSource: DataSource) {
     throw new Error("Skill entity is not initialized.");
   }
 
-  userRepository.save([userAdmin, userUser]);
+  const count = await getCount(userRepository);
+  if (count !== 0) {
+    dataSource.logger.log("log", "Skipping seeding users.");
+    return;
+  }
+
+  try {
+    userRepository.save([userAdmin, userUser]);
+  } catch (error) {
+    dataSource.logger.log(
+      "log",
+      "Skipping seeding users as they already seeded.",
+    );
+  }
 }

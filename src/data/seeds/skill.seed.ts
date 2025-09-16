@@ -3,6 +3,7 @@ import { DataSource } from "typeorm";
 import { seedSkillFile } from "../../config/constants";
 import Skill from "../entity/profile/skill.entity";
 import { readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface SkillJSON {
   id: string;
@@ -16,6 +17,12 @@ export async function seedSkill(dataSource: DataSource): Promise<void> {
   const skillRepository = dataSource.getRepository(Skill);
   if (!skillRepository) {
     throw new Error("Skill entity is not initialized.");
+  }
+
+  const count = await getCount(skillRepository);
+  if (count !== 0) {
+    dataSource.logger.log("log", "Skipping seeding skills.");
+    return;
   }
 
   const skills = (await readJsonAsync(seedSkillFile)) as SkillJSON[];
