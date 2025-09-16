@@ -81,6 +81,12 @@ class Volunteer:
         """
         return get_string_or_null(self.volunteer.get("Coordinator Comments", ""))
     
+    def get_status(self):
+        """
+        Extracts Status from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Status", ""))
+    
     def get_cgc(self):
         """
         Extracts certificate of good conduct status from the volunteer dictionary.
@@ -102,6 +108,7 @@ def get_volunteer(volunteer):
 
     volunteer_instance = Volunteer(volunteer)
     return {
+        "status": volunteer_instance.get_status(),
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
         "info": volunteer_instance.get_info(),

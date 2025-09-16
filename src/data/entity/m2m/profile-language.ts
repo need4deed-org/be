@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
+import { IsEnum } from "class-validator";
 import Language from "../profile/language.entity";
 import Profile from "../profile/profile.entity";
 
@@ -27,6 +28,7 @@ export default class ProfileLanguage {
     enum: LangProficiency,
     default: LangProficiency.ADVANCED,
   })
+  @IsEnum(LangProficiency)
   proficiency: LangProficiency;
 
   @ManyToOne(() => Profile, (profile) => profile.profileLanguage, {

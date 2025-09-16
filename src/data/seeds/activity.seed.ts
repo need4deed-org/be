@@ -4,6 +4,7 @@ import { seedActivityFile } from "../../config/constants";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import { readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface ActivityJSON {
   id: string;
@@ -18,6 +19,12 @@ export async function seedActivity(dataSource: DataSource): Promise<void> {
   const activityRepository = dataSource.getRepository(Activity);
   if (!activityRepository) {
     throw new Error("Activity entity is not initialized.");
+  }
+
+  const count = await getCount(activityRepository);
+  if (count !== 0) {
+    dataSource.logger.log("log", "Skipping seeding activities.");
+    return;
   }
 
   const categoryRepository = dataSource.getRepository(Category);

@@ -15,6 +15,7 @@ import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
 import { TranslationEntityType } from "../types";
 import { readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 const fieldNameTitle = "title";
 const fieldNameDescription = "description";
@@ -348,6 +349,12 @@ export async function seedFieldTranslation(
   const fieldTranslationRepository = dataSource.getRepository(FieldTranslation);
   if (!fieldTranslationRepository) {
     throw new Error("FieldTranslation entity is not initialized.");
+  }
+
+  const count = await getCount(fieldTranslationRepository);
+  if (count !== 0) {
+    dataSource.logger.log("log", "Skipping seeding translations.");
+    return;
   }
 
   const languageRepository = dataSource.getRepository(Language);
