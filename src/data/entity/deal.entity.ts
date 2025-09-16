@@ -1,3 +1,4 @@
+import { IsEnum } from "class-validator";
 import {
   Column,
   Entity,
@@ -30,6 +31,7 @@ export default class Deal {
     enum: DealType,
     nullable: false,
   })
+  @IsEnum(DealType)
   type: DealType;
 
   @ManyToOne(() => Profile, (profile) => profile.deal, {

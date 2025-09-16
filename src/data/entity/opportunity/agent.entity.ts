@@ -1,3 +1,4 @@
+import { IsEnum } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { AgentOperatorType, AgentType } from "../../types";
 import AgentPostcode from "../m2m/agent-postcode";
@@ -23,6 +24,7 @@ export default class Agent {
     nullable: false,
     default: AgentType.RAC,
   })
+  @IsEnum(AgentType)
   type: AgentType;
 
   @Column()

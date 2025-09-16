@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
+import { IsEnum } from "class-validator";
 import Language from "../profile/language.entity";
 import EventTranslation from "./event_translation.entity";
 
@@ -32,6 +33,7 @@ export default class EventN4D {
   dateEnd?: Date;
 
   @Column({ type: "enum", enum: EventN4DType, default: EventN4DType.PARTY })
+  @IsEnum(EventN4DType)
   type: EventN4DType;
 
   @Column({ type: "varchar", length: 256, nullable: true })

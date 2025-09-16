@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import {
   Column,
   Entity,
@@ -26,6 +26,7 @@ export default class Opportunity {
     enum: OpportunityType,
     nullable: false,
   })
+  @IsEnum(OpportunityType)
   type: OpportunityType;
 
   @Column()

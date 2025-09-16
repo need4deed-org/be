@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { LocationType } from "../../types";
 import Deal from "../deal.entity";
@@ -23,6 +23,7 @@ export default class Location {
     nullable: false,
     default: LocationType.DISTRICT,
   })
+  @IsEnum(LocationType)
   type: LocationType;
 
   @Column({ nullable: true })
