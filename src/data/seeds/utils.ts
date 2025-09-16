@@ -1,4 +1,4 @@
-import { DocumentStatusType } from "need4deed-sdk";
+import { DocumentStatusType, VolunteerStateType } from "need4deed-sdk";
 import { Repository } from "typeorm";
 
 import Activity from "../entity/profile/activity.entity";
@@ -78,6 +78,46 @@ export function getDocumentStatus(status: string): DocumentStatusType {
     No: DocumentStatusType.NO,
   };
   return statusMap[status] || DocumentStatusType.UNDEFINED;
+}
+
+export function getVolunteerStatus(status: string): VolunteerStateType {
+  if (!status) {
+    return VolunteerStateType.NEW;
+  }
+
+  if (status.includes("Temp Inactive")) {
+    return VolunteerStateType.TEMP_INACTIVE;
+  }
+
+  if (status.includes("Inactive")) {
+    return VolunteerStateType.INACTIVE;
+  }
+  if (status.includes("Accompany")) {
+    return VolunteerStateType.ACTIVE_ACCOMPANY;
+  }
+
+  if (status.includes("Active")) {
+    return VolunteerStateType.ACTIVE_REGULAR;
+  }
+
+  if (status.includes("Matched")) {
+    return VolunteerStateType.MATCHED;
+  }
+
+  if (status.includes("Sent Opportunities List")) {
+    return VolunteerStateType.OPPORTUNITY_SENT;
+  }
+
+  return VolunteerStateType.TO_REMATCH;
+}
+
+export async function getCount<R>(repository: Repository<R>): Promise<number> {
+  const count = await repository
+    .createQueryBuilder("r")
+    .select("r.id")
+    .getCount();
+
+  return count;
 }
 
 const districts = {

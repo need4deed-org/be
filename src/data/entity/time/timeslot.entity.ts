@@ -1,4 +1,4 @@
-import { IsDate, IsOptional, IsString } from "class-validator";
+import { IsDate, IsEnum, IsOptional, IsString } from "class-validator";
 import { OccasionalType } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
@@ -41,6 +41,7 @@ export default class Timeslot {
     enum: OccasionalType,
   })
   @IsOptional()
+  @IsEnum(OccasionalType)
   occasional: OccasionalType;
 
   @OneToMany(() => TimeTimeslot, (timeTimeslot) => timeTimeslot.timeslot)

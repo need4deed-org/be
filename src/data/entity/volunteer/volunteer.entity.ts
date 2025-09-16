@@ -1,5 +1,5 @@
-import { IsOptional, IsString } from "class-validator";
-import { DocumentStatusType } from "need4deed-sdk";
+import { IsEnum, IsOptional, IsString } from "class-validator";
+import { DocumentStatusType, VolunteerStateType } from "need4deed-sdk";
 
 import {
   Column,
@@ -29,9 +29,18 @@ export default class Volunteer {
 
   @Column({
     type: "enum",
+    enum: VolunteerStateType,
+    default: VolunteerStateType.NEW,
+  })
+  @IsEnum(VolunteerStateType)
+  status: VolunteerStateType;
+
+  @Column({
+    type: "enum",
     enum: DocumentStatusType,
     default: DocumentStatusType.UNDEFINED,
   })
+  @IsEnum(DocumentStatusType)
   statusVaccination: DocumentStatusType;
 
   @Column({
@@ -39,6 +48,7 @@ export default class Volunteer {
     enum: DocumentStatusType,
     default: DocumentStatusType.UNDEFINED,
   })
+  @IsEnum(DocumentStatusType)
   statusCGC: DocumentStatusType;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })

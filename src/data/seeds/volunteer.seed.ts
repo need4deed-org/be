@@ -2,6 +2,7 @@ import {
   DocumentStatusType,
   LangProficiency,
   OccasionalType,
+  VolunteerStateType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
 
@@ -26,7 +27,13 @@ import Timeslot from "../entity/time/timeslot.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { DealType } from "../types";
 import { categorize, getStartEnd, readJsonAsync } from "../utils";
-import { getDocumentStatus, getEnumValue, getLanguage } from "./utils";
+import {
+  getCount,
+  getDocumentStatus,
+  getEnumValue,
+  getLanguage,
+  getVolunteerStatus,
+} from "./utils";
 
 interface ProfileJSON {
   info: string;
@@ -61,6 +68,7 @@ interface PersonJSON {
   address: AddressJSON;
 }
 interface VolunteerJSON {
+  status: VolunteerStateType;
   statusCGC: DocumentStatusType;
   statusVaccination: DocumentStatusType;
   info: string;
@@ -334,10 +342,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     Volunteer,
   );
 
-  const count = await volunteerRepository
-    .createQueryBuilder("v")
-    .select("v.id")
-    .getCount();
+  const count = await getCount(volunteerRepository);
   if (count !== 0) {
     dataSource.logger.log("log", "Skipping seeding volunteers.");
     return;
@@ -356,6 +361,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       const deal = await createDeal(volunteer.deal, dataSource);
 
       const newVolunteer = new Volunteer({
+        status: getVolunteerStatus(volunteer.status),
         statusCGC: getDocumentStatus(volunteer.statusCGC),
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
         info: volunteer.info || "",
