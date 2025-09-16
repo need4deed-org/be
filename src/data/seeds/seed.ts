@@ -4,9 +4,10 @@ import { seedCategory } from "./category.seed";
 import { seedDistrict } from "./district.seed";
 import { seedFieldTranslation } from "./field_translation.seed";
 import { seedLanguage } from "./language.seed";
-import { seedLeadFrom } from "./lead_from";
+import { seedLeadFrom } from "./lead_from.seed";
 import { seedPostcode } from "./postcode.seed";
 import { seedSkill } from "./skill.seed";
+import { seedUser } from "./user.seed";
 import { seedVolunteers } from "./volunteer.seed";
 
 export async function seed() {
@@ -18,5 +19,6 @@ export async function seed() {
   await seedFieldTranslation(AppDataSource);
   await seedPostcode(AppDataSource);
   await seedDistrict(AppDataSource);
+  await seedUser(AppDataSource);
   await seedVolunteers(AppDataSource);
 }
