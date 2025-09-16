@@ -108,6 +108,7 @@ def get_volunteer(volunteer):
 
     volunteer_instance = Volunteer(volunteer)
     return {
+        "status": volunteer_instance.get_status(),
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
         "info": volunteer_instance.get_info(),
