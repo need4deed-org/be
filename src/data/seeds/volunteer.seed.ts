@@ -27,7 +27,12 @@ import Timeslot from "../entity/time/timeslot.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { DealType } from "../types";
 import { categorize, getStartEnd, readJsonAsync } from "../utils";
-import { getDocumentStatus, getEnumValue, getLanguage } from "./utils";
+import {
+  getDocumentStatus,
+  getEnumValue,
+  getLanguage,
+  getVolunteerStatus,
+} from "./utils";
 
 interface ProfileJSON {
   info: string;
