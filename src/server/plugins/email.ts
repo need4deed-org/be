@@ -6,11 +6,20 @@ import { SendMailOptions } from "nodemailer"; // Nodemailer types
 import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { getSesClient } from "../../services/email/ses";
 
-type SupportedTransport = "ses";
+type SupportedTransport = "ses" | "smtp";
 
 interface EmailPluginOptions extends FastifyMailerOptions {
   provider: SupportedTransport;
   defaultFrom?: string; // Optional default 'from' address
+  smtpConfig?: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+  };
 }
 
 declare module "fastify" {
@@ -37,6 +46,12 @@ async function emailPlugin(
           SendEmailCommand,
         },
       };
+      break;
+    case "smtp":
+      if (!options.smtpConfig) {
+        throw new Error("SMTP configuration is required for 'smtp' provider");
+      }
+      nodemailerTransportConfig = options.smtpConfig;
       break;
     default:
       throw new Error(`Unsupported email provider type: ${options.provider}`);
