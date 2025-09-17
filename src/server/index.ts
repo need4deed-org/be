@@ -3,7 +3,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
 
 import { defaultFrom } from "../config/constants";
-import { getMailerConfigForSES, getSesClient } from "../services";
+import { getMailerConfigForGoogle } from "../services";
 import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
@@ -36,8 +36,14 @@ export const start = async () => {
       secret: process.env.JWT_SECRET || generateRandomString(64),
     });
     fastify.register(cors, corsOptions);
-    fastify.register(fastifyMailer, getMailerConfigForSES(getSesClient()));
-    fastify.register(emailPlugin, { provider: "ses", defaultFrom });
+    fastify.register(fastifyMailer, {
+      transport: getMailerConfigForGoogle(),
+    });
+    fastify.register(emailPlugin, {
+      provider: "smtp",
+      defaultFrom,
+      smtpConfig: getMailerConfigForGoogle(),
+    });
     fastify.register(healthRoutes, { prefix: RoutePrefix.HEALTH_CHECK });
     fastify.register(authRoutes, { prefix: RoutePrefix.AUTH });
     fastify.register(userRoutes, { prefix: RoutePrefix.USER });
