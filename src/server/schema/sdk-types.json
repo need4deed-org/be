@@ -102,6 +102,20 @@
         }
       },
       "additionalProperties": false
+    },
+    "VolunteerStateType": {
+      "type": "string",
+      "enum": [
+        "New",
+        "Opportunity sent",
+        "Matched",
+        "Active regular",
+        "Active accompany",
+        "Active fest",
+        "To rematch",
+        "Temp inactive",
+        "Inactive"
+      ]
     }
   }
 }
