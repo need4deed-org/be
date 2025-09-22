@@ -13,6 +13,9 @@ import healthRoutes from "./routes/health";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer";
+import entityTypesSchema from "./schema/entity-types.json";
+import sdkTypesSchema from "./schema/sdk-types.json";
+import volunteerListSchema from "./schema/volunteer-api.json";
 import { RoutePrefix } from "./types";
 import { generateRandomString } from "./utils";
 
@@ -30,6 +33,20 @@ export const fastify: FastifyInstance = Fastify({
 
 export const start = async () => {
   try {
+    // Register external schemas first so they're available for $ref resolution
+    fastify.addSchema({
+      $id: "./entity-types.json",
+      ...entityTypesSchema,
+    });
+    fastify.addSchema({
+      $id: "./sdk-types.json",
+      ...sdkTypesSchema,
+    });
+    fastify.addSchema({
+      $id: "./volunteer-api.json", // this is because ApiVolunteerGet extends ApiVolunteerGetList
+      ...volunteerListSchema,
+    });
+
     fastify.register(typeormPlugin);
     fastify.register(cookie);
     fastify.register(jwtPlugin, {
