@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "OccasionalType": {
+      "type": "string",
+      "enum": ["weekends", "weekdays"]
+    },
+    "Address": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "postcode": {
+          "$ref": "#/definitions/Postcode"
+        }
+      },
+      "required": ["id", "street", "city", "postcode"],
+      "additionalProperties": false
+    },
+    "Postcode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        }
+      },
+      "required": ["id", "code", "latitude", "longitude"],
+      "additionalProperties": false
+    },
+    "DocumentStatusType": {
+      "type": "string",
+      "enum": [
+        "undefined",
+        "yes",
+        "no",
+        "asked_to_apply",
+        "applied_self",
+        "applied_n4d"
+      ]
+    },
+    "TimedText": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "type": {
+          "$ref": "#/definitions/TimedTextType"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": ["date", "type", "text"],
+      "additionalProperties": false
+    },
+    "TimedTextType": {
+      "type": "string",
+      "enum": ["create", "update", "remove"]
+    },
+    "Option": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/OptionId"
+        },
+        "title": {
+          "$ref": "#/definitions/OptionTitle"
+        }
+      },
+      "required": ["id", "title"],
+      "additionalProperties": false
+    },
+    "OptionId": {
+      "type": ["string", "number"]
+    },
+    "OptionTitle": {
+      "type": "object",
+      "properties": {
+        "en": {
+          "type": "string"
+        },
+        "de": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
