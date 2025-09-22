@@ -1,6 +1,10 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { ApiVolunteerGetList, VolunteerFormData } from "need4deed-sdk";
+import {
+  ApiVolunteerGetList,
+  SortOrder,
+  VolunteerFormData,
+} from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
 import { Id } from "../../data/types";
@@ -9,7 +13,7 @@ import {
   parseFormData,
   serialize,
   volunteerFormParser,
-  volunteerSerializer,
+  volunteerListSerializer,
 } from "../../services";
 import { volunteerFormSchema, volunteerResponseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
@@ -31,6 +35,7 @@ async function volunteerRoutes(
       page: string;
       limit: string;
       language: string;
+      order: SortOrder;
     };
     Reply: {
       message: string;
@@ -60,6 +65,10 @@ async function volunteerRoutes(
       const take = Math.abs(parseInt(request.query.limit)) || defaultTake;
       const skip = (page - 1) * take;
 
+      let orderDirection: "DESC" | "ASC";
+      if (request.query.order === SortOrder.NewToOld) orderDirection = "DESC";
+      if (request.query.order === SortOrder.OldToNew) orderDirection = "ASC";
+
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
@@ -86,11 +95,18 @@ async function volunteerRoutes(
             "deal.location.locationAddress.address",
             "deal.location.locationAddress.address.postcode",
           ],
+          ...(orderDirection
+            ? {
+                order: {
+                  createdAt: orderDirection,
+                },
+              }
+            : {}),
         });
 
         await addTranslatedFields(volunteers, isoCode);
 
-        const data = serialize(volunteers, volunteerSerializer);
+        const data = serialize(volunteers, volunteerListSerializer);
 
         return reply.status(200).send({
           message: `Volunteers page ${page}`,
