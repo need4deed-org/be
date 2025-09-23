@@ -2,6 +2,9 @@ import { Lang } from "need4deed-sdk";
 
 export enum Role {
   USER = "user",
+  COORDINATOR = "coordinator",
+  AGENT = "agent",
+  VOLUNTEER = "volunteer",
   ADMIN = "admin",
 }
 
