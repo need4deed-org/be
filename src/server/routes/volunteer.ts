@@ -8,7 +8,7 @@ import {
 } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
-import { Id } from "../../data/types";
+import { Id, Role } from "../../data/types";
 import {
   leadFromParser,
   parseFormData,
@@ -82,6 +82,7 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
@@ -140,6 +141,7 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
       const page = Math.abs(parseInt(request.query.page)) || 1;
