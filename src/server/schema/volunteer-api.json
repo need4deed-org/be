@@ -15,18 +15,18 @@
           "type": "string"
         },
         "status": {
-          "$ref": "./sdk-types.json#/definitions/VolunteerStateType"
+          "$ref": "sdk-types.json#/definitions/VolunteerStateType"
         },
         "languages": {
           "type": "array",
           "items": {
-            "$ref": "./entity-types.json#/definitions/Language"
+            "$ref": "entity-types.json#/definitions/Language"
           }
         },
         "availability": {
           "type": "array",
           "items": {
-            "$ref": "./entity-types.json#/definitions/Timeslot"
+            "$ref": "entity-types.json#/definitions/Timeslot"
           }
         },
         "activities": {
