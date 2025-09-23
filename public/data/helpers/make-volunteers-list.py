@@ -74,31 +74,37 @@ class Volunteer:
             "time": get_time_data(),
             "location": get_location_data(),
         }
-    
-    def get_info(self):
+
+    def get_info_about(self):
         """
-        Extracts certificate of good conduct status from the volunteer dictionary.
+        Extracts comments from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Comments", ""))
+
+    def get_info_experience(self):
+        """
+        Extracts coordinator comments from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Coordinator Comments", ""))
-    
+
     def get_status(self):
         """
         Extracts Status from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Status", ""))
-    
+
     def get_cgc(self):
         """
         Extracts certificate of good conduct status from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Certificate of good conduct", ""))
-    
+
     def get_vaccination(self):
         """
         Extracts vaccination status from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Measles vacc", ""))
-    
+
 def get_volunteer(volunteer):
     """
     Processes a volunteer object and returns a structured JSON.
@@ -111,7 +117,8 @@ def get_volunteer(volunteer):
         "status": volunteer_instance.get_status(),
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
-        "info": volunteer_instance.get_info(),
+        "infoAbout": volunteer_instance.get_info_about(),
+        "infoExperience": volunteer_instance.get_info_experience(),
         "person": volunteer_instance.get_person_data(),
         "deal": volunteer_instance.get_deal_data(),
     }

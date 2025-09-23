@@ -71,7 +71,8 @@ interface VolunteerJSON {
   status: VolunteerStateType;
   statusCGC: DocumentStatusType;
   statusVaccination: DocumentStatusType;
-  info: string;
+  infoAbout: string;
+  infoExperience: string;
   person: PersonJSON;
   deal: DealJSON;
 }
@@ -364,7 +365,8 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         status: getVolunteerStatus(volunteer.status),
         statusCGC: getDocumentStatus(volunteer.statusCGC),
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
-        info: volunteer.info || "",
+        infoAbout: volunteer.infoAbout || "",
+        infoExperience: volunteer.infoExperience || "",
         person,
         deal,
       });

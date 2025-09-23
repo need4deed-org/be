@@ -1,17 +1,27 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { ApiVolunteerGetList, VolunteerFormData } from "need4deed-sdk";
+import {
+  ApiVolunteerGet,
+  ApiVolunteerGetList,
+  SortOrder,
+  VolunteerFormData,
+} from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
-import { Id } from "../../data/types";
+import { Id, Role } from "../../data/types";
 import {
   leadFromParser,
   parseFormData,
   serialize,
   volunteerFormParser,
+  volunteerListSerializer,
   volunteerSerializer,
 } from "../../services";
-import { volunteerFormSchema, volunteerResponseSchema } from "../schema";
+import {
+  volunteerFormSchema,
+  volunteerIdResponseSchema,
+  volunteerResponseSchema,
+} from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import { addTranslatedFields, getLanguageCode } from "../utils";
@@ -25,12 +35,96 @@ async function volunteerRoutes(
   options: FastifyPluginOptions,
 ) {
   const prefixedPath = options.prefix || RoutePrefix.VOLUNTEER;
+  const relations = [
+    "person",
+    "person.address",
+    "person.address.postcode",
+    "deal",
+    "deal.postcode",
+    "deal.profile",
+    "deal.profile.profileActivity.activity",
+    "deal.profile.profileSkill.skill",
+    "deal.profile.profileLanguage.language",
+    "deal.time",
+    "deal.time.timeTimeslot.timeslot",
+    "deal.location",
+    "deal.location.locationPostcode.postcode",
+    "deal.location.locationDistrict.district",
+    "deal.location.locationAddress.address",
+    "deal.location.locationAddress.address.postcode",
+  ];
+
+  fastify.get<{
+    Querystring: {
+      language: string;
+    };
+    Reply: {
+      message: string;
+      data?: ApiVolunteerGet;
+    };
+  }>(
+    `${prefixedPath}/:id`,
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+          },
+          required: ["id"],
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: volunteerIdResponseSchema,
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const volunteerId = Number(id);
+      if (isNaN(volunteerId)) {
+        fastify.log.error(``);
+        reply.status(400).send({ message: `${id} is not a volunteer id.` });
+      }
+
+      const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+
+      try {
+        const volunteerRepository = fastify.db.volunteerRepository;
+        const volunteer = await volunteerRepository.findOne({
+          where: { id: volunteerId },
+          relations,
+        });
+
+        await addTranslatedFields([volunteer], isoCode);
+
+        const data = volunteerSerializer(volunteer);
+        return reply
+          .status(200)
+          .send({ message: `Volunteer id:${volunteerId}`, data });
+      } catch (error) {
+        fastify.log.error(
+          `Error fetching volunteer id=${volunteerId}: ${error}`,
+        );
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
 
   fastify.get<{
     Querystring: {
       page: string;
       limit: string;
       language: string;
+      order: SortOrder;
     };
     Reply: {
       message: string;
@@ -54,11 +148,16 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
       const page = Math.abs(parseInt(request.query.page)) || 1;
       const take = Math.abs(parseInt(request.query.limit)) || defaultTake;
       const skip = (page - 1) * take;
+
+      let orderDirection: "DESC" | "ASC";
+      if (request.query.order === SortOrder.NewToOld) orderDirection = "DESC";
+      if (request.query.order === SortOrder.OldToNew) orderDirection = "ASC";
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
@@ -68,29 +167,19 @@ async function volunteerRoutes(
         const [volunteers, count] = await volunteerRepository.findAndCount({
           skip,
           take,
-          relations: [
-            "person",
-            "person.address",
-            "person.address.postcode",
-            "deal",
-            "deal.postcode",
-            "deal.profile",
-            "deal.profile.profileActivity.activity",
-            "deal.profile.profileSkill.skill",
-            "deal.profile.profileLanguage.language",
-            "deal.time",
-            "deal.time.timeTimeslot.timeslot",
-            "deal.location",
-            "deal.location.locationPostcode.postcode",
-            "deal.location.locationDistrict.district",
-            "deal.location.locationAddress.address",
-            "deal.location.locationAddress.address.postcode",
-          ],
+          relations,
+          ...(orderDirection
+            ? {
+                order: {
+                  createdAt: orderDirection,
+                },
+              }
+            : {}),
         });
 
         await addTranslatedFields(volunteers, isoCode);
 
-        const data = serialize(volunteers, volunteerSerializer);
+        const data = serialize(volunteers, volunteerListSerializer);
 
         return reply.status(200).send({
           message: `Volunteers page ${page}`,

@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -12,6 +13,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { Role } from "../types";
 import { verifyPassword } from "../utils";
 import Person from "./person.entity";
 
@@ -40,9 +42,9 @@ export default class User {
   @IsBoolean()
   isActive: boolean;
 
-  @Column({ default: "user" })
-  @IsString()
-  role: string;
+  @Column({ type: "enum", enum: Role, default: Role.USER })
+  @IsEnum(Role)
+  role: Role;
 
   @Column({ default: "en" })
   @IsString()
