@@ -2,6 +2,8 @@ import { DataSource } from "typeorm";
 
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
+import { Role } from "../types";
+import { hashPassword } from "../utils";
 import { getCount } from "./utils";
 
 export async function seedUser(dataSource: DataSource) {
@@ -13,8 +15,8 @@ export async function seedUser(dataSource: DataSource) {
 
   const userAdmin = new User({
     email: "john.doe@need4deed.org",
-    password: "no_password",
-    role: "admin",
+    password: await hashPassword("no_password"),
+    role: Role.ADMIN,
     isActive: true,
     person: personAdmin,
   });
@@ -27,8 +29,8 @@ export async function seedUser(dataSource: DataSource) {
 
   const userUser = new User({
     email: "anna.doe@need4deed.org",
-    password: "no_password",
-    role: "user",
+    password: await hashPassword("no_password"),
+    role: Role.COORDINATOR,
     isActive: true,
     person: personUser,
   });
