@@ -190,7 +190,7 @@ async function userRoutes(
       email: string;
       password?: string;
       isActive?: boolean;
-      role?: string;
+      role?: Role;
       language?: string;
       timezone?: string;
       person: PersonUpdateType;
