@@ -55,6 +55,9 @@ async function volunteerRoutes(
   ];
 
   fastify.get<{
+    Querystring: {
+      language: string;
+    };
     Reply: {
       message: string;
       data?: ApiVolunteerGet;
@@ -92,12 +95,16 @@ async function volunteerRoutes(
         reply.status(400).send({ message: `${id} is not a volunteer id.` });
       }
 
+      const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+
       try {
         const volunteerRepository = fastify.db.volunteerRepository;
         const volunteer = await volunteerRepository.findOne({
           where: { id: volunteerId },
           relations,
         });
+
+        await addTranslatedFields([volunteer], isoCode);
 
         const data = volunteerSerializer(volunteer);
         return reply
