@@ -77,13 +77,13 @@ class Volunteer:
 
     def get_info_about(self):
         """
-        Extracts certificate of good conduct status from the volunteer dictionary.
+        Extracts comments from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Comments", ""))
 
     def get_info_experience(self):
         """
-        Extracts vaccination status from the volunteer dictionary.
+        Extracts coordinator comments from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Coordinator Comments", ""))
 
