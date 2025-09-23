@@ -87,6 +87,12 @@ export default class Person {
 
   @OneToMany(() => Testimonial, (testimonial) => testimonial.person)
   testimonial: Testimonial[];
+
+  get name(): string {
+    return [this.firstName, this.middleName, this.lastName]
+      .filter(Boolean)
+      .join(" ");
+  }
 }
 
 export type PersonType = Person;

@@ -1,23 +1,30 @@
 import {
+  Address,
+  ApiVolunteerGet,
   ApiVolunteerGetList,
   Availability,
   ByDay,
   Daytime,
   Hour,
   Occasionally,
+  Option,
+  TimedText,
 } from "need4deed-sdk";
 
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
-import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
 
-export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
+const city = "Berlin";
+
+export function volunteerListSerializer(
+  volunteer: Volunteer,
+): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
     const status = volunteer.status;
-    const name = getName(volunteer.person);
+    const name = volunteer.person.name;
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time.timeTimeslot);
@@ -46,6 +53,50 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGetList {
       `Error serializing volunteer (id:${volunteer.id}): ${error}`,
     );
   }
+}
+
+export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
+  const address: Address = {
+    ...volunteer.person.address,
+    id: String(volunteer.person.address.id),
+    city,
+    postcode: {
+      ...volunteer.person.address.postcode,
+      id: String(volunteer.person.address.postcode.id),
+      code: volunteer.person.address.postcode.value,
+      latitude: volunteer.person.address.postcode.latitude || null,
+      longitude: volunteer.person.address.postcode.longitude || null,
+    },
+  };
+
+  const comments = [] as unknown as TimedText[];
+  const email = volunteer.person.email;
+  const firstName = volunteer.person.firstName;
+  const goodConductCertificate = volunteer.statusCGC;
+  const infoAbout = volunteer.infoAbout;
+  const infoExperience = volunteer.infoExperience;
+  const lastName = volunteer.person.lastName;
+  const measlesVaccination = volunteer.statusVaccination;
+  const opportunitiesApplied = [] as unknown as Option[];
+  const opportunitiesMatched = [] as unknown as Option[];
+  const phone = volunteer.person.phone;
+  const timelineLogs = [] as unknown as TimedText[];
+  return {
+    address,
+    comments,
+    email,
+    firstName,
+    goodConductCertificate,
+    infoAbout,
+    infoExperience,
+    lastName,
+    measlesVaccination,
+    opportunitiesApplied,
+    opportunitiesMatched,
+    phone,
+    timelineLogs,
+    ...volunteerListSerializer(volunteer),
+  };
 }
 
 function getByDay(rrule: string): ByDay {
@@ -88,12 +139,6 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
 
     throw new Error("Timeslot is missing required fields");
   });
-}
-
-function getName(person: Person) {
-  return `${person.firstName ?? ""}${
-    person.middleName ? " " + person.middleName : ""
-  } ${person.lastName ?? ""}`.trim();
 }
 
 function getLanguages(profileLanguage: ProfileLanguage[]) {

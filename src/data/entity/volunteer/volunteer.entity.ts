@@ -22,10 +22,15 @@ export default class Volunteer {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  info: string;
+  infoAbout: string;
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  infoExperience: string;
 
   @Column({
     type: "enum",

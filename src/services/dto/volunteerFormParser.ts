@@ -30,11 +30,11 @@ export async function volunteerFormParser(
   const deal = await dealParser(formData);
 
   // volunteer
-  const info = formData.comments || "";
+  const infoAbout = formData.comments || "";
   const statusVaccination = formData.measlesVaccination;
   const statusCGC = formData.goodConductCertificate;
   const volunteer = new Volunteer({
-    info,
+    infoAbout,
     person,
     deal,
     statusVaccination,
