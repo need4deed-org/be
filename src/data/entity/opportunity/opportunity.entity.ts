@@ -1,4 +1,5 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
+import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -6,7 +7,8 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import { OpportunityType } from "../../types";
+
+import {} from "../../types";
 import Deal from "../deal.entity";
 import Agent from "./agent.entity";
 
@@ -29,10 +31,23 @@ export default class Opportunity {
   @IsEnum(OpportunityType)
   type: OpportunityType;
 
-  @Column()
+  @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  info: string;
+  info?: string;
+
+  @Column({
+    type: "enum",
+    enum: TranslatedIntoType,
+    nullable: true,
+  })
+  @IsEnum(TranslatedIntoType)
+  translationType: TranslatedIntoType;
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  infoConfidential?: string;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;

@@ -1,3 +1,22 @@
+import json
+import subprocess
+
+
+def is_valid_js_date(date_str: str) -> bool:
+    """
+    Checks if a string is valid date for javascript `new Date(date_str)`.
+    """
+    js_code = f"""
+        const d = new Date("{date_str}");
+        console.log(!isNaN(d));
+    """
+    result = subprocess.run(
+        ["node", "-e", js_code],
+        capture_output=True,
+        text=True
+    )
+    return result.stdout.strip() == "true"
+
 def get_name_fields(name):
     """
     Extracts the names from the string.
