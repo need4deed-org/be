@@ -18,7 +18,7 @@ export default class Timeslot {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  description: string;
+  info: string;
 
   @Column({ nullable: true })
   @IsOptional()
