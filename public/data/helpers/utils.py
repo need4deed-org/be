@@ -2,6 +2,12 @@ import json
 import subprocess
 
 
+def get_list_item_safe(lst: list, idx: int):
+    if 0<=idx<len(lst):
+        return lst[idx]
+    
+    return None
+
 def is_valid_js_date(date_str: str) -> bool:
     """
     Checks if a string is valid date for javascript `new Date(date_str)`.

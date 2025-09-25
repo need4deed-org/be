@@ -1,8 +1,8 @@
 import json
 import sys
 
-from utils import (get_email, get_list, get_name_fields, get_string_or_null,
-                   get_timeslot_data, is_valid_js_date)
+from utils import (get_email, get_list, get_list_item_safe, get_name_fields,
+                   get_string_or_null, get_timeslot_data, is_valid_js_date)
 
 
 class Opportunity:
@@ -20,7 +20,48 @@ class Opportunity:
         if not self.opportunity or not isinstance(self.opportunity, dict):
             return None
         
-        return {}
+        def get_agent_title():
+            """
+            Calculates agent title from the opportunity dictionary.
+            """
+            title = self.opportunity.get("Accommodation Centre", "")
+            if title:
+                return title[:title.find(" (")]
+
+            return f"noname {get_list_item_safe(self.opportunity.get('RAC Contact','').split('<|>'), 1) or ''}".strip()
+
+        def get_person_data():
+            """
+            Extracts and formats person data from a volunteer dictionary.
+            """
+            rac_contact = self.opportunity.get("RAC Contact","").split("<|>")
+            if len(rac_contact) == 5:
+                name, email, phone, _, postcode = self.opportunity.get("RAC Contact","").split("<|>")
+                return {
+                    **get_name_fields(name),
+                    "email": email,
+                    "phone": phone,
+                    "address": {
+                        "postcode": postcode
+                    },
+                }
+
+            return None
+
+        title = get_agent_title()
+        person = get_person_data()
+        organization = {
+            "title": get_agent_title(),
+            "person": person
+        }
+        postcode = person["address"]["postcode"] if person and person.get("address") else None
+
+        return {
+            "title": title,
+            "organization": organization,
+            "person": person,
+            "postcode": postcode,
+        }
 
     def get_deal_data(self):
         """
@@ -79,6 +120,12 @@ class Opportunity:
             "location": get_location_data(),
         }
 
+    def get_title(self):
+        """
+        Extracts title from the opportunity dictionary.
+        """
+        return get_string_or_null(self.opportunity.get("Name", ""))
+
     def get_info(self):
         """
         Extracts info from the opportunity dictionary.
@@ -114,7 +161,7 @@ class Opportunity:
         Extracts postcode from the opportunity dictionary.
         """
         postcode = str(self.opportunity.get("Postcode", None))
-        if postcode:
+        if postcode and postcode != "None":
             return postcode[:5]
         else:
             rac_contact = self.opportunity.get("RAC Contact", None)
@@ -134,6 +181,7 @@ def get_opportunity(opportunity):
 
     opportunity_instance = Opportunity(opportunity)
     return {
+        "title": opportunity_instance.get_title(),
         "status": opportunity_instance.get_status(),
         "type": opportunity_instance.get_type(),
         "translationType": opportunity_instance.get_translation_type(),
