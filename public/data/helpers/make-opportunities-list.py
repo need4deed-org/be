@@ -1,8 +1,9 @@
 import json
 import sys
 
-from utils import (get_email, get_list, get_list_item_safe, get_name_fields,
-                   get_string_or_null, get_timeslot_data, is_valid_js_date)
+from utils import (get_email, get_language_split, get_list, get_list_item_safe,
+                   get_name_fields, get_string_or_null, get_timeslot_data,
+                   is_valid_js_date)
 
 
 class Opportunity:
@@ -76,7 +77,7 @@ class Opportunity:
             """
             activities = [activity.strip() for activity in self.opportunity.get("Type", "").split(",")]
             skills = [activity.strip() for activity in self.opportunity.get("Skills", "").split(",")]
-            languages = [get_list(language.strip().split(" ")) for language in self.opportunity.get("Refugee Languages", "").split(",")]
+            languages = [get_list(get_language_split(language.strip())) for language in self.opportunity.get("Refugee Languages", "").split(",")]
 
             return {
                 "info": get_string_or_null(self.opportunity.get("Comments", "")),

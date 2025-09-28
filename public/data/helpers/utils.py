@@ -63,6 +63,16 @@ def get_email(email):
     
     return None
 
+def get_language_split(language):
+    if not language:
+        return [None]
+    if language == "Northern Kurdish native":
+        return ["Northern Kurdish", "native"]
+    if language == "Northern Kurdish":
+        return ["Northern Kurdish", "advanced"]
+    language_split = language.split(" ")
+    return language_split if len(language_split)==2 else [language, "advanced"]
+
 def get_list(lst):
     return [item for item in lst if item]
 
