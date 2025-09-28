@@ -23,7 +23,7 @@ export default class Address {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   @IsString()
   @Length(100)
   title: string;
