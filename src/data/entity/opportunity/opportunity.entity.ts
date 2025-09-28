@@ -8,7 +8,6 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import {} from "../../types";
 import Deal from "../deal.entity";
 import Agent from "./agent.entity";
 
@@ -22,6 +21,10 @@ export default class Opportunity {
 
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column()
+  @IsString()
+  title: string;
 
   @Column({
     type: "enum",
