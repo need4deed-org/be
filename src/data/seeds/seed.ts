@@ -5,6 +5,7 @@ import { seedDistrict } from "./district.seed";
 import { seedFieldTranslation } from "./field_translation.seed";
 import { seedLanguage } from "./language.seed";
 import { seedLeadFrom } from "./lead_from.seed";
+import { seedOpportunities } from "./opportunity.seed";
 import { seedPostcode } from "./postcode.seed";
 import { seedSkill } from "./skill.seed";
 import { seedUser } from "./user.seed";
@@ -21,4 +22,5 @@ export async function seed() {
   await seedDistrict(AppDataSource);
   await seedUser(AppDataSource);
   await seedVolunteers(AppDataSource);
+  await seedOpportunities(AppDataSource);
 }
