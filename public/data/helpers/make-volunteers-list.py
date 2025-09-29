@@ -1,8 +1,8 @@
 import json
 import sys
 
-from utils import (get_email, get_list, get_name_fields, get_string_or_null,
-                   get_timeslot_data)
+from utils import (get_email, get_language_split, get_list, get_name_fields,
+                   get_string_or_null, get_timeslot_data)
 
 
 class Volunteer:
@@ -40,7 +40,7 @@ class Volunteer:
             """
             activities = [activity.strip() for activity in self.volunteer.get("Activities", "").split(",")]
             skills = [activity.strip() for activity in self.volunteer.get("Skills", "").split(",")]
-            languages = [get_list(activity.strip().split(" ")) for activity in self.volunteer.get("Languages", "").split(",")]
+            languages = [get_list(get_language_split(language.strip())) for language in self.volunteer.get("Languages", "").split(",")]
 
             return {
                 "info": get_string_or_null(self.volunteer.get("Comments", "")),

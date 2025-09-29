@@ -40,6 +40,7 @@ export enum AgentOperatorType {
 
 export enum AgentType {
   RAC = "RAC",
+  NGO = "NGO",
 }
 
 export enum TranslationEntityType {

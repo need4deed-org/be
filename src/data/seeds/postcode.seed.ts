@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { seedPLZFile } from "../../config/constants";
 import Postcode from "../entity/location/postcode.entity";
 import { readJsonAsync } from "../utils";
-import { getCount } from "./utils";
+import { getCount, getRepository } from "./utils";
 
 interface PLZJSON {
   plz: string;
@@ -16,10 +16,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
     throw new Error("DataSource is not initialized.");
   }
 
-  const postcodeRepository = dataSource.getRepository(Postcode);
-  if (!postcodeRepository) {
-    throw new Error("Postcode entity is not initialized.");
-  }
+  const postcodeRepository = getRepository(dataSource, Postcode);
 
   const count = await getCount(postcodeRepository);
   if (count !== 0) {
@@ -52,7 +49,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
       }
       return result;
     },
-    [],
+    [new Postcode({ value: "12345" })],
   );
 
   try {
