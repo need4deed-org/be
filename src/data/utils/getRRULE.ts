@@ -1,5 +1,6 @@
 export function getRRULE(day: string): string | null {
   if (
+    typeof day === "string" &&
     [
       "monday",
       "tuesday",

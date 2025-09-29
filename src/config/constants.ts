@@ -55,6 +55,12 @@ export const seedVolunteersFile = path.join(
   "volunteers.json",
 );
 
+export const seedOpportunitiesFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "opportunities.json",
+);
+
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
   "https://app.need4deed.org/verify-email";

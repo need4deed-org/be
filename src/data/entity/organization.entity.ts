@@ -26,7 +26,7 @@ export default class Organization {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ unique: true })
   @IsNotEmpty()
   @IsString()
   title: string;

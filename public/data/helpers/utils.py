@@ -2,6 +2,12 @@ import json
 import subprocess
 
 
+def get_list_item_safe(lst: list, idx: int):
+    if 0<=idx<len(lst):
+        return lst[idx]
+    
+    return None
+
 def is_valid_js_date(date_str: str) -> bool:
     """
     Checks if a string is valid date for javascript `new Date(date_str)`.
@@ -56,6 +62,16 @@ def get_email(email):
         return email
     
     return None
+
+def get_language_split(language):
+    if not language:
+        return [None]
+    if language == "Northern Kurdish native":
+        return ["Northern Kurdish", "native"]
+    if language == "Northern Kurdish":
+        return ["Northern Kurdish", "advanced"]
+    language_split = language.split(" ")
+    return language_split if len(language_split)==2 else [language, "advanced"]
 
 def get_list(lst):
     return [item for item in lst if item]
