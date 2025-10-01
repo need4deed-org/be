@@ -50,4 +50,5 @@ export enum TranslationEntityType {
   CATEGORY = "category",
   LANGUAGE = "language",
   LEAD = "lead_from",
+  DISTRICT = "district",
 }

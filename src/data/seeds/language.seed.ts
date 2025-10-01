@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { seedLanguageFile } from "../../config/constants";
 import Language from "../entity/profile/language.entity";
 import { readJsonAsync } from "../utils";
-import { getCount } from "./utils";
+import { getCount, getRepository } from "./utils";
 
 interface LanguageJSON {
   iso_code: string;
@@ -15,10 +15,7 @@ export async function seedLanguage(dataSource: DataSource): Promise<void> {
     throw new Error("DataSource is not initialized.");
   }
 
-  const languageRepository = dataSource.getRepository(Language);
-  if (!languageRepository) {
-    throw new Error("Language entity is not initialized.");
-  }
+  const languageRepository = getRepository(dataSource, Language);
 
   const count = await getCount(languageRepository);
   if (count !== 0) {

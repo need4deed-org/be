@@ -8,4 +8,5 @@ export enum RoutePrefix {
   HEALTH_CHECK = "/health-check",
   VERIFY_EMAIL = "/verify-email",
   VOLUNTEER = "/volunteer",
+  OPTION = "/option",
 }

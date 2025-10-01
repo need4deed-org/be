@@ -18,10 +18,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     throw new Error("DataSource is not initialized.");
   }
 
-  const volunteerRepository = getRepository(
-    dataSource as unknown as DataSource,
-    Volunteer,
-  );
+  const volunteerRepository = getRepository(dataSource, Volunteer);
 
   const count = await getCount(volunteerRepository);
   if (count !== 0) {
