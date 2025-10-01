@@ -10,6 +10,7 @@ import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
 import authRoutes from "./routes/auth";
 import healthRoutes from "./routes/health";
+import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer";
@@ -60,6 +61,7 @@ export const start = async () => {
     fastify.register(userRoutes, { prefix: RoutePrefix.USER });
     fastify.register(personRoutes, { prefix: RoutePrefix.PERSON });
     fastify.register(volunteerRoutes, { prefix: RoutePrefix.VOLUNTEER });
+    fastify.register(optionRoutes, { prefix: RoutePrefix.OPTION });
 
     await fastify.ready();
 
