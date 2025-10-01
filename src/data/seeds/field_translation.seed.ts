@@ -289,7 +289,7 @@ async function seedSkills(
     if (!existingSkillTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const translationDE = new FieldTranslation();
       translationDE.translation = de;
-      translationDE.entityType = TranslationEntityType.ACTIVITY;
+      translationDE.entityType = TranslationEntityType.SKILL;
       translationDE.entityId = skill.id;
       translationDE.languageId = langDE.id;
       translationsForInsert.push(translationDE);
@@ -298,7 +298,7 @@ async function seedSkills(
     if (!existingSkillTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
       translationEN.translation = de;
-      translationEN.entityType = TranslationEntityType.ACTIVITY;
+      translationEN.entityType = TranslationEntityType.SKILL;
       translationEN.entityId = skill.id;
       translationEN.languageId = langEN.id;
       translationsForInsert.push(translationEN);
