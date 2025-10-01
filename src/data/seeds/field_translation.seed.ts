@@ -15,7 +15,7 @@ import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
 import { TranslationEntityType } from "../types";
 import { readJsonAsync } from "../utils";
-import { getCount } from "./utils";
+import { getCount, getRepository } from "./utils";
 
 const fieldNameTitle = "title";
 const fieldNameDescription = "description";
@@ -346,10 +346,10 @@ export async function seedFieldTranslation(
     throw new Error("DataSource is not initialized.");
   }
 
-  const fieldTranslationRepository = dataSource.getRepository(FieldTranslation);
-  if (!fieldTranslationRepository) {
-    throw new Error("FieldTranslation entity is not initialized.");
-  }
+  const fieldTranslationRepository = getRepository(
+    dataSource,
+    FieldTranslation,
+  );
 
   const count = await getCount(fieldTranslationRepository);
   if (count !== 0) {
@@ -357,10 +357,7 @@ export async function seedFieldTranslation(
     return;
   }
 
-  const languageRepository = dataSource.getRepository(Language);
-  if (!languageRepository) {
-    throw new Error("Language entity is not initialized.");
-  }
+  const languageRepository = getRepository(dataSource, Language);
 
   const langEN = await languageRepository.findOne({
     where: { isoCode: isoCodeEN },
@@ -382,7 +379,7 @@ export async function seedFieldTranslation(
     langDE,
   );
 
-  const categoryRepository = dataSource.getRepository(Category);
+  const categoryRepository = getRepository(dataSource, Category);
   await seedCategories(
     fieldTranslationRepository,
     categoryRepository,
@@ -390,7 +387,7 @@ export async function seedFieldTranslation(
     langDE,
   );
 
-  const activityRepository = dataSource.getRepository(Activity);
+  const activityRepository = getRepository(dataSource, Activity);
   await seedActivities(
     fieldTranslationRepository,
     activityRepository,
@@ -398,10 +395,10 @@ export async function seedFieldTranslation(
     langDE,
   );
 
-  const skillRepository = dataSource.getRepository(Skill);
+  const skillRepository = getRepository(dataSource, Skill);
   await seedSkills(fieldTranslationRepository, skillRepository, langEN, langDE);
 
-  const leadFromRepository = dataSource.getRepository(LeadFrom);
+  const leadFromRepository = getRepository(dataSource, LeadFrom);
   await seedLeeds(
     fieldTranslationRepository,
     leadFromRepository,
