@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { seedCategoryFile } from "../../config/constants";
 import Category from "../entity/profile/category.entity";
 import { readJsonAsync } from "../utils";
-import { getCount } from "./utils";
+import { getCount, getRepository } from "./utils";
 
 interface CategoryJSON {
   id: string;
@@ -14,10 +14,7 @@ export async function seedCategory(dataSource: DataSource): Promise<void> {
     throw new Error("DataSource is not initialized.");
   }
 
-  const categoryRepository = dataSource.getRepository(Category);
-  if (!categoryRepository) {
-    throw new Error("Category entity is not initialized.");
-  }
+  const categoryRepository = getRepository(dataSource, Category);
 
   const count = await getCount(categoryRepository);
   if (count !== 0) {
