@@ -276,6 +276,40 @@ async function seedSkills(
         )
       : [],
   );
+
+  const translationsForInsert: FieldTranslation[] = [];
+  for (const skillTranslation of skillTranslations) {
+    const {
+      id,
+      title: { en, de },
+    } = skillTranslation;
+
+    const skill = skills.find((_skill) => _skill.title === id);
+
+    if (!existingSkillTranslationsSet.has(`${isoCodeDE}_${de}`)) {
+      const translationDE = new FieldTranslation();
+      translationDE.translation = de;
+      translationDE.entityType = TranslationEntityType.ACTIVITY;
+      translationDE.entityId = skill.id;
+      translationDE.languageId = langDE.id;
+      translationsForInsert.push(translationDE);
+    }
+
+    if (!existingSkillTranslationsSet.has(`${isoCodeEN}_${en}`)) {
+      const translationEN = new FieldTranslation();
+      translationEN.translation = de;
+      translationEN.entityType = TranslationEntityType.ACTIVITY;
+      translationEN.entityId = skill.id;
+      translationEN.languageId = langEN.id;
+      translationsForInsert.push(translationEN);
+    }
+  }
+
+  try {
+    await fieldTranslationRepository.insert(translationsForInsert);
+  } catch (error) {
+    throw new Error(`Error inserting activity translations: ${error.message}`);
+  }
 }
 
 async function seedLeeds(
