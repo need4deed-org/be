@@ -21,6 +21,7 @@ import ProfileSkill from "./entity/m2m/profile-skill";
 import TimeTimeslot from "./entity/m2m/time-timeslot";
 import Agent from "./entity/opportunity/agent.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
+import Option from "./entity/option.entity";
 import Organization from "./entity/organization.entity";
 import Person from "./entity/person.entity";
 import Activity from "./entity/profile/activity.entity";
@@ -72,6 +73,7 @@ export const AppDataSource = new DataSource({
     ProfileLanguage,
     ProfileSkill,
     Postcode,
+    Option,
     Skill,
     Testimonial,
     Time,
