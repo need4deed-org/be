@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 
 import { onRequestHookHandler } from "fastify";
 import FieldTranslation from "../../data/entity/field_translation.entity";
+import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import User from "../../data/entity/user.entity";
@@ -18,6 +19,7 @@ declare module "fastify" {
       volunteerRepository: Repository<Volunteer>;
       languageRepository: Repository<Language>;
       fieldTranslationRepository: Repository<FieldTranslation>;
+      optionRepository: Repository<Option>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

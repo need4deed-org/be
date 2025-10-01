@@ -1,15 +1,18 @@
 import { Lang } from "need4deed-sdk";
-import { Repository } from "typeorm";
-import { AppDataSource } from "../../data/data-source";
+import { In, Repository } from "typeorm";
+import { AppDataSource as dataSource } from "../../data/data-source";
 import FieldTranslation from "../../data/entity/field_translation.entity";
+import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import Option from "../../data/entity/option.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
+import { getRepository } from "../../data/seeds/utils";
 import { TranslationEntityType } from "../../data/types";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
-  const postcodeRepository = AppDataSource.getRepository(Postcode);
+  const postcodeRepository = getRepository(dataSource, Postcode);
 
   let postcode = await postcodeRepository.findOneBy({ value: code });
 
@@ -22,7 +25,7 @@ export async function getPostcode(code: string): Promise<Postcode | null> {
 }
 
 export async function getProfileEntityByTitle<
-  E extends new (args: unknown) => { title: string; id: number },
+  E extends new () => { title: string; id: number },
   M extends object,
 >(
   entityTitle: string,
@@ -51,7 +54,7 @@ export async function getProfileEntityByTitle<
 export async function getTimeslot(
   timeslotData: Partial<Timeslot>,
 ): Promise<Timeslot> {
-  const timeslotRepository = AppDataSource.getRepository(Timeslot);
+  const timeslotRepository = getRepository(dataSource, Timeslot);
 
   let timeslot = await timeslotRepository.findOneBy(timeslotData);
   if (!timeslot) {
@@ -62,17 +65,19 @@ export async function getTimeslot(
 }
 
 export async function getInstanceByTranslation<
-  E extends new (args: unknown) => { id: number; title: string },
+  E extends new () => { id: number; title: string },
 >(
   entityTitle: string,
   entity: E,
   entityType: TranslationEntityType,
 ): Promise<InstanceType<E> | null> {
-  const repository = AppDataSource.getRepository(entity);
+  const repository = getRepository(dataSource, entity);
   let instance = await repository.findOneBy({ title: entityTitle });
   if (!instance && entityType !== TranslationEntityType.NONE) {
-    const fieldTranslationRepository =
-      AppDataSource.getRepository(FieldTranslation);
+    const fieldTranslationRepository = getRepository(
+      dataSource,
+      FieldTranslation,
+    );
 
     const translation = await fieldTranslationRepository.findOne({
       where: {
@@ -102,17 +107,17 @@ export async function addTranslatedFields(
   let languageRepository: Repository<Language>;
   let fieldTranslationRepository: Repository<FieldTranslation>;
   try {
-    fieldTranslationRepository = AppDataSource.getRepository(FieldTranslation);
-    languageRepository = AppDataSource.getRepository(Language);
+    fieldTranslationRepository = getRepository(dataSource, FieldTranslation);
+    languageRepository = getRepository(dataSource, Language);
     language = await languageRepository.findOne({ where: { isoCode } });
     if (!language) {
       throw new Error(`Language ${isoCode} not found.`);
     }
   } catch (error) {
-    AppDataSource.logger.log("warn", `Error loading language: ${error}`);
+    dataSource.logger.log("warn", `Error loading language: ${error}`);
     throw new Error(error.message);
   }
-  AppDataSource.logger.log("log", "Translating volunteers");
+  dataSource.logger.log("log", "Translating volunteers");
   for (const volunteer of volunteers) {
     for (const pl of volunteer.deal.profile.profileLanguage) {
       const translation = await fieldTranslationRepository.findOne({
@@ -151,4 +156,93 @@ export async function addTranslatedFields(
         : ps.skill.translation;
     }
   }
+}
+
+export async function getOptions(
+  list: TranslationEntityType | undefined,
+  language: Lang,
+): Promise<
+  Partial<Record<TranslationEntityType, { title: string; id: number }[]>>
+> {
+  const optionRepository = getRepository(dataSource, Option);
+  const fieldTranslationRepository = getRepository(
+    dataSource,
+    FieldTranslation,
+  );
+  const languageRepository = getRepository(dataSource, Language);
+  const lang = await languageRepository.findOne({
+    where: { isoCode: language },
+  });
+  if (!lang) {
+    throw new Error(`Language ${language} not found.`);
+  }
+  const languageId = lang.id;
+
+  async function getList(itemType: TranslationEntityType) {
+    const options = await optionRepository.find({
+      where: { itemType },
+    });
+
+    if (
+      [
+        TranslationEntityType.ACTIVITY,
+        TranslationEntityType.LANGUAGE,
+        TranslationEntityType.SKILL,
+        TranslationEntityType.LEAD,
+        TranslationEntityType.CATEGORY,
+      ].includes(itemType)
+    ) {
+      const items = await fieldTranslationRepository.find({
+        where: {
+          entityType: itemType,
+          entityId: In(options.map(({ itemId }) => itemId)),
+          fieldName: "title",
+          languageId,
+        },
+      });
+
+      return items.map(({ translation, entityId }) => ({
+        title: translation,
+        id: entityId,
+      }));
+    }
+
+    if (itemType === TranslationEntityType.DISTRICT) {
+      const districtRepository = getRepository(dataSource, District);
+      const items = await districtRepository.find({
+        where: {
+          id: In(options.map(({ itemId }) => itemId)),
+        },
+      });
+
+      return items.map(({ title, id }) => ({ title, id }));
+    }
+
+    return [];
+  }
+
+  if (!list) {
+    return {
+      [TranslationEntityType.LANGUAGE]: await getList(
+        TranslationEntityType.LANGUAGE,
+      ),
+      [TranslationEntityType.DISTRICT]: await getList(
+        TranslationEntityType.DISTRICT,
+      ),
+      [TranslationEntityType.CATEGORY]: await getList(
+        TranslationEntityType.CATEGORY,
+      ),
+      [TranslationEntityType.ACTIVITY]: await getList(
+        TranslationEntityType.ACTIVITY,
+      ),
+      [TranslationEntityType.SKILL]: await getList(TranslationEntityType.SKILL),
+      [TranslationEntityType.LEAD]: await getList(TranslationEntityType.LEAD),
+    };
+  }
+
+  if (!Object.values(TranslationEntityType).includes(list)) {
+    throw new Error(`Unknown list: ${list}`);
+  }
+
+  return await { [list]: await getList(list) };
 }

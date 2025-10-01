@@ -3,7 +3,7 @@ import { DataSource } from "typeorm";
 import { seedLeadFromFile } from "../../config/constants";
 import LeadFrom from "../entity/lead.entity";
 import { readJsonAsync } from "../utils";
-import { getCount } from "./utils";
+import { getCount, getRepository } from "./utils";
 
 interface LeadJSON {
   id: string;
@@ -15,10 +15,7 @@ export async function seedLeadFrom(dataSource: DataSource): Promise<void> {
     throw new Error("DataSource is not initialized.");
   }
 
-  const leadFromRepository = dataSource.getRepository(LeadFrom);
-  if (!leadFromRepository) {
-    throw new Error("Skill entity is not initialized.");
-  }
+  const leadFromRepository = getRepository(dataSource, LeadFrom);
 
   const count = await getCount(leadFromRepository);
   if (count !== 0) {

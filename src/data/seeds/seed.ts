@@ -1,4 +1,4 @@
-import { AppDataSource } from "../data-source";
+import { AppDataSource as dataSource } from "../data-source";
 import { seedActivity } from "./activity.seed";
 import { seedCategory } from "./category.seed";
 import { seedDistrict } from "./district.seed";
@@ -6,21 +6,23 @@ import { seedFieldTranslation } from "./field_translation.seed";
 import { seedLanguage } from "./language.seed";
 import { seedLeadFrom } from "./lead_from.seed";
 import { seedOpportunities } from "./opportunity.seed";
+import { seedOptions } from "./option.seed";
 import { seedPostcode } from "./postcode.seed";
 import { seedSkill } from "./skill.seed";
 import { seedUser } from "./user.seed";
 import { seedVolunteers } from "./volunteer.seed";
 
 export async function seed() {
-  await seedLanguage(AppDataSource);
-  await seedCategory(AppDataSource);
-  await seedActivity(AppDataSource);
-  await seedSkill(AppDataSource);
-  await seedLeadFrom(AppDataSource);
-  await seedFieldTranslation(AppDataSource);
-  await seedPostcode(AppDataSource);
-  await seedDistrict(AppDataSource);
-  await seedUser(AppDataSource);
-  await seedVolunteers(AppDataSource);
-  await seedOpportunities(AppDataSource);
+  await seedLanguage(dataSource);
+  await seedCategory(dataSource);
+  await seedActivity(dataSource);
+  await seedSkill(dataSource);
+  await seedLeadFrom(dataSource);
+  await seedFieldTranslation(dataSource);
+  await seedPostcode(dataSource);
+  await seedDistrict(dataSource);
+  await seedOptions(dataSource);
+  await seedUser(dataSource);
+  await seedVolunteers(dataSource);
+  await seedOpportunities(dataSource);
 }
