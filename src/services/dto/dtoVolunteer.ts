@@ -128,13 +128,13 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
       return {
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
-      };
+      } as Availability;
     }
     if (timeslot?.occasional) {
       return {
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
-      };
+      } as Availability;
     }
 
     throw new Error("Timeslot is missing required fields");
