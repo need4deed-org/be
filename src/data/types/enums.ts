@@ -43,7 +43,7 @@ export enum AgentType {
   NGO = "NGO",
 }
 
-export enum TranslationEntityType {
+export enum EntityTableName {
   NONE = "none",
   ACTIVITY = "activity",
   SKILL = "skill",

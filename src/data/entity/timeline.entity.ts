@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsString, MaxLength } from "class-validator";
 import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 
-import { TranslationEntityType } from "../types";
+import { EntityTableName } from "../types";
 
 @Entity()
 @Index(["entityType", "entityId", "timestamp", "fieldName"], {
@@ -15,7 +15,7 @@ export default class Timeline {
   @IsNotEmpty()
   @IsString()
   @MaxLength(100)
-  entityType: TranslationEntityType;
+  entityType: EntityTableName;
 
   @Column()
   @IsNotEmpty()

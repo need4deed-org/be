@@ -2,13 +2,13 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 
 import { Lang } from "need4deed-sdk";
-import { TranslationEntityType } from "../../data/types";
+import { EntityTableName } from "../../data/types";
 import { optionListsSchema, responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";
 
 type OptionLists = Partial<
-  Record<TranslationEntityType, { title: string; id: number }[]>
+  Record<EntityTableName, { title: string; id: number }[]>
 >;
 
 async function optionRoutes(
@@ -18,13 +18,11 @@ async function optionRoutes(
   const prefixedPath = options.prefix || RoutePrefix.OPTION;
 
   fastify.get<{
-    Params: { list?: TranslationEntityType };
+    Params: { list?: EntityTableName };
     Querystring: { language: Lang };
     Reply: {
       message: string;
-      data?: Partial<
-        Record<TranslationEntityType, { title: string; id: number }[]>
-      >;
+      data?: Partial<Record<EntityTableName, { title: string; id: number }[]>>;
     };
   }>(
     `${prefixedPath}/:list?`,

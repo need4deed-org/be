@@ -18,7 +18,7 @@ import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
-import { TranslationEntityType } from "../../data/types";
+import { EntityTableName } from "../../data/types";
 import { getRRULE, getStartEnd } from "../../data/utils";
 import {
   getPostcode,
@@ -36,7 +36,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   for (const volunteerActivity of volunteerActivities) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerActivity,
-      TranslationEntityType.ACTIVITY,
+      EntityTableName.ACTIVITY,
       Activity,
       ProfileActivity,
     );
@@ -51,7 +51,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   for (const volunteerSkill of volunteerSkills) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerSkill,
-      TranslationEntityType.SKILL,
+      EntityTableName.SKILL,
       Skill,
       ProfileSkill,
     );
@@ -67,7 +67,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   for (const volunteerLanguage of volunteerLanguages) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerLanguage.title,
-      TranslationEntityType.LANGUAGE,
+      EntityTableName.LANGUAGE,
       Language,
       ProfileLanguage,
     );
@@ -124,7 +124,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   for (const volunteerDistrict of volunteerDistricts) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerDistrict,
-      TranslationEntityType.NONE,
+      EntityTableName.NONE,
       District,
       LocationDistrict,
       "district",

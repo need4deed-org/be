@@ -1,5 +1,5 @@
 import LeadFrom from "../../data/entity/lead.entity";
-import { TranslationEntityType } from "../../data/types";
+import { EntityTableName } from "../../data/types";
 import { getInstanceByTranslation } from "../../server/utils";
 
 export async function leadFromParser(
@@ -11,7 +11,7 @@ export async function leadFromParser(
     const leadInstance = await getInstanceByTranslation(
       volunteerLead,
       LeadFrom,
-      TranslationEntityType.LEAD,
+      EntityTableName.LEAD,
     );
     if (leadInstance) {
       leadFrom.push(leadInstance);

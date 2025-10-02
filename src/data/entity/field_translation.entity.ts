@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import { TranslationEntityType } from "../types";
+import { EntityTableName } from "../types";
 import Language from "./profile/language.entity";
 
 @Entity()
@@ -39,7 +39,7 @@ export default class FieldTranslation {
   @IsNotEmpty()
   @IsString()
   @MaxLength(100)
-  entityType: TranslationEntityType;
+  entityType: EntityTableName;
 
   @Column()
   @IsNotEmpty()
