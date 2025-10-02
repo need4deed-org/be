@@ -1,4 +1,4 @@
-import { EntityTableName, Lang } from "need4deed-sdk";
+import { ApiOptionLists, EntityTableName, Lang } from "need4deed-sdk";
 import { In, Repository } from "typeorm";
 
 import { AppDataSource as dataSource } from "../../data/data-source";
@@ -161,7 +161,7 @@ export async function addTranslatedFields(
 export async function getOptions(
   list: EntityTableName | undefined,
   language: Lang,
-): Promise<Partial<Record<EntityTableName, { title: string; id: number }[]>>> {
+): Promise<ApiOptionLists> {
   const optionRepository = getRepository(dataSource, Option);
   const fieldTranslationRepository = getRepository(
     dataSource,

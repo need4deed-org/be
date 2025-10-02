@@ -1,15 +1,11 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { EntityTableName } from "need4deed-sdk";
+import { ApiOptionLists, EntityTableName } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
 import { optionListsSchema, responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";
-
-type OptionLists = Partial<
-  Record<EntityTableName, { title: string; id: number }[]>
->;
 
 async function optionRoutes(
   fastify: FastifyInstance,
@@ -22,7 +18,7 @@ async function optionRoutes(
     Querystring: { language: Lang };
     Reply: {
       message: string;
-      data?: Partial<Record<EntityTableName, { title: string; id: number }[]>>;
+      data?: ApiOptionLists;
     };
   }>(
     `${prefixedPath}/:list?`,
