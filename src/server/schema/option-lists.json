@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/OptionLists",
+  "definitions": {
+    "OptionLists": {
+      "type": "object",
+      "properties": {
+        "activity": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        },
+        "skill": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        },
+        "category": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        },
+        "language": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        },
+        "lead_from": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        },
+        "district": {
+          "type": "array",
+          "items": { "$ref": "sdk-types.json#/definitions/OptionItem" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
