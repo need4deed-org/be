@@ -1,3 +1,4 @@
+import { EntityTableName } from "need4deed-sdk";
 import { DataSource, Repository } from "typeorm";
 
 import {
@@ -13,7 +14,6 @@ import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { TranslationEntityType } from "../types";
 import { readJsonAsync } from "../utils";
 import { getCount, getRepository } from "./utils";
 
@@ -44,7 +44,7 @@ async function seedLanguagesInUse(
   )) as OptionJSON[];
 
   const existingLanguageTranslations = await fieldTranslationRepository.find({
-    where: { entityType: TranslationEntityType.LANGUAGE },
+    where: { entityType: EntityTableName.LANGUAGE },
     relations: ["language"],
   });
 
@@ -70,7 +70,7 @@ async function seedLanguagesInUse(
       if (language) {
         const translationEN = new FieldTranslation();
         translationEN.translation = en;
-        translationEN.entityType = TranslationEntityType.LANGUAGE;
+        translationEN.entityType = EntityTableName.LANGUAGE;
         translationEN.entityId = language.id;
         translationEN.languageId = langEN.id;
         translationsForInsert.push(translationEN);
@@ -83,7 +83,7 @@ async function seedLanguagesInUse(
       if (language) {
         const translationDE = new FieldTranslation();
         translationDE.translation = de;
-        translationDE.entityType = TranslationEntityType.LANGUAGE;
+        translationDE.entityType = EntityTableName.LANGUAGE;
         translationDE.entityId = language.id;
         translationDE.languageId = langDE.id;
         translationsForInsert.push(translationDE);
@@ -114,7 +114,7 @@ async function seedCategories(
   }
 
   const existingCategoryTranslations = await fieldTranslationRepository.find({
-    where: { entityType: TranslationEntityType.CATEGORY },
+    where: { entityType: EntityTableName.CATEGORY },
     relations: ["language"],
   });
 
@@ -138,7 +138,7 @@ async function seedCategories(
     ) {
       const newTranslation = new FieldTranslation();
       newTranslation.translation = title.en;
-      newTranslation.entityType = TranslationEntityType.CATEGORY;
+      newTranslation.entityType = EntityTableName.CATEGORY;
       newTranslation.entityId = category.id;
       newTranslation.languageId = langEN.id;
       translationsForInsert.push(newTranslation);
@@ -150,7 +150,7 @@ async function seedCategories(
     ) {
       const newTranslation = new FieldTranslation();
       newTranslation.translation = title.de;
-      newTranslation.entityType = TranslationEntityType.CATEGORY;
+      newTranslation.entityType = EntityTableName.CATEGORY;
       newTranslation.entityId = category.id;
       newTranslation.languageId = langDE.id;
       translationsForInsert.push(newTranslation);
@@ -163,7 +163,7 @@ async function seedCategories(
       const newTranslation = new FieldTranslation();
       newTranslation.fieldName = fieldNameDescription;
       newTranslation.translation = description.en;
-      newTranslation.entityType = TranslationEntityType.CATEGORY;
+      newTranslation.entityType = EntityTableName.CATEGORY;
       newTranslation.entityId = category.id;
       newTranslation.languageId = langEN.id;
       translationsForInsert.push(newTranslation);
@@ -176,7 +176,7 @@ async function seedCategories(
       const newTranslation = new FieldTranslation();
       newTranslation.fieldName = fieldNameDescription;
       newTranslation.translation = description.de;
-      newTranslation.entityType = TranslationEntityType.CATEGORY;
+      newTranslation.entityType = EntityTableName.CATEGORY;
       newTranslation.entityId = category.id;
       newTranslation.languageId = langDE.id;
       translationsForInsert.push(newTranslation);
@@ -203,7 +203,7 @@ async function seedActivities(
   )) as OptionJSON[];
 
   const existingActivities = await fieldTranslationRepository.find({
-    where: { entityType: TranslationEntityType.ACTIVITY },
+    where: { entityType: EntityTableName.ACTIVITY },
     relations: ["language"],
   });
 
@@ -228,7 +228,7 @@ async function seedActivities(
     if (!existingActivityTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
       translationEN.translation = en;
-      translationEN.entityType = TranslationEntityType.ACTIVITY;
+      translationEN.entityType = EntityTableName.ACTIVITY;
       translationEN.entityId = activity.id;
       translationEN.languageId = langEN.id;
       translationsForInsert.push(translationEN);
@@ -237,7 +237,7 @@ async function seedActivities(
     if (!existingActivityTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const translationDE = new FieldTranslation();
       translationDE.translation = de;
-      translationDE.entityType = TranslationEntityType.ACTIVITY;
+      translationDE.entityType = EntityTableName.ACTIVITY;
       translationDE.entityId = activity.id;
       translationDE.languageId = langDE.id;
       translationsForInsert.push(translationDE);
@@ -264,7 +264,7 @@ async function seedSkills(
   )) as OptionJSON[];
 
   const existingSkills = await fieldTranslationRepository.find({
-    where: { entityType: TranslationEntityType.SKILL },
+    where: { entityType: EntityTableName.SKILL },
     relations: ["language"],
   });
 
@@ -289,7 +289,7 @@ async function seedSkills(
     if (!existingSkillTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const translationDE = new FieldTranslation();
       translationDE.translation = de;
-      translationDE.entityType = TranslationEntityType.SKILL;
+      translationDE.entityType = EntityTableName.SKILL;
       translationDE.entityId = skill.id;
       translationDE.languageId = langDE.id;
       translationsForInsert.push(translationDE);
@@ -298,7 +298,7 @@ async function seedSkills(
     if (!existingSkillTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
       translationEN.translation = de;
-      translationEN.entityType = TranslationEntityType.SKILL;
+      translationEN.entityType = EntityTableName.SKILL;
       translationEN.entityId = skill.id;
       translationEN.languageId = langEN.id;
       translationsForInsert.push(translationEN);
@@ -325,7 +325,7 @@ async function seedLeeds(
   )) as OptionJSON[];
 
   const existingLeads = await fieldTranslationRepository.find({
-    where: { entityType: TranslationEntityType.LEAD },
+    where: { entityType: EntityTableName.LEAD },
     relations: ["language"],
   });
 
@@ -350,7 +350,7 @@ async function seedLeeds(
     if (!existingLeadFromTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
       translationEN.translation = en;
-      translationEN.entityType = TranslationEntityType.LEAD;
+      translationEN.entityType = EntityTableName.LEAD;
       translationEN.entityId = lead.id;
       translationEN.languageId = langEN.id;
       translationsForInsert.push(translationEN);
@@ -359,7 +359,7 @@ async function seedLeeds(
     if (!existingLeadFromTranslationsSet.has(`${isoCodeDE}_${de}`)) {
       const translationDE = new FieldTranslation();
       translationDE.translation = de;
-      translationDE.entityType = TranslationEntityType.LEAD;
+      translationDE.entityType = EntityTableName.LEAD;
       translationDE.entityId = lead.id;
       translationDE.languageId = langDE.id;
       translationsForInsert.push(translationDE);

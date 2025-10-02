@@ -116,6 +116,15 @@
         "Temp inactive",
         "Inactive"
       ]
+    },
+    "OptionItem": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "id": { "type": "number" }
+      },
+      "required": ["title", "id"],
+      "additionalProperties": false
     }
   }
 }
