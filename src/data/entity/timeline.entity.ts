@@ -1,7 +1,6 @@
 import { IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { EntityTableName } from "need4deed-sdk";
 import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
-
-import { EntityTableName } from "../types";
 
 @Entity()
 @Index(["entityType", "entityId", "timestamp", "fieldName"], {

@@ -1,3 +1,4 @@
+import { EntityTableName } from "need4deed-sdk";
 import { DataSource, Repository } from "typeorm";
 
 import {
@@ -13,7 +14,6 @@ import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { EntityTableName } from "../types";
 import { readJsonAsync } from "../utils";
 import { getCount, getRepository } from "./utils";
 

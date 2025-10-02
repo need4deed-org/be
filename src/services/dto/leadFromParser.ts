@@ -1,5 +1,6 @@
+import { EntityTableName } from "need4deed-sdk";
+
 import LeadFrom from "../../data/entity/lead.entity";
-import { EntityTableName } from "../../data/types";
 import { getInstanceByTranslation } from "../../server/utils";
 
 export async function leadFromParser(
