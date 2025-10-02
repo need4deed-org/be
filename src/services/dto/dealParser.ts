@@ -1,6 +1,7 @@
 import {
   ApiLanguage,
   DealType,
+  EntityTableName,
   OccasionalType,
   VolunteerFormData,
 } from "need4deed-sdk";
@@ -18,7 +19,6 @@ import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
-import { EntityTableName } from "../../data/types";
 import { getRRULE, getStartEnd } from "../../data/utils";
 import {
   getPostcode,

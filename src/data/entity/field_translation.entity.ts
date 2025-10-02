@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { EntityTableName } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import { EntityTableName } from "../types";
 import Language from "./profile/language.entity";
 
 @Entity()

@@ -1,3 +1,4 @@
+import { EntityTableName } from "need4deed-sdk";
 import { DataSource, In, Repository } from "typeorm";
 
 import { seedLanguageInUseFile } from "../../config/constants";
@@ -7,7 +8,6 @@ import Option from "../entity/option.entity";
 import Activity from "../entity/profile/activity.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { EntityTableName } from "../types";
 import { readJsonAsync } from "../utils";
 import { getCount, getRepository } from "./utils";
 

@@ -42,13 +42,3 @@ export enum AgentType {
   RAC = "RAC",
   NGO = "NGO",
 }
-
-export enum EntityTableName {
-  NONE = "none",
-  ACTIVITY = "activity",
-  SKILL = "skill",
-  CATEGORY = "category",
-  LANGUAGE = "language",
-  LEAD = "lead_from",
-  DISTRICT = "district",
-}

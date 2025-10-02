@@ -1,6 +1,6 @@
 import { IsEnum } from "class-validator";
+import { EntityTableName } from "need4deed-sdk";
 import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-import { EntityTableName } from "../types";
 
 @Entity()
 export default class Option {

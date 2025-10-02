@@ -1,5 +1,6 @@
-import { Lang } from "need4deed-sdk";
+import { EntityTableName, Lang } from "need4deed-sdk";
 import { In, Repository } from "typeorm";
+
 import { AppDataSource as dataSource } from "../../data/data-source";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import District from "../../data/entity/location/district.entity";
@@ -9,7 +10,6 @@ import Language from "../../data/entity/profile/language.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../data/seeds/utils";
-import { EntityTableName } from "../../data/types";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
   const postcodeRepository = getRepository(dataSource, Postcode);
