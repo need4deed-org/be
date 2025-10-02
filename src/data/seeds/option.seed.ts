@@ -1,3 +1,4 @@
+import { EntityTableName } from "need4deed-sdk";
 import { DataSource, In, Repository } from "typeorm";
 
 import { seedLanguageInUseFile } from "../../config/constants";
@@ -7,7 +8,6 @@ import Option from "../entity/option.entity";
 import Activity from "../entity/profile/activity.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { TranslationEntityType } from "../types";
 import { readJsonAsync } from "../utils";
 import { getCount, getRepository } from "./utils";
 
@@ -36,7 +36,7 @@ async function getOptionsForLanguagesInUse(
   )) as OptionJSON[];
 
   const existingLanguageOptions = await optionRepository.find({
-    where: { itemType: TranslationEntityType.LANGUAGE },
+    where: { itemType: EntityTableName.LANGUAGE },
   });
 
   const existingLanguageOptionsSet = new Set(
@@ -54,7 +54,7 @@ async function getOptionsForLanguagesInUse(
   for (const languageInUse of languagesInUse) {
     if (!existingLanguageOptionsSet.has(languageInUse.id)) {
       const newOption = new Option({
-        itemType: TranslationEntityType.LANGUAGE,
+        itemType: EntityTableName.LANGUAGE,
         itemId: languageInUse.id,
       });
       optionsForInsert.push(newOption);
@@ -80,8 +80,7 @@ async function getOptionsForEntity<E extends OptionEntity>(
     entity as new () => InstanceType<E>,
   );
   // const itemType = entity.name.toLowerCase() as TranslationEntityType;
-  const itemType = dataSource.getMetadata(entity)
-    .tableName as TranslationEntityType;
+  const itemType = dataSource.getMetadata(entity).tableName as EntityTableName;
   const items = await entityRepository.find();
   if (!items.length) {
     throw new Error(`${entity.name} not loaded yet.`);

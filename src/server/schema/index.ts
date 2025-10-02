@@ -12,3 +12,6 @@ export const volunteerIdResponseSchema =
 
 import volunteerFormSchemaJson from "./volunteer-form.json";
 export const volunteerFormSchema = volunteerFormSchemaJson;
+
+import optionListsSchemaJson from "./option-lists.json";
+export const optionListsSchema = optionListsSchemaJson.definitions.OptionLists;

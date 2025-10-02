@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from "class-validator";
+import { EntityTableName } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 
-import { TranslationEntityType } from "../types";
 import Language from "./profile/language.entity";
 
 @Entity()
@@ -35,11 +35,14 @@ export default class FieldTranslation {
   @Column({ nullable: true })
   languageId: number;
 
-  @Column()
+  @Column({
+    type: "enum",
+    enum: EntityTableName,
+    default: EntityTableName.NONE,
+  })
   @IsNotEmpty()
-  @IsString()
-  @MaxLength(100)
-  entityType: TranslationEntityType;
+  @IsEnum(EntityTableName)
+  entityType: EntityTableName;
 
   @Column()
   @IsNotEmpty()
