@@ -1,91 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$ref": "#/definitions/ApiVolunteerGet",
+  "$ref": "#/definitions/ApiVolunteerGetPart",
   "definitions": {
     "ApiVolunteerGet": {
-      "allOf": [
-        { "$ref": "volunteer-api.json" },
-        {
-          "type": "object",
-          "properties": {
-            "createdAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "updatedAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "firstName": {
-              "type": "string"
-            },
-            "lastName": {
-              "type": "string"
-            },
-            "phone": {
-              "type": "string"
-            },
-            "email": {
-              "type": "string"
-            },
-            "address": {
-              "$ref": "sdk-types.json#/definitions/Address"
-            },
-            "goodConductCertificate": {
-              "$ref": "sdk-types.json#/definitions/DocumentStatusType"
-            },
-            "measlesVaccination": {
-              "$ref": "sdk-types.json#/definitions/DocumentStatusType"
-            },
-            "infoAbout": {
-              "type": "string"
-            },
-            "infoExperience": {
-              "type": "string"
-            },
-            "timelineLogs": {
-              "type": "array",
-              "items": {
-                "$ref": "sdk-types.json#/definitions/TimedText"
-              }
-            },
-            "comments": {
-              "type": "array",
-              "items": {
-                "$ref": "sdk-types.json#/definitions/TimedText"
-              }
-            },
-            "opportunitiesApplied": {
-              "type": "array",
-              "items": {
-                "$ref": "sdk-types.json#/definitions/Option"
-              }
-            },
-            "opportunitiesMatched": {
-              "type": "array",
-              "items": {
-                "$ref": "sdk-types.json#/definitions/Option"
-              }
-            }
-          },
-          "required": [
-            "address",
-            "comments",
-            "email",
-            "firstName",
-            "goodConductCertificate",
-            "infoAbout",
-            "infoExperience",
-            "lastName",
-            "measlesVaccination",
-            "opportunitiesApplied",
-            "opportunitiesMatched",
-            "phone",
-            "timelineLogs"
-          ],
-          "additionalProperties": false
-        }
-      ]
+      "$ref": "volunteer-api-id-properties.json#/definitions/ApiVolunteerProperties",
+      "required": [
+        "id",
+        "name",
+        "avatarUrl",
+        "status",
+        "languages",
+        "availability",
+        "activities",
+        "locations",
+        "skills",
+        "address",
+        "comments",
+        "email",
+        "firstName",
+        "goodConductCertificate",
+        "infoAbout",
+        "infoExperience",
+        "lastName",
+        "measlesVaccination",
+        "opportunitiesApplied",
+        "opportunitiesMatched",
+        "phone",
+        "timelineLogs",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
     }
   }
 }
