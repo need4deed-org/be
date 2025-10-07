@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ApiVolunteerProperties",
+  "definitions": {
+    "ApiVolunteerProperties": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": ["number", "string"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateType"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "entity-types.json#/definitions/Language"
+          }
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "entity-types.json#/definitions/Timeslot"
+          }
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/OptionItem"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/OptionItem"
+          }
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/OptionItem"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "address": {
+          "$ref": "sdk-types.json#/definitions/Address"
+        },
+        "goodConductCertificate": {
+          "$ref": "sdk-types.json#/definitions/DocumentStatusType"
+        },
+        "measlesVaccination": {
+          "$ref": "sdk-types.json#/definitions/DocumentStatusType"
+        },
+        "infoAbout": {
+          "type": "string"
+        },
+        "infoExperience": {
+          "type": "string"
+        },
+        "timelineLogs": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/TimedText"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/TimedText"
+          }
+        },
+        "opportunitiesApplied": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/Option"
+          }
+        },
+        "opportunitiesMatched": {
+          "type": "array",
+          "items": {
+            "$ref": "sdk-types.json#/definitions/Option"
+          }
+        }
+      }
+    }
+  }
+}
