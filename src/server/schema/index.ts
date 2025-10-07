@@ -10,6 +10,10 @@ import volunteerIdSchemaJson from "./volunteer-api-id.json";
 export const volunteerIdResponseSchema =
   volunteerIdSchemaJson.definitions.ApiVolunteerGet;
 
+import volunteerIdPatchSchemaJson from "./volunteer-api-id-part.json";
+export const volunteerIdPatchBodySchema =
+  volunteerIdPatchSchemaJson.definitions.ApiVolunteerBodyPart;
+
 import volunteerFormSchemaJson from "./volunteer-form.json";
 export const volunteerFormSchema = volunteerFormSchemaJson;
 
