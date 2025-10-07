@@ -13,6 +13,7 @@ import {
 
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
+import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
 
@@ -55,7 +56,10 @@ export function volunteerListSerializer(
   }
 }
 
-export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
+export function volunteerSerializer(
+  volunteer: Volunteer,
+  timedEvents: Timeline[],
+): ApiVolunteerGet {
   const address: Address = {
     ...volunteer.person.address,
     id: String(volunteer.person.address.id),
@@ -69,7 +73,20 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
     },
   };
 
-  const comments = [] as unknown as TimedText[];
+  const comments: TimedText[] = timedEvents
+    .filter(({ contentType }) => contentType === "comment")
+    .map(({ id, timestamp, content }) => ({
+      id,
+      timestamp,
+      content,
+    }));
+  const timelineLogs: TimedText[] = timedEvents
+    .filter(({ contentType }) => contentType !== "comment")
+    .map(({ id, timestamp, content }) => ({
+      id,
+      timestamp,
+      content,
+    }));
   const email = volunteer.person.email;
   const firstName = volunteer.person.firstName;
   const goodConductCertificate = volunteer.statusCGC;
@@ -80,7 +97,8 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
   const opportunitiesApplied = [] as unknown as Option[];
   const opportunitiesMatched = [] as unknown as Option[];
   const phone = volunteer.person.phone;
-  const timelineLogs = [] as unknown as TimedText[];
+  const createdAt = volunteer.createdAt;
+  const updatedAt = volunteer.updatedAt;
   return {
     address,
     comments,
@@ -95,6 +113,8 @@ export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
     opportunitiesMatched,
     phone,
     timelineLogs,
+    createdAt,
+    updatedAt,
     ...volunteerListSerializer(volunteer),
   };
 }
