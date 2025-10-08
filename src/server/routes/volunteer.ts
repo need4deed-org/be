@@ -3,11 +3,11 @@ import fp from "fastify-plugin";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
+  Lang,
   SortOrder,
   VolunteerFormData,
 } from "need4deed-sdk";
 
-import { Lang } from "need4deed-sdk";
 import { Id, Role } from "../../data/types";
 import {
   leadFromParser,
@@ -24,7 +24,7 @@ import {
 } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
-import { addTranslatedFields, getLanguageCode } from "../utils";
+import { addTranslatedFields, getLanguageCode, getTimedEvents } from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
 
@@ -91,8 +91,8 @@ async function volunteerRoutes(
       const { id } = request.params as { id: string };
       const volunteerId = Number(id);
       if (isNaN(volunteerId)) {
-        fastify.log.error(``);
-        reply.status(400).send({ message: `${id} is not a volunteer id.` });
+        fastify.log.error(`${id} is not a valid id.`);
+        reply.status(400).send({ message: `${id} is not a valid id.` });
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
@@ -106,10 +106,14 @@ async function volunteerRoutes(
 
         await addTranslatedFields([volunteer], isoCode);
 
-        const data = volunteerSerializer(volunteer);
-        return reply
-          .status(200)
-          .send({ message: `Volunteer id:${volunteerId}`, data });
+        const timedEvents = await getTimedEvents(volunteer);
+
+        const data = volunteerSerializer(volunteer, timedEvents);
+
+        return reply.status(200).send({
+          message: `Volunteer id:${volunteerId}`,
+          data,
+        });
       } catch (error) {
         fastify.log.error(
           `Error fetching volunteer id=${volunteerId}: ${error}`,

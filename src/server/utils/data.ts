@@ -1,4 +1,9 @@
-import { ApiOptionLists, EntityTableName, Lang } from "need4deed-sdk";
+import {
+  ApiOptionLists,
+  EntityTableName,
+  Lang,
+  OptionItem,
+} from "need4deed-sdk";
 import { In, Repository } from "typeorm";
 
 import { AppDataSource as dataSource } from "../../data/data-source";
@@ -8,6 +13,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import Option from "../../data/entity/option.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
+import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../data/seeds/utils";
 
@@ -158,6 +164,19 @@ export async function addTranslatedFields(
   }
 }
 
+export async function getTimedEvents(volunteer: Volunteer) {
+  const timelineRepository = getRepository(dataSource, Timeline);
+  const events = await timelineRepository.find({
+    where: {
+      targetEntityType: EntityTableName.VOLUNTEER,
+      targetEntityId: volunteer.id,
+    },
+    order: { timestamp: "DESC" },
+  });
+
+  return events;
+}
+
 export async function getOptions(
   list: EntityTableName | undefined,
   language: Lang,
@@ -176,7 +195,7 @@ export async function getOptions(
   }
   const languageId = lang.id;
 
-  async function getList(itemType: EntityTableName) {
+  async function getList(itemType: EntityTableName): Promise<OptionItem[]> {
     const options = await optionRepository.find({
       where: { itemType },
     });
