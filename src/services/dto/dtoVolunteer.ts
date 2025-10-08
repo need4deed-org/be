@@ -7,7 +7,7 @@ import {
   Daytime,
   Hour,
   Occasionally,
-  Option,
+  OptionItem,
   TimedText,
 } from "need4deed-sdk";
 
@@ -87,6 +87,7 @@ export function volunteerSerializer(
       timestamp,
       content,
     }));
+  const personId = volunteer.person.id;
   const email = volunteer.person.email;
   const firstName = volunteer.person.firstName;
   const goodConductCertificate = volunteer.statusCGC;
@@ -94,12 +95,29 @@ export function volunteerSerializer(
   const infoExperience = volunteer.infoExperience;
   const lastName = volunteer.person.lastName;
   const measlesVaccination = volunteer.statusVaccination;
-  const opportunitiesApplied = [] as unknown as Option[];
-  const opportunitiesMatched = [] as unknown as Option[];
+  const opportunitiesApplied = [] as unknown as OptionItem[];
+  const opportunitiesMatched = [] as unknown as OptionItem[];
   const phone = volunteer.person.phone;
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
+  const activities = getOptionItems(
+    volunteer.deal.profile.profileActivity,
+    "activity",
+  );
+  const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
+  const locations = getOptionItems(
+    volunteer.deal.location.locationDistrict,
+    "district",
+  );
+  const languages = getLanguages(volunteer.deal.profile.profileLanguage);
+  const availability = getAvailability(volunteer.deal.time.timeTimeslot);
+
   return {
+    id: volunteer.id,
+    status: volunteer.status,
+    personId,
+    avatarUrl: volunteer.person?.avatarUrl || null,
+    name: volunteer.person.name,
     address,
     comments,
     email,
@@ -115,7 +133,11 @@ export function volunteerSerializer(
     timelineLogs,
     createdAt,
     updatedAt,
-    ...volunteerListSerializer(volunteer),
+    languages,
+    availability,
+    activities,
+    skills,
+    locations,
   };
 }
 
@@ -146,12 +168,14 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
   return timeTimeslot.map(({ timeslot }): Availability => {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
+        timeslotId: timeslot.id,
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
       } as Availability;
     }
     if (timeslot?.occasional) {
       return {
+        timeslotId: timeslot.id,
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
       } as Availability;
@@ -163,8 +187,19 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
 
 function getLanguages(profileLanguage: ProfileLanguage[]) {
   return profileLanguage.map((pl) => ({
+    languageId: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,
+  }));
+}
+
+function getOptionItems<T>(
+  profileItems: T[],
+  entityName: string,
+): OptionItem[] {
+  return profileItems.map((pa) => ({
+    id: pa[entityName].id,
+    title: pa[entityName].translation || pa[entityName].title,
   }));
 }
 
