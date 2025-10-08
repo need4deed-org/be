@@ -46,3 +46,60 @@ export function getLanguageCode(isoCode: string): Lang | null {
 
   return null;
 }
+
+/**
+ * Removes all properties from an object whose values are `null` or `undefined`.
+ *
+ * - Safely returns an empty object if the input is `null`, `undefined`, or not an object.
+ * - Keeps other falsy values (like `0`, `false`, `''`, `NaN`).
+ *
+ * @template T
+ * @param {T} obj - The input object to clean.
+ * @returns {Partial<T>} A shallow copy of `obj` with only non-nullish properties retained.
+ *
+ * @example
+ * stripNullishAttributes({ a: 1, b: null, c: undefined, d: 0 })
+ * // → { a: 1, d: 0 }
+ *
+ * @example
+ * stripNullishAttributes(null)
+ * // → {}
+ */
+export function stripNullishAttributes<T>(obj: T): Partial<T> {
+  if (obj === null || typeof obj !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(obj).filter(
+      ([, value]) => value !== null && value !== undefined,
+    ),
+  ) as Partial<T>;
+}
+
+/**
+ * Determines whether a value is an empty plain object
+ * or not an object created by the `Object` constructor.
+ *
+ * - Returns `true` for:
+ *   - Empty plain objects (`{}`)
+ *   - Non-object values (`null`, numbers, strings, etc.)
+ *   - Non-plain objects (arrays, dates, custom instances, etc.)
+ * - Returns `false` only for non-empty plain objects.
+ *
+ * @param {object} obj - The value to test.
+ * @returns {boolean} `true` if the value is an empty plain object or not an object created by `Object`; otherwise `false`.
+ *
+ * @example
+ * isObjectAndEmpty({})           // → true
+ * isObjectAndEmpty({ a: 1 })     // → false
+ * isObjectAndEmpty([])           // → true
+ * isObjectAndEmpty(new Date())   // → true
+ * isObjectAndEmpty(null)         // → true
+ */
+export function isObjectAndEmpty(obj: object): boolean {
+  if (obj === null || typeof obj !== "object") return true;
+
+  const proto = Object.getPrototypeOf(obj);
+  const isPlainObject = proto === Object.prototype || proto === null;
+
+  return !isPlainObject || Object.keys(obj).length === 0;
+}
