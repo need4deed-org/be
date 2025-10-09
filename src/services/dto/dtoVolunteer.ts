@@ -11,6 +11,7 @@ import {
   TimedText,
 } from "need4deed-sdk";
 
+import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
@@ -87,17 +88,22 @@ export function volunteerSerializer(
       timestamp,
       content,
     }));
-  const personId = volunteer.person.id;
-  const email = volunteer.person.email;
-  const firstName = volunteer.person.firstName;
+  const person: ApiPersonGet = {
+    id: volunteer.person.id,
+    email: volunteer.person.email,
+    firstName: volunteer.person.firstName,
+    lastName: volunteer.person.lastName,
+    middleName: volunteer.person.middleName,
+    phone: volunteer.person.phone,
+    avatarUrl: volunteer.person?.avatarUrl || null,
+    address,
+  };
   const goodConductCertificate = volunteer.statusCGC;
   const infoAbout = volunteer.infoAbout;
   const infoExperience = volunteer.infoExperience;
-  const lastName = volunteer.person.lastName;
   const measlesVaccination = volunteer.statusVaccination;
   const opportunitiesApplied = [] as unknown as OptionItem[];
   const opportunitiesMatched = [] as unknown as OptionItem[];
-  const phone = volunteer.person.phone;
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
   const activities = getOptionItems(
@@ -115,21 +121,20 @@ export function volunteerSerializer(
   return {
     id: volunteer.id,
     status: volunteer.status,
-    personId,
-    avatarUrl: volunteer.person?.avatarUrl || null,
-    name: volunteer.person.name,
-    address,
+    person,
+    statusEngagement: volunteer.statusEngagement,
+    statusCommunication: volunteer.statusCommunication,
+    statusAppreciation: volunteer.statusAppreciation,
+    statusType: volunteer.statusType,
+    statusMatch: volunteer.statusMatch,
+    statusCgcProcess: volunteer.statusCgcProcess,
     comments,
-    email,
-    firstName,
     goodConductCertificate,
     infoAbout,
     infoExperience,
-    lastName,
     measlesVaccination,
     opportunitiesApplied,
     opportunitiesMatched,
-    phone,
     timelineLogs,
     createdAt,
     updatedAt,
