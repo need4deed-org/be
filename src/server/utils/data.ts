@@ -3,19 +3,23 @@ import {
   EntityTableName,
   Lang,
   OptionItem,
+  VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { In, Repository } from "typeorm";
+import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
 import { AppDataSource as dataSource } from "../../data/data-source";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import Option from "../../data/entity/option.entity";
+import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../data/seeds/utils";
+import { isObjectAndEmpty, stripNullishAttributes } from "./common";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
   const postcodeRepository = getRepository(dataSource, Postcode);
@@ -254,4 +258,61 @@ export async function getOptions(
   }
 
   return await { [list]: await getList(list) };
+}
+
+export function getPatchData(body: VolunteerPatchBodyData) {
+  const volunteerData: Partial<Volunteer> = stripNullishAttributes({
+    status: body.status,
+    infoAbout: body.infoAbout,
+    infoExperience: body.infoExperience,
+    statusCGC: body.goodConductCertificate,
+    statusVaccination: body.measlesVaccination,
+    statusEngagement: body.statusEngagement,
+    statusCommunication: body.statusCommunication,
+    statusAppreciation: body.statusAppreciation,
+    statusType: body.statusType,
+    statusMatch: body.statusMatch,
+    statusCgcProcess: body.statusCgcProcess,
+  });
+  const personData: Partial<Person> = stripNullishAttributes({
+    id: body.person?.id,
+    firstName: body.person?.firstName,
+    lastName: body.person?.lastName,
+    middleName: body.person?.middleName,
+    email: body.person?.email,
+    phone: body.person?.phone,
+  });
+  const comments = body.comments;
+  const addressData = body.person?.address;
+  const postcodeData = body.person?.address?.postcode;
+  const languages = body.languages;
+  const availability = body.availability;
+  const activities = body.activities;
+  const skills = body.skills;
+  const locations = body.locations;
+
+  return {
+    volunteerData: isObjectAndEmpty(volunteerData) ? null : volunteerData,
+    personData: isObjectAndEmpty(personData) ? null : personData,
+    comments,
+    addressData,
+    postcodeData,
+    languages,
+    availability,
+    activities,
+    skills,
+    locations,
+  };
+}
+
+export async function patchEntity<E extends { id: number }>(
+  entity: new () => E,
+  id: number,
+  data: Partial<E>,
+): Promise<boolean> {
+  const repository = getRepository(dataSource, entity);
+
+  return await repository
+    .update({ id } as any, data as QueryDeepPartialEntity<E>)
+    .then((response) => response.affected === 1);
 }
