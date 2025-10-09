@@ -6,8 +6,11 @@ import {
   Lang,
   SortOrder,
   VolunteerFormData,
+  VolunteerPatchBodyData,
 } from "need4deed-sdk";
 
+import Person from "../../data/entity/person.entity";
+import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { Id, Role } from "../../data/types";
 import {
   leadFromParser,
@@ -19,12 +22,19 @@ import {
 } from "../../services";
 import {
   volunteerFormSchema,
+  volunteerIdPatchBodySchema,
   volunteerIdResponseSchema,
   volunteerResponseSchema,
 } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
-import { addTranslatedFields, getLanguageCode, getTimedEvents } from "../utils";
+import {
+  addTranslatedFields,
+  getLanguageCode,
+  getPatchData,
+  getTimedEvents,
+  patchEntity,
+} from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
 
@@ -192,6 +202,113 @@ async function volunteerRoutes(
         });
       } catch (error) {
         fastify.log.error(`Error fetching volunteers: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.patch<{
+    Params: { id: string };
+    Querystring: {
+      language: string;
+    };
+    Body: VolunteerPatchBodyData;
+    Reply: {
+      message: string;
+      data?: ApiVolunteerGet;
+    };
+  }>(
+    `${prefixedPath}/:id`,
+    {
+      schema: {
+        body: volunteerIdPatchBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: volunteerIdResponseSchema,
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+    },
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (isNaN(id)) {
+        return reply
+          .status(400)
+          .send({ message: `${request.params.id}: is not a valid id.` });
+      }
+
+      const {
+        volunteerData,
+        personData,
+        addressData,
+        postcodeData,
+        languages,
+        availability,
+        activities,
+        skills,
+        locations,
+      } = getPatchData(request.body);
+
+      try {
+        if (volunteerData) {
+          const success = await patchEntity(Volunteer, id, volunteerData);
+          if (!success) {
+            return reply.status(404).send({
+              message: `Volunteer (id=${id}) not found.`,
+            });
+          }
+        }
+        fastify.log.debug(
+          `Person (data=${JSON.stringify(personData)}) is being patched.`,
+        );
+        if (personData) {
+          const success = await patchEntity(Person, personData.id, personData);
+          if (!success) {
+            return reply.status(404).send({
+              message: `Person (id=${personData.id}) not found.`,
+            });
+          }
+        }
+      } catch (error) {
+        fastify.log.error(`Error patching volunteer data (id=${id}): ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+
+      const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+
+      const volunteerRepository = fastify.db.volunteerRepository;
+
+      try {
+        const volunteer = await volunteerRepository.findOne({
+          where: { id },
+          relations,
+        });
+
+        if (!volunteer) {
+          return reply
+            .status(404)
+            .send({ message: `Volunteer id:${id} not found.` });
+        }
+
+        addTranslatedFields([volunteer], isoCode);
+
+        const timedEvents = await getTimedEvents(volunteer);
+
+        const data = volunteerSerializer(volunteer, timedEvents);
+
+        return reply.status(200).send({
+          message: `Volunteer (id=${id}) has been patched`,
+          data,
+        });
+      } catch (error) {
+        fastify.log.error(`Error fetching volunteer (id=${id}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
