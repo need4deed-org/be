@@ -8,14 +8,29 @@
         "id": {
           "type": "number"
         },
-        "name": {
-          "type": "string"
-        },
-        "avatarUrl": {
-          "type": "string"
+        "person": {
+          "$ref": "sdk-types.json#/definitions/ApiPersonGet"
         },
         "status": {
           "$ref": "sdk-types.json#/definitions/VolunteerStateType"
+        },
+        "statusEngagement": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateEngagementType"
+        },
+        "statusCommunication": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateCommunicationType"
+        },
+        "statusAppreciation": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateAppreciationType"
+        },
+        "statusType": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateTypeType"
+        },
+        "statusMatch": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateMatchType"
+        },
+        "statusCgcProcess": {
+          "$ref": "sdk-types.json#/definitions/VolunteerStateCGCType"
         },
         "languages": {
           "type": "array",
@@ -54,21 +69,6 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
-        },
-        "firstName": {
-          "type": "string"
-        },
-        "lastName": {
-          "type": "string"
-        },
-        "phone": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "address": {
-          "$ref": "sdk-types.json#/definitions/Address"
         },
         "goodConductCertificate": {
           "$ref": "sdk-types.json#/definitions/DocumentStatusType"
