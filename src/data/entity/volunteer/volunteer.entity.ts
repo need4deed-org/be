@@ -1,5 +1,14 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
-import { DocumentStatusType, VolunteerStateType } from "need4deed-sdk";
+import {
+  DocumentStatusType,
+  VolunteerStateAppreciationType,
+  VolunteerStateCGCType,
+  VolunteerStateCommunicationType,
+  VolunteerStateEngagementType,
+  VolunteerStateMatchType,
+  VolunteerStateType,
+  VolunteerStateTypeType,
+} from "need4deed-sdk";
 
 import {
   Column,
@@ -39,6 +48,54 @@ export default class Volunteer {
   })
   @IsEnum(VolunteerStateType)
   status: VolunteerStateType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateEngagementType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateEngagementType)
+  statusEngagement: VolunteerStateEngagementType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateCommunicationType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateCommunicationType)
+  statusCommunication: VolunteerStateCommunicationType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateAppreciationType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateAppreciationType)
+  statusAppreciation: VolunteerStateAppreciationType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateTypeType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateTypeType)
+  statusType: VolunteerStateTypeType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateMatchType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateMatchType)
+  statusMatch: VolunteerStateMatchType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateCGCType,
+    nullable: true,
+  })
+  @IsEnum(VolunteerStateCGCType)
+  statusCgcProcess: VolunteerStateCGCType;
 
   @Column({
     type: "enum",
