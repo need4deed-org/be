@@ -95,11 +95,30 @@ export function stripNullishAttributes<T>(obj: T): Partial<T> {
  * isObjectAndEmpty(new Date())   // → true
  * isObjectAndEmpty(null)         // → true
  */
-export function isObjectAndEmpty(obj: object): boolean {
+export function isObjectAndEmpty<T>(obj: T): boolean {
   if (obj === null || typeof obj !== "object") return true;
 
   const proto = Object.getPrototypeOf(obj);
   const isPlainObject = proto === Object.prototype || proto === null;
 
   return !isPlainObject || Object.keys(obj).length === 0;
+}
+
+export function getEmptyPropsNull<T extends Record<string, unknown>>(
+  obj: T,
+): T {
+  if (obj === null || typeof obj !== "object") return obj;
+
+  return Object.keys(obj).reduce((acc: T, key: keyof T) => {
+    const val = obj[key];
+    acc[key] = isObjectAndEmpty(val) ? null : val;
+    return acc;
+  }, {} as T);
+}
+
+export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
+  if (arr === null || !Array.isArray(arr) || arr.length > 0) {
+    return arr;
+  }
+  return null;
 }
