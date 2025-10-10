@@ -10,6 +10,7 @@ import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity
 
 import { AppDataSource as dataSource } from "../../data/data-source";
 import FieldTranslation from "../../data/entity/field_translation.entity";
+import Address from "../../data/entity/location/address.entity";
 import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import Option from "../../data/entity/option.entity";
@@ -19,7 +20,11 @@ import Timeslot from "../../data/entity/time/timeslot.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../data/seeds/utils";
-import { isObjectAndEmpty, stripNullishAttributes } from "./common";
+import {
+  getEmptyPropsNull,
+  getNullFromEmptyArray,
+  stripNullishAttributes,
+} from "./common";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
   const postcodeRepository = getRepository(dataSource, Postcode);
@@ -283,25 +288,29 @@ export function getPatchData(body: VolunteerPatchBodyData) {
     phone: body.person?.phone,
   });
   const comments = body.comments;
-  const addressData = body.person?.address;
-  const postcodeData = body.person?.address?.postcode;
-  const languages = body.languages;
-  const availability = body.availability;
-  const activities = body.activities;
-  const skills = body.skills;
-  const locations = body.locations;
+  const addressData: Partial<Address> = stripNullishAttributes({
+    id: body.person?.address?.id,
+    street: body.person?.address?.street,
+    city: body.person?.address?.city,
+  });
+  const postcodeData: Partial<Postcode> = stripNullishAttributes({
+    id: body.person?.address?.postcode?.id,
+    value: body.person?.address?.postcode?.code,
+  });
 
   return {
-    volunteerData: isObjectAndEmpty(volunteerData) ? null : volunteerData,
-    personData: isObjectAndEmpty(personData) ? null : personData,
-    comments,
-    addressData,
-    postcodeData,
-    languages,
-    availability,
-    activities,
-    skills,
-    locations,
+    ...getEmptyPropsNull({
+      volunteerData,
+      personData,
+      comments,
+      addressData,
+      postcodeData,
+    }),
+    languages: getNullFromEmptyArray(body.languages),
+    availability: getNullFromEmptyArray(body.availability),
+    activities: getNullFromEmptyArray(body.activities),
+    skills: getNullFromEmptyArray(body.skills),
+    locations: getNullFromEmptyArray(body.locations),
   };
 }
 
@@ -315,4 +324,28 @@ export async function patchEntity<E extends { id: number }>(
   return await repository
     .update({ id } as any, data as QueryDeepPartialEntity<E>)
     .then((response) => response.affected === 1);
+}
+
+export async function patchAddress(
+  addressData: Partial<Address>,
+  postcodeData: Partial<Postcode>,
+): Promise<boolean> {
+  const postcodeRepository = getRepository(dataSource, Postcode);
+
+  const address = { ...addressData } as Address;
+
+  if (postcodeData) {
+    if (postcodeData.id) {
+      address.postcodeId = postcodeData.id;
+    } else if (postcodeData.value) {
+      let postcode = await postcodeRepository.findOneBy({
+        value: postcodeData.value,
+      });
+      if (postcode) {
+        address.postcodeId = postcode.id;
+      }
+    }
+  }
+
+  return await patchEntity(Address, address.id!, address);
 }
