@@ -4,6 +4,9 @@
     "Timeslot": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "number"
+        },
         "day": {
           "anyOf": [
             {
@@ -76,6 +79,9 @@
     "Language": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "number"
+        },
         "title": {
           "type": "string"
         },
