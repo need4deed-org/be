@@ -173,14 +173,14 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
   return timeTimeslot.map(({ timeslot }): Availability => {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
-        timeslotId: timeslot.id,
+        id: timeslot.id,
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
       } as Availability;
     }
     if (timeslot?.occasional) {
       return {
-        timeslotId: timeslot.id,
+        id: timeslot.id,
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
       } as Availability;
@@ -192,7 +192,7 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
 
 function getLanguages(profileLanguage: ProfileLanguage[]) {
   return profileLanguage.map((pl) => ({
-    languageId: pl.language.id,
+    id: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,
   }));
