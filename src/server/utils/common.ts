@@ -104,6 +104,20 @@ export function isObjectAndEmpty<T>(obj: T): boolean {
   return !isPlainObject || Object.keys(obj).length === 0;
 }
 
+/**
+ * Returns a shallow copy of an object where all properties
+ * that are empty objects are replaced with `null`.
+ *
+ * If the input is not an object (or is `null`), it is returned as-is.
+ *
+ * @template T - The type of the input object.
+ * @param {T} obj - The object to transform.
+ * @returns {T} A new object with empty objects replaced by `null`.
+ *
+ * @example
+ * getEmptyPropsNull({ a: {}, b: { x: 1 }, c: [] });
+ * // → { a: null, b: { x: 1 }, c: [] }
+ */
 export function getEmptyPropsNull<T extends Record<string, unknown>>(
   obj: T,
 ): T {
@@ -116,6 +130,21 @@ export function getEmptyPropsNull<T extends Record<string, unknown>>(
   }, {} as T);
 }
 
+/**
+ * Returns `null` if the provided array is empty.
+ * Otherwise, returns the array itself.
+ *
+ * If the input is not an array or is `null`, it is returned unchanged.
+ *
+ * @template T - The type of elements in the array.
+ * @param {T[] | null} arr - The array to check.
+ * @returns {T[] | null} `null` if the array is empty, otherwise the original array.
+ *
+ * @example
+ * getNullFromEmptyArray([]);      // → null
+ * getNullFromEmptyArray([1, 2]);  // → [1, 2]
+ * getNullFromEmptyArray(null);    // → null
+ */
 export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
   if (arr === null || !Array.isArray(arr) || arr.length > 0) {
     return arr;
