@@ -21,7 +21,6 @@
           "$ref": "#/definitions/Postcode"
         }
       },
-      "required": ["id", "street", "city", "postcode"],
       "additionalProperties": false
     },
     "Postcode": {
@@ -40,7 +39,6 @@
           "type": "number"
         }
       },
-      "required": ["id", "code", "latitude", "longitude"],
       "additionalProperties": false
     },
     "DocumentStatusType": {
