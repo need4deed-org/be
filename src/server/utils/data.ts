@@ -5,7 +5,7 @@ import {
   OptionItem,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import { In, Repository } from "typeorm";
+import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
 import { AppDataSource as dataSource } from "../../data/data-source";
@@ -348,4 +348,98 @@ export async function patchAddress(
   }
 
   return await patchEntity(Address, address.id!, address);
+}
+
+function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
+  const m2mRelationsMap: Record<
+    string,
+    {
+      relations: string[];
+      idFieldNames: [
+        "profile" | "location" | "time",
+        string,
+        "language" | "activity" | "skill" | "district" | "timeslot",
+        string,
+      ];
+    }
+  > = {
+    ProfileLanguage: {
+      idFieldNames: ["profile", "profileId", "language", "languageId"],
+      relations: ["deal", "deal.profile.profileLanguage"],
+    },
+    ProfileActivity: {
+      idFieldNames: ["profile", "profileId", "activity", "activityId"],
+      relations: ["deal", "deal.profile", "deal.profile.profileActivity"],
+    },
+    ProfileSkill: {
+      idFieldNames: ["profile", "profileId", "skill", "skillId"],
+      relations: ["deal", "deal.profile", "deal.profile.profileSkill"],
+    },
+    LocationDistrict: {
+      idFieldNames: ["location", "locationId", "district", "districtId"],
+      relations: ["deal", "deal.location", "deal.location.locationDistrict"],
+    },
+    TimeTimeslot: {
+      idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
+      relations: ["deal", "deal.time", "deal.time.timeTimeslot"],
+    },
+  };
+
+  return m2mRelationsMap[m2mEntityName];
+}
+
+export async function updateOptionList<
+  M extends { id: number },
+  L extends { id: number; proficiency?: string },
+>(
+  volunteerId: number,
+  m2mEntity: new (arg?: unknown) => M,
+  list: L[],
+): Promise<boolean> {
+  const {
+    relations,
+    idFieldNames: [host, hostId, listName, listItemId],
+  } = getVolunteerRelationsAndIdFieldName(m2mEntity.name);
+
+  dataSource.transaction(async (manager) => {
+    const volunteerRepository = getRepository(
+      manager as unknown as DataSource,
+      Volunteer,
+    );
+    const volunteer = await volunteerRepository.findOne({
+      where: { id: volunteerId },
+      relations,
+    });
+    if (!volunteer) {
+      return false;
+    }
+    const m2mRepository = getRepository(
+      manager as unknown as DataSource,
+      m2mEntity,
+    );
+
+    const where = { [hostId]: volunteer.deal[host].id } as FindOptionsWhere<M>;
+    dataSource.logger.log("log", `DEBUG:where: ${JSON.stringify(where)}`);
+    const currentList = await m2mRepository.find({ where });
+    if (currentList.length > 0) {
+      await m2mRepository.delete(currentList.map(({ id }) => id));
+    }
+
+    const newList = list.map((item) => {
+      return new m2mEntity({
+        [hostId]: volunteer.deal[host].id,
+        [listItemId]: item.id,
+        ...(listName === "language" ? { proficiency: item.proficiency } : {}),
+      });
+    });
+
+    dataSource.logger.log(
+      "log",
+      `Updating ${JSON.stringify(newList)} for volunteer ${volunteerId}`,
+    );
+
+    await m2mRepository.save(newList);
+  });
+
+  return true;
 }
