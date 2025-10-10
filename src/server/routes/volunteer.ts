@@ -33,6 +33,7 @@ import {
   getLanguageCode,
   getPatchData,
   getTimedEvents,
+  patchAddress,
   patchEntity,
 } from "../utils";
 import { updateLeads } from "../utils/updateLeads";
@@ -265,14 +266,21 @@ async function volunteerRoutes(
             });
           }
         }
-        fastify.log.debug(
-          `Person (data=${JSON.stringify(personData)}) is being patched.`,
-        );
-        if (personData) {
+
+        if (personData && personData.id) {
           const success = await patchEntity(Person, personData.id, personData);
           if (!success) {
             return reply.status(404).send({
               message: `Person (id=${personData.id}) not found.`,
+            });
+          }
+        }
+
+        if (addressData && addressData.id) {
+          const success = await patchAddress(addressData, postcodeData);
+          if (!success) {
+            return reply.status(404).send({
+              message: `Address (id=${addressData.id}) not found.`,
             });
           }
         }
