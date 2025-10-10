@@ -9,6 +9,11 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 
+import LocationDistrict from "../../data/entity/m2m/location-district";
+import ProfileActivity from "../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { Id, Role } from "../../data/types";
@@ -35,6 +40,7 @@ import {
   getTimedEvents,
   patchAddress,
   patchEntity,
+  updateOptionList,
 } from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
@@ -279,8 +285,69 @@ async function volunteerRoutes(
         if (addressData && addressData.id) {
           const success = await patchAddress(addressData, postcodeData);
           if (!success) {
-            return reply.status(404).send({
-              message: `Address (id=${addressData.id}) not found.`,
+            return reply.status(400).send({
+              message: `Address (id=${addressData.id}) failed to update.`,
+            });
+          }
+        }
+
+        if (languages) {
+          const success = await updateOptionList(
+            id,
+            ProfileLanguage,
+            languages,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Languages for volunteer (id=${id}) failed to update.`,
+            });
+          }
+        }
+
+        if (availability) {
+          const success = await updateOptionList(
+            id,
+            TimeTimeslot,
+            availability,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Availability for volunteer (id=${id}) failed to update.`,
+            });
+          }
+        }
+
+        if (activities) {
+          const success = await updateOptionList(
+            id,
+            ProfileActivity,
+            activities,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Activities for volunteer (id=${id}) failed to update.`,
+            });
+          }
+        }
+
+        if (skills) {
+          const success = await updateOptionList(id, ProfileSkill, skills);
+          if (!success) {
+            return reply.status(400).send({
+              message: `Skills for volunteer (id=${id}) failed to update.`,
+            });
+          }
+        }
+
+        if (locations) {
+          const success = await updateOptionList(
+            id,
+            LocationDistrict,
+            locations,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Locations for volunteer (id=${id}) failed to update.`,
             });
           }
         }
