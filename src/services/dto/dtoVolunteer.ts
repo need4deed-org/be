@@ -63,11 +63,11 @@ export function volunteerSerializer(
 ): ApiVolunteerGet {
   const address: Address = {
     ...volunteer.person.address,
-    id: String(volunteer.person.address.id),
+    id: volunteer.person.address.id,
     city,
     postcode: {
       ...volunteer.person.address.postcode,
-      id: String(volunteer.person.address.postcode.id),
+      id: volunteer.person.address.postcode.id,
       code: volunteer.person.address.postcode.value,
       latitude: volunteer.person.address.postcode.latitude || null,
       longitude: volunteer.person.address.postcode.longitude || null,
