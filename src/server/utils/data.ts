@@ -1,5 +1,6 @@
 import {
   ApiOptionLists,
+  ApiVolunteerGet,
   EntityTableName,
   Lang,
   OptionItem,
@@ -20,6 +21,7 @@ import Timeslot from "../../data/entity/time/timeslot.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../data/seeds/utils";
+import { volunteerSerializer } from "../../services";
 import {
   getEmptyPropsNull,
   getNullFromEmptyArray,
@@ -338,7 +340,7 @@ export async function patchAddress(
     if (postcodeData.id) {
       address.postcodeId = postcodeData.id;
     } else if (postcodeData.value) {
-      let postcode = await postcodeRepository.findOneBy({
+      const postcode = await postcodeRepository.findOneBy({
         value: postcodeData.value,
       });
       if (postcode) {
@@ -401,45 +403,75 @@ export async function updateOptionList<
     idFieldNames: [host, hostId, listName, listItemId],
   } = getVolunteerRelationsAndIdFieldName(m2mEntity.name);
 
-  dataSource.transaction(async (manager) => {
-    const volunteerRepository = getRepository(
-      manager as unknown as DataSource,
-      Volunteer,
-    );
-    const volunteer = await volunteerRepository.findOne({
-      where: { id: volunteerId },
-      relations,
-    });
-    if (!volunteer) {
-      return false;
-    }
-    const m2mRepository = getRepository(
-      manager as unknown as DataSource,
-      m2mEntity,
-    );
-
-    const where = { [hostId]: volunteer.deal[host].id } as FindOptionsWhere<M>;
-    dataSource.logger.log("log", `DEBUG:where: ${JSON.stringify(where)}`);
-    const currentList = await m2mRepository.find({ where });
-    if (currentList.length > 0) {
-      await m2mRepository.delete(currentList.map(({ id }) => id));
-    }
-
-    const newList = list.map((item) => {
-      return new m2mEntity({
-        [hostId]: volunteer.deal[host].id,
-        [listItemId]: item.id,
-        ...(listName === "language" ? { proficiency: item.proficiency } : {}),
+  try {
+    dataSource.transaction(async (manager) => {
+      const volunteerRepository = getRepository(
+        manager as unknown as DataSource,
+        Volunteer,
+      );
+      const volunteer = await volunteerRepository.findOne({
+        where: { id: volunteerId },
+        relations,
       });
+      if (!volunteer) {
+        return false;
+      }
+      const m2mRepository = getRepository(
+        manager as unknown as DataSource,
+        m2mEntity,
+      );
+
+      const where = {
+        [hostId]: volunteer.deal[host].id,
+      } as FindOptionsWhere<M>;
+      dataSource.logger.log("log", `DEBUG:where: ${JSON.stringify(where)}`);
+      const currentList = await m2mRepository.find({ where });
+      if (currentList.length > 0) {
+        await m2mRepository.delete(currentList.map(({ id }) => id));
+      }
+
+      const newList = list.map((item) => {
+        return new m2mEntity({
+          [hostId]: volunteer.deal[host].id,
+          [listItemId]: item.id,
+          ...(listName === "language" ? { proficiency: item.proficiency } : {}),
+        });
+      });
+
+      await m2mRepository.save(newList);
     });
-
+  } catch (error) {
     dataSource.logger.log(
-      "log",
-      `Updating ${JSON.stringify(newList)} for volunteer ${volunteerId}`,
+      "warn",
+      `Error updating list: ${m2mEntity.name} for volunteer id=${volunteerId}`,
     );
-
-    await m2mRepository.save(newList);
-  });
+    return false;
+  }
 
   return true;
+}
+
+export async function fetchVolunteerById(
+  id: number,
+  isoCode: Lang,
+  relations: string[],
+): Promise<ApiVolunteerGet | null> {
+  const volunteerRepository = getRepository(dataSource, Volunteer);
+
+  const volunteer = await volunteerRepository.findOne({
+    where: { id },
+    relations,
+  });
+
+  if (!volunteer) {
+    return null;
+  }
+
+  addTranslatedFields([volunteer], isoCode);
+
+  const timedEvents = await getTimedEvents(volunteer);
+
+  const data = volunteerSerializer(volunteer, timedEvents);
+
+  return data;
 }
