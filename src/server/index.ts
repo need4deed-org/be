@@ -16,7 +16,7 @@ import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer";
 import entityTypesSchema from "./schema/entity-types.json";
 import sdkTypesSchema from "./schema/sdk-types.json";
-import volunteerListSchema from "./schema/volunteer-api.json";
+import volunteerGetProperties from "./schema/volunteer-api-id-properties.json";
 import { RoutePrefix } from "./types";
 import { generateRandomString } from "./utils";
 
@@ -44,8 +44,8 @@ export const start = async () => {
       ...sdkTypesSchema,
     });
     fastify.addSchema({
-      $id: "volunteer-api.json", // this is because ApiVolunteerGet extends ApiVolunteerGetList
-      ...volunteerListSchema,
+      $id: "volunteer-api-id-properties.json",
+      ...volunteerGetProperties,
     });
 
     fastify.register(typeormPlugin);

@@ -21,7 +21,6 @@
           "$ref": "#/definitions/Postcode"
         }
       },
-      "required": ["id", "street", "city", "postcode"],
       "additionalProperties": false
     },
     "Postcode": {
@@ -40,7 +39,6 @@
           "type": "number"
         }
       },
-      "required": ["id", "code", "latitude", "longitude"],
       "additionalProperties": false
     },
     "DocumentStatusType": {
@@ -103,6 +101,19 @@
       },
       "additionalProperties": false
     },
+    "ApiPersonGet": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "middleName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "$ref": "#/definitions/Address" },
+        "avatarUrl": { "type": "string" }
+      }
+    },
     "VolunteerStateType": {
       "type": "string",
       "enum": [
@@ -116,6 +127,43 @@
         "Temp inactive",
         "Inactive"
       ]
+    },
+    "VolunteerStateEngagementType": {
+      "type": "string",
+      "enum": [
+        "new",
+        "active",
+        "available",
+        "temp-unavailable",
+        "inactive",
+        "unresponsive"
+      ]
+    },
+    "VolunteerStateCommunicationType": {
+      "type": "string",
+      "enum": [
+        "called",
+        "email-sent",
+        "briefed",
+        "tried-call",
+        "not-responding"
+      ]
+    },
+    "VolunteerStateAppreciationType": {
+      "type": "string",
+      "enum": ["t-shirt", "benefit-card", "tote-bag"]
+    },
+    "VolunteerStateTypeType": {
+      "type": "string",
+      "enum": ["accompanying", "general", "event", "festival", "weekend-only"]
+    },
+    "VolunteerStateMatchType": {
+      "type": "string",
+      "enum": ["matched", "needs-rematching"]
+    },
+    "VolunteerStateCGCType": {
+      "type": "string",
+      "enum": ["accompanying", "other"]
     },
     "OptionItem": {
       "type": "object",
