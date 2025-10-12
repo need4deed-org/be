@@ -3,11 +3,19 @@ import fp from "fastify-plugin";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
+  Lang,
   SortOrder,
   VolunteerFormData,
+  VolunteerPatchBodyData,
 } from "need4deed-sdk";
 
-import { Lang } from "need4deed-sdk";
+import LocationDistrict from "../../data/entity/m2m/location-district";
+import ProfileActivity from "../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
+import Person from "../../data/entity/person.entity";
+import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { Id, Role } from "../../data/types";
 import {
   leadFromParser,
@@ -15,16 +23,24 @@ import {
   serialize,
   volunteerFormParser,
   volunteerListSerializer,
-  volunteerSerializer,
 } from "../../services";
 import {
   volunteerFormSchema,
+  volunteerIdPatchBodySchema,
   volunteerIdResponseSchema,
   volunteerResponseSchema,
 } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
-import { addTranslatedFields, getLanguageCode } from "../utils";
+import {
+  addTranslatedFields,
+  fetchVolunteerById,
+  getLanguageCode,
+  getPatchData,
+  patchAddress,
+  patchEntity,
+  updateOptionList,
+} from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
 
@@ -55,6 +71,7 @@ async function volunteerRoutes(
   ];
 
   fastify.get<{
+    Params: { id: string };
     Querystring: {
       language: string;
     };
@@ -69,7 +86,7 @@ async function volunteerRoutes(
         params: {
           type: "object",
           properties: {
-            id: { type: "string" },
+            id: { type: "number" },
           },
           required: ["id"],
         },
@@ -88,32 +105,26 @@ async function volunteerRoutes(
       onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
-      const { id } = request.params as { id: string };
-      const volunteerId = Number(id);
-      if (isNaN(volunteerId)) {
-        fastify.log.error(``);
-        reply.status(400).send({ message: `${id} is not a volunteer id.` });
+      const id = Number(request.params.id);
+      if (isNaN(id)) {
+        fastify.log.error(`${id} is not a valid id.`);
+        reply.status(400).send({ message: `${id} is not a valid id.` });
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const volunteerRepository = fastify.db.volunteerRepository;
-        const volunteer = await volunteerRepository.findOne({
-          where: { id: volunteerId },
-          relations,
+        const data = await fetchVolunteerById(id, isoCode, relations);
+        if (!data) {
+          fastify.log.error(`Failed fetching volunteer (id=${id}).`);
+          throw new Error(`Volunteer (id=${id}) not found after patch.`);
+        }
+        return reply.status(200).send({
+          message: `Volunteer (id=${id}) patched.`,
+          data,
         });
-
-        await addTranslatedFields([volunteer], isoCode);
-
-        const data = volunteerSerializer(volunteer);
-        return reply
-          .status(200)
-          .send({ message: `Volunteer id:${volunteerId}`, data });
       } catch (error) {
-        fastify.log.error(
-          `Error fetching volunteer id=${volunteerId}: ${error}`,
-        );
+        fastify.log.error(`Error fetching volunteer id=${id}: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -188,6 +199,176 @@ async function volunteerRoutes(
         });
       } catch (error) {
         fastify.log.error(`Error fetching volunteers: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.patch<{
+    Params: { id: string };
+    Querystring: {
+      language: string;
+    };
+    Body: VolunteerPatchBodyData;
+    Reply: {
+      message: string;
+      data?: ApiVolunteerGet;
+    };
+  }>(
+    `${prefixedPath}/:id`,
+    {
+      schema: {
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "number" },
+          },
+          required: ["id"],
+        },
+        body: volunteerIdPatchBodySchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: volunteerIdResponseSchema,
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+    },
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (isNaN(id)) {
+        return reply
+          .status(400)
+          .send({ message: `${request.params.id}: is not a valid id.` });
+      }
+
+      const {
+        volunteerData,
+        personData,
+        addressData,
+        postcodeData,
+        languages,
+        availability,
+        activities,
+        skills,
+        locations,
+      } = getPatchData(request.body);
+
+      try {
+        if (volunteerData) {
+          const success = await patchEntity(Volunteer, id, volunteerData);
+          if (!success) {
+            return reply.status(400).send({
+              message: `Volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+
+        if (personData && personData.id) {
+          const success = await patchEntity(Person, personData.id, personData);
+          if (!success) {
+            return reply.status(400).send({
+              message: `Person (id=${personData.id}) not updated.`,
+            });
+          }
+        }
+
+        if (addressData && addressData.id) {
+          const success = await patchAddress(addressData, postcodeData);
+          if (!success) {
+            return reply.status(400).send({
+              message: `Address (id=${addressData.id}) not updated.`,
+            });
+          }
+        }
+
+        if (languages) {
+          const success = await updateOptionList(
+            id,
+            ProfileLanguage,
+            languages,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Languages for volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+
+        if (availability) {
+          const success = await updateOptionList(
+            id,
+            TimeTimeslot,
+            availability,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Availability for volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+
+        if (activities) {
+          const success = await updateOptionList(
+            id,
+            ProfileActivity,
+            activities,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Activities for volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+
+        if (skills) {
+          const success = await updateOptionList(id, ProfileSkill, skills);
+          if (!success) {
+            return reply.status(400).send({
+              message: `Skills for volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+
+        if (locations) {
+          const success = await updateOptionList(
+            id,
+            LocationDistrict,
+            locations,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Locations for volunteer (id=${id}) not updated.`,
+            });
+          }
+        }
+      } catch (error) {
+        fastify.log.error(`Error patching volunteer data (id=${id}): ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+
+      const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+
+      try {
+        const data = await fetchVolunteerById(id, isoCode, relations);
+        if (!data) {
+          fastify.log.error(
+            `Failed fetching volunteer (id=${id}) after patch.`,
+          );
+          throw new Error(`Volunteer (id=${id}) not found after patch.`);
+        }
+        return reply.status(200).send({
+          message: `Volunteer (id=${id}) patched.`,
+          data,
+        });
+      } catch (error) {
+        fastify.log.error(`Error fetching volunteer (id=${id}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },

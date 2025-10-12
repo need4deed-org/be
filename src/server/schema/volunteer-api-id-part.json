@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ApiVolunteerBodyPart",
+  "definitions": {
+    "ApiVolunteerBodyPart": {
+      "$ref": "volunteer-api-id-properties.json#/definitions/ApiVolunteerProperties"
+    }
+  }
+}

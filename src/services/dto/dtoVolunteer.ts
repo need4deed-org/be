@@ -7,12 +7,14 @@ import {
   Daytime,
   Hour,
   Occasionally,
-  Option,
+  OptionItem,
   TimedText,
 } from "need4deed-sdk";
 
+import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
+import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
 
@@ -55,47 +57,92 @@ export function volunteerListSerializer(
   }
 }
 
-export function volunteerSerializer(volunteer: Volunteer): ApiVolunteerGet {
+export function volunteerSerializer(
+  volunteer: Volunteer,
+  timedEvents: Timeline[],
+): ApiVolunteerGet {
   const address: Address = {
     ...volunteer.person.address,
-    id: String(volunteer.person.address.id),
+    id: volunteer.person.address.id,
     city,
     postcode: {
       ...volunteer.person.address.postcode,
-      id: String(volunteer.person.address.postcode.id),
+      id: volunteer.person.address.postcode.id,
       code: volunteer.person.address.postcode.value,
       latitude: volunteer.person.address.postcode.latitude || null,
       longitude: volunteer.person.address.postcode.longitude || null,
     },
   };
 
-  const comments = [] as unknown as TimedText[];
-  const email = volunteer.person.email;
-  const firstName = volunteer.person.firstName;
+  const comments: TimedText[] = timedEvents
+    .filter(({ contentType }) => contentType === "comment")
+    .map(({ id, timestamp, content }) => ({
+      id,
+      timestamp,
+      content,
+    }));
+  const timelineLogs: TimedText[] = timedEvents
+    .filter(({ contentType }) => contentType !== "comment")
+    .map(({ id, timestamp, content }) => ({
+      id,
+      timestamp,
+      content,
+    }));
+  const person: ApiPersonGet = {
+    id: volunteer.person.id,
+    email: volunteer.person.email,
+    firstName: volunteer.person.firstName,
+    lastName: volunteer.person.lastName,
+    middleName: volunteer.person.middleName,
+    phone: volunteer.person.phone,
+    avatarUrl: volunteer.person?.avatarUrl || null,
+    address,
+  };
   const goodConductCertificate = volunteer.statusCGC;
   const infoAbout = volunteer.infoAbout;
   const infoExperience = volunteer.infoExperience;
-  const lastName = volunteer.person.lastName;
   const measlesVaccination = volunteer.statusVaccination;
-  const opportunitiesApplied = [] as unknown as Option[];
-  const opportunitiesMatched = [] as unknown as Option[];
-  const phone = volunteer.person.phone;
-  const timelineLogs = [] as unknown as TimedText[];
+  const opportunitiesApplied = [] as unknown as OptionItem[];
+  const opportunitiesMatched = [] as unknown as OptionItem[];
+  const createdAt = volunteer.createdAt;
+  const updatedAt = volunteer.updatedAt;
+  const activities = getOptionItems(
+    volunteer.deal.profile.profileActivity,
+    "activity",
+  );
+  const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
+  const locations = getOptionItems(
+    volunteer.deal.location.locationDistrict,
+    "district",
+  );
+  const languages = getLanguages(volunteer.deal.profile.profileLanguage);
+  const availability = getAvailability(volunteer.deal.time.timeTimeslot);
+
   return {
-    address,
+    id: volunteer.id,
+    status: volunteer.status,
+    person,
+    statusEngagement: volunteer.statusEngagement,
+    statusCommunication: volunteer.statusCommunication,
+    statusAppreciation: volunteer.statusAppreciation,
+    statusType: volunteer.statusType,
+    statusMatch: volunteer.statusMatch,
+    statusCgcProcess: volunteer.statusCgcProcess,
     comments,
-    email,
-    firstName,
     goodConductCertificate,
     infoAbout,
     infoExperience,
-    lastName,
     measlesVaccination,
     opportunitiesApplied,
     opportunitiesMatched,
-    phone,
     timelineLogs,
-    ...volunteerListSerializer(volunteer),
+    createdAt,
+    updatedAt,
+    languages,
+    availability,
+    activities,
+    skills,
+    locations,
   };
 }
 
@@ -126,12 +173,14 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
   return timeTimeslot.map(({ timeslot }): Availability => {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
+        id: timeslot.id,
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
       } as Availability;
     }
     if (timeslot?.occasional) {
       return {
+        id: timeslot.id,
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
       } as Availability;
@@ -143,8 +192,19 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
 
 function getLanguages(profileLanguage: ProfileLanguage[]) {
   return profileLanguage.map((pl) => ({
+    id: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,
+  }));
+}
+
+function getOptionItems<T>(
+  profileItems: T[],
+  entityName: string,
+): OptionItem[] {
+  return profileItems.map((pa) => ({
+    id: pa[entityName].id,
+    title: pa[entityName].translation || pa[entityName].title,
   }));
 }
 
