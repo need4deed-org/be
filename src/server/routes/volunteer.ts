@@ -23,7 +23,6 @@ import {
   serialize,
   volunteerFormParser,
   volunteerListSerializer,
-  volunteerSerializer,
 } from "../../services";
 import {
   volunteerFormSchema,
@@ -35,9 +34,9 @@ import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import {
   addTranslatedFields,
+  fetchVolunteerById,
   getLanguageCode,
   getPatchData,
-  getTimedEvents,
   patchAddress,
   patchEntity,
   updateOptionList,
@@ -72,6 +71,7 @@ async function volunteerRoutes(
   ];
 
   fastify.get<{
+    Params: { id: string };
     Querystring: {
       language: string;
     };
@@ -86,7 +86,7 @@ async function volunteerRoutes(
         params: {
           type: "object",
           properties: {
-            id: { type: "string" },
+            id: { type: "number" },
           },
           required: ["id"],
         },
@@ -105,9 +105,8 @@ async function volunteerRoutes(
       onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
-      const { id } = request.params as { id: string };
-      const volunteerId = Number(id);
-      if (isNaN(volunteerId)) {
+      const id = Number(request.params.id);
+      if (isNaN(id)) {
         fastify.log.error(`${id} is not a valid id.`);
         reply.status(400).send({ message: `${id} is not a valid id.` });
       }
@@ -115,26 +114,17 @@ async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const volunteerRepository = fastify.db.volunteerRepository;
-        const volunteer = await volunteerRepository.findOne({
-          where: { id: volunteerId },
-          relations,
-        });
-
-        await addTranslatedFields([volunteer], isoCode);
-
-        const timedEvents = await getTimedEvents(volunteer);
-
-        const data = volunteerSerializer(volunteer, timedEvents);
-
+        const data = await fetchVolunteerById(id, isoCode, relations);
+        if (!data) {
+          fastify.log.error(`Failed fetching volunteer (id=${id}).`);
+          throw new Error(`Volunteer (id=${id}) not found after patch.`);
+        }
         return reply.status(200).send({
-          message: `Volunteer id:${volunteerId}`,
+          message: `Volunteer (id=${id}) patched.`,
           data,
         });
       } catch (error) {
-        fastify.log.error(
-          `Error fetching volunteer id=${volunteerId}: ${error}`,
-        );
+        fastify.log.error(`Error fetching volunteer id=${id}: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -228,6 +218,13 @@ async function volunteerRoutes(
     `${prefixedPath}/:id`,
     {
       schema: {
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "number" },
+          },
+          required: ["id"],
+        },
         body: volunteerIdPatchBodySchema,
         response: {
           200: {
@@ -267,8 +264,8 @@ async function volunteerRoutes(
         if (volunteerData) {
           const success = await patchEntity(Volunteer, id, volunteerData);
           if (!success) {
-            return reply.status(404).send({
-              message: `Volunteer (id=${id}) not found.`,
+            return reply.status(400).send({
+              message: `Volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -276,8 +273,8 @@ async function volunteerRoutes(
         if (personData && personData.id) {
           const success = await patchEntity(Person, personData.id, personData);
           if (!success) {
-            return reply.status(404).send({
-              message: `Person (id=${personData.id}) not found.`,
+            return reply.status(400).send({
+              message: `Person (id=${personData.id}) not updated.`,
             });
           }
         }
@@ -286,7 +283,7 @@ async function volunteerRoutes(
           const success = await patchAddress(addressData, postcodeData);
           if (!success) {
             return reply.status(400).send({
-              message: `Address (id=${addressData.id}) failed to update.`,
+              message: `Address (id=${addressData.id}) not updated.`,
             });
           }
         }
@@ -299,7 +296,7 @@ async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Languages for volunteer (id=${id}) failed to update.`,
+              message: `Languages for volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -312,7 +309,7 @@ async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Availability for volunteer (id=${id}) failed to update.`,
+              message: `Availability for volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -325,7 +322,7 @@ async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Activities for volunteer (id=${id}) failed to update.`,
+              message: `Activities for volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -334,7 +331,7 @@ async function volunteerRoutes(
           const success = await updateOptionList(id, ProfileSkill, skills);
           if (!success) {
             return reply.status(400).send({
-              message: `Skills for volunteer (id=${id}) failed to update.`,
+              message: `Skills for volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -347,7 +344,7 @@ async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Locations for volunteer (id=${id}) failed to update.`,
+              message: `Locations for volunteer (id=${id}) not updated.`,
             });
           }
         }
@@ -358,28 +355,16 @@ async function volunteerRoutes(
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
-      const volunteerRepository = fastify.db.volunteerRepository;
-
       try {
-        const volunteer = await volunteerRepository.findOne({
-          where: { id },
-          relations,
-        });
-
-        if (!volunteer) {
-          return reply
-            .status(404)
-            .send({ message: `Volunteer id:${id} not found.` });
+        const data = await fetchVolunteerById(id, isoCode, relations);
+        if (!data) {
+          fastify.log.error(
+            `Failed fetching volunteer (id=${id}) after patch.`,
+          );
+          throw new Error(`Volunteer (id=${id}) not found after patch.`);
         }
-
-        addTranslatedFields([volunteer], isoCode);
-
-        const timedEvents = await getTimedEvents(volunteer);
-
-        const data = volunteerSerializer(volunteer, timedEvents);
-
         return reply.status(200).send({
-          message: `Volunteer (id=${id}) has been patched`,
+          message: `Volunteer (id=${id}) patched.`,
           data,
         });
       } catch (error) {
