@@ -3,7 +3,7 @@ import fp from "fastify-plugin";
 import { ApiOptionLists, EntityTableName } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
-import { optionListsSchema, responseErrors } from "../schema";
+import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";
 
@@ -27,7 +27,7 @@ async function optionRoutes(
         params: {
           type: "object",
           properties: {
-            list: { type: "string" },
+            list: { type: ["string"] },
           },
         },
         response: {
@@ -35,7 +35,7 @@ async function optionRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: optionListsSchema,
+              data: { $ref: "option-lists#" },
             },
             required: ["message", "data"],
           },
