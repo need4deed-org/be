@@ -2,10 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "OccasionalType": {
+      "$id": "OccasionalType",
       "type": "string",
       "enum": ["weekends", "weekdays"]
     },
     "Address": {
+      "$id": "Address",
       "type": "object",
       "properties": {
         "id": {
@@ -18,12 +20,24 @@
           "type": "string"
         },
         "postcode": {
-          "$ref": "#/definitions/Postcode"
+          "$ref": "Postcode#"
         }
       },
       "additionalProperties": false
     },
+    "FilterParamsType": {
+      "$id": "FilterParamsType",
+      "type": "string",
+      "enum": [
+        "accompanying",
+        "district",
+        "engagement",
+        "availability",
+        "languages"
+      ]
+    },
     "Postcode": {
+      "$id": "Postcode",
       "type": "object",
       "properties": {
         "id": {
@@ -42,6 +56,7 @@
       "additionalProperties": false
     },
     "DocumentStatusType": {
+      "$id": "DocumentStatusType",
       "type": "string",
       "enum": [
         "undefined",
@@ -53,6 +68,7 @@
       ]
     },
     "TimedText": {
+      "$id": "TimedText",
       "type": "object",
       "properties": {
         "date": {
@@ -60,7 +76,7 @@
           "format": "date-time"
         },
         "type": {
-          "$ref": "#/definitions/TimedTextType"
+          "$ref": "TimedTextType#"
         },
         "text": {
           "type": "string"
@@ -70,26 +86,30 @@
       "additionalProperties": false
     },
     "TimedTextType": {
+      "$id": "TimedTextType",
       "type": "string",
       "enum": ["create", "update", "remove"]
     },
     "Option": {
+      "$id": "Option",
       "type": "object",
       "properties": {
         "id": {
-          "$ref": "#/definitions/OptionId"
+          "$ref": "OptionId#"
         },
         "title": {
-          "$ref": "#/definitions/OptionTitle"
+          "$ref": "OptionTitle#"
         }
       },
       "required": ["id", "title"],
       "additionalProperties": false
     },
     "OptionId": {
+      "$id": "OptionId",
       "type": ["string", "number"]
     },
     "OptionTitle": {
+      "$id": "OptionTitle",
       "type": "object",
       "properties": {
         "en": {
@@ -102,6 +122,7 @@
       "additionalProperties": false
     },
     "ApiPersonGet": {
+      "$id": "ApiPersonGet",
       "type": "object",
       "properties": {
         "id": { "type": "number" },
@@ -110,11 +131,12 @@
         "middleName": { "type": "string" },
         "email": { "type": "string" },
         "phone": { "type": "string" },
-        "address": { "$ref": "#/definitions/Address" },
+        "address": { "$ref": "Address#" },
         "avatarUrl": { "type": "string" }
       }
     },
     "VolunteerStateType": {
+      "$id": "VolunteerStateType",
       "type": "string",
       "enum": [
         "New",
@@ -129,6 +151,7 @@
       ]
     },
     "VolunteerStateEngagementType": {
+      "$id": "VolunteerStateEngagementType",
       "type": "string",
       "enum": [
         "new",
@@ -140,6 +163,7 @@
       ]
     },
     "VolunteerStateCommunicationType": {
+      "$id": "VolunteerStateCommunicationType",
       "type": "string",
       "enum": [
         "called",
@@ -150,22 +174,27 @@
       ]
     },
     "VolunteerStateAppreciationType": {
+      "$id": "VolunteerStateAppreciationType",
       "type": "string",
       "enum": ["t-shirt", "benefit-card", "tote-bag"]
     },
     "VolunteerStateTypeType": {
+      "$id": "VolunteerStateTypeType",
       "type": "string",
       "enum": ["accompanying", "general", "event", "festival", "weekend-only"]
     },
     "VolunteerStateMatchType": {
+      "$id": "VolunteerStateMatchType",
       "type": "string",
       "enum": ["matched", "needs-rematching"]
     },
     "VolunteerStateCGCType": {
+      "$id": "VolunteerStateCGCType",
       "type": "string",
       "enum": ["accompanying", "other"]
     },
     "OptionItem": {
+      "$id": "OptionItem",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
@@ -173,6 +202,21 @@
       },
       "required": ["title", "id"],
       "additionalProperties": false
+    },
+    "ApiLanguage": {
+      "$id": "ApiLanguage",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "proficiency": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
+        },
+        "additionalProperties": false
+      },
+      "required": ["title", "proficiency"]
     }
   }
 }
