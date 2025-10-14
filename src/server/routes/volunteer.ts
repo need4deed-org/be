@@ -4,6 +4,7 @@ import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
   Lang,
+  QueryParamsKeys,
   SortOrder,
   VolunteerFormData,
   VolunteerPatchBodyData,
@@ -24,16 +25,11 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../services";
-import {
-  volunteerFormSchema,
-  volunteerIdPatchBodySchema,
-  volunteerIdResponseSchema,
-  volunteerResponseSchema,
-} from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import {
   addTranslatedFields,
+  EnumValuesMap,
   fetchVolunteerById,
   getLanguageCode,
   getPatchData,
@@ -95,7 +91,7 @@ async function volunteerRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: volunteerIdResponseSchema,
+              data: { $ref: "volunteer-api-id#" },
             },
             required: ["message", "data"],
           },
@@ -131,12 +127,7 @@ async function volunteerRoutes(
   );
 
   fastify.get<{
-    Querystring: {
-      page: string;
-      limit: string;
-      language: string;
-      order: SortOrder;
-    };
+    Querystring: EnumValuesMap<typeof QueryParamsKeys>;
     Reply: {
       message: string;
       count?: number;
@@ -152,7 +143,7 @@ async function volunteerRoutes(
             properties: {
               message: { type: "string" },
               count: { type: "number" },
-              data: { type: "array", items: volunteerResponseSchema },
+              data: { type: "array", items: { $ref: "volunteer-api#" } },
             },
             required: ["message", "data"],
           },
@@ -225,13 +216,13 @@ async function volunteerRoutes(
           },
           required: ["id"],
         },
-        body: volunteerIdPatchBodySchema,
+        body: { $ref: "volunteer-api-id-part#" },
         response: {
           200: {
             type: "object",
             properties: {
               message: { type: "string" },
-              data: volunteerIdResponseSchema,
+              data: { $ref: "volunteer-api-id#" },
             },
             required: ["message", "data"],
           },
@@ -387,7 +378,7 @@ async function volunteerRoutes(
     prefixedPath,
     {
       schema: {
-        body: volunteerFormSchema,
+        body: { $ref: "volunteer-form-data" },
         response: {
           200: {
             type: "object",
