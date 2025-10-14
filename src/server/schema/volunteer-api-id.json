@@ -1,11 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$ref": "#/definitions/ApiVolunteerGetPart",
+  "$ref": "ApiVolunteerGet#",
   "definitions": {
     "ApiVolunteerGet": {
+      "$id": "ApiVolunteerGet",
       "allOf": [
         {
-          "$ref": "volunteer-api-id-properties.json#/definitions/ApiVolunteerProperties"
+          "$ref": "ApiVolunteerProperties#"
         },
         {
           "required": [

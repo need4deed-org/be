@@ -392,7 +392,7 @@ function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
 
 export async function updateOptionList<
   M extends { id: number },
-  L extends { id: number; proficiency?: string },
+  L extends { id: number | string },
 >(
   volunteerId: number,
   m2mEntity: new (arg?: unknown) => M,
@@ -434,7 +434,12 @@ export async function updateOptionList<
         return new m2mEntity({
           [hostId]: volunteer.deal[host].id,
           [listItemId]: item.id,
-          ...(listName === "language" ? { proficiency: item.proficiency } : {}),
+          ...(listName === "language" // TODO: tech debt here
+            ? {
+                proficiency: (item as unknown as { proficiency: string })
+                  .proficiency,
+              }
+            : {}),
         });
       });
 
