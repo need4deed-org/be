@@ -2,6 +2,8 @@ import * as path from "path";
 
 const publicFixturesFromHere = ["..", "..", "public", "data"];
 
+export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
+
 export const seedPLZFile = path.join(
   __dirname,
   ...publicFixturesFromHere,
