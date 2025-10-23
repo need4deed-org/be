@@ -31,6 +31,7 @@ import {
   addTranslatedFields,
   EnumValuesMap,
   fetchVolunteerById,
+  getFilteredVolunteers,
   getLanguageCode,
   getPatchData,
   patchAddress,
@@ -121,6 +122,61 @@ async function volunteerRoutes(
         });
       } catch (error) {
         fastify.log.error(`Error fetching volunteer id=${id}: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.get<{
+    Querystring: EnumValuesMap<typeof QueryParamsKeys>;
+    Reply: {
+      message: string;
+      count?: number;
+      data?: Array<ApiVolunteerGetList>;
+    };
+  }>(
+    `${prefixedPath}/mv`,
+    {
+      schema: {
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              count: { type: "number" },
+              // data: { type: "array" },
+              data: { type: "array", items: { $ref: "volunteer-api#" } },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+    },
+    async (request, reply) => {
+      try {
+        // Extract filter parameters from query string (or request body/params)
+        const filterParams = {
+          page: 2,
+          filter: { german: true },
+          orderDirection: "ASC",
+        };
+
+        const [volunteers, count] = await getFilteredVolunteers(
+          fastify,
+          filterParams,
+        );
+
+        const data = serialize(volunteers, volunteerListSerializer);
+
+        reply.status(200).send({
+          message: `Volunteers page ${1}`,
+          count,
+          data,
+        });
+      } catch (error) {
+        fastify.log.error(`Error fetching volunteers: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
