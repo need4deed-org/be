@@ -34,6 +34,7 @@ import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
 import User from "./entity/user.entity";
+import VolunteerListMV from "./entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { getLoggingForDataSource } from "./utils";
@@ -82,6 +83,7 @@ export const AppDataSource = new DataSource({
     Timeslot,
     User,
     Volunteer,
+    VolunteerListMV,
   ],
   migrations: [],
   subscribers: [],
