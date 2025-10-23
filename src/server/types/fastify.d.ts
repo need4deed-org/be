@@ -20,6 +20,7 @@ declare module "fastify" {
       languageRepository: Repository<Language>;
       fieldTranslationRepository: Repository<FieldTranslation>;
       optionRepository: Repository<Option>;
+      volunteerListMvRepository: Repository<VolunteerListMV>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

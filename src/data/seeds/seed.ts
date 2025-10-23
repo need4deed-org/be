@@ -1,4 +1,4 @@
-import { AppDataSource as dataSource } from "../data-source";
+import { DataSource } from "typeorm";
 import { seedActivity } from "./activity.seed";
 import { seedCategory } from "./category.seed";
 import { seedDistrict } from "./district.seed";
@@ -12,7 +12,7 @@ import { seedSkill } from "./skill.seed";
 import { seedUser } from "./user.seed";
 import { seedVolunteers } from "./volunteer.seed";
 
-export async function seed() {
+export async function seed(dataSource: DataSource) {
   await seedLanguage(dataSource);
   await seedCategory(dataSource);
   await seedActivity(dataSource);
@@ -25,4 +25,6 @@ export async function seed() {
   await seedUser(dataSource);
   await seedVolunteers(dataSource);
   await seedOpportunities(dataSource);
+
+  return dataSource;
 }

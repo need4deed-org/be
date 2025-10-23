@@ -7,6 +7,7 @@ import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import User from "../../data/entity/user.entity";
+import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 
 const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
@@ -22,8 +23,10 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
       languageRepository: AppDataSource.getRepository(Language),
       fieldTranslationRepository: AppDataSource.getRepository(FieldTranslation),
       optionRepository: AppDataSource.getRepository(Option),
+      volunteerListMvRepository: AppDataSource.getRepository(VolunteerListMV),
     });
 
+    // TODO: add validation of others
     if (!fastify.db.userRepository || !fastify.db.personRepository) {
       fastify.log.error(
         "ERROR: Repositories were not correctly initialized on fastify.db",
