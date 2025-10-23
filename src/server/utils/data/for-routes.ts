@@ -9,24 +9,24 @@ import {
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 
-import { AppDataSource as dataSource } from "../../data/data-source";
-import FieldTranslation from "../../data/entity/field_translation.entity";
-import Address from "../../data/entity/location/address.entity";
-import District from "../../data/entity/location/district.entity";
-import Postcode from "../../data/entity/location/postcode.entity";
-import Option from "../../data/entity/option.entity";
-import Person from "../../data/entity/person.entity";
-import Language from "../../data/entity/profile/language.entity";
-import Timeslot from "../../data/entity/time/timeslot.entity";
-import Timeline from "../../data/entity/timeline.entity";
-import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { getRepository } from "../../data/seeds/utils";
-import { volunteerSerializer } from "../../services";
+import { AppDataSource as dataSource } from "../../../data/data-source";
+import FieldTranslation from "../../../data/entity/field_translation.entity";
+import Address from "../../../data/entity/location/address.entity";
+import District from "../../../data/entity/location/district.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
+import Option from "../../../data/entity/option.entity";
+import Person from "../../../data/entity/person.entity";
+import Language from "../../../data/entity/profile/language.entity";
+import Timeslot from "../../../data/entity/time/timeslot.entity";
+import Timeline from "../../../data/entity/timeline.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { getRepository } from "../../../data/seeds/utils";
+import { volunteerSerializer } from "../../../services";
 import {
   getEmptyPropsNull,
   getNullFromEmptyArray,
   stripNullishAttributes,
-} from "./common";
+} from "../common";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
   const postcodeRepository = getRepository(dataSource, Postcode);
