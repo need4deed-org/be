@@ -29,14 +29,14 @@ export function volunteerListSerializer(
     const name = volunteer.person.name;
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
-    const availability = getAvailability(volunteer.deal.time.timeTimeslot);
+    const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
     const activities = getTitles(
       volunteer.deal.profile.profileActivity,
       "activity",
     );
     const skills = getTitles(volunteer.deal.profile.profileSkill, "skill");
     const locations = getTitles(
-      volunteer.deal.location.locationDistrict,
+      volunteer.deal.location?.locationDistrict,
       "district",
     );
     return {
@@ -170,7 +170,7 @@ function getHour(date: Date): Hour {
 }
 
 function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
-  return timeTimeslot.map(({ timeslot }): Availability => {
+  return timeTimeslot?.map(({ timeslot }): Availability => {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
         id: timeslot.id,
@@ -191,7 +191,7 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
 }
 
 function getLanguages(profileLanguage: ProfileLanguage[]) {
-  return profileLanguage.map((pl) => ({
+  return profileLanguage?.map((pl) => ({
     id: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,
@@ -202,14 +202,14 @@ function getOptionItems<T>(
   profileItems: T[],
   entityName: string,
 ): OptionItem[] {
-  return profileItems.map((pa) => ({
+  return profileItems?.map((pa) => ({
     id: pa[entityName].id,
     title: pa[entityName].translation || pa[entityName].title,
   }));
 }
 
 function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems.map(
+  return profileItems?.map(
     (pa) => pa[entityName].translation || pa[entityName].title,
   );
 }
