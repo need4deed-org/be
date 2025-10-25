@@ -5,7 +5,6 @@ import {
   ApiVolunteerGetList,
   Lang,
   QueryParamsKeys,
-  SortOrder,
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
@@ -31,9 +30,11 @@ import {
   addTranslatedFields,
   EnumValuesMap,
   fetchVolunteerById,
+  fetchVolunteers,
   getFilteredVolunteers,
   getLanguageCode,
   getPatchData,
+  parseQueryParams,
   patchAddress,
   patchEntity,
   updateOptionList,
@@ -157,16 +158,37 @@ async function volunteerRoutes(
     async (request, reply) => {
       try {
         // Extract filter parameters from query string (or request body/params)
-        const filterParams = {
-          page: 2,
-          filter: { german: true },
-          orderDirection: "ASC",
-        };
+        const {
+          page,
+          limit,
+          orderDirection,
+          language,
+          filter: {
+            accompanying,
+            german,
+            search,
+            district,
+            languages,
+            engagement,
+            availability,
+          },
+        } = parseQueryParams(request.query);
 
-        const [volunteers, count] = await getFilteredVolunteers(
-          fastify,
-          filterParams,
-        );
+        const [volunteers, count] = await getFilteredVolunteers(fastify, {
+          page,
+          limit,
+          orderDirection,
+          language,
+          filter: {
+            accompanying,
+            german,
+            search,
+            district,
+            languages,
+            engagement,
+            availability,
+          },
+        });
 
         const data = serialize(volunteers, volunteerListSerializer);
 
@@ -209,30 +231,50 @@ async function volunteerRoutes(
       onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
-      const page = Math.abs(parseInt(request.query.page)) || 1;
-      const take = Math.abs(parseInt(request.query.limit)) || defaultTake;
-      const skip = (page - 1) * take;
+      const {
+        page,
+        limit,
+        orderDirection,
+        language,
+        filter: {
+          accompanying,
+          german,
+          search,
+          district,
+          languages,
+          engagement,
+          availability,
+        },
+      } = parseQueryParams(request.query);
 
-      let orderDirection: "DESC" | "ASC";
-      if (request.query.order === SortOrder.NewToOld) orderDirection = "DESC";
-      if (request.query.order === SortOrder.OldToNew) orderDirection = "ASC";
+      fastify.log.debug(
+        `GET /volunteer parsed: ${JSON.stringify({
+          page,
+          limit,
+          orderDirection,
+          language,
+          filter: {
+            accompanying,
+            german,
+            search,
+            district,
+            languages,
+            engagement,
+            availability,
+          },
+        })}`,
+      );
+      // return reply.status(400).send({ message: "test query" });
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const volunteerRepository = fastify.db.volunteerRepository;
-
-        const [volunteers, count] = await volunteerRepository.findAndCount({
-          skip,
-          take,
-          relations,
-          ...(orderDirection
-            ? {
-                order: {
-                  createdAt: orderDirection,
-                },
-              }
-            : {}),
+        const [volunteers, count] = await fetchVolunteers({
+          skip: 60,
+          take: 12,
+          orderDirection: "ASC",
+          german: true,
+          whereOptions: null,
         });
 
         await addTranslatedFields(volunteers, isoCode);
@@ -240,7 +282,7 @@ async function volunteerRoutes(
         const data = serialize(volunteers, volunteerListSerializer);
 
         return reply.status(200).send({
-          message: `Volunteers page ${page}`,
+          message: `Volunteers page ${request.query.page}`,
           count,
           data,
         });
