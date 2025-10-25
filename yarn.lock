@@ -1875,10 +1875,10 @@ ms@^2.1.3:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-need4deed-sdk@^0.0.15:
-  version "0.0.15"
-  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.15.tgz#2f3802445276be55a7a5f4accabc9d61a40064dc"
-  integrity sha512-UCw0rOsbCRKqBGoqlKOrJM6A67NfCCTu8znfFzJdnywSjJxC0YGPAIa6oj1JjvjEaDxTKKoo0Feyn/DFspPU9g==
+need4deed-sdk@^0.0.16:
+  version "0.0.16"
+  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.16.tgz#79c995c3fb325139556a931e75e16586062f6490"
+  integrity sha512-jfJJYrRzmj3XLH+i0/6R4myU6QFpsYEn2mfhWsA2drWJHAYRIL52gqxBoQxHmkHlPTe3xkmQvxz1tDrVJdR6HA==
 
 no-case@^3.0.4:
   version "3.0.4"
