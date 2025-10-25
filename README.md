@@ -1,7 +1,12 @@
-# Awesome Project Build with TypeORM
+# Backend
 
-Steps to run this project:
+TypeScript backend with Fastify, TypeORM and PostgreSQL.
 
-1. Run `npm i` command
-2. Setup database settings inside `data-source.ts` file
-3. Run `npm start` command
+## Quickstart
+
+```bash
+docker compose up
+```
+
+Backend: `http://localhost:5000`  
+Database: `localhost:5432`
