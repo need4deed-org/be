@@ -41,7 +41,7 @@ import { getLoggingForDataSource } from "./utils";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
-  host: process.env.DB_HOST || "localhost",
+  host: process.env.DB_HOST || "127.0.0.1",
   port: 5432,
   username: "postgres",
   password: "postgres",
