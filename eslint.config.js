@@ -1,0 +1,74 @@
+// eslint.config.cjs
+const js = require("@eslint/js");
+const ts = require("@typescript-eslint/eslint-plugin");
+const tsParser = require("@typescript-eslint/parser");
+const prettier = require("eslint-config-prettier");
+const importPlugin = require("eslint-plugin-import");
+const unusedImports = require("eslint-plugin-unused-imports");
+
+module.exports = [
+  js.configs.recommended,
+  prettier,
+  {
+    files: ["**/*.ts"],
+    ignores: ["dist", "node_modules"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: __dirname,
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: {
+          experimentalDecorators: true,
+        },
+      },
+    },
+    plugins: {
+      "@typescript-eslint": ts,
+      import: importPlugin,
+      "unused-imports": unusedImports,
+    },
+    rules: {
+      curly: ["error", "all"],
+      eqeqeq: ["error", "always"],
+      "no-var": "error",
+      "prefer-const": "error",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "@typescript-eslint/no-explicit-any": "warn",
+
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          vars: "all",
+          varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+        },
+      ],
+
+      "import/order": [
+        "error",
+        {
+          groups: [
+            ["builtin", "external"],
+            ["internal"],
+            ["parent", "sibling", "index"],
+          ],
+          pathGroups: [
+            {
+              pattern: "@/**",
+              group: "internal",
+              position: "after",
+            },
+          ],
+          "newlines-between": "always",
+          alphabetize: { order: "asc", caseInsensitive: true },
+        },
+      ],
+
+      "sort-keys": ["error", "asc", { caseSensitive: false, natural: true }],
+    },
+  },
+];
