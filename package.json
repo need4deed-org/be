@@ -4,8 +4,19 @@
   "description": "Awesome project developed with TypeORM.",
   "type": "commonjs",
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/node": "^22.13.10",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/utils": "^8.46.2",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.30.0",
+    "eslint-plugin-unused-imports": "^3.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
     "nodemon": "^3.1.10",
+    "prettier": "^3.0.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.2"
@@ -34,6 +45,20 @@
     "start": "ts-node src/index.ts",
     "dev": "nodemon --watch src --ext ts,js,json --exec \"ts-node src/index.ts\"",
     "typeorm": "node --require ts-node/register --require tsconfig-paths/register ./node_modules/typeorm/cli.js",
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,css,scss}": [
+      "prettier --write"
+    ]
   }
 }
