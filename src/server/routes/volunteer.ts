@@ -352,7 +352,7 @@ async function volunteerRoutes(
           const success = await updateOptionList(
             id,
             TimeTimeslot,
-            availability,
+            availability.map(a => ({ id: a.timeslotId })),
           );
           if (!success) {
             return reply.status(400).send({
