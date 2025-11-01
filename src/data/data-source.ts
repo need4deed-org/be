@@ -38,14 +38,16 @@ import VolunteerListMV from "./entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { getLoggingForDataSource } from "./utils";
+import * as fs from 'fs';
 
 export const AppDataSource = new DataSource({
   type: "postgres",
   host: process.env.DB_HOST || "localhost",
   port: 5432,
-  username: "postgres",
-  password: "postgres",
-  database: "postgres",
+  username: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "postgres",
+  database: process.env.DB_DATABASE || "postgres",
+  schema: process.env.DB_SCHEMA || "public",
   synchronize: true,
   // logging: false,
   entities: [
@@ -85,7 +87,11 @@ export const AppDataSource = new DataSource({
     Volunteer,
     VolunteerListMV,
   ],
-  migrations: [],
+  ssl: process.env.NODE_ENV === "production" ? {
+    rejectUnauthorized: true,
+    ca: fs.readFileSync('/app/certificates/eu-central-1-bundle.pem').toString()
+  } : false,
+ // migrations: [__dirname + "/migrations/**/*.ts"],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
   logging: getLoggingForDataSource(process.env.NODE_ENV),
