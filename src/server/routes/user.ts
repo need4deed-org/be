@@ -221,7 +221,7 @@ async function userRoutes(
               id: personData.id,
             });
           } catch (error) {
-            fastify.log.error("Error finding person by ID:", error);
+            fastify.log.error(`Error finding person by ID: ${error}`);
             return reply
               .status(500)
               .send({ message: "Error retrieving person data." });
@@ -237,10 +237,12 @@ async function userRoutes(
 
           const errors = await validate(resolvedPerson);
           if (errors.length > 0) {
-            fastify.log.error("New Person entity validation errors:", errors);
+            fastify.log.error(
+              `New Person entity validation errors: ${JSON.stringify(errors)}`,
+            );
             return reply.status(400).send({
               message: "Validation failed for new person data",
-              errors: errors.flatMap((err) =>
+              errors: errors.flatMap(err =>
                 Object.values(err.constraints || {}),
               ),
             });
@@ -281,10 +283,12 @@ async function userRoutes(
       // Validate the Account entity using class-validator
       const errors = await validate(newUser);
       if (errors.length > 0) {
-        fastify.log.error("User entity validation errors:", errors);
+        fastify.log.error(
+          `User entity validation errors: ${JSON.stringify(errors)}`,
+        );
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: errors.flatMap(err => Object.values(err.constraints || {})),
         });
       }
 
