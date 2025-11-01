@@ -1,21 +1,45 @@
-FROM node:20-alpine
 
-ARG NODE_ENV
-ARG JWT_SECRET
+FROM node:lts-alpine AS builder
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --production=false
+COPY . .
+RUN yarn build
+
+FROM node:lts-alpine AS production
+
+# Note: JWT_SECRET should be provided at runtime via secrets management
+# not as build args for security reasons
+ARG NODE_ENV=production
 
 ENV NODE_ENV=${NODE_ENV}
-ENV JWT_SECRET=${JWT_SECRET}
 
 WORKDIR /app
 
-RUN apk update && apk add --no-cache curl
+RUN apk update && apk add --no-cache curl dumb-init
+
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 COPY package.json yarn.lock ./
 
-RUN yarn install --frozen-lockfile --production=false
+RUN yarn install --frozen-lockfile --production=true && yarn cache clean
 
-COPY . .
+COPY --from=builder /app/build ./build
 
-EXPOSE 5000
+COPY ca/eu-central-1-bundle.pem ./certificates/eu-central-1-bundle.pem
+COPY public ./public
 
-CMD ["yarn", "dev"]
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the production server
+CMD ["node", "build/index.js"]

@@ -11,15 +11,20 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - DB_HOST=${DB_HOST:-db}
-    image: be:dev
+      - PORT=8000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=postgres
     ports:
-      - 5000:5000
+      - 8000:8000
     volumes:
       - .:/app
 
   db:
     container_name: db
-    image: postgres:latest
+    image: postgres:17.2
     ports:
       - 5432:5432
     environment:
