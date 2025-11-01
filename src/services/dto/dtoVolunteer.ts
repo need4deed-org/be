@@ -20,9 +20,7 @@ import { fastify } from "../../server";
 
 const city = "Berlin";
 
-export function volunteerListSerializer(
-  volunteer: Volunteer,
-): ApiVolunteerGetList {
+export function volunteerListSerializer(volunteer: Volunteer): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
     const status = volunteer.status;
@@ -30,15 +28,9 @@ export function volunteerListSerializer(
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
-    const activities = getTitles(
-      volunteer.deal.profile.profileActivity,
-      "activity",
-    );
+    const activities = getTitles(volunteer.deal.profile.profileActivity, "activity");
     const skills = getTitles(volunteer.deal.profile.profileSkill, "skill");
-    const locations = getTitles(
-      volunteer.deal.location?.locationDistrict,
-      "district",
-    );
+    const locations = getTitles(volunteer.deal.location?.locationDistrict, "district");
     return {
       id,
       status,
@@ -51,16 +43,11 @@ export function volunteerListSerializer(
       locations,
     };
   } catch (error) {
-    fastify.log.error(
-      `Error serializing volunteer (id:${volunteer.id}): ${error}`,
-    );
+    fastify.log.error(`Error serializing volunteer (id:${volunteer.id}): ${error}`);
   }
 }
 
-export function volunteerSerializer(
-  volunteer: Volunteer,
-  timedEvents: Timeline[],
-): ApiVolunteerGet {
+export function volunteerSerializer(volunteer: Volunteer, timedEvents: Timeline[]): ApiVolunteerGet {
   const address: Address = {
     ...volunteer.person.address,
     id: volunteer.person.address.id,
@@ -106,15 +93,9 @@ export function volunteerSerializer(
   const opportunitiesMatched = [] as unknown as OptionItem[];
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
-  const activities = getOptionItems(
-    volunteer.deal.profile.profileActivity,
-    "activity",
-  );
+  const activities = getOptionItems(volunteer.deal.profile.profileActivity, "activity");
   const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
-  const locations = getOptionItems(
-    volunteer.deal.location.locationDistrict,
-    "district",
-  );
+  const locations = getOptionItems(volunteer.deal.location.locationDistrict, "district");
   const languages = getLanguages(volunteer.deal.profile.profileLanguage);
   const availability = getAvailability(volunteer.deal.time.timeTimeslot);
 
@@ -174,6 +155,11 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
         id: timeslot.id,
+        description: timeslot.info || "",
+        start: timeslot.start,
+        end: timeslot.end,
+        rrule: timeslot.rrule,
+        timeslotId: timeslot.id,
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
       } as unknown as Availability; // TODO: tech debt here
@@ -181,6 +167,11 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
     if (timeslot?.occasional) {
       return {
         id: timeslot.id,
+        description: timeslot.info || "",
+        start: timeslot.start,
+        end: timeslot.end,
+        rrule: timeslot.rrule,
+        timeslotId: timeslot.id,
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
       } as unknown as Availability; // TODO: tech debt here
@@ -198,10 +189,7 @@ function getLanguages(profileLanguage: ProfileLanguage[]) {
   }));
 }
 
-function getOptionItems<T>(
-  profileItems: T[],
-  entityName: string,
-): OptionItem[] {
+function getOptionItems<T>(profileItems: T[], entityName: string): OptionItem[] {
   return profileItems?.map((pa) => ({
     id: pa[entityName].id,
     title: pa[entityName].translation || pa[entityName].title,
@@ -209,7 +197,5 @@ function getOptionItems<T>(
 }
 
 function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems?.map(
-    (pa) => pa[entityName].translation || pa[entityName].title,
-  );
+  return profileItems?.map((pa) => pa[entityName].translation || pa[entityName].title);
 }
