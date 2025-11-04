@@ -10,8 +10,8 @@ import {
   OptionItem,
   TimedText,
 } from "need4deed-sdk";
-
 import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
+
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
