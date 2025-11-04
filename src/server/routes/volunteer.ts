@@ -28,8 +28,8 @@ import {
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import {
-  addTranslatedFields,
   EnumValuesMap,
+  addTranslatedFields,
   fetchVolunteerById,
   getFilteredVolunteers,
   getLanguageCode,
@@ -214,8 +214,8 @@ async function volunteerRoutes(
       const skip = (page - 1) * take;
 
       let orderDirection: "DESC" | "ASC";
-      if (request.query.order === SortOrder.NewToOld) orderDirection = "DESC";
-      if (request.query.order === SortOrder.OldToNew) orderDirection = "ASC";
+      if (request.query.order === SortOrder.NewToOld) {orderDirection = "DESC";}
+      if (request.query.order === SortOrder.OldToNew) {orderDirection = "ASC";}
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
@@ -352,7 +352,7 @@ async function volunteerRoutes(
           const success = await updateOptionList(
             id,
             TimeTimeslot,
-            availability,
+            availability.map((a) => ({ id: a.timeslotId })),
           );
           if (!success) {
             return reply.status(400).send({

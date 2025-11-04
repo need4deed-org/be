@@ -10,8 +10,8 @@ import {
   OptionItem,
   TimedText,
 } from "need4deed-sdk";
-
 import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
+
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
@@ -25,7 +25,8 @@ export function volunteerListSerializer(
 ): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
-    const status = volunteer.status;
+    const statusEngagement = volunteer.statusEngagement;
+    const statusType = volunteer.statusType;
     const name = volunteer.person.name;
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
@@ -41,7 +42,8 @@ export function volunteerListSerializer(
     );
     return {
       id,
-      status,
+      statusEngagement,
+      statusType,
       name,
       avatarUrl,
       languages,
@@ -174,6 +176,11 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
         id: timeslot.id,
+        description: timeslot.info || "",
+        start: timeslot.start,
+        end: timeslot.end,
+        rrule: timeslot.rrule,
+        timeslotId: timeslot.id,
         day: getByDay(timeslot.rrule),
         daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
       } as unknown as Availability; // TODO: tech debt here
@@ -181,6 +188,11 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
     if (timeslot?.occasional) {
       return {
         id: timeslot.id,
+        description: timeslot.info || "",
+        start: timeslot.start,
+        end: timeslot.end,
+        rrule: timeslot.rrule,
+        timeslotId: timeslot.id,
         day: Occasionally.OCCASIONALLY,
         daytime: [timeslot.occasional],
       } as unknown as Availability; // TODO: tech debt here
