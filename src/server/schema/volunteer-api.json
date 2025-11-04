@@ -15,7 +15,10 @@
         "avatarUrl": {
           "type": "string"
         },
-        "status": {
+        "statusEngagement": {
+          "$ref": "VolunteerStateEngagementType#"
+        },
+        "statusType": {
           "$ref": "VolunteerStateType#"
         },
         "languages": {
