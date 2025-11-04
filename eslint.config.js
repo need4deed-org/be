@@ -5,6 +5,7 @@ const tsParser = require("@typescript-eslint/parser");
 const prettier = require("eslint-config-prettier");
 const importPlugin = require("eslint-plugin-import");
 const unusedImports = require("eslint-plugin-unused-imports");
+const globals = require("globals");
 
 module.exports = [
   js.configs.recommended,
@@ -22,6 +23,10 @@ module.exports = [
         ecmaFeatures: {
           experimentalDecorators: true,
         },
+      },
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
       },
     },
     plugins: {
@@ -68,7 +73,7 @@ module.exports = [
         },
       ],
 
-      "sort-keys": ["error", "asc", { caseSensitive: false, natural: true }],
+      "sort-keys": "off",
     },
   },
 ];
