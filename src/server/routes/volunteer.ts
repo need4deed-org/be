@@ -27,8 +27,8 @@ import {
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 import {
-  addTranslatedFields,
   EnumValuesMap,
+  addTranslatedFields,
   fetchVolunteerById,
   fetchVolunteers,
   getFilteredVolunteers,
@@ -41,8 +41,6 @@ import {
 } from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
-
-const defaultTake = 12;
 
 async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -394,7 +392,7 @@ async function volunteerRoutes(
           const success = await updateOptionList(
             id,
             TimeTimeslot,
-            availability,
+            availability.map((a) => ({ id: a.timeslotId })),
           );
           if (!success) {
             return reply.status(400).send({

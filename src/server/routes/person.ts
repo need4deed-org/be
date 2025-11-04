@@ -133,8 +133,7 @@ async function personRoutes(
       const errors = await validate(newPerson);
       if (errors.length > 0) {
         fastify.log.error(
-          "Person entity validation errors (class-validator):",
-          errors,
+          `Person entity validation errors (class-validator): ${JSON.stringify(errors)}`,
         );
         return reply.status(400).send({
           message: "Entity validation failed during creation",
