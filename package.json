@@ -55,7 +55,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix"
+      "eslint --fix --ignore-pattern eslint.config.js"
     ],
     "*.{json,md,css,scss}": [
       "prettier --write"
