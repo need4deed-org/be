@@ -242,7 +242,7 @@ async function userRoutes(
             );
             return reply.status(400).send({
               message: "Validation failed for new person data",
-              errors: errors.flatMap(err =>
+              errors: errors.flatMap((err) =>
                 Object.values(err.constraints || {}),
               ),
             });
@@ -288,7 +288,7 @@ async function userRoutes(
         );
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap(err => Object.values(err.constraints || {})),
+          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
         });
       }
 
