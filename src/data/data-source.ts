@@ -1,3 +1,4 @@
+import path from "path";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 
@@ -46,8 +47,6 @@ export const AppDataSource = new DataSource({
   username: "postgres",
   password: "postgres",
   database: "postgres",
-  synchronize: true,
-  // logging: false,
   entities: [
     Activity,
     Address,
@@ -85,7 +84,9 @@ export const AppDataSource = new DataSource({
     Volunteer,
     VolunteerListMV,
   ],
-  migrations: [],
+  synchronize: false,
+  migrationsRun: false,
+  migrations: [path.join(__dirname, "migrations", "**", "*.{ts,js}")],
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
   logging: getLoggingForDataSource(process.env.NODE_ENV),
