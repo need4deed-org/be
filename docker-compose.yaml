@@ -1,5 +1,8 @@
 services:
   be:
+    depends_on:
+      db:
+        condition: service_healthy
     container_name: be
     build:
       context: .
@@ -26,6 +29,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     volumes:
       - be_database:/var/lib/postgresql
 
