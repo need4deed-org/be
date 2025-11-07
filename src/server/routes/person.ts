@@ -137,7 +137,7 @@ async function personRoutes(
         );
         return reply.status(400).send({
           message: "Entity validation failed during creation",
-          errors: errors.flatMap(err => Object.values(err.constraints || {})),
+          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
         });
       }
 

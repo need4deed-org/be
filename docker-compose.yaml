@@ -1,7 +1,6 @@
 services:
   be:
     container_name: be
-
     depends_on:
       bootstrap:
         condition: service_completed_successfully

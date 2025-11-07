@@ -1,3 +1,4 @@
+import path from "path";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 

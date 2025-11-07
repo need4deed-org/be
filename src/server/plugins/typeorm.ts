@@ -10,7 +10,7 @@ import User from "../../data/entity/user.entity";
 import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 
-const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
+const typeormPlugin: FastifyPluginAsync = async (fastify) => {
   try {
     await AppDataSource.initialize();
     fastify.log.info("TypeORM Data Source has been initialized!");
@@ -28,19 +28,23 @@ const typeormPlugin: FastifyPluginAsync = async (fastify, opts) => {
 
     // TODO: add validation of others
     if (!fastify.db.userRepository || !fastify.db.personRepository) {
-      fastify.log.error("ERROR: Repositories were not correctly initialized on fastify.db");
+      fastify.log.error(
+        "ERROR: Repositories were not correctly initialized on fastify.db",
+      );
       throw new Error("Database repositories failed to initialize.");
     }
 
     // Close connection when Fastify closes
-    fastify.addHook("onClose", async (instance) => {
+    fastify.addHook("onClose", async () => {
       if (AppDataSource.isInitialized) {
         await AppDataSource.destroy();
         fastify.log.info("TypeORM Data Source has been closed.");
       }
     });
   } catch (err) {
-    fastify.log.error(`Error during TypeORM Data Source initialization: ${err}`);
+    fastify.log.error(
+      `Error during TypeORM Data Source initialization: ${err}`,
+    );
     throw err; // prevent server from starting without DB
   }
 };
