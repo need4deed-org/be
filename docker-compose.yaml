@@ -1,6 +1,10 @@
 services:
   be:
     container_name: be
+
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     build:
       context: .
       args:
@@ -10,18 +14,31 @@ services:
       - .env
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - DB_HOST=${DB_HOST:-db}
       - PORT=8000
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
-      - DB_DATABASE=postgres
+      - DB_NAME=postgres
+      - DB_SCHEMA=public
     ports:
       - 8000:8000
-    volumes:
-      - .:/app
 
+  bootstrap:
+    container_name: data-bootstrap
+    depends_on:
+      db:
+        condition: service_healthy
+    build:
+      context: ./data-bootstrap
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+      - DB_SCHEMA=public
+  
   db:
     container_name: db
     image: postgres:17.2
@@ -33,6 +50,12 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - be_database:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   be_database:
