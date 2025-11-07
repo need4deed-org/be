@@ -46,9 +46,10 @@ export const AppDataSource = new DataSource({
   port: 5432,
   username: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "postgres",
-  database: process.env.DB_DATABASE || "postgres",
+  database: process.env.DB_NAME || "postgres",
   schema: process.env.DB_SCHEMA || "public",
-  synchronize: true,
+  synchronize: false,
+  migrationsRun: true,
   // logging: false,
   entities: [
     Activity,
@@ -91,7 +92,10 @@ export const AppDataSource = new DataSource({
     rejectUnauthorized: true,
     ca: fs.readFileSync('/app/certificates/eu-central-1-bundle.pem').toString()
   } : false,
- // migrations: [__dirname + "/migrations/**/*.ts"],
+  migrations: process.env.NODE_ENV === "production"
+    ? [__dirname + "/migrations/**/*.js"]
+    : [__dirname + "/migrations/**/*.ts"],
+  migrationsTableName: "be_migrations",
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
   logging: getLoggingForDataSource(process.env.NODE_ENV),
