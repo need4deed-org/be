@@ -10,8 +10,8 @@ import {
   OptionItem,
   TimedText,
 } from "need4deed-sdk";
-
 import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
+
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
@@ -20,20 +20,30 @@ import { fastify } from "../../server";
 
 const city = "Berlin";
 
-export function volunteerListSerializer(volunteer: Volunteer): ApiVolunteerGetList {
+export function volunteerListSerializer(
+  volunteer: Volunteer,
+): ApiVolunteerGetList {
   try {
     const id = volunteer.id;
-    const status = volunteer.status;
+    const statusEngagement = volunteer.statusEngagement;
+    const statusType = volunteer.statusType;
     const name = volunteer.person.name;
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
-    const activities = getTitles(volunteer.deal.profile.profileActivity, "activity");
+    const activities = getTitles(
+      volunteer.deal.profile.profileActivity,
+      "activity",
+    );
     const skills = getTitles(volunteer.deal.profile.profileSkill, "skill");
-    const locations = getTitles(volunteer.deal.location?.locationDistrict, "district");
+    const locations = getTitles(
+      volunteer.deal.location?.locationDistrict,
+      "district",
+    );
     return {
       id,
-      status,
+      statusEngagement,
+      statusType,
       name,
       avatarUrl,
       languages,
@@ -43,11 +53,16 @@ export function volunteerListSerializer(volunteer: Volunteer): ApiVolunteerGetLi
       locations,
     };
   } catch (error) {
-    fastify.log.error(`Error serializing volunteer (id:${volunteer.id}): ${error}`);
+    fastify.log.error(
+      `Error serializing volunteer (id:${volunteer.id}): ${error}`,
+    );
   }
 }
 
-export function volunteerSerializer(volunteer: Volunteer, timedEvents: Timeline[]): ApiVolunteerGet {
+export function volunteerSerializer(
+  volunteer: Volunteer,
+  timedEvents: Timeline[],
+): ApiVolunteerGet {
   const address: Address = {
     ...volunteer.person.address,
     id: volunteer.person.address.id,
@@ -93,9 +108,15 @@ export function volunteerSerializer(volunteer: Volunteer, timedEvents: Timeline[
   const opportunitiesMatched = [] as unknown as OptionItem[];
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
-  const activities = getOptionItems(volunteer.deal.profile.profileActivity, "activity");
+  const activities = getOptionItems(
+    volunteer.deal.profile.profileActivity,
+    "activity",
+  );
   const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
-  const locations = getOptionItems(volunteer.deal.location.locationDistrict, "district");
+  const locations = getOptionItems(
+    volunteer.deal.location.locationDistrict,
+    "district",
+  );
   const languages = getLanguages(volunteer.deal.profile.profileLanguage);
   const availability = getAvailability(volunteer.deal.time.timeTimeslot);
 
@@ -189,7 +210,10 @@ function getLanguages(profileLanguage: ProfileLanguage[]) {
   }));
 }
 
-function getOptionItems<T>(profileItems: T[], entityName: string): OptionItem[] {
+function getOptionItems<T>(
+  profileItems: T[],
+  entityName: string,
+): OptionItem[] {
   return profileItems?.map((pa) => ({
     id: pa[entityName].id,
     title: pa[entityName].translation || pa[entityName].title,
@@ -197,5 +221,7 @@ function getOptionItems<T>(profileItems: T[], entityName: string): OptionItem[] 
 }
 
 function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems?.map((pa) => pa[entityName].translation || pa[entityName].title);
+  return profileItems?.map(
+    (pa) => pa[entityName].translation || pa[entityName].title,
+  );
 }
