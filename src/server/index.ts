@@ -117,7 +117,8 @@ export const start = async () => {
 
     await fastify.ready();
 
-    await fastify.listen({ port: 5000, host: "0.0.0.0" });
+    const port = Number(process.env.PORT) || 5000;
+    await fastify.listen({ port, host: "0.0.0.0" });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

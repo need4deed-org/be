@@ -1,12 +1,59 @@
+# Dependencies
 node_modules
-dist
-build
-.git
-.vscode
+npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.env
 
-# database
+# Build output
+dist
+build
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Development
+.git
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Testing
+coverage
+.nyc_output
+test-results
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Database
 *.sqlite
 db_data
