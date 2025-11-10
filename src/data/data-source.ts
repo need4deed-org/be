@@ -1,4 +1,4 @@
-import path from "path";
+import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 
@@ -39,7 +39,6 @@ import VolunteerListMV from "./entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { getLoggingForDataSource } from "./utils";
-import * as fs from 'fs';
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -51,7 +50,6 @@ export const AppDataSource = new DataSource({
   schema: process.env.DB_SCHEMA || "public",
   synchronize: false,
   migrationsRun: true,
-  // logging: false,
   entities: [
     Activity,
     Address,
@@ -89,13 +87,19 @@ export const AppDataSource = new DataSource({
     Volunteer,
     VolunteerListMV,
   ],
-  ssl: process.env.NODE_ENV === "production" ? {
-    rejectUnauthorized: true,
-    ca: fs.readFileSync('/app/certificates/eu-central-1-bundle.pem').toString()
-  } : false,
-  migrations: process.env.NODE_ENV === "production"
-    ? [__dirname + "/migrations/**/*.js"]
-    : [__dirname + "/migrations/**/*.ts"],
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? {
+          rejectUnauthorized: true,
+          ca: fs
+            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
+            .toString(),
+        }
+      : false,
+  migrations:
+    process.env.NODE_ENV === "production"
+      ? [__dirname + "/migrations/**/*.js"]
+      : [__dirname + "/migrations/**/*.ts"],
   migrationsTableName: "be_migrations",
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
