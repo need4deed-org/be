@@ -8,7 +8,6 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "importOrder": ["^(node:.*)$", "^@?\\w", "^@/", "^[./]"],
-  "importOrderSeparation": true,
-  "importOrderSortSpecifiers": true,
-  "plugins": ["@trivago/prettier-plugin-sort-imports"]
+  "importOrderParserPlugins": ["typescript", "decorators-legacy"],
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"]
 }

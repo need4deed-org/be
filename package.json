@@ -4,7 +4,7 @@
   "description": "Awesome project developed with TypeORM.",
   "type": "commonjs",
   "devDependencies": {
-    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
     "@types/node": "^24.9.1",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
@@ -44,7 +44,12 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon --watch src --ext ts,js,json --exec \"ts-node src/index.ts\"",
-    "typeorm": "node --require ts-node/register --require tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    "typeorm": "typeorm-ts-node-commonjs -d src/data/data-source.ts",
+    "migration:generate": "yarn typeorm migration:generate",
+    "migration:create": "yarn typeorm migration:create",
+    "migration:run": "yarn typeorm migration:run",
+    "migration:revert": "yarn typeorm migration:revert",
+    "migration:show": "yarn typeorm migration:show",
     "build": "tsc",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
@@ -60,5 +65,6 @@
     "*.{json,md,css,scss}": [
       "prettier --write"
     ]
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

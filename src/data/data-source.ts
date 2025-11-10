@@ -1,10 +1,10 @@
-import path from "path";
+import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-
+import Comment from "./entity/comment.entity";
 import Deal from "./entity/deal.entity";
-import EventN4D from "./entity/event/event.entity";
 import EventTranslation from "./entity/event/event_translation.entity";
+import EventN4D from "./entity/event/event.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
@@ -44,15 +44,19 @@ export const AppDataSource = new DataSource({
   type: "postgres",
   host: process.env.DB_HOST || "127.0.0.1",
   port: 5432,
-  username: "postgres",
-  password: "postgres",
-  database: "postgres",
+  username: process.env.DB_USER || "postgres",
+  password: process.env.DB_PASSWORD || "postgres",
+  database: process.env.DB_NAME || "postgres",
+  schema: process.env.DB_SCHEMA || "public",
+  synchronize: false,
+  migrationsRun: true,
   entities: [
     Activity,
     Address,
     Agent,
     AgentPostcode,
     Category,
+    Comment,
     Deal,
     District,
     DistrictPostcode,
@@ -84,9 +88,20 @@ export const AppDataSource = new DataSource({
     Volunteer,
     VolunteerListMV,
   ],
-  synchronize: false,
-  migrationsRun: false,
-  migrations: [path.join(__dirname, "migrations", "**", "*.{ts,js}")],
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? {
+          rejectUnauthorized: true,
+          ca: fs
+            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
+            .toString(),
+        }
+      : false,
+  migrations:
+    process.env.NODE_ENV === "production"
+      ? [__dirname + "/migrations/**/*.js"]
+      : [__dirname + "/migrations/**/*.ts"],
+  migrationsTableName: "be_migrations",
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),
   logging: getLoggingForDataSource(process.env.NODE_ENV),
