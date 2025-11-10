@@ -53,7 +53,10 @@ export default class EventTranslation {
   @Column({ type: "varchar", length: 256, nullable: true })
   followupText?: string;
 
-  @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.eventTranslation)
+  @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.eventTranslation, {
+    onDelete: 'CASCADE',
+    createForeignKeyConstraints: false
+  })
   @JoinColumn({ name: "eventn4d_id" })
   eventn4d: EventN4D;
 
