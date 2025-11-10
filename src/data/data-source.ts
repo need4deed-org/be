@@ -1,10 +1,10 @@
 import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-
+import Comment from "./entity/comment.entity";
 import Deal from "./entity/deal.entity";
-import EventN4D from "./entity/event/event.entity";
 import EventTranslation from "./entity/event/event_translation.entity";
+import EventN4D from "./entity/event/event.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
@@ -56,6 +56,7 @@ export const AppDataSource = new DataSource({
     Agent,
     AgentPostcode,
     Category,
+    Comment,
     Deal,
     District,
     DistrictPostcode,
