@@ -9,7 +9,6 @@ import {
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-
 import LocationDistrict from "../../data/entity/m2m/location-district";
 import ProfileActivity from "../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
@@ -25,11 +24,11 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../services";
-import { responseErrors } from "../schema/responseErrors";
+import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import {
-  EnumValuesMap,
   addTranslatedFields,
+  EnumValuesMap,
   fetchVolunteerById,
   getFilteredVolunteers,
   getLanguageCode,
@@ -214,8 +213,12 @@ async function volunteerRoutes(
       const skip = (page - 1) * take;
 
       let orderDirection: "DESC" | "ASC";
-      if (request.query.order === SortOrder.NewToOld) {orderDirection = "DESC";}
-      if (request.query.order === SortOrder.OldToNew) {orderDirection = "ASC";}
+      if (request.query.order === SortOrder.NewToOld) {
+        orderDirection = "DESC";
+      }
+      if (request.query.order === SortOrder.OldToNew) {
+        orderDirection = "ASC";
+      }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
