@@ -11,7 +11,7 @@ import {
   TimedText,
 } from "need4deed-sdk";
 import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
-
+import Comment from "../../data/entity/comment.entity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
@@ -61,6 +61,7 @@ export function volunteerListSerializer(
 
 export function volunteerSerializer(
   volunteer: Volunteer,
+  volunteerComments: Comment[],
   timedEvents: Timeline[],
 ): ApiVolunteerGet {
   const address: Address = {
@@ -76,20 +77,21 @@ export function volunteerSerializer(
     },
   };
 
-  const comments: TimedText[] = timedEvents
-    .filter(({ contentType }) => contentType === "comment")
-    .map(({ id, timestamp, content }) => ({
+  const comments: TimedText[] = volunteerComments.map((comment) => ({
+    id: comment.id,
+    timestamp: comment.updatedAt,
+    content: comment.text,
+    authorName: comment.user.person.name,
+  }));
+
+  const timelineLogs: TimedText[] = timedEvents.map(
+    ({ id, timestamp, content }) => ({
       id,
       timestamp,
       content,
-    }));
-  const timelineLogs: TimedText[] = timedEvents
-    .filter(({ contentType }) => contentType !== "comment")
-    .map(({ id, timestamp, content }) => ({
-      id,
-      timestamp,
-      content,
-    }));
+      authorName: "", // TODO: add author field to timeline logs
+    }),
+  );
   const person: ApiPersonGet = {
     id: volunteer.person.id,
     email: volunteer.person.email,
