@@ -71,18 +71,21 @@
       "$id": "TimedText",
       "type": "object",
       "properties": {
-        "date": {
+        "id": {
+          "type": "number"
+        },
+        "timestamp": {
           "type": "string",
           "format": "date-time"
         },
-        "type": {
-          "$ref": "TimedTextType#"
+        "content": {
+          "type": "string"
         },
-        "text": {
+        "authorName": {
           "type": "string"
         }
       },
-      "required": ["date", "type", "text"],
+      "required": ["id", "timestamp", "content", "authorName"],
       "additionalProperties": false
     },
     "TimedTextType": {
