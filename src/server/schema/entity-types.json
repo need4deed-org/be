@@ -94,6 +94,94 @@
         "additionalProperties": false
       },
       "required": ["title", "proficiency"]
+    },
+    "Comment": {
+      "$id": "Comment",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "user": {
+          "$ref": "User#"
+        },
+        "entityId": {
+          "type": "number"
+        },
+        "entityType": {
+          "type": "string",
+          "enum": ["volunteer", "opportunity"]
+        }
+      },
+      "additionalProperties": false,
+      "required": ["text", "userId", "entityId", "entityType"]
+    },
+    "User": {
+      "$id": "User",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "coordinator", "user"]
+        },
+        "language": {
+          "$ref": "Language#"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "person": {
+          "$ref": "Person#"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["isActive", "role"]
+    },
+    "Person": {
+      "$id": "Person",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "middleName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name"]
     }
   }
 }

@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-
 import { AppDataSource } from "../../data/data-source";
+import Comment from "../../data/entity/comment.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
@@ -24,6 +24,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       fieldTranslationRepository: AppDataSource.getRepository(FieldTranslation),
       optionRepository: AppDataSource.getRepository(Option),
       volunteerListMvRepository: AppDataSource.getRepository(VolunteerListMV),
+      commentRepository: AppDataSource.getRepository(Comment),
     });
 
     // TODO: add validation of others
