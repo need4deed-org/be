@@ -5,7 +5,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
 import Language from "../profile/language.entity";
 import EventN4D from "./event.entity";
 
@@ -54,8 +53,8 @@ export default class EventTranslation {
   followupText?: string;
 
   @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.eventTranslation, {
-    onDelete: 'CASCADE',
-    createForeignKeyConstraints: false
+    onDelete: "CASCADE",
+    // createForeignKeyConstraints: false
   })
   @JoinColumn({ name: "eventn4d_id" })
   eventn4d: EventN4D;
