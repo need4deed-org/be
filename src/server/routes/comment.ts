@@ -44,10 +44,10 @@ async function commentRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { type: "array" },
-              // data: { type: "array", items: { $ref: "Comment#" } },
+              data: { type: "array", items: { $ref: "Comment#" } },
+              count: { type: "number" },
             },
-            required: ["message", "data"],
+            required: ["message", "data", "count"],
           },
           ...responseErrors,
         },
@@ -59,7 +59,7 @@ async function commentRoutes(
         const { userId, entityId, entityType } = request.query;
 
         const commentRepository = fastify.db.commentRepository;
-        const comments = await commentRepository.find({
+        const [comments, count] = await commentRepository.findAndCount({
           where: { userId, entityId, entityType },
           relations: ["user", "user.person", "language"],
         });
@@ -68,7 +68,7 @@ async function commentRoutes(
           return reply.status(404).send({ message: "Comments not found." });
         }
 
-        return { message: "Comments", data: comments };
+        return { message: "Comments", data: comments, count };
       } catch (error) {
         fastify.log.error(`Error fetching comment: ${error}`);
         return reply.status(500).send({
