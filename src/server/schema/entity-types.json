@@ -123,8 +123,7 @@
           "enum": ["volunteer", "opportunity"]
         }
       },
-      "additionalProperties": false,
-      "required": ["text", "userId", "entityId", "entityType"]
+      "additionalProperties": false
     },
     "User": {
       "$id": "User",
