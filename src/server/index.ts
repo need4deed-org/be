@@ -1,9 +1,8 @@
 import cookie from "@fastify/cookie";
-import Fastify, { FastifyInstance } from "fastify";
-import fastifyMailer from "fastify-mailer";
-
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
+import Fastify, { FastifyInstance } from "fastify";
+import fastifyMailer from "fastify-mailer";
 import { defaultFrom, selfUrl } from "../config/constants";
 import { getMailerConfigForSES, getSesClient } from "../services";
 import cors, { corsOptions } from "./plugins/cors";
@@ -11,6 +10,7 @@ import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
 import authRoutes from "./routes/auth";
+import commentRoutes from "./routes/comment";
 import healthRoutes from "./routes/health";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
@@ -114,6 +114,7 @@ export const start = async () => {
     await fastify.register(personRoutes, { prefix: RoutePrefix.PERSON });
     await fastify.register(volunteerRoutes, { prefix: RoutePrefix.VOLUNTEER });
     await fastify.register(optionRoutes, { prefix: RoutePrefix.OPTION });
+    await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
 
     await fastify.ready();
 

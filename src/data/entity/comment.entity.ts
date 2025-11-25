@@ -12,9 +12,7 @@ import Language from "./profile/language.entity";
 import User from "./user.entity";
 
 @Entity()
-@Index(["language", "entityType", "entityId"], {
-  unique: true,
-})
+@Index(["entityType", "entityId", "languageId"], { unique: false })
 export default class Comment {
   @PrimaryGeneratedColumn()
   id: number;
@@ -23,6 +21,12 @@ export default class Comment {
   @IsNotEmpty()
   @IsString()
   text: string;
+
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  createdAt: Date;
+
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  updatedAt: Date;
 
   @ManyToOne(() => Language, {
     nullable: false,
@@ -40,6 +44,9 @@ export default class Comment {
   })
   @JoinColumn({ name: "user_id" })
   user: User;
+
+  @Column()
+  userId: number;
 
   @Column({
     type: "enum",

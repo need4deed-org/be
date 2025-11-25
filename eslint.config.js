@@ -41,6 +41,15 @@ module.exports = [
       "prefer-const": "error",
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
 
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
