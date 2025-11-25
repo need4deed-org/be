@@ -1,4 +1,5 @@
 export * from "./dealParser";
+export * from "./dtoComment";
 export * from "./dtoVolunteer";
 export * from "./leadFromParser";
 export * from "./parseFormData";
