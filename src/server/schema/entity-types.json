@@ -92,8 +92,7 @@
           "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
         },
         "additionalProperties": false
-      },
-      "required": ["title", "proficiency"]
+      }
     },
     "Comment": {
       "$id": "Comment",
@@ -151,8 +150,7 @@
           "$ref": "Person#"
         }
       },
-      "additionalProperties": false,
-      "required": ["isActive", "role"]
+      "additionalProperties": false
     },
     "Person": {
       "$id": "Person",
@@ -180,8 +178,7 @@
           "type": "string"
         }
       },
-      "additionalProperties": false,
-      "required": ["name"]
+      "additionalProperties": false
     }
   }
 }
