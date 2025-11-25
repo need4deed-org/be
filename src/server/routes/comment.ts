@@ -1,9 +1,10 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { EntityTableName } from "need4deed-sdk";
+import { ApiComment, EntityTableName } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import { Role } from "../../data/types";
+import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 
@@ -25,7 +26,7 @@ async function commentRoutes(
     Reply: {
       message: string;
       count?: number;
-      data?: Array<Comment>;
+      data?: Array<ApiComment>;
     };
   }>(
     prefixedPath,
@@ -44,7 +45,7 @@ async function commentRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { type: "array", items: { $ref: "Comment#" } },
+              data: { type: "array", items: { $ref: "ApiComment#" } },
               count: { type: "number" },
             },
             required: ["message", "data", "count"],
@@ -68,7 +69,9 @@ async function commentRoutes(
           return reply.status(404).send({ message: "Comments not found." });
         }
 
-        return { message: "Comments", data: comments, count };
+        const data = comments.map(commentSerializer);
+
+        return { message: "Comments", data, count };
       } catch (error) {
         fastify.log.error(`Error fetching comment: ${error}`);
         return reply.status(500).send({
