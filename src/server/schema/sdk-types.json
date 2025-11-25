@@ -124,6 +124,18 @@
       },
       "additionalProperties": false
     },
+    "ApiComment": {
+      "$id": "ApiComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "content": { "type": "string" },
+        "entityId": { "type": "number" },
+        "entityType": { "type": "string" },
+        "authorName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
     "ApiPersonGet": {
       "$id": "ApiPersonGet",
       "type": "object",
