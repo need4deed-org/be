@@ -53,7 +53,7 @@ async function commentRoutes(
           ...responseErrors,
         },
       },
-      // onRequest: [fastify.authenticate()],
+      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       try {
@@ -140,13 +140,13 @@ async function commentRoutes(
     prefixedPath,
     {
       schema: {
-        body: { type: "object", additionalProperties: true },
+        body: { $ref: "Comment#" },
         response: {
           201: {
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { type: "object", additionalProperties: true },
+              data: { $ref: "Comment#" },
             },
             required: ["message", "data"],
           },
@@ -162,8 +162,6 @@ async function commentRoutes(
       const newComment = commentRepository.create({
         ...body,
         user: { id: request.user.id },
-        createdAt: new Date(),
-        updatedAt: new Date(),
       });
 
       const errors = await validate(newComment);
@@ -200,13 +198,13 @@ async function commentRoutes(
     `${prefixedPath}/:id`,
     {
       schema: {
-        body: { type: "object", additionalProperties: true },
+        body: { $ref: "Comment#" },
         response: {
           200: {
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { type: "object", additionalProperties: true },
+              data: { $ref: "Comment#" },
             },
             required: ["message", "data"],
           },
