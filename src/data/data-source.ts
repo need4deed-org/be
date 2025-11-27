@@ -49,7 +49,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "postgres",
   schema: process.env.DB_SCHEMA || "public",
   synchronize: false,
-  migrationsRun: true,
+  migrationsRun: process.env.NODE_ENV === "production",
   entities: [
     Activity,
     Address,
