@@ -1,5 +1,7 @@
+ 
 export enum RoutePrefix {
   AUTH = "/auth",
+  COMMENT = "/comment",
   HEALTH_CHECK = "/health-check",
   LOGIN = "/login",
   ME = "/me",

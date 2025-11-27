@@ -9,8 +9,8 @@ ENV PGDATABASE=mydb
 ENV PGUSER=postgres
 ENV PGPASSWORD=password
 
-# Copy the SQL dump file
-COPY dump.sql /app/
+# Copy the SQL files
+COPY *.sql /app/
 
 # Create script to restore dump to external database
 COPY bootstrap.sh /app/

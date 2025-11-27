@@ -8,8 +8,8 @@ import {
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
-
 import { AppDataSource as dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
@@ -48,7 +48,7 @@ export async function getProfileEntityByTitle<
   entityTitle: string,
   entityType: EntityTableName,
   entity: E,
-  m2mEntity: new (args: unknown) => M,
+  m2mEntity: new (_args: unknown) => M,
   key?: keyof M,
 ): Promise<M | null> {
   const instance = await getInstanceByTranslation(
@@ -173,6 +173,21 @@ export async function addTranslatedFields(
         : ps.skill.translation;
     }
   }
+}
+
+export async function getVolunteerComments(volunteer: Volunteer) {
+  const commentRepository = getRepository(dataSource, Comment);
+  const relations = ["user", "user.person"];
+  const comments = await commentRepository.find({
+    where: {
+      entityType: EntityTableName.VOLUNTEER,
+      entityId: volunteer.id,
+    },
+    order: { updatedAt: "DESC" },
+    relations,
+  });
+
+  return comments;
 }
 
 export async function getTimedEvents(volunteer: Volunteer) {
@@ -395,7 +410,7 @@ export async function updateOptionList<
   L extends { id: number | string },
 >(
   volunteerId: number,
-  m2mEntity: new (arg?: unknown) => M,
+  m2mEntity: new (_args?: unknown) => M,
   list: L[],
 ): Promise<boolean> {
   const {
@@ -448,7 +463,7 @@ export async function updateOptionList<
   } catch (error) {
     dataSource.logger.log(
       "warn",
-      `Error updating list: ${m2mEntity.name} for volunteer id=${volunteerId}`,
+      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${volunteerId}`,
     );
     return false;
   }
@@ -475,8 +490,9 @@ export async function fetchVolunteerById(
   addTranslatedFields([volunteer], isoCode);
 
   const timedEvents = await getTimedEvents(volunteer);
+  const comments = await getVolunteerComments(volunteer);
 
-  const data = volunteerSerializer(volunteer, timedEvents);
+  const data = volunteerSerializer(volunteer, comments, timedEvents);
 
   return data;
 }
