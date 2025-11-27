@@ -8,7 +8,6 @@ import {
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-
 import LocationDistrict from "../../data/entity/m2m/location-district";
 import ProfileActivity from "../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
@@ -24,11 +23,11 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../services";
-import { responseErrors } from "../schema/responseErrors";
+import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import {
-  EnumValuesMap,
   addTranslatedFields,
+  EnumValuesMap,
   fetchVolunteerById,
   fetchVolunteers,
   getFilteredVolunteers,
@@ -262,7 +261,6 @@ async function volunteerRoutes(
           },
         })}`,
       );
-      // return reply.status(400).send({ message: "test query" });
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 

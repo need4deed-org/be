@@ -1,14 +1,16 @@
+ 
 import { JWT } from "@fastify/jwt";
 import "fastify";
-import { Repository } from "typeorm";
-
 import { onRequestHookHandler } from "fastify";
+import { Repository } from "typeorm";
+import Comment from "../../data/entity/comment.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import User from "../../data/entity/user.entity";
-import Volunteer from "../../data/entity/volunteer.entity";
+import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
+import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { AuthOptions } from "./auth";
 
 declare module "fastify" {
@@ -21,6 +23,7 @@ declare module "fastify" {
       fieldTranslationRepository: Repository<FieldTranslation>;
       optionRepository: Repository<Option>;
       volunteerListMvRepository: Repository<VolunteerListMV>;
+      commentRepository: Repository<Comment>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

@@ -71,18 +71,21 @@
       "$id": "TimedText",
       "type": "object",
       "properties": {
-        "date": {
+        "id": {
+          "type": "number"
+        },
+        "timestamp": {
           "type": "string",
           "format": "date-time"
         },
-        "type": {
-          "$ref": "TimedTextType#"
+        "content": {
+          "type": "string"
         },
-        "text": {
+        "authorName": {
           "type": "string"
         }
       },
-      "required": ["date", "type", "text"],
+      "required": ["id", "timestamp", "content", "authorName"],
       "additionalProperties": false
     },
     "TimedTextType": {
@@ -120,6 +123,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "ApiComment": {
+      "$id": "ApiComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "content": { "type": "string" },
+        "entityId": { "type": "number" },
+        "entityType": { "type": "string" },
+        "authorName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
     },
     "ApiPersonGet": {
       "$id": "ApiPersonGet",

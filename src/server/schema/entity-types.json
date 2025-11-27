@@ -92,8 +92,92 @@
           "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
         },
         "additionalProperties": false
+      }
+    },
+    "Comment": {
+      "$id": "Comment",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "user": {
+          "$ref": "User#"
+        },
+        "entityId": {
+          "type": "number"
+        },
+        "entityType": {
+          "type": "string",
+          "enum": ["volunteer", "opportunity"]
+        }
       },
-      "required": ["title", "proficiency"]
+      "additionalProperties": false
+    },
+    "User": {
+      "$id": "User",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "coordinator", "user"]
+        },
+        "language": {
+          "$ref": "Language#"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "person": {
+          "$ref": "Person#"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Person": {
+      "$id": "Person",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "middleName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
