@@ -1,105 +1,124 @@
 CREATE MATERIALIZED VIEW volunteer_list_mv AS
-WITH
--- 1. Aggregate Languages (M2M)
-volunteer_languages AS (
-    SELECT v.id AS volunteer_id, array_agg(l.id) AS language_ids_array, string_agg((l.title)::text, ' '::text) AS languages_text, bool_or(((l.title)::text = 'German'::text)) AS has_german_language
-    FROM volunteer v
-    LEFT JOIN deal d ON v.deal_id = d.id
-    LEFT JOIN profile pr ON d.profile_id = pr.id
-    LEFT JOIN profile_language pl ON pr.id = pl.profile_id
-    LEFT JOIN language l ON pl.language_id = l.id
-    GROUP BY v.id
-),
--- 2. Aggregate Skills (M2M) - Titles for Search
-volunteer_skills AS (
-    SELECT v.id AS volunteer_id, string_agg((s.title)::text, ' '::text) AS skills_text
-    FROM volunteer v
-    LEFT JOIN deal d ON v.deal_id = d.id
-    LEFT JOIN profile pr ON d.profile_id = pr.id
-    LEFT JOIN profile_skill ps ON pr.id = ps.profile_id
-    LEFT JOIN skill s ON ps.skill_id = s.id
-    GROUP BY v.id
-),
--- 3. Aggregate Activities (M2M) - Titles for Search
-volunteer_activities AS (
-    SELECT v.id AS volunteer_id, string_agg((a.title)::text, ' '::text) AS activities_text
-    FROM volunteer v
-    LEFT JOIN deal d ON v.deal_id = d.id
-    LEFT JOIN profile pr ON d.profile_id = pr.id
-    LEFT JOIN profile_activity pa ON pr.id = pa.profile_id
-    LEFT JOIN activity a ON pa.activity_id = a.id
-    GROUP BY v.id
-),
--- 4. Aggregate Districts (M2M via deal location)
-volunteer_districts AS (
-    SELECT v.id AS volunteer_id, array_agg(dt.id) AS district_ids_array, string_agg((dt.title)::text, ' '::text) AS districts_text
-    FROM volunteer v
-    LEFT JOIN deal d ON v.deal_id = d.id
-    LEFT JOIN location_district ld ON d.location_id = ld.location_id
-    LEFT JOIN district dt ON ld.district_id = dt.id
-    GROUP BY v.id
-),
--- 🔑 NEW: 5. Aggregate Availability (M2M via deal time)
-volunteer_availability AS (
+WITH AggregatedTimeslots AS (
+    -- 1. Aggregates timeslot data into the three required arrays for filtering
+    -- Supports ToR Filters 5 & 6
     SELECT
-        v.id AS volunteer_id,
-        -- Aggregate regular days (e.g., Monday). Assumes timeslot has 'day' and 'type' columns.
-        array_agg(t.day) FILTER (WHERE t.type = 'regular') AS available_days_array,
-        -- Aggregate time blocks (e.g., 08-11). Assumes timeslot has 'time_block' column.
-        array_agg(t.time_block) FILTER (WHERE t.type = 'regular') AS available_times_array,
-        -- Aggregate occasional types (e.g., weekends). Assumes 'day' holds the occasional descriptor.
-        array_agg(t.day) FILTER (WHERE t.type = 'occasional') AS available_occasional_array
-    FROM volunteer v
-    LEFT JOIN deal d ON v.deal_id = d.id
-    LEFT JOIN "time" tm ON d.time_id = tm.id
-    LEFT JOIN time_timeslot tts ON tm.id = tts.time_id
-    LEFT JOIN timeslot t ON tts.timeslot_id = t.id
-    GROUP BY v.id
+        d.id AS deal_id,
+        -- Aggregate BYDAY codes (e.g., 'MO', 'TU', 'FR')
+        ARRAY_AGG(
+            DISTINCT
+            SUBSTRING(t.rrule FROM 'BYDAY=([A-Z,]+)')
+        ) FILTER (WHERE t.rrule IS NOT NULL) AS available_days_array_raw,
+        -- Aggregate Time Blocks (e.g., '08-11', '14-17')
+        ARRAY_AGG(
+            DISTINCT
+            CASE
+                WHEN EXTRACT(HOUR FROM t.start) >= 8 AND EXTRACT(HOUR FROM t.end) <= 11 THEN '08-11'
+                WHEN EXTRACT(HOUR FROM t.start) >= 11 AND EXTRACT(HOUR FROM t.end) <= 14 THEN '11-14'
+                WHEN EXTRACT(HOUR FROM t.end) <= 17 AND EXTRACT(HOUR FROM t.start) >= 14 THEN '14-17'
+                WHEN EXTRACT(HOUR FROM t.end) <= 20 AND EXTRACT(HOUR FROM t.start) >= 17 THEN '17-20'
+                ELSE NULL
+            END
+        ) FILTER (WHERE t.rrule IS NOT NULL) AS available_times_array,
+        -- Aggregate Occasional statuses (e.g., 'weekends', 'public_holidays')
+        ARRAY_AGG(
+            DISTINCT t.occasional
+        ) FILTER (WHERE t.occasional IS NOT NULL) AS available_occasional_array,
+        JSONB_AGG(
+            JSONB_BUILD_OBJECT(
+                'start_hour', EXTRACT(HOUR FROM t.start),
+                'end_hour', EXTRACT(HOUR FROM t.end),
+                'byday_part', COALESCE(SUBSTRING(t.rrule FROM 'BYDAY=([A-Z,]+)'), ''),
+                'occasional', t.occasional
+            )
+        ) AS timeslot_data
+    FROM
+        public.timeslot t
+    INNER JOIN
+        public.time_timeslot tt ON t.id = tt.timeslot_id
+    INNER JOIN
+        public.time tm ON tt.time_id = tm.id
+    INNER JOIN
+        public.deal d ON tm.id = d.time_id
+    GROUP BY
+        d.id
+),
+AggregatedLanguages AS (
+    -- 2. Aggregate language data by traversing deal -> profile -> profile_language -> language
+    -- Supports ToR Filter 4 (language IDs) and Filter 7 (language titles for search)
+    SELECT
+        d.id AS deal_id,
+        ARRAY_AGG(lang.id) AS language_ids,
+        ARRAY_AGG(lang.title) AS language_titles
+    FROM public.language lang
+    INNER JOIN public.profile_language pl ON lang.id = pl.language_id
+    INNER JOIN public.profile p ON pl.profile_id = p.id
+    INNER JOIN public.deal d ON p.id = d.profile_id
+    GROUP BY d.id
+),
+AggregatedDistricts AS (
+    -- 3. Aggregate district data by traversing deal -> location -> location_district -> district
+    -- This provides the IDs for ToR Filter 3 and titles for ToR Filter 7
+    SELECT
+        d.id AS deal_id,
+        ARRAY_AGG(dist.id) AS district_ids,
+        ARRAY_AGG(dist.title) AS district_titles
+    FROM public.district dist
+    INNER JOIN public.location_district ld ON dist.id = ld.district_id
+    INNER JOIN public.location l ON ld.location_id = l.id
+    INNER JOIN public.deal d ON l.id = d.location_id
+    GROUP BY d.id
+),
+AggregatedActivities AS (
+    -- 4. Aggregate activity data by traversing deal -> profile -> profile_activity -> activity
+    -- Supports ToR Filter 7 (activity titles for search)
+    SELECT
+        d.id AS deal_id,
+        ARRAY_AGG(a.id) AS activity_ids,
+        ARRAY_AGG(a.title) AS activity_titles
+    FROM public.activity a
+    INNER JOIN public.profile_activity pa ON a.id = pa.activity_id
+    INNER JOIN public.profile p ON pa.profile_id = p.id
+    INNER JOIN public.deal d ON p.id = d.profile_id
+    GROUP BY d.id
 )
--- Final SELECT for the Materialized View
 SELECT
     v.id AS volunteer_id,
-    v.status,
-    v.status_engagement,
-    v.status_type AS volunteer_type,
-    p.avatar_url,
-    
-    CONCAT_WS(' ', 
-        NULLIF(TRIM(BOTH FROM p.first_name), ''::text), 
-        NULLIF(TRIM(BOTH FROM p.middle_name), ''::text), 
-        NULLIF(TRIM(BOTH FROM p.last_name), ''::text)
-    ) AS full_name,
-    
-    vl.language_ids_array,
-    vl.has_german_language,
-    vd.district_ids_array,
-    
-    -- 🔑 NEW AVAILABILITY COLUMNS EXPOSED
-    va.available_days_array,
-    va.available_times_array,
-    va.available_occasional_array,
-    
-    -- EXPANDED search_vector
-    to_tsvector('english'::regconfig,
-        COALESCE(vd.districts_text, ''::text) || ' ' ||
-        COALESCE(vs.skills_text, ''::text) || ' ' ||
-        COALESCE(va.activities_text, ''::text) || ' ' ||
-        COALESCE(vl.languages_text, ''::text) || ' ' ||
-        COALESCE(v.info_about, ''::text) || ' ' ||
-        COALESCE(v.info_experience, ''::text) || ' ' ||
-        COALESCE(pr.info, ''::text) || ' ' ||
-        COALESCE(loc.info, ''::text) || ' ' ||
-        COALESCE(t.info, ''::text)
-    ) AS search_vector
-FROM public.volunteer v
-JOIN public.person p ON ((v.person_id = p.id))
-LEFT JOIN public.deal d ON v.deal_id = d.id
-LEFT JOIN public.profile pr ON d.profile_id = pr.id
-LEFT JOIN public.location loc ON d.location_id = loc.id
-LEFT JOIN public."time" t ON d.time_id = t.id
-LEFT JOIN volunteer_languages vl ON v.id = vl.volunteer_id
-LEFT JOIN volunteer_skills vs ON v.id = vs.volunteer_id
-LEFT JOIN volunteer_activities va ON v.id = va.volunteer_id
-LEFT JOIN volunteer_districts vd ON v.id = vd.volunteer_id
--- 🔑 NEW AVAILABILITY JOIN
-LEFT JOIN volunteer_availability va ON v.id = va.volunteer_id;
+    d.id AS deal_id,
+    v.status_engagement, -- ToR Filter 1
+    v.status_type,       -- ToR Filter 2
+    per.first_name,
+    per.last_name,
+    per.email,
+    per.phone,
+    per.avatar_url,
+    ad.district_ids AS district_ids_array,     -- ToR Filter 3
+    al.language_ids AS language_ids_array,     -- ToR Filter 4
+    -- ToR Filter 4: Checks if German (ISO 'de') is in the language list.
+    (al.language_ids @> ARRAY[(SELECT id FROM public.language WHERE iso_code = 'de' LIMIT 1)]::integer[]) AS has_german_language,
+    -- ToR Filters 5 & 6 (Availability Arrays)
+    (SELECT ARRAY_AGG(x) FROM UNNEST(at.available_days_array_raw) AS x) AS available_days_array,
+    at.available_times_array,
+    at.available_occasional_array,
+    -- ToR Filter 7 (Search Arrays)
+    aa.activity_titles,
+    al.language_titles,
+    ad.district_titles,
+    at.timeslot_data
+FROM
+    public.deal d
+INNER JOIN
+    public.volunteer v ON d.id = v.deal_id
+INNER JOIN
+    public.person per ON v.person_id = per.id
+INNER JOIN
+    public.profile p ON d.profile_id = p.id
+INNER JOIN
+    public.location l ON d.location_id = l.id
+LEFT JOIN AggregatedActivities aa ON d.id = aa.deal_id
+LEFT JOIN AggregatedLanguages al ON d.id = al.deal_id
+LEFT JOIN AggregatedTimeslots at ON d.id = at.deal_id
+LEFT JOIN AggregatedDistricts ad ON d.id = ad.deal_id
+WHERE
+    d.type = 'volunteer'
+WITH DATA;
