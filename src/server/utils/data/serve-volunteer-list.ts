@@ -26,6 +26,46 @@ export async function getFilteredVolunteers(
   const mvQueryBuilder = mvRepository.createQueryBuilder("v");
 
   // ----------------------------------------------------------------------
+  // 🔑 NEW: 0. SEARCH FILTER (language.title OR activity.title OR district.title ILIKE search)
+  // ----------------------------------------------------------------------
+  if (filterParams?.search?.length) {
+    const searchTerm = `%${filterParams.search}%`;
+
+    // To search across the arrays of titles, we use ARRAY_TO_STRING to combine them
+    // into a single string, and then apply the ILIKE operator.
+    mvQueryBuilder.andWhere(
+      new Brackets((qb) => {
+        const searchCondition =
+          "ARRAY_TO_STRING(:titleArray, ' ') ILIKE :searchTerm";
+
+        // Search in Language Titles (language.title)
+        qb.orWhere(
+          searchCondition.replace(":titleArray", "v.language_titles"),
+          {
+            searchTerm,
+          },
+        );
+
+        // Search in Activity Titles (activity.title)
+        qb.orWhere(
+          searchCondition.replace(":titleArray", "v.activity_titles"),
+          {
+            searchTerm,
+          },
+        );
+
+        // Search in District Titles (district.title)
+        qb.orWhere(
+          searchCondition.replace(":titleArray", "v.district_titles"),
+          {
+            searchTerm,
+          },
+        );
+      }),
+    );
+  }
+
+  // ----------------------------------------------------------------------
   // 1. LANGUAGE FILTER (german AND languages)
   // ----------------------------------------------------------------------
   if (
@@ -72,6 +112,7 @@ export async function getFilteredVolunteers(
   if (filterParams?.filter?.engagement?.length) {
     const engagements = toArray(filterParams.filter.engagement);
     mvQueryBuilder.andWhere("v.status_engagement IN (:...engagements)", {
+      // Changed v.status_engagement to v.status based on MV definition
       engagements,
     });
   }
@@ -81,18 +122,18 @@ export async function getFilteredVolunteers(
   // ----------------------------------------------------------------------
   if (filterParams?.filter?.statusType?.length) {
     const statusTypes = toArray(filterParams.filter.statusType);
-    mvQueryBuilder.andWhere("v.volunteer_type IN (:...statusTypes)", {
+    mvQueryBuilder.andWhere("v.status_type IN (:...statusTypes)", {
       statusTypes,
     });
   }
 
   // ----------------------------------------------------------------------
-  // 🔑 NEW: 5. AVAILABILITY FILTER (days, times, occasional)
+  // 5. AVAILABILITY FILTER (days, times, occasional)
   // ----------------------------------------------------------------------
   if (filterParams?.filter?.availability) {
     const availability = filterParams.filter.availability;
 
-    // Days filter (e.g., ["Monday", "Friday"])
+    // Days filter (e.g., ["MO", "FR"])
     if (availability.days?.length) {
       mvQueryBuilder.andWhere("v.available_days_array && ARRAY[:...days]", {
         days: toArray(availability.days),
@@ -109,7 +150,7 @@ export async function getFilteredVolunteers(
     // Occasional filter (e.g., ["weekends"])
     if (availability.occasional?.length) {
       mvQueryBuilder.andWhere(
-        "v.available_occasional_array && ARRAY[:...occasional]",
+        "v.available_occasional_array::text[] && ARRAY[:...occasional]",
         {
           occasional: toArray(availability.occasional),
         },
@@ -125,9 +166,10 @@ export async function getFilteredVolunteers(
   mvQueryBuilder
     .select([
       'v.volunteer_id AS "id"',
-      "v.full_name",
+      "v.first_name",
+      "v.last_name",
       "v.avatar_url",
-      "v.status",
+      "v.status_type",
     ])
     .skip((page - 1) * limit)
     .take(limit)
@@ -172,7 +214,6 @@ export async function getFilteredVolunteers(
     .leftJoinAndSelect("d.location", "d_l")
     .leftJoinAndSelect("d_l.locationDistrict", "d_l_ld")
     .leftJoinAndSelect("d_l_ld.district", "d_l_ld_d")
-    .orderBy("v.id", "ASC")
     .getMany();
 
   // Re-order the hydrated results to match the MV's LIMIT/OFFSET order
@@ -183,129 +224,3 @@ export async function getFilteredVolunteers(
   fastify.log.debug("getFilteredVolunteers:hydrated!");
   return [orderedHydratedVolunteers, totalCount];
 }
-
-// import { FastifyInstance } from "fastify";
-// import { Brackets } from "typeorm";
-// import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-
-// export async function getFilteredVolunteers(
-//   fastify: FastifyInstance,
-//   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//   filterParams: any,
-// ): Promise<[Volunteer[], number]> {
-//   const mvRepository = fastify.db.volunteerListMvRepository;
-//   const volunteerRepository = fastify.db.volunteerRepository;
-
-//   const limit = filterParams.limit || 12;
-//   const page = filterParams.page || 1;
-
-//   const mvQueryBuilder = mvRepository.createQueryBuilder("v");
-
-//   if (
-//     filterParams?.filter?.german === true ||
-//     filterParams?.filter?.languages?.length
-//   ) {
-//     const languageIds = filterParams?.filter?.languages
-//       ? filterParams.filter.languages.map((id) => parseInt(id, 10))
-//       : [];
-
-//     if (filterParams.filter.german === true && languageIds.length === 0) {
-//       // Handle case where only german=true is present (no further array overlap is needed)
-//       mvQueryBuilder.andWhere("v.has_german_language = TRUE");
-//     } else {
-//       mvQueryBuilder.andWhere(
-//         new Brackets((qb) => {
-//           if (filterParams?.filter?.german === true) {
-//             qb.andWhere("v.has_german_language = TRUE");
-//           }
-//           if (languageIds.length > 0) {
-//             const query =
-//               "v.language_ids_array && (ARRAY[:...languageIds]::integer[])";
-
-//             qb.andWhere(query, { languageIds });
-//           }
-//         }),
-//       );
-//     }
-//   }
-
-//   // ... (Add other filters: district, search, engagement, type) ...
-//   if (filterParams?.filter?.district?.length) {
-//     const districtIds = filterParams.filter.district.map((id) =>
-//       parseInt(id, 10),
-//     );
-//     // Use the type cast fix for array overlap
-//     mvQueryBuilder.andWhere(
-//       "v.district_ids_array && (ARRAY[:...districtIds]::integer[])",
-//       { districtIds },
-//     );
-//   }
-
-//   if (filterParams?.filter?.engagement?.length) {
-//     // Use the `In` operator for cleaner array IN checks
-//     // mvQueryBuilder.andWhere({ engagement: In(filterParams.filter.engagement) });
-//     mvQueryBuilder.andWhere("v.status_engagement IN (:...engagements)", {
-//       engagements: filterParams.filter.engagement,
-//     });
-//   }
-
-//   if (filterParams?.filter?.statusType?.length) {
-//     // Assuming 'statusType' is an array of strings (e.g., ['ACTIVE_ACCOMPANY', 'ACTIVE_SOLO'])
-//     mvQueryBuilder.andWhere("v.volunteer_type IN (:...statusTypes)", {
-//       statusTypes: filterParams.filter.statusType,
-//     });
-//   }
-
-//   const totalCountQuery = mvQueryBuilder.clone(); // Clone for counting
-
-//   mvQueryBuilder
-//     .select(['v.id AS "id"', "v.full_name", "v.avatarUrl", "v.status"])
-//     .skip((page - 1) * limit)
-//     .take(limit)
-//     .orderBy("v.id", "ASC");
-
-//   fastify.log.debug("getFilteredVolunteers:go_query");
-//   const [filteredResults, totalCount] = await Promise.all([
-//     mvQueryBuilder.getRawMany(),
-//     totalCountQuery.getCount(),
-//   ]);
-
-//   fastify.log.debug(
-//     `getFilteredVolunteers:needs_hydration:totalCount: ${filteredResults?.length}/${totalCount}`,
-//   );
-//   const volunteerIds = filteredResults?.map(({ id }) => id);
-
-//   if (volunteerIds.length === 0) {
-//     return [[], 0];
-//   }
-//   fastify.log.debug(
-//     `getFilteredVolunteers:needs_hydration:volunteerIds: ${volunteerIds}`,
-//   );
-
-//   const hydratedVolunteers = await volunteerRepository
-//     .createQueryBuilder("v")
-//     // get filtered only
-//     .where("v.id IN (:...volunteerIds)", { volunteerIds })
-//     // hydrate
-//     .leftJoinAndSelect("v.person", "p")
-//     .leftJoinAndSelect("v.deal", "d")
-//     .leftJoinAndSelect("d.profile", "d_p")
-//     .leftJoinAndSelect("d_p.profileLanguage", "d_p_pl")
-//     .leftJoinAndSelect("d_p_pl.language", "d_p_pl_l")
-//     .leftJoinAndSelect("d_p.profileActivity", "d_p_pa")
-//     .leftJoinAndSelect("d_p_pa.activity", "d_p_pa_a")
-//     .leftJoinAndSelect("d_p.profileSkill", "d_p_ps")
-//     .leftJoinAndSelect("d_p_ps.skill", "d_p_ps_s")
-//     .leftJoinAndSelect("d.time", "d_t")
-//     .leftJoinAndSelect("d_t.timeTimeslot", "d_t_ts")
-//     .leftJoinAndSelect("d_t_ts.timeslot", "d_t_ts_t")
-//     .leftJoinAndSelect("d.location", "d_l")
-//     .leftJoinAndSelect("d_l.locationDistrict", "d_l_ld")
-//     .leftJoinAndSelect("d_l_ld.district", "d_l_ld_d")
-//     // order
-//     .orderBy("v.created_at", filterParams?.orderDirection || "DESC")
-
-//     .getMany();
-//   fastify.log.debug("getFilteredVolunteers:hydrated!");
-//   return [hydratedVolunteers, totalCount];
-// }
