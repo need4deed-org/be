@@ -4,7 +4,9 @@ import {
   EntityTableName,
   Lang,
   OptionItem,
+  SortOrder,
   VolunteerPatchBodyData,
+  VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
@@ -22,6 +24,7 @@ import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/seeds/utils";
 import { volunteerSerializer } from "../../../services";
+import { tryCatch } from "../../../services/utils";
 import {
   getEmptyPropsNull,
   getNullFromEmptyArray,
@@ -495,4 +498,204 @@ export async function fetchVolunteerById(
   const data = volunteerSerializer(volunteer, comments, timedEvents);
 
   return data;
+}
+
+export async function getGerman(): Promise<Language> {
+  const languageRepository = getRepository(dataSource, Language);
+  const [german] = await tryCatch(
+    languageRepository.findOne({ where: { isoCode: "de" } }),
+  );
+
+  return german;
+}
+
+export async function fetchVolunteers({
+  skip,
+  take,
+  german,
+  orderDirection,
+}: {
+  skip: number;
+  take: number;
+  german: boolean;
+  orderDirection: "ASC" | "DESC" | null;
+}): Promise<[Volunteer[], number]> {
+  const volunteerRepository = getRepository(dataSource, Volunteer);
+  let volunteersQuery = await volunteerRepository
+    // Start the query with the Volunteer entity, aliased as 'volunteer'
+    .createQueryBuilder("volunteer")
+    // 1. Join to the 'person' relation from Volunteer
+    .leftJoinAndSelect("volunteer.person", "person")
+    .leftJoinAndSelect("person.address", "address")
+    .leftJoinAndSelect("address.postcode", "address_postcode")
+    // 2. Join to the 'deal' relation from Volunteer
+    .leftJoinAndSelect("volunteer.deal", "deal")
+    // Joins under 'deal'
+    .leftJoinAndSelect("deal.postcode", "deal_postcode") // Directly on deal, not person
+    // Joins for 'deal.profile' and its deep relations
+    .leftJoinAndSelect("deal.profile", "profile")
+    .leftJoinAndSelect("profile.profileActivity", "profileActivity")
+    .leftJoinAndSelect("profileActivity.activity", "activity")
+    .leftJoinAndSelect("profile.profileSkill", "profileSkill")
+    .leftJoinAndSelect("profileSkill.skill", "skill")
+    .leftJoinAndSelect("profile.profileLanguage", "profileLanguage")
+    // .leftJoinAndSelect("profileLanguage.language", "language")
+    // Joins for 'deal.time' and its deep relations
+    .leftJoinAndSelect("deal.time", "time")
+    .leftJoinAndSelect("time.timeTimeslot", "timeTimeslot")
+    .leftJoinAndSelect("timeTimeslot.timeslot", "timeslot")
+    // Joins for 'deal.location' and its deep relations
+    .leftJoinAndSelect("deal.location", "location")
+    .leftJoinAndSelect("location.locationPostcode", "locationPostcode")
+    .leftJoinAndSelect("locationPostcode.postcode", "location_postcode")
+    .leftJoinAndSelect("location.locationDistrict", "locationDistrict")
+    .leftJoinAndSelect("locationDistrict.district", "district")
+    .leftJoinAndSelect("location.locationAddress", "locationAddress")
+    .leftJoinAndSelect("locationAddress.address", "locationAddress_address")
+    .leftJoinAndSelect(
+      "locationAddress_address.postcode",
+      "locationAddress_address_postcode",
+    );
+
+  if (german) {
+    volunteersQuery = volunteersQuery
+      .innerJoin("profileLanguage.language", "with_de_language")
+      .andWhere("with_de_language.isoCode = :isoCode", {
+        isoCode: "de",
+      });
+  }
+
+  volunteersQuery = volunteersQuery
+    .leftJoinAndSelect("profile.profileLanguage", "allProfileLanguages")
+    .leftJoinAndSelect("allProfileLanguages.language", "allLanguages");
+  // Use .distinct(true) to prevent duplication caused by the joins
+  // .distinct(true);
+
+  if (orderDirection) {
+    volunteersQuery = volunteersQuery.orderBy(
+      "volunteer.createdAt",
+      orderDirection,
+    );
+  }
+
+  const volunteersPaginatedAndCount = volunteersQuery
+    .skip(skip)
+    .take(take)
+    .getManyAndCount();
+
+  if ((await volunteersPaginatedAndCount)[1] <= skip) {
+    throw new Error("Invalid page number.");
+  }
+
+  return volunteersPaginatedAndCount;
+}
+
+function getAvailabilityForFiltering(
+  availabilityQueryParam: string[] | undefined,
+) {
+  if (!availabilityQueryParam?.length) {
+    return;
+  }
+  const availabilityForFiltering = availabilityQueryParam.reduce(
+    (acc, curr) => {
+      const [key, value] = curr.split("~");
+      switch (key) {
+        case "days":
+          acc.days.push(value);
+          break;
+        case "times":
+          acc.times.push(value);
+          break;
+        case "occasional":
+          acc.occasional.push(value);
+          break;
+      }
+      return acc;
+    },
+    { days: [], times: [], occasional: [] },
+  );
+
+  return availabilityForFiltering;
+}
+
+type InputQuery = { [key: string]: string | string[] };
+
+export function parseQueryParams(rawQuery: InputQuery) {
+  const filter: {
+    [key: string]: any;
+  } = {};
+
+  // 1. Reconstruct the nested 'filter' object
+  for (const key in rawQuery) {
+    if (key.startsWith("filter[")) {
+      // Extracts the inner key, e.g., "district" from "filter[district][0]"
+      const match = key.match(/filter\[(\w+)\]/);
+      if (match) {
+        const filterKey = match[1];
+        const value = rawQuery[key];
+
+        // Check for array-like keys (e.g., "filter[district][0]")
+        if (
+          key.match(/\[\d+\]$/) ||
+          [
+            "district",
+            "language",
+            "engagement",
+            "availability",
+            "statusType",
+          ].includes(filterKey)
+        ) {
+          // Extract the index and ensure the value is added to an array
+          if (!filter[filterKey]) {
+            filter[filterKey] = [];
+          }
+          // This is simple for demonstration; a robust parser should handle indices
+          filter[filterKey].push(value);
+        } else {
+          // Handle simple filter properties (search, accompanying, german)
+          filter[filterKey] = value;
+        }
+      }
+      // Remove the processed filter keys from the root object
+      // This is implicitly handled by not processing them further, but a robust
+      // function might delete them from a copy.
+    }
+  }
+
+  // 2. Type Conversion and Final Structure
+  return {
+    limit: parseInt(rawQuery.limit as string, 10) || 0,
+    page: parseInt(rawQuery.page as string, 10) || 1,
+    orderDirection: getOrderDirection(rawQuery.sortOrder as SortOrder),
+    language: rawQuery.language as string,
+    filter: {
+      accompanying: getPositive(filter.accompanying as string)
+        ? VolunteerStateTypeType.ACCOMPANYING
+        : undefined,
+      german: getPositive(filter.german as string),
+      // Simple string properties
+      search: filter.search,
+
+      // Array properties
+      district: filter.district as string[],
+      languages: filter.language as string[],
+      statusType: filter.statusType as string[],
+      engagement: filter.engagement as string[],
+      availability: getAvailabilityForFiltering(filter.availability),
+    },
+  };
+}
+
+function getPositive(arg: string): boolean {
+  return (arg ?? false) !== false && arg !== "0"; // makes "" positive while "0" negative
+}
+
+export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
+  if (orderDirection === SortOrder.NewToOld) {
+    return "DESC";
+  }
+  if (orderDirection === SortOrder.OldToNew) {
+    return "ASC";
+  }
+  return null;
 }

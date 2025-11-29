@@ -21,6 +21,12 @@
         "statusType": {
           "$ref": "VolunteerStateType#"
         },
+        "stateEngagement": {
+          "$ref": "VolunteerStateEngagementType#"
+        },
+        "stateType": {
+          "$ref": "VolunteerStateTypeType#"
+        },
         "languages": {
           "type": "array",
           "items": {
