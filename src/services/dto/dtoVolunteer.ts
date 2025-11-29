@@ -1,5 +1,6 @@
 import {
   Address,
+  ApiPersonGet,
   ApiVolunteerGet,
   ApiVolunteerGetList,
   Availability,
@@ -10,7 +11,6 @@ import {
   OptionItem,
   TimedText,
 } from "need4deed-sdk";
-import { ApiPersonGet } from "need4deed-sdk/dist/types/api/person";
 import Comment from "../../data/entity/comment.entity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
@@ -40,6 +40,15 @@ export function volunteerListSerializer(
       volunteer.deal.location?.locationDistrict,
       "district",
     );
+    // const activities = getOptionItems(
+    //   volunteer.deal.profile.profileActivity,
+    //   "activity",
+    // );
+    // const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
+    // const locations = getOptionItems(
+    //   volunteer.deal.location.locationDistrict,
+    //   "district",
+    // );
     return {
       id,
       statusEngagement,
@@ -119,6 +128,7 @@ export function volunteerSerializer(
     volunteer.deal.location.locationDistrict,
     "district",
   );
+
   const languages = getLanguages(volunteer.deal.profile.profileLanguage);
   const availability = getAvailability(volunteer.deal.time.timeTimeslot);
 
