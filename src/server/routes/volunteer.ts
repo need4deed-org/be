@@ -101,7 +101,7 @@ async function volunteerRoutes(
       const id = Number(request.params.id);
       if (isNaN(id)) {
         fastify.log.error(`${id} is not a valid id.`);
-        reply.status(400).send({ message: `${id} is not a valid id.` });
+        return reply.status(400).send({ message: `${id} is not a valid id.` });
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
