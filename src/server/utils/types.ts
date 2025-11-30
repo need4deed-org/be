@@ -7,3 +7,10 @@ export type ExtendWithEnumValues<
   E extends Record<string, string>,
   V = string,
 > = Base & { [K in E[keyof E]]: V };
+
+type Primitive = string | number | boolean | null | undefined;
+
+// The core recursive type alias
+export type DeeplyNestedObject = {
+  [key: string]: Primitive | DeeplyNestedObject | DeeplyNestedObject[];
+};

@@ -4,7 +4,9 @@ import {
   EntityTableName,
   Lang,
   OptionItem,
+  SortOrder,
   VolunteerPatchBodyData,
+  VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
@@ -22,6 +24,7 @@ import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/seeds/utils";
 import { volunteerSerializer } from "../../../services";
+import { tryCatch } from "../../../services/utils";
 import {
   getEmptyPropsNull,
   getNullFromEmptyArray,
@@ -495,4 +498,123 @@ export async function fetchVolunteerById(
   const data = volunteerSerializer(volunteer, comments, timedEvents);
 
   return data;
+}
+
+export async function getGerman(): Promise<Language> {
+  const languageRepository = getRepository(dataSource, Language);
+  const [german] = await tryCatch(
+    languageRepository.findOne({ where: { isoCode: "de" } }),
+  );
+
+  return german;
+}
+
+function getAvailabilityForFiltering(
+  availabilityQueryParam: string[] | undefined,
+) {
+  if (!availabilityQueryParam?.length) {
+    return;
+  }
+  const availabilityForFiltering = availabilityQueryParam.reduce(
+    (acc, curr) => {
+      const [key, value] = curr.split("~");
+      switch (key) {
+        case "days":
+          acc.days.push(value);
+          break;
+        case "times":
+          acc.times.push(value);
+          break;
+        case "occasional":
+          acc.occasional.push(value);
+          break;
+      }
+      return acc;
+    },
+    { days: [], times: [], occasional: [] },
+  );
+
+  return availabilityForFiltering;
+}
+
+type InputQuery = { [key: string]: string | string[] };
+
+export function parseQueryParams(rawQuery: InputQuery) {
+  const filter: {
+    [key: string]: any;
+  } = {};
+
+  // 1. Reconstruct the nested 'filter' object
+  for (const key in rawQuery) {
+    if (key.startsWith("filter[")) {
+      // Extracts the inner key, e.g., "district" from "filter[district][0]"
+      const match = key.match(/filter\[(\w+)\]/);
+      if (match) {
+        const filterKey = match[1];
+        const value = rawQuery[key];
+
+        // Check for array-like keys (e.g., "filter[district][0]")
+        if (
+          key.match(/\[\d+\]$/) ||
+          [
+            "district",
+            "language",
+            "engagement",
+            "availability",
+            "statusType",
+          ].includes(filterKey)
+        ) {
+          // Extract the index and ensure the value is added to an array
+          if (!filter[filterKey]) {
+            filter[filterKey] = [];
+          }
+          // This is simple for demonstration; a robust parser should handle indices
+          filter[filterKey].push(value);
+        } else {
+          // Handle simple filter properties (search, accompanying, german)
+          filter[filterKey] = value;
+        }
+      }
+      // Remove the processed filter keys from the root object
+      // This is implicitly handled by not processing them further, but a robust
+      // function might delete them from a copy.
+    }
+  }
+
+  // 2. Type Conversion and Final Structure
+  return {
+    limit: parseInt(rawQuery.limit as string, 10) || 0,
+    page: parseInt(rawQuery.page as string, 10) || 1,
+    orderDirection: getOrderDirection(rawQuery.sortOrder as SortOrder),
+    language: rawQuery.language as string,
+    filter: {
+      accompanying: getPositive(filter.accompanying as string)
+        ? VolunteerStateTypeType.ACCOMPANYING
+        : undefined,
+      german: getPositive(filter.german as string),
+      // Simple string properties
+      search: filter.search,
+
+      // Array properties
+      district: filter.district as string[],
+      languages: filter.language as string[],
+      statusType: filter.statusType as string[],
+      engagement: filter.engagement as string[],
+      availability: getAvailabilityForFiltering(filter.availability),
+    },
+  };
+}
+
+function getPositive(arg: string): boolean {
+  return (arg ?? false) !== false && arg !== "0"; // makes "" positive while "0" negative
+}
+
+export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
+  if (orderDirection === SortOrder.NewToOld) {
+    return "DESC";
+  }
+  if (orderDirection === SortOrder.OldToNew) {
+    return "ASC";
+  }
+  return null;
 }

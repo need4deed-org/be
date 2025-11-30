@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+ 
 import { JWT } from "@fastify/jwt";
 import "fastify";
 import { onRequestHookHandler } from "fastify";
