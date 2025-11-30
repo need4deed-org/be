@@ -5,7 +5,6 @@ import {
   ApiVolunteerGetList,
   Lang,
   QueryParamsKeys,
-  SortOrder,
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
@@ -27,20 +26,18 @@ import {
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import {
-  addTranslatedFields,
   EnumValuesMap,
   fetchVolunteerById,
   getFilteredVolunteers,
   getLanguageCode,
   getPatchData,
+  parseQueryParams,
   patchAddress,
   patchEntity,
   updateOptionList,
 } from "../utils";
 import { updateLeads } from "../utils/updateLeads";
 import { writeVolunteer } from "../utils/writeVolunteer";
-
-const defaultTake = 12;
 
 async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -134,61 +131,6 @@ async function volunteerRoutes(
       data?: Array<ApiVolunteerGetList>;
     };
   }>(
-    `${prefixedPath}/mv`,
-    {
-      schema: {
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              count: { type: "number" },
-              // data: { type: "array" },
-              data: { type: "array", items: { $ref: "volunteer-api#" } },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
-      },
-      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
-    },
-    async (request, reply) => {
-      try {
-        // Extract filter parameters from query string (or request body/params)
-        const filterParams = {
-          page: 2,
-          filter: { german: true },
-          orderDirection: "ASC",
-        };
-
-        const [volunteers, count] = await getFilteredVolunteers(
-          fastify,
-          filterParams,
-        );
-
-        const data = serialize(volunteers, volunteerListSerializer);
-
-        reply.status(200).send({
-          message: `Volunteers page ${1}`,
-          count,
-          data,
-        });
-      } catch (error) {
-        fastify.log.error(`Error fetching volunteers: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
-      }
-    },
-  );
-
-  fastify.get<{
-    Querystring: EnumValuesMap<typeof QueryParamsKeys>;
-    Reply: {
-      message: string;
-      count?: number;
-      data?: Array<ApiVolunteerGetList>;
-    };
-  }>(
     prefixedPath,
     {
       schema: {
@@ -208,42 +150,63 @@ async function volunteerRoutes(
       onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
     },
     async (request, reply) => {
-      const page = Math.abs(parseInt(request.query.page)) || 1;
-      const take = Math.abs(parseInt(request.query.limit)) || defaultTake;
-      const skip = (page - 1) * take;
-
-      let orderDirection: "DESC" | "ASC";
-      if (request.query.order === SortOrder.NewToOld) {
-        orderDirection = "DESC";
-      }
-      if (request.query.order === SortOrder.OldToNew) {
-        orderDirection = "ASC";
-      }
-
-      const isoCode = getLanguageCode(request.query.language) || Lang.DE;
-
       try {
-        const volunteerRepository = fastify.db.volunteerRepository;
+        const {
+          page,
+          limit,
+          orderDirection,
+          language,
+          filter: {
+            accompanying,
+            german,
+            search,
+            district,
+            languages,
+            statusType,
+            engagement,
+            availability,
+          },
+        } = parseQueryParams(request.query);
+        fastify.log.debug(
+          `GET /volunteer parsed: ${JSON.stringify({
+            page,
+            limit,
+            orderDirection,
+            language,
+            filter: {
+              accompanying,
+              german,
+              search,
+              district,
+              languages,
+              statusType,
+              engagement,
+              availability,
+            },
+          })}`,
+        );
 
-        const [volunteers, count] = await volunteerRepository.findAndCount({
-          skip,
-          take,
-          relations,
-          ...(orderDirection
-            ? {
-                order: {
-                  createdAt: orderDirection,
-                },
-              }
-            : {}),
+        const [volunteers, count] = await getFilteredVolunteers(fastify, {
+          page,
+          limit,
+          orderDirection,
+          language,
+          filter: {
+            accompanying,
+            german,
+            search,
+            district,
+            languages,
+            statusType,
+            engagement,
+            availability,
+          },
         });
-
-        await addTranslatedFields(volunteers, isoCode);
 
         const data = serialize(volunteers, volunteerListSerializer);
 
-        return reply.status(200).send({
-          message: `Volunteers page ${page}`,
+        reply.status(200).send({
+          message: `Volunteers page ${1}`,
           count,
           data,
         });
