@@ -502,9 +502,13 @@ export async function fetchVolunteerById(
 
 export async function getGerman(): Promise<Language> {
   const languageRepository = getRepository(dataSource, Language);
-  const [german] = await tryCatch(
+  const [german, error] = await tryCatch(
     languageRepository.findOne({ where: { isoCode: "de" } }),
   );
+
+  if (error) {
+    dataSource.logger.log("warn", `Error fetching German language: ${error}`);
+  }
 
   return german;
 }
@@ -541,7 +545,7 @@ type InputQuery = { [key: string]: string | string[] };
 
 export function parseQueryParams(rawQuery: InputQuery) {
   const filter: {
-    [key: string]: any;
+    [key: string]: unknown;
   } = {};
 
   // 1. Reconstruct the nested 'filter' object
@@ -569,15 +573,12 @@ export function parseQueryParams(rawQuery: InputQuery) {
             filter[filterKey] = [];
           }
           // This is simple for demonstration; a robust parser should handle indices
-          filter[filterKey].push(value);
+          (filter[filterKey] as unknown[]).push(value);
         } else {
           // Handle simple filter properties (search, accompanying, german)
           filter[filterKey] = value;
         }
       }
-      // Remove the processed filter keys from the root object
-      // This is implicitly handled by not processing them further, but a robust
-      // function might delete them from a copy.
     }
   }
 
@@ -586,7 +587,7 @@ export function parseQueryParams(rawQuery: InputQuery) {
     limit: parseInt(rawQuery.limit as string, 10) || 0,
     page: parseInt(rawQuery.page as string, 10) || 1,
     orderDirection: getOrderDirection(rawQuery.sortOrder as SortOrder),
-    language: rawQuery.language as string,
+    language: rawQuery.language,
     filter: {
       accompanying: getPositive(filter.accompanying as string)
         ? VolunteerStateTypeType.ACCOMPANYING
@@ -600,7 +601,9 @@ export function parseQueryParams(rawQuery: InputQuery) {
       languages: filter.language as string[],
       statusType: filter.statusType as string[],
       engagement: filter.engagement as string[],
-      availability: getAvailabilityForFiltering(filter.availability),
+      availability: getAvailabilityForFiltering(
+        filter.availability as string[],
+      ),
     },
   };
 }
@@ -616,5 +619,10 @@ export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
   if (orderDirection === SortOrder.OldToNew) {
     return "ASC";
   }
-  return null;
+
+  dataSource.logger.log(
+    "warn",
+    `Unknown sort order: ${orderDirection}, defaulting to DESC`,
+  );
+  return "DESC";
 }
