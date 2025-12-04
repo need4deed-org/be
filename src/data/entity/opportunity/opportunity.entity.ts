@@ -5,10 +5,11 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
 import Deal from "../deal.entity";
+import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Agent from "./agent.entity";
 
 @Entity()
@@ -71,4 +72,10 @@ export default class Opportunity {
 
   @Column({ nullable: true })
   agentId: number;
+
+  @OneToMany(
+    () => OpportunityVolunteer,
+    (opportunityVolunteer) => opportunityVolunteer.opportunity,
+  )
+  opportunityVolunteer: OpportunityVolunteer[];
 }
