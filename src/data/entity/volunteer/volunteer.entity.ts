@@ -9,15 +9,16 @@ import {
   VolunteerStateType,
   VolunteerStateTypeType,
 } from "need4deed-sdk";
-
 import {
   Column,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
 import Deal from "../deal.entity";
+import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
 
 @Entity()
@@ -132,4 +133,10 @@ export default class Volunteer {
 
   @Column({ nullable: true })
   personId: number;
+
+  @OneToMany(
+    () => OpportunityVolunteer,
+    (opportunityVolunteer) => opportunityVolunteer.volunteer,
+  )
+  opportunityVolunteer: OpportunityVolunteer[];
 }
