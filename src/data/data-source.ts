@@ -16,6 +16,7 @@ import DistrictPostcode from "./entity/m2m/district-postcode";
 import LocationAddress from "./entity/m2m/location-address";
 import LocationDistrict from "./entity/m2m/location-district";
 import LocationPostcode from "./entity/m2m/location-postcode";
+import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import ProfileActivity from "./entity/m2m/profile-activity";
 import ProfileLanguage from "./entity/m2m/profile-language";
 import ProfileSkill from "./entity/m2m/profile-skill";
@@ -70,6 +71,7 @@ export const AppDataSource = new DataSource({
     LocationDistrict,
     LocationPostcode,
     Opportunity,
+    OpportunityVolunteer,
     Organization,
     Person,
     Profile,
