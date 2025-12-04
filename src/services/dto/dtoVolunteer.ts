@@ -115,8 +115,9 @@ export function volunteerSerializer(
   const infoAbout = volunteer.infoAbout;
   const infoExperience = volunteer.infoExperience;
   const measlesVaccination = volunteer.statusVaccination;
-  const opportunitiesApplied = [] as unknown as OptionItem[];
-  const opportunitiesMatched = [] as unknown as OptionItem[];
+  const opportunities = [];
+  const opportunitiesApplied = [];
+  const opportunitiesMatched = [];
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
   const activities = getOptionItems(
@@ -147,6 +148,7 @@ export function volunteerSerializer(
     infoAbout,
     infoExperience,
     measlesVaccination,
+    opportunities,
     opportunitiesApplied,
     opportunitiesMatched,
     timelineLogs,
