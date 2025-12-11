@@ -42,3 +42,9 @@ export enum AgentType {
   RAC = "RAC",
   NGO = "NGO",
 }
+
+export enum ConfigType {
+  SCHEMA = "schema",
+  REFERENCE_DATA = "reference_data",
+  MASTER_DATA = "master_data",
+}
