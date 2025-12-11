@@ -398,7 +398,7 @@ CREATE TABLE public.config (
     config_key public.config_type_enum NOT NULL,
     config_value character varying,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
 
 
@@ -418,6 +418,12 @@ CREATE SEQUENCE public.config_id_seq
 
 
 ALTER SEQUENCE public.config_id_seq OWNER TO postgres;
+
+--
+-- Name: activity_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.config_id_seq OWNED BY public.config.id;
 
 --
 -- Name: activity; Type: TABLE; Schema: public; Owner: postgres
@@ -1790,6 +1796,13 @@ CREATE MATERIALIZED VIEW public.volunteer_list_mv AS
 
 
 ALTER MATERIALIZED VIEW public.volunteer_list_mv OWNER TO postgres;
+
+--
+-- Name: config id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.config ALTER COLUMN id SET DEFAULT nextval('public.config_id_seq'::regclass);
+
 
 --
 -- Name: activity id; Type: DEFAULT; Schema: public; Owner: postgres
