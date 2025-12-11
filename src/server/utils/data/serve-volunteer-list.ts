@@ -166,8 +166,7 @@ export async function getFilteredVolunteers(
   mvQueryBuilder
     .select([
       'v.volunteer_id AS "id"',
-      "v.first_name",
-      "v.last_name",
+      'v.full_name AS "name"',
       "v.avatar_url",
       "v.status_type",
     ])
