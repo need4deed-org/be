@@ -12,6 +12,8 @@ else
     echo "Importing database schema..."
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/schema.sql
 
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -tAc "INSERT INTO public.config (config_key, config_value) VALUES ('schema', 'true');"
+
     if [ $? -eq 0 ]; then
         echo "Database import completed successfully"
     
@@ -34,6 +36,7 @@ PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}"
 
 if [ $? -eq 0 ]; then
     echo "Database import completed successfully"
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -tAc "INSERT INTO public.config (config_key, config_value) VALUES ('reference_data', 'true');"
   
 else
     echo "Import failed"
