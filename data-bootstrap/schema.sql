@@ -21,11 +21,22 @@ SET row_security = off;
 -- Name: agent_type_enum; Type: TYPE; Schema: public; Owner: postgres
 --
 
+CREATE TYPE public.config_type_enum AS ENUM (
+    'schema',
+    'reference_data',
+    'master_data'
+);
+
+ALTER TYPE public.config_type_enum OWNER TO postgres;
+
+--
+-- Name: agent_type_enum; Type: TYPE; Schema: public; Owner: postgres
+--
+
 CREATE TYPE public.agent_type_enum AS ENUM (
     'RAC',
     'NGO'
 );
-
 
 ALTER TYPE public.agent_type_enum OWNER TO postgres;
 
@@ -377,6 +388,42 @@ ALTER TYPE public.volunteer_status_vaccination_enum OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: config; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.config (
+    id integer NOT NULL,
+    config_key public.config_type_enum NOT NULL,
+    config_value character varying,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.config OWNER TO postgres;
+
+--
+-- Name: config_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.config_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.config_id_seq OWNER TO postgres;
+
+--
+-- Name: activity_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.config_id_seq OWNED BY public.config.id;
 
 --
 -- Name: activity; Type: TABLE; Schema: public; Owner: postgres
@@ -1749,6 +1796,13 @@ CREATE MATERIALIZED VIEW public.volunteer_list_mv AS
 
 
 ALTER MATERIALIZED VIEW public.volunteer_list_mv OWNER TO postgres;
+
+--
+-- Name: config id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.config ALTER COLUMN id SET DEFAULT nextval('public.config_id_seq'::regclass);
+
 
 --
 -- Name: activity id; Type: DEFAULT; Schema: public; Owner: postgres
