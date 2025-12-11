@@ -2,6 +2,15 @@
 
 set -e
 
+# Check if database is already bootstrapped by checking for a marker table
+echo "Checking if database is already bootstrapped..."
+BOOTSTRAPPED=$(PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -tAc "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='person')")
+
+if [ "$BOOTSTRAPPED" = "t" ]; then
+    echo "Database already bootstrapped, skipping import..."
+    exit 0
+fi
+
 echo "Importing database schema..."
 PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/schema.sql
 
