@@ -1,1 +1,0 @@
-SELECT 1 FROM pg_matviews WHERE matviewname = 'volunteer_list_mv';
