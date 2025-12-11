@@ -92,6 +92,7 @@ SELECT
     per.email,
     per.phone,
     per.avatar_url,
+    CONCAT_WS(' ', NULLIF(TRIM(per.first_name), ''), NULLIF(TRIM(per.last_name), '')) AS full_name,
     ad.district_ids AS district_ids_array,     -- ToR Filter 3
     al.language_ids AS language_ids_array,     -- ToR Filter 4
     -- ToR Filter 4: Checks if German (ISO 'de') is in the language list.
