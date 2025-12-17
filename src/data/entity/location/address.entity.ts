@@ -33,6 +33,11 @@ export default class Address {
   @Length(200)
   street: string;
 
+  @Column({ nullable: true })
+  @IsString()
+  @Length(100)
+  city: string;
+
   @ManyToOne(() => Postcode, (postcode) => postcode.address, {
     onDelete: "CASCADE",
   })
