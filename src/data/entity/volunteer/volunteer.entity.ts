@@ -1,6 +1,7 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
 import {
   DocumentStatusType,
+  VolunteerCommunicationType,
   VolunteerStateAppreciationType,
   VolunteerStateCGCType,
   VolunteerStateCommunicationType,
@@ -113,6 +114,14 @@ export default class Volunteer {
   })
   @IsEnum(DocumentStatusType)
   statusCGC: DocumentStatusType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerCommunicationType,
+    default: VolunteerCommunicationType.MOBILE_PHONE,
+  })
+  @IsEnum(VolunteerCommunicationType)
+  preferredCommunicationType: VolunteerCommunicationType;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
