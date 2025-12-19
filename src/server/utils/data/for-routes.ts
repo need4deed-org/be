@@ -422,7 +422,7 @@ export async function updateOptionList<
   } = getVolunteerRelationsAndIdFieldName(m2mEntity.name);
 
   try {
-    dataSource.transaction(async (manager) => {
+    await dataSource.transaction(async (manager) => {
       const volunteerRepository = getRepository(
         manager as unknown as DataSource,
         Volunteer,
@@ -431,9 +431,11 @@ export async function updateOptionList<
         where: { id: volunteerId },
         relations,
       });
+
       if (!volunteer) {
-        return false;
+        throw new Error(`Volunteer ${volunteerId} not found`);
       }
+
       const m2mRepository = getRepository(
         manager as unknown as DataSource,
         m2mEntity,
@@ -442,7 +444,7 @@ export async function updateOptionList<
       const where = {
         [hostId]: volunteer.deal[host].id,
       } as FindOptionsWhere<M>;
-      dataSource.logger.log("log", `DEBUG:where: ${JSON.stringify(where)}`);
+
       const currentList = await m2mRepository.find({ where });
       if (currentList.length > 0) {
         await m2mRepository.delete(currentList.map(({ id }) => id));
@@ -463,6 +465,8 @@ export async function updateOptionList<
 
       await m2mRepository.save(newList);
     });
+
+    return true;
   } catch (error) {
     dataSource.logger.log(
       "warn",
@@ -470,8 +474,6 @@ export async function updateOptionList<
     );
     return false;
   }
-
-  return true;
 }
 
 export async function fetchVolunteerById(
