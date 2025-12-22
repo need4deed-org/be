@@ -7,7 +7,7 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": ["string", "number"]
         },
         "person": {
           "$ref": "ApiPersonGet#"
@@ -76,6 +76,12 @@
         },
         "measlesVaccination": {
           "$ref": "DocumentStatusType#"
+        },
+        "preferredCommunicationType": {
+          "type": "array",
+          "items": {
+            "$ref": "VolunteerCommunicationType#"
+          }
         },
         "infoAbout": {
           "type": "string"

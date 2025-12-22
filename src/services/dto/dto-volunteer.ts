@@ -40,15 +40,7 @@ export function volunteerListSerializer(
       volunteer.deal.location?.locationDistrict,
       "district",
     );
-    // const activities = getOptionItems(
-    //   volunteer.deal.profile.profileActivity,
-    //   "activity",
-    // );
-    // const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
-    // const locations = getOptionItems(
-    //   volunteer.deal.location.locationDistrict,
-    //   "district",
-    // );
+
     return {
       id,
       statusEngagement,
@@ -111,6 +103,7 @@ export function volunteerSerializer(
     avatarUrl: volunteer.person?.avatarUrl || null,
     address,
   };
+  const preferredCommunicationType = volunteer.preferredCommunicationType;
   const goodConductCertificate = volunteer.statusCGC;
   const infoAbout = volunteer.infoAbout;
   const infoExperience = volunteer.infoExperience;
@@ -143,6 +136,7 @@ export function volunteerSerializer(
     statusType: volunteer.statusType,
     statusMatch: volunteer.statusMatch,
     statusCgcProcess: volunteer.statusCgcProcess,
+    preferredCommunicationType,
     comments,
     goodConductCertificate,
     infoAbout,
