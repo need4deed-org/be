@@ -17,6 +17,7 @@
             "activities",
             "locations",
             "skills",
+            "preferredCommunicationType",
             "comments",
             "goodConductCertificate",
             "infoAbout",
