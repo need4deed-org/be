@@ -116,12 +116,15 @@ export default class Volunteer {
   statusCGC: DocumentStatusType;
 
   @Column({
-    type: "enum",
-    enum: VolunteerCommunicationType,
-    default: VolunteerCommunicationType.MOBILE_PHONE,
+    type: "text",
+    array: true,
+    default: () => `ARRAY['mobilePhone']`,
+    transformer: {
+      to: (value: VolunteerCommunicationType[]) => value,
+      from: (value: unknown) => value as VolunteerCommunicationType[],
+    },
   })
-  @IsEnum(VolunteerCommunicationType)
-  preferredCommunicationType: VolunteerCommunicationType;
+  preferredCommunicationType: VolunteerCommunicationType[];
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
