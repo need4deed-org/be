@@ -67,6 +67,11 @@
         "applied_n4d"
       ]
     },
+    "VolunteerCommunicationType": {
+      "$id": "VolunteerCommunicationType",
+      "type": "string",
+      "enum": ["email", "mobilePhone", "whatsapp", "telegram"]
+    },
     "TimedText": {
       "$id": "TimedText",
       "type": "object",
