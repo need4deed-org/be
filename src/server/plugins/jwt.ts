@@ -1,7 +1,6 @@
 import fastifyJwt from "@fastify/jwt";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
-
 import { accessCookieName, cookieOptions } from "../../config/constants";
 import { Role } from "../../data/types";
 import { AuthOptions } from "../types";
@@ -23,13 +22,13 @@ async function jwtPlugin(
       try {
         try {
           await request.jwtVerify();
-        } catch (error) {
+        } catch (_error) {
           reply.status(401);
           throw new Error("Authorization failed.");
         }
 
         const userId = request.user?.id;
-        fastify.log.debug(`jwtPlugin:authenticated: ${userId}}`);
+        fastify.log.debug(`jwtPlugin:authenticated: ${userId}`);
 
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
