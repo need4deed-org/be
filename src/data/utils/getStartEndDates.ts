@@ -9,7 +9,7 @@ export function getStartEndDates(
     endHour < 0 &&
     endHour > 24
   ) {
-    throw new Error("Invalid hours");
+    return null;
   }
   const start = new Date("2024-01-01");
   start.setHours(startHour, 0, 0, 0);
@@ -32,6 +32,10 @@ export function getStartEnd(
     "14:00 - 16:00": { startHour: 14, endHour: 17 }, // 14-17
     "16:00 - 18:00": { startHour: 14, endHour: 17 }, // 14-17
     "18:00 - 20:00": { startHour: 17, endHour: 20 }, // 17-20
+    "8:00-11:00": { startHour: 8, endHour: 11 },
+    "11:00-14:00": { startHour: 11, endHour: 14 },
+    "14:00-17:00": { startHour: 14, endHour: 17 },
+    "17:00-20:00": { startHour: 14, endHour: 17 },
     "08-11": { startHour: 8, endHour: 11 }, // 8-11
     "14-17": { startHour: 14, endHour: 17 }, // 14-17
     "17-20": { startHour: 17, endHour: 20 }, // 17-20
