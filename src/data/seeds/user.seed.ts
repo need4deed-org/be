@@ -1,10 +1,9 @@
+import { UserRole } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-
 import Address from "../entity/location/address.entity";
 import Postcode from "../entity/location/postcode.entity";
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
-import { Role } from "../types";
 import { hashPassword } from "../utils";
 import { getCount, getRepository } from "./utils";
 
@@ -28,7 +27,7 @@ export async function seedUser(dataSource: DataSource) {
   const userAdmin = new User({
     email: "john.doe@need4deed.org",
     password: await hashPassword("no_password"),
-    role: Role.ADMIN,
+    role: UserRole.ADMIN,
     isActive: true,
     person: personAdmin,
   });
@@ -42,7 +41,7 @@ export async function seedUser(dataSource: DataSource) {
   const coordinatorUser = new User({
     email: "sarah.doe@need4deed.org",
     password: await hashPassword("no_password"),
-    role: Role.COORDINATOR,
+    role: UserRole.COORDINATOR,
     isActive: true,
     person: personCoordinator,
   });
@@ -63,14 +62,14 @@ export async function seedUser(dataSource: DataSource) {
   const userUser = new User({
     email: "anna.doe@need4deed.org",
     password: await hashPassword("no_password"),
-    role: Role.USER,
+    role: UserRole.USER,
     isActive: true,
     person: personUser,
   });
 
   try {
     await userRepository.save([userAdmin, coordinatorUser, userUser]);
-  } catch (error) {
+  } catch (_error) {
     dataSource.logger.log(
       "log",
       "Skipping seeding users as they already seeded.",
