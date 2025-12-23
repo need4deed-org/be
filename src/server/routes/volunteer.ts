@@ -5,6 +5,7 @@ import {
   ApiVolunteerGetList,
   Lang,
   QueryParamsKeys,
+  UserRole,
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
@@ -15,7 +16,7 @@ import ProfileSkill from "../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { Id, Role } from "../../data/types";
+import { Id } from "../../data/types";
 import {
   leadFromParser,
   parseFormData,
@@ -96,7 +97,7 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       const id = Number(request.params.id);
@@ -148,7 +149,7 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       try {
@@ -252,7 +253,7 @@ async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: Role.COORDINATOR })],
+      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       const id = Number(request.params.id);

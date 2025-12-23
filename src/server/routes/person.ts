@@ -1,9 +1,8 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-
+import { UserRole } from "need4deed-sdk";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
-import { Role } from "../../data/types";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
@@ -38,7 +37,7 @@ async function personRoutes(
     };
   }>(
     prefixedPath,
-    { schema, onRequest: [fastify.authenticate({ role: Role.ADMIN })] },
+    { schema, onRequest: [fastify.authenticate({ role: UserRole.ADMIN })] },
     async (request, reply) => {
       try {
         const personRepository = fastify.db.personRepository;
@@ -76,7 +75,7 @@ async function personRoutes(
           );
         }
 
-        if (user.role !== Role.ADMIN && user.personId !== parsedPersonId) {
+        if (user.role !== UserRole.ADMIN && user.personId !== parsedPersonId) {
           return reply
             .status(403)
             .send({ message: "Insufficient permissions." });
