@@ -1,6 +1,7 @@
 export function getStartEndDates(
   startHour: number,
   endHour: number,
+  date?: Date,
 ): { start: Date; end: Date } {
   if (
     startHour < endHour &&
@@ -11,7 +12,8 @@ export function getStartEndDates(
   ) {
     return null;
   }
-  const start = new Date("2024-01-01");
+
+  const start = new Date(date || "2024-01-01");
   start.setHours(startHour, 0, 0, 0);
   const end = new Date("2024-01-01");
   end.setHours(endHour, 0, 0, 0);
