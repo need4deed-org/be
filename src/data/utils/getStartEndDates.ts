@@ -10,7 +10,7 @@ export function getStartEndDates(
     endHour < 0 &&
     endHour > 24
   ) {
-    return null;
+    throw new Error("Invalid start or end hours");
   }
 
   const start = new Date(date || "2024-01-01");
