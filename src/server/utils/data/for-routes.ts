@@ -430,11 +430,6 @@ export async function getOrCreateTimeslot(
     throw new Error(errorMsg);
   }
 
-  dataSource.logger.log(
-    "log",
-    `Getting or creating timeslot: ${rrule}, start: ${start.toISOString()}, end: ${end.toISOString()}`,
-  );
-
   const repositoryTimeslot = getRepository(dataSource, Timeslot);
   let timeslot = await repositoryTimeslot.findOne({
     where: {
