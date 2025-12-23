@@ -1,12 +1,13 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-
+import { Id, UserRole } from "need4deed-sdk";
+import { accessCookieName } from "../../config/constants";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
-import { Role } from "../../data/types";
 import { hashPassword } from "../../data/utils";
 import { sendVerificationEmail } from "../../services";
+import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseErrors } from "../schema/responseErrors";
 import {
   createUserBodySchema,
@@ -42,7 +43,7 @@ async function userRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: Role.ADMIN })],
+      onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
     },
     async (request, reply) => {
       try {
@@ -98,6 +99,65 @@ async function userRoutes(
         return reply
           .status(200)
           .send({ message: `Details for account id:${userId}`, data: user });
+      } catch (error) {
+        fastify.log.error(`Error fetching user: ${error}`);
+        return reply.status(500).send({ message: "Internal server error." });
+      }
+    },
+  );
+
+  fastify.get<{ Querystring: { access?: string } }>(
+    prefixedPath + RoutePrefix.ME,
+    {
+      schema: {
+        querystring: {
+          type: ["object", "null"],
+          properties: {
+            access: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            $ref: "ApiUserMe#",
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      let token: string;
+
+      if (request.query?.access) {
+        token = request.query.access;
+      } else if (request.cookies && request.cookies[accessCookieName]) {
+        token = request.cookies[accessCookieName];
+      }
+
+      if (!token) {
+        return reply.status(400).send({ message: "Access token is required." });
+      }
+
+      const { id } = fastify.jwt.verify(token) as { id: Id };
+
+      const userRepository = fastify.db.userRepository;
+      if (!userRepository) {
+        fastify.log.error("userRepository is not initialized!");
+        return reply.status(500).send({ message: "Internal Server Error." });
+      }
+
+      try {
+        const user = await userRepository.findOne({
+          where: { id: Number(id) },
+          relations: ["person"],
+        });
+
+        if (!user) {
+          return reply.status(404).send({ message: "User not found." });
+        }
+
+        const payload = serializeUserToMeDTO(user);
+        return reply.status(200).send(payload);
       } catch (error) {
         fastify.log.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
@@ -190,7 +250,7 @@ async function userRoutes(
       email: string;
       password?: string;
       isActive?: boolean;
-      role?: Role;
+      role?: UserRole;
       language?: string;
       timezone?: string;
       person: PersonUpdateType;
