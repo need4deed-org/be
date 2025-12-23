@@ -138,7 +138,15 @@ async function userRoutes(
         return reply.status(400).send({ message: "Access token is required." });
       }
 
-      const { id } = fastify.jwt.verify(token) as { id: Id };
+      let decoded: object;
+      try {
+        decoded = fastify.jwt.verify(token) as { id: Id };
+      } catch (error) {
+        fastify.log.error(`JWT verification failed: ${error}`);
+        return reply.status(400).send({ message: "Invalid access token." });
+      }
+
+      const id = (decoded as { id: Id }).id;
 
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
