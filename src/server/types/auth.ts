@@ -1,6 +1,6 @@
-import { Role } from "../../data/types";
+import { UserRole } from "need4deed-sdk";
 
 export interface AuthOptions {
-  role?: Role;
+  role?: UserRole;
   allowSelf?: boolean;
 }
