@@ -237,6 +237,42 @@
         "additionalProperties": false
       },
       "required": ["title", "proficiency"]
+    },
+    "ApiUserMe": {
+      "$id": "ApiUserMe",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin", "coordinator", "agent", "volunteer"]
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isoCode": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "additionalProperties": false
+      },
+      "required": ["id", "email", "role"]
     }
   }
 }
