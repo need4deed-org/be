@@ -30,6 +30,7 @@ import {
   fetchVolunteerById,
   getFilteredVolunteers,
   getLanguageCode,
+  getOrCreateTimeslot,
   getPatchData,
   parseQueryParams,
   patchAddress,
@@ -318,7 +319,14 @@ async function volunteerRoutes(
           const success = await updateOptionList(
             id,
             TimeTimeslot,
-            availability.map((a) => ({ id: a.timeslotId })),
+            await Promise.all(
+              availability.map((availabilityObject) => {
+                if (availabilityObject.id) {
+                  return { id: availabilityObject.id };
+                }
+                return getOrCreateTimeslot(availabilityObject);
+              }),
+            ),
           );
           if (!success) {
             return reply.status(400).send({
