@@ -24,6 +24,7 @@ import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/seeds/utils";
+import { getRRULE, getStartEnd } from "../../../data/utils";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 import {
@@ -413,23 +414,48 @@ function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
 export async function getOrCreateTimeslot(
   availabilityObject: Availability,
 ): Promise<Timeslot> {
-  // const timeslotRepository = getRepository(dataSource, Timeslot);
+  const errorMsg = "Invalid availability object to get or create timeslot";
 
   const { day, daytime } = availabilityObject;
-  if (day && daytime) {
-    // let timeslot = await timeslotRepository.findOneBy({
-    //   day,
-    //   time,
-    //   occasional,
-    // });
-    // if (!timeslot) {
-    //   timeslot = new Timeslot({ day, time, occasional });
-    //   await timeslotRepository.save(timeslot);
-    // }
-    // return timeslot;
+  if (!day || !daytime || !Array.isArray(daytime)) {
+    throw new Error(errorMsg);
+  }
+  const rrule = getRRULE(day);
+
+  const { start, end } = getStartEnd(daytime.join("-")) || {
+    start: null,
+    end: null,
+  };
+  if (!rrule || !start || !end) {
+    throw new Error(errorMsg);
   }
 
-  return { id: 26 } as Timeslot;
+  dataSource.logger.log(
+    "log",
+    `Getting or creating timeslot: ${rrule}, start: ${start.toISOString()}, end: ${end.toISOString()}`,
+  );
+
+  const repositoryTimeslot = getRepository(dataSource, Timeslot);
+  let timeslot = await repositoryTimeslot.findOne({
+    where: {
+      rrule,
+      start,
+      end,
+    },
+  });
+
+  if (timeslot) {
+    return timeslot;
+  }
+
+  timeslot = new Timeslot({
+    rrule,
+    start,
+    end,
+  });
+  await repositoryTimeslot.save(timeslot);
+
+  return timeslot;
 }
 
 export async function updateOptionList<
