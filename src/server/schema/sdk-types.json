@@ -201,7 +201,7 @@
     "VolunteerStateTypeType": {
       "$id": "VolunteerStateTypeType",
       "type": "string",
-      "enum": ["accompanying", "general", "event", "festival", "weekend-only"]
+      "enum": ["accompanying", "regular", "events"]
     },
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
