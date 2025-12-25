@@ -25,7 +25,6 @@ import volunteerApiIdSchema from "./schema/volunteer-api-id.json";
 import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
-import { generateRandomString } from "./utils";
 
 export const fastify: FastifyInstance = Fastify({
   logger: {
@@ -77,9 +76,12 @@ export const start = async () => {
 
     await fastify.register(typeormPlugin);
     await fastify.register(cookie);
-    await fastify.register(jwtPlugin, {
-      secret: process.env.JWT_SECRET || generateRandomString(64),
-    });
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET is not defined in environment variables.");
+    }
+    await fastify.register(jwtPlugin, { secret });
     await fastify.register(cors, corsOptions);
     await fastify.register(
       fastifyMailer,

@@ -1,9 +1,8 @@
 import fastifyJwt from "@fastify/jwt";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
-
+import { UserRole } from "need4deed-sdk";
 import { accessCookieName, cookieOptions } from "../../config/constants";
-import { Role } from "../../data/types";
 import { AuthOptions } from "../types";
 
 async function jwtPlugin(
@@ -23,13 +22,13 @@ async function jwtPlugin(
       try {
         try {
           await request.jwtVerify();
-        } catch (error) {
+        } catch (_error) {
           reply.status(401);
           throw new Error("Authorization failed.");
         }
 
         const userId = request.user?.id;
-        fastify.log.debug(`jwtPlugin:authenticated: ${userId}}`);
+        fastify.log.debug(`jwtPlugin:authenticated: ${userId}`);
 
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
@@ -45,7 +44,7 @@ async function jwtPlugin(
           throw new Error("User not found.");
         }
 
-        if (user.role === Role.ADMIN) {
+        if (user.role === UserRole.ADMIN) {
           reply.status(200);
           return;
         }

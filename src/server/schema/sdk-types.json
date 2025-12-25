@@ -67,6 +67,11 @@
         "applied_n4d"
       ]
     },
+    "VolunteerCommunicationType": {
+      "$id": "VolunteerCommunicationType",
+      "type": "string",
+      "enum": ["email", "mobilePhone", "whatsapp", "telegram"]
+    },
     "TimedText": {
       "$id": "TimedText",
       "type": "object",
@@ -196,7 +201,7 @@
     "VolunteerStateTypeType": {
       "$id": "VolunteerStateTypeType",
       "type": "string",
-      "enum": ["accompanying", "general", "event", "festival", "weekend-only"]
+      "enum": ["accompanying", "regular", "events"]
     },
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
@@ -232,6 +237,42 @@
         "additionalProperties": false
       },
       "required": ["title", "proficiency"]
+    },
+    "ApiUserMe": {
+      "$id": "ApiUserMe",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin", "coordinator", "agent", "volunteer"]
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isoCode": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "additionalProperties": false
+      },
+      "required": ["id", "email", "role"]
     }
   }
 }
