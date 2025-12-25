@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
 } from "class-validator";
+import { UserRole } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -13,7 +14,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import { Role } from "../types";
 import { verifyPassword } from "../utils";
 import Person from "./person.entity";
 
@@ -42,9 +42,9 @@ export default class User {
   @IsBoolean()
   isActive: boolean;
 
-  @Column({ type: "enum", enum: Role, default: Role.USER })
-  @IsEnum(Role)
-  role: Role;
+  @Column({ type: "enum", enum: UserRole, default: UserRole.USER })
+  @IsEnum(UserRole)
+  role: UserRole;
 
   @Column({ default: "en" })
   @IsString()

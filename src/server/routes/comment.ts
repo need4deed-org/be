@@ -1,9 +1,8 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { ApiComment, EntityTableName } from "need4deed-sdk";
+import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
-import { Role } from "../../data/types";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
@@ -245,7 +244,7 @@ async function commentRoutes(
           );
         }
 
-        if (user.role !== Role.ADMIN && user.id !== comment.user.id) {
+        if (user.role !== UserRole.ADMIN && user.id !== comment.user.id) {
           return reply
             .status(403)
             .send({ message: "Insufficient permissions." });

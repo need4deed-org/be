@@ -1,6 +1,7 @@
 import {
   ApiOptionLists,
   ApiVolunteerGet,
+  Availability,
   EntityTableName,
   Lang,
   OptionItem,
@@ -23,6 +24,7 @@ import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/seeds/utils";
+import { getRRULE, getStartEnd } from "../../../data/utils";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 import {
@@ -298,6 +300,7 @@ export function getPatchData(body: VolunteerPatchBodyData) {
     statusType: body.statusType,
     statusMatch: body.statusMatch,
     statusCgcProcess: body.statusCgcProcess,
+    preferredCommunicationType: body.preferredCommunicationType,
   });
   const personData: Partial<Person> = stripNullishAttributes({
     id: body.person?.id,
@@ -342,7 +345,7 @@ export async function patchEntity<E extends { id: number }>(
   const repository = getRepository(dataSource, entity);
 
   return await repository
-    .update({ id } as any, data as QueryDeepPartialEntity<E>)
+    .update({ id } as FindOptionsWhere<E>, data as QueryDeepPartialEntity<E>)
     .then((response) => response.affected === 1);
 }
 
@@ -408,6 +411,48 @@ function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
   return m2mRelationsMap[m2mEntityName];
 }
 
+export async function getOrCreateTimeslot(
+  availabilityObject: Availability,
+): Promise<Timeslot> {
+  const errorMsg = "Invalid availability object to get or create timeslot";
+
+  const { day, daytime } = availabilityObject;
+  if (!day || !daytime || !Array.isArray(daytime)) {
+    throw new Error(errorMsg);
+  }
+  const rrule = getRRULE(day);
+
+  const { start, end } = getStartEnd(daytime.join("-")) || {
+    start: null,
+    end: null,
+  };
+  if (!rrule || !start || !end) {
+    throw new Error(errorMsg);
+  }
+
+  const repositoryTimeslot = getRepository(dataSource, Timeslot);
+  let timeslot = await repositoryTimeslot.findOne({
+    where: {
+      rrule,
+      start,
+      end,
+    },
+  });
+
+  if (timeslot) {
+    return timeslot;
+  }
+
+  timeslot = new Timeslot({
+    rrule,
+    start,
+    end,
+  });
+  await repositoryTimeslot.save(timeslot);
+
+  return timeslot;
+}
+
 export async function updateOptionList<
   M extends { id: number },
   L extends { id: number | string },
@@ -446,12 +491,13 @@ export async function updateOptionList<
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
+
       if (currentList.length > 0) {
         await m2mRepository.delete(currentList.map(({ id }) => id));
       }
 
       const newList = list.map((item) => {
-        return new m2mEntity({
+        const newItem = new m2mEntity({
           [hostId]: volunteer.deal[host].id,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
@@ -461,6 +507,8 @@ export async function updateOptionList<
               }
             : {}),
         });
+
+        return newItem;
       });
 
       await m2mRepository.save(newList);
