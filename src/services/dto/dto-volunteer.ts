@@ -1,15 +1,14 @@
 import {
   Address,
+  ApiAvailability,
   ApiPersonGet,
   ApiVolunteerGet,
   ApiVolunteerGetList,
-  Availability,
   ByDay,
-  Daytime,
-  Hour,
   Occasionally,
   OptionItem,
   TimedText,
+  TimeSlot,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
@@ -171,39 +170,34 @@ function getByDay(rrule: string): ByDay {
   return ByDay[byDay];
 }
 
-function getHour(date: Date): Hour {
-  if (!date) {
-    throw new Error("Date is required to get hour");
+function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
+  if (!start || !end) {
+    throw new Error("Start and end dates are required to get TimeSlot");
   }
-  const hour = `H${String(date.getHours()).padStart(2, "0")}`;
-  return Hour[hour];
+  const timeslot = `${start.getHours().toString().padStart(2, "0")}-${end.getHours().toString().padStart(2, "0")}`;
+
+  if (Object.values(TimeSlot).includes(timeslot as TimeSlot)) {
+    return timeslot as TimeSlot;
+  }
+
+  throw new Error("From or To hour value is not supported");
 }
 
-function getAvailability(timeTimeslot: TimeTimeslot[]): Availability[] {
-  return timeTimeslot?.map(({ timeslot }): Availability => {
-    if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
-      return {
-        id: timeslot.id,
-        description: timeslot.info || "",
-        start: timeslot.start,
-        end: timeslot.end,
-        rrule: timeslot.rrule,
-        timeslotId: timeslot.id,
-        day: getByDay(timeslot.rrule),
-        daytime: [getHour(timeslot.start), getHour(timeslot.end)] as Daytime,
-      } as unknown as Availability; // TODO: tech debt here
-    }
+function getAvailability(timeTimeslot: TimeTimeslot[]): ApiAvailability[] {
+  return timeTimeslot?.map(({ timeslot }): ApiAvailability => {
     if (timeslot?.occasional) {
       return {
         id: timeslot.id,
-        description: timeslot.info || "",
-        start: timeslot.start,
-        end: timeslot.end,
-        rrule: timeslot.rrule,
-        timeslotId: timeslot.id,
         day: Occasionally.OCCASIONALLY,
-        daytime: [timeslot.occasional],
-      } as unknown as Availability; // TODO: tech debt here
+        daytime: timeslot.occasional,
+      };
+    }
+    if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
+      return {
+        id: timeslot.id,
+        day: getByDay(timeslot.rrule),
+        daytime: getTimeSlotForDaytime(timeslot.start, timeslot.end),
+      };
     }
 
     throw new Error("Timeslot is missing required fields");
