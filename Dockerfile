@@ -31,9 +31,8 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/build/data/migrations ./build/data/migrations
 
 COPY ca/eu-central-1-bundle.pem ./certificates/eu-central-1-bundle.pem
-COPY src/data/sql ./build/data/sql
-COPY public ./public
 
+COPY public ./public
 
 # Change ownership of all files to nodejs user
 RUN chown -R nodejs:nodejs /app
