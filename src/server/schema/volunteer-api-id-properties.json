@@ -42,7 +42,7 @@
         "availability": {
           "type": "array",
           "items": {
-            "$ref": "Timeslot#"
+            "$ref": "ApiAvailability#"
           }
         },
         "activities": {
