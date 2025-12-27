@@ -200,7 +200,7 @@ function getAvailability(timeTimeslot: TimeTimeslot[]): ApiAvailability[] {
       };
     }
 
-    throw new Error("Timeslot is missing required fields");
+    throw new Error("Timeslot is lacking required fields");
   });
 }
 
