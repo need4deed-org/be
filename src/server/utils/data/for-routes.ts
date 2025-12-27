@@ -1,9 +1,11 @@
 import {
+  ApiAvailability,
   ApiOptionLists,
   ApiVolunteerGet,
-  Availability,
   EntityTableName,
   Lang,
+  Occasionally,
+  OccasionalType,
   OptionItem,
   SortOrder,
   VolunteerPatchBodyData,
@@ -412,42 +414,48 @@ function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
 }
 
 export async function getOrCreateTimeslot(
-  availabilityObject: Availability,
+  availabilityObject: ApiAvailability,
 ): Promise<Timeslot> {
   const errorMsg = "Invalid availability object to get or create timeslot";
 
   const { day, daytime } = availabilityObject;
-  if (!day || !daytime || !Array.isArray(daytime)) {
+  if (!day || !daytime) {
     throw new Error(errorMsg);
   }
-  const rrule = getRRULE(day);
 
-  const { start, end } = getStartEnd(daytime.join("-")) || {
-    start: null,
-    end: null,
-  };
-  if (!rrule || !start || !end) {
+  let payload: FindOptionsWhere<Timeslot> | Partial<Timeslot>;
+
+  const isOccasional = Object.values(Occasionally).includes(
+    day as Occasionally,
+  );
+
+  if (isOccasional) {
+    payload = Object.values(OccasionalType).includes(daytime as OccasionalType)
+      ? { occasional: daytime as OccasionalType }
+      : null;
+  } else {
+    const rrule = getRRULE(day);
+    const { start, end } = getStartEnd(daytime) || {
+      start: null,
+      end: null,
+    };
+    if (rrule && start && end) {
+      payload = { rrule, start, end };
+    }
+  }
+
+  if (!payload) {
     throw new Error(errorMsg);
   }
 
   const repositoryTimeslot = getRepository(dataSource, Timeslot);
-  let timeslot = await repositoryTimeslot.findOne({
-    where: {
-      rrule,
-      start,
-      end,
-    },
-  });
+  let timeslot = await repositoryTimeslot.findOne({ where: payload });
 
   if (timeslot) {
     return timeslot;
   }
 
-  timeslot = new Timeslot({
-    rrule,
-    start,
-    end,
-  });
+  timeslot = new Timeslot({ ...(payload as Partial<Timeslot>) });
   await repositoryTimeslot.save(timeslot);
 
   return timeslot;
