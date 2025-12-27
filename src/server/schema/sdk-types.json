@@ -238,6 +238,30 @@
       },
       "required": ["title", "proficiency"]
     },
+    "ApiAvailability": {
+      "$id": "ApiAvailability",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "day": {
+          "type": "string",
+          "enum": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+            "occasionally"
+          ]
+        },
+        "daytime": {
+          "type": "string",
+          "enum": ["08-11", "11-14", "14-17", "17-20", "weekdays", "weekends"]
+        }
+      }
+    },
     "ApiUserMe": {
       "$id": "ApiUserMe",
       "type": "object",
