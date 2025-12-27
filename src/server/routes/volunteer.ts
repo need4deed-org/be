@@ -208,7 +208,7 @@ async function volunteerRoutes(
         const data = serialize(volunteers, volunteerListSerializer);
 
         reply.status(200).send({
-          message: `Volunteers page ${1}`,
+          message: `Volunteers page ${page}`,
           count,
           data,
         });
