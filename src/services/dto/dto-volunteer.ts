@@ -64,18 +64,20 @@ export function volunteerSerializer(
   volunteerComments: Comment[],
   timedEvents: Timeline[],
 ): ApiVolunteerGet {
-  const address: Address = {
-    ...volunteer.person.address,
-    id: volunteer.person.address.id,
-    city,
-    postcode: {
-      ...volunteer.person.address.postcode,
-      id: volunteer.person.address.postcode.id,
-      code: volunteer.person.address.postcode.value,
-      latitude: volunteer.person.address.postcode.latitude || null,
-      longitude: volunteer.person.address.postcode.longitude || null,
-    },
-  };
+  const address: Address | null = volunteer.person.address
+    ? {
+        ...volunteer.person.address,
+        id: volunteer.person.address.id,
+        city,
+        postcode: {
+          ...volunteer.person.address.postcode,
+          id: volunteer.person.address.postcode.id,
+          code: volunteer.person.address.postcode.value,
+          latitude: volunteer.person.address.postcode.latitude || null,
+          longitude: volunteer.person.address.postcode.longitude || null,
+        },
+      }
+    : null;
 
   const comments: TimedText[] = volunteerComments.map((comment) => ({
     id: comment.id,
