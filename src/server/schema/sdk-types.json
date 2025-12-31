@@ -201,7 +201,7 @@
     "VolunteerStateTypeType": {
       "$id": "VolunteerStateTypeType",
       "type": "string",
-      "enum": ["accompanying", "regular", "events"]
+      "enum": ["accompanying", "regular", "events", "regular-accompanying"]
     },
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
