@@ -363,6 +363,7 @@ ALTER TYPE public.volunteer_status_match_enum OWNER TO postgres;
 CREATE TYPE public.volunteer_status_type_enum AS ENUM (
     'accompanying',
     'regular',
+    'regular-accompanying',
     'events'
 );
 
