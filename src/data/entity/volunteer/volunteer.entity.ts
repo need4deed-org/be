@@ -19,6 +19,7 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import Deal from "../deal.entity";
+import Document from "../document.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
 
@@ -151,4 +152,7 @@ export default class Volunteer {
     (opportunityVolunteer) => opportunityVolunteer.volunteer,
   )
   opportunityVolunteer: OpportunityVolunteer[];
+
+  @OneToMany(() => Document, (document) => document.volunteer)
+  documents: Document[];
 }
