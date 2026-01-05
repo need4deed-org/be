@@ -89,22 +89,16 @@ export async function start() {
         return reply.status(error.statusCode).send({
           error: error.constructor.name,
           message: error.message,
-          ...(process.env.NODE_ENV !== "production" && { stack: error.stack }),
         });
       }
 
       // Handle schema errors
       if (error.validation) {
-        return reply.status(400).send({
-          message: "Validation failed",
-          details: error.validation,
-        });
+        return reply.status(400).send({ message: "Validation failed" });
       }
 
       // Handle generic TypeORM / Unexpected errors
-      return reply.status(500).send({
-        message: "Something went wrong. " + error.message,
-      });
+      return reply.status(500).send({ message: "Something went wrong." });
     });
 
     await fastify.register(typeormPlugin);
@@ -150,6 +144,9 @@ export async function start() {
     await fastify.register(volunteerRoutes, { prefix: RoutePrefix.VOLUNTEER });
     await fastify.register(optionRoutes, { prefix: RoutePrefix.OPTION });
     await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
+
+    await fastify.ready();
+    fastify.log.debug(fastify.printRoutes());
 
     const port = Number(process.env.PORT) || 5000;
     await fastify.listen({ port, host: "0.0.0.0" });
