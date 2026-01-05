@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
@@ -42,11 +41,10 @@ import { updateLeads } from "../../utils/updateLeads";
 import { writeVolunteer } from "../../utils/writeVolunteer";
 import volunteerDocRoutes from "./doc/doc.routes";
 
-async function volunteerRoutes(
+export default async function volunteerRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.VOLUNTEER;
   fastify.log.debug(`Registering volunteer routes at ${options.prefix}`);
   const relations = [
     "person",
@@ -68,7 +66,7 @@ async function volunteerRoutes(
   ];
 
   await fastify.register(volunteerDocRoutes, {
-    prefix: `/:id/doc`,
+    prefix: `/:id${RoutePrefix.DOC}`,
   });
 
   fastify.get<{
@@ -81,7 +79,7 @@ async function volunteerRoutes(
       data?: ApiVolunteerGet;
     };
   }>(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
         params: {
@@ -139,7 +137,7 @@ async function volunteerRoutes(
       data?: Array<ApiVolunteerGetList>;
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         response: {
@@ -236,7 +234,7 @@ async function volunteerRoutes(
       data?: ApiVolunteerGet;
     };
   }>(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
         params: {
@@ -412,7 +410,7 @@ async function volunteerRoutes(
       data?: { id: Id };
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: { $ref: "volunteer-form-data" },
@@ -462,8 +460,3 @@ async function volunteerRoutes(
     },
   );
 }
-
-export default fp(volunteerRoutes, {
-  name: "volunteer-routes",
-  dependencies: ["typeorm-plugin"],
-});
