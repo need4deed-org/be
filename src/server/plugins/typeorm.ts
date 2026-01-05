@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { dataSource } from "../../data/data-source";
 import Comment from "../../data/entity/comment.entity";
+import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
@@ -28,6 +29,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       optionRepository: dataSource.getRepository(Option),
       volunteerListMvRepository: dataSource.getRepository(VolunteerListMV),
       commentRepository: dataSource.getRepository(Comment),
+      documentRepository: dataSource.getRepository(Document),
     });
 
     // TODO: add validation of others
