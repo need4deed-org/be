@@ -4,6 +4,7 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
 import { defaultFrom, selfUrl } from "../config/constants";
+import { BaseError } from "../config/error/base";
 import { getMailerConfigForSES, getSesClient } from "../services";
 import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
@@ -72,6 +73,23 @@ export const start = async () => {
     await fastify.addSchema({
       $id: "option-lists",
       ...optionListsSchema,
+    });
+
+    await fastify.setErrorHandler((error, request, reply) => {
+      request.log.error(error);
+
+      // If it's one of our custom errors, use its status code
+      if (error instanceof BaseError) {
+        return reply.status(error.statusCode).send({
+          message: error.message,
+          ...(process.env.NODE_ENV !== "production" && { stack: error.stack }),
+        });
+      }
+
+      // Handle generic TypeORM / Unexpected errors
+      return reply.status(500).send({
+        message: "Something went wrong. " + error.message,
+      });
     });
 
     await fastify.register(typeormPlugin);
