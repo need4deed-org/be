@@ -9,23 +9,23 @@ import {
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileActivity from "../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../data/entity/m2m/profile-skill";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
-import Person from "../../data/entity/person.entity";
-import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { Id } from "../../data/types";
+import LocationDistrict from "../../../data/entity/m2m/location-district";
+import ProfileActivity from "../../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import Person from "../../../data/entity/person.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { Id } from "../../../data/types";
 import {
   leadFromParser,
   parseFormData,
   serialize,
   volunteerFormParser,
   volunteerListSerializer,
-} from "../../services";
-import { responseErrors } from "../schema";
-import { RoutePrefix } from "../types";
+} from "../../../services";
+import { responseErrors } from "../../schema";
+import { RoutePrefix } from "../../types";
 import {
   EnumValuesMap,
   fetchVolunteerById,
@@ -37,15 +37,17 @@ import {
   patchAddress,
   patchEntity,
   updateOptionList,
-} from "../utils";
-import { updateLeads } from "../utils/updateLeads";
-import { writeVolunteer } from "../utils/writeVolunteer";
+} from "../../utils";
+import { updateLeads } from "../../utils/updateLeads";
+import { writeVolunteer } from "../../utils/writeVolunteer";
+import volunteerDocRoutes from "./doc/doc.routes";
 
 async function volunteerRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
   const prefixedPath = options.prefix || RoutePrefix.VOLUNTEER;
+  fastify.log.debug(`Registering volunteer routes at ${options.prefix}`);
   const relations = [
     "person",
     "person.address",
@@ -64,6 +66,10 @@ async function volunteerRoutes(
     "deal.location.locationAddress.address",
     "deal.location.locationAddress.address.postcode",
   ];
+
+  await fastify.register(volunteerDocRoutes, {
+    prefix: `/:id/doc`,
+  });
 
   fastify.get<{
     Params: { id: string };
