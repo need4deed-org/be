@@ -1,8 +1,8 @@
-import { AppDataSource } from "../../data/data-source";
+import { dataSource } from "../../data/data-source";
 import LeadFrom from "../../data/entity/lead.entity";
 
 export async function updateLeads(leads: LeadFrom[]): Promise<void> {
-  const leadFromRepository = AppDataSource.getRepository(LeadFrom);
+  const leadFromRepository = dataSource.getRepository(LeadFrom);
   for (const lead of leads) {
     lead.count += 1;
   }
