@@ -13,7 +13,7 @@ import {
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
-import { AppDataSource as dataSource } from "../../../data/data-source";
+import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";

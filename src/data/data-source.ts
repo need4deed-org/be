@@ -43,7 +43,7 @@ import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { getLoggingForDataSource } from "./utils";
 
-export const AppDataSource = new DataSource({
+export const dataSource = new DataSource({
   type: "postgres",
   host: process.env.DB_HOST || "127.0.0.1",
   port: 5432,
