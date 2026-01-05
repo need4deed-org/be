@@ -81,8 +81,17 @@ export const start = async () => {
       // If it's one of our custom errors, use its status code
       if (error instanceof BaseError) {
         return reply.status(error.statusCode).send({
+          error: error.constructor.name,
           message: error.message,
           ...(process.env.NODE_ENV !== "production" && { stack: error.stack }),
+        });
+      }
+
+      // Handle schema errors
+      if (error.validation) {
+        return reply.status(400).send({
+          message: "Validation failed",
+          details: error.validation,
         });
       }
 
