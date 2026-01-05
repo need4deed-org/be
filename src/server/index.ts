@@ -15,7 +15,7 @@ import healthRoutes from "./routes/health";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
-import volunteerRoutes from "./routes/volunteer";
+import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import entityTypesSchema from "./schema/entity-types.json";
 import optionListsSchema from "./schema/option-lists.json";
 import sdkTypesSchema from "./schema/sdk-types.json";
@@ -36,9 +36,15 @@ export const fastify: FastifyInstance = Fastify({
       },
     },
   },
+  ajv: {
+    customOptions: {
+      strict: false,
+    },
+  },
 });
 
-export const start = async () => {
+export async function start() {
+  fastify.log.info("Starting server...");
   try {
     // Register external schemas first so they're available for $ref resolution
     await fastify.addSchema({
@@ -118,12 +124,10 @@ export const start = async () => {
     await fastify.register(optionRoutes, { prefix: RoutePrefix.OPTION });
     await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
 
-    await fastify.ready();
-
     const port = Number(process.env.PORT) || 5000;
     await fastify.listen({ port, host: "0.0.0.0" });
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
   }
-};
+}
