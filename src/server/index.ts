@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
@@ -110,6 +111,10 @@ export async function start() {
     }
     await fastify.register(jwtPlugin, { secret });
     await fastify.register(cors, corsOptions);
+    await fastify.register(multipart, {
+      attachFieldsToBody: "keyValues",
+    });
+
     await fastify.register(
       fastifyMailer,
       getMailerConfigForSES(getSesClient()),
