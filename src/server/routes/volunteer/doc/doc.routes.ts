@@ -4,6 +4,7 @@ import Document from "../../../../data/entity/document.entity";
 import { tryCatch } from "../../../../services/utils";
 import {
   idParamSchema,
+  idTypeParamSchema,
   responseErrors,
   volunteerDocSchemaGet200,
   volunteerDocSchemaGetMeta200,
@@ -133,4 +134,92 @@ export default async function volunteerDocRoutes(
         </PostResponse>`,
       );
   });
+
+  fastify.delete<{ Params: { id: number } }>(
+    "/",
+    {
+      schema: {
+        params: idParamSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const documentRepository = fastify.db.documentRepository;
+
+      const [{ affected }, error] = await tryCatch(
+        documentRepository.delete({ volunteerId: id }),
+      );
+
+      if (error) {
+        fastify.log.error(
+          `Error deleting documents for volunteer_id${id}: ${error}`,
+        );
+        return reply.status(400).send({
+          message: `Error deleting documents: ${error}`,
+        });
+      }
+
+      if (affected === 0) {
+        return reply.status(404).send({
+          message: `Documents for volunteer_id:${id} not found.`,
+        });
+      }
+
+      return reply.send({
+        message: `${affected} document${affected !== 1 ? "s" : ""} for volunteer_id:${id} successfully deleted.`,
+      });
+    },
+  );
+
+  fastify.delete<{ Params: { id: number; type: DocumentType } }>(
+    "/:type",
+    {
+      schema: {
+        params: idTypeParamSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id, type } = request.params;
+      const documentRepository = fastify.db.documentRepository;
+
+      const [{ affected }, error] = await tryCatch(
+        documentRepository.delete({ volunteerId: id, type }),
+      );
+
+      if (error) {
+        fastify.log.error(
+          `Error deleting document for volunteer ${id}: ${error}`,
+        );
+        return reply.status(400).send({
+          message: `Error deleting document: ${error}`,
+        });
+      }
+
+      if (affected === 0) {
+        return reply.status(404).send({
+          message: `Document of type:${type} for volunteer_id:${id} not found.`,
+        });
+      }
+
+      return reply.send({
+        message: `Document ${affected} of type:${type} for volunteer_id:${id} successfully deleted.`,
+      });
+    },
+  );
 }
