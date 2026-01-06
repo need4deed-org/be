@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
+  Id,
   Lang,
   QueryParamsKeys,
   UserRole,
@@ -15,7 +16,6 @@ import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { Id } from "../../../data/types";
 import {
   leadFromParser,
   parseFormData,
@@ -23,7 +23,7 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
-import { responseErrors } from "../../schema";
+import { idParamSchema, responseErrors } from "../../schema";
 import { RoutePrefix } from "../../types";
 import {
   EnumValuesMap,
@@ -82,13 +82,7 @@ export default async function volunteerRoutes(
     "/:id",
     {
       schema: {
-        params: {
-          type: "object",
-          properties: {
-            id: { type: "number" },
-          },
-          required: ["id"],
-        },
+        params: idParamSchema,
         response: {
           200: {
             type: "object",
@@ -237,13 +231,7 @@ export default async function volunteerRoutes(
     "/:id",
     {
       schema: {
-        params: {
-          type: "object",
-          properties: {
-            id: { type: "number" },
-          },
-          required: ["id"],
-        },
+        params: idParamSchema,
         body: { $ref: "volunteer-api-id-part#" },
         response: {
           200: {
