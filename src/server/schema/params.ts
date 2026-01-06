@@ -6,11 +6,11 @@ export const idParamSchema = {
   required: ["id"],
 };
 
-export const idFileParamSchema = {
+export const idTypeParamSchema = {
   type: "object",
   properties: {
     id: { type: "integer" },
-    docId: { type: "integer" },
+    type: { $ref: "DocumentType#" },
   },
-  required: ["id", "docId"],
+  required: ["id", "type"],
 };
