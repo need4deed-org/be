@@ -1,8 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { Id, UserRole } from "need4deed-sdk";
-import { accessCookieName } from "../../config/constants";
+import { UserRole } from "need4deed-sdk";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
@@ -126,28 +125,6 @@ async function userRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      let token: string;
-
-      if (request.query?.access) {
-        token = request.query.access;
-      } else if (request.cookies && request.cookies[accessCookieName]) {
-        token = request.cookies[accessCookieName];
-      }
-
-      if (!token) {
-        return reply.status(400).send({ message: "Access token is required." });
-      }
-
-      let decoded: object;
-      try {
-        decoded = fastify.jwt.verify(token) as { id: Id };
-      } catch (error) {
-        fastify.log.error(`JWT verification failed: ${error}`);
-        return reply.status(400).send({ message: "Invalid access token." });
-      }
-
-      const id = (decoded as { id: Id }).id;
-
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
         fastify.log.error("userRepository is not initialized!");
@@ -156,7 +133,7 @@ async function userRoutes(
 
       try {
         const user = await userRepository.findOne({
-          where: { id: Number(id) },
+          where: { id: Number(request.user?.id) },
           relations: ["person"],
         });
 
