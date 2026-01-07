@@ -1,8 +1,6 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
-import { Id, UserRole } from "need4deed-sdk";
-import { accessCookieName } from "../../config/constants";
+import { UserRole } from "need4deed-sdk";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
@@ -17,18 +15,17 @@ import {
 } from "../schema/user.schema";
 import { RoutePrefix } from "../types";
 
-async function userRoutes(
+export default async function userRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  _options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.USER;
   fastify.get<{
     Reply: {
       message: string;
       data?: Array<User>;
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         response: {
@@ -65,7 +62,7 @@ async function userRoutes(
       data?: User;
     };
   }>(
-    prefixedPath + "/:id",
+    "/:id",
     {
       schema: {
         response: {
@@ -107,7 +104,7 @@ async function userRoutes(
   );
 
   fastify.get<{ Querystring: { access?: string } }>(
-    prefixedPath + RoutePrefix.ME,
+    RoutePrefix.ME,
     {
       schema: {
         querystring: {
@@ -126,28 +123,6 @@ async function userRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      let token: string;
-
-      if (request.query?.access) {
-        token = request.query.access;
-      } else if (request.cookies && request.cookies[accessCookieName]) {
-        token = request.cookies[accessCookieName];
-      }
-
-      if (!token) {
-        return reply.status(400).send({ message: "Access token is required." });
-      }
-
-      let decoded: object;
-      try {
-        decoded = fastify.jwt.verify(token) as { id: Id };
-      } catch (error) {
-        fastify.log.error(`JWT verification failed: ${error}`);
-        return reply.status(400).send({ message: "Invalid access token." });
-      }
-
-      const id = (decoded as { id: Id }).id;
-
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
         fastify.log.error("userRepository is not initialized!");
@@ -156,7 +131,7 @@ async function userRoutes(
 
       try {
         const user = await userRepository.findOne({
-          where: { id: Number(id) },
+          where: { id: request.user?.id },
           relations: ["person"],
         });
 
@@ -174,7 +149,7 @@ async function userRoutes(
   );
 
   fastify.post<{ Body: { token: string } }>(
-    prefixedPath + RoutePrefix.VERIFY_EMAIL,
+    RoutePrefix.VERIFY_EMAIL,
     {
       schema: {
         body: userVerifyEmailSchema,
@@ -266,7 +241,7 @@ async function userRoutes(
     };
     Reply: User | { message: string; errors?: any };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: createUserBodySchema,
@@ -382,8 +357,3 @@ async function userRoutes(
     },
   );
 }
-
-export default fp(userRoutes, {
-  name: "user-routes",
-  dependencies: ["typeorm-plugin"],
-});
