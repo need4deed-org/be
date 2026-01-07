@@ -14,6 +14,12 @@ import User from "./user.entity";
 @Entity()
 @Index(["entityType", "entityId", "languageId"], { unique: false })
 export default class Comment {
+  constructor(comment?: Partial<Comment>) {
+    if (comment) {
+      Object.assign(this, comment);
+    }
+  }
+
   @PrimaryGeneratedColumn()
   id: number;
 
