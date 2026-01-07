@@ -688,7 +688,7 @@ export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
 }
 
 export function getDocumentUrl(_s3Key: string): string {
-  return "https://d2nwrdddg8skub.cloudfront.net/dev/test_pdf.pdf";
+  return `${process.env.MOCK_VOLUNTEER_DOC_S3_UPLOAD_URL}/volunteer/1/doc/download?url=https://d2nwrdddg8skub.cloudfront.net/dev/test_pdf.pdf`;
 }
 
 export async function getVolunteerDocuments(
