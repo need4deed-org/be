@@ -316,7 +316,8 @@
         "type": { "$ref": "DocumentType#" },
         "originalName": { "type": "string" },
         "url": { "type": "string" },
-        "mimeType": { "type": "string" }
+        "mimeType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "type", "originalName", "url", "mimeType"]
     },

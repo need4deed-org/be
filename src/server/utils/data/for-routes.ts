@@ -705,6 +705,7 @@ export async function getVolunteerDocuments(
       originalName: doc.originalName,
       url: getDocumentUrl(doc.s3Key),
       mimeType: doc.mimeType,
+      createdAt: doc.createdAt,
     }),
   );
 
