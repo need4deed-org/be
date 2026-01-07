@@ -60,7 +60,7 @@ export default async function volunteerDocRoutes(
         "x-amz-meta-volunteer-id": String(id),
         "x-amz-meta-document-type": type,
         "x-amz-meta-original-name": originalName,
-        "x-amz-meta-mime-type": "application/pdf",
+        "x-amz-meta-mime-type": mimeType,
         "x-amz-meta-s3-key": key,
       };
 
