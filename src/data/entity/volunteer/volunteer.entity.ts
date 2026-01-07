@@ -18,6 +18,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import Communication from "../communication.entity";
 import Deal from "../deal.entity";
 import Document from "../document.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
@@ -155,4 +156,7 @@ export default class Volunteer {
 
   @OneToMany(() => Document, (document) => document.volunteer)
   documents: Document[];
+
+  @OneToMany(() => Communication, (communication) => communication.user)
+  communications: Communication[];
 }
