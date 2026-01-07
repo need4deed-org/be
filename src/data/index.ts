@@ -1,8 +1,8 @@
-import { AppDataSource } from "./data-source";
+import { dataSource } from "./data-source";
 
 async function initDatabase() {
   try {
-    const dataSource = await AppDataSource.initialize();
+    await dataSource.initialize();
     if (dataSource.isInitialized) {
       // eslint-disable-next-line no-console
       console.log("Data Source has been initialized!");
@@ -25,4 +25,6 @@ async function initDatabase() {
   }
 }
 
-initDatabase();
+if (dataSource.isInitialized === false) {
+  initDatabase();
+}

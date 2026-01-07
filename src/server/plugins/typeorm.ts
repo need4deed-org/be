@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import { AppDataSource } from "../../data/data-source";
+import { dataSource } from "../../data/data-source";
 import Comment from "../../data/entity/comment.entity";
+import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
@@ -12,19 +13,23 @@ import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 
 const typeormPlugin: FastifyPluginAsync = async (fastify) => {
   try {
-    await AppDataSource.initialize();
+    if (!dataSource.isInitialized) {
+      fastify.log.info("Initializing TypeORM Data Source...");
+      await dataSource.initialize();
+    }
     fastify.log.info("TypeORM Data Source has been initialized!");
 
     // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
-      userRepository: AppDataSource.getRepository(User),
-      personRepository: AppDataSource.getRepository(Person),
-      volunteerRepository: AppDataSource.getRepository(Volunteer),
-      languageRepository: AppDataSource.getRepository(Language),
-      fieldTranslationRepository: AppDataSource.getRepository(FieldTranslation),
-      optionRepository: AppDataSource.getRepository(Option),
-      volunteerListMvRepository: AppDataSource.getRepository(VolunteerListMV),
-      commentRepository: AppDataSource.getRepository(Comment),
+      userRepository: dataSource.getRepository(User),
+      personRepository: dataSource.getRepository(Person),
+      volunteerRepository: dataSource.getRepository(Volunteer),
+      languageRepository: dataSource.getRepository(Language),
+      fieldTranslationRepository: dataSource.getRepository(FieldTranslation),
+      optionRepository: dataSource.getRepository(Option),
+      volunteerListMvRepository: dataSource.getRepository(VolunteerListMV),
+      commentRepository: dataSource.getRepository(Comment),
+      documentRepository: dataSource.getRepository(Document),
     });
 
     // TODO: add validation of others
@@ -37,8 +42,8 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Close connection when Fastify closes
     fastify.addHook("onClose", async () => {
-      if (AppDataSource.isInitialized) {
-        await AppDataSource.destroy();
+      if (dataSource.isInitialized) {
+        await dataSource.destroy();
         fastify.log.info("TypeORM Data Source has been closed.");
       }
     });

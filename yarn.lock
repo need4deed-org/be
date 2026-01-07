@@ -624,6 +624,11 @@
     ajv-formats "^3.0.1"
     fast-uri "^3.0.0"
 
+"@fastify/busboy@^3.0.0":
+  version "3.2.0"
+  resolved "https://registry.yarnpkg.com/@fastify/busboy/-/busboy-3.2.0.tgz#13ed8212f3b9ba697611529d15347f8528058cea"
+  integrity sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==
+
 "@fastify/cookie@^11.0.2":
   version "11.0.2"
   resolved "https://registry.yarnpkg.com/@fastify/cookie/-/cookie-11.0.2.tgz#fa772c652e51f9252addd788289aa16627ebe5f1"
@@ -639,6 +644,11 @@
   dependencies:
     fastify-plugin "^5.0.0"
     toad-cache "^3.7.0"
+
+"@fastify/deepmerge@^3.0.0":
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/@fastify/deepmerge/-/deepmerge-3.1.0.tgz#4ee797682268eb9d7da51df8e415219addc512ca"
+  integrity sha512-lCVONBQINyNhM6LLezB6+2afusgEYR4G8xenMsfe+AT+iZ7Ca6upM5Ha8UkZuYSnuMw3GWl/BiPXnLMi/gSxuQ==
 
 "@fastify/error@^4.0.0":
   version "4.2.0"
@@ -674,6 +684,17 @@
   integrity sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A==
   dependencies:
     dequal "^2.0.3"
+
+"@fastify/multipart@^9.3.0":
+  version "9.3.0"
+  resolved "https://registry.yarnpkg.com/@fastify/multipart/-/multipart-9.3.0.tgz#b7b473dc2f1e931193157a5ed81dc26df103ff73"
+  integrity sha512-NpeKipTOjjL1dA7SSlRMrOWWtrE8/0yKOmeudkdQoEaz4sVDJw5MVdZIahsWhvpc3YTN7f04f9ep/Y65RKoOWA==
+  dependencies:
+    "@fastify/busboy" "^3.0.0"
+    "@fastify/deepmerge" "^3.0.0"
+    "@fastify/error" "^4.0.0"
+    fastify-plugin "^5.0.0"
+    secure-json-parse "^4.0.0"
 
 "@fastify/proxy-addr@^5.0.0":
   version "5.1.0"
@@ -3254,10 +3275,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-need4deed-sdk@^0.0.32:
-  version "0.0.32"
-  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.32.tgz#f1e5b6b368a7862a955c50d7c0f4d24d64e7b418"
-  integrity sha512-j1Hi0pH+0UCehAbMzMp4zWFHipZ1JdTjTu5Cdg+PBfiMxb8Yn4uMgQ2uXsQOfgnvhm5Ve/Dfxls4SeDdLw9uoA==
+need4deed-sdk@^0.0.33:
+  version "0.0.33"
+  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.33.tgz#56e95a0e4261532d6260678dd39676cfb10077ab"
+  integrity sha512-pX4fAT2GbaJZ0xw6jDkrQ7xiK0qj9wsx/2zQEUPZXXH6gqNXa0CLGKKBAHuHlwb7UgQA/tYmgfuR07esSGvTCg==
 
 no-case@^3.0.4:
   version "3.0.4"

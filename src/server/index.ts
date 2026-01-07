@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
@@ -16,7 +17,7 @@ import healthRoutes from "./routes/health";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
-import volunteerRoutes from "./routes/volunteer";
+import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import entityTypesSchema from "./schema/entity-types.json";
 import optionListsSchema from "./schema/option-lists.json";
 import sdkTypesSchema from "./schema/sdk-types.json";
@@ -37,9 +38,15 @@ export const fastify: FastifyInstance = Fastify({
       },
     },
   },
+  ajv: {
+    customOptions: {
+      strict: false,
+    },
+  },
 });
 
-export const start = async () => {
+export async function start() {
+  fastify.log.info("Starting server...");
   try {
     // Register external schemas first so they're available for $ref resolution
     await fastify.addSchema({
@@ -83,22 +90,16 @@ export const start = async () => {
         return reply.status(error.statusCode).send({
           error: error.constructor.name,
           message: error.message,
-          ...(process.env.NODE_ENV !== "production" && { stack: error.stack }),
         });
       }
 
       // Handle schema errors
       if (error.validation) {
-        return reply.status(400).send({
-          message: "Validation failed",
-          details: error.validation,
-        });
+        return reply.status(400).send({ message: "Validation failed" });
       }
 
       // Handle generic TypeORM / Unexpected errors
-      return reply.status(500).send({
-        message: "Something went wrong. " + error.message,
-      });
+      return reply.status(500).send({ message: "Something went wrong." });
     });
 
     await fastify.register(typeormPlugin);
@@ -110,6 +111,10 @@ export const start = async () => {
     }
     await fastify.register(jwtPlugin, { secret });
     await fastify.register(cors, corsOptions);
+    await fastify.register(multipart, {
+      attachFieldsToBody: "keyValues",
+    });
+
     await fastify.register(
       fastifyMailer,
       getMailerConfigForSES(getSesClient()),
@@ -146,6 +151,7 @@ export const start = async () => {
     await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
 
     await fastify.ready();
+    fastify.log.debug(fastify.printRoutes());
 
     const port = Number(process.env.PORT) || 5000;
     await fastify.listen({ port, host: "0.0.0.0" });
@@ -153,4 +159,4 @@ export const start = async () => {
     fastify.log.error(err);
     process.exit(1);
   }
-};
+}
