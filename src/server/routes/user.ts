@@ -131,7 +131,7 @@ export default async function userRoutes(
 
       try {
         const user = await userRepository.findOne({
-          where: { id: Number(request.user?.id) },
+          where: { id: request.user?.id },
           relations: ["person"],
         });
 
