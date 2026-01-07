@@ -1,9 +1,9 @@
- 
 import { JWT } from "@fastify/jwt";
 import "fastify";
 import { onRequestHookHandler } from "fastify";
 import { Repository } from "typeorm";
 import Comment from "../../data/entity/comment.entity";
+import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
@@ -24,6 +24,7 @@ declare module "fastify" {
       optionRepository: Repository<Option>;
       volunteerListMvRepository: Repository<VolunteerListMV>;
       commentRepository: Repository<Comment>;
+      documentRepository: Repository<Document>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

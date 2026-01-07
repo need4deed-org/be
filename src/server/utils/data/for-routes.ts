@@ -1,5 +1,6 @@
 import {
   ApiAvailability,
+  ApiDocumentGet,
   ApiOptionLists,
   ApiVolunteerGet,
   EntityTableName,
@@ -13,8 +14,9 @@ import {
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
-import { AppDataSource as dataSource } from "../../../data/data-source";
+import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
+import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
@@ -683,4 +685,29 @@ export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
     `Unknown sort order: ${orderDirection}, defaulting to DESC`,
   );
   return "DESC";
+}
+
+export function getDocumentUrl(_s3Key: string): string {
+  return `${process.env.MOCK_VOLUNTEER_DOC_S3_UPLOAD_URL}/volunteer/1/doc/download?url=${encodeURIComponent("https://d2nwrdddg8skub.cloudfront.net/dev/test_pdf.pdf")}`;
+}
+
+export async function getVolunteerDocuments(
+  volunteerId: number,
+): Promise<ApiDocumentGet[]> {
+  const documentRepository = getRepository(dataSource, Document);
+  const volunteerDocuments =
+    (await documentRepository.find({ where: { volunteerId } })) || [];
+
+  const apiDocuments: ApiDocumentGet[] = volunteerDocuments.map(
+    (doc): ApiDocumentGet => ({
+      id: doc.id,
+      type: doc.type,
+      originalName: doc.originalName,
+      url: getDocumentUrl(doc.s3Key),
+      mimeType: doc.mimeType,
+      createdAt: doc.createdAt,
+    }),
+  );
+
+  return apiDocuments;
 }

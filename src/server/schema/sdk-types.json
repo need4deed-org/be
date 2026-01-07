@@ -297,6 +297,39 @@
         "additionalProperties": false
       },
       "required": ["id", "email", "role"]
+    },
+    "DocumentType": {
+      "$id": "DocumentType",
+      "type": "string",
+      "enum": [
+        "passport-copy",
+        "CGC-application",
+        "good-conduct-cert",
+        "measles-vacc-cert"
+      ]
+    },
+    "ApiDocumentGet": {
+      "$id": "ApiDocumentGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "type": { "$ref": "DocumentType#" },
+        "originalName": { "type": "string" },
+        "url": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "originalName", "url", "mimeType"]
+    },
+    "ApiDocumentPost": {
+      "$id": "ApiDocumentPost",
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "DocumentType#" },
+        "originalName": { "type": "string" },
+        "mimeType": { "type": "string" }
+      },
+      "required": ["type", "originalName", "mimeType"]
     }
   }
 }

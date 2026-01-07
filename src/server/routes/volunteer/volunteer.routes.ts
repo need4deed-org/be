@@ -1,31 +1,30 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
+  Id,
   Lang,
   QueryParamsKeys,
   UserRole,
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileActivity from "../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../data/entity/m2m/profile-skill";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
-import Person from "../../data/entity/person.entity";
-import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { Id } from "../../data/types";
+import LocationDistrict from "../../../data/entity/m2m/location-district";
+import ProfileActivity from "../../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import Person from "../../../data/entity/person.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   leadFromParser,
   parseFormData,
   serialize,
   volunteerFormParser,
   volunteerListSerializer,
-} from "../../services";
-import { responseErrors } from "../schema";
-import { RoutePrefix } from "../types";
+} from "../../../services";
+import { idParamSchema, responseErrors } from "../../schema";
+import { RoutePrefix } from "../../types";
 import {
   EnumValuesMap,
   fetchVolunteerById,
@@ -37,15 +36,16 @@ import {
   patchAddress,
   patchEntity,
   updateOptionList,
-} from "../utils";
-import { updateLeads } from "../utils/updateLeads";
-import { writeVolunteer } from "../utils/writeVolunteer";
+} from "../../utils";
+import { updateLeads } from "../../utils/updateLeads";
+import { writeVolunteer } from "../../utils/writeVolunteer";
+import volunteerDocRoutes from "./doc/doc.routes";
 
-async function volunteerRoutes(
+export default async function volunteerRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.VOLUNTEER;
+  fastify.log.debug(`Registering volunteer routes at ${options.prefix}`);
   const relations = [
     "person",
     "person.address",
@@ -65,6 +65,10 @@ async function volunteerRoutes(
     "deal.location.locationAddress.address.postcode",
   ];
 
+  await fastify.register(volunteerDocRoutes, {
+    prefix: `/:id${RoutePrefix.DOC}`,
+  });
+
   fastify.get<{
     Params: { id: string };
     Querystring: {
@@ -75,16 +79,10 @@ async function volunteerRoutes(
       data?: ApiVolunteerGet;
     };
   }>(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
-        params: {
-          type: "object",
-          properties: {
-            id: { type: "number" },
-          },
-          required: ["id"],
-        },
+        params: idParamSchema,
         response: {
           200: {
             type: "object",
@@ -133,7 +131,7 @@ async function volunteerRoutes(
       data?: Array<ApiVolunteerGetList>;
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         response: {
@@ -230,16 +228,10 @@ async function volunteerRoutes(
       data?: ApiVolunteerGet;
     };
   }>(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
-        params: {
-          type: "object",
-          properties: {
-            id: { type: "number" },
-          },
-          required: ["id"],
-        },
+        params: idParamSchema,
         body: { $ref: "volunteer-api-id-part#" },
         response: {
           200: {
@@ -406,7 +398,7 @@ async function volunteerRoutes(
       data?: { id: Id };
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: { $ref: "volunteer-form-data" },
@@ -456,8 +448,3 @@ async function volunteerRoutes(
     },
   );
 }
-
-export default fp(volunteerRoutes, {
-  name: "volunteer-routes",
-  dependencies: ["typeorm-plugin"],
-});
