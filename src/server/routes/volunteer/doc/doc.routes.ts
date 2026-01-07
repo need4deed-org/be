@@ -1,3 +1,4 @@
+import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { DocumentType } from "need4deed-sdk";
 import Document from "../../../../data/entity/document.entity";
@@ -36,6 +37,28 @@ export default async function volunteerDocRoutes(
       });
     },
   );
+
+  fastify.get("/download", async (request, reply) => {
+    const { url } = request.query as { url: string };
+    const fileName = "test_pdf.pdf";
+
+    const [urlObj, error] = await tryCatch(fetch(url));
+
+    if (error) {
+      fastify.log.error(`Error fetching document from URL ${url}: ${error}`);
+      return reply.status(400).send({
+        message: `Error fetching document from URL: ${error}`,
+      });
+    }
+
+    reply.raw.writeHead(200, {
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Type": "application/pdf",
+      "Content-Length": urlObj.headers.get("Content-Length") || "",
+    });
+
+    Readable.fromWeb(urlObj.body).pipe(reply.raw);
+  });
 
   fastify.get<{
     Params: { id: number };
