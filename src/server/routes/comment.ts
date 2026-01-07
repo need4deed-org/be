@@ -1,18 +1,14 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
-import { RoutePrefix } from "../types";
 
-async function commentRoutes(
+export default async function commentRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  _options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.COMMENT;
-
   //
   // GET /comment
   //
@@ -28,7 +24,7 @@ async function commentRoutes(
       data?: Array<ApiComment>;
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         querystring: {
@@ -84,7 +80,7 @@ async function commentRoutes(
   // GET /comment/:id
   //
   fastify.get(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
         response: {
@@ -136,7 +132,7 @@ async function commentRoutes(
   // POST /comment
   //
   fastify.post(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: { $ref: "Comment#" },
@@ -194,7 +190,7 @@ async function commentRoutes(
   // PATCH /comment/:id
   //
   fastify.patch(
-    `${prefixedPath}/:id`,
+    "/:id",
     {
       schema: {
         body: { $ref: "Comment#" },
@@ -279,9 +275,71 @@ async function commentRoutes(
       }
     },
   );
-}
 
-export default fp(commentRoutes, {
-  name: "comment-routes",
-  dependencies: ["typeorm-plugin"],
-});
+  fastify.delete(
+    "/:id",
+    {
+      schema: {
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      try {
+        const id = Number((request.params as { id: string }).id);
+        if (isNaN(id) || id <= 0) {
+          return reply.status(400).send({
+            message: "Invalid comment ID provided.",
+          });
+        }
+
+        const commentRepository = fastify.db.commentRepository;
+        const comment = await commentRepository.findOne({
+          where: { id },
+          relations: ["user"],
+        });
+
+        if (!comment) {
+          return reply
+            .status(404)
+            .send({ message: `Comment id:${id} not found.` });
+        }
+
+        // Only creator or admin can delete
+        const user = await fastify.db.userRepository.findOne({
+          where: { id: request.user.id },
+        });
+
+        if (!user) {
+          throw new Error(
+            `Error deleting comment ${id}: user ${request.user.id} not found`,
+          );
+        }
+
+        if (user.role !== UserRole.ADMIN && user.id !== comment.user.id) {
+          return reply
+            .status(403)
+            .send({ message: "Insufficient permissions." });
+        }
+
+        await commentRepository.remove(comment);
+
+        return { message: `Successfully deleted comment ${id}` };
+      } catch (error) {
+        fastify.log.error(`Error deleting comment: ${error}`);
+        return reply.status(500).send({
+          message: "Internal server error.",
+        });
+      }
+    },
+  );
+}
