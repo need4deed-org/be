@@ -12,9 +12,11 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { verifyPassword } from "../utils";
+import Communication from "./communication.entity";
 import Person from "./person.entity";
 
 @Entity()
@@ -68,6 +70,9 @@ export default class User {
   createdAt: Date;
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
+
+  @OneToMany(() => Communication, (communication) => communication.user)
+  communications: Communication[];
 
   async checkPassword(password: string): Promise<boolean> {
     if (!this.password) {
