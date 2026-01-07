@@ -1,6 +1,5 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
@@ -16,18 +15,17 @@ import {
 } from "../schema/user.schema";
 import { RoutePrefix } from "../types";
 
-async function userRoutes(
+export default async function userRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  _options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.USER;
   fastify.get<{
     Reply: {
       message: string;
       data?: Array<User>;
     };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         response: {
@@ -64,7 +62,7 @@ async function userRoutes(
       data?: User;
     };
   }>(
-    prefixedPath + "/:id",
+    "/:id",
     {
       schema: {
         response: {
@@ -106,7 +104,7 @@ async function userRoutes(
   );
 
   fastify.get<{ Querystring: { access?: string } }>(
-    prefixedPath + RoutePrefix.ME,
+    RoutePrefix.ME,
     {
       schema: {
         querystring: {
@@ -151,7 +149,7 @@ async function userRoutes(
   );
 
   fastify.post<{ Body: { token: string } }>(
-    prefixedPath + RoutePrefix.VERIFY_EMAIL,
+    RoutePrefix.VERIFY_EMAIL,
     {
       schema: {
         body: userVerifyEmailSchema,
@@ -243,7 +241,7 @@ async function userRoutes(
     };
     Reply: User | { message: string; errors?: any };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: createUserBodySchema,
@@ -359,8 +357,3 @@ async function userRoutes(
     },
   );
 }
-
-export default fp(userRoutes, {
-  name: "user-routes",
-  dependencies: ["typeorm-plugin"],
-});
