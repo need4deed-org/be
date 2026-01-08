@@ -3,6 +3,7 @@ import "fastify";
 import { onRequestHookHandler } from "fastify";
 import { Repository } from "typeorm";
 import Comment from "../../data/entity/comment.entity";
+import Communication from "../../data/entity/communication.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
@@ -25,6 +26,7 @@ declare module "fastify" {
       volunteerListMvRepository: Repository<VolunteerListMV>;
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
+      communicationRepository: Repository<Communication>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

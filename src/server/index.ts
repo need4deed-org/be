@@ -13,6 +13,7 @@ import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
+import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
@@ -149,6 +150,9 @@ export async function start() {
     await fastify.register(volunteerRoutes, { prefix: RoutePrefix.VOLUNTEER });
     await fastify.register(optionRoutes, { prefix: RoutePrefix.OPTION });
     await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
+    await fastify.register(communicationRoutes, {
+      prefix: RoutePrefix.COMMUNICATION,
+    });
 
     await fastify.ready();
     fastify.log.debug(fastify.printRoutes());

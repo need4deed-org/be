@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sdk-types",
   "definitions": {
     "OccasionalType": {
       "$id": "OccasionalType",
@@ -330,6 +331,75 @@
         "mimeType": { "type": "string" }
       },
       "required": ["type", "originalName", "mimeType"]
+    },
+    "ContactType": {
+      "$id": "ContactType",
+      "type": "string",
+      "enum": ["called", "tried-to-call", "texted-or-emailed", "other"]
+    },
+    "ContactMethodType": {
+      "$id": "ContactMethodType",
+      "type": "string",
+      "enum": [
+        "email",
+        "phone-number",
+        "telegram",
+        "whatsapp",
+        "signal",
+        "sms",
+        "voicenote"
+      ]
+    },
+    "CommunicationType": {
+      "$id": "CommunicationType",
+      "type": "string",
+      "enum": [
+        "briefed",
+        "first-inquiry-sent",
+        "opportunity-list-sent",
+        "status-update",
+        "post-match-followup"
+      ]
+    },
+    "ApiCommunicationGet": {
+      "$id": "ApiCommunicationGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "contactType": { "$ref": "ContactType#" },
+        "contactMethod": { "$ref": "ContactMethodType#" },
+        "communicationType": { "$ref": "CommunicationType#" },
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "number" },
+        "volunteerId": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "contactType",
+        "contactMethod",
+        "date",
+        "userId",
+        "volunteerId"
+      ]
+    },
+    "CommunicationPost": {
+      "$id": "CommunicationPost",
+      "type": "object",
+      "properties": {
+        "contactType": { "$ref": "ContactType#" },
+        "contactMethod": { "$ref": "ContactMethodType#" },
+        "communicationType": { "$ref": "CommunicationType#" },
+        "date": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ApiCommunicationPost": {
+      "$id": "ApiCommunicationPost",
+      "allOf": [{ "$ref": "CommunicationPost#" }],
+      "required": ["contactType", "contactMethod", "date"]
+    },
+    "ApiCommunicationPatch": {
+      "$id": "ApiCommunicationPatch",
+      "$ref": "CommunicationPost#"
     }
   }
 }
