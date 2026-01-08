@@ -39,13 +39,13 @@ import {
 } from "../../utils";
 import { updateLeads } from "../../utils/updateLeads";
 import { writeVolunteer } from "../../utils/writeVolunteer";
+import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc/doc.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  _options: FastifyPluginOptions,
 ) {
-  fastify.log.debug(`Registering volunteer routes at ${options.prefix}`);
   const relations = [
     "person",
     "person.address",
@@ -67,6 +67,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
+  });
+
+  await fastify.register(volunteerCommunicationRoutes, {
+    prefix: `/:id${RoutePrefix.COMMUNICATION}`,
   });
 
   fastify.get<{
