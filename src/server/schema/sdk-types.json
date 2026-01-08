@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sdk-types",
   "definitions": {
     "OccasionalType": {
       "$id": "OccasionalType",
@@ -381,16 +382,24 @@
         "volunteerId"
       ]
     },
-    "ApiCommunicationPost": {
-      "$id": "ApiCommunicationPost",
+    "CommunicationPost": {
+      "$id": "CommunicationPost",
       "type": "object",
       "properties": {
         "contactType": { "$ref": "ContactType#" },
         "contactMethod": { "$ref": "ContactMethodType#" },
         "communicationType": { "$ref": "CommunicationType#" },
         "date": { "type": "string", "format": "date-time" }
-      },
+      }
+    },
+    "ApiCommunicationPost": {
+      "$id": "ApiCommunicationPost",
+      "allOf": [{ "$ref": "CommunicationPost#" }],
       "required": ["contactType", "contactMethod", "date"]
+    },
+    "ApiCommunicationPatch": {
+      "$id": "ApiCommunicationPatch",
+      "$ref": "CommunicationPost#"
     }
   }
 }
