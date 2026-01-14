@@ -40,7 +40,7 @@ import {
 import { updateLeads } from "../../utils/updateLeads";
 import { writeVolunteer } from "../../utils/writeVolunteer";
 import volunteerCommunicationRoutes from "./communication.routes";
-import volunteerDocRoutes from "./doc/doc.routes";
+import volunteerDocRoutes from "./doc.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
