@@ -1,7 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
-import Comment from "../../data/entity/comment.entity";
+import Comment from "../../data/entity/volunteer/comment.entity";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 

@@ -1,14 +1,14 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { dataSource } from "../../data/data-source";
-import Comment from "../../data/entity/comment.entity";
-import Communication from "../../data/entity/communication.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Option from "../../data/entity/option.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import User from "../../data/entity/user.entity";
+import Comment from "../../data/entity/volunteer/comment.entity";
+import Communication from "../../data/entity/volunteer/communication.entity";
 import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 

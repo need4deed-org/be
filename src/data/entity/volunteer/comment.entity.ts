@@ -8,8 +8,8 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import Language from "./profile/language.entity";
-import User from "./user.entity";
+import Language from "../profile/language.entity";
+import User from "../user.entity";
 
 @Entity()
 @Index(["entityType", "entityId", "languageId"], { unique: false })
