@@ -37,6 +37,7 @@ import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
 import User from "./entity/user.entity";
+import Appreciation from "./entity/volunteer/appreciation.entity";
 import Comment from "./entity/volunteer/comment.entity";
 import Communication from "./entity/volunteer/communication.entity";
 import VolunteerListMV from "./entity/volunteer/volunteer-list-mv.entity";
@@ -59,6 +60,7 @@ export const dataSource = new DataSource({
     Address,
     Agent,
     AgentPostcode,
+    Appreciation,
     Category,
     Comment,
     Communication,
