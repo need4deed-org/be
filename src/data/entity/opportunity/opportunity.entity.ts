@@ -2,14 +2,17 @@ import { IsEnum, IsOptional, IsString } from "class-validator";
 import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from "typeorm";
 import Deal from "../deal.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
+import Appreciation from "../volunteer/appreciation.entity";
 import Agent from "./agent.entity";
 
 @Entity()
@@ -53,10 +56,10 @@ export default class Opportunity {
   @IsString()
   infoConfidential?: string;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @UpdateDateColumn()
   updatedAt: Date;
 
   @ManyToOne(() => Deal)
@@ -78,4 +81,7 @@ export default class Opportunity {
     (opportunityVolunteer) => opportunityVolunteer.opportunity,
   )
   opportunityVolunteer: OpportunityVolunteer[];
+
+  @OneToMany(() => Appreciation, (appreciation) => appreciation.opportunity)
+  appreciations: Appreciation[];
 }

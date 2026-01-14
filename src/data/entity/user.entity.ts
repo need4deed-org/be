@@ -16,8 +16,9 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { verifyPassword } from "../utils";
-import Communication from "./communication.entity";
 import Person from "./person.entity";
+import Appreciation from "./volunteer/appreciation.entity";
+import Communication from "./volunteer/communication.entity";
 
 @Entity()
 export default class User {
@@ -73,6 +74,9 @@ export default class User {
 
   @OneToMany(() => Communication, (communication) => communication.user)
   communications: Communication[];
+
+  @OneToMany(() => Appreciation, (appreciation) => appreciation.user)
+  appreciations: Appreciation[];
 
   async checkPassword(password: string): Promise<boolean> {
     if (!this.password) {
