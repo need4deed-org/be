@@ -12,16 +12,19 @@ import {
 } from "need4deed-sdk";
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from "typeorm";
 import Deal from "../deal.entity";
 import Document from "../document.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
+import Appreciation from "./appreciation.entity";
 import Communication from "./communication.entity";
 
 @Entity()
@@ -120,7 +123,7 @@ export default class Volunteer {
   @Column({
     type: "text",
     array: true,
-    default: () => `ARRAY['mobilePhone']`,
+    default: () => "ARRAY['mobilePhone']",
     transformer: {
       to: (value: VolunteerCommunicationType[]) => value,
       from: (value: unknown) => value as VolunteerCommunicationType[],
@@ -128,10 +131,10 @@ export default class Volunteer {
   })
   preferredCommunicationType: VolunteerCommunicationType[];
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @UpdateDateColumn()
   updatedAt: Date;
 
   @ManyToOne(() => Deal)
@@ -157,6 +160,9 @@ export default class Volunteer {
   @OneToMany(() => Document, (document) => document.volunteer)
   documents: Document[];
 
-  @OneToMany(() => Communication, (communication) => communication.user)
+  @OneToMany(() => Communication, (communication) => communication.volunteer)
   communications: Communication[];
+
+  @OneToMany(() => Appreciation, (appreciation) => appreciation.volunteer)
+  appreciations: Appreciation[];
 }
