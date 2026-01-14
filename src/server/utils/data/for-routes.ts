@@ -15,7 +15,6 @@ import {
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 import { dataSource } from "../../../data/data-source";
-import Comment from "../../../data/entity/comment.entity";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -26,6 +25,7 @@ import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
+import Comment from "../../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/seeds/utils";
 import { getRRULE, getStartEnd } from "../../../data/utils";

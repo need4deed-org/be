@@ -10,8 +10,8 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import User from "./user.entity";
-import Volunteer from "./volunteer/volunteer.entity";
+import User from "../user.entity";
+import Volunteer from "./volunteer.entity";
 
 @Entity()
 export default class Communication {

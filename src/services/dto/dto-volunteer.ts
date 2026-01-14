@@ -10,10 +10,10 @@ import {
   TimedText,
   TimeSlot,
 } from "need4deed-sdk";
-import Comment from "../../data/entity/comment.entity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
+import Comment from "../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
 
