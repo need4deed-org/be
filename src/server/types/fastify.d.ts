@@ -2,6 +2,7 @@ import { JWT } from "@fastify/jwt";
 import "fastify";
 import { onRequestHookHandler } from "fastify";
 import { Repository } from "typeorm";
+import Appreciation from "../../data/entity/appreciation.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Document from "../../data/entity/document.entity";
@@ -27,6 +28,7 @@ declare module "fastify" {
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
       communicationRepository: Repository<Communication>;
+      appreciationRepository: Repository<Appreciation>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

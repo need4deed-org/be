@@ -39,8 +39,9 @@ import {
 } from "../../utils";
 import { updateLeads } from "../../utils/updateLeads";
 import { writeVolunteer } from "../../utils/writeVolunteer";
+import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
-import volunteerDocRoutes from "./doc/doc.routes";
+import volunteerDocRoutes from "./doc.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -65,12 +66,24 @@ export default async function volunteerRoutes(
     "deal.location.locationAddress.address.postcode",
   ];
 
+  await fastify.addHook(
+    "onRequest",
+    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  );
+
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
+    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerCommunicationRoutes, {
     prefix: `/:id${RoutePrefix.COMMUNICATION}`,
+    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+  });
+
+  await fastify.register(volunteerAppreciationRoutes, {
+    prefix: `/:id${RoutePrefix.APPRECIATION}`,
+    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   fastify.get<{
@@ -99,7 +112,6 @@ export default async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       const id = Number(request.params.id);
@@ -151,7 +163,6 @@ export default async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       try {
@@ -249,7 +260,6 @@ export default async function volunteerRoutes(
           ...responseErrors,
         },
       },
-      onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
     },
     async (request, reply) => {
       const id = Number(request.params.id);

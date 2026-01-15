@@ -1,5 +1,6 @@
 export const RoutePrefix = {
   AUTH: "/auth",
+  APPRECIATION: "/appreciation",
   COMMENT: "/comment",
   COMMUNICATION: "/communication",
   DOC: "/doc",

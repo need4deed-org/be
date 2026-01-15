@@ -382,8 +382,8 @@
         "volunteerId"
       ]
     },
-    "CommunicationPost": {
-      "$id": "CommunicationPost",
+    "ApiCommunication": {
+      "$id": "ApiCommunication",
       "type": "object",
       "properties": {
         "contactType": { "$ref": "ContactType#" },
@@ -394,12 +394,55 @@
     },
     "ApiCommunicationPost": {
       "$id": "ApiCommunicationPost",
-      "allOf": [{ "$ref": "CommunicationPost#" }],
+      "allOf": [{ "$ref": "ApiCommunication#" }],
       "required": ["contactType", "contactMethod", "date"]
     },
     "ApiCommunicationPatch": {
       "$id": "ApiCommunicationPatch",
-      "$ref": "CommunicationPost#"
+      "$ref": "ApiCommunication#"
+    },
+    "ApiAppreciationGet": {
+      "$id": "ApiAppreciationGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "$ref": "VolunteerStateAppreciationType#" },
+        "dateDue": { "type": "string", "format": "date-time" },
+        "dateDelivery": { "type": "string", "format": "date-time" },
+        "userId": { "type": "number" },
+        "opportunityId": { "type": "number" },
+        "volunteerId": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "title",
+        "dateDue",
+        "userId",
+        "opportunityId",
+        "volunteerId"
+      ]
+    },
+    "ApiAppreciation": {
+      "$id": "ApiAppreciation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "$ref": "VolunteerStateAppreciationType#" },
+        "dateDue": { "type": "string", "format": "date-time" },
+        "dateDelivery": { "type": "string", "format": "date-time" },
+        "userId": { "type": "number" },
+        "opportunityId": { "type": "number" },
+        "volunteerId": { "type": "number" }
+      }
+    },
+    "AppreciationPost": {
+      "$id": "ApiAppreciationPost",
+      "allOff": [{ "$ref": "ApiAppreciation#" }],
+      "required": ["title", "volunteerId", "dateDue"]
+    },
+    "AppreciationPatch": {
+      "$id": "ApiAppreciationPatch",
+      "$ref": "ApiAppreciation#"
     }
   }
 }
