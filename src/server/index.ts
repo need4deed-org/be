@@ -11,6 +11,7 @@ import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
+import appreciationRoutes from "./routes/apprerciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
@@ -152,6 +153,9 @@ export async function start() {
     await fastify.register(commentRoutes, { prefix: RoutePrefix.COMMENT });
     await fastify.register(communicationRoutes, {
       prefix: RoutePrefix.COMMUNICATION,
+    });
+    await fastify.register(appreciationRoutes, {
+      prefix: RoutePrefix.APPRECIATION,
     });
 
     await fastify.ready();

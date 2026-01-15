@@ -1,4 +1,4 @@
-import { ContactType, VolunteerStateAppreciationType } from "need4deed-sdk";
+import { VolunteerStateAppreciationType } from "need4deed-sdk";
 import {
   Column,
   CreateDateColumn,
@@ -22,7 +22,7 @@ export default class Appreciation {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "enum", enum: ContactType })
+  @Column({ type: "enum", enum: VolunteerStateAppreciationType })
   title: VolunteerStateAppreciationType;
 
   @Column({ type: "timestamp", nullable: true })
@@ -54,7 +54,7 @@ export default class Appreciation {
   @JoinColumn({ name: "volunteer_id" })
   volunteer: Volunteer;
 
-  @Column({ nullable: true })
+  @Column()
   volunteerId: number;
 
   @ManyToOne(() => User, {

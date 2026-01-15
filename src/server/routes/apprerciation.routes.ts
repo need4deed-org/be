@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerCommunicationPatch, UserRole } from "need4deed-sdk";
+import { ApiAppreciationPatch, UserRole } from "need4deed-sdk";
 import { idParamSchema } from "../schema";
 
-export default async function communicationRoutes(
+export default async function appreciationRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
@@ -13,19 +13,19 @@ export default async function communicationRoutes(
 
   fastify.patch<{
     Params: { id: string };
-    Body: ApiVolunteerCommunicationPatch;
+    Body: ApiAppreciationPatch;
   }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
-        body: { $ref: "ApiCommunicationPatch#" },
+        body: { $ref: "ApiAppreciationPatch#" },
         response: {
           200: {
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { $ref: "ApiCommunicationGet#" },
+              data: { $ref: "ApiAppreciationGet#" },
             },
             required: ["message", "data"],
           },
@@ -35,25 +35,25 @@ export default async function communicationRoutes(
     async (request, reply) => {
       const id = Number(request.params.id);
 
-      const communicationRepository = fastify.db.communicationRepository;
-      const communication = await communicationRepository.findOne({
+      const appreciationRepository = fastify.db.appreciationRepository;
+      const appreciation = await appreciationRepository.findOne({
         where: { id },
       });
 
-      if (!communication) {
+      if (!appreciation) {
         return reply.status(404).send({
-          message: `Communication with id:${id} not found.`,
+          message: `Appreciation with id:${id} not found.`,
         });
       }
 
-      const updatedCommunication = await communicationRepository.save({
-        ...communication,
+      const updatedAppreciation = await appreciationRepository.save({
+        ...appreciation,
         ...request.body,
       });
 
       return reply.status(200).send({
-        message: `Communication with id:${id} updated.`,
-        data: updatedCommunication,
+        message: `Appreciation with id:${id} updated.`,
+        data: updatedAppreciation,
       });
     },
   );
@@ -77,27 +77,27 @@ export default async function communicationRoutes(
     async (request, reply) => {
       const id = Number(request.params.id);
 
-      const communicationRepository = fastify.db.communicationRepository;
-      const communication = await communicationRepository.findOne({
+      const appreciationRepository = fastify.db.appreciationRepository;
+      const appreciation = await appreciationRepository.findOne({
         where: { id },
       });
 
-      if (!communication) {
+      if (!appreciation) {
         return reply.status(404).send({
           message: `Communication with id:${id} not found.`,
         });
       }
 
-      if (communication.userId !== request.user.id) {
+      if (appreciation.userId !== request.user.id) {
         return reply.status(403).send({
           message: `You do not have permission to delete communication with id:${id}.`,
         });
       }
 
-      await communicationRepository.remove(communication);
+      await appreciationRepository.remove(appreciation);
 
       return reply.status(200).send({
-        message: `Communication with id:${id} deleted.`,
+        message: `Appreciation with id:${id} deleted.`,
       });
     },
   );

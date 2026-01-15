@@ -1,8 +1,8 @@
 import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { DocumentType } from "need4deed-sdk";
-import Document from "../../../../data/entity/document.entity";
-import { tryCatch } from "../../../../services/utils";
+import Document from "../../../data/entity/document.entity";
+import { tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
   idTypeParamSchema,
@@ -10,8 +10,8 @@ import {
   volunteerDocSchemaGet200,
   volunteerDocSchemaGetMeta200,
   volunteerDocSchemaUploadMeta,
-} from "../../../schema";
-import { getVolunteerDocuments } from "../../../utils";
+} from "../../schema";
+import { getVolunteerDocuments } from "../../utils";
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
