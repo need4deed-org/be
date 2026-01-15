@@ -1,11 +1,16 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerCommunicationPatch } from "need4deed-sdk";
+import { ApiVolunteerCommunicationPatch, UserRole } from "need4deed-sdk";
 import { idParamSchema } from "../schema";
 
-export default function communicationRoutes(
+export default async function communicationRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  await fastify.addHook(
+    "onRequest",
+    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  );
+
   fastify.patch<{
     Params: { id: string };
     Body: ApiVolunteerCommunicationPatch;
@@ -26,7 +31,6 @@ export default function communicationRoutes(
           },
         },
       },
-      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const id = Number(request.params.id);
@@ -69,7 +73,6 @@ export default function communicationRoutes(
           },
         },
       },
-      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const id = Number(request.params.id);
