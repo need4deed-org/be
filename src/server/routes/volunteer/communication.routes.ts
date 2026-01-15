@@ -22,7 +22,6 @@ export default function volunteerCommunicationRoutes(
           },
         },
       },
-      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
@@ -58,7 +57,6 @@ export default function volunteerCommunicationRoutes(
           },
         },
       },
-      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
