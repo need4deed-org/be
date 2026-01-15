@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiAppreciationGet, ApiAppreciationPost } from "need4deed-sdk";
+import { dtoAppreciation } from "../../../services/dto/dto-appreciation";
 import { idParamSchema, responseErrors } from "../../schema";
 
 export default function volunteerAppreciationRoutes(
@@ -40,9 +41,11 @@ export default function volunteerAppreciationRoutes(
         },
       });
 
+      const data = appreciations.map(dtoAppreciation);
+
       return reply.status(200).send({
         message: `List of appreciations for volunteer_id:${volunteerId}`,
-        data: appreciations,
+        data,
       });
     },
   );

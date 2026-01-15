@@ -438,7 +438,7 @@
     "AppreciationPost": {
       "$id": "ApiAppreciationPost",
       "allOff": [{ "$ref": "ApiAppreciation#" }],
-      "required": ["title", "volunteerId", "dateDue"]
+      "required": ["title", "dateDue"]
     },
     "AppreciationPatch": {
       "$id": "ApiAppreciationPatch",
