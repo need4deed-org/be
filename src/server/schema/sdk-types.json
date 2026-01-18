@@ -407,8 +407,8 @@
       "properties": {
         "id": { "type": "number" },
         "title": { "$ref": "VolunteerStateAppreciationType#" },
-        "dateDue": { "type": "string", "format": "date-time" },
-        "dateDelivery": { "type": "string", "format": "date-time" },
+        "dateDue": { "type": ["string", "null"], "format": "date-time" },
+        "dateDelivery": { "type": ["string", "null"], "format": "date-time" },
         "userId": { "type": "number" },
         "opportunityId": { "type": "number" },
         "volunteerId": { "type": "number" }
@@ -428,8 +428,8 @@
       "properties": {
         "id": { "type": "number" },
         "title": { "$ref": "VolunteerStateAppreciationType#" },
-        "dateDue": { "type": "string", "format": "date-time" },
-        "dateDelivery": { "type": "string", "format": "date-time" },
+        "dateDue": { "type": ["string", "null"], "format": "date-time" },
+        "dateDelivery": { "type": ["string", "null"], "format": "date-time" },
         "userId": { "type": "number" },
         "opportunityId": { "type": "number" },
         "volunteerId": { "type": "number" }
