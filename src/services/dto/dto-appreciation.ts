@@ -12,7 +12,5 @@ export function dtoAppreciation(
     volunteerId: appreciation.volunteerId,
     opportunityId: appreciation?.opportunityId,
     userId: appreciation?.userId,
-    createdAt: appreciation?.createdAt,
-    updatedAt: appreciation?.updatedAt,
   };
 }
