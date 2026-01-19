@@ -6,9 +6,15 @@ export class BadRequestError extends BaseError {
   }
 }
 
+export class UnauthenticatedError extends BaseError {
+  constructor(message = "Unauthenticated") {
+    super(message, 401);
+  }
+}
+
 export class UnauthorizedError extends BaseError {
   constructor(message = "Unauthorized") {
-    super(message, 401);
+    super(message, 403);
   }
 }
 

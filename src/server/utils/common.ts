@@ -1,5 +1,5 @@
-import { Lang } from "need4deed-sdk";
 import * as crypto from "node:crypto";
+import { Lang, UserRole } from "need4deed-sdk";
 
 /**
  * Generates a cryptographically secure, pseudo-random hexadecimal string of a specified length.
@@ -66,7 +66,7 @@ export function getLanguageCode(isoCode: string): Lang | null {
  * // → {}
  */
 export function stripNullishAttributes<T>(obj: T): Partial<T> {
-  if (obj === null || typeof obj !== "object") return {};
+  if (obj === null || typeof obj !== "object") {return {};}
 
   return Object.fromEntries(
     Object.entries(obj).filter(
@@ -96,7 +96,7 @@ export function stripNullishAttributes<T>(obj: T): Partial<T> {
  * isObjectAndEmpty(null)         // → true
  */
 export function isObjectAndEmpty<T>(obj: T): boolean {
-  if (obj === null || typeof obj !== "object") return true;
+  if (obj === null || typeof obj !== "object") {return true;}
 
   const proto = Object.getPrototypeOf(obj);
   const isPlainObject = proto === Object.prototype || proto === null;
@@ -121,7 +121,7 @@ export function isObjectAndEmpty<T>(obj: T): boolean {
 export function getEmptyPropsNull<T extends Record<string, unknown>>(
   obj: T,
 ): T {
-  if (obj === null || typeof obj !== "object") return obj;
+  if (obj === null || typeof obj !== "object") {return obj;}
 
   return Object.keys(obj).reduce((acc: T, key: keyof T) => {
     const val = obj[key];
@@ -150,4 +150,27 @@ export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
     return arr;
   }
   return null;
+}
+
+/**
+ * Checks if a user has permission to access an entity based on ownership or role.
+ * * @template E - An entity type that includes a `userId` property.
+ * @param {E} entity - The resource being checked.
+ * @param {UserRole[]} roles - An array of roles authorized to bypass ownership (e.g., ADMIN).
+ * @param {Object} user - The user attempting the action.
+ * @param {number} user.id - The unique identifier of the user.
+ * @param {UserRole} user.role - The role assigned to the user.
+ * * @returns {boolean} `true` if the user is the owner OR has an authorized role; otherwise `false`.
+ * * @example
+ * const isAuthorized = validatePermissions(appreciation, [UserRole.ADMIN], currentUser);
+ * if (isAuthorized) {
+ * // Proceed with sensitive operation
+ * }
+ */
+export function validatePermissions<E extends { userId: number }>(
+  entity: E,
+  roles: UserRole[],
+  user: { id: number; role: UserRole },
+) {
+  return entity.userId === user.id || roles?.includes(user.role);
 }
