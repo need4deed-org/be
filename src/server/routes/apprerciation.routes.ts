@@ -84,13 +84,16 @@ export default async function appreciationRoutes(
 
       if (!appreciation) {
         return reply.status(404).send({
-          message: `Communication with id:${id} not found.`,
+          message: `Appreciation with id:${id} not found.`,
         });
       }
 
-      if (appreciation.userId !== request.user.id) {
+      if (
+        appreciation.userId !== request.user.id &&
+        !(request.user.role in [UserRole.ADMIN, UserRole.COORDINATOR])
+      ) {
         return reply.status(403).send({
-          message: `You do not have permission to delete communication with id:${id}.`,
+          message: `Permission denied, appreciation with id:${id} not deleted.`,
         });
       }
 
