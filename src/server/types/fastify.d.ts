@@ -1,6 +1,7 @@
 import { JWT } from "@fastify/jwt";
 import "fastify";
 import { onRequestHookHandler } from "fastify";
+import { UserRole } from "need4deed-sdk";
 import { Repository } from "typeorm";
 import Appreciation from "../../data/entity/appreciation.entity";
 import Comment from "../../data/entity/comment.entity";
@@ -55,6 +56,7 @@ declare module "@fastify/jwt" {
     user: {
       id: number;
       email: string;
+      role: UserRole;
       iat: number; // issued at (timestamp)
       exp: number; // expiration (timestamp)
     };
