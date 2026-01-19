@@ -1,18 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiAppreciationPatch, UserRole } from "need4deed-sdk";
-import Appreciation from "../../data/entity/volunteer/appreciation.entity";
+import { NotFoundError, UnauthorizedError } from "../../config/error/fastify";
 import { idParamSchema } from "../schema";
-
-function validateAppreciationOwnership(
-  appreciation: Appreciation,
-  user: { id: number; role: UserRole },
-): boolean {
-  return (
-    appreciation.userId === user.id ||
-    user.role === UserRole.ADMIN ||
-    user.role === UserRole.COORDINATOR
-  );
-}
+import { validatePermissions } from "../utils";
 
 export default async function appreciationRoutes(
   fastify: FastifyInstance,
@@ -53,15 +43,19 @@ export default async function appreciationRoutes(
       });
 
       if (!appreciation) {
-        return reply.status(404).send({
-          message: `Appreciation with id:${id} not found.`,
-        });
+        throw new NotFoundError(`Appreciation with id:${id} not found.`);
       }
 
-      if (!validateAppreciationOwnership(appreciation, request.user)) {
-        return reply.status(403).send({
-          message: `Permission denied, appreciation with id:${id} not patched.`,
-        });
+      if (
+        !validatePermissions(
+          appreciation,
+          [UserRole.ADMIN, UserRole.COORDINATOR],
+          request.user,
+        )
+      ) {
+        throw new UnauthorizedError(
+          `Permission denied, appreciation with id:${id} not updated.`,
+        );
       }
 
       const updatedAppreciation = await appreciationRepository.save({
@@ -101,15 +95,19 @@ export default async function appreciationRoutes(
       });
 
       if (!appreciation) {
-        return reply.status(404).send({
-          message: `Appreciation with id:${id} not found.`,
-        });
+        throw new NotFoundError(`Appreciation with id:${id} not found.`);
       }
 
-      if (!validateAppreciationOwnership(appreciation, request.user)) {
-        return reply.status(403).send({
-          message: `Permission denied, appreciation with id:${id} not deleted.`,
-        });
+      if (
+        !validatePermissions(
+          appreciation,
+          [UserRole.ADMIN, UserRole.COORDINATOR],
+          request.user,
+        )
+      ) {
+        throw new UnauthorizedError(
+          `Permission denied, appreciation with id:${id} not deleted.`,
+        );
       }
 
       await appreciationRepository.remove(appreciation);
