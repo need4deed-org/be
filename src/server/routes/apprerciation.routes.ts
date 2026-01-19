@@ -1,6 +1,18 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiAppreciationPatch, UserRole } from "need4deed-sdk";
+import Appreciation from "../../data/entity/volunteer/appreciation.entity";
 import { idParamSchema } from "../schema";
+
+function validateAppreciationOwnership(
+  appreciation: Appreciation,
+  user: { id: number; role: UserRole },
+): boolean {
+  return (
+    appreciation.userId === user.id ||
+    user.role === UserRole.ADMIN ||
+    user.role === UserRole.COORDINATOR
+  );
+}
 
 export default async function appreciationRoutes(
   fastify: FastifyInstance,
@@ -46,6 +58,12 @@ export default async function appreciationRoutes(
         });
       }
 
+      if (!validateAppreciationOwnership(appreciation, request.user)) {
+        return reply.status(403).send({
+          message: `Permission denied, appreciation with id:${id} not patched.`,
+        });
+      }
+
       const updatedAppreciation = await appreciationRepository.save({
         ...appreciation,
         ...request.body,
@@ -88,10 +106,7 @@ export default async function appreciationRoutes(
         });
       }
 
-      if (
-        appreciation.userId !== request.user.id &&
-        !(request.user.role in [UserRole.ADMIN, UserRole.COORDINATOR])
-      ) {
+      if (!validateAppreciationOwnership(appreciation, request.user)) {
         return reply.status(403).send({
           message: `Permission denied, appreciation with id:${id} not deleted.`,
         });
