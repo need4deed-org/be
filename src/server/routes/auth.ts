@@ -73,7 +73,7 @@ async function authRoutes(
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
-        const userPayload = { id: user.id, email: user.email };
+        const userPayload = { id: user.id, email: user.email, role: user.role };
 
         const access = fastify.jwt.sign(
           { ...userPayload, type: "access" },

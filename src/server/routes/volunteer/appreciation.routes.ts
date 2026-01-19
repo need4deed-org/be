@@ -70,12 +70,14 @@ export default function volunteerAppreciationRoutes(
     },
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
+      const userId = request.user.id;
       const appreciationData = request.body;
 
       const appreciationRepository = fastify.db.appreciationRepository;
       const newAppreciation = appreciationRepository.create({
         ...appreciationData,
         volunteerId,
+        userId,
       });
 
       const savedAppreciation =
