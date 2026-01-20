@@ -115,7 +115,14 @@ export default async function userRoutes(
         },
         response: {
           200: {
-            $ref: "ApiUserMe#",
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: {
+                $ref: "ApiUserMe#",
+              },
+            },
+            required: ["message", "data"],
           },
           ...responseErrors,
         },
@@ -140,7 +147,7 @@ export default async function userRoutes(
         }
 
         const payload = serializeUserToMeDTO(user);
-        return reply.status(200).send(payload);
+        return reply.status(200).send({ message: "Logged in User", data: payload });
       } catch (error) {
         fastify.log.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
