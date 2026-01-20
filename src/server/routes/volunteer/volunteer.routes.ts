@@ -138,6 +138,28 @@ export default async function volunteerRoutes(
     "/",
     {
       schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "number" },
+            limit: { type: "number" },
+            orderDirection: { type: "string" },
+            language: { type: "string" },
+            filter: {
+              type: "object",
+              properties: {
+                accompanying: { type: "string" },
+                german: { type: "string" },
+                search: { type: "string" },
+                district: { type: "string" },
+                languages: { type: "string" },
+                statusType: { type: "string" },
+                engagement: { type: "string" },
+                availability: { type: "string" },
+              },
+            },
+          },
+        },
         response: {
           200: {
             type: "object",
