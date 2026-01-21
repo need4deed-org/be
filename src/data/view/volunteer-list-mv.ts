@@ -1,15 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
-
-export class UpdateVolunteerListMv1763036250587 implements MigrationInterface {
-  name = "UpdateVolunteerListMv1763036250587";
-
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    // Drop the view first for idempotency
-    await queryRunner.query(
-      `DROP MATERIALIZED VIEW IF EXISTS volunteer_list_mv;`,
-    );
-
-    const createViewQuery = `
+export async function createVolunteerListMV(
+  queryRunner: import("typeorm").QueryRunner,
+): Promise<void> {
+  const createViewQuery = `
             CREATE MATERIALIZED VIEW volunteer_list_mv AS
             WITH AggregatedTimeslots AS (
                 -- 1. Aggregates timeslot data into the three required arrays for filtering
@@ -137,19 +129,18 @@ export class UpdateVolunteerListMv1763036250587 implements MigrationInterface {
             WITH DATA;
         `;
 
-    await queryRunner.query(createViewQuery);
+  await queryRunner.query(
+    `DROP MATERIALIZED VIEW IF EXISTS volunteer_list_mv;`,
+  );
 
-    // Ensure the unique index exists for CONCURRENT refresh (required after view creation)
-    try {
-      await queryRunner.query(
-        `CREATE UNIQUE INDEX mv_deal_id_unique_idx ON volunteer_list_mv (volunteer_id);`,
-      );
-    } catch (_) {
-      // Ignore if index already exists
-    }
-  }
+  await queryRunner.query(createViewQuery);
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP MATERIALIZED VIEW volunteer_list_mv;`);
+  // Ensure the unique index exists for CONCURRENT refresh (required after view creation)
+  try {
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX mv_deal_id_unique_idx ON volunteer_list_mv (volunteer_id);`,
+    );
+  } catch (_) {
+    // Ignore if index already exists
   }
 }
