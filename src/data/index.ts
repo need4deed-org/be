@@ -1,5 +1,7 @@
 import { dataSource } from "./data-source";
+import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
+let queryRunner: import("typeorm").QueryRunner;
 async function initDatabase() {
   try {
     await dataSource.initialize();
@@ -15,6 +17,9 @@ async function initDatabase() {
         // eslint-disable-next-line no-console
         console.log("Migrations completed.");
       }
+      queryRunner = dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await createVolunteerListMV(queryRunner);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -22,6 +27,10 @@ async function initDatabase() {
     throw Error(
       `Error occurred while initializing DataSource: ${error.message}`,
     );
+  } finally {
+    if (queryRunner) {
+      await queryRunner.release();
+    }
   }
 }
 
