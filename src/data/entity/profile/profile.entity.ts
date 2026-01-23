@@ -27,16 +27,16 @@ export default class Profile {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  info: string | null;
+  info?: string;
 
   @ManyToOne(() => Category, (category) => category.profile, {
     nullable: true,
   })
   @JoinColumn({ name: "category_id" })
-  category: Category;
+  category?: Category;
 
   @Column({ nullable: true })
-  categoryId: number | null;
+  categoryId: number;
 
   @OneToMany(
     () => ProfileActivity,

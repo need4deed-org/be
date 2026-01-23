@@ -108,9 +108,11 @@ export const dataSource = new DataSource({
         }
       : false,
   migrations:
-    process.env.NODE_ENV === "production"
-      ? [__dirname + "/migrations/**/*.js"]
-      : [__dirname + "/migrations/**/*.ts"],
+    process.env.NODE_ENV === "test"
+      ? []
+      : [
+          `${__dirname} + /migrations/**/*.s${process.env.NODE_ENV === "production" ? "js" : "ts"}`,
+        ],
   migrationsTableName: "be_migrations",
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),

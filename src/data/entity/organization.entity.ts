@@ -34,13 +34,13 @@ export default class Organization {
   @Column({ nullable: true })
   @IsOptional()
   @IsEmail()
-  email: string | null;
+  email?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
   @Length(7, 20) // Example phone length validation
-  phone: string | null;
+  phone?: string;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
