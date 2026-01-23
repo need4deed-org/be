@@ -2,6 +2,9 @@
   "name": "n4d-be",
   "version": "0.0.1",
   "description": "Awesome project developed with TypeORM.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "type": "commonjs",
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
