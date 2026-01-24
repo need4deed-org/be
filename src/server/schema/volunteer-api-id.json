@@ -11,7 +11,6 @@
         {
           "required": [
             "id",
-            "status",
             "languages",
             "availability",
             "activities",

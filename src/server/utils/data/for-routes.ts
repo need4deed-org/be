@@ -293,7 +293,6 @@ export async function getOptions(
 
 export function getPatchData(body: VolunteerPatchBodyData) {
   const volunteerData: Partial<Volunteer> = stripNullishAttributes({
-    status: body.status,
     infoAbout: body.infoAbout,
     infoExperience: body.infoExperience,
     statusCGC: body.goodConductCertificate,
@@ -304,6 +303,7 @@ export function getPatchData(body: VolunteerPatchBodyData) {
     statusType: body.statusType,
     statusMatch: body.statusMatch,
     statusCgcProcess: body.statusCgcProcess,
+    dateReturn: body.dateReturn,
     preferredCommunicationType: body.preferredCommunicationType,
   });
   const personData: Partial<Person> = stripNullishAttributes({
