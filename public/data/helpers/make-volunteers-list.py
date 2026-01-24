@@ -104,6 +104,12 @@ class Volunteer:
         Extracts vaccination status from the volunteer dictionary.
         """
         return get_string_or_null(self.volunteer.get("Measles vacc", ""))
+    
+    def get_accompanying(self):
+        """
+        Extracts accompanying flag from the volunteer dictionary.
+        """
+        return bool(self.volunteer.get("Accompanying", ""))
 
 def get_volunteer(volunteer):
     """
@@ -115,6 +121,7 @@ def get_volunteer(volunteer):
     volunteer_instance = Volunteer(volunteer)
     return {
         "status": volunteer_instance.get_status(),
+        "accompanying": volunteer_instance.get_accompanying(),
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
         "infoAbout": volunteer_instance.get_info_about(),
