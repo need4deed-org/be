@@ -27,9 +27,6 @@ RUN yarn install --frozen-lockfile --production=true && yarn cache clean
 
 COPY --from=builder /app/build ./build
 
-# Copy compiled migration files (.js) instead of source (.ts) files
-COPY --from=builder /app/build/data/migrations ./build/data/migrations
-
 COPY ca/eu-central-1-bundle.pem ./certificates/eu-central-1-bundle.pem
 
 COPY public ./public
@@ -49,4 +46,4 @@ EXPOSE 8000
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the production server
-CMD ["node", "build/index.js"]
+CMD ["node", "build/src/index.js"]
