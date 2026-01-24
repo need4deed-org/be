@@ -279,7 +279,7 @@ export default async function volunteerRoutes(
         activities,
         skills,
         locations,
-      } = getPatchData(request.body);
+      } = getPatchData(request.body, ["dateReturn"]);
 
       try {
         if (volunteerData) {

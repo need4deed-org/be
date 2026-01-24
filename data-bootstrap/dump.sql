@@ -339,7 +339,7 @@ ALTER TYPE public.volunteer_status_enum OWNER TO postgres;
 
 CREATE TYPE public.volunteer_status_match_enum AS ENUM (
     'no-matches',
-    'pending_match',
+    'pending-match',
     'matched',
     'needs-rematch'
 );
