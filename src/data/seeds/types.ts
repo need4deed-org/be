@@ -57,6 +57,7 @@ export interface AgentJSON {
 }
 export interface VolunteerJSON {
   status: VolunteerStateType;
+  accompanying: boolean;
   statusCGC: DocumentStatusType;
   statusVaccination: DocumentStatusType;
   infoAbout: string;
