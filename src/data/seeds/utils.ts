@@ -1,10 +1,13 @@
 import {
   DocumentStatusType,
   OccasionalType,
-  VolunteerStateType,
+  VolunteerStateAppreciationType,
+  VolunteerStateCommunicationType,
+  VolunteerStateEngagementType,
+  VolunteerStateMatchType,
+  VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
-
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
@@ -33,6 +36,7 @@ import {
   DealJSON,
   OrganizationJSON,
   PersonJSON,
+  VolunteerJSON,
 } from "./types";
 
 const noGenderAvatarUrl = "all_genders_avatar.png";
@@ -130,35 +134,22 @@ export function getDocumentStatus(status: string): DocumentStatusType {
   return statusMap[status] || DocumentStatusType.UNDEFINED;
 }
 
-export function getVolunteerStatus(status: string): VolunteerStateType {
-  if (!status) {
-    return VolunteerStateType.NEW;
-  }
-
-  if (status.includes("Temp Inactive")) {
-    return VolunteerStateType.TEMP_INACTIVE;
-  }
-
-  if (status.includes("Inactive")) {
-    return VolunteerStateType.INACTIVE;
-  }
-  if (status.includes("Accompany")) {
-    return VolunteerStateType.ACTIVE_ACCOMPANY;
-  }
-
-  if (status.includes("Active")) {
-    return VolunteerStateType.ACTIVE_REGULAR;
-  }
-
-  if (status.includes("Matched")) {
-    return VolunteerStateType.MATCHED;
-  }
-
-  if (status.includes("Sent Opportunities List")) {
-    return VolunteerStateType.OPPORTUNITY_SENT;
-  }
-
-  return VolunteerStateType.TO_REMATCH;
+export function getVolunteerState(volunteer: VolunteerJSON): Partial<{
+  statusEngagement: VolunteerStateEngagementType;
+  statusCommunication: VolunteerStateCommunicationType;
+  statusAppreciation: VolunteerStateAppreciationType;
+  statusType: VolunteerStateTypeType;
+  statusMatch: VolunteerStateMatchType;
+}> {
+  return {
+    statusEngagement: VolunteerStateEngagementType.NEW,
+    statusCommunication: undefined,
+    statusAppreciation: undefined,
+    statusType: volunteer.accompanying
+      ? VolunteerStateTypeType.ACCOMPANYING
+      : VolunteerStateTypeType.REGULAR,
+    statusMatch: VolunteerStateMatchType.NO_MATCHES,
+  };
 }
 
 export async function getCount<R>(repository: Repository<R>): Promise<number> {
@@ -470,7 +461,7 @@ export async function createDeal(
   const location = new Location();
   await locationRepository.save(location);
 
-  for (let title of dealData.location.districts) {
+  for (const title of dealData.location.districts) {
     let district = await districtRepository.findOne({ where: { title } });
     if (!district) {
       district = new District({ title });
