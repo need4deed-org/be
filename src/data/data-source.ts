@@ -111,7 +111,7 @@ export const dataSource = new DataSource({
     process.env.NODE_ENV === "test"
       ? []
       : [
-          `${__dirname} + /migrations/**/*.s${process.env.NODE_ENV === "production" ? "js" : "ts"}`,
+          `${__dirname}/migrations/**/*.${process.env.NODE_ENV === "production" ? "js" : "ts"}`,
         ],
   migrationsTableName: "be_migrations",
   subscribers: [],

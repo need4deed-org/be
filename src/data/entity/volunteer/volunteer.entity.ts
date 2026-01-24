@@ -7,7 +7,6 @@ import {
   VolunteerStateCommunicationType,
   VolunteerStateEngagementType,
   VolunteerStateMatchType,
-  VolunteerStateType,
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import {
@@ -50,16 +49,8 @@ export default class Volunteer {
 
   @Column({
     type: "enum",
-    enum: VolunteerStateType,
-    default: VolunteerStateType.NEW,
-  })
-  @IsEnum(VolunteerStateType)
-  status: VolunteerStateType;
-
-  @Column({
-    type: "enum",
     enum: VolunteerStateEngagementType,
-    nullable: true,
+    default: VolunteerStateEngagementType.NEW,
   })
   @IsEnum(VolunteerStateEngagementType)
   statusEngagement: VolunteerStateEngagementType;
@@ -91,7 +82,7 @@ export default class Volunteer {
   @Column({
     type: "enum",
     enum: VolunteerStateMatchType,
-    nullable: true,
+    default: VolunteerStateMatchType.NO_MATCHES,
   })
   @IsEnum(VolunteerStateMatchType)
   statusMatch: VolunteerStateMatchType;
@@ -130,6 +121,10 @@ export default class Volunteer {
     },
   })
   preferredCommunicationType: VolunteerCommunicationType[];
+
+  @Column({ nullable: true })
+  @IsOptional()
+  dateReturn: Date;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -129,7 +129,6 @@ export function volunteerSerializer(
 
   return {
     id: volunteer.id,
-    status: volunteer.status,
     person,
     statusEngagement: volunteer.statusEngagement,
     statusCommunication: volunteer.statusCommunication,
@@ -137,6 +136,7 @@ export function volunteerSerializer(
     statusType: volunteer.statusType,
     statusMatch: volunteer.statusMatch,
     statusCgcProcess: volunteer.statusCgcProcess,
+    dateReturn: volunteer.dateReturn,
     preferredCommunicationType,
     comments,
     goodConductCertificate,
