@@ -12,9 +12,6 @@
         "person": {
           "$ref": "ApiPersonGet#"
         },
-        "status": {
-          "$ref": "VolunteerStateType#"
-        },
         "statusEngagement": {
           "$ref": "VolunteerStateEngagementType#"
         },
@@ -32,6 +29,10 @@
         },
         "statusCgcProcess": {
           "$ref": "VolunteerStateCGCType#"
+        },
+        "dateReturn": {
+          "type": ["string", "null"],
+          "format": "date-time"
         },
         "languages": {
           "type": "array",

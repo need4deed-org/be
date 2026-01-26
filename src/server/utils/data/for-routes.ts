@@ -291,39 +291,54 @@ export async function getOptions(
   return await { [list]: await getList(list) };
 }
 
-export function getPatchData(body: VolunteerPatchBodyData) {
-  const volunteerData: Partial<Volunteer> = stripNullishAttributes({
-    status: body.status,
-    infoAbout: body.infoAbout,
-    infoExperience: body.infoExperience,
-    statusCGC: body.goodConductCertificate,
-    statusVaccination: body.measlesVaccination,
-    statusEngagement: body.statusEngagement,
-    statusCommunication: body.statusCommunication,
-    statusAppreciation: body.statusAppreciation,
-    statusType: body.statusType,
-    statusMatch: body.statusMatch,
-    statusCgcProcess: body.statusCgcProcess,
-    preferredCommunicationType: body.preferredCommunicationType,
-  });
-  const personData: Partial<Person> = stripNullishAttributes({
-    id: body.person?.id,
-    firstName: body.person?.firstName,
-    lastName: body.person?.lastName,
-    middleName: body.person?.middleName,
-    email: body.person?.email,
-    phone: body.person?.phone,
-  });
+export function getPatchData(
+  body: VolunteerPatchBodyData,
+  nullable?: Array<keyof VolunteerPatchBodyData>,
+) {
+  const volunteerData: Partial<Volunteer> = stripNullishAttributes(
+    {
+      infoAbout: body.infoAbout,
+      infoExperience: body.infoExperience,
+      statusCGC: body.goodConductCertificate,
+      statusVaccination: body.measlesVaccination,
+      statusEngagement: body.statusEngagement,
+      statusCommunication: body.statusCommunication,
+      statusAppreciation: body.statusAppreciation,
+      statusType: body.statusType,
+      statusMatch: body.statusMatch,
+      statusCgcProcess: body.statusCgcProcess,
+      dateReturn: body.dateReturn,
+      preferredCommunicationType: body.preferredCommunicationType,
+    },
+    nullable,
+  );
+  const personData: Partial<Person> = stripNullishAttributes(
+    {
+      id: body.person?.id,
+      firstName: body.person?.firstName,
+      lastName: body.person?.lastName,
+      middleName: body.person?.middleName,
+      email: body.person?.email,
+      phone: body.person?.phone,
+    },
+    nullable,
+  );
   const comments = body.comments;
-  const addressData: Partial<Address> = stripNullishAttributes({
-    id: body.person?.address?.id,
-    street: body.person?.address?.street,
-    city: body.person?.address?.city,
-  });
-  const postcodeData: Partial<Postcode> = stripNullishAttributes({
-    id: body.person?.address?.postcode?.id,
-    value: body.person?.address?.postcode?.code,
-  });
+  const addressData: Partial<Address> = stripNullishAttributes(
+    {
+      id: body.person?.address?.id,
+      street: body.person?.address?.street,
+      city: body.person?.address?.city,
+    },
+    nullable,
+  );
+  const postcodeData: Partial<Postcode> = stripNullishAttributes(
+    {
+      id: body.person?.address?.postcode?.id,
+      value: body.person?.address?.postcode?.code,
+    },
+    nullable,
+  );
 
   return {
     ...getEmptyPropsNull({

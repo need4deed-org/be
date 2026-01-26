@@ -38,28 +38,28 @@ export default class Person {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  middleName: string | null;
+  middleName?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  lastName: string | null;
+  lastName?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsEmail() // Validate as email if provided
-  email: string | null;
+  email?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
   @Length(7, 20) // Example phone length validation
-  phone: string | null;
+  phone?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  avatarUrl: string | null;
+  avatarUrl?: string;
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
