@@ -36,7 +36,7 @@ export default class Agent {
   @IsEnum(AgentType)
   type: AgentType;
 
-  @Column()
+  @Column({ type: "enum", enum: AgentOperatorType, nullable: false })
   operatorType: AgentOperatorType;
 
   @Column()

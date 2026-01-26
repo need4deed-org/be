@@ -65,13 +65,21 @@ export function getLanguageCode(isoCode: string): Lang | null {
  * stripNullishAttributes(null)
  * // → {}
  */
-export function stripNullishAttributes<T>(obj: T): Partial<T> {
-  if (obj === null || typeof obj !== "object") {return {};}
+export function stripNullishAttributes<T>(
+  obj: T,
+  nullable: Array<unknown>,
+): Partial<T> {
+  if (obj === null || typeof obj !== "object") {
+    return {};
+  }
 
   return Object.fromEntries(
-    Object.entries(obj).filter(
-      ([, value]) => value !== null && value !== undefined,
-    ),
+    Object.entries(obj).filter(([key, value]) => {
+      if (nullable?.includes(key)) {
+        return true;
+      }
+      return value !== null && value !== undefined;
+    }),
   ) as Partial<T>;
 }
 
@@ -96,7 +104,9 @@ export function stripNullishAttributes<T>(obj: T): Partial<T> {
  * isObjectAndEmpty(null)         // → true
  */
 export function isObjectAndEmpty<T>(obj: T): boolean {
-  if (obj === null || typeof obj !== "object") {return true;}
+  if (obj === null || typeof obj !== "object") {
+    return true;
+  }
 
   const proto = Object.getPrototypeOf(obj);
   const isPlainObject = proto === Object.prototype || proto === null;
@@ -121,7 +131,9 @@ export function isObjectAndEmpty<T>(obj: T): boolean {
 export function getEmptyPropsNull<T extends Record<string, unknown>>(
   obj: T,
 ): T {
-  if (obj === null || typeof obj !== "object") {return obj;}
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
 
   return Object.keys(obj).reduce((acc: T, key: keyof T) => {
     const val = obj[key];

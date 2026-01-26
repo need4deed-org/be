@@ -1,5 +1,4 @@
 import { DataSource } from "typeorm";
-
 import { seedVolunteersFile } from "../../config/constants";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { readJsonAsync } from "../utils";
@@ -10,7 +9,7 @@ import {
   getDocumentStatus,
   getOrCreatePerson,
   getRepository,
-  getVolunteerStatus,
+  getVolunteerState,
 } from "./utils";
 
 export async function seedVolunteers(dataSource: DataSource): Promise<void> {
@@ -37,7 +36,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       const deal = await createDeal(volunteer.deal, dataSource);
 
       const newVolunteer = new Volunteer({
-        status: getVolunteerStatus(volunteer.status),
+        ...getVolunteerState(volunteer),
         statusCGC: getDocumentStatus(volunteer.statusCGC),
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
         infoAbout: volunteer.infoAbout || "",
