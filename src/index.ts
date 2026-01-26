@@ -9,9 +9,10 @@ export async function start() {
     server = await createServer();
     const port = Number(process.env.PORT) || 5000;
     await server.listen({ port, host: "0.0.0.0" });
-    server.log.info("Server started.");
+    // eslint-disable-next-line no-console
+    console.log("Server started.");
   } catch (err) {
-    server.log.error(err);
+    console.error(err);
     process.exit(1);
   }
 }

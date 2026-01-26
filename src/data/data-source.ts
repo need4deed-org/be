@@ -54,7 +54,7 @@ export const dataSource = new DataSource({
   database: process.env.DB_NAME || "postgres",
   schema: process.env.DB_SCHEMA || "public",
   synchronize: false,
-  migrationsRun: process.env.NODE_ENV === "production",
+  migrationsRun: false,
   entities: [
     Activity,
     Address,
