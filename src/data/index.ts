@@ -1,16 +1,19 @@
 import { dataSource } from "./data-source";
 import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
-let queryRunner: import("typeorm").QueryRunner;
+const lockNumber = 0xcdf2a8471b3e8f5fn;
+
 async function initDatabase() {
+  await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
   try {
     await dataSource.initialize();
     if (dataSource.isInitialized) {
       dataSource.logger.log("info", "Data Source has been initialized!");
 
-      queryRunner = dataSource.createQueryRunner();
-      await queryRunner.connect();
-      await createVolunteerListMV(queryRunner);
+      await dataSource.runMigrations();
+      dataSource.logger.log("info", "Run migrations");
+
+      await createVolunteerListMV(dataSource);
       dataSource.logger.log("info", "Created MVs");
 
       dataSource.logger.log("info", "Seeded master data");
@@ -22,9 +25,7 @@ async function initDatabase() {
       `Error occurred while initializing DataSource: ${error.message}`,
     );
   } finally {
-    if (queryRunner) {
-      await queryRunner.release();
-    }
+    await dataSource.query(`SELECT pg_advisory_unlock(${lockNumber})`);
   }
 }
 
