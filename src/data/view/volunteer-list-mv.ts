@@ -1,5 +1,7 @@
+import { DataSource } from "typeorm";
+
 export async function createVolunteerListMV(
-  queryRunner: import("typeorm").QueryRunner,
+  dataSource: DataSource,
 ): Promise<void> {
   const createViewQuery = `
             CREATE MATERIALIZED VIEW volunteer_list_mv AS
@@ -129,15 +131,13 @@ export async function createVolunteerListMV(
             WITH DATA;
         `;
 
-  await queryRunner.query(
-    `DROP MATERIALIZED VIEW IF EXISTS volunteer_list_mv;`,
-  );
+  await dataSource.query(`DROP MATERIALIZED VIEW IF EXISTS volunteer_list_mv;`);
 
-  await queryRunner.query(createViewQuery);
+  await dataSource.query(createViewQuery);
 
   // Ensure the unique index exists for CONCURRENT refresh (required after view creation)
   try {
-    await queryRunner.query(
+    await dataSource.query(
       `CREATE UNIQUE INDEX mv_deal_id_unique_idx ON volunteer_list_mv (volunteer_id);`,
     );
   } catch (_) {
