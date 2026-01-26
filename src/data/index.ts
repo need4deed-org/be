@@ -1,35 +1,31 @@
 import { dataSource } from "./data-source";
 import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
-let queryRunner: import("typeorm").QueryRunner;
-async function initDatabase() {
-  try {
-    await dataSource.initialize();
-    if (dataSource.isInitialized) {
-      // eslint-disable-next-line no-console
-      console.log("Data Source has been initialized!");
+const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
 
-      // Run pending migrations in development
-      if (process.env.NODE_ENV === "development") {
-        // eslint-disable-next-line no-console
-        console.log("Running pending migrations...");
-        await dataSource.runMigrations();
-        // eslint-disable-next-line no-console
-        console.log("Migrations completed.");
-      }
-      queryRunner = dataSource.createQueryRunner();
-      await queryRunner.connect();
-      await createVolunteerListMV(queryRunner);
-    }
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.log(error);
-    throw Error(
-      `Error occurred while initializing DataSource: ${error.message}`,
-    );
-  } finally {
-    if (queryRunner) {
-      await queryRunner.release();
+async function initDatabase() {
+  await dataSource.initialize();
+  if (dataSource.isInitialized) {
+    dataSource.logger.log("info", "Data Source has been initialized!");
+    await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
+    dataSource.logger.log("info", "Acquired the lock for migrations");
+    try {
+      await dataSource.runMigrations();
+      dataSource.logger.log("info", "Run migrations");
+
+      await createVolunteerListMV(dataSource);
+      dataSource.logger.log("info", "Created MVs");
+
+      dataSource.logger.log("info", "Seeded master data");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log(error);
+      throw Error(
+        `Error occurred while initializing DataSource: ${error.message}`,
+      );
+    } finally {
+      await dataSource.query(`SELECT pg_advisory_unlock(${lockNumber})`);
+      dataSource.logger.log("info", "Released the lock for migrations");
     }
   }
 }
