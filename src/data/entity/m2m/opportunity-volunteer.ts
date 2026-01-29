@@ -2,10 +2,12 @@ import { IsEnum } from "class-validator";
 import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from "typeorm";
 import Opportunity from "../opportunity/opportunity.entity";
 import Volunteer from "../volunteer/volunteer.entity";
@@ -24,10 +26,15 @@ export default class OpportunityVolunteer {
   @Column({
     type: "enum",
     enum: OpportunityVolunteerStatusType,
-    nullable: true,
   })
   @IsEnum(OpportunityVolunteerStatusType)
   status: OpportunityVolunteerStatusType;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   @ManyToOne(
     () => Opportunity,
