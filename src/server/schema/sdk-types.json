@@ -214,6 +214,11 @@
       "type": "string",
       "enum": ["accompanying", "other"]
     },
+    "OpportunityVolunteerStatusType": {
+      "$id": "OpportunityVolunteerStatusType",
+      "type": "string",
+      "enum": ["pending", "matched", "active", "past"]
+    },
     "OptionItem": {
       "$id": "OptionItem",
       "type": "object",
@@ -443,6 +448,26 @@
     "AppreciationPatch": {
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
+    },
+    "ApiVolunteerOpportunityGet": {
+      "$id": "ApiVolunteerOpportunityGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "opportunityId": { "type": "number" },
+        "volunteerId": { "type": "number" },
+        "title": { "type": "string" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "opportunityId",
+        "volunteerId",
+        "title",
+        "status",
+        "updatedAt"
+      ]
     }
   }
 }
