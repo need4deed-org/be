@@ -11,6 +11,16 @@ import {
   responseErrors,
 } from "../../schema";
 
+const notFoundMsg = (m2mId: number, volunteerId: number) =>
+  `There's no M2M relation id:${m2mId} for volunteer id:${volunteerId} to an opportunity`;
+
+const successMsg = (
+  opportunityId: number,
+  volunteerId: number,
+  action: "updated" | "deleted",
+) =>
+  `Opportunity id:${opportunityId} for volunteer id:${volunteerId} has been ${action}.`;
+
 export default function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -102,9 +112,7 @@ export default function volunteerOpportunityRoutes(
       });
 
       if (!opportunity) {
-        throw new NotFoundError(
-          `There's no M2M relation id:${m2mId} for volunteer id:${volunteerId} to an opportunity`,
-        );
+        throw new NotFoundError(notFoundMsg(m2mId, volunteerId));
       }
 
       opportunityVolunteerRepository.merge(opportunity, request.body);
@@ -112,8 +120,54 @@ export default function volunteerOpportunityRoutes(
 
       const data = opportunityVolunteerDTO(opportunity);
       return reply.status(200).send({
-        message: `Opportunity id:${opportunity.opportunityId} for volunteer id:${volunteerId} has been updated.`,
+        message: successMsg(opportunity.opportunityId, volunteerId, "updated"),
         data,
+      });
+    },
+  );
+
+  fastify.delete<{
+    Params: { id: number; m2mId: number };
+    Reply: { message: string };
+  }>(
+    "/:m2mId",
+    {
+      schema: {
+        params: idmM2mIdParamSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id: volunteerId, m2mId } = request.params;
+      if (volunteerId <= 0 || m2mId <= 0) {
+        throw new BadRequestError("Param id must ba a positive number");
+      }
+
+      const opportunityVolunteerRepository =
+        fastify.db.opportunityVolunteerRepository;
+
+      const opportunity = await opportunityVolunteerRepository.findOne({
+        where: { id: m2mId },
+        relations: ["opportunity"],
+      });
+
+      if (!opportunity) {
+        throw new NotFoundError(notFoundMsg(m2mId, volunteerId));
+      }
+
+      await opportunityVolunteerRepository.delete(opportunity);
+
+      return reply.status(200).send({
+        message: successMsg(opportunity.opportunityId, volunteerId, "deleted"),
       });
     },
   );
