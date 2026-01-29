@@ -21,7 +21,7 @@ const msg200 = (
   volunteerId: number,
   action: "updated" | "deleted",
 ) =>
-  `Opportunity id:${opportunityId} for volunteer id:${volunteerId} has been ${action}.`;
+  `Relation for volunteer id:${volunteerId} and opportunity id:${opportunityId} has been ${action}.`;
 
 export default function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
@@ -159,14 +159,13 @@ export default function volunteerOpportunityRoutes(
 
       const opportunity = await opportunityVolunteerRepository.findOne({
         where: { id: m2mId },
-        relations: ["opportunity"],
       });
 
       if (!opportunity) {
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
-      await opportunityVolunteerRepository.delete(opportunity);
+      await opportunityVolunteerRepository.delete({ id: m2mId });
 
       return reply.status(200).send({
         message: msg200(opportunity.opportunityId, volunteerId, "deleted"),
