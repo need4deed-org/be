@@ -7,6 +7,7 @@ export const RoutePrefix = {
   HEALTH_CHECK: "/health-check",
   LOGIN: "/login",
   ME: "/me",
+  OPPORTUNITY: "/opportunity",
   OPTION: "/option",
   PERSON: "/person",
   REFRESH: "/refresh",
