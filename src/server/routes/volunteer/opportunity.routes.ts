@@ -11,10 +11,12 @@ import {
   responseErrors,
 } from "../../schema";
 
-const notFoundMsg = (m2mId: number, volunteerId: number) =>
+const msg400 = "URL param must ba a positive number";
+
+const msg404 = (m2mId: number, volunteerId: number) =>
   `There's no M2M relation id:${m2mId} for volunteer id:${volunteerId} to an opportunity`;
 
-const successMsg = (
+const msg200 = (
   opportunityId: number,
   volunteerId: number,
   action: "updated" | "deleted",
@@ -52,7 +54,7 @@ export default function volunteerOpportunityRoutes(
     async (request, reply) => {
       const volunteerId = request.params.id;
       if (volunteerId <= 0) {
-        throw new BadRequestError("Volunteer id must ba a positive number");
+        throw new BadRequestError(msg400);
       }
 
       const opportunityVolunteerRepository =
@@ -100,7 +102,7 @@ export default function volunteerOpportunityRoutes(
     async (request, reply) => {
       const { id: volunteerId, m2mId } = request.params;
       if (volunteerId <= 0 || m2mId <= 0) {
-        throw new BadRequestError("Param id must ba a positive number");
+        throw new BadRequestError(msg400);
       }
 
       const opportunityVolunteerRepository =
@@ -112,7 +114,7 @@ export default function volunteerOpportunityRoutes(
       });
 
       if (!opportunity) {
-        throw new NotFoundError(notFoundMsg(m2mId, volunteerId));
+        throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
       opportunityVolunteerRepository.merge(opportunity, request.body);
@@ -120,7 +122,7 @@ export default function volunteerOpportunityRoutes(
 
       const data = opportunityVolunteerDTO(opportunity);
       return reply.status(200).send({
-        message: successMsg(opportunity.opportunityId, volunteerId, "updated"),
+        message: msg200(opportunity.opportunityId, volunteerId, "updated"),
         data,
       });
     },
@@ -161,13 +163,13 @@ export default function volunteerOpportunityRoutes(
       });
 
       if (!opportunity) {
-        throw new NotFoundError(notFoundMsg(m2mId, volunteerId));
+        throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
       await opportunityVolunteerRepository.delete(opportunity);
 
       return reply.status(200).send({
-        message: successMsg(opportunity.opportunityId, volunteerId, "deleted"),
+        message: msg200(opportunity.opportunityId, volunteerId, "deleted"),
       });
     },
   );
