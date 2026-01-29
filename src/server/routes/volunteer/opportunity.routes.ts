@@ -11,6 +11,18 @@ import {
   responseErrors,
 } from "../../schema";
 
+const msg400 = "URL param must ba a positive number";
+
+const msg404 = (m2mId: number, volunteerId: number) =>
+  `There's no M2M relation id:${m2mId} for volunteer id:${volunteerId} to an opportunity`;
+
+const msg200 = (
+  opportunityId: number,
+  volunteerId: number,
+  action: "updated" | "deleted",
+) =>
+  `Relation for volunteer id:${volunteerId} and opportunity id:${opportunityId} has been ${action}.`;
+
 export default function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -42,7 +54,7 @@ export default function volunteerOpportunityRoutes(
     async (request, reply) => {
       const volunteerId = request.params.id;
       if (volunteerId <= 0) {
-        throw new BadRequestError("Volunteer id must ba a positive number");
+        throw new BadRequestError(msg400);
       }
 
       const opportunityVolunteerRepository =
@@ -90,7 +102,7 @@ export default function volunteerOpportunityRoutes(
     async (request, reply) => {
       const { id: volunteerId, m2mId } = request.params;
       if (volunteerId <= 0 || m2mId <= 0) {
-        throw new BadRequestError("Param id must ba a positive number");
+        throw new BadRequestError(msg400);
       }
 
       const opportunityVolunteerRepository =
@@ -102,9 +114,7 @@ export default function volunteerOpportunityRoutes(
       });
 
       if (!opportunity) {
-        throw new NotFoundError(
-          `There's no M2M relation id:${m2mId} for volunteer id:${volunteerId} to an opportunity`,
-        );
+        throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
       opportunityVolunteerRepository.merge(opportunity, request.body);
@@ -112,8 +122,53 @@ export default function volunteerOpportunityRoutes(
 
       const data = opportunityVolunteerDTO(opportunity);
       return reply.status(200).send({
-        message: `Opportunity id:${opportunity.opportunityId} for volunteer id:${volunteerId} has been updated.`,
+        message: msg200(opportunity.opportunityId, volunteerId, "updated"),
         data,
+      });
+    },
+  );
+
+  fastify.delete<{
+    Params: { id: number; m2mId: number };
+    Reply: { message: string };
+  }>(
+    "/:m2mId",
+    {
+      schema: {
+        params: idmM2mIdParamSchema,
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id: volunteerId, m2mId } = request.params;
+      if (volunteerId <= 0 || m2mId <= 0) {
+        throw new BadRequestError("Param id must ba a positive number");
+      }
+
+      const opportunityVolunteerRepository =
+        fastify.db.opportunityVolunteerRepository;
+
+      const opportunity = await opportunityVolunteerRepository.findOne({
+        where: { id: m2mId },
+      });
+
+      if (!opportunity) {
+        throw new NotFoundError(msg404(m2mId, volunteerId));
+      }
+
+      await opportunityVolunteerRepository.delete({ id: m2mId });
+
+      return reply.status(200).send({
+        message: msg200(opportunity.opportunityId, volunteerId, "deleted"),
       });
     },
   );
