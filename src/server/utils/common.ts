@@ -100,18 +100,22 @@ export function stripNullishAttributes<T>(
  * isObjectAndEmpty({})           // → true
  * isObjectAndEmpty({ a: 1 })     // → false
  * isObjectAndEmpty([])           // → true
- * isObjectAndEmpty(new Date())   // → true
+ * isObjectAndEmpty(new Date())   // → false
  * isObjectAndEmpty(null)         // → true
  */
 export function isObjectAndEmpty<T>(obj: T): boolean {
   if (obj === null || typeof obj !== "object") {
-    return true;
+    return false;
+  }
+
+  if (Array.isArray(obj)) {
+    return false;
   }
 
   const proto = Object.getPrototypeOf(obj);
   const isPlainObject = proto === Object.prototype || proto === null;
 
-  return !isPlainObject || Object.keys(obj).length === 0;
+  return isPlainObject && Object.keys(obj as object).length === 0;
 }
 
 /**
@@ -137,7 +141,7 @@ export function getEmptyPropsNull<T extends Record<string, unknown>>(
 
   return Object.keys(obj).reduce((acc: T, key: keyof T) => {
     const val = obj[key];
-    acc[key] = isObjectAndEmpty(val) ? null : val;
+    acc[key] = isObjectAndEmpty(val) ? (null as unknown as T[keyof T]) : val;
     return acc;
   }, {} as T);
 }
