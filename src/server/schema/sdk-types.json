@@ -475,13 +475,12 @@
       ]
     },
     "ApiVolunteerOpportunityPatch": {
-      "$id": "ApiVolunteerOpportunityPatch#",
+      "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
         "status": { "$ref": "OpportunityVolunteerStatusType#" }
       },
-      "required": ["status"],
-      "additionalProperties": false
+      "required": ["status"]
     }
   }
 }
