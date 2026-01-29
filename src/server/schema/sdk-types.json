@@ -366,27 +366,6 @@
         "post-match-followup"
       ]
     },
-    "ApiCommunicationGet": {
-      "$id": "ApiCommunicationGet",
-      "type": "object",
-      "properties": {
-        "id": { "type": "number" },
-        "contactType": { "$ref": "ContactType#" },
-        "contactMethod": { "$ref": "ContactMethodType#" },
-        "communicationType": { "$ref": "CommunicationType#" },
-        "date": { "type": "string", "format": "date-time" },
-        "userId": { "type": "number" },
-        "volunteerId": { "type": "number" }
-      },
-      "required": [
-        "id",
-        "contactType",
-        "contactMethod",
-        "date",
-        "userId",
-        "volunteerId"
-      ]
-    },
     "ApiCommunication": {
       "$id": "ApiCommunication",
       "type": "object",
@@ -397,6 +376,29 @@
         "date": { "type": "string", "format": "date-time" }
       }
     },
+    "ApiCommunicationGet": {
+      "$id": "ApiCommunicationGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiCommunication#" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "number" },
+            "userId": { "type": "number" },
+            "volunteerId": { "type": "number" }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "contactType",
+        "contactMethod",
+        "date",
+        "userId",
+        "volunteerId"
+      ]
+    },
     "ApiCommunicationPost": {
       "$id": "ApiCommunicationPost",
       "allOf": [{ "$ref": "ApiCommunication#" }],
@@ -405,27 +407,6 @@
     "ApiCommunicationPatch": {
       "$id": "ApiCommunicationPatch",
       "$ref": "ApiCommunication#"
-    },
-    "ApiAppreciationGet": {
-      "$id": "ApiAppreciationGet",
-      "type": "object",
-      "properties": {
-        "id": { "type": "number" },
-        "title": { "$ref": "VolunteerStateAppreciationType#" },
-        "dateDue": { "type": ["string", "null"], "format": "date-time" },
-        "dateDelivery": { "type": ["string", "null"], "format": "date-time" },
-        "userId": { "type": "number" },
-        "opportunityId": { "type": "number" },
-        "volunteerId": { "type": "number" }
-      },
-      "required": [
-        "id",
-        "title",
-        "dateDue",
-        "userId",
-        "opportunityId",
-        "volunteerId"
-      ]
     },
     "ApiAppreciation": {
       "$id": "ApiAppreciation",
@@ -440,6 +421,18 @@
         "volunteerId": { "type": "number" }
       }
     },
+    "ApiAppreciationGet": {
+      "$id": "ApiAppreciationGet",
+      "allOff": [{ "$ref": "ApiAppreciation#" }],
+      "required": [
+        "id",
+        "title",
+        "dateDue",
+        "userId",
+        "opportunityId",
+        "volunteerId"
+      ]
+    },
     "AppreciationPost": {
       "$id": "ApiAppreciationPost",
       "allOff": [{ "$ref": "ApiAppreciation#" }],
@@ -449,17 +442,29 @@
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
     },
-    "ApiVolunteerOpportunityGet": {
-      "$id": "ApiVolunteerOpportunityGet",
+    "ApiVolunteerOpportunity": {
+      "$id": "ApiVolunteerOpportunity",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
         "opportunityId": { "type": "number" },
         "volunteerId": { "type": "number" },
         "title": { "type": "string" },
-        "status": { "$ref": "OpportunityVolunteerStatusType#" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+      }
+    },
+    "ApiVolunteerOpportunityGet": {
+      "$id": "ApiVolunteerOpportunityGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiVolunteerOpportunity#" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "number" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ],
       "required": [
         "id",
         "opportunityId",
@@ -468,6 +473,15 @@
         "status",
         "updatedAt"
       ]
+    },
+    "ApiVolunteerOpportunityPatch": {
+      "$id": "ApiVolunteerOpportunityPatch#",
+      "type": "object",
+      "properties": {
+        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+      },
+      "required": ["status"],
+      "additionalProperties": false
     }
   }
 }
