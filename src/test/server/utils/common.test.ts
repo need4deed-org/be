@@ -3,7 +3,7 @@ import {
   generateRandomString,
   getLanguageCode,
   stripNullishAttributes,
-  isObjectAndEmpty,
+  isEmptyPlainObject,
   getEmptyPropsNull,
   getNullFromEmptyArray,
   validatePermissions,
@@ -40,21 +40,23 @@ describe("server/utils/common", () => {
     expect(stripNullishAttributes(null as any, [])).toEqual({});
   });
 
-  it("isObjectAndEmpty behaves for various types", () => {
-    expect(isObjectAndEmpty({})).toBe(true);
-    expect(isObjectAndEmpty({ a: 1 })).toBe(false);
-    expect(isObjectAndEmpty([])).toBe(false);
-    expect(isObjectAndEmpty(new Date())).toBe(false);
-    expect(isObjectAndEmpty(Object.create(null))).toBe(true);
-    expect(isObjectAndEmpty(null)).toBe(false);
-    expect(isObjectAndEmpty(() => {})).toBe(false);
+  it("isEmptyPlainObject behaves for various types", () => {
+    expect(isEmptyPlainObject({})).toBe(true);
+    expect(isEmptyPlainObject({ a: 1 })).toBe(false);
+    expect(isEmptyPlainObject({ a: {} })).toBe(false);
+    expect(isEmptyPlainObject([])).toBe(false);
+    expect(isEmptyPlainObject(new Date())).toBe(false);
+    expect(isEmptyPlainObject(Object.create(null))).toBe(true);
+    expect(isEmptyPlainObject(null)).toBe(false);
+    expect(isEmptyPlainObject(() => {})).toBe(false);
     class C {}
-    expect(isObjectAndEmpty(new C())).toBe(false);
+    expect(isEmptyPlainObject(new C())).toBe(false);
   });
 
   it("getEmptyPropsNull replaces empty plain objects with null (shallow)", () => {
     const src = { a: {}, b: { x: 1 }, c: [], d: Object.create(null) };
     expect(getEmptyPropsNull(src)).toEqual({ a: null, b: { x: 1 }, c: [], d: null });
+    expect(getEmptyPropsNull({ name: "Adam" })).toEqual({ name: "Adam" });
 
     // shallow behaviour: nested empty objects are preserved in parent objects
     const nested = { p: { inner: {} } };
