@@ -84,38 +84,31 @@ export function stripNullishAttributes<T>(
 }
 
 /**
- * Determines whether a value is an empty plain object
- * or not an object created by the `Object` constructor.
+ * Determines whether a value is a strictly empty plain object.
  *
- * - Returns `true` for:
- *   - Empty plain objects (`{}`)
- *   - Non-object values (`null`, numbers, strings, etc.)
- *   - Non-plain objects (arrays, dates, custom instances, etc.)
- * - Returns `false` only for non-empty plain objects.
+ * - Returns `true` ONLY for empty plain objects (`{}`).
+ * - Returns `false` for everything else (null, undefined, strings, numbers, arrays, Dates, populated objects).
  *
- * @param {object} obj - The value to test.
- * @returns {boolean} `true` if the value is an empty plain object or not an object created by `Object`; otherwise `false`.
+ * @param {unknown} obj - The value to test.
+ * @returns {boolean} `true` if the value is `{}`; otherwise `false`.
  *
  * @example
- * isObjectAndEmpty({})           // → true
- * isObjectAndEmpty({ a: 1 })     // → false
- * isObjectAndEmpty([])           // → true
- * isObjectAndEmpty(new Date())   // → false
- * isObjectAndEmpty(null)         // → true
+ * isEmptyPlainObject({})             // → true
+ * isEmptyPlainObject({ a: 1 })       // → false
+ * isEmptyPlainObject([])             // → false
+ * isEmptyPlainObject(new Date())     // → false
+ * isEmptyPlainObject(null)           // → false
+ * isEmptyPlainObject("some string")  // → false
  */
-export function isObjectAndEmpty<T>(obj: T): boolean {
+export function isEmptyPlainObject<T>(obj: T): boolean {
   if (obj === null || typeof obj !== "object") {
-    return false;
-  }
-
-  if (Array.isArray(obj)) {
     return false;
   }
 
   const proto = Object.getPrototypeOf(obj);
   const isPlainObject = proto === Object.prototype || proto === null;
 
-  return isPlainObject && Object.keys(obj as object).length === 0;
+  return isPlainObject && Object.keys(obj).length === 0;
 }
 
 /**
@@ -141,7 +134,7 @@ export function getEmptyPropsNull<T extends Record<string, unknown>>(
 
   return Object.keys(obj).reduce((acc: T, key: keyof T) => {
     const val = obj[key];
-    acc[key] = isObjectAndEmpty(val) ? (null as unknown as T[keyof T]) : val;
+    acc[key] = isEmptyPlainObject(val) ? null : val;
     return acc;
   }, {} as T);
 }
