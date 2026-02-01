@@ -51,7 +51,7 @@ async function authRoutes(
       }
 
       try {
-        fastify.log.debug(`Attempting to authenticate: ${email}/${password}`);
+        fastify.log.debug(`Attempting to authenticate: ${email}`);
 
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
