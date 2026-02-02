@@ -1,7 +1,7 @@
 {
   "name": "n4d-be",
   "version": "0.0.1",
-  "description": "Awesome project developed with TypeORM.",
+  "description": "Need4Deed API",
   "engines": {
     "node": ">=22.0.0"
   },
