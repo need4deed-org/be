@@ -1,5 +1,9 @@
 import { IsEnum, IsOptional, IsString } from "class-validator";
-import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
+import {
+  OpportunityStatusType,
+  OpportunityType,
+  TranslatedIntoType,
+} from "need4deed-sdk";
 import {
   Column,
   CreateDateColumn,
@@ -37,6 +41,14 @@ export default class Opportunity {
   })
   @IsEnum(OpportunityType)
   type: OpportunityType;
+
+  @Column({
+    type: "enum",
+    enum: OpportunityStatusType,
+    default: OpportunityStatusType.NEW,
+  })
+  @IsEnum(OpportunityStatusType)
+  status: OpportunityStatusType;
 
   @Column({ nullable: true })
   @IsOptional()
