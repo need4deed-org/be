@@ -43,7 +43,7 @@
     "fastify": "^5.3.3",
     "fastify-mailer": "^2.3.1",
     "fastify-plugin": "^5.0.1",
-    "need4deed-sdk": "^0.0.42",
+    "need4deed-sdk": "^0.0.48",
     "nodemailer": "^7.0.4",
     "pg": "^8.14.1",
     "pino-pretty": "^13.0.0",
@@ -69,7 +69,8 @@
     "test:watch": "yarn test --watch",
     "test:coverage": "yarn test --coverage",
     "test:ui": "yarn test --ui",
-    "prepare": "husky"
+    "prepare": "husky",
+    "what": "node -e 'console.log(\"need4deed-sdk: \" + require(\"./package.json\").dependencies[\"need4deed-sdk\"])'"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
