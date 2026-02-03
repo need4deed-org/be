@@ -16,6 +16,7 @@ import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
+import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person";
 import userRoutes from "./routes/user";
@@ -152,6 +153,9 @@ export async function createServer(
   await fastifyInstance.register(personRoutes, { prefix: RoutePrefix.PERSON });
   await fastifyInstance.register(volunteerRoutes, {
     prefix: RoutePrefix.VOLUNTEER,
+  });
+  await fastifyInstance.register(opportunityRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY,
   });
   await fastifyInstance.register(optionRoutes, { prefix: RoutePrefix.OPTION });
   await fastifyInstance.register(commentRoutes, {
