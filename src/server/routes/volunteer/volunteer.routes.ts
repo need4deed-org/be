@@ -19,7 +19,6 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   leadFromParser,
   parseFormData,
-  serialize,
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
@@ -224,7 +223,7 @@ export default async function volunteerRoutes(
           },
         });
 
-        const data = serialize(volunteers, volunteerListSerializer);
+        const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
         reply.status(200).send({
           message: `Volunteers page ${page}`,
