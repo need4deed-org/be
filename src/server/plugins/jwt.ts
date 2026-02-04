@@ -45,6 +45,7 @@ async function jwtPlugin(
         }
 
         if (user.role === UserRole.ADMIN) {
+          fastify.log.debug(`Admin user ${userId} authenticated, bypassing further checks.`);
           reply.status(200);
           return;
         }
