@@ -1,6 +1,5 @@
-import { DataSource } from "typeorm";
-
 import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
+import { DataSource } from "typeorm";
 import { seedOpportunitiesFile } from "../../config/constants";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import { readJsonAsync } from "../utils";
@@ -46,7 +45,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
         title,
         type:
           getEnumValue(OpportunityType, opportunity.info) ||
-          OpportunityType.GENERAL,
+          OpportunityType.REGULAR,
         translationType:
           getEnumValue(TranslatedIntoType, opportunity.translationType) ||
           TranslatedIntoType.NO_TRANSLATION,
