@@ -28,11 +28,6 @@ export enum DealType {
   OPPORTUNITY = "opportunity",
 }
 
-export enum OpportunityType {
-  VOLUNTEERING = "volunteering",
-  ACCOMPANYING = "accompanying",
-}
-
 export enum AgentOperatorType {
   ORGANIZATION = "organization",
   PERSON = "person",
