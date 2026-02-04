@@ -481,6 +481,16 @@
         "status": { "$ref": "OpportunityVolunteerStatusType#" }
       },
       "required": ["status"]
+    },
+    "OpportunityType": {
+      "$id": "OpportunityType",
+      "type": "string",
+      "enum": ["accompanying", "regular", "events"]
+    },
+    "OpportunityStatusType": {
+      "$id": "OpportunityStatusType",
+      "type": "string",
+      "enum": ["new", "searching", "active", "past"]
     }
   }
 }
