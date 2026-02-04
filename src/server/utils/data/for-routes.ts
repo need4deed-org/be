@@ -727,3 +727,7 @@ export async function getVolunteerDocuments(
 
   return apiDocuments;
 }
+
+export function normalizeStringArrayInput(input: string | string[]) {
+  return Array.isArray(input) ? In(input) : input;
+}
