@@ -8,7 +8,7 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
-    volunteerType: opportunity.deal.profile.volunteeringType,
-    statusOpportunity: opportunity.status,
+    type: opportunity.deal.profile.volunteeringType,
+    status: opportunity.status,
   };
 }
