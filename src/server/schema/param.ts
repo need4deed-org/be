@@ -5,6 +5,7 @@ export const idParamSchema = {
   },
   required: ["id"],
 };
+export type IdParam = { id: number };
 
 export const idTypeParamSchema = {
   type: "object",
@@ -14,6 +15,7 @@ export const idTypeParamSchema = {
   },
   required: ["id", "type"],
 };
+export type IdTypeParam = { id: number; type: string };
 
 export const idmM2mIdParamSchema = {
   type: "object",
@@ -23,3 +25,4 @@ export const idmM2mIdParamSchema = {
   },
   required: ["id", "m2mId"],
 };
+export type IdM2mIdParam = { id: number; m2mId: number };
