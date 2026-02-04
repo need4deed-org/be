@@ -1,3 +1,5 @@
+import { getRef } from "../utils";
+
 export const idParamSchema = {
   type: "object",
   properties: {
@@ -11,7 +13,7 @@ export const idTypeParamSchema = {
   type: "object",
   properties: {
     id: { type: "integer" },
-    type: { $ref: "DocumentType#" },
+    type: getRef("DocumentType#"),
   },
   required: ["id", "type"],
 };
