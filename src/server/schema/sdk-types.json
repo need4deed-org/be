@@ -491,6 +491,21 @@
       "$id": "OpportunityStatusType",
       "type": "string",
       "enum": ["new", "searching", "active", "past"]
+    },
+    "ApiOpportunityGetList": {
+      "$id": "ApiOpportunityGetList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "type": { "$ref": "OpportunityType#" },
+        "status": { "$ref": "OpportunityStatusType#" },
+        "title": { "type": "string" },
+        "category": {
+          "type": "object",
+          "properties": { "id": { "type": "number" } }
+        }
+      },
+      "required": ["id", "type", "status", "title", "category"]
     }
   }
 }
