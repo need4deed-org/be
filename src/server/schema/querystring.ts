@@ -1,18 +1,21 @@
+import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
+import { getRef } from "../utils";
+
 export const opportunityListQuerySchema = {
   type: "object",
   properties: {
     page: { type: "integer", minimum: 1 },
     limit: { type: "integer", minimum: 1, maximum: 120 },
     type: {
-      oneOf: [
-        { $ref: "OpportunityType#" },
-        { type: "array", items: { $ref: "OpportunityType#" } },
+      anyOf: [
+        getRef("OpportunityType#"),
+        { type: "array", items: getRef("OpportunityType#") },
       ],
     },
     status: {
-      oneOf: [
-        { $ref: "OpportunityStatusType#" },
-        { type: "array", items: { $ref: "OpportunityStatusType#" } },
+      anyOf: [
+        getRef("OpportunityStatusType#"),
+        { type: "array", items: getRef("OpportunityStatusType#") },
       ],
     },
   },
@@ -21,6 +24,6 @@ export const opportunityListQuerySchema = {
 export type OpportunityListQuery = {
   page?: number;
   limit?: number;
-  type?: string;
-  status?: string;
+  type?: OpportunityType | OpportunityType[];
+  status?: OpportunityStatusType | OpportunityStatusType[];
 };
