@@ -70,7 +70,7 @@
     "test:coverage": "yarn test --coverage",
     "test:ui": "yarn test --ui",
     "prepare": "husky",
-    "what": "node -e 'console.log(\"need4deed-sdk: \" + require(\"./package.json\").dependencies[\"need4deed-sdk\"])'"
+    "what": "./get-json-field-value.sh package.json"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
