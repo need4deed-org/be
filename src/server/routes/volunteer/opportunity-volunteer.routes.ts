@@ -9,6 +9,7 @@ import {
   idmM2mIdParamSchema,
   idParamSchema,
   responseErrors,
+  responseSchema,
 } from "../../schema";
 
 const msg400 = "URL param must ba a positive number";
@@ -35,20 +36,7 @@ export default function volunteerOpportunityVolunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "array",
-                items: { $ref: "ApiVolunteerOpportunityGet#" },
-              },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerOpportunityGet#", true, false),
       },
     },
     async (request, reply) => {
@@ -86,17 +74,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       schema: {
         params: idmM2mIdParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "ApiVolunteerOpportunityGet#" },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerOpportunityGet#"),
       },
     },
     async (request, reply) => {
