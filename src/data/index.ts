@@ -1,3 +1,8 @@
+import {
+  isProd,
+  shouldRunMigrations,
+  shouldTruncateAll,
+} from "../config/constants";
 import { dataSource } from "./data-source";
 import { seed } from "./seeds/seed";
 import { removeData } from "./utils";
@@ -12,9 +17,11 @@ async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
-      await removeData(dataSource);
+      if (shouldTruncateAll) {
+        await removeData(dataSource);
+      }
 
-      if (process.env.NODE_ENV !== "development") {
+      if (isProd || shouldRunMigrations) {
         await dataSource.runMigrations();
         dataSource.logger.log("info", "Run migrations");
       }
