@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
-  ApiVolunteerOpportunityGet,
+  ApiOpportunityVolunteerGet,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
@@ -9,6 +9,7 @@ import {
   idmM2mIdParamSchema,
   idParamSchema,
   responseErrors,
+  responseSchema,
 } from "../../schema";
 
 const msg400 = "URL param must ba a positive number";
@@ -23,32 +24,19 @@ const msg200 = (
 ) =>
   `Relation for volunteer id:${volunteerId} and opportunity id:${opportunityId} has been ${action}.`;
 
-export default function volunteerOpportunityRoutes(
+export default function volunteerOpportunityVolunteerRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
   fastify.get<{
     Params: { id: number };
-    Reply: { message: string; data: ApiVolunteerOpportunityGet[] };
+    Reply: { message: string; data: ApiOpportunityVolunteerGet[] };
   }>(
     "/",
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "array",
-                items: { $ref: "ApiVolunteerOpportunityGet#" },
-              },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerOpportunityGet#", true, false),
       },
     },
     async (request, reply) => {
@@ -78,7 +66,7 @@ export default function volunteerOpportunityRoutes(
 
   fastify.patch<{
     Params: { id: number; m2mId: number };
-    Reply: { message: string; data: ApiVolunteerOpportunityGet };
+    Reply: { message: string; data: ApiOpportunityVolunteerGet };
     Body: { status: OpportunityVolunteerStatusType };
   }>(
     "/:m2mId",
@@ -86,17 +74,7 @@ export default function volunteerOpportunityRoutes(
       schema: {
         params: idmM2mIdParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "ApiVolunteerOpportunityGet#" },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerOpportunityGet#"),
       },
     },
     async (request, reply) => {

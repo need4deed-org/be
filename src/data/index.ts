@@ -1,4 +1,11 @@
+import {
+  isProd,
+  shouldRunMigrations,
+  shouldTruncateAll,
+} from "../config/constants";
 import { dataSource } from "./data-source";
+import { seed } from "./seeds/seed";
+import { removeData } from "./utils";
 import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
 const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
@@ -10,13 +17,21 @@ async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
-      await dataSource.runMigrations();
-      dataSource.logger.log("info", "Run migrations");
+      if (shouldTruncateAll) {
+        await removeData(dataSource);
+      }
+
+      if (isProd || shouldRunMigrations) {
+        await dataSource.runMigrations();
+        dataSource.logger.log("info", "Run migrations");
+      }
 
       await createVolunteerListMV(dataSource);
       dataSource.logger.log("info", "Created MVs");
 
       dataSource.logger.log("info", "Seeded master data");
+      await seed(dataSource);
+      dataSource.logger.log("info", "Database initialization completed");
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log(error);
