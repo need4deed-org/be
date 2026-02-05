@@ -1,7 +1,7 @@
 {
   "name": "n4d-be",
   "version": "0.0.1",
-  "description": "Awesome project developed with TypeORM.",
+  "description": "Need4Deed API",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -43,7 +43,7 @@
     "fastify": "^5.3.3",
     "fastify-mailer": "^2.3.1",
     "fastify-plugin": "^5.0.1",
-    "need4deed-sdk": "^0.0.42",
+    "need4deed-sdk": "^0.0.50",
     "nodemailer": "^7.0.4",
     "pg": "^8.14.1",
     "pino-pretty": "^13.0.0",
@@ -60,6 +60,7 @@
     "migration:revert": "yarn typeorm migration:revert",
     "migration:show": "yarn typeorm migration:show",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "type-check": "tsc --noEmit",
@@ -68,7 +69,8 @@
     "test:watch": "yarn test --watch",
     "test:coverage": "yarn test --coverage",
     "test:ui": "yarn test --ui",
-    "prepare": "husky"
+    "prepare": "husky",
+    "what": "./get-json-field-value.sh package.json"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

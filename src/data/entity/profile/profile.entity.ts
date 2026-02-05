@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
+import { ProfileVolunteeringType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -28,6 +29,11 @@ export default class Profile {
   @IsOptional()
   @IsString()
   info?: string;
+
+  @Column({ type: "enum", enum: ProfileVolunteeringType, nullable: true })
+  @IsOptional()
+  @IsEnum(ProfileVolunteeringType)
+  volunteeringType?: ProfileVolunteeringType;
 
   @ManyToOne(() => Category, (category) => category.profile, {
     nullable: true,

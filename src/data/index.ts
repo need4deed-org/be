@@ -10,8 +10,10 @@ async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
-      await dataSource.runMigrations();
-      dataSource.logger.log("info", "Run migrations");
+      if (process.env.NODE_ENV !== "development") {
+        await dataSource.runMigrations();
+        dataSource.logger.log("info", "Run migrations");
+      }
 
       await createVolunteerListMV(dataSource);
       dataSource.logger.log("info", "Created MVs");

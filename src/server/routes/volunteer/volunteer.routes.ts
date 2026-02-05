@@ -19,7 +19,6 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   leadFromParser,
   parseFormData,
-  serialize,
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
@@ -42,7 +41,7 @@ import { writeVolunteer } from "../../utils/writeVolunteer";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
-import volunteerOpportunityRoutes from "./opportunity.routes";
+import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -87,8 +86,8 @@ export default async function volunteerRoutes(
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
-  await fastify.register(volunteerOpportunityRoutes, {
-    prefix: `/:id${RoutePrefix.OPPORTUNITY}`,
+  await fastify.register(volunteerOpportunityVolunteerRoutes, {
+    prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
@@ -224,7 +223,7 @@ export default async function volunteerRoutes(
           },
         });
 
-        const data = serialize(volunteers, volunteerListSerializer);
+        const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
         reply.status(200).send({
           message: `Volunteers page ${page}`,

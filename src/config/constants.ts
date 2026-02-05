@@ -87,3 +87,5 @@ export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
 
 export const authAccessTokenCookieName = "access";
 export const authRefreshTokenCookieName = "refresh";
+
+export const defaultPageSize = 12;
