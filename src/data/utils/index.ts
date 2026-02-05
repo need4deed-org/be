@@ -5,3 +5,4 @@ export * from "./getRRULE";
 export * from "./getStartEndDates";
 export * from "./passwd";
 export * from "./readJsonAsync";
+export * from "./remove-data";
