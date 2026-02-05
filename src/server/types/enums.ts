@@ -8,6 +8,7 @@ export const RoutePrefix = {
   LOGIN: "/login",
   ME: "/me",
   OPPORTUNITY: "/opportunity",
+  OPPORTUNITY_LINKED: "/opportunity-linked",
   OPTION: "/option",
   PERSON: "/person",
   REFRESH: "/refresh",

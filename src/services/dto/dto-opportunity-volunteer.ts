@@ -1,9 +1,9 @@
-import { ApiVolunteerOpportunityGet } from "need4deed-sdk";
+import { ApiOpportunityVolunteerGet } from "need4deed-sdk";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 
 export function opportunityVolunteerDTO(
   opportunityVolunteer: OpportunityVolunteer,
-): ApiVolunteerOpportunityGet {
+): ApiOpportunityVolunteerGet {
   if (!(opportunityVolunteer instanceof OpportunityVolunteer)) {
     throw new Error("Wrong opportunity-volunteer format.");
   }

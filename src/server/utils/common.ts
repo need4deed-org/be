@@ -183,3 +183,7 @@ export function validatePermissions<E extends { userId: number }>(
 ) {
   return entity.userId === user.id || roles?.includes(user.role);
 }
+
+export function getRef(reference: string) {
+  return { $ref: reference };
+}

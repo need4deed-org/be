@@ -1,5 +1,6 @@
 import { UserRole } from "need4deed-sdk";
 import { DataSource } from "typeorm";
+import { NotFoundError } from "../../config/error/fastify";
 import Address from "../entity/location/address.entity";
 import Postcode from "../entity/location/postcode.entity";
 import Person from "../entity/person.entity";
@@ -49,8 +50,19 @@ export async function seedUser(dataSource: DataSource) {
   const postcode12345 = await postcodeRepository.findOne({
     where: { value: "12345" },
   });
-  const address = new Address({ postcode: postcode12345, title: "Dummy" });
-  await addressRepository.save(address);
+  let address = await addressRepository.findOne({
+    where: { title: "Dummy" },
+  });
+  if (!postcode12345) {
+    throw new NotFoundError(
+      "Postcode 12345 not found. Please seed postcodes first.",
+    );
+  }
+  if (!address) {
+    address = new Address({ postcode: postcode12345, title: "Dummy" });
+    await addressRepository.save(address);
+  }
+
   const personUser = new Person({
     firstName: "Anna",
     middleName: "User",

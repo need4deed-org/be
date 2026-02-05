@@ -14,6 +14,7 @@ import {
 } from "need4deed-sdk";
 import { DataSource, FindOptionsWhere, In, Repository } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
+import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
@@ -659,7 +660,7 @@ export function parseQueryParams(rawQuery: InputQuery) {
 
   // 2. Type Conversion and Final Structure
   return {
-    limit: parseInt(rawQuery.limit as string, 10) || 0,
+    limit: parseInt(rawQuery.limit as string, 10) || defaultPageSize,
     page: parseInt(rawQuery.page as string, 10) || 1,
     orderDirection: getOrderDirection(rawQuery.sortOrder as SortOrder),
     language: rawQuery.language,
@@ -725,4 +726,8 @@ export async function getVolunteerDocuments(
   );
 
   return apiDocuments;
+}
+
+export function normalizeStringArrayInput(input: string | string[]) {
+  return Array.isArray(input) ? In(input) : input;
 }
