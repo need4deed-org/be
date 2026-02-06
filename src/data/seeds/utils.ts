@@ -28,8 +28,9 @@ import Profile from "../entity/profile/profile.entity";
 import Skill from "../entity/profile/skill.entity";
 import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
+import { categorize } from "../lib";
 import { AgentOperatorType, AgentType } from "../types";
-import { categorize, getRRULE, getStartEnd } from "../utils";
+import { getRRULE, getStartEnd } from "../utils";
 import {
   AddressJSON,
   AgentJSON,
