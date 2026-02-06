@@ -1,21 +1,20 @@
 import {
   Address,
-  ApiAvailability,
   ApiPersonGet,
   ApiVolunteerGet,
   ApiVolunteerGetList,
-  ByDay,
-  Occasionally,
-  OptionItem,
   TimedText,
-  TimeSlot,
 } from "need4deed-sdk";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Timeline from "../../data/entity/timeline.entity";
 import Comment from "../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
+import {
+  getAvailability,
+  getLanguages,
+  getOptionItems,
+  getTitles,
+} from "./utils";
 
 const city = "Berlin";
 
@@ -155,77 +154,4 @@ export function volunteerSerializer(
     skills,
     locations,
   };
-}
-
-function getByDay(rrule: string): ByDay {
-  if (!rrule) {
-    throw new Error("RRule is required to get ByDay");
-  }
-  const byDayPos = rrule.indexOf("BYDAY") + 6;
-  if (byDayPos < 6) {
-    return null;
-  }
-  const byDay = rrule.slice(byDayPos, byDayPos + 2);
-  if (!(byDay in ByDay)) {
-    throw new Error("RRule BYDAY value is not recognized");
-  }
-  return ByDay[byDay];
-}
-
-function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
-  if (!start || !end) {
-    throw new Error("Start and end dates are required to get TimeSlot");
-  }
-  const timeslot = `${start.getHours().toString().padStart(2, "0")}-${end.getHours().toString().padStart(2, "0")}`;
-
-  if (Object.values(TimeSlot).includes(timeslot as TimeSlot)) {
-    return timeslot as TimeSlot;
-  }
-
-  throw new Error("From or To hour value is not supported");
-}
-
-function getAvailability(timeTimeslot: TimeTimeslot[]): ApiAvailability[] {
-  return timeTimeslot?.map(({ timeslot }): ApiAvailability => {
-    if (timeslot?.occasional) {
-      return {
-        id: timeslot.id,
-        day: Occasionally.OCCASIONALLY,
-        daytime: timeslot.occasional,
-      };
-    }
-    if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
-      return {
-        id: timeslot.id,
-        day: getByDay(timeslot.rrule),
-        daytime: getTimeSlotForDaytime(timeslot.start, timeslot.end),
-      };
-    }
-
-    throw new Error("Timeslot is lacking required fields");
-  });
-}
-
-function getLanguages(profileLanguage: ProfileLanguage[]) {
-  return profileLanguage?.map((pl) => ({
-    id: pl.language.id,
-    title: pl.language.translation || pl.language.title,
-    proficiency: pl.proficiency,
-  }));
-}
-
-function getOptionItems<T>(
-  profileItems: T[],
-  entityName: string,
-): OptionItem[] {
-  return profileItems?.map((pa) => ({
-    id: pa[entityName].id,
-    title: pa[entityName].translation || pa[entityName].title,
-  }));
-}
-
-function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems?.map(
-    (pa) => pa[entityName].translation || pa[entityName].title,
-  );
 }
