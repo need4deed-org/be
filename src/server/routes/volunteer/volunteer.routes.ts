@@ -42,6 +42,7 @@ import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
+import volunteerOpportunityRoutes from "./volunteer-opportunity.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -83,6 +84,11 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
+    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+  });
+
+  await fastify.register(volunteerOpportunityRoutes, {
+    prefix: `/:id${RoutePrefix.OPPORTUNITY}`,
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
