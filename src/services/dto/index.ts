@@ -4,4 +4,5 @@ export * from "./dto-opportunity-volunteer";
 export * from "./dto-volunteer";
 export * from "./leadFromParser";
 export * from "./parseFormData";
+export * from "./utils";
 export * from "./volunteerFormParser";
