@@ -187,3 +187,22 @@ export function validatePermissions<E extends { userId: number }>(
 export function getRef(reference: string) {
   return { $ref: reference };
 }
+
+/**
+ * Calculates pagination offsets (skip and take) based on page number and limit.
+ * *
+ *
+ * @param {number} [page=1] - The current page number (1-indexed). Defaults to 1.
+ * @param {number} [limit=10] - The number of items to return per page. Defaults to 10.
+ * @returns {[number, number]} A tuple containing `[skip, take]`:
+ * - `skip`: The number of records to bypass.
+ * - `take`: The number of records to return.
+ * * @example
+ * const [skip, take] = getSkipTake(2, 20);
+ * // returns [20, 20]
+ */
+export function getSkipTake(page?: number, limit?: number): [number, number] {
+  const take = limit || 10;
+  const skip = ((page || 1) - 1) * take;
+  return [skip, take];
+}
