@@ -24,6 +24,37 @@ export async function tryCatch<T, E = Error>(
 }
 
 /**
+ * A higher-order function that wraps a synchronous function in a try/catch block.
+ * * If the wrapped function executes successfully, it returns the result.
+ * If it throws an error, the error is passed to the provided logger
+ * and the function returns `null`.
+ *
+ * @template T - A function type that represents the function being wrapped.
+ * * @param {T} fn - The synchronous function to be executed safely.
+ * @param {(err: unknown) => void} logger - A callback function to handle or log errors.
+ * * @returns {(...args: Parameters<T>) => (ReturnType<T> | null)}
+ * A new function that accepts the same arguments as `fn` and returns its result or `null`.
+ * * @example
+ * const parseData = (json: string) => JSON.parse(json);
+ * const safeParse = tryCatchFn(parseData, console.error);
+ * * const result = safeParse('{"valid": "json"}'); // Returns { valid: "json" }
+ * const badResult = safeParse('invalid-json');   // Logs error and returns null
+ */
+export const tryCatchFn =
+  <T extends (...args: unknown[]) => ReturnType<T>>(
+    fn: T,
+    logger: (err: unknown) => void,
+  ) =>
+  (...args: Parameters<T>): ReturnType<T> | null => {
+    try {
+      return fn(...args);
+    } catch (error) {
+      logger(error);
+      return null;
+    }
+  };
+
+/**
  * Extracts the HTTP status code from an error object.
  * * If the error is an instance of `BaseError` and contains a valid numeric
  * status code, that code is returned. Otherwise, it defaults to 500.
