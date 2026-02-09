@@ -4,7 +4,7 @@ import { responseErrors } from "./responseErrors";
 export function responseSchema(
   dataSchemaRef: string,
   isArray = false,
-  count = true,
+  count = isArray,
 ) {
   return {
     200: {
