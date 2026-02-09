@@ -1,3 +1,4 @@
+import { ApiPersonPatch } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import Person from "../../../data/entity/person.entity";
 import { dtoParsePerson, dtoSerializePerson } from "../../../services/dto"; // Adjust the import path
@@ -32,7 +33,7 @@ describe("dtoParsePerson", () => {
       },
     };
 
-    const result = dtoParsePerson(apiPerson);
+    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
 
     expect(result.address).toEqual({
       street: "123 Main St",
@@ -54,7 +55,7 @@ describe("dtoParsePerson", () => {
       },
     };
 
-    const result = dtoParsePerson(apiPerson);
+    const result = dtoParsePerson(apiPerson as unknown as ApiPersonPatch);
 
     expect(result.address?.postcode).toEqual({
       id: "pc_123",
@@ -77,7 +78,7 @@ describe("dtoParsePerson", () => {
       },
     };
 
-    const result = dtoParsePerson(apiPerson);
+    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
 
     expect(result.address).toBeDefined();
     expect(result.address?.street).toBe("Lone Street");
