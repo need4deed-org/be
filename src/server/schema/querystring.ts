@@ -1,4 +1,3 @@
-import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { getRef } from "../utils";
 
 export const opportunityListQuerySchema = {
@@ -20,10 +19,4 @@ export const opportunityListQuerySchema = {
     },
   },
   additionalProperties: false,
-};
-export type OpportunityListQuery = {
-  page?: number;
-  limit?: number;
-  type?: OpportunityType | OpportunityType[];
-  status?: OpportunityStatusType | OpportunityStatusType[];
 };
