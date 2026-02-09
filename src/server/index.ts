@@ -11,6 +11,7 @@ import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
 import typeormPlugin from "./plugins/typeorm";
+import agentRoutes from "./routes/agent.routes";
 import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
@@ -167,9 +168,7 @@ export async function createServer(
   await fastifyInstance.register(appreciationRoutes, {
     prefix: RoutePrefix.APPRECIATION,
   });
-
-  await fastifyInstance.ready();
-  fastifyInstance.log.debug(fastifyInstance.printRoutes());
+  await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
 
   return fastifyInstance;
 }

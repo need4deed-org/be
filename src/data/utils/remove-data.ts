@@ -13,7 +13,7 @@ export async function removeData(dataSource: DataSource): Promise<void> {
             SELECT tablename 
             FROM pg_tables 
             WHERE schemaname = 'public' 
-            AND tablename NOT IN ('migrations', 'typeorm_metadata')
+            AND tablename NOT IN ('be_migrations', 'typeorm_metadata')
         ) LOOP
             EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP; -- Corrected from END DECLARE
