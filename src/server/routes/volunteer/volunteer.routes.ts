@@ -88,6 +88,7 @@ export default async function volunteerRoutes(
   });
 
   await fastify.register(volunteerOpportunityRoutes, {
+    // TODO: remove ":id" from GET
     prefix: `/:id${RoutePrefix.OPPORTUNITY}`,
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
