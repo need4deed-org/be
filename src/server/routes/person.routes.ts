@@ -1,18 +1,20 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import fp from "fastify-plugin";
-import { UserRole } from "need4deed-sdk";
+import { ApiPersonGet, ApiPersonPatch, UserRole } from "need4deed-sdk";
+import { NotFoundError } from "../../config";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
+import { dtoParsePerson, dtoSerializePerson } from "../../services";
+import { deepMerge } from "../../services/utils";
+import { idParamSchema, responseSchema } from "../schema";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
-import { RoutePrefix } from "../types";
+import { ParamsId, ReplyData } from "../types";
+import { updatePerson } from "../utils";
 
-async function personRoutes(
+export default async function personRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  _options: FastifyPluginOptions,
 ) {
-  const prefixedPath = options.prefix || RoutePrefix.PERSON;
-
   const schema = {
     response: {
       200: {
@@ -36,7 +38,7 @@ async function personRoutes(
       data?: Array<Person>;
     };
   }>(
-    prefixedPath,
+    "/",
     { schema, onRequest: [fastify.authenticate({ role: UserRole.ADMIN })] },
     async (request, reply) => {
       try {
@@ -53,7 +55,7 @@ async function personRoutes(
   );
 
   fastify.get(
-    `${prefixedPath}/:id`,
+    "/:id",
     { schema, onRequest: [fastify.authenticate()] },
     async (request, reply) => {
       try {
@@ -102,11 +104,54 @@ async function personRoutes(
     },
   );
 
+  fastify.patch<{
+    Params: ParamsId;
+    Reply: ReplyData<ApiPersonGet>;
+    Body: ApiPersonPatch;
+  }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPersonPatch#" },
+        response: responseSchema("ApiPersonGet#"),
+      },
+    },
+    async (request, reply) => {
+      const personId = request.params.id;
+      const person = await fastify.db.personRepository.findOne({
+        where: { id: personId },
+        relations: ["address.postcode"],
+      });
+
+      if (!person) {
+        throw new NotFoundError(`Person with id ${personId} not found.`);
+      }
+
+      const updatedPersonObj = deepMerge(
+        {
+          id: person.id,
+          addressId: person.addressId,
+          address: { postcodeId: person.address.postcodeId },
+        },
+        dtoParsePerson(request.body),
+      );
+
+      const updatedPerson = await updatePerson(updatedPersonObj);
+
+      const data = dtoSerializePerson(updatedPerson);
+
+      return reply
+        .status(200)
+        .send({ message: "Person updated successfully.", data });
+    },
+  );
+
   fastify.post<{
     Body: PersonCreateType;
     Reply: { message: string; errors?: string[]; data?: Person };
   }>(
-    prefixedPath,
+    "/",
     {
       schema: {
         body: newPersonSchema,
@@ -160,8 +205,3 @@ async function personRoutes(
     },
   );
 }
-
-export default fp(personRoutes, {
-  name: "person-routes",
-  dependencies: ["typeorm-plugin"],
-});

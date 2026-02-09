@@ -74,3 +74,31 @@ export function getErrorStatusCode(error: BaseError | Error): number {
   }
   return 500; // Default to Internal Server Error
 }
+
+export function isObject(item) {
+  return Boolean(item && typeof item === "object" && !Array.isArray(item));
+}
+
+export function deepMerge(target, source) {
+  if (!isObject(target)) {
+    return isObject(source) ? Object.assign({}, source) : source;
+  }
+
+  const output = Object.assign({}, target);
+
+  if (isObject(source)) {
+    Object.keys(source).forEach((key) => {
+      if (isObject(source[key])) {
+        // Only recurse if BOTH are objects
+        if (key in target && isObject(target[key])) {
+          output[key] = deepMerge(target[key], source[key]);
+        } else {
+          output[key] = Object.assign({}, source[key]);
+        }
+      } else {
+        output[key] = source[key];
+      }
+    });
+  }
+  return output;
+}

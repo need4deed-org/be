@@ -68,10 +68,14 @@
         "applied_n4d"
       ]
     },
-    "VolunteerCommunicationType": {
-      "$id": "VolunteerCommunicationType",
+    "PreferredCommunicationType": {
+      "$id": "PreferredCommunicationType",
       "type": "string",
       "enum": ["email", "mobilePhone", "whatsapp", "telegram"]
+    },
+    "VolunteerCommunicationType": {
+      "$id": "VolunteerCommunicationType",
+      "$ref": "PreferredCommunicationType#"
     },
     "TimedText": {
       "$id": "TimedText",
@@ -142,19 +146,29 @@
         "timestamp": { "type": "string", "format": "date-time" }
       }
     },
-    "ApiPersonGet": {
-      "$id": "ApiPersonGet",
+    "ApiPerson": {
+      "$id": "ApiPerson",
       "type": "object",
       "properties": {
         "id": { "type": "number" },
+        "avatarUrl": { "type": "string" },
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
         "middleName": { "type": "string" },
         "email": { "type": "string" },
         "phone": { "type": "string" },
         "address": { "$ref": "Address#" },
-        "avatarUrl": { "type": "string" }
+        "preferredComm": { "$ref": "PreferredCommunicationType#" }
       }
+    },
+    "ApiPersonGet": {
+      "$id": "ApiPersonGet",
+      "$ref": "ApiPerson#",
+      "required": ["id", "firstName", "email"]
+    },
+    "ApiPersonPatch": {
+      "$id": "ApiPersonPatch",
+      "$ref": "ApiPerson#"
     },
     "VolunteerStateType": {
       "$id": "VolunteerStateType",

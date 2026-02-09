@@ -15,6 +15,7 @@ export interface QuerystringPagination {
   limit?: number;
 }
 
+// TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
   type: string;
   status: string;
@@ -32,4 +33,7 @@ export type QuerystringOpportunityGetList = QuerystringPagination &
   QuerystringOpportunityFiltering;
 
 export type QuerystringVolunteerOpportunityGetList = QuerystringPagination &
+  QuerystringOpportunityFiltering;
+
+export type QuerystringOpportunityList = QuerystringPagination &
   QuerystringOpportunityFiltering;
