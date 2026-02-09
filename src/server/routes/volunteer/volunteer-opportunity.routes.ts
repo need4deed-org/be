@@ -17,42 +17,46 @@ export default async function volunteerOpportunityRoutes(
   fastify.get<{
     Querystring: QuerystringVolunteerOpportunityGetList;
     Reply: ReplyDataCount<ApiVolunteerOpportunityGetList[]>;
-  }>("/", async (request, reply) => {
-    const relations = [
-      "deal.profile.profileLanguage.language",
-      "deal.profile.profileActivity.activity",
-      "deal.location.locationDistrict.district",
-      "deal.time.timeTimeslot.timeslot",
-    ];
+  }>(
+    "/",
+    // TODO: add schema
+    async (request, reply) => {
+      const relations = [
+        "deal.profile.profileLanguage.language",
+        "deal.profile.profileActivity.activity",
+        "deal.location.locationDistrict.district",
+        "deal.time.timeTimeslot.timeslot",
+      ];
 
-    const { page, limit, ...filters } = request.query;
+      const { page, limit, ...filters } = request.query;
 
-    const [skip, take] = getSkipTake(page, limit);
+      const [skip, take] = getSkipTake(page, limit);
 
-    const where = Object.fromEntries(
-      Object.entries(filters as QuerystringVolunteerOpportunityGetList).map(
-        ([key, value]) => [key, normalizeStringArrayInput(value)],
-      ),
-    );
+      const where = Object.fromEntries(
+        Object.entries(filters as QuerystringVolunteerOpportunityGetList).map(
+          ([key, value]) => [key, normalizeStringArrayInput(value)],
+        ),
+      );
 
-    const opportunityRepository = fastify.db.opportunityRepository;
+      const opportunityRepository = fastify.db.opportunityRepository;
 
-    const [opportunities, count] = await opportunityRepository.findAndCount({
-      where,
-      relations,
-      skip,
-      take,
-    });
+      const [opportunities, count] = await opportunityRepository.findAndCount({
+        where,
+        relations,
+        skip,
+        take,
+      });
 
-    const data = dtoOpportunitiesCalcCategory(
-      opportunities,
-      dtoVolunteerOpportunityGetList,
-    );
+      const data = dtoOpportunitiesCalcCategory(
+        opportunities,
+        dtoVolunteerOpportunityGetList,
+      );
 
-    return reply.status(200).send({
-      message: `Opportunities for a volunteer.`,
-      data,
-      count,
-    });
-  });
+      return reply.status(200).send({
+        message: `Opportunities for a volunteer.`,
+        data,
+        count,
+      });
+    },
+  );
 }
