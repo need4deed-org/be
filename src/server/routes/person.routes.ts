@@ -137,15 +137,7 @@ export default async function personRoutes(
         dtoParsePerson(request.body),
       );
 
-      fastify.log.debug(
-        `Updating person with id ${personId}: ${JSON.stringify(updatedPersonObj)}`,
-      );
-
       const updatedPerson = await updatePerson(updatedPersonObj);
-
-      fastify.log.debug(
-        `Updated person with id ${personId}: ${JSON.stringify(updatedPerson)}`,
-      );
 
       const data = dtoSerializePerson(updatedPerson);
 
