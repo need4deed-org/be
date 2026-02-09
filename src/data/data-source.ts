@@ -22,6 +22,7 @@ import ProfileActivity from "./entity/m2m/profile-activity";
 import ProfileLanguage from "./entity/m2m/profile-language";
 import ProfileSkill from "./entity/m2m/profile-skill";
 import TimeTimeslot from "./entity/m2m/time-timeslot";
+import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
 import Option from "./entity/option.entity";
@@ -56,6 +57,7 @@ export const dataSource = new DataSource({
   synchronize: false,
   migrationsRun: false,
   entities: [
+    Accompanying,
     Activity,
     Address,
     Agent,
