@@ -7,11 +7,8 @@ import {
   dtoOpportunitiesCalcCategory,
   dtoOpportunityGetList,
 } from "../../../services/dto/dto-opportunity";
-import {
-  OpportunityListQuery,
-  opportunityListQuerySchema,
-  responseSchema,
-} from "../../schema";
+import { opportunityListQuerySchema, responseSchema } from "../../schema";
+import { QuerystringOpportunityList } from "../../types";
 import { normalizeStringArrayInput } from "../../utils";
 
 export default async function opportunityRoutes(
@@ -24,7 +21,7 @@ export default async function opportunityRoutes(
   );
 
   fastify.get<{
-    Querystring: OpportunityListQuery;
+    Querystring: QuerystringOpportunityList;
   }>(
     "/",
     {
