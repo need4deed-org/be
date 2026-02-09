@@ -22,12 +22,12 @@ export default class Accompanying {
   @IsString()
   name: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
   @IsOptional()
   phone?: string;
 
-  @Column()
+  @Column({ nullable: true })
   @IsString()
   @IsOptional()
   email?: string;
@@ -39,7 +39,7 @@ export default class Accompanying {
   @Column({ type: "enum", enum: TranslatedIntoType, nullable: true })
   @IsOptional()
   @IsEnum(TranslatedIntoType)
-  languageToTranslate: TranslatedIntoType;
+  languageToTranslate?: TranslatedIntoType;
 
   @OneToMany(() => Profile, (profile) => profile.accompanying)
   profile: Profile;
