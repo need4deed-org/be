@@ -10,6 +10,7 @@ import {
 import { opportunityListQuerySchema, responseSchema } from "../../schema";
 import { QuerystringOpportunityList } from "../../types";
 import { normalizeStringArrayInput } from "../../utils";
+import { mockOppId } from "./opportunity-id-mock";
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
@@ -20,6 +21,7 @@ export default async function opportunityRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
+  fastify.get("/:id", mockOppId);
   fastify.get<{
     Querystring: QuerystringOpportunityList;
   }>(
