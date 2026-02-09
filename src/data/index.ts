@@ -18,19 +18,28 @@ async function initDatabase() {
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
       if (shouldTruncateAll) {
+        dataSource.logger.log("info", "Attempting to truncate all tables...");
         await removeData(dataSource);
+        dataSource.logger.log("info", "Successfully truncated all tables");
+      } else {
+        dataSource.logger.log(
+          "info",
+          "Truncate all tables skipped due to configuration",
+        );
       }
 
       if (isProd || shouldRunMigrations) {
+        dataSource.logger.log("info", "Attempting to run migrations");
         await dataSource.runMigrations();
-        dataSource.logger.log("info", "Run migrations");
+        dataSource.logger.log("info", "Migrations completed");
       }
 
       await createVolunteerListMV(dataSource);
       dataSource.logger.log("info", "Created MVs");
 
-      dataSource.logger.log("info", "Seeded master data");
+      dataSource.logger.log("info", "Attempting to seed master data");
       await seed(dataSource);
+      dataSource.logger.log("info", "Successfully seeded master data");
       dataSource.logger.log("info", "Database initialization completed");
     } catch (error) {
       // eslint-disable-next-line no-console
