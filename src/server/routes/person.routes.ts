@@ -5,6 +5,7 @@ import { NotFoundError } from "../../config";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
 import { deepMerge } from "../../services/utils";
+import { idParamSchema, responseSchema } from "../schema";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { ParamsId, ReplyData } from "../types";
@@ -107,42 +108,52 @@ export default async function personRoutes(
     Params: ParamsId;
     Reply: ReplyData<ApiPersonGet>;
     Body: ApiPersonPatch;
-  }>("/:id", async (request, reply) => {
-    const personId = request.params.id;
-    const person = await fastify.db.personRepository.findOne({
-      where: { id: personId },
-      relations: ["address.postcode"],
-    });
-
-    if (!person) {
-      throw new NotFoundError(`Person with id ${personId} not found.`);
-    }
-
-    const updatedPersonObj = deepMerge(
-      {
-        id: person.id,
-        addressId: person.addressId,
-        address: { postcodeId: person.address.postcodeId },
+  }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPersonPatch#" },
+        response: responseSchema("ApiPersonGet#"),
       },
-      dtoParsePerson(request.body),
-    );
+    },
+    async (request, reply) => {
+      const personId = request.params.id;
+      const person = await fastify.db.personRepository.findOne({
+        where: { id: personId },
+        relations: ["address.postcode"],
+      });
 
-    fastify.log.debug(
-      `Updating person with id ${personId}: ${JSON.stringify(updatedPersonObj)}`,
-    );
+      if (!person) {
+        throw new NotFoundError(`Person with id ${personId} not found.`);
+      }
 
-    const updatedPerson = await updatePerson(updatedPersonObj);
+      const updatedPersonObj = deepMerge(
+        {
+          id: person.id,
+          addressId: person.addressId,
+          address: { postcodeId: person.address.postcodeId },
+        },
+        dtoParsePerson(request.body),
+      );
 
-    fastify.log.debug(
-      `Updated person with id ${personId}: ${JSON.stringify(updatedPerson)}`,
-    );
+      fastify.log.debug(
+        `Updating person with id ${personId}: ${JSON.stringify(updatedPersonObj)}`,
+      );
 
-    const data = dtoSerializePerson(updatedPerson);
+      const updatedPerson = await updatePerson(updatedPersonObj);
 
-    return reply
-      .status(200)
-      .send({ message: "Person updated successfully.", data });
-  });
+      fastify.log.debug(
+        `Updated person with id ${personId}: ${JSON.stringify(updatedPerson)}`,
+      );
+
+      const data = dtoSerializePerson(updatedPerson);
+
+      return reply
+        .status(200)
+        .send({ message: "Person updated successfully.", data });
+    },
+  );
 
   fastify.post<{
     Body: PersonCreateType;
