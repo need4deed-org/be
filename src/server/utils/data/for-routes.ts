@@ -34,8 +34,7 @@ import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
 import Comment from "../../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { getRepository } from "../../../data/seeds/utils";
-import { getRRULE, getStartEnd } from "../../../data/utils";
+import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 import {

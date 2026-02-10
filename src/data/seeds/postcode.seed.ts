@@ -1,9 +1,8 @@
 import { DataSource } from "typeorm";
-
 import { seedPLZFile } from "../../config/constants";
 import Postcode from "../entity/location/postcode.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface PLZJSON {
   plz: string;

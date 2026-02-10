@@ -1,11 +1,10 @@
 import { DataSource } from "typeorm";
-
 import { seedDistrictFile } from "../../config/constants";
 import District from "../entity/location/district.entity";
 import Postcode from "../entity/location/postcode.entity";
 import DistrictPostcode from "../entity/m2m/district-postcode";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface DistrictJSON {
   district: string;

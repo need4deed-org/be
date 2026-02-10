@@ -30,7 +30,7 @@ import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import { categorize } from "../lib";
 import { AgentOperatorType, AgentType } from "../types";
-import { getRRULE, getStartEnd } from "../utils";
+import { getRepository, getRRULE, getStartEnd } from "../utils";
 import {
   AddressJSON,
   AgentJSON,
@@ -160,17 +160,6 @@ export async function getCount<R>(repository: Repository<R>): Promise<number> {
     .getCount();
 
   return count;
-}
-
-export function getRepository<T>(
-  dataSource: DataSource,
-  entity: new () => T,
-): Repository<T> {
-  const repository = dataSource.getRepository(entity);
-  if (!repository) {
-    throw new Error(`${entity.name} entity is not initialized.`);
-  }
-  return repository;
 }
 
 export async function getPostcodeGetter(dataSource: DataSource) {
