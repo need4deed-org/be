@@ -6,7 +6,7 @@ import { dataSource } from "../../data/data-source";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import { categorize } from "../../data/lib";
-import { getRepository } from "../../data/seeds/utils";
+import { getRepository } from "../../data/utils";
 import { tryCatchFn } from "../utils";
 import { getAvailability } from "./utils";
 
@@ -66,7 +66,7 @@ export function dtoOpportunitiesCalcCategory<T>(
     if (opportunity.deal.profile.categoryId) {
       return dtoFn(opportunity);
     }
-     
+
     opportunity.deal.profile.categoryId = categorize(
       opportunity.deal.profile.profileActivity.map(
         ({ activity }) => activity.categoryId,

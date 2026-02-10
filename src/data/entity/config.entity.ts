@@ -17,6 +17,6 @@ export default class Config {
   @IsEnum(ConfigType)
   configKey: ConfigType;
 
-  @Column({ nullable: true })
-  configValue: string;
+  @Column({ type: "boolean", nullable: true })
+  configValue: boolean;
 }

@@ -1,9 +1,8 @@
 import { DataSource } from "typeorm";
-
 import { seedCategoryFile } from "../../config/constants";
 import Category from "../entity/profile/category.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface CategoryJSON {
   id: string;

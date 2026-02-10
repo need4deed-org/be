@@ -2,15 +2,9 @@ import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedOpportunitiesFile } from "../../config/constants";
 import Opportunity from "../entity/opportunity/opportunity.entity";
-import { readJsonAsync } from "../utils";
+import { getRepository, readJsonAsync } from "../utils";
 import { OpportunityJSON } from "./types";
-import {
-  createDeal,
-  getCount,
-  getEnumValue,
-  getOrCreateAgent,
-  getRepository,
-} from "./utils";
+import { createDeal, getCount, getEnumValue, getOrCreateAgent } from "./utils";
 
 export async function seedOpportunities(dataSource: DataSource): Promise<void> {
   if (!dataSource) {
