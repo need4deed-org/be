@@ -42,4 +42,5 @@ export enum ConfigType {
   SCHEMA = "schema",
   REFERENCE_DATA = "reference_data",
   MASTER_DATA = "master_data",
+  TRUNCATE_ALL = "truncate-all",
 }
