@@ -1,9 +1,8 @@
 import { DataSource } from "typeorm";
-
 import { seedSkillFile } from "../../config/constants";
 import Skill from "../entity/profile/skill.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface SkillJSON {
   id: string;

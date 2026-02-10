@@ -1,6 +1,5 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource, In, Repository } from "typeorm";
-
 import { seedLanguageInUseFile } from "../../config/constants";
 import LeadFrom from "../entity/lead.entity";
 import District from "../entity/location/district.entity";
@@ -8,13 +7,8 @@ import Option from "../entity/option.entity";
 import Activity from "../entity/profile/activity.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
-
-const fieldNameTitle = "title";
-const fieldNameDescription = "description";
-const isoCodeEN = "en";
-const isoCodeDE = "de";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface ContentEnDe {
   en: string;
