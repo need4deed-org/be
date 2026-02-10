@@ -17,10 +17,14 @@ async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
+      if (isProd || shouldRunMigrations) {
+        dataSource.logger.log("info", "Attempting to run migrations");
+        await dataSource.runMigrations();
+        dataSource.logger.log("info", "Migrations completed");
+      }
+
       if (shouldTruncateAll) {
-        dataSource.logger.log("info", "Attempting to truncate all tables...");
         await removeData(dataSource);
-        dataSource.logger.log("info", "Successfully truncated all tables");
       } else {
         dataSource.logger.log(
           "info",
@@ -28,18 +32,13 @@ async function initDatabase() {
         );
       }
 
-      if (isProd || shouldRunMigrations) {
-        dataSource.logger.log("info", "Attempting to run migrations");
-        await dataSource.runMigrations();
-        dataSource.logger.log("info", "Migrations completed");
-      }
+      dataSource.logger.log("info", "Attempting to seed data");
+      await seed(dataSource);
+      dataSource.logger.log("info", "Successfully seeded data");
 
       await createVolunteerListMV(dataSource);
       dataSource.logger.log("info", "Created MVs");
 
-      dataSource.logger.log("info", "Attempting to seed master data");
-      await seed(dataSource);
-      dataSource.logger.log("info", "Successfully seeded master data");
       dataSource.logger.log("info", "Database initialization completed");
     } catch (error) {
       // eslint-disable-next-line no-console
