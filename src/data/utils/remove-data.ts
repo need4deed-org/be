@@ -9,8 +9,13 @@ export async function removeData(dataSource: DataSource): Promise<void> {
     configKey: ConfigType.TRUNCATE_ALL,
   })) as Config | null;
 
+  dataSource.logger.log(
+    "info",
+    `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "Okay." : JSON.stringify(flagRecord)}`,
+  );
+
   if (flagRecord && flagRecord.configValue === true) {
-    dataSource.logger.log(
+    return dataSource.logger.log(
       "info",
       "Data is already truncated according to the config. Skipping truncation.",
     );
