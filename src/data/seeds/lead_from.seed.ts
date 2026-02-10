@@ -1,9 +1,8 @@
 import { DataSource } from "typeorm";
-
 import { seedLeadFromFile } from "../../config/constants";
 import LeadFrom from "../entity/lead.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 interface LeadJSON {
   id: string;

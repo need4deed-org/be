@@ -1,14 +1,13 @@
 import { DataSource } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
 import Volunteer from "../entity/volunteer/volunteer.entity";
-import { readJsonAsync } from "../utils";
+import { getRepository, readJsonAsync } from "../utils";
 import { VolunteerJSON } from "./types";
 import {
   createDeal,
   getCount,
   getDocumentStatus,
   getOrCreatePerson,
-  getRepository,
   getVolunteerState,
 } from "./utils";
 

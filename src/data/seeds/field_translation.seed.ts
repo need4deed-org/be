@@ -1,6 +1,5 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource, Repository } from "typeorm";
-
 import {
   seedActivityFile,
   seedCategoryFile,
@@ -14,8 +13,8 @@ import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { readJsonAsync } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, readJsonAsync } from "../utils";
+import { getCount } from "./utils";
 
 const fieldNameTitle = "title";
 const fieldNameDescription = "description";

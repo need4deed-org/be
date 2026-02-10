@@ -5,8 +5,8 @@ import Address from "../entity/location/address.entity";
 import Postcode from "../entity/location/postcode.entity";
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
-import { hashPassword } from "../utils";
-import { getCount, getRepository } from "./utils";
+import { getRepository, hashPassword } from "../utils";
+import { getCount } from "./utils";
 
 export async function seedUser(dataSource: DataSource) {
   const userRepository = getRepository(dataSource, User);

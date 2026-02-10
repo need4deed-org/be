@@ -1,8 +1,30 @@
 import { DataSource } from "typeorm";
+import Config from "../entity/config.entity";
+import { ConfigType } from "../types";
+import { getRepository } from "../utils";
 
 export async function removeData(dataSource: DataSource): Promise<void> {
-  dataSource.logger.log("info", "Removing existing data from the database");
+  const configRepository = getRepository(dataSource, "config");
+  let flagRecord = (await configRepository.findOneBy({
+    configKey: ConfigType.TRUNCATE_ALL,
+  })) as Config | null;
 
+  dataSource.logger.log(
+    "info",
+    `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "Okay." : JSON.stringify(flagRecord)}`,
+  );
+
+  if (flagRecord && flagRecord.configValue === true) {
+    return dataSource.logger.log(
+      "info",
+      "Data is already truncated according to the config. Skipping truncation.",
+    );
+  }
+
+  dataSource.logger.log(
+    "info",
+    "Attempting to remove existing data from the database...",
+  );
   await dataSource.query(`
     DO $$ 
     DECLARE 
@@ -13,12 +35,16 @@ export async function removeData(dataSource: DataSource): Promise<void> {
             SELECT tablename 
             FROM pg_tables 
             WHERE schemaname = 'public' 
-            AND tablename NOT IN ('be_migrations', 'typeorm_metadata')
+            AND tablename NOT IN ('be_migrations', 'typeorm_metadata', 'config') -- Exclude migrations and config tables
         ) LOOP
             EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP; -- Corrected from END DECLARE
     END $$;
   `);
+
+  flagRecord = flagRecord || new Config({ configKey: ConfigType.TRUNCATE_ALL });
+  flagRecord.configValue = true;
+  await configRepository.save(flagRecord);
 
   dataSource.logger.log("info", "Existing data has been removed successfully");
 }
