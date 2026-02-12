@@ -437,7 +437,7 @@
     },
     "ApiAppreciationGet": {
       "$id": "ApiAppreciationGet",
-      "allOff": [{ "$ref": "ApiAppreciation#" }],
+      "$ref": "ApiAppreciation#",
       "required": [
         "id",
         "title",
@@ -449,7 +449,7 @@
     },
     "AppreciationPost": {
       "$id": "ApiAppreciationPost",
-      "allOff": [{ "$ref": "ApiAppreciation#" }],
+      "$ref": "ApiAppreciation#",
       "required": ["title", "dateDue"]
     },
     "AppreciationPatch": {
