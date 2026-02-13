@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPatch, UserRole } from "need4deed-sdk";
 import { idParamSchema } from "../schema";
+import { responseSchema } from "../schema/response-schema";
 
 export default async function communicationRoutes(
   fastify: FastifyInstance,
@@ -20,16 +21,7 @@ export default async function communicationRoutes(
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiCommunicationPatch#" },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "ApiCommunicationGet#" },
-            },
-            required: ["message", "data"],
-          },
-        },
+        response: responseSchema("ApiCommunicationGet"),
       },
     },
     async (request, reply) => {
@@ -63,15 +55,7 @@ export default async function communicationRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-            },
-            required: ["message"],
-          },
-        },
+        response: responseSchema("message"),
       },
     },
     async (request, reply) => {
