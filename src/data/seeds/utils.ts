@@ -1,4 +1,6 @@
 import {
+  AgentOperatorType,
+  AgentType,
   DocumentStatusType,
   OccasionalType,
   VolunteerStateAppreciationType,
@@ -29,7 +31,6 @@ import Skill from "../entity/profile/skill.entity";
 import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import { categorize } from "../lib";
-import { AgentOperatorType, AgentType } from "../types";
 import { getRepository, getRRULE, getStartEnd } from "../utils";
 import {
   AddressJSON,
