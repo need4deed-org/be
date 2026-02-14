@@ -447,12 +447,12 @@
         "volunteerId"
       ]
     },
-    "AppreciationPost": {
+    "ApiAppreciationPost": {
       "$id": "ApiAppreciationPost",
       "$ref": "ApiAppreciation#",
       "required": ["title", "dateDue"]
     },
-    "AppreciationPatch": {
+    "ApiAppreciationPatch": {
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
     },
