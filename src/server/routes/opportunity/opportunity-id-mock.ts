@@ -22,12 +22,15 @@ export async function mockOppId(request, reply) {
         { id: 4, title: "Farsi", purpose: "recipient" },
       ],
       activities: [
-        { id: 1, title: "Gardening" },
-        { id: 2, title: "Community Support" },
+        { id: 1, title: { en: "Gardening", de: "Gartenarbeit" } },
+        {
+          id: 2,
+          title: { en: "Community Support", de: "Gemeinschaftsunterstützung" },
+        },
       ],
       skills: [
-        { id: 1, title: "Communication" },
-        { id: 2, title: "Teamwork" },
+        { id: 1, title: { en: "Communication", de: "Kommunikation" } },
+        { id: 2, title: { en: "Teamwork", de: "Teamarbeit" } },
       ],
       location: [{ id: 1, title: "Kreuzberg" }],
       availability: [
