@@ -72,6 +72,11 @@ export default async function volunteerRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
+  await fastify.register(volunteerOpportunityRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY,
+    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+  });
+
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
@@ -84,12 +89,6 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
-  });
-
-  await fastify.register(volunteerOpportunityRoutes, {
-    // TODO: remove ":id" from GET
-    prefix: `/:id${RoutePrefix.OPPORTUNITY}`,
     onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
