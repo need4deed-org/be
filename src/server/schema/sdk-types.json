@@ -121,6 +121,19 @@
       "$id": "OptionId",
       "type": ["string", "number"]
     },
+    "OptionById": {
+      "$id": "OptionById",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "OptionId#"
+        },
+        "title": {
+          "$ref": "OptionTitle#"
+        }
+      },
+      "additionalProperties": false
+    },
     "OptionTitle": {
       "$id": "OptionTitle",
       "type": "object",

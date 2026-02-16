@@ -4,6 +4,7 @@ import {
   dtoOpportunitiesCalcCategory,
   dtoVolunteerOpportunityGetList,
 } from "../../../services/dto/dto-opportunity";
+import { responseErrors } from "../../schema";
 import {
   QuerystringVolunteerOpportunityGetList,
   ReplyDataCount,
@@ -19,7 +20,25 @@ export default async function volunteerOpportunityRoutes(
     Reply: ReplyDataCount<ApiVolunteerOpportunityGetList[]>;
   }>(
     "/",
-    // TODO: add schema
+    {
+      schema: {
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: {
+                type: "array",
+                items: { $ref: "volunteer-api-opportunity#" },
+              },
+              count: { type: "number" },
+            },
+            required: ["message", "data", "count"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
     async (request, reply) => {
       const relations = [
         "deal.profile.profileLanguage.language",
