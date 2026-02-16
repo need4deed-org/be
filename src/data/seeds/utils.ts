@@ -505,7 +505,6 @@ export async function getOrCreateAgent(
     representative,
     operatorType: AgentOperatorType.ORGANIZATION,
     operatorId: organization.id,
-    postcode: await postcodeGetter(agentData?.postcode),
   });
   await agentRepository.save(newAgent);
   return newAgent;
