@@ -39,7 +39,7 @@ export class UpdateAgentEntity1771086827549 implements MigrationInterface {
       `ALTER TABLE "agent" ALTER COLUMN "type" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "agent" ALTER COLUMN "type" TYPE "public"."agent_type_enum" USING "type"::"text"::"public"."agent_type_enum"`,
+      `ALTER TABLE "agent" ALTER COLUMN "type" TYPE "public"."agent_type_enum" USING lower("type"::"text")::"public"."agent_type_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "type" SET DEFAULT 'rac'`,
@@ -61,7 +61,7 @@ export class UpdateAgentEntity1771086827549 implements MigrationInterface {
       `ALTER TABLE "agent" ALTER COLUMN "type" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "agent" ALTER COLUMN "type" TYPE "public"."agent_type_enum_old" USING "type"::"text"::"public"."agent_type_enum_old"`,
+      `ALTER TABLE "agent" ALTER COLUMN "type" TYPE "public"."agent_type_enum_old" USING upper("type"::"text")::"public"."agent_type_enum_old"`,
     );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "type" SET DEFAULT 'RAC'`,

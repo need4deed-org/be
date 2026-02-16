@@ -16,7 +16,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import Postcode from "../location/postcode.entity";
+import Address from "../location/address.entity";
+import District from "../location/district.entity";
 import AgentPostcode from "../m2m/agent-postcode";
 import Person from "../person.entity";
 import Opportunity from "./opportunity.entity";
@@ -100,12 +101,19 @@ export default class Agent {
   @Column({ nullable: true })
   personId: number;
 
-  @ManyToOne(() => Postcode)
-  @JoinColumn({ name: "postcode_id" })
-  postcode: Postcode;
+  @ManyToOne(() => Address)
+  @JoinColumn({ name: "address_id" })
+  address: Address;
 
   @Column({ nullable: true })
-  postcodeId: number;
+  addressId: number;
+
+  @ManyToOne(() => District)
+  @JoinColumn({ name: "district_id" })
+  district: District;
+
+  @Column({ nullable: true })
+  districtId: number;
 
   @OneToMany(() => AgentPostcode, (agentPostcode) => agentPostcode.agent)
   agentPostcode: AgentPostcode[];
