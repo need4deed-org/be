@@ -1,5 +1,5 @@
 import Agent from "../../../data/entity/opportunity/agent.entity";
-import { getDistrictFromPostcode } from "../../../data/utils";
+import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 
 export function getDistrictToAgentHandler() {
   const updates: Agent[] = [];
