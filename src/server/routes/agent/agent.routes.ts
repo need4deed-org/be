@@ -13,6 +13,7 @@ import {
 } from "need4deed-sdk";
 import { dtoAgentGetList } from "../../../services";
 import { ParamsId } from "../../types";
+import { getDistrictToAgentHandler } from "../../utils";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -23,10 +24,20 @@ export default async function agentRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
   fastify.get("/", async (_request, _reply) => {
-    const relations = [];
     const agentRepository = fastify.db.agentRepository;
+    const relations = ["address.postcode"];
+
     const [agents, count] = await agentRepository.findAndCount({ relations });
-    const data = agents.map(dtoAgentGetList);
+
+    const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
+    const data = (await Promise.all(agents.map(addDistrictToAgent))).map(
+      dtoAgentGetList,
+    );
+
+    if (updates.length > 0) {
+      await agentRepository.save(updates);
+    }
+
     return _reply.status(200).send({
       message: "Agents fetched successfully",
       data,
