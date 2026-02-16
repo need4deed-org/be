@@ -3,6 +3,7 @@ import {
   shouldRunMigrations,
   shouldTruncateAll,
 } from "../config/constants";
+import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
 import { seed } from "./seeds/seed";
 import { removeData } from "./utils";
@@ -17,7 +18,12 @@ async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     dataSource.logger.log("info", "Acquired the lock for migrations");
     try {
-      if (isProd || shouldRunMigrations) {
+      const [[migrationsTable]] = await tryCatch<[{ exists: boolean }]>(
+        dataSource.query(
+          `SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'be_migrations') AS exists;`,
+        ),
+      );
+      if (isProd || !migrationsTable?.exists || shouldRunMigrations) {
         dataSource.logger.log("info", "Attempting to run migrations");
         await dataSource.runMigrations();
         dataSource.logger.log("info", "Migrations completed");
