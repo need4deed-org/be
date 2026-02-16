@@ -22,6 +22,24 @@ export default async function volunteerOpportunityRoutes(
     "/",
     {
       schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "integer", minimum: 1 },
+            limit: { type: "integer", minimum: 1 },
+            type: { type: "string" },
+            status: { type: "string" },
+            agentId: { type: "number" },
+            search: { type: "string" },
+            language: { type: "string" },
+            german: { type: "boolean" },
+            activity: { type: "string" },
+            skill: { type: "string" },
+            availability: { type: "string" },
+            district: { type: "string" },
+          },
+          required: ["type", "status"],
+        },
         response: {
           200: {
             type: "object",
