@@ -511,15 +511,21 @@
       "type": "object",
       "properties": {
         "id": { "type": "number" },
-        "type": { "$ref": "OpportunityType#" },
-        "status": { "$ref": "OpportunityStatusType#" },
+        "volunteerType": { "$ref": "OpportunityType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
         "category": {
           "type": "object",
           "properties": { "id": { "type": "number" } }
         }
       },
-      "required": ["id", "type", "status", "title", "category"]
+      "required": [
+        "id",
+        "volunteerType",
+        "statusOpportunity",
+        "title",
+        "category"
+      ]
     }
   }
 }
