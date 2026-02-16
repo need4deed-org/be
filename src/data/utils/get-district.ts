@@ -7,16 +7,18 @@ import { getRepository } from "./get-repository";
 export async function getDistrictFromPostcode(
   postcode: Postcode,
 ): Promise<District | null> {
-  const districtPostcodeRepository = getRepository(
-    dataSource,
-    DistrictPostcode,
-  );
-  const districtPostcode = await districtPostcodeRepository.findOne({
-    where: { postcodeId: postcode.id },
-    relations: ["district"],
-  });
-  if (districtPostcode) {
-    return districtPostcode.district;
+  if (postcode?.id) {
+    const districtPostcodeRepository = getRepository(
+      dataSource,
+      DistrictPostcode,
+    );
+    const districtPostcode = await districtPostcodeRepository.findOne({
+      where: { postcodeId: postcode.id },
+      relations: ["district"],
+    });
+    if (districtPostcode) {
+      return districtPostcode.district;
+    }
   }
   return null;
 }
