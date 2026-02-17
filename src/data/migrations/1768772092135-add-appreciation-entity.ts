@@ -11,9 +11,6 @@ export class AddAppreciationEntity1768772092135 implements MigrationInterface {
       `CREATE TABLE "appreciation" ("id" SERIAL NOT NULL, "title" "public"."appreciation_title_enum" NOT NULL, "date_due" TIMESTAMP, "date_delivery" TIMESTAMP, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "opportunity_id" integer, "volunteer_id" integer NOT NULL, "user_id" integer, CONSTRAINT "PK_d9824c8e198e82f7394c805eddf" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT ARRAY['mobilePhone']`,
-    );
-    await queryRunner.query(
       `ALTER TABLE "appreciation" ADD CONSTRAINT "FK_ce5266cf486c563f4e2c8babe4c" FOREIGN KEY ("opportunity_id") REFERENCES "opportunity"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
@@ -33,9 +30,6 @@ export class AddAppreciationEntity1768772092135 implements MigrationInterface {
     );
     await queryRunner.query(
       `ALTER TABLE "appreciation" DROP CONSTRAINT "FK_ce5266cf486c563f4e2c8babe4c"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT ARRAY['mobilePhone']`,
     );
     await queryRunner.query(`DROP TABLE "appreciation"`);
     await queryRunner.query(`DROP TYPE "public"."appreciation_title_enum"`);

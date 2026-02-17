@@ -1,4 +1,5 @@
 export * from "./dealParser";
+export * from "./dto-agent";
 export * from "./dto-comment";
 export * from "./dto-opportunity-volunteer";
 export * from "./dto-person";
