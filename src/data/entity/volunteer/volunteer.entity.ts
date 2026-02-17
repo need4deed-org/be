@@ -114,7 +114,7 @@ export default class Volunteer {
   @Column({
     type: "text",
     array: true,
-    default: () => "ARRAY['mobilePhone']",
+    default: () => "'{mobilePhone}'",
     transformer: {
       to: (value: VolunteerCommunicationType[]) => value,
       from: (value: unknown) => value as VolunteerCommunicationType[],
