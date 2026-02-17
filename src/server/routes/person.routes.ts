@@ -16,20 +16,7 @@ export default async function personRoutes(
   _options: FastifyPluginOptions,
 ) {
   const schema = {
-    response: {
-      200: {
-        type: "object",
-        properties: {
-          message: { type: "string" },
-          data: {
-            type: "array",
-            items: personResponseSchema,
-          },
-        },
-        required: ["message", "data"],
-      },
-      ...responseErrors,
-    },
+    response: responseSchema("ApiPersonGet#", true),
   };
 
   fastify.get<{
@@ -155,17 +142,7 @@ export default async function personRoutes(
     {
       schema: {
         body: newPersonSchema,
-        response: {
-          201: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: personResponseSchema,
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiPersonGet"),
       },
     },
     async (request, reply) => {
