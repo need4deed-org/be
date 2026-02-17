@@ -460,12 +460,12 @@
         "volunteerId"
       ]
     },
-    "AppreciationPost": {
+    "ApiAppreciationPost": {
       "$id": "ApiAppreciationPost",
       "$ref": "ApiAppreciation#",
       "required": ["title", "dateDue"]
     },
-    "AppreciationPatch": {
+    "ApiAppreciationPatch": {
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
     },
@@ -524,15 +524,43 @@
       "type": "object",
       "properties": {
         "id": { "type": "number" },
-        "type": { "$ref": "OpportunityType#" },
-        "status": { "$ref": "OpportunityStatusType#" },
+        "volunteerType": { "$ref": "OpportunityType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
         "category": {
           "type": "object",
           "properties": { "id": { "type": "number" } }
         }
       },
-      "required": ["id", "type", "status", "title", "category"]
+      "required": [
+        "id",
+        "volunteerType",
+        "statusOpportunity",
+        "title",
+        "category"
+      ]
+    },
+    "AgentType": {
+      "$id": "AgentType",
+      "type": "string",
+      "enum": ["rac", "ngo"]
+    },
+    "ApiAgent": {
+      "$id": "ApiAgent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "type": "string" },
+        "type": { "$ref": "AgentType#" },
+        "address": { "$ref": "Address#" },
+        "district": { "$ref": "Option#" },
+        "activeVolunteers": { "type": "integer" }
+      }
+    },
+    "ApiAgentGetList": {
+      "$id": "ApiAgentGetList",
+      "$ref": "ApiAgent#",
+      "required": ["id", "title", "type"]
     }
   }
 }

@@ -139,30 +139,30 @@ describe("validatePermissions", () => {
 });
 
 describe("getSkipTake()", () => {
-  it("should return default values [0, 10] when no arguments are provided", () => {
+  it("should return default values [0, 12] when no arguments are provided", () => {
     const result = getSkipTake();
-    expect(result).toEqual([0, 10]);
+    expect(result).toEqual([0, 12]);
   });
 
   it("should calculate the correct skip for the first page", () => {
-    const [skip, take] = getSkipTake(1, 20);
+    const [skip, take] = getSkipTake({ page: 1, limit: 20 });
     expect(skip).toBe(0);
     expect(take).toBe(20);
   });
 
   it("should calculate the correct skip for subsequent pages", () => {
-    expect(getSkipTake(3, 10)).toEqual([20, 10]);
+    expect(getSkipTake({ page: 3, limit: 10 })).toEqual([20, 10]);
 
-    expect(getSkipTake(2, 50)).toEqual([50, 50]);
+    expect(getSkipTake({ page: 2, limit: 50 })).toEqual([50, 50]);
   });
 
   it("should handle undefined page or limit by using defaults", () => {
-    expect(getSkipTake(undefined, 15)).toEqual([0, 15]);
+    expect(getSkipTake({ page: undefined, limit: 15 })).toEqual([0, 15]);
 
-    expect(getSkipTake(5, undefined)).toEqual([40, 10]);
+    expect(getSkipTake({ page: 5, limit: undefined })).toEqual([48, 12]);
   });
 
   it("should return 0 skip if page is provided as 0 (due to falsy check)", () => {
-    expect(getSkipTake(0, 10)).toEqual([0, 10]);
+    expect(getSkipTake({ page: 0, limit: 10 })).toEqual([0, 10]);
   });
 });
