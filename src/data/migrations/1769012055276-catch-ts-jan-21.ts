@@ -16,15 +16,9 @@ export class CatchTsJan211769012055276 implements MigrationInterface {
     await queryRunner.query(
       `DROP TYPE "public"."volunteer_status_type_enum_old"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT ARRAY['mobilePhone']`,
-    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT ARRAY['mobilePhone']`,
-    );
     await queryRunner.query(
       `CREATE TYPE "public"."volunteer_status_type_enum_old" AS ENUM('accompanying', 'regular', 'event', 'festival', 'weekend-only')`,
     );

@@ -1,3 +1,5 @@
+import { Lang } from "need4deed-sdk";
+
 export interface ParamsId {
   id: number;
 }
@@ -15,6 +17,10 @@ export interface QuerystringPagination {
   limit?: number;
 }
 
+export interface QuerystringPaginationLanguage extends QuerystringPagination {
+  language: Lang;
+}
+
 // TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
   type: string;
@@ -29,11 +35,16 @@ export interface QuerystringOpportunityFiltering {
   district?: string;
 }
 
-export type QuerystringOpportunityGetList = QuerystringPagination &
+export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering;
 
-export type QuerystringVolunteerOpportunityGetList = QuerystringPagination &
+export type QuerystringVolunteerOpportunityGetList =
+  QuerystringPaginationLanguage & QuerystringOpportunityFiltering;
+
+export type QuerystringOpportunityList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering;
 
-export type QuerystringOpportunityList = QuerystringPagination &
-  QuerystringOpportunityFiltering;
+export interface QuerystringAgentFiltering {}
+
+export type QuerystringAgentGetList = QuerystringPaginationLanguage &
+  QuerystringAgentFiltering;

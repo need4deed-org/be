@@ -17,8 +17,8 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
-    type: opportunity.deal.profile.volunteeringType,
-    status: opportunity.status,
+    volunteerType: opportunity.deal.profile.volunteeringType,
+    statusOpportunity: opportunity.status,
   };
 }
 
@@ -34,8 +34,8 @@ export function dtoVolunteerOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
-    type: opportunity.type,
-    status: opportunity.status,
+    volunteerType: opportunity.type,
+    statusOpportunity: opportunity.status,
     languages: opportunity.deal.profile.profileLanguage
       .filter(Boolean)
       .map((pl) => ({

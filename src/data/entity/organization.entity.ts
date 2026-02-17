@@ -7,10 +7,12 @@ import {
 } from "class-validator";
 import {
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from "typeorm";
 import Address from "./location/address.entity";
 import Person from "./person.entity";
@@ -42,10 +44,15 @@ export default class Organization {
   @Length(7, 20) // Example phone length validation
   phone?: string;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  website?: string;
+
+  @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @UpdateDateColumn()
   updatedAt: Date;
 
   @ManyToOne(() => Address, (address) => address.organization, {
