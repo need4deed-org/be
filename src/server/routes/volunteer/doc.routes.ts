@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { DocumentType } from "need4deed-sdk";
 import Document from "../../../data/entity/document.entity";
 import { tryCatch } from "../../../services/utils";
+import { responseSchema } from "../../schema";
 import {
   idParamSchema,
   idTypeParamSchema,
@@ -163,14 +164,7 @@ export default async function volunteerDocRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("message"),
       },
     },
     async (request, reply) => {
@@ -207,14 +201,7 @@ export default async function volunteerDocRoutes(
     {
       schema: {
         params: idTypeParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("message"),
       },
     },
     async (request, reply) => {

@@ -16,6 +16,7 @@ import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { responseSchema } from "../../schema";
 import {
   leadFromParser,
   parseFormData,
@@ -112,17 +113,7 @@ export default async function volunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "volunteer-api-id#" },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerGet"),
       },
     },
     async (request, reply) => {
@@ -162,18 +153,7 @@ export default async function volunteerRoutes(
     "/",
     {
       schema: {
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              count: { type: "number" },
-              data: { type: "array", items: { $ref: "volunteer-api#" } },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerGetList", true),
       },
     },
     async (request, reply) => {
@@ -260,17 +240,7 @@ export default async function volunteerRoutes(
       schema: {
         params: idParamSchema,
         body: { $ref: "volunteer-api-id-part#" },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "volunteer-api-id#" },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("ApiVolunteerGet"),
       },
     },
     async (request, reply) => {
