@@ -526,6 +526,28 @@
         "title",
         "category"
       ]
+    },
+    "AgentType": {
+      "$id": "AgentType",
+      "type": "string",
+      "enum": ["rac", "ngo"]
+    },
+    "ApiAgent": {
+      "$id": "ApiAgent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "title": { "type": "string" },
+        "type": { "$ref": "AgentType#" },
+        "address": { "$ref": "Address#" },
+        "district": { "$ref": "Option#" },
+        "activeVolunteers": { "type": "integer" }
+      }
+    },
+    "ApiAgentGetList": {
+      "$id": "ApiAgentGetList",
+      "$ref": "ApiAgent#",
+      "required": ["id", "title", "type"]
     }
   }
 }
