@@ -5,6 +5,7 @@ import {
   AgentType,
   AgentVolunteerSearchType,
   ApiAgentGet,
+  ApiAgentGetList,
   ApiCommunicationGet,
   CommunicationType,
   ContactMethodType,
@@ -12,8 +13,14 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { dtoAgentGetList } from "../../../services";
-import { ParamsId } from "../../types";
-import { getDistrictToAgentHandler } from "../../utils";
+import { agentListQuerySchema, responseSchema } from "../../schema";
+import { ParamsId, QuerystringAgentGetList, ReplyDataCount } from "../../types";
+import {
+  getDistrictToAgentHandler,
+  getSkipTake,
+  normalizeStringArrayInput,
+} from "../../utils";
+import { addVolunteerToAgent } from "../../utils/data/add-volunteer-to-agent";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -23,27 +30,56 @@ export default async function agentRoutes(
     "onRequest",
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
-  fastify.get("/", async (_request, _reply) => {
-    const agentRepository = fastify.db.agentRepository;
-    const relations = ["address.postcode"];
+  fastify.get<{
+    Querystring: QuerystringAgentGetList;
+    Reply: ReplyDataCount<ApiAgentGetList[]>;
+  }>(
+    "/",
+    {
+      schema: {
+        querystring: agentListQuerySchema,
+        response: responseSchema("ApiAgentGetList#", true),
+      },
+    },
+    async (request, reply) => {
+      const { page, limit, ...filters } = request.query;
+      const [skip, take] = getSkipTake({ page, limit });
+      const where = Object.fromEntries(
+        Object.entries(filters as QuerystringAgentGetList).map(
+          ([key, value]) => [key, normalizeStringArrayInput(value)],
+        ),
+      );
 
-    const [agents, count] = await agentRepository.findAndCount({ relations });
+      const agentRepository = fastify.db.agentRepository;
+      const relations = [
+        "address.postcode",
+        "district",
+        "opportunity.opportunityVolunteer",
+      ];
 
-    const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
-    const data = (await Promise.all(agents.map(addDistrictToAgent))).map(
-      dtoAgentGetList,
-    );
+      const [agents, count] = await agentRepository.findAndCount({
+        where,
+        relations,
+        skip,
+        take,
+      });
 
-    if (updates.length > 0) {
-      await agentRepository.save(updates);
-    }
+      const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
+      const agentsDistrict = await Promise.all(agents.map(addDistrictToAgent));
+      const agentsDistrictVolunteer = agentsDistrict.map(addVolunteerToAgent);
+      const data = agentsDistrictVolunteer.map(dtoAgentGetList);
 
-    return _reply.status(200).send({
-      message: "Agents fetched successfully",
-      data,
-      count,
-    });
-  });
+      if (updates.length > 0) {
+        await agentRepository.save(updates);
+      }
+
+      return reply.status(200).send({
+        message: "Agents fetched successfully",
+        data,
+        count,
+      });
+    },
+  );
 
   fastify.get<{ Params: ParamsId }>("/:id", async (request, reply) => {
     const { id } = request.params;
