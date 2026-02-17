@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto";
 import { Lang, UserRole } from "need4deed-sdk";
+import { defaultPageSize } from "../../config";
 
 /**
  * Generates a cryptographically secure, pseudo-random hexadecimal string of a specified length.
@@ -193,7 +194,7 @@ export function getRef(reference: string) {
  * *
  *
  * @param {number} [page=1] - The current page number (1-indexed). Defaults to 1.
- * @param {number} [limit=10] - The number of items to return per page. Defaults to 10.
+ * @param {number} [limit=12] - The number of items to return per page. Defaults to 10.
  * @returns {[number, number]} A tuple containing `[skip, take]`:
  * - `skip`: The number of records to bypass.
  * - `take`: The number of records to return.
@@ -201,8 +202,16 @@ export function getRef(reference: string) {
  * const [skip, take] = getSkipTake(2, 20);
  * // returns [20, 20]
  */
-export function getSkipTake(page?: number, limit?: number): [number, number] {
-  const take = limit || 10;
-  const skip = ((page || 1) - 1) * take;
+export function getSkipTake(pageLimit?: {
+  page: number;
+  limit: number;
+}): [number, number] {
+  function isValid(value: number) {
+    return !isNaN(Number(value)) && value > 0;
+  }
+
+  const { page, limit } = pageLimit || {};
+  const take = isValid(limit) ? limit : defaultPageSize;
+  const skip = ((isValid(page) ? page : 1) - 1) * take;
   return [skip, take];
 }

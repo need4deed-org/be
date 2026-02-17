@@ -67,7 +67,7 @@ export default async function volunteerOpportunityRoutes(
 
       const { page, limit, ...filters } = request.query;
 
-      const [skip, take] = getSkipTake(page, limit);
+      const [skip, take] = getSkipTake({ page, limit });
 
       const where = Object.fromEntries(
         Object.entries(filters as QuerystringVolunteerOpportunityGetList).map(
