@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiAppreciationPatch, UserRole } from "need4deed-sdk";
 import { NotFoundError, UnauthorizedError } from "../../config/error/fastify";
-import { idParamSchema, responseSchema } from "../schema";
+import { idParamSchema } from "../schema";
 import { validatePermissions } from "../utils";
 
 export default async function appreciationRoutes(
@@ -22,7 +22,16 @@ export default async function appreciationRoutes(
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAppreciationPatch#" },
-        response: responseSchema("ApiAppreciationGet"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "ApiAppreciationGet#" },
+            },
+            required: ["message", "data"],
+          },
+        },
       },
     },
     async (request, reply) => {
@@ -66,7 +75,15 @@ export default async function appreciationRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: responseSchema("ApiAppreciationGet"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
+        },
       },
     },
     async (request, reply) => {
