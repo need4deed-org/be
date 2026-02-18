@@ -7,7 +7,6 @@ import { hashPassword } from "../../data/utils";
 import { sendVerificationEmail } from "../../services";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseErrors } from "../schema/responseErrors";
-import { responseSchema } from "../schema/response-schema";
 import {
   createUserBodySchema,
   userResponseSchema,
@@ -29,7 +28,17 @@ export default async function userRoutes(
     "/",
     {
       schema: {
-        response: responseSchema("ApiUserGet", true),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { type: "array", items: userResponseSchema },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
     },
@@ -56,7 +65,17 @@ export default async function userRoutes(
     "/:id",
     {
       schema: {
-        response: responseSchema("ApiUserGet"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: userResponseSchema,
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate({ allowSelf: true })],
     },
@@ -94,7 +113,19 @@ export default async function userRoutes(
             access: { type: "string" },
           },
         },
-        response: responseSchema("ApiUserMe"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: {
+                $ref: "ApiUserMe#",
+              },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },

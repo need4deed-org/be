@@ -114,7 +114,14 @@ export default function volunteerOpportunityVolunteerRoutes(
     {
       schema: {
         params: idmM2mIdParamSchema,
-        response: responseSchema("message"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
           ...responseErrors,
         },
       },

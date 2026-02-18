@@ -4,7 +4,6 @@ import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import Comment from "../../data/entity/volunteer/comment.entity";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
-import { responseSchema } from "../schema/response-schema";
 
 export default async function commentRoutes(
   fastify: FastifyInstance,
@@ -36,7 +35,18 @@ export default async function commentRoutes(
             entityType: { type: "string" },
           },
         },
-        response: responseSchema("ApiComment", true, true),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { type: "array", items: { $ref: "ApiComment#" } },
+              count: { type: "number" },
+            },
+            required: ["message", "data", "count"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },
@@ -73,7 +83,17 @@ export default async function commentRoutes(
     "/:id",
     {
       schema: {
-        response: responseSchema("Comment"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "Comment#" },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },
@@ -116,7 +136,17 @@ export default async function commentRoutes(
     {
       schema: {
         body: { $ref: "Comment#" },
-        response: responseSchema("Comment"),
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "Comment#" },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },
@@ -164,7 +194,17 @@ export default async function commentRoutes(
     {
       schema: {
         body: { $ref: "Comment#" },
-        response: responseSchema("Comment"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "Comment#" },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },
@@ -240,7 +280,16 @@ export default async function commentRoutes(
     "/:id",
     {
       schema: {
-        response: responseSchema("message"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
       },
       onRequest: [fastify.authenticate()],
     },
