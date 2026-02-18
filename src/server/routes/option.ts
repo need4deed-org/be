@@ -4,7 +4,6 @@ import { ApiOptionLists, EntityTableName } from "need4deed-sdk";
 
 import { Lang } from "need4deed-sdk";
 import { responseErrors } from "../schema";
-import { responseSchema } from "../schema/response-schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";
 
@@ -31,7 +30,16 @@ async function optionRoutes(
             list: { type: ["string"] },
           },
         },
-        response: responseSchema("option-lists"),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "option-lists#" },
+            },
+            required: ["message", "data"],
+          },
+        },
         ...responseErrors,
       },
     },
