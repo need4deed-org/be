@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiAppreciationGet, ApiAppreciationPost } from "need4deed-sdk";
 import { dtoAppreciation } from "../../../services/dto/dto-appreciation";
 import { idParamSchema, responseErrors } from "../../schema";
-import { responseSchema } from "../../schema";
 
 export default function volunteerAppreciationRoutes(
   fastify: FastifyInstance,
@@ -19,7 +18,17 @@ export default function volunteerAppreciationRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: responseSchema("ApiAppreciationGet", true),
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { type: "array", items: { $ref: "ApiAppreciationGet#" } },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
       },
     },
     async (request, reply) => {
@@ -47,7 +56,16 @@ export default function volunteerAppreciationRoutes(
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAppreciationPost#" },
-        response: responseSchema("ApiAppreciationGet"),
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "ApiAppreciationGet#" },
+            },
+            required: ["message", "data"],
+          },
+        },
       },
     },
     async (request, reply) => {
