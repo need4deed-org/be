@@ -1,14 +1,15 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
-import {
-  dtoOpportunitiesCalcCategory,
-  dtoVolunteerOpportunityGetList,
-} from "../../../services/dto/dto-opportunity";
+import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
   QuerystringVolunteerOpportunityGetList,
   ReplyDataCount,
 } from "../../types";
-import { getSkipTake, normalizeStringArrayInput } from "../../utils";
+import {
+  getCategoryToProfileHandler,
+  getSkipTake,
+  normalizeStringArrayInput,
+} from "../../utils";
 
 export default async function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
@@ -47,10 +48,21 @@ export default async function volunteerOpportunityRoutes(
         take,
       });
 
-      const data = dtoOpportunitiesCalcCategory(
-        opportunities,
-        dtoVolunteerOpportunityGetList,
-      );
+      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
+      const opportunitiesCategory = opportunities.map((opportunity) => {
+        Object.assign(
+          opportunity.deal.profile,
+          addCategoryToProfile(opportunity.deal.profile),
+        );
+        return opportunity;
+      });
+
+      if (updates.length > 0) {
+        const profileRepository = fastify.db.profileRepository;
+        await profileRepository.save(updates);
+      }
+
+      const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);
 
       return reply.status(200).send({
         message: `Opportunities for a volunteer.`,
