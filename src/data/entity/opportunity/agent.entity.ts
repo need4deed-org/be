@@ -1,5 +1,6 @@
 import { IsArray, IsEnum, IsOptional, IsString } from "class-validator";
 import {
+  AgentEngagementStatusType,
   AgentOperatorType,
   AgentServiceType,
   AgentTrustType,
@@ -63,6 +64,13 @@ export default class Agent {
     default: AgentVolunteerSearchType.NOT_NEEDED,
   })
   searchStatus: AgentVolunteerSearchType;
+
+  @Column({
+    type: "enum",
+    enum: AgentEngagementStatusType,
+    default: AgentEngagementStatusType.NEW,
+  })
+  engagementStatus: AgentEngagementStatusType;
 
   @Column({
     type: "text",
