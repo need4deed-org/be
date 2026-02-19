@@ -1,8 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-
 import { responseErrors } from "../schema/responseErrors";
-import { responseSchema } from "../schema/response-schema";
 import { RoutePrefix } from "../types";
 
 async function healthRoutes(
@@ -12,7 +10,16 @@ async function healthRoutes(
   const prefixedPath = options.prefix || RoutePrefix.HEALTH_CHECK;
 
   const schema = {
-    response: responseSchema("message"),
+    response: {
+      200: {
+        type: "object",
+        properties: {
+          message: { type: "string" },
+        },
+        required: ["message"],
+      },
+      ...responseErrors,
+    },
   };
 
   fastify.get(prefixedPath, { schema }, async (request, reply) => {

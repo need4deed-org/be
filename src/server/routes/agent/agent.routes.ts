@@ -92,6 +92,7 @@ export default async function agentRoutes(
       statusEngagement: AgentEngagementStatusType.NEW,
       volunteerSearch: AgentVolunteerSearchType.NOT_NEEDED,
       trustLevel: AgentTrustType.UNKNOWN,
+      activeVolunteers: 0,
       comments: [
         {
           id: 1,
