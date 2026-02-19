@@ -3,13 +3,13 @@ import { UserRole } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { defaultPageSize } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import {
-  dtoOpportunitiesCalcCategory,
-  dtoOpportunityGetList,
-} from "../../../services/dto/dto-opportunity";
+import { dtoOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import { opportunityListQuerySchema, responseSchema } from "../../schema";
 import { QuerystringOpportunityList } from "../../types";
-import { normalizeStringArrayInput } from "../../utils";
+import {
+  getCategoryToProfileHandler,
+  normalizeStringArrayInput,
+} from "../../utils";
 import { mockOppId } from "./opportunity-id-mock";
 
 export default async function opportunityRoutes(
@@ -63,10 +63,21 @@ export default async function opportunityRoutes(
         take,
       });
 
-      const data = dtoOpportunitiesCalcCategory(
-        opportunities,
-        dtoOpportunityGetList,
-      );
+      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
+      const opportunitiesCategory = opportunities.map((opportunity) => {
+        Object.assign(
+          opportunity.deal.profile,
+          addCategoryToProfile(opportunity.deal.profile),
+        );
+        return opportunity;
+      });
+
+      if (updates.length > 0) {
+        const profileRepository = fastify.db.profileRepository;
+        await profileRepository.save(updates);
+      }
+
+      const data = opportunitiesCategory.map(dtoOpportunityGetList);
 
       return reply.status(200).send({
         message: `Opportunities page:${page}.`,
