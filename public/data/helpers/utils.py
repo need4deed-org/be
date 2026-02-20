@@ -2,6 +2,17 @@ import json
 import subprocess
 
 
+def get_parsed_cli(argv):
+    if len(argv) < 2:
+        return (None, None)
+    
+    if argv[1] == "-s":
+        if len(argv) < 3:
+            return (None, None)
+        return (True, argv[2])
+    
+    return (False, argv[1])
+
 def get_list_item_safe(lst: list, idx: int):
     if 0<=idx<len(lst):
         return lst[idx]
@@ -23,7 +34,21 @@ def is_valid_js_date(date_str: str) -> bool:
     )
     return result.stdout.strip() == "true"
 
-def get_name_fields(name):
+def scramble_pii(pii: str)->str:
+    def get_random_char(char):
+        import random
+        import string
+
+        alphabet = string.ascii_letters + string.digits
+
+        if char in alphabet:
+            return random.choice(alphabet)
+
+        return char
+    
+    return "".join([get_random_char(ch) for ch in pii.strip()])
+
+def get_name_fields(name, scramble=False):
     """
     Extracts the names from the string.
     """
@@ -35,7 +60,7 @@ def get_name_fields(name):
     if not isinstance(name, str) or len(name.strip()) == 0:
         return name_fields
     
-    names = [item.strip() for item in name.split(" ") if item.strip()]
+    names = [scramble_pii(item) if scramble else item.strip() for item in name.split(" ") if item.strip()]
     
     name_fields["firstName"] = names[0]
     if len(names) == 2:
@@ -48,7 +73,7 @@ def get_name_fields(name):
 
     return name_fields
 
-def get_email(email):
+def get_email(email, scramble=False):
     """
     Extracts the email from the string.
     """
@@ -59,7 +84,7 @@ def get_email(email):
     if "@" in email and "." in email:
         if email.startswith("mailto:"):
             email = email[7:]
-        return email
+        return scramble_pii(email) if scramble else email
     
     return None
 
@@ -76,12 +101,16 @@ def get_language_split(language):
 def get_list(lst):
     return [item for item in lst if item]
 
-def get_string_or_null(value):
+def get_string_or_null(value, scramble=False):
     """
     Returns the value if it exists, otherwise returns None.
     """
+    value = str(value)
 
-    return value if len(str(value)) else None
+    if not len(value):
+        return None
+
+    return scramble_pii(value) if scramble else value
 
 def get_timeslot_data(timeslot):
     """
@@ -111,7 +140,7 @@ def is_convertible_to_int(s):
     except (ValueError, TypeError):
         return False
 
-def get_address(address):
+def get_address(address, scramble=False):
     """
     Extracts address data from a string.
     examples:

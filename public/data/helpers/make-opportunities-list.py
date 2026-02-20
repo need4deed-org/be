@@ -2,8 +2,8 @@ import json
 import sys
 
 from utils import (get_email, get_language_split, get_list, get_list_item_safe,
-                   get_name_fields, get_string_or_null, get_timeslot_data,
-                   is_valid_js_date)
+                   get_name_fields, get_parsed_cli, get_string_or_null,
+                   get_timeslot_data, is_valid_js_date)
 
 
 class Opportunity:
@@ -11,8 +11,9 @@ class Opportunity:
     A class to handle opportunity data processing.
     """
 
-    def __init__(self, opportunity):
+    def __init__(self, opportunity, scramble):
         self.opportunity = opportunity
+        self.scramble = scramble
 
     def get_agent_data(self):
         """
@@ -39,11 +40,11 @@ class Opportunity:
             if len(rac_contact) == 5:
                 name, email, phone, _, postcode = self.opportunity.get("RAC Contact","").split("<|>")
                 return {
-                    **get_name_fields(name),
-                    "email": email,
-                    "phone": phone,
+                    **get_name_fields(name, scramble=self.scramble),
+                    "email": get_email(email, scramble=self.scramble),
+                    "phone": get_string_or_null(phone, scramble=self.scramble),
                     "address": {
-                        "postcode": postcode
+                        "postcode": get_string_or_null(postcode, scramble=self.scramble)
                     },
                 }
 
@@ -137,7 +138,7 @@ class Opportunity:
         """
         Extracts confidential info from the opportunity dictionary.
         """
-        return get_string_or_null(self.opportunity.get("AA information", ""))
+        return get_string_or_null(self.opportunity.get("AA information", ""), scramble=self.scramble)
 
     def get_status(self):
         """
@@ -173,14 +174,14 @@ class Opportunity:
 
         return None
 
-def get_opportunity(opportunity):
+def get_opportunity(opportunity, scramble=False):
     """
     Processes an opportunity object and returns a structured JSON.
     """
     if not opportunity or not isinstance(opportunity, dict):
         return None
 
-    opportunity_instance = Opportunity(opportunity)
+    opportunity_instance = Opportunity(opportunity, scramble)
     return {
         "title": opportunity_instance.get_title(),
         "status": opportunity_instance.get_status(),
@@ -194,14 +195,16 @@ def get_opportunity(opportunity):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"Usage: python {sys.argv[0]} <path_to_opportunity_json>")
+    scramble, file_url = get_parsed_cli(sys.argv) 
+
+    if not file_url:
+        print(f"Usage: python {sys.argv[0]} <path_to_volunteer_json>")
         sys.exit(1)
 
     try:
-        with open(sys.argv[1], 'r') as file:
+        with open(file_url, 'r') as file:
             opportunity_data = json.load(file)
-            result = [get_opportunity(opportunity) for opportunity in opportunity_data]
+            result = [get_opportunity(opportunity, bool(scramble)) for opportunity in opportunity_data]
             print(json.dumps(result, indent=4))
     except Exception as e:
         print(f"Error processing opportunity data: {e}")

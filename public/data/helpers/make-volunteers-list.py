@@ -2,7 +2,7 @@ import json
 import sys
 
 from utils import (get_email, get_language_split, get_list, get_name_fields,
-                   get_string_or_null, get_timeslot_data)
+                   get_parsed_cli, get_string_or_null, get_timeslot_data)
 
 
 class Volunteer:
@@ -10,8 +10,9 @@ class Volunteer:
     A class to handle volunteer data processing.
     """
 
-    def __init__(self, volunteer):
+    def __init__(self, volunteer, scramble):
         self.volunteer = volunteer
+        self.scramble = scramble
 
     def get_person_data(self):
         """
@@ -21,10 +22,10 @@ class Volunteer:
             return None
         
         return {
-            **get_name_fields(self.volunteer.get("Name", "")),
-            "email": get_email(self.volunteer.get("E-mail", "")),
-            "phone": get_string_or_null(self.volunteer.get("Phone Number", "")),
-            "address": {"postcode": get_string_or_null(self.volunteer.get("Post code", ""))},
+            **get_name_fields(self.volunteer.get("Name", ""), scramble=self.scramble),
+            "email": get_email(self.volunteer.get("E-mail", ""), scramble=self.scramble),
+            "phone": get_string_or_null(self.volunteer.get("Phone Number", ""), scramble=self.scramble),
+            "address": {"postcode": get_string_or_null(self.volunteer.get("Post code", ""), scramble=self.scramble)},
         }
 
     def get_deal_data(self):
@@ -43,7 +44,7 @@ class Volunteer:
             languages = [get_list(get_language_split(language.strip())) for language in self.volunteer.get("Languages", "").split(",")]
 
             return {
-                "info": get_string_or_null(self.volunteer.get("Comments", "")),
+                "info": get_string_or_null(self.volunteer.get("Comments", ""), scramble=self.scramble),
                 "activities": get_list(activities),
                 "skills": get_list(skills),
                 "languages": get_list(languages),
@@ -79,13 +80,13 @@ class Volunteer:
         """
         Extracts comments from the volunteer dictionary.
         """
-        return get_string_or_null(self.volunteer.get("Comments", ""))
+        return get_string_or_null(self.volunteer.get("Comments", ""), scramble=self.scramble)
 
     def get_info_experience(self):
         """
         Extracts coordinator comments from the volunteer dictionary.
         """
-        return get_string_or_null(self.volunteer.get("Coordinator Comments", ""))
+        return get_string_or_null(self.volunteer.get("Coordinator Comments", ""), scramble=self.scramble)
 
     def get_status(self):
         """
@@ -111,14 +112,14 @@ class Volunteer:
         """
         return bool(self.volunteer.get("Accompanying", ""))
 
-def get_volunteer(volunteer):
+def get_volunteer(volunteer, scramble=False):
     """
     Processes a volunteer object and returns a structured JSON.
     """
     if not volunteer or not isinstance(volunteer, dict):
         return None
 
-    volunteer_instance = Volunteer(volunteer)
+    volunteer_instance = Volunteer(volunteer, scramble)
     return {
         "status": volunteer_instance.get_status(),
         "accompanying": volunteer_instance.get_accompanying(),
@@ -132,14 +133,17 @@ def get_volunteer(volunteer):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    scramble, file_url = get_parsed_cli(sys.argv) 
+
+    if not file_url:
         print(f"Usage: python {sys.argv[0]} <path_to_volunteer_json>")
         sys.exit(1)
 
+
     try:
-        with open(sys.argv[1], 'r') as file:
+        with open(file_url, 'r') as file:
             volunteer_data = json.load(file)
-            result = [get_volunteer(volunteer) for volunteer in volunteer_data]
+            result = [get_volunteer(volunteer, scramble=bool(scramble)) for volunteer in volunteer_data]
             print(json.dumps(result, indent=4))
     except Exception as e:
         print(f"Error processing volunteer data: {e}")
