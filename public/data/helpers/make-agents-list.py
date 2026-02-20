@@ -11,7 +11,7 @@ class Agent:
     A class to handle RACs data processing.
     """
 
-    def __init__(self, agent, scramble):
+    def __init__(self, agent, scramble: bool):
         self.agent = agent
         self.scramble = scramble
 
@@ -38,7 +38,7 @@ class Agent:
         
         return {
             "id": uuid.uuid4().hex,
-            "title": get_string_or_null(self.agent.get("Operator", "")),
+            "title": get_string_or_null(self.agent.get("Operator", ""), scramble=self.scramble),
             "address": {"id": uuid.uuid4().hex, **get_address(self.agent.get("Address", ""), scramble=self.scramble)}, # type: ignore
             "phone": get_string_or_null(self.agent.get("Phone", ""), scramble=self.scramble),
             "email": get_email(self.agent.get("Email", ""), scramble=self.scramble),
