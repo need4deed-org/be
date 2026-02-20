@@ -168,7 +168,7 @@ def get_address(address, scramble=False):
         parts.pop()
 
     return {
-        "street": " ".join(parts),
+        "street": get_string_or_null(" ".join(parts), scramble=scramble),
         "city": "Berlin",
-        "postcode": postcode,
+        "postcode": get_string_or_null(postcode, scramble=scramble),
     }

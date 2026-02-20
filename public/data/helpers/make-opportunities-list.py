@@ -28,9 +28,13 @@ class Opportunity:
             """
             title = self.opportunity.get("Accommodation Centre", "")
             if title:
-                return title[:title.find(" (")]
+                return get_string_or_null(title[:title.find(" (")], scramble=self.scramble)
 
-            return f"noname {get_list_item_safe(self.opportunity.get('RAC Contact','').split('<|>'), 1) or ''}".strip()
+            return get_string_or_null(
+                f"noname {get_list_item_safe(self.opportunity.get('RAC Contact','').split('<|>'), 1) or ''}".strip(),
+                scramble=self.scramble,
+                )
+
 
         def get_person_data():
             """
@@ -132,7 +136,7 @@ class Opportunity:
         """
         Extracts info from the opportunity dictionary.
         """
-        return get_string_or_null(self.opportunity.get("VO information", ""))
+        return get_string_or_null(self.opportunity.get("VO information", ""), scramble=self.scramble)
 
     def get_info_confidential(self):
         """
