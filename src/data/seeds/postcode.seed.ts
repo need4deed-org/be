@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedPLZFile } from "../../config/constants";
 import Postcode from "../entity/location/postcode.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface PLZJSON {
@@ -23,7 +23,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const plzs = (await readJsonAsync(seedPLZFile)) as PLZJSON[];
+  const plzs = (await fetchJsonFromUrl(seedPLZFile)) as PLZJSON[];
 
   const existingPostcodes = new Set(
     (await postcodeRepository.find()).map((postcode) => postcode.value),

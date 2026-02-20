@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedCategoryFile } from "../../config/constants";
 import Category from "../entity/profile/category.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface CategoryJSON {
@@ -21,7 +21,9 @@ export async function seedCategory(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const categories = (await readJsonAsync(seedCategoryFile)) as CategoryJSON[];
+  const categories = (await fetchJsonFromUrl(
+    seedCategoryFile,
+  )) as CategoryJSON[];
 
   const existingCategories = new Set(
     (await categoryRepository.find()).map((category) => category.title),
