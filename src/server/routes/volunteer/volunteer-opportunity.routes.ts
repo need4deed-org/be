@@ -27,7 +27,11 @@ export default async function volunteerOpportunityRoutes(
     {
       schema: {
         querystring: volunteerOpportunityListQuerySchema,
-        response: responseSchema("volunteer-api-opportunity#", true, false),
+        response: responseSchema(
+          "ApiVolunteerOpportunityGetList#",
+          true,
+          false,
+        ),
       },
     },
     async (request, reply) => {
