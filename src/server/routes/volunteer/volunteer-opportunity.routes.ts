@@ -1,7 +1,10 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
-import { responseErrors } from "../../schema";
+import {
+  responseSchema,
+  volunteerOpportunityListQuerySchema,
+} from "../../schema";
 import {
   QuerystringVolunteerOpportunityGetList,
   ReplyDataCount,
@@ -23,39 +26,8 @@ export default async function volunteerOpportunityRoutes(
     "/",
     {
       schema: {
-        querystring: {
-          type: "object",
-          properties: {
-            page: { type: "integer", minimum: 1 },
-            limit: { type: "integer", minimum: 1 },
-            type: { type: "string" },
-            status: { type: "string" },
-            agentId: { type: "number" },
-            search: { type: "string" },
-            language: { type: "string" },
-            german: { type: "boolean" },
-            activity: { type: "string" },
-            skill: { type: "string" },
-            availability: { type: "string" },
-            district: { type: "string" },
-          },
-          required: ["type", "status"],
-        },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "array",
-                items: { $ref: "volunteer-api-opportunity#" },
-              },
-              count: { type: "number" },
-            },
-            required: ["message", "data", "count"],
-          },
-          ...responseErrors,
-        },
+        querystring: volunteerOpportunityListQuerySchema,
+        response: responseSchema("volunteer-api-opportunity#", true, false),
       },
     },
     async (request, reply) => {
