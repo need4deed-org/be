@@ -12,10 +12,10 @@
     "category": {
       "$ref": "OptionById#"
     },
-    "type": {
+    "volunteerType": {
       "$ref": "VolunteerStateTypeType#"
     },
-    "status": {
+    "statusOpportunity": {
       "$ref": "OpportunityStatusType#"
     },
     "languages": {
@@ -41,8 +41,8 @@
     "id",
     "title",
     "category",
-    "type",
-    "status",
+    "volunteerType",
+    "statusOpportunity",
     "languages",
     "activities",
     "location",
