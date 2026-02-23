@@ -1,8 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-import { ApiOptionLists, EntityTableName } from "need4deed-sdk";
-
-import { Lang } from "need4deed-sdk";
+import { ApiOptionLists, EntityTableName, Lang } from "need4deed-sdk";
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";

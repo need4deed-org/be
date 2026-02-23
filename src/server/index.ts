@@ -28,6 +28,7 @@ import sdkTypesSchema from "./schema/sdk-types.json";
 import volunteerApiIdPartSchema from "./schema/volunteer-api-id-part.json";
 import volunteerGetPropertiesSchema from "./schema/volunteer-api-id-properties.json";
 import volunteerApiIdSchema from "./schema/volunteer-api-id.json";
+import volunteerApiOpportunitySchema from "./schema/volunteer-api-opportunity.json";
 import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
@@ -76,6 +77,10 @@ export async function createServer(
   await fastifyInstance.addSchema({
     $id: "volunteer-api-id-part",
     ...volunteerApiIdPartSchema,
+  });
+  await fastifyInstance.addSchema({
+    $id: "volunteer-api-opportunity",
+    ...volunteerApiOpportunitySchema,
   });
   await fastifyInstance.addSchema({
     $id: "volunteer-form-data",

@@ -35,3 +35,22 @@ export const agentListQuerySchema = {
   },
   additionalProperties: false,
 };
+
+export const volunteerOpportunityListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    ...languageProp,
+    type: getRef("VolunteerStateTypeType#"),
+    status: getRef("OpportunityStatusType#"),
+    agentId: { type: "number" },
+    search: { type: "string" },
+    german: { type: "boolean" },
+    activity: { type: "string" },
+    skill: { type: "string" },
+    availability: { type: "string" },
+    district: { type: "string" },
+  },
+  required: ["type", "status"],
+  additionalProperties: false,
+};

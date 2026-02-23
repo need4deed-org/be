@@ -103,8 +103,8 @@
       "type": "string",
       "enum": ["create", "update", "remove"]
     },
-    "Option": {
-      "$id": "Option",
+    "OptionProps": {
+      "$id": "OptionProps",
       "type": "object",
       "properties": {
         "id": {
@@ -114,8 +114,17 @@
           "$ref": "OptionTitle#"
         }
       },
-      "required": ["id", "title"],
       "additionalProperties": false
+    },
+    "Option": {
+      "$id": "Option",
+      "$ref": "OptionProps#",
+      "required": ["id", "title"]
+    },
+    "OptionById": {
+      "$id": "OptionById",
+      "$ref": "OptionProps#",
+      "required": ["id"]
     },
     "OptionId": {
       "$id": "OptionId",
