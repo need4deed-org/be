@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedLanguageFile } from "../../config/constants";
 import Language from "../entity/profile/language.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface LanguageJSON {
@@ -22,7 +22,9 @@ export async function seedLanguage(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const languages = (await readJsonAsync(seedLanguageFile)) as LanguageJSON[];
+  const languages = (await fetchJsonFromUrl(
+    seedLanguageFile,
+  )) as LanguageJSON[];
 
   const existingIsoCodes = new Set(
     (await languageRepository.find()).map((language) => language.isoCode),

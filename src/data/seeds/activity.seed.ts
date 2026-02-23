@@ -2,7 +2,7 @@ import { DataSource } from "typeorm";
 import { seedActivityFile } from "../../config/constants";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface ActivityJSON {
@@ -30,7 +30,9 @@ export async function seedActivity(dataSource: DataSource): Promise<void> {
 
   const categories = await categoryRepository.find();
 
-  const activities = (await readJsonAsync(seedActivityFile)) as ActivityJSON[];
+  const activities = (await fetchJsonFromUrl(
+    seedActivityFile,
+  )) as ActivityJSON[];
 
   const existingActivities = new Set(
     (await activityRepository.find()).map((activity) => activity.title),
