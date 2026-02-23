@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   AgentEngagementStatusType,
   AgentTrustType,
-  AgentType,
   AgentVolunteerSearchType,
   ApiAgentGet,
   ApiAgentGetList,
@@ -87,7 +86,7 @@ export default async function agentRoutes(
     const data: ApiAgentGet = {
       id: Number(id),
       title: "Hanger 1-3",
-      type: AgentType.RAC,
+      type: undefined,
       createdAt: now,
       statusEngagement: AgentEngagementStatusType.NEW,
       volunteerSearch: AgentVolunteerSearchType.NOT_NEEDED,
@@ -116,7 +115,7 @@ export default async function agentRoutes(
           "A refugee accommodation centre providing housing and support services for newly arrived refugees in Berlin.",
         website: "orgname.de",
         address: "Musterstraße 12, Berlin, 10115",
-        organizationType: AgentType.NGO,
+        organizationType: undefined,
         operator: "AWO",
         services: "Sozialrecht, Beratungsstelle",
         clientLanguages: [

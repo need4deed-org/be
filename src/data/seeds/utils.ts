@@ -1,6 +1,5 @@
 import {
   AgentOperatorType,
-  AgentType,
   DocumentStatusType,
   OccasionalType,
   VolunteerStateAppreciationType,
@@ -501,7 +500,7 @@ export async function getOrCreateAgent(
 
   const newAgent = new Agent({
     title: agentData.title,
-    type: AgentType.RAC,
+    type: undefined,
     representative,
     operatorType: AgentOperatorType.ORGANIZATION,
     operatorId: organization.id,
