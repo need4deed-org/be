@@ -2,6 +2,10 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
+  responseSchema,
+  volunteerOpportunityListQuerySchema,
+} from "../../schema";
+import {
   QuerystringVolunteerOpportunityGetList,
   ReplyDataCount,
 } from "../../types";
@@ -20,7 +24,12 @@ export default async function volunteerOpportunityRoutes(
     Reply: ReplyDataCount<ApiVolunteerOpportunityGetList[]>;
   }>(
     "/",
-    // TODO: add schema
+    {
+      schema: {
+        querystring: volunteerOpportunityListQuerySchema,
+        response: responseSchema("ApiVolunteerOpportunityGetList#", true),
+      },
+    },
     async (request, reply) => {
       const relations = [
         "deal.profile.profileLanguage.language",

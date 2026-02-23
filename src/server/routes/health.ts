@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
-
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 

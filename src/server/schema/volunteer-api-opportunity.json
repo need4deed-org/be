@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "ApiVolunteerOpportunityGetList#",
+  "definitions": {
+    "ApiVolunteerOpportunityGetList": {
+      "$id": "ApiVolunteerOpportunityGetList",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "OptionById#"
+        },
+        "volunteerType": {
+          "$ref": "VolunteerStateTypeType#"
+        },
+        "statusOpportunity": {
+          "$ref": "OpportunityStatusType#"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "Language#"
+          }
+        },
+        "activities": {
+          "$ref": "OptionById#"
+        },
+        "location": {
+          "$ref": "OptionById#"
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "ApiAvailability#"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "category",
+        "volunteerType",
+        "statusOpportunity",
+        "languages",
+        "activities",
+        "location",
+        "availability"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

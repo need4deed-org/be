@@ -147,7 +147,9 @@ export default async function userRoutes(
         }
 
         const payload = serializeUserToMeDTO(user);
-        return reply.status(200).send({ message: "Logged in User", data: payload });
+        return reply
+          .status(200)
+          .send({ message: "Logged in User", data: payload });
       } catch (error) {
         fastify.log.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
