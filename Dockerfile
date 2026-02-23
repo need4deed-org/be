@@ -10,10 +10,11 @@ FROM node:22-alpine AS production
 # Note: JWT_SECRET should be provided at runtime via secrets management
 # not as build args for security reasons
 ARG NODE_ENV=production
+ARG AWS_S3_BASE
 
 ENV NODE_ENV=${NODE_ENV}
 ENV PORT=8000
-
+ENV AWS_S3_BASE=${AWS_S3_BASE}
 WORKDIR /app
 
 RUN apk update && apk add --no-cache curl dumb-init

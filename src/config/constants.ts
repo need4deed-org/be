@@ -4,6 +4,9 @@ const publicFixturesFromHere = ["..", "..", "public", "data"];
 
 const positives = ["1", "YES", "Yes", "yes", "TRUE", "True", "true"];
 
+export const awsS3BaseUrl =
+  process.env.AWS_S3_BASE || "https://d2nwrdddg8skub.cloudfront.net/dev/";
+
 export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
 
 export const seedPLZFile = path.join(
@@ -53,17 +56,9 @@ export const seedLeadFromFile = path.join(
   "leads.json",
 );
 
-export const seedVolunteersFile = path.join(
-  __dirname,
-  ...publicFixturesFromHere,
-  "volunteers.json",
-);
+export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
 
-export const seedOpportunitiesFile = path.join(
-  __dirname,
-  ...publicFixturesFromHere,
-  "opportunities.json",
-);
+export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
