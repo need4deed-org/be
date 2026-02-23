@@ -13,7 +13,7 @@ import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 const fieldNameTitle = "title";
@@ -38,7 +38,7 @@ async function seedLanguagesInUse(
   langEN: Language,
   langDE: Language,
 ) {
-  const languagesTranslations = (await readJsonAsync(
+  const languagesTranslations = (await fetchJsonFromUrl(
     seedLanguageInUseFile,
   )) as OptionJSON[];
 
@@ -103,7 +103,7 @@ async function seedCategories(
   langEN: Language,
   langDE: Language,
 ) {
-  const categoryTranslations = (await readJsonAsync(
+  const categoryTranslations = (await fetchJsonFromUrl(
     seedCategoryFile,
   )) as OptionJSON[];
 
@@ -197,7 +197,7 @@ async function seedActivities(
 ) {
   const activities = await activityRepository.find();
 
-  const activityTranslations = (await readJsonAsync(
+  const activityTranslations = (await fetchJsonFromUrl(
     seedActivityFile,
   )) as OptionJSON[];
 
@@ -258,7 +258,7 @@ async function seedSkills(
 ) {
   const skills = await skillRepository.find();
 
-  const skillTranslations = (await readJsonAsync(
+  const skillTranslations = (await fetchJsonFromUrl(
     seedSkillFile,
   )) as OptionJSON[];
 
@@ -319,7 +319,7 @@ async function seedLeeds(
 ) {
   const leads = await leadFromRepository.find();
 
-  const leadTranslations = (await readJsonAsync(
+  const leadTranslations = (await fetchJsonFromUrl(
     seedLeadFromFile,
   )) as OptionJSON[];
 

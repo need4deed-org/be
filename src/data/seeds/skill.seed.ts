@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedSkillFile } from "../../config/constants";
 import Skill from "../entity/profile/skill.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface SkillJSON {
@@ -21,7 +21,7 @@ export async function seedSkill(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const skills = (await readJsonAsync(seedSkillFile)) as SkillJSON[];
+  const skills = (await fetchJsonFromUrl(seedSkillFile)) as SkillJSON[];
 
   const existingSkills = new Set(
     (await skillRepository.find()).map((skill) => skill.title),

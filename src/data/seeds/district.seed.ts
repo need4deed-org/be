@@ -3,7 +3,7 @@ import { seedDistrictFile } from "../../config/constants";
 import District from "../entity/location/district.entity";
 import Postcode from "../entity/location/postcode.entity";
 import DistrictPostcode from "../entity/m2m/district-postcode";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface DistrictJSON {
@@ -34,7 +34,9 @@ export async function seedDistrict(dataSource: DataSource): Promise<void> {
     throw new Error("Postcode entity is not initialized.");
   }
 
-  const districts = (await readJsonAsync(seedDistrictFile)) as DistrictJSON[];
+  const districts = (await fetchJsonFromUrl(
+    seedDistrictFile,
+  )) as DistrictJSON[];
 
   const existingDistrictTitles = new Set(
     (await districtRepository.find()).map((district) => district.title),

@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
 import Volunteer from "../entity/volunteer/volunteer.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { VolunteerJSON } from "./types";
 import {
   createDeal,
@@ -24,7 +24,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const volunteers = (await readJsonAsync(
+  const volunteers = (await fetchJsonFromUrl(
     seedVolunteersFile,
   )) as VolunteerJSON[];
 

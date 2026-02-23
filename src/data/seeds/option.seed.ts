@@ -7,7 +7,7 @@ import Option from "../entity/option.entity";
 import Activity from "../entity/profile/activity.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface ContentEnDe {
@@ -25,7 +25,7 @@ async function getOptionsForLanguagesInUse(
   optionRepository: Repository<Option>,
   languageRepository: Repository<Language>,
 ) {
-  const languagesTranslations = (await readJsonAsync(
+  const languagesTranslations = (await fetchJsonFromUrl(
     seedLanguageInUseFile,
   )) as OptionJSON[];
 
