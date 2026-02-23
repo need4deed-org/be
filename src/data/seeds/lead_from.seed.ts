@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { seedLeadFromFile } from "../../config/constants";
 import LeadFrom from "../entity/lead.entity";
-import { getRepository, readJsonAsync } from "../utils";
+import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
 
 interface LeadJSON {
@@ -22,7 +22,7 @@ export async function seedLeadFrom(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  const leads = (await readJsonAsync(seedLeadFromFile)) as LeadJSON[];
+  const leads = (await fetchJsonFromUrl(seedLeadFromFile)) as LeadJSON[];
 
   const existingLeads = new Set(
     (await leadFromRepository.find()).map((lead) => lead.title),
