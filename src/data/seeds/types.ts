@@ -71,6 +71,7 @@ export interface OpportunityJSON {
   type: OpportunityType;
   translationType: string;
   info: string;
+  numberVolunteers: string;
   infoConfidential: string;
   deal: DealJSON;
   agent: AgentJSON;

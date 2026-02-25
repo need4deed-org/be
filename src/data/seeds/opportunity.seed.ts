@@ -45,6 +45,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
           TranslatedIntoType.NO_TRANSLATION,
         info: opportunity.info || "",
         infoConfidential: opportunity.infoConfidential || "",
+        numberVolunteers: Number(opportunity.numberVolunteers),
         agent,
         deal,
       });
