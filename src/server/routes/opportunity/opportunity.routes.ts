@@ -1,5 +1,9 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import {
+  ApiOpportunityGet,
+  ApiOpportunityGetList,
+  UserRole,
+} from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { defaultPageSize } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -8,8 +12,17 @@ import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
 } from "../../../services/dto";
-import { opportunityListQuerySchema, responseSchema } from "../../schema";
-import { ParamsId, QuerystringOpportunityList, ReplyData } from "../../types";
+import {
+  idParamSchema,
+  opportunityListQuerySchema,
+  responseSchema,
+} from "../../schema";
+import {
+  ParamsId,
+  QuerystringOpportunityList,
+  ReplyData,
+  ReplyDataCount,
+} from "../../types";
 import {
   addComments2Entity,
   getCategoryToProfileHandler,
@@ -26,8 +39,14 @@ export default async function opportunityRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
-  fastify.get<{ Params: ParamsId; Replay: ReplyData<{}> }>(
+  fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
     "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema("ApiOpportunityGet#"),
+      },
+    },
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
@@ -66,6 +85,7 @@ export default async function opportunityRoutes(
   );
   fastify.get<{
     Querystring: QuerystringOpportunityList;
+    Reply: ReplyDataCount<ApiOpportunityGetList[]>;
   }>(
     "/",
     {
