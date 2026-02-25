@@ -28,7 +28,9 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   return {
     type: agent.type,
     name: agent.title,
-    address: `${agent.address?.street}, ${agent.address?.postcode?.value} ${agent.address?.city ? agent.address.city : "Berlin"}`,
+    address: agent.representative.address
+      ? `${agent.representative.address.street}, ${agent.representative.address.postcode?.value} ${agent.representative.address.city ? agent.representative.address.city : "Berlin"}`
+      : "Berlin",
     district: { id: agent.districtId, title: { de: agent.district?.title } },
   };
 }
