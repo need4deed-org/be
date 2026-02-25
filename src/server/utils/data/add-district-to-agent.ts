@@ -1,13 +1,17 @@
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 
-export function getDistrictToAgentHandler() {
+export function getDistrictToAgentHandler(isRepresentative = false) {
   const updates: Agent[] = [];
 
   return {
     async addDistrictToAgent(agent: Agent): Promise<Agent> {
       if (!agent.districtId) {
-        const district = await getDistrictFromPostcode(agent.address?.postcode);
+        const district = await getDistrictFromPostcode(
+          isRepresentative
+            ? agent.representative.address.postcode
+            : agent.address?.postcode,
+        );
         if (district) {
           agent.district = district;
           updates.push(agent);
