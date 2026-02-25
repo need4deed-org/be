@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { deepMerge, isObject, tryCatchFn } from "../../../services/utils";
+import {
+  deepMerge,
+  isObject,
+  pascal2snake,
+  tryCatchFn,
+} from "../../../services/utils";
 
 describe("tryCatchFn", () => {
   it("should return the result of the function when it succeeds", () => {
@@ -135,5 +140,54 @@ describe("deepMerge", () => {
 
     const result = deepMerge(target, source);
     expect(result.list).toEqual([3]);
+  });
+});
+
+describe("pascal2snake", () => {
+  describe("Basic Transformations", () => {
+    it("should insert underscores between camel/pascal boundaries", () => {
+      expect(pascal2snake("UserProfile")).toBe("User_Profile");
+      expect(pascal2snake("PatientMedicalRecord")).toBe(
+        "Patient_Medical_Record",
+      );
+    });
+
+    it("should handle single word strings without adding underscores", () => {
+      expect(pascal2snake("User")).toBe("User");
+    });
+
+    it("should handle numbers as boundaries", () => {
+      // Because of your updated ([a-z0-9]) regex
+      expect(pascal2snake("Address2Data")).toBe("Address2_Data");
+    });
+  });
+
+  describe("Casing Options", () => {
+    it('should return UPPER_SNAKE_CASE when caseTo is "upper"', () => {
+      expect(pascal2snake("UserProfile", "upper")).toBe("USER_PROFILE");
+      expect(pascal2snake("User", "upper")).toBe("USER");
+    });
+
+    it('should return lower_snake_case when caseTo is "lower"', () => {
+      expect(pascal2snake("UserProfile", "lower")).toBe("user_profile");
+    });
+
+    it("should return the raw snake string if no caseTo is provided", () => {
+      // It keeps original casing but adds underscores
+      expect(pascal2snake("UserProfile")).toBe("User_Profile");
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("should handle already snake_cased strings", () => {
+      expect(pascal2snake("USER_PROFILE", "upper")).toBe("USER_PROFILE");
+    });
+
+    it("should handle strings with acronyms correctly", () => {
+      // Note: 'ID' (Upper-Upper) does not match ([a-z0-9])([A-Z])
+      // This is usually desired so you don't get U_S_E_R_I_D
+      expect(pascal2snake("UserID", "upper")).toBe("USER_ID");
+      expect(pascal2snake("UserID", "lower")).toBe("user_id");
+    });
   });
 });
