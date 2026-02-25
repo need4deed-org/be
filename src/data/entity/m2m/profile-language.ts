@@ -1,4 +1,5 @@
-import { LangProficiency } from "need4deed-sdk";
+import { IsEnum } from "class-validator";
+import { LangProficiency, LangPurpose } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -6,8 +7,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
-import { IsEnum } from "class-validator";
 import Language from "../profile/language.entity";
 import Profile from "../profile/profile.entity";
 
@@ -30,6 +29,15 @@ export default class ProfileLanguage {
   })
   @IsEnum(LangProficiency)
   proficiency: LangProficiency;
+
+  @Column({
+    nullable: true,
+    type: "enum",
+    enum: LangPurpose,
+    default: LangPurpose.GENERAL,
+  })
+  @IsEnum(LangPurpose)
+  purpose: LangPurpose;
 
   @ManyToOne(() => Profile, (profile) => profile.profileLanguage, {
     onDelete: "CASCADE",
