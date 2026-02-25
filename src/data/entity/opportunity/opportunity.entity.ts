@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsInt, IsOptional, IsString } from "class-validator";
 import {
   OpportunityStatusType,
   OpportunityType,
@@ -49,6 +49,10 @@ export default class Opportunity {
   })
   @IsEnum(OpportunityStatusType)
   status: OpportunityStatusType;
+
+  @Column({ default: 1 })
+  @IsInt()
+  numberVolunteers: number;
 
   @Column({ nullable: true })
   @IsOptional()
