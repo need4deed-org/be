@@ -45,11 +45,11 @@ export default class Agent {
   @Column({
     type: "enum",
     enum: AgentType,
-    nullable: false,
-    default: AgentType.RAC,
+    nullable: true,
   })
+  @IsOptional()
   @IsEnum(AgentType)
-  type: AgentType;
+  type?: AgentType;
 
   @Column({
     type: "enum",

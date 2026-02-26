@@ -1,3 +1,4 @@
+import path from "path";
 import { BaseError } from "../../config/error/base";
 
 type Success<T> = readonly [T, null];
@@ -101,4 +102,36 @@ export function deepMerge(target, source) {
     });
   }
   return output;
+}
+
+export function pascal2snake(pascal: string, caseTo?: "lower" | "upper") {
+  const snake = pascal.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+
+  switch (caseTo) {
+    case "lower":
+      return snake.toLowerCase();
+    case "upper":
+      return snake.toUpperCase();
+    default:
+  }
+  return snake;
+}
+
+export function isProbablyFileSystemPath(str: string): boolean {
+  if (typeof str !== "string") {
+    return false;
+  }
+  if (/^\w+:\/\//.test(str)) {
+    return false;
+  }
+  if (str.trim() === "") {
+    return false;
+  }
+
+  return (
+    path.isAbsolute(str) ||
+    str.startsWith(".") ||
+    str.includes("/") ||
+    str.includes("\\")
+  );
 }

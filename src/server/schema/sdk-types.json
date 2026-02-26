@@ -147,7 +147,7 @@
       "$id": "ApiComment",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "content": { "type": "string" },
         "entityId": { "type": "number" },
         "entityType": { "type": "string" },
@@ -159,7 +159,7 @@
       "$id": "ApiPerson",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "avatarUrl": { "type": "string" },
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
@@ -247,7 +247,7 @@
       "type": "object",
       "properties": {
         "title": { "type": "string" },
-        "id": { "type": "number" }
+        "id": { "type": "integer" }
       },
       "required": ["title", "id"],
       "additionalProperties": false
@@ -263,6 +263,10 @@
           "type": "string",
           "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
         },
+        "purpose": {
+          "type": "string",
+          "enum": ["general", "translation", "recipient"]
+        },
         "additionalProperties": false
       },
       "required": ["title", "proficiency"]
@@ -271,7 +275,7 @@
       "$id": "ApiAvailability",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "day": {
           "type": "string",
           "enum": [
@@ -341,7 +345,7 @@
       "$id": "ApiDocumentGet",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "type": { "$ref": "DocumentType#" },
         "originalName": { "type": "string" },
         "url": { "type": "string" },
@@ -407,7 +411,7 @@
         {
           "type": "object",
           "properties": {
-            "id": { "type": "number" },
+            "id": { "type": "integer" },
             "userId": { "type": "number" },
             "volunteerId": { "type": "number" }
           }
@@ -435,7 +439,7 @@
       "$id": "ApiAppreciation",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "title": { "$ref": "VolunteerStateAppreciationType#" },
         "dateDue": { "type": ["string", "null"], "format": "date-time" },
         "dateDelivery": { "type": ["string", "null"], "format": "date-time" },
@@ -483,7 +487,7 @@
         {
           "type": "object",
           "properties": {
-            "id": { "type": "number" },
+            "id": { "type": "integer" },
             "updatedAt": { "type": "string", "format": "date-time" }
           }
         }
@@ -519,13 +523,13 @@
       "$id": "ApiOpportunityGetList",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "volunteerType": { "$ref": "OpportunityType#" },
         "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
         "category": {
           "type": "object",
-          "properties": { "id": { "type": "number" } }
+          "properties": { "id": { "type": "integer" } }
         }
       },
       "required": [
@@ -536,16 +540,75 @@
         "category"
       ]
     },
+    "ApiOpportunityGet": {
+      "$id": "ApiOpportunityGet",
+      "allOf": [
+        { "$ref": "ApiOpportunityGetList#" },
+        {
+          "type": "object",
+          "properties": {
+            "createdAt": { "type": "string", "format": "date-time" },
+            "description": { "type": "string" },
+            "numberOfVolunteers": { "type": "integer" },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            },
+            "activities": {
+              "type": "array",
+              "items": { "$ref": "OptionById#" }
+            },
+            "skills": { "type": "array", "items": { "$ref": "OptionById" } },
+            "location": { "type": "array", "items": { "$ref": "OptionById" } },
+            "availability": {
+              "type": "array",
+              "items": { "$ref": "ApiAvailability#" }
+            },
+            "contact": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "phone": { "type": "string" },
+                "email": { "type": "string" },
+                "waysToContact": { "$ref": "PreferredCommunicationType#" }
+              }
+            },
+            "agent": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "AgentType#" },
+                "name": { "type": "string" },
+                "address": { "type": "string" },
+                "district": { "$ref": "OptionById#" }
+              }
+            },
+            "accompanyingDetails": { "$ref": "ApiAccompanying#" },
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+          }
+        }
+      ]
+    },
     "AgentType": {
       "$id": "AgentType",
       "type": "string",
-      "enum": ["rac", "ngo"]
+      "enum": [
+        "AE",
+        "GU1",
+        "GU2",
+        "GU2+",
+        "GU3",
+        "NU",
+        "ASOG",
+        "counseling-center",
+        "tandem",
+        "multiple-social-support"
+      ]
     },
     "ApiAgent": {
       "$id": "ApiAgent",
       "type": "object",
       "properties": {
-        "id": { "type": "number" },
+        "id": { "type": "integer" },
         "title": { "type": "string" },
         "type": { "$ref": "AgentType#" },
         "address": { "$ref": "Address#" },
@@ -557,6 +620,21 @@
       "$id": "ApiAgentGetList",
       "$ref": "ApiAgent#",
       "required": ["id", "title", "type"]
+    },
+    "ApiAccompanying": {
+      "$id": "ApiAccompanying",
+      "type": "object",
+      "properties": {
+        "appointmentAddress": { "type": "string" },
+        "appointmentDate": { "type": "string" },
+        "appointmentTime": { "type": "string" },
+        "refugeeNumber": { "type": "string" },
+        "refugeeName": { "type": "string" },
+        "languageToTranslate": {
+          "type": "string",
+          "enum": ["deutsche", "englishOk", "noTranslation"]
+        }
+      }
     }
   }
 }
