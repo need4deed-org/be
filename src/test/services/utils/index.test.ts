@@ -1,7 +1,9 @@
+import path from "path";
 import { describe, expect, it, vi } from "vitest";
 import {
   deepMerge,
   isObject,
+  isProbablyFileSystemPath,
   pascal2snake,
   tryCatchFn,
 } from "../../../services/utils";
@@ -188,6 +190,57 @@ describe("pascal2snake", () => {
       // This is usually desired so you don't get U_S_E_R_I_D
       expect(pascal2snake("UserID", "upper")).toBe("USER_ID");
       expect(pascal2snake("UserID", "lower")).toBe("user_id");
+    });
+  });
+});
+
+describe("isProbablyFileSystemPath", () => {
+  describe("Positive Cases (Should return true)", () => {
+    it("identifies absolute paths", () => {
+      // Mocking path.isAbsolute to ensure the logic flows correctly
+      const spy = vi.spyOn(path, "isAbsolute").mockReturnValueOnce(true);
+      expect(isProbablyFileSystemPath("/usr/bin/node")).toBe(true);
+      spy.mockRestore();
+    });
+
+    it("identifies relative paths starting with dot", () => {
+      expect(isProbablyFileSystemPath("./config.json")).toBe(true);
+      expect(isProbablyFileSystemPath("../images/logo.png")).toBe(true);
+    });
+
+    it("identifies strings containing forward slashes", () => {
+      expect(isProbablyFileSystemPath("folder/file.txt")).toBe(true);
+    });
+
+    it("identifies strings containing backslashes (Windows style)", () => {
+      expect(isProbablyFileSystemPath("C:\\Users\\Guest")).toBe(true);
+      expect(isProbablyFileSystemPath("relative\\path")).toBe(true);
+    });
+  });
+
+  describe("Negative Cases (Should return false)", () => {
+    it("returns false for non-string inputs", () => {
+      expect(isProbablyFileSystemPath(null)).toBe(false);
+      // @ts-expect-error
+      expect(isProbablyFileSystemPath(123)).toBe(false);
+    });
+
+    it("returns false for URLs with protocols", () => {
+      expect(isProbablyFileSystemPath("https://google.com")).toBe(false);
+      expect(isProbablyFileSystemPath("ftp://server.local")).toBe(false);
+      expect(isProbablyFileSystemPath("mailto:someone@example.com")).toBe(
+        false,
+      );
+    });
+
+    it("returns false for empty or whitespace strings", () => {
+      expect(isProbablyFileSystemPath("")).toBe(false);
+      expect(isProbablyFileSystemPath("   ")).toBe(false);
+    });
+
+    it("returns false for plain words without path markers", () => {
+      expect(isProbablyFileSystemPath("filename")).toBe(false);
+      expect(isProbablyFileSystemPath("just_a_string")).toBe(false);
     });
   });
 });
