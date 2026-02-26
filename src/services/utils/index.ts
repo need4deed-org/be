@@ -1,3 +1,4 @@
+import path from "path";
 import { BaseError } from "../../config/error/base";
 
 type Success<T> = readonly [T, null];
@@ -114,4 +115,23 @@ export function pascal2snake(pascal: string, caseTo?: "lower" | "upper") {
     default:
   }
   return snake;
+}
+
+export function isProbablyFileSystemPath(str: string): boolean {
+  if (typeof str !== "string") {
+    return false;
+  }
+  if (/^\w+:\/\//.test(str)) {
+    return false;
+  }
+  if (str.trim() === "") {
+    return false;
+  }
+
+  return (
+    path.isAbsolute(str) ||
+    str.startsWith(".") ||
+    str.includes("/") ||
+    str.includes("\\")
+  );
 }
