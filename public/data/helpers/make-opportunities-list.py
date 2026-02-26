@@ -35,14 +35,20 @@ class Opportunity:
             Calculates agent title from the opportunity dictionary.
             """
             title = self.opportunity.get("Accommodation Centre", "")
-            if title:
-                return get_string_or_null(
-                    title[: title.find(" (")], scramble=self.scramble
+            if type(title) == str:
+                return (
+                    get_string_or_null(
+                        title[: title.find(" (")], scramble=self.scramble
+                    ),
+                    title[-40:-8] if len(title) > 40 else "",
                 )
 
-            return get_string_or_null(
-                f"noname {get_list_item_safe(self.opportunity.get('RAC Contact','').split('<|>'), 1) or ''}".strip(),
-                scramble=self.scramble,
+            return (
+                get_string_or_null(
+                    f"noname {get_list_item_safe(self.opportunity.get('RAC Contact','').split('<|>'), 1) or ''}".strip(),
+                    scramble=self.scramble,
+                ),
+                "",
             )
 
         def get_person_data():
@@ -65,15 +71,16 @@ class Opportunity:
 
             return None
 
-        title = get_agent_title()
+        title, page_id = get_agent_title()
         person = get_person_data()
-        organization = {"title": get_agent_title(), "person": person}
+        organization = {"title": title, "person": person}
         postcode = (
             person["address"]["postcode"] if person and person.get("address") else None
         )
 
         return {
             "title": title,
+            "page_id": page_id,
             "organization": organization,
             "person": person,
             "postcode": postcode,

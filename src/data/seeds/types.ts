@@ -51,6 +51,7 @@ export interface OrganizationJSON {
 }
 export interface AgentJSON {
   title: string;
+  page_id: string;
   organization: OrganizationJSON;
   person: PersonJSON;
   postcode: string;
