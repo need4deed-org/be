@@ -1,6 +1,6 @@
+import path from "path";
 import {
   AgentOperatorType,
-  AgentType,
   DocumentStatusType,
   OccasionalType,
   VolunteerStateAppreciationType,
@@ -501,7 +501,7 @@ export async function getOrCreateAgent(
 
   const newAgent = new Agent({
     title: agentData.title,
-    type: AgentType.RAC,
+    type: undefined,
     representative,
     operatorType: AgentOperatorType.ORGANIZATION,
     operatorId: organization.id,
@@ -606,4 +606,23 @@ export function getDistrict(title: string) {
   }
 
   return null;
+}
+
+export function isProbablyFileSystemPath(str: string): boolean {
+  if (typeof str !== "string") {
+    return false;
+  }
+  if (/^\w+:\/\//.test(str)) {
+    return false;
+  }
+  if (str.trim() === "") {
+    return false;
+  }
+
+  return (
+    path.isAbsolute(str) ||
+    str.startsWith(".") ||
+    str.includes("/") ||
+    str.includes("\\")
+  );
 }

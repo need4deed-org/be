@@ -51,6 +51,7 @@ export interface OrganizationJSON {
 }
 export interface AgentJSON {
   title: string;
+  page_id: string;
   organization: OrganizationJSON;
   person: PersonJSON;
   postcode: string;
@@ -71,6 +72,7 @@ export interface OpportunityJSON {
   type: OpportunityType;
   translationType: string;
   info: string;
+  numberVolunteers: string;
   infoConfidential: string;
   deal: DealJSON;
   agent: AgentJSON;

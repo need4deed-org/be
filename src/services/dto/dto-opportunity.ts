@@ -1,10 +1,39 @@
 import {
+  ApiOpportunityContact,
+  ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
+  OpportunityType,
 } from "need4deed-sdk";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import Comment from "../../data/entity/volunteer/comment.entity";
 import { tryCatchFn } from "../utils";
+import { dtoOpportunityAccompanying } from "./dto-accompanying";
+import { dtoOpportunityAgent } from "./dto-agent";
+import { commentSerializer } from "./dto-comment";
 import { getAvailability } from "./utils";
+
+const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
+  console.error(`Error getting availability for opportunity: ${error}`);
+});
+
+function getOpportunityDescription(opportunity: Opportunity) {
+  if (opportunity.type === OpportunityType.ACCOMPANYING) {
+    return opportunity.infoConfidential;
+  }
+  return opportunity.info;
+}
+
+function getOpportunityContact(
+  opportunity: Opportunity,
+): ApiOpportunityContact {
+  return {
+    name: opportunity.agent.representative.name,
+    phone: opportunity.agent.representative.phone,
+    email: opportunity.agent.representative.email,
+    waysToContact: opportunity.agent.representative.preferredCommunicationType,
+  };
+}
 
 export function dtoOpportunityGetList(
   opportunity: Opportunity,
@@ -13,22 +42,19 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
-    volunteerType: opportunity.deal.profile.volunteeringType,
+    volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
+    createdAt: opportunity.createdAt,
   };
 }
 
 export function dtoVolunteerOpportunityGetList(
   opportunity: Opportunity,
 ): ApiVolunteerOpportunityGetList {
-  const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
-    console.error(
-      `Error getting availability for opportunity (id:${opportunity.id}): ${error}`,
-    );
-  });
   return {
     id: opportunity.id,
     title: opportunity.title,
+    createdAt: opportunity.createdAt,
     category: { id: opportunity.deal.profile.categoryId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
@@ -50,5 +76,52 @@ export function dtoVolunteerOpportunityGetList(
         id: ld.district.id,
       })),
     availability: getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot),
+  };
+}
+
+export function dtoOpportunityGet(
+  opportunityComments: Opportunity & { comments: Comment[] },
+): ApiOpportunityGet {
+  return {
+    id: opportunityComments.id,
+    title: opportunityComments.title,
+    volunteerType: opportunityComments.type,
+    statusOpportunity: opportunityComments.status,
+    createdAt: opportunityComments.createdAt,
+    category: { id: opportunityComments.deal.profile.categoryId },
+    description: getOpportunityDescription(opportunityComments),
+    numberOfVolunteers: opportunityComments.numberVolunteers,
+    languages: opportunityComments.deal.profile.profileLanguage
+      .filter(Boolean)
+      .map((pl) => ({
+        id: pl.language.id,
+        title: pl.language.title,
+        proficiency: pl.proficiency,
+        purpose: pl.purpose,
+      })),
+    activities: opportunityComments.deal.profile.profileActivity
+      .filter(Boolean)
+      .map((pa) => ({
+        id: pa.activity.id,
+      })),
+    skills: opportunityComments.deal.profile.profileSkill
+      .filter(Boolean)
+      .map((ps) => ({
+        id: ps.skill.id,
+      })),
+    location: opportunityComments.deal.location.locationDistrict
+      .filter(Boolean)
+      .map((ld) => ({
+        id: ld.district.id,
+      })),
+    availability: getAvailabilityTryCatch(
+      opportunityComments.deal.time?.timeTimeslot,
+    ),
+    contact: getOpportunityContact(opportunityComments),
+    agent: dtoOpportunityAgent(opportunityComments.agent),
+    accompanyingDetails: dtoOpportunityAccompanying(
+      opportunityComments.deal.profile.accompanying,
+    ),
+    comments: opportunityComments.comments.map(commentSerializer),
   };
 }

@@ -5,6 +5,7 @@ import {
   IsString,
   Length,
 } from "class-validator";
+import { PreferredCommunicationType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -60,6 +61,17 @@ export default class Person {
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  @Column({
+    type: "text",
+    array: true,
+    default: () => "'{mobilePhone}'",
+    transformer: {
+      to: (value: PreferredCommunicationType[]) => value,
+      from: (value: unknown) => value as PreferredCommunicationType[],
+    },
+  })
+  preferredCommunicationType: PreferredCommunicationType[];
 
   @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;

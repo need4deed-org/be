@@ -1,5 +1,12 @@
+import path from "path";
 import { describe, expect, it, vi } from "vitest";
-import { deepMerge, isObject, tryCatchFn } from "../../../services/utils";
+import {
+  deepMerge,
+  isObject,
+  isProbablyFileSystemPath,
+  pascal2snake,
+  tryCatchFn,
+} from "../../../services/utils";
 
 describe("tryCatchFn", () => {
   it("should return the result of the function when it succeeds", () => {
@@ -135,5 +142,105 @@ describe("deepMerge", () => {
 
     const result = deepMerge(target, source);
     expect(result.list).toEqual([3]);
+  });
+});
+
+describe("pascal2snake", () => {
+  describe("Basic Transformations", () => {
+    it("should insert underscores between camel/pascal boundaries", () => {
+      expect(pascal2snake("UserProfile")).toBe("User_Profile");
+      expect(pascal2snake("PatientMedicalRecord")).toBe(
+        "Patient_Medical_Record",
+      );
+    });
+
+    it("should handle single word strings without adding underscores", () => {
+      expect(pascal2snake("User")).toBe("User");
+    });
+
+    it("should handle numbers as boundaries", () => {
+      // Because of your updated ([a-z0-9]) regex
+      expect(pascal2snake("Address2Data")).toBe("Address2_Data");
+    });
+  });
+
+  describe("Casing Options", () => {
+    it('should return UPPER_SNAKE_CASE when caseTo is "upper"', () => {
+      expect(pascal2snake("UserProfile", "upper")).toBe("USER_PROFILE");
+      expect(pascal2snake("User", "upper")).toBe("USER");
+    });
+
+    it('should return lower_snake_case when caseTo is "lower"', () => {
+      expect(pascal2snake("UserProfile", "lower")).toBe("user_profile");
+    });
+
+    it("should return the raw snake string if no caseTo is provided", () => {
+      // It keeps original casing but adds underscores
+      expect(pascal2snake("UserProfile")).toBe("User_Profile");
+    });
+  });
+
+  describe("Edge Cases", () => {
+    it("should handle already snake_cased strings", () => {
+      expect(pascal2snake("USER_PROFILE", "upper")).toBe("USER_PROFILE");
+    });
+
+    it("should handle strings with acronyms correctly", () => {
+      // Note: 'ID' (Upper-Upper) does not match ([a-z0-9])([A-Z])
+      // This is usually desired so you don't get U_S_E_R_I_D
+      expect(pascal2snake("UserID", "upper")).toBe("USER_ID");
+      expect(pascal2snake("UserID", "lower")).toBe("user_id");
+    });
+  });
+});
+
+describe("isProbablyFileSystemPath", () => {
+  describe("Positive Cases (Should return true)", () => {
+    it("identifies absolute paths", () => {
+      // Mocking path.isAbsolute to ensure the logic flows correctly
+      const spy = vi.spyOn(path, "isAbsolute").mockReturnValueOnce(true);
+      expect(isProbablyFileSystemPath("/usr/bin/node")).toBe(true);
+      spy.mockRestore();
+    });
+
+    it("identifies relative paths starting with dot", () => {
+      expect(isProbablyFileSystemPath("./config.json")).toBe(true);
+      expect(isProbablyFileSystemPath("../images/logo.png")).toBe(true);
+    });
+
+    it("identifies strings containing forward slashes", () => {
+      expect(isProbablyFileSystemPath("folder/file.txt")).toBe(true);
+    });
+
+    it("identifies strings containing backslashes (Windows style)", () => {
+      expect(isProbablyFileSystemPath("C:\\Users\\Guest")).toBe(true);
+      expect(isProbablyFileSystemPath("relative\\path")).toBe(true);
+    });
+  });
+
+  describe("Negative Cases (Should return false)", () => {
+    it("returns false for non-string inputs", () => {
+      expect(isProbablyFileSystemPath(null)).toBe(false);
+      // @ts-expect-error
+      expect(isProbablyFileSystemPath(123)).toBe(false);
+    });
+
+    it("returns false for URLs with protocols", () => {
+      expect(isProbablyFileSystemPath("https://google.com")).toBe(false);
+      expect(isProbablyFileSystemPath("ftp://server.local")).toBe(false);
+      expect(isProbablyFileSystemPath("mailto:someone@example.com")).toBe(
+        false,
+      );
+    });
+
+    it("returns false for empty or whitespace strings", () => {
+      expect(isProbablyFileSystemPath("")).toBe(false);
+      expect(isProbablyFileSystemPath("   ")).toBe(false);
+    });
+
+    it("returns false for plain words without path markers", () => {
+      expect(isProbablyFileSystemPath("filename")).toBe(false);
+      expect(isProbablyFileSystemPath("just_a_string")).toBe(false);
+    });
   });
 });

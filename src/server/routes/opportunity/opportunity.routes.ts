@@ -1,16 +1,34 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import {
+  ApiOpportunityGet,
+  ApiOpportunityGetList,
+  UserRole,
+} from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { defaultPageSize } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { dtoOpportunityGetList } from "../../../services/dto/dto-opportunity";
-import { opportunityListQuerySchema, responseSchema } from "../../schema";
-import { QuerystringOpportunityList } from "../../types";
+import Comment from "../../../data/entity/volunteer/comment.entity";
 import {
+  dtoOpportunityGet,
+  dtoOpportunityGetList,
+} from "../../../services/dto";
+import {
+  idParamSchema,
+  opportunityListQuerySchema,
+  responseSchema,
+} from "../../schema";
+import {
+  ParamsId,
+  QuerystringOpportunityList,
+  ReplyData,
+  ReplyDataCount,
+} from "../../types";
+import {
+  addComments2Entity,
   getCategoryToProfileHandler,
+  getDistrictToAgentHandler,
   normalizeStringArrayInput,
 } from "../../utils";
-import { mockOppId } from "./opportunity-id-mock";
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
@@ -21,9 +39,53 @@ export default async function opportunityRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
-  fastify.get("/:id", mockOppId);
+  fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema("ApiOpportunityGet#"),
+      },
+    },
+    async (request, reply) => {
+      const id = request.params.id;
+      const relations = [
+        "deal.profile.accompanying",
+        "deal.profile.profileLanguage.language",
+        "deal.profile.profileActivity.activity",
+        "deal.profile.profileSkill.skill",
+        "deal.location.locationDistrict.district",
+        "agent.representative.address.postcode",
+      ];
+
+      const opportunityRepository = fastify.db.opportunityRepository;
+      const opportunity = await opportunityRepository.findOne({
+        where: { id },
+        relations,
+      });
+
+      const opportunityComments: Opportunity & { comments: Comment[] } =
+        await addComments2Entity(opportunity);
+
+      const { addDistrictToAgent, updates } = getDistrictToAgentHandler(true);
+      Object.assign(
+        opportunityComments.agent,
+        await addDistrictToAgent(opportunityComments.agent),
+      );
+
+      if (updates.length) {
+        const agentRepository = fastify.db.agentRepository;
+        await agentRepository.save(updates);
+      }
+
+      const data = dtoOpportunityGet(opportunityComments);
+
+      return reply.status(200).send({ message: `Opportunity id:${id}`, data });
+    },
+  );
   fastify.get<{
     Querystring: QuerystringOpportunityList;
+    Reply: ReplyDataCount<ApiOpportunityGetList[]>;
   }>(
     "/",
     {
