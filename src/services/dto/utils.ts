@@ -82,3 +82,13 @@ export function getTitles<T>(profileItems: T[], entityName: string) {
     (pa) => pa[entityName].translation || pa[entityName].title,
   );
 }
+
+export function getNameFields(name: string) {
+  const names = name.split(" ");
+
+  return {
+    firstName: names.shift() || undefined,
+    lastName: names.pop() || undefined,
+    middleName: names.join(" ") || undefined,
+  };
+}
