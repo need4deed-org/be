@@ -25,9 +25,7 @@ export async function getVolunteerFormData(
     schedule: body.schedule.map(([day, daytime]) => {
       return [day, daytime.toLowerCase()] as unknown as [number, OptionId];
     }),
-    districts: body.preferred_berlin_locations.map(
-      (pbl) => ({ title: pbl }) as unknown as OptionId,
-    ),
+    districts: body.preferred_berlin_locations,
     languages: await Promise.all([
       ...body.native_languages.map(
         async (l) =>
@@ -51,12 +49,8 @@ export async function getVolunteerFormData(
           }) as ApiLanguage,
       ),
     ]),
-    activities: body.preferred_berlin_locations.map(
-      (a) => ({ title: a }) as unknown as OptionId,
-    ),
-    skills: body.preferred_berlin_locations.map(
-      (s) => ({ title: s }) as unknown as OptionId,
-    ),
+    activities: body.activities,
+    skills: body.skills,
     leadFrom: body.lead_from.split(",").map((lf) => lf.trim()),
     comments: body.comments,
   };
