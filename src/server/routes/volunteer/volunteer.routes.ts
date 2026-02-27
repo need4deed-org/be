@@ -68,34 +68,34 @@ export default async function volunteerRoutes(
     "deal.location.locationAddress.address.postcode",
   ];
 
-  // await fastify.addHook(
-  //   "onRequest",
-  //   fastify.authenticate({ role: UserRole.COORDINATOR }),
-  // );
+  await fastify.addHook(
+    "onRequest",
+    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  );
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerCommunicationRoutes, {
     prefix: `/:id${RoutePrefix.COMMUNICATION}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerOpportunityVolunteerRoutes, {
     prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerLegacyRoutes, {
