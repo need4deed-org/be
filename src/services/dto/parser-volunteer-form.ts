@@ -3,7 +3,7 @@ import Address from "../../data/entity/location/address.entity";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getPostcode } from "../../server/utils";
-import { dealParser } from "./dealParser";
+import { dealParser } from "./parser-deal";
 import { getNameFields } from "./utils";
 
 export async function volunteerFormParser(
