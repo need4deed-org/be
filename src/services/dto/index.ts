@@ -1,4 +1,3 @@
-export * from "./dealParser";
 export * from "./dto-accompanying";
 export * from "./dto-agent";
 export * from "./dto-comment";
@@ -6,7 +5,8 @@ export * from "./dto-opportunity";
 export * from "./dto-opportunity-volunteer";
 export * from "./dto-person";
 export * from "./dto-volunteer";
-export * from "./leadFromParser";
-export * from "./parseFormData";
+export * from "./parser-deal";
+export * from "./parser-form-data";
+export * from "./parser-lead-from";
+export * from "./parser-volunteer-form";
 export * from "./utils";
-export * from "./volunteerFormParser";

@@ -151,41 +151,48 @@ export async function addTranslatedFields(
   }
   dataSource.logger.log("log", "Translating volunteers");
   for (const volunteer of volunteers) {
-    for (const pl of volunteer.deal.profile.profileLanguage) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: EntityTableName.LANGUAGE,
-          entityId: pl.language.id,
-        },
-      });
-      pl.language.translation = translation?.translation
-        ? translation?.translation
-        : pl.language.translation;
-    }
-    for (const pa of volunteer.deal.profile.profileActivity) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: EntityTableName.ACTIVITY,
-          entityId: pa.activity.id,
-        },
-      });
-      pa.activity.translation = translation?.translation
-        ? translation?.translation
-        : pa.activity.translation;
-    }
-    for (const ps of volunteer.deal.profile.profileSkill) {
-      const translation = await fieldTranslationRepository.findOne({
-        where: {
-          language,
-          entityType: EntityTableName.SKILL,
-          entityId: ps.skill.id,
-        },
-      });
-      ps.skill.translation = translation?.translation
-        ? translation?.translation
-        : ps.skill.translation;
+    try {
+      for (const pl of volunteer.deal.profile.profileLanguage) {
+        const translation = await fieldTranslationRepository.findOne({
+          where: {
+            language,
+            entityType: EntityTableName.LANGUAGE,
+            entityId: pl.language.id,
+          },
+        });
+        pl.language.translation = translation?.translation
+          ? translation?.translation
+          : pl.language.translation;
+      }
+      for (const pa of volunteer.deal.profile.profileActivity) {
+        const translation = await fieldTranslationRepository.findOne({
+          where: {
+            language,
+            entityType: EntityTableName.ACTIVITY,
+            entityId: pa.activity.id,
+          },
+        });
+        pa.activity.translation = translation?.translation
+          ? translation?.translation
+          : pa.activity.translation;
+      }
+      for (const ps of volunteer.deal.profile.profileSkill) {
+        const translation = await fieldTranslationRepository.findOne({
+          where: {
+            language,
+            entityType: EntityTableName.SKILL,
+            entityId: ps.skill.id,
+          },
+        });
+        ps.skill.translation = translation?.translation
+          ? translation?.translation
+          : ps.skill.translation;
+      }
+    } catch (error) {
+      dataSource.logger.log(
+        "warn",
+        `Error occurred while adding translations to a volunteer id:${volunteer.id} ${error}`,
+      );
     }
   }
 }

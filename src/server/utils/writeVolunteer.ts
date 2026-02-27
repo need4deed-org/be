@@ -11,9 +11,8 @@ import Person from "../../data/entity/person.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import Time from "../../data/entity/time/time.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { Id } from "../../data/types";
 
-export async function writeVolunteer(volunteer: Volunteer): Promise<Id> {
+export async function writeVolunteer(volunteer: Volunteer): Promise<number> {
   // Use a transaction to ensure atomicity
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
     // 1. Get all necessary repositories using the transactional entity manager

@@ -41,6 +41,7 @@ import { writeVolunteer } from "../../utils/writeVolunteer";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
+import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 import volunteerOpportunityRoutes from "./volunteer-opportunity.routes";
 
@@ -74,27 +75,32 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerCommunicationRoutes, {
     prefix: `/:id${RoutePrefix.COMMUNICATION}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   await fastify.register(volunteerOpportunityVolunteerRoutes, {
     prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
-    onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
+  });
+
+  await fastify.register(volunteerLegacyRoutes, {
+    prefix: `${RoutePrefix.LEGACY}`,
+    // onRequest: [fastify.authenticate({ role: UserRole.COORDINATOR })],
   });
 
   fastify.get<{
@@ -140,7 +146,7 @@ export default async function volunteerRoutes(
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
         }
         return reply.status(200).send({
-          message: `Volunteer (id=${id}) patched.`,
+          message: `Volunteer (id=${id}).`,
           data,
         });
       } catch (error) {

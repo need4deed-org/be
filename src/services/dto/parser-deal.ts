@@ -5,7 +5,6 @@ import {
   OccasionalType,
   VolunteerFormData,
 } from "need4deed-sdk";
-
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
