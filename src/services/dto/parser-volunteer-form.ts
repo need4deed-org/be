@@ -1,11 +1,10 @@
 import { VolunteerFormData } from "need4deed-sdk";
-
 import Address from "../../data/entity/location/address.entity";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { getNameFields } from "../../data/utils";
 import { getPostcode } from "../../server/utils";
 import { dealParser } from "./dealParser";
+import { getNameFields } from "./utils";
 
 export async function volunteerFormParser(
   formData: VolunteerFormData,
@@ -20,7 +19,7 @@ export async function volunteerFormParser(
 
   // person
   const person = new Person({
-    ...getNameFields(formData),
+    ...getNameFields(formData.fullName),
     email: formData.email,
     phone: formData.phone,
     address,

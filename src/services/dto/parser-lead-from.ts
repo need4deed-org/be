@@ -1,5 +1,4 @@
 import { EntityTableName } from "need4deed-sdk";
-
 import LeadFrom from "../../data/entity/lead.entity";
 import { getInstanceByTranslation } from "../../server/utils";
 
