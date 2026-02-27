@@ -1,5 +1,9 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { VolunteerLegacyFormData } from "need4deed-sdk";
+import {
+  OpportunityVolunteerStatusType,
+  VolunteerLegacyFormData,
+} from "need4deed-sdk";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import {
   leadFromParser,
   parseFormData,
@@ -15,10 +19,7 @@ export default async function volunteerLegacyRoutes(
   fastify.post<{ Querystring: { id: number }; Body: VolunteerLegacyFormData }>(
     "/",
     async (request, reply) => {
-      const opportunityId = request.query.id;
-      const volunteerFormData = await getVolunteerFormData(
-        Object.assign(request.body, { opportunityId }),
-      );
+      const volunteerFormData = await getVolunteerFormData(request.body);
 
       const volunteer = await parseFormData(
         volunteerFormData,
@@ -33,10 +34,25 @@ export default async function volunteerLegacyRoutes(
       const id = await writeVolunteer(volunteer);
       if (id) {
         await updateLeads(leads);
+
+        if (request.body.origin_opportunity) {
+          const opportunityVolunteerRepository =
+            fastify.db.opportunityVolunteerRepository;
+          const opportunityVolunteer = new OpportunityVolunteer({
+            volunteerId: id,
+            opportunityId: request.body.origin_opportunity,
+            status: OpportunityVolunteerStatusType.SUGGESTED,
+          });
+
+          await opportunityVolunteerRepository.save(opportunityVolunteer);
+        }
       }
 
+      const opportunityMessage = request.body.origin_opportunity
+        ? ` with opportunity id:${request.body.origin_opportunity}`
+        : "";
       return reply.status(200).send({
-        message: "Volunteer has been created.",
+        message: `Volunteer has been created.${opportunityMessage}`,
         data: { id },
       });
     },
