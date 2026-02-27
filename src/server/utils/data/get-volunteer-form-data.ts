@@ -9,10 +9,10 @@ import {
 import { getLanguageTitle } from "./get-language-title";
 
 export async function getVolunteerFormData(
-  body: VolunteerLegacyFormData & { opportunityId?: number },
+  body: VolunteerLegacyFormData,
 ): Promise<VolunteerFormData> {
   return {
-    opportunityId: body.opportunityId,
+    opportunityId: body.origin_opportunity,
     fullName: body.full_name,
     phone: body.phone,
     email: body.email,
