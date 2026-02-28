@@ -120,7 +120,7 @@ export function dtoOpportunityGet(
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent),
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunityComments.deal.profile.accompanying,
+      opportunityComments.accompanying,
     ),
     comments: opportunityComments.comments.map(commentSerializer),
   };
