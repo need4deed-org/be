@@ -17,6 +17,7 @@ import {
 import Deal from "../deal.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Appreciation from "../volunteer/appreciation.entity";
+import Accompanying from "./accompanying.entity";
 import Agent from "./agent.entity";
 
 @Entity()
@@ -77,6 +78,15 @@ export default class Opportunity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @ManyToOne(() => Accompanying, (accompanying) => accompanying.opportunity, {
+    nullable: true,
+  })
+  @JoinColumn({ name: "accompanying_id" })
+  accompanying?: Accompanying;
+
+  @Column({ nullable: true })
+  accompanyingId: number;
 
   @ManyToOne(() => Deal)
   @JoinColumn({ name: "deal_id" })
