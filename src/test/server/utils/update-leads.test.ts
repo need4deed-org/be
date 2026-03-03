@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { updateLeads } from "../../../server/utils/updateLeads";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import LeadFrom from "../../../data/entity/lead.entity";
+import { updateLeads } from "../../../server/utils/data/update-leads";
 
 const leadFromSave = vi.fn();
 
