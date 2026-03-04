@@ -1,18 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
-import Person from "../../../data/entity/person.entity";
-import Profile from "../../../data/entity/profile/profile.entity";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import Time from "../../../data/entity/time/time.entity";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Location from "../../../data/entity/location/location.entity";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import Deal from "../../../data/entity/deal.entity";
+import ProfileActivity from "../../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import Person from "../../../data/entity/person.entity";
+import Profile from "../../../data/entity/profile/profile.entity";
+import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-
-import { writeVolunteer } from "../../../server/utils/writeVolunteer";
+import { writeVolunteerLegacy } from "../../../server/utils/data";
 
 const txnManager: any = { getRepository: vi.fn() };
 
@@ -118,18 +117,28 @@ describe("writeVolunteer", () => {
       },
     };
 
-    const result = await writeVolunteer(volunteer as Volunteer);
+    const result = await writeVolunteerLegacy(volunteer as Volunteer);
 
     expect(addrSave).toHaveBeenCalledWith(volunteer.person.address);
     expect(personSave).toHaveBeenCalledWith(volunteer.person);
     expect(profileSave).toHaveBeenCalledWith(volunteer.deal.profile);
-    expect(profileActivitySave).toHaveBeenCalledWith(volunteer.deal.profile.profileActivity);
-    expect(profileSkillSave).toHaveBeenCalledWith(volunteer.deal.profile.profileSkill);
-    expect(profileLanguageSave).toHaveBeenCalledWith(volunteer.deal.profile.profileLanguage);
+    expect(profileActivitySave).toHaveBeenCalledWith(
+      volunteer.deal.profile.profileActivity,
+    );
+    expect(profileSkillSave).toHaveBeenCalledWith(
+      volunteer.deal.profile.profileSkill,
+    );
+    expect(profileLanguageSave).toHaveBeenCalledWith(
+      volunteer.deal.profile.profileLanguage,
+    );
     expect(timeSave).toHaveBeenCalledWith(volunteer.deal.time);
-    expect(timeTimeslotSave).toHaveBeenCalledWith(volunteer.deal.time.timeTimeslot);
+    expect(timeTimeslotSave).toHaveBeenCalledWith(
+      volunteer.deal.time.timeTimeslot,
+    );
     expect(locationSave).toHaveBeenCalledWith(volunteer.deal.location);
-    expect(locationDistrictSave).toHaveBeenCalledWith(volunteer.deal.location.locationDistrict);
+    expect(locationDistrictSave).toHaveBeenCalledWith(
+      volunteer.deal.location.locationDistrict,
+    );
     expect(dealSave).toHaveBeenCalledWith(volunteer.deal);
     expect(volunteerSave).toHaveBeenCalledWith(volunteer);
 
@@ -151,13 +160,20 @@ describe("writeVolunteer", () => {
       person: { id: undefined, address: { id: undefined } },
       deal: {
         id: undefined,
-        profile: { id: undefined, profileActivity: [{}], profileSkill: [], profileLanguage: [] },
+        profile: {
+          id: undefined,
+          profileActivity: [{}],
+          profileSkill: [],
+          profileLanguage: [],
+        },
         time: { id: undefined, timeTimeslot: [] },
         location: { id: undefined, locationDistrict: [] },
       },
     };
 
-    await expect(writeVolunteer(volunteer as Volunteer)).rejects.toThrow("m2m failed");
+    await expect(writeVolunteerLegacy(volunteer as Volunteer)).rejects.toThrow(
+      "m2m failed",
+    );
 
     // profile id should still have been set before trying to save m2m
     expect(volunteer.deal.profile.id).toBe(33);
