@@ -36,7 +36,7 @@ import {
   patchEntity,
   updateLeads,
   updateOptionList,
-  writeVolunteer,
+  writeVolunteerLegacy,
 } from "../../utils";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -457,7 +457,7 @@ export default async function volunteerRoutes(
           leadFromParser,
         );
 
-        const id = await writeVolunteer(volunteer);
+        const id = await writeVolunteerLegacy(volunteer);
         if (id) {
           await updateLeads(leads);
         }
