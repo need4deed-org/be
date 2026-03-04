@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class MoveAccompanyingToOpportunity1772300739265
+export class MoveAccompanyingToOpportunity1772545971802
   implements MigrationInterface
 {
-  name = "MoveAccompanyingToOpportunity1772300739265";
+  name = "MoveAccompanyingToOpportunity1772545971802";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -16,16 +16,13 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TABLE "opportunity" ADD "accompanying_id" integer`,
     );
     await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT '{mobilePhone}'`,
-    );
-    await queryRunner.query(
       `DROP INDEX "public"."IDX_cd9cbf582b713498a61c626c2d"`,
     );
     await queryRunner.query(
       `ALTER TYPE "public"."field_translation_entity_type_enum" RENAME TO "field_translation_entity_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."field_translation_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."field_translation_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "field_translation" ALTER COLUMN "entity_type" DROP DEFAULT`,
@@ -43,7 +40,7 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TYPE "public"."option_item_type_enum" RENAME TO "option_item_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."option_item_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."option_item_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "option" ALTER COLUMN "item_type" TYPE "public"."option_item_type_enum" USING "item_type"::"text"::"public"."option_item_type_enum"`,
@@ -56,7 +53,7 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TYPE "public"."timeline_source_entity_type_enum" RENAME TO "timeline_source_entity_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."timeline_source_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."timeline_source_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "timeline" ALTER COLUMN "source_entity_type" TYPE "public"."timeline_source_entity_type_enum" USING "source_entity_type"::"text"::"public"."timeline_source_entity_type_enum"`,
@@ -68,7 +65,7 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TYPE "public"."timeline_target_entity_type_enum" RENAME TO "timeline_target_entity_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."timeline_target_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."timeline_target_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "timeline" ALTER COLUMN "target_entity_type" TYPE "public"."timeline_target_entity_type_enum" USING "target_entity_type"::"text"::"public"."timeline_target_entity_type_enum"`,
@@ -80,7 +77,7 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TYPE "public"."timeline_content_entity_type_enum" RENAME TO "timeline_content_entity_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."timeline_content_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."timeline_content_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "timeline" ALTER COLUMN "content_entity_type" TYPE "public"."timeline_content_entity_type_enum" USING "content_entity_type"::"text"::"public"."timeline_content_entity_type_enum"`,
@@ -95,7 +92,7 @@ export class MoveAccompanyingToOpportunity1772300739265
       `ALTER TYPE "public"."comment_entity_type_enum" RENAME TO "comment_entity_type_enum_old"`,
     );
     await queryRunner.query(
-      `CREATE TYPE "public"."comment_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'volunteer')`,
+      `CREATE TYPE "public"."comment_entity_type_enum" AS ENUM('none', 'activity', 'skill', 'comment', 'category', 'language', 'lead_from', 'district', 'opportunity', 'volunteer')`,
     );
     await queryRunner.query(
       `ALTER TABLE "comment" ALTER COLUMN "entity_type" DROP DEFAULT`,
@@ -224,9 +221,6 @@ export class MoveAccompanyingToOpportunity1772300739265
     );
     await queryRunner.query(
       `CREATE UNIQUE INDEX "IDX_cd9cbf582b713498a61c626c2d" ON "field_translation" ("entity_id", "entity_type", "field_name", "language_id") `,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "preferred_communication_type" SET DEFAULT ARRAY['mobilePhone'`,
     );
     await queryRunner.query(
       `ALTER TABLE "opportunity" DROP COLUMN "accompanying_id"`,
