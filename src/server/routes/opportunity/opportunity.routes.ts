@@ -40,7 +40,7 @@ export default async function opportunityRoutes(
   });
 
   await fastify.register(opportunityOpportunityVolunteerRoutes, {
-    prefix: `:id/${RoutePrefix.VOLUNTEER_LINKED}`,
+    prefix: `:id${RoutePrefix.VOLUNTEER_LINKED}`,
   });
 
   fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
