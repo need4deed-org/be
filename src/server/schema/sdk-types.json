@@ -511,7 +511,8 @@
           "properties": {
             "name": { "type": "string" },
             "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
-            "engagement": { "$ref": "VolunteerStateEngagementType#" }
+            "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "avatarUrl": { "type": "string" }
           }
         }
       ],
