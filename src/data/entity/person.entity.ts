@@ -5,7 +5,7 @@ import {
   IsString,
   Length,
 } from "class-validator";
-// import { PreferredCommunicationType } from "need4deed-sdk";
+import { PreferredCommunicationType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -19,15 +19,6 @@ import Organization from "./organization.entity";
 import Testimonial from "./testimonial.entity";
 import User from "./user.entity"; // Ensure this import is correct
 import Volunteer from "./volunteer/volunteer.entity";
-
-const PreferredCommunicationType = {
-  EMAIL: "email",
-  MOBILE_PHONE: "mobilePhone",
-  WHATSAPP: "whatsapp",
-  TELEGRAM: "telegram",
-} as const;
-// eslint-disable-next-line no-redeclare
-type PreferredCommunicationType = typeof PreferredCommunicationType;
 
 @Entity()
 export default class Person {
