@@ -12,14 +12,16 @@ export function responseSchema(
       properties: {
         message: { type: "string" },
         ...(count ? { count: { type: "number" } } : {}),
-        data: isArray
+        ...(dataSchemaRef
           ? {
-              type: "array",
-              items: {
-                $ref: dataSchemaRef,
-              },
+              data: isArray
+                ? {
+                    type: "array",
+                    items: getRef(dataSchemaRef),
+                  }
+                : getRef(dataSchemaRef),
             }
-          : getRef(dataSchemaRef),
+          : {}),
       },
       required: ["message", "data"],
       additionalProperties: false,
