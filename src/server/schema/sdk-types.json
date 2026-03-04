@@ -469,26 +469,49 @@
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
     },
-    "ApiVolunteerOpportunity": {
-      "$id": "ApiVolunteerOpportunity",
+    "VolunteerOpportunity": {
+      "$id": "VolunteerOpportunity",
       "type": "object",
       "properties": {
+        "id": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
         "opportunityId": { "type": "number" },
         "volunteerId": { "type": "number" },
-        "title": { "type": "string" },
-        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "ApiVolunteerOpportunityGet": {
       "$id": "ApiVolunteerOpportunityGet",
       "type": "object",
       "allOf": [
-        { "$ref": "ApiVolunteerOpportunity#" },
+        { "$ref": "VolunteerOpportunity#" },
         {
           "type": "object",
           "properties": {
-            "id": { "type": "integer" },
-            "updatedAt": { "type": "string", "format": "date-time" }
+            "title": { "type": "string" }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "opportunityId",
+        "volunteerId",
+        "title",
+        "status",
+        "updatedAt"
+      ]
+    },
+    "ApiOpportunityVolunteerGet": {
+      "$id": "ApiOpportunityVolunteerGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "VolunteerOpportunity#" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
+            "engagement": { "$ref": "VolunteerStateEngagementType#" }
           }
         }
       ],
