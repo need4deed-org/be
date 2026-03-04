@@ -11,7 +11,7 @@ import Person from "../../../data/entity/person.entity";
 import Profile from "../../../data/entity/profile/profile.entity";
 import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { writeVolunteer } from "../../../server/utils/writeVolunteer";
+import { writeVolunteerLegacy } from "../../../server/utils/data";
 
 const txnManager: any = { getRepository: vi.fn() };
 
@@ -117,7 +117,7 @@ describe("writeVolunteer", () => {
       },
     };
 
-    const result = await writeVolunteer(volunteer as Volunteer);
+    const result = await writeVolunteerLegacy(volunteer as Volunteer);
 
     expect(addrSave).toHaveBeenCalledWith(volunteer.person.address);
     expect(personSave).toHaveBeenCalledWith(volunteer.person);
@@ -171,7 +171,7 @@ describe("writeVolunteer", () => {
       },
     };
 
-    await expect(writeVolunteer(volunteer as Volunteer)).rejects.toThrow(
+    await expect(writeVolunteerLegacy(volunteer as Volunteer)).rejects.toThrow(
       "m2m failed",
     );
 
