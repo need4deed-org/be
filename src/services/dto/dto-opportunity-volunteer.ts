@@ -35,6 +35,7 @@ export function opportunityOpportunityVolunteerDTO(
     opportunityId: opportunityVolunteer.opportunityId,
     updatedAt: opportunityVolunteer.updatedAt,
     name: opportunityVolunteer.volunteer.person.name,
+    avatarUrl: opportunityVolunteer.volunteer.person.avatarUrl,
     volunteeringType: opportunityVolunteer.volunteer.statusType,
     engagement: opportunityVolunteer.volunteer.statusEngagement,
   };
