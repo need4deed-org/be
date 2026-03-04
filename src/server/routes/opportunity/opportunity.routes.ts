@@ -1,9 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  ApiOpportunityGet,
-  ApiOpportunityGetList,
-  UserRole,
-} from "need4deed-sdk";
+import { ApiOpportunityGet, ApiOpportunityGetList } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { defaultPageSize } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -22,6 +18,7 @@ import {
   QuerystringOpportunityList,
   ReplyData,
   ReplyDataCount,
+  RoutePrefix,
 } from "../../types";
 import {
   addComments2Entity,
@@ -29,15 +26,17 @@ import {
   getDistrictToAgentHandler,
   normalizeStringArrayInput,
 } from "../../utils";
+import opportunityLegacyRoutes from "./legacy.routes";
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  await fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  await fastify.addHook("onRequest", fastify.authenticate());
+
+  await fastify.register(opportunityLegacyRoutes, {
+    prefix: RoutePrefix.LEGACY,
+  });
 
   fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
     "/:id",
@@ -50,7 +49,7 @@ export default async function opportunityRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
-        "deal.profile.accompanying",
+        "accompanying",
         "deal.profile.profileLanguage.language",
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
