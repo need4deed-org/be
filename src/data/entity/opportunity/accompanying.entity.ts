@@ -1,7 +1,7 @@
 import { IsDate, IsEnum, IsOptional, IsString } from "class-validator";
 import { TranslatedIntoType } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import Profile from "../profile/profile.entity";
+import Opportunity from "./opportunity.entity";
 
 @Entity()
 export default class Accompanying {
@@ -41,6 +41,6 @@ export default class Accompanying {
   @IsEnum(TranslatedIntoType)
   languageToTranslate?: TranslatedIntoType;
 
-  @OneToMany(() => Profile, (profile) => profile.accompanying)
-  profile: Profile;
+  @OneToMany(() => Opportunity, (opportunity) => opportunity.accompanying)
+  opportunity: Opportunity;
 }
