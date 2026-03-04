@@ -9,8 +9,8 @@ import {
   parseFormData,
   volunteerFormParser,
 } from "../../../services";
-import { getVolunteerFormData, writeVolunteer } from "../../utils";
-import { updateLeads } from "../../utils/updateLeads";
+import { getVolunteerFormData, writeVolunteerLegacy } from "../../utils";
+import { updateLeads } from "../../utils/data/update-leads";
 
 export default async function volunteerLegacyRoutes(
   fastify: FastifyInstance,
@@ -31,7 +31,7 @@ export default async function volunteerLegacyRoutes(
         leadFromParser,
       );
 
-      const id = await writeVolunteer(volunteer);
+      const id = await writeVolunteerLegacy(volunteer);
       if (id) {
         await updateLeads(leads);
 

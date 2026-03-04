@@ -1,18 +1,20 @@
-import { dataSource } from "../../data/data-source";
-import Deal from "../../data/entity/deal.entity";
-import Address from "../../data/entity/location/address.entity";
-import Location from "../../data/entity/location/location.entity";
-import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileActivity from "../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../data/entity/m2m/profile-skill";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
-import Person from "../../data/entity/person.entity";
-import Profile from "../../data/entity/profile/profile.entity";
-import Time from "../../data/entity/time/time.entity";
-import Volunteer from "../../data/entity/volunteer/volunteer.entity";
+import { dataSource } from "../../../data/data-source";
+import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import Location from "../../../data/entity/location/location.entity";
+import LocationDistrict from "../../../data/entity/m2m/location-district";
+import ProfileActivity from "../../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import Person from "../../../data/entity/person.entity";
+import Profile from "../../../data/entity/profile/profile.entity";
+import Time from "../../../data/entity/time/time.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 
-export async function writeVolunteer(volunteer: Volunteer): Promise<number> {
+export async function writeVolunteerLegacy(
+  volunteer: Volunteer,
+): Promise<number> {
   // Use a transaction to ensure atomicity
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
     // 1. Get all necessary repositories using the transactional entity manager
