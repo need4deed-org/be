@@ -496,9 +496,9 @@
         "id",
         "opportunityId",
         "volunteerId",
-        "title",
         "status",
-        "updatedAt"
+        "updatedAt",
+        "title"
       ]
     },
     "ApiOpportunityVolunteerGet": {
@@ -520,9 +520,12 @@
         "id",
         "opportunityId",
         "volunteerId",
-        "title",
         "status",
-        "updatedAt"
+        "updatedAt",
+        "name",
+        "volunteeringType",
+        "engagement",
+        "avatarUrl"
       ]
     },
     "ApiVolunteerOpportunityPatch": {
