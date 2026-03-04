@@ -18,6 +18,7 @@ export const RoutePrefix = {
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",
   VOLUNTEER: "/volunteer",
+  VOLUNTEER_LINKED: "/volunteer-linked",
 } as const;
 
 // eslint-disable-next-line no-redeclare
