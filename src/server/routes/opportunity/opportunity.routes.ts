@@ -27,6 +27,7 @@ import {
   normalizeStringArrayInput,
 } from "../../utils";
 import opportunityLegacyRoutes from "./legacy.routes";
+import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
@@ -36,6 +37,10 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
+  });
+
+  await fastify.register(opportunityOpportunityVolunteerRoutes, {
+    prefix: `:id${RoutePrefix.VOLUNTEER_LINKED}`,
   });
 
   fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(

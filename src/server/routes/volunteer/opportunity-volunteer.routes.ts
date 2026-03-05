@@ -4,7 +4,7 @@ import {
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
-import { opportunityVolunteerDTO } from "../../../services";
+import { volunteerOpportunityVolunteerDTO } from "../../../services";
 import {
   idmM2mIdParamSchema,
   idParamSchema,
@@ -55,7 +55,7 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      const data = opportunities.map(opportunityVolunteerDTO);
+      const data = opportunities.map(volunteerOpportunityVolunteerDTO);
 
       return reply.status(200).send({
         message: `Opportunities for volunteer id:${volunteerId}.`,
@@ -98,7 +98,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       opportunityVolunteerRepository.merge(opportunity, request.body);
       await opportunityVolunteerRepository.save(opportunity, { reload: true });
 
-      const data = opportunityVolunteerDTO(opportunity);
+      const data = volunteerOpportunityVolunteerDTO(opportunity);
       return reply.status(200).send({
         message: msg200(opportunity.opportunityId, volunteerId, "updated"),
         data,

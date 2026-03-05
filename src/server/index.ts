@@ -17,6 +17,7 @@ import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
+import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import personRoutes from "./routes/person.routes";
@@ -174,6 +175,9 @@ export async function createServer(
     prefix: RoutePrefix.APPRECIATION,
   });
   await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
+  await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
+  });
 
   return fastifyInstance;
 }
