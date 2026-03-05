@@ -23,7 +23,7 @@ export function responseSchema(
             }
           : {}),
       },
-      required: ["message", "data"],
+      required: ["message", ...(dataSchemaRef ? ["data"] : [])],
       additionalProperties: false,
     },
     ...responseErrors,
