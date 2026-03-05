@@ -553,6 +553,16 @@
       },
       "required": ["status"]
     },
+    "ApiVolunteerOpportunityPost": {
+      "$id": "ApiVolunteerOpportunityPost",
+      "type": "object",
+      "properties": {
+        "opportunityId": { "type": "integer" },
+        "volunteerId": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+      },
+      "required": ["status"]
+    },
     "OpportunityType": {
       "$id": "OpportunityType",
       "type": "string",
