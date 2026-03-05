@@ -120,7 +120,7 @@
         },
         "entityType": {
           "type": "string",
-          "enum": ["volunteer", "opportunity"]
+          "enum": ["volunteer", "opportunity", "agent"]
         }
       },
       "additionalProperties": false
