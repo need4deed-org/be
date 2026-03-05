@@ -512,7 +512,24 @@
             "name": { "type": "string" },
             "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
             "engagement": { "$ref": "VolunteerStateEngagementType#" },
-            "avatarUrl": { "type": "string" }
+            "avatarUrl": { "type": "string" },
+            "activities": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "skills": { "type": "array", "items": { "$ref": "OptionItem#" } },
+            "locations": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "availability": {
+              "type": "array",
+              "items": { "$ref": "ApiAvailability#" }
+            },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            }
           }
         }
       ],
