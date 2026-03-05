@@ -14,21 +14,33 @@ export default async function m2mOpportunityVolunteerRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
-  fastify.post<{ Body: {} }>("/", async (request, reply) => {
-    const opportunityVolunteerRepository =
-      fastify.db.opportunityVolunteerRepository;
+  fastify.post<{
+    Body: Omit<OpportunityVolunteer, "opportunity" | "volunteer">;
+    Reply: ReplyMessage;
+  }>(
+    "/",
+    {
+      schema: {
+        body: { $ref: "ApiVolunteerOpportunityPost#" },
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const opportunityVolunteerRepository =
+        fastify.db.opportunityVolunteerRepository;
 
-    const opportunityVolunteer = new OpportunityVolunteer(request.body);
-    await opportunityVolunteerRepository.save(opportunityVolunteer);
+      const opportunityVolunteer = new OpportunityVolunteer(request.body);
+      await opportunityVolunteerRepository.save(opportunityVolunteer);
 
-    return reply.status(200).send({
-      message: `Created M2M opportunityId:${opportunityVolunteer.opportunityId}, volunteerId:${opportunityVolunteer.volunteerId}, status:${opportunityVolunteer.status}.`,
-    });
-  });
+      return reply.status(200).send({
+        message: `Created M2M opportunityId:${opportunityVolunteer.opportunityId}, volunteerId:${opportunityVolunteer.volunteerId}, status:${opportunityVolunteer.status}.`,
+      });
+    },
+  );
 
   fastify.patch<{
     Params: ParamsId;
-    Reply: { message: string };
+    Reply: ReplyMessage;
     Body: { status: OpportunityVolunteerStatusType };
   }>(
     "/:id",
