@@ -469,26 +469,26 @@
       "$id": "ApiAppreciationPatch",
       "$ref": "ApiAppreciation#"
     },
-    "ApiVolunteerOpportunity": {
-      "$id": "ApiVolunteerOpportunity",
+    "VolunteerOpportunity": {
+      "$id": "VolunteerOpportunity",
       "type": "object",
       "properties": {
+        "id": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
         "opportunityId": { "type": "number" },
         "volunteerId": { "type": "number" },
-        "title": { "type": "string" },
-        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "ApiVolunteerOpportunityGet": {
       "$id": "ApiVolunteerOpportunityGet",
       "type": "object",
       "allOf": [
-        { "$ref": "ApiVolunteerOpportunity#" },
+        { "$ref": "VolunteerOpportunity#" },
         {
           "type": "object",
           "properties": {
-            "id": { "type": "integer" },
-            "updatedAt": { "type": "string", "format": "date-time" }
+            "title": { "type": "string" }
           }
         }
       ],
@@ -496,15 +496,69 @@
         "id",
         "opportunityId",
         "volunteerId",
-        "title",
         "status",
-        "updatedAt"
+        "updatedAt",
+        "title"
+      ]
+    },
+    "ApiOpportunityVolunteerGet": {
+      "$id": "ApiOpportunityVolunteerGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "VolunteerOpportunity#" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
+            "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "avatarUrl": { "type": "string" },
+            "activities": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "skills": { "type": "array", "items": { "$ref": "OptionItem#" } },
+            "locations": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "availability": {
+              "type": "array",
+              "items": { "$ref": "ApiAvailability#" }
+            },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "opportunityId",
+        "volunteerId",
+        "status",
+        "updatedAt",
+        "name",
+        "volunteeringType",
+        "engagement",
+        "avatarUrl"
       ]
     },
     "ApiVolunteerOpportunityPatch": {
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
+        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+      },
+      "required": ["status"]
+    },
+    "ApiVolunteerOpportunityPost": {
+      "$id": "ApiVolunteerOpportunityPost",
+      "type": "object",
+      "properties": {
+        "opportunityId": { "type": "integer" },
+        "volunteerId": { "type": "integer" },
         "status": { "$ref": "OpportunityVolunteerStatusType#" }
       },
       "required": ["status"]

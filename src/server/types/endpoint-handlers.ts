@@ -12,6 +12,8 @@ export type ReplyDataCount<T> = {
 
 export type ReplyData<T> = Omit<ReplyDataCount<T>, "count">;
 
+export type ReplyMessage = { message: string };
+
 export interface QuerystringPagination {
   page?: number;
   limit?: number;
