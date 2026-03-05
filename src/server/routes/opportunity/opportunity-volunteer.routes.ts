@@ -34,7 +34,14 @@ export default function opportunityOpportunityVolunteerRoutes(
         where: {
           opportunityId,
         },
-        relations: ["volunteer.person"],
+        relations: [
+          "volunteer.person",
+          "volunteer.deal.profile.profileActivity.activity",
+          "volunteer.deal.profile.profileSkill.skill",
+          "volunteer.deal.profile.profileLanguage.language",
+          "volunteer.deal.time.timeTimeslot.timeslot",
+          "volunteer.deal.location.locationDistrict.district",
+        ],
       });
 
       const data = volunteers.map(opportunityOpportunityVolunteerDTO);
