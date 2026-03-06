@@ -41,7 +41,7 @@ export default async function volunteerLegacyRoutes(
           const opportunityVolunteer = new OpportunityVolunteer({
             volunteerId: id,
             opportunityId: request.body.origin_opportunity,
-            status: OpportunityVolunteerStatusType.SUGGESTED,
+            status: OpportunityVolunteerStatusType.PENDING,
           });
 
           await opportunityVolunteerRepository.save(opportunityVolunteer);
