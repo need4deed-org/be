@@ -4,6 +4,10 @@ export interface ParamsId {
   id: number;
 }
 
+export interface DataId {
+  id: number;
+}
+
 export type ReplyDataCount<T> = {
   message: string;
   data: T;
