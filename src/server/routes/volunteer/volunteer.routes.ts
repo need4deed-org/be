@@ -280,6 +280,9 @@ export default async function volunteerRoutes(
           .send({ message: `${request.params.id}: is not a valid id.` });
       }
 
+      const volunteerRepository = fastify.db.volunteerRepository;
+      const dealId = (await volunteerRepository.findOneBy({ id })).dealId;
+
       const {
         volunteerData,
         personData,
@@ -328,14 +331,14 @@ export default async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Languages for volunteer (id=${id}) not updated.`,
+              message: `Languages for volunteer (deal_id:${id}) not updated.`,
             });
           }
         }
 
         if (availability) {
           const success = await updateOptionList(
-            id,
+            dealId,
             TimeTimeslot,
             await Promise.all(
               availability.map((availabilityObject) => {
@@ -348,47 +351,49 @@ export default async function volunteerRoutes(
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Availability for volunteer (id=${id}) not updated.`,
+              message: `Availability for volunteer (deal_id:${dealId}) not updated.`,
             });
           }
         }
 
         if (activities) {
           const success = await updateOptionList(
-            id,
+            dealId,
             ProfileActivity,
             activities,
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Activities for volunteer (id=${id}) not updated.`,
+              message: `Activities for volunteer (deal_id:${dealId}) not updated.`,
             });
           }
         }
 
         if (skills) {
-          const success = await updateOptionList(id, ProfileSkill, skills);
+          const success = await updateOptionList(dealId, ProfileSkill, skills);
           if (!success) {
             return reply.status(400).send({
-              message: `Skills for volunteer (id=${id}) not updated.`,
+              message: `Skills for volunteer (deal_id:${dealId}) not updated.`,
             });
           }
         }
 
         if (locations) {
           const success = await updateOptionList(
-            id,
+            dealId,
             LocationDistrict,
             locations,
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Locations for volunteer (id=${id}) not updated.`,
+              message: `Locations for volunteer (deal_id:${dealId}) not updated.`,
             });
           }
         }
       } catch (error) {
-        fastify.log.error(`Error patching volunteer data (id=${id}): ${error}`);
+        fastify.log.error(
+          `Error patching volunteer data (id=${dealId}): ${error}`,
+        );
         return reply.status(500).send({ message: "Internal server error." });
       }
 
