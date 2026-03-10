@@ -112,7 +112,7 @@ export function isEmptyPlainObject<T>(obj: T): boolean {
 
 /**
  * Returns a shallow copy of an object where all properties
- * that are empty objects are replaced with `null`.
+ * that are empty objects or arrays are replaced with `null`.
  *
  * If the input is not an object (or is `null`), it is returned as-is.
  *
@@ -121,19 +121,21 @@ export function isEmptyPlainObject<T>(obj: T): boolean {
  * @returns {T} A new object with empty objects replaced by `null`.
  *
  * @example
- * getEmptyPropsNull({ a: {}, b: { x: 1 }, c: [] });
- * // → { a: null, b: { x: 1 }, c: [] }
+ * getEmptyPropsNull({ a: {}, b: { x: 1 }, c: [], d: [""] });
+ * // → { a: null, b: { x: 1 }, c: null, d: [""] }
  */
-export function getEmptyPropsNull<T extends Record<string, unknown>>(
-  obj: T,
-): T {
+export function getEmptyPropsNull<
+  T extends Record<string, unknown | unknown[]>,
+>(obj: T): T {
   if (obj === null || typeof obj !== "object") {
     return obj;
   }
 
   return Object.keys(obj).reduce((acc: T, key: keyof T) => {
     const val = obj[key];
-    acc[key] = isEmptyPlainObject(val) ? null : val;
+    acc[key] = isEmptyPlainObject(val)
+      ? null
+      : (getNullFromEmptyArray(val as unknown[]) as T[keyof T]);
     return acc;
   }, {} as T);
 }
