@@ -19,9 +19,10 @@ import {
   Repository,
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
-import { BadRequestError } from "../../../config";
+import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Deal from "../../../data/entity/deal.entity";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -340,7 +341,7 @@ export async function patchAddress(
   return await patchEntity(Address, address);
 }
 
-function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
+function getDealRelationsAndIdFieldName(m2mEntityName: string) {
   const m2mRelationsMap: Record<
     string,
     {
@@ -355,23 +356,23 @@ function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
   > = {
     ProfileLanguage: {
       idFieldNames: ["profile", "profileId", "language", "languageId"],
-      relations: ["deal", "deal.profile.profileLanguage"],
+      relations: ["profile.profileLanguage"],
     },
     ProfileActivity: {
       idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["deal", "deal.profile", "deal.profile.profileActivity"],
+      relations: ["profile.profileActivity"],
     },
     ProfileSkill: {
       idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["deal", "deal.profile", "deal.profile.profileSkill"],
+      relations: ["profile.profileSkill"],
     },
     LocationDistrict: {
       idFieldNames: ["location", "locationId", "district", "districtId"],
-      relations: ["deal", "deal.location", "deal.location.locationDistrict"],
+      relations: ["location.locationDistrict"],
     },
     TimeTimeslot: {
       idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
-      relations: ["deal", "deal.time", "deal.time.timeTimeslot"],
+      relations: ["time.timeTimeslot"],
     },
   };
 
@@ -430,28 +431,28 @@ export async function updateOptionList<
   M extends { id: number },
   L extends { id: number | string },
 >(
-  volunteerId: number,
+  dealId: number,
   m2mEntity: new (_args?: unknown) => M,
   list: L[],
 ): Promise<boolean> {
   const {
     relations,
     idFieldNames: [host, hostId, listName, listItemId],
-  } = getVolunteerRelationsAndIdFieldName(m2mEntity.name);
+  } = getDealRelationsAndIdFieldName(m2mEntity.name);
 
   try {
     await dataSource.transaction(async (manager) => {
-      const volunteerRepository = getRepository(
+      const dealRepository = getRepository(
         manager as unknown as DataSource,
-        Volunteer,
+        Deal,
       );
-      const volunteer = await volunteerRepository.findOne({
-        where: { id: volunteerId },
+      const deal = await dealRepository.findOne({
+        where: { id: dealId },
         relations,
       });
 
-      if (!volunteer) {
-        throw new Error(`Volunteer ${volunteerId} not found`);
+      if (!deal) {
+        throw new NotFoundError(`Deal id:${dealId} not found`);
       }
 
       const m2mRepository = getRepository(
@@ -460,7 +461,7 @@ export async function updateOptionList<
       );
 
       const where = {
-        [hostId]: volunteer.deal[host].id,
+        [hostId]: deal[host].id,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -471,7 +472,7 @@ export async function updateOptionList<
 
       const newList = list.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: volunteer.deal[host].id,
+          [hostId]: deal[host].id,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {
@@ -491,7 +492,7 @@ export async function updateOptionList<
   } catch (error) {
     dataSource.logger.log(
       "warn",
-      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${volunteerId}`,
+      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${dealId}`,
     );
     return false;
   }
