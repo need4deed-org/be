@@ -30,7 +30,7 @@ import {
   getFilteredVolunteers,
   getLanguageCode,
   getOrCreateTimeslot,
-  getPatchData,
+  getVolunteerPatchData,
   parseQueryParams,
   patchAddress,
   patchEntity,
@@ -290,11 +290,11 @@ export default async function volunteerRoutes(
         activities,
         skills,
         locations,
-      } = getPatchData(request.body, ["dateReturn"]);
+      } = getVolunteerPatchData(request.body, ["dateReturn"]);
 
       try {
         if (volunteerData) {
-          const success = await patchEntity(Volunteer, id, volunteerData);
+          const success = await patchEntity(Volunteer, volunteerData, id);
           if (!success) {
             return reply.status(400).send({
               message: `Volunteer (id=${id}) not updated.`,
@@ -303,7 +303,7 @@ export default async function volunteerRoutes(
         }
 
         if (personData && personData.id) {
-          const success = await patchEntity(Person, personData.id, personData);
+          const success = await patchEntity(Person, personData);
           if (!success) {
             return reply.status(400).send({
               message: `Person (id=${personData.id}) not updated.`,
