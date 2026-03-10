@@ -19,6 +19,7 @@ import {
   Repository,
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
+import { BadRequestError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Document from "../../../data/entity/document.entity";
@@ -305,7 +306,10 @@ export async function patchEntity<E extends { id: number }>(
 ): Promise<boolean> {
   const repository = getRepository(dataSource, entity);
 
-  const id = entityId || data.id;
+  const id = entityId || data?.id;
+  if (!id) {
+    throw new BadRequestError("Missing id for object update.");
+  }
 
   return await repository
     .update({ id } as FindOptionsWhere<E>, data as QueryDeepPartialEntity<E>)
