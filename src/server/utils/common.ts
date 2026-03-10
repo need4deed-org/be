@@ -49,22 +49,20 @@ export function getLanguageCode(isoCode: string): Lang | null {
 }
 
 /**
- * Removes all properties from an object whose values are `null` or `undefined`.
- *
- * - Safely returns an empty object if the input is `null`, `undefined`, or not an object.
- * - Keeps other falsy values (like `0`, `false`, `''`, `NaN`).
- *
- * @template T
- * @param {T} obj - The input object to clean.
- * @returns {Partial<T>} A shallow copy of `obj` with only non-nullish properties retained.
- *
- * @example
- * stripNullishAttributes({ a: 1, b: null, c: undefined, d: 0 })
- * // → { a: 1, d: 0 }
- *
- * @example
- * stripNullishAttributes(null)
- * // → {}
+ * Removes `null` and `undefined` properties from an object, except for those
+ * explicitly allowed via a whitelist.
+ * * @template T - The type of the input object.
+ * @param {T} obj - The source object to strip nullish values from.
+ * @param {Array<keyof T | unknown>} nullable - An array of property keys that should be
+ * preserved even if their values are null or undefined.
+ * @returns {Partial<T>} A new object containing only non-nullish values and whitelisted keys.
+ * * @example
+ * const input = { name: "Alice", age: null, bio: null };
+ * // Returns { name: "Alice" }
+ * stripNullishAttributes(input, []);
+ * * @example
+ * // Returns { name: "Alice", bio: null }
+ * stripNullishAttributes(input, ["bio"]);
  */
 export function stripNullishAttributes<T>(
   obj: T,
