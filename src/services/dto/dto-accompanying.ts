@@ -7,11 +7,11 @@ export function dtoOpportunityAccompanying(
   return accompanying
     ? {
         appointmentAddress: accompanying.address,
-        appointmentDate: accompanying.date,
-        appointmentTime: accompanying.date,
+        appointmentDate: accompanying.date.toDateString(),
+        appointmentTime: accompanying.date.toTimeString().slice(0, 5),
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
-        languageToTranslate: accompanying.languageToTranslate,
+        languageToTranslate: accompanying.langCode,
       }
     : {};
 }
