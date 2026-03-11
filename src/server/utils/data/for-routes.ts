@@ -9,7 +9,7 @@ import {
   OccasionalType,
   OptionItem,
   SortOrder,
-  VolunteerPatchBodyData,
+  TranslatedIntoType,
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import {
@@ -17,9 +17,11 @@ import {
   DeepPartial,
   FindOptionsWhere,
   In,
+  QueryFailedError,
   Repository,
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
+import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Document from "../../../data/entity/document.entity";
@@ -37,11 +39,6 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
-import {
-  getEmptyPropsNull,
-  getNullFromEmptyArray,
-  stripNullishAttributes,
-} from "../common";
 
 export async function getPostcode(code: string): Promise<Postcode | null> {
   const postcodeRepository = getRepository(dataSource, Postcode);
@@ -304,81 +301,28 @@ export async function getOptions(
   return await { [list]: await getList(list) };
 }
 
-export function getPatchData(
-  body: VolunteerPatchBodyData,
-  nullable?: Array<keyof VolunteerPatchBodyData>,
-) {
-  const volunteerData: Partial<Volunteer> = stripNullishAttributes(
-    {
-      infoAbout: body.infoAbout,
-      infoExperience: body.infoExperience,
-      statusCGC: body.goodConductCertificate,
-      statusVaccination: body.measlesVaccination,
-      statusEngagement: body.statusEngagement,
-      statusCommunication: body.statusCommunication,
-      statusAppreciation: body.statusAppreciation,
-      statusType: body.statusType,
-      statusMatch: body.statusMatch,
-      statusCgcProcess: body.statusCgcProcess,
-      dateReturn: body.dateReturn,
-      preferredCommunicationType: body.preferredCommunicationType,
-    },
-    nullable,
-  );
-  const personData: Partial<Person> = stripNullishAttributes(
-    {
-      id: body.person?.id,
-      firstName: body.person?.firstName,
-      lastName: body.person?.lastName,
-      middleName: body.person?.middleName,
-      email: body.person?.email,
-      phone: body.person?.phone,
-    },
-    nullable,
-  );
-  const comments = body.comments;
-  const addressData: Partial<Address> = stripNullishAttributes(
-    {
-      id: body.person?.address?.id,
-      street: body.person?.address?.street,
-      city: body.person?.address?.city,
-    },
-    nullable,
-  );
-  const postcodeData: Partial<Postcode> = stripNullishAttributes(
-    {
-      id: body.person?.address?.postcode?.id,
-      value: body.person?.address?.postcode?.code,
-    },
-    nullable,
-  );
-
-  return {
-    ...getEmptyPropsNull({
-      volunteerData,
-      personData,
-      comments,
-      addressData,
-      postcodeData,
-    }),
-    languages: getNullFromEmptyArray(body.languages),
-    availability: getNullFromEmptyArray(body.availability),
-    activities: getNullFromEmptyArray(body.activities),
-    skills: getNullFromEmptyArray(body.skills),
-    locations: getNullFromEmptyArray(body.locations),
-  };
-}
-
 export async function patchEntity<E extends { id: number }>(
   entity: new () => E,
-  id: number,
   data: Partial<E>,
-): Promise<boolean> {
+  entityId?: number,
+): Promise<boolean | void> {
   const repository = getRepository(dataSource, entity);
+
+  const id = entityId || data?.id;
+  if (!id) {
+    throw new BadRequestError("Missing id for object update.");
+  }
 
   return await repository
     .update({ id } as FindOptionsWhere<E>, data as QueryDeepPartialEntity<E>)
-    .then((response) => response.affected === 1);
+    .then((response) => response.affected === 1)
+    .catch((error) => {
+      if (error instanceof QueryFailedError) {
+        throw new BadRequestError(
+          `Invalid data for patching:${entity.name} object id:${id}`,
+        );
+      }
+    });
 }
 
 export async function patchAddress(
@@ -402,41 +346,50 @@ export async function patchAddress(
     }
   }
 
-  return await patchEntity(Address, address.id!, address);
+  return Boolean(await patchEntity(Address, address));
 }
 
-function getVolunteerRelationsAndIdFieldName(m2mEntityName: string) {
+function getDealRelationsAndIdFieldName(m2mEntityName: string) {
   const m2mRelationsMap: Record<
     string,
     {
       relations: string[];
       idFieldNames: [
-        "profile" | "location" | "time",
+        "accompanying" | "profile" | "location" | "time",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
       ];
     }
   > = {
+    AccompanyingLanguage: {
+      idFieldNames: [
+        "accompanying",
+        "accompanyingId",
+        "language",
+        "languageId",
+      ],
+      relations: ["profile.profileLanguage"],
+    },
     ProfileLanguage: {
       idFieldNames: ["profile", "profileId", "language", "languageId"],
-      relations: ["deal", "deal.profile.profileLanguage"],
+      relations: ["profile.profileLanguage"],
     },
     ProfileActivity: {
       idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["deal", "deal.profile", "deal.profile.profileActivity"],
+      relations: ["profile.profileActivity"],
     },
     ProfileSkill: {
       idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["deal", "deal.profile", "deal.profile.profileSkill"],
+      relations: ["profile.profileSkill"],
     },
     LocationDistrict: {
       idFieldNames: ["location", "locationId", "district", "districtId"],
-      relations: ["deal", "deal.location", "deal.location.locationDistrict"],
+      relations: ["location.locationDistrict"],
     },
     TimeTimeslot: {
       idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
-      relations: ["deal", "deal.time", "deal.time.timeTimeslot"],
+      relations: ["time.timeTimeslot"],
     },
   };
 
@@ -450,7 +403,7 @@ export async function getOrCreateTimeslot(
 
   const { day, daytime } = availabilityObject;
   if (!day || !daytime) {
-    throw new Error(errorMsg);
+    throw new BadRequestError(errorMsg);
   }
 
   let payload: FindOptionsWhere<Timeslot> | Partial<Timeslot>;
@@ -475,7 +428,7 @@ export async function getOrCreateTimeslot(
   }
 
   if (!payload) {
-    throw new Error(errorMsg);
+    throw new BadRequestError(errorMsg);
   }
 
   const repositoryTimeslot = getRepository(dataSource, Timeslot);
@@ -495,28 +448,29 @@ export async function updateOptionList<
   M extends { id: number },
   L extends { id: number | string },
 >(
-  volunteerId: number,
+  rootId: number,
   m2mEntity: new (_args?: unknown) => M,
   list: L[],
+  rootEntity: string = "deal",
 ): Promise<boolean> {
   const {
     relations,
     idFieldNames: [host, hostId, listName, listItemId],
-  } = getVolunteerRelationsAndIdFieldName(m2mEntity.name);
+  } = getDealRelationsAndIdFieldName(m2mEntity.name);
 
   try {
     await dataSource.transaction(async (manager) => {
-      const volunteerRepository = getRepository(
+      const rootRepository = getRepository(
         manager as unknown as DataSource,
-        Volunteer,
+        rootEntity,
       );
-      const volunteer = await volunteerRepository.findOne({
-        where: { id: volunteerId },
+      const root = await rootRepository.findOne({
+        where: { id: rootId },
         relations,
       });
 
-      if (!volunteer) {
-        throw new Error(`Volunteer ${volunteerId} not found`);
+      if (!root) {
+        throw new NotFoundError(`Root id:${rootId} not found`);
       }
 
       const m2mRepository = getRepository(
@@ -525,7 +479,7 @@ export async function updateOptionList<
       );
 
       const where = {
-        [hostId]: volunteer.deal[host].id,
+        [hostId]: root[host].id,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -536,7 +490,7 @@ export async function updateOptionList<
 
       const newList = list.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: volunteer.deal[host].id,
+          [hostId]: root[host].id,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {
@@ -556,7 +510,7 @@ export async function updateOptionList<
   } catch (error) {
     dataSource.logger.log(
       "warn",
-      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${volunteerId}`,
+      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${rootId}`,
     );
     return false;
   }
@@ -781,4 +735,57 @@ export async function updateAddress(
     where: { id: address.id! },
     relations: ["postcode"],
   })) as Address;
+}
+
+export async function setTranslationType(
+  translation: TranslatedIntoType,
+): Promise<number> {
+  const isoCodeMap = {
+    [TranslatedIntoType.DEUTSCHE]: "de",
+    [TranslatedIntoType.ENGLISH_OK]: "en",
+    [TranslatedIntoType.NO_TRANSLATION]: "zzz",
+  };
+
+  if (!isoCodeMap[translation]) {
+    throw new Error(
+      `Shouldn't happen that languageToTranslate is ${translation}`,
+    );
+  }
+
+  const languageRepository = getRepository(dataSource, Language);
+
+  const language = await languageRepository.findOne({
+    where: { isoCode: isoCodeMap[translation] },
+  });
+
+  if (!language) {
+    throw new Error(
+      `Shouldn't happen that language:${isoCodeMap[translation]} not found.`,
+    );
+  }
+
+  return language.id;
+}
+
+export async function getTranslationType(
+  id: number,
+): Promise<TranslatedIntoType> {
+  const languageRepository = getRepository(dataSource, Language);
+  const language = await languageRepository.findOneBy({ id });
+  if (!language) {
+    throw new NotFoundError("Language for accompanying not fond.");
+  }
+
+  switch (language.isoCode) {
+    case "de":
+      return TranslatedIntoType.DEUTSCHE;
+    case "en":
+      return TranslatedIntoType.ENGLISH_OK;
+    case "zzz":
+      return TranslatedIntoType.NO_TRANSLATION;
+    default:
+      throw new BadRequestError(
+        `Cannot interpret ${language.title} as accompanying language.`,
+      );
+  }
 }

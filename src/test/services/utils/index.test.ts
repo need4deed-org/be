@@ -1,7 +1,9 @@
 import path from "path";
 import { describe, expect, it, vi } from "vitest";
+import { BadRequestError } from "../../../config/error";
 import {
   deepMerge,
+  getDateObj,
   isObject,
   isProbablyFileSystemPath,
   pascal2snake,
@@ -242,5 +244,54 @@ describe("isProbablyFileSystemPath", () => {
       expect(isProbablyFileSystemPath("filename")).toBe(false);
       expect(isProbablyFileSystemPath("just_a_string")).toBe(false);
     });
+  });
+});
+
+describe("getDateObj()", () => {
+  it("should return a valid Date object when given valid inputs", () => {
+    const dateStr = "2026-03-11";
+    const timeStr = "14:30";
+
+    const result = getDateObj(dateStr, timeStr);
+
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(2); // March is 0-indexed
+    expect(result.getDate()).toBe(11);
+    expect(result.getHours()).toBe(14);
+    expect(result.getMinutes()).toBe(30);
+  });
+
+  it("should handle single digit hours and minutes correctly", () => {
+    const result = getDateObj("2026-05-20", "09:05");
+
+    expect(result.getHours()).toBe(9);
+    expect(result.getMinutes()).toBe(5);
+  });
+
+  it("should throw BadRequestError if the date string is invalid", () => {
+    const invalidDate = "not-a-date";
+    const time = "12:00";
+
+    expect(() => getDateObj(invalidDate, time)).toThrow(BadRequestError);
+    expect(() => getDateObj(invalidDate, time)).toThrow(
+      "Date and/or time is invalid.",
+    );
+  });
+
+  it("should throw BadRequestError if the time string is formatted incorrectly", () => {
+    const date = "2026-01-01";
+    const invalidTime = "noon";
+
+    expect(() => getDateObj(date, invalidTime)).toThrow(BadRequestError);
+  });
+
+  it("should handle null or undefined time gracefully via the fallback", () => {
+    // Because of the `time?.split(":") || ""` logic:
+    // hours/minutes become undefined, Number(undefined) is NaN,
+    // resulting in an Invalid Date, which triggers the error.
+    expect(() => getDateObj("2026-01-01", null as any)).toThrow(
+      BadRequestError,
+    );
   });
 });

@@ -10,5 +10,6 @@ export * from "./parser-deal-volunteer";
 export * from "./parser-form-data";
 export * from "./parser-lead-from";
 export * from "./parser-opportunity-legacy";
+export * from "./parser-opportunity-patch-data";
 export * from "./parser-volunteer-form";
 export * from "./utils";

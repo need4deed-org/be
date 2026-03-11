@@ -77,12 +77,13 @@ describe("isEmptyPlainObject()", () => {
 
 describe("getEmptyPropsNull", () => {
   it("getEmptyPropsNull replaces empty plain objects with null (shallow)", () => {
-    const src = { a: {}, b: { x: 1 }, c: [], d: Object.create(null) };
+    const src = { a: {}, b: { x: 1 }, c: [], d: [""], e: Object.create(null) };
     expect(getEmptyPropsNull(src)).toEqual({
       a: null,
       b: { x: 1 },
-      c: [],
-      d: null,
+      c: null,
+      d: [""],
+      e: null,
     });
     expect(getEmptyPropsNull({ name: "Adam" })).toEqual({ name: "Adam" });
 
