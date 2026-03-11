@@ -1,13 +1,26 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiOpportunityGet, ApiOpportunityGetList } from "need4deed-sdk";
+import {
+  ApiOpportunityGet,
+  ApiOpportunityGetList,
+  ApiOpportunityPatch,
+} from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
+import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
+import ProfileActivity from "../../../data/entity/m2m/profile-activity";
+import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Person from "../../../data/entity/person.entity";
 import Comment from "../../../data/entity/volunteer/comment.entity";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
-} from "../../../services/dto";
+  parseOpportunity,
+} from "../../../services";
 import {
   idParamSchema,
   opportunityListQuerySchema,
@@ -18,13 +31,19 @@ import {
   QuerystringOpportunityList,
   ReplyData,
   ReplyDataCount,
+  ReplyMessage,
   RoutePrefix,
 } from "../../types";
 import {
   addComments2Entity,
   getCategoryToProfileHandler,
   getDistrictToAgentHandler,
+  getOrCreateTimeslot,
+  getTranslationType,
   normalizeStringArrayInput,
+  patchEntity,
+  setTranslationType,
+  updateOptionList,
 } from "../../utils";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -82,11 +101,16 @@ export default async function opportunityRoutes(
         await agentRepository.save(updates);
       }
 
+      opportunityComments.accompanying.langCode = await setTranslationType(
+        opportunityComments.accompanying.languageToTranslate,
+      );
+
       const data = dtoOpportunityGet(opportunityComments);
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
   );
+
   fastify.get<{
     Querystring: QuerystringOpportunityList;
     Reply: ReplyDataCount<ApiOpportunityGetList[]>;
@@ -150,6 +174,153 @@ export default async function opportunityRoutes(
         data,
         count,
       });
+    },
+  );
+
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiOpportunityPatch;
+    Reply: ReplyMessage;
+  }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiVolunteerOpportunityPatch#" },
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const id = request.params.id;
+
+      const opportunityRepository = fastify.db.opportunityRepository;
+      const opportunity = await opportunityRepository.findOne({
+        where: { id },
+      });
+      if (!opportunity) {
+        throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
+
+      const dealId = opportunity.dealId;
+      if (!dealId) {
+        throw new Error(`Opportunity id:${id} is lacking a deal.`);
+      }
+
+      const {
+        opportunity: opportunityObj,
+        contact,
+        agent,
+        accompanying,
+        languages,
+        schedule,
+        skills,
+        activities,
+      } = parseOpportunity(request.body);
+      fastify.log.debug(
+        `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
+      );
+
+      if (opportunityObj) {
+        const success = await patchEntity(
+          Opportunity,
+          opportunityObj,
+          opportunity.id,
+        );
+        if (!success) {
+          throw new Error("Patching opportunity failed.");
+        }
+      }
+
+      if (contact) {
+        const success = await patchEntity(Person, contact);
+        if (!success) {
+          throw new Error(
+            "Patching contact failed while patching opportunity.",
+          );
+        }
+      }
+
+      if (agent) {
+        const success = await patchEntity(Agent, agent, opportunity.agentId);
+        if (!success) {
+          throw new Error("Patching agent failed while patching opportunity.");
+        }
+      }
+
+      if (accompanying) {
+        const languageToTranslate = await getTranslationType(
+          Number(accompanying.languageToTranslate),
+        );
+        const success = await patchEntity(
+          Accompanying,
+          Object.assign(accompanying, { languageToTranslate }),
+          opportunity.accompanyingId,
+        );
+        if (!success) {
+          throw new BadRequestError(
+            "Patching accompanying failed while patching opportunity.",
+          );
+        }
+      }
+
+      if (schedule) {
+        const success = await updateOptionList(
+          dealId,
+          TimeTimeslot,
+          await Promise.all(
+            schedule.map((scheduleObject) => {
+              if (scheduleObject.id) {
+                return { id: scheduleObject.id };
+              }
+              return getOrCreateTimeslot(scheduleObject);
+            }),
+          ),
+        );
+        if (!success) {
+          throw new BadRequestError(
+            `Availability for volunteer (id=${id}) not updated.`,
+          );
+        }
+      }
+
+      if (languages) {
+        const success = await updateOptionList(
+          dealId,
+          ProfileLanguage,
+          languages,
+        );
+        if (!success) {
+          throw new BadRequestError(
+            `Languages for opportunity (deal_id:${dealId}) not updated.`,
+          );
+        }
+      }
+
+      if (activities) {
+        const success = await updateOptionList(
+          dealId,
+          ProfileActivity,
+          activities,
+        );
+        if (!success) {
+          throw new BadRequestError(
+            `Activities for opportunity (deal_id:${dealId}) not updated.`,
+          );
+        }
+      }
+
+      if (skills) {
+        const success = await updateOptionList(dealId, ProfileSkill, skills);
+        if (!success) {
+          throw new BadRequestError(
+            `Skills for opportunity (deal_id:${dealId}) not updated.`,
+          );
+        }
+      }
+
+      return reply
+        .status(200)
+        .send({ message: "Opportunity has been patched." });
     },
   );
 }

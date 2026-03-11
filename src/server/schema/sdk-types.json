@@ -549,9 +549,57 @@
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
-        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+        "statusOpportunity": { "$ref": "OpportunityVolunteerStatusType#" },
+        "numberVolunteers": { "type": "integer" },
+        "description": { "type": "string" },
+        "languagesMain": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        },
+        "languagesResidents": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        },
+        "activities": { "type": "array", "items": { "$ref": "OptionItem#" } },
+        "skills": { "type": "array", "items": { "$ref": "OptionItem#" } },
+        "schedule": {
+          "type": "array",
+          "items": { "$ref": "ApiAvailability#" }
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "name": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string" },
+            "waysToContact": {
+              "type": "array",
+              "items": { "$ref": "PreferredCommunicationType#" }
+            }
+          }
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "district": { "type": "string" }
+          }
+        },
+        "accompanyingDetails": {
+          "type": "object",
+          "properties": {
+            "appointmentAddress": { "type": "string" },
+            "appointmentDate": { "type": "string" },
+            "appointmentTime": { "type": "string" },
+            "refugeeNumber": { "type": "string" },
+            "refugeeName": { "type": "string" },
+            "languagesToTranslate": { "type": "integer" }
+          }
+        }
       },
-      "required": ["status"]
+      "additionalProperties": false
     },
     "ApiVolunteerOpportunityPost": {
       "$id": "ApiVolunteerOpportunityPost",
@@ -621,6 +669,7 @@
             "contact": {
               "type": "object",
               "properties": {
+                "id": { "type": "integer" },
                 "name": { "type": "string" },
                 "phone": { "type": "string" },
                 "email": { "type": "string" },
@@ -684,10 +733,7 @@
         "appointmentTime": { "type": "string" },
         "refugeeNumber": { "type": "string" },
         "refugeeName": { "type": "string" },
-        "languageToTranslate": {
-          "type": "string",
-          "enum": ["deutsche", "englishOk", "noTranslation"]
-        }
+        "languageToTranslate": { "type": "integer" }
       }
     }
   }
