@@ -3,6 +3,7 @@ import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
 import { getDateObj } from "../utils";
 
@@ -42,7 +43,7 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             phone: body?.accompanyingDetails?.refugeeNumber,
             name: body?.accompanyingDetails?.refugeeName,
             languageToTranslate:
-              body?.accompanyingDetails?.languagesToTranslate?.join(", "),
+              body?.accompanyingDetails?.languagesToTranslate?.at(0),
           } as Partial<Accompanying>)
         : {},
       languages: [
@@ -54,10 +55,10 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
           id: l.id,
           purpose: LangPurpose.TRANSLATION,
         })),
-      ] as Array<{ id: number }>,
-      skills: (body?.skills || []) as Array<{ id: number }>,
-      activities: (body?.activities || []) as Array<{ id: number }>,
-      schedule: (body.schedule || []) as Array<{ id: number }>,
+      ] as DataId[],
+      skills: (body?.skills || []) as DataId[],
+      activities: (body?.activities || []) as DataId[],
+      schedule: (body.schedule || []) as DataId[],
     }),
   };
 }
