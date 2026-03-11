@@ -1,10 +1,10 @@
 import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
-import { BadRequestError } from "../../../config";
-import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
-import Agent from "../../../data/entity/opportunity/agent.entity";
-import { getNameFields } from "../../../services";
-import { getDateObj } from "../../../services/utils";
-import { getEmptyPropsNull } from "../common";
+import { getNameFields } from "..";
+import { BadRequestError } from "../../config";
+import Accompanying from "../../data/entity/opportunity/accompanying.entity";
+import Agent from "../../data/entity/opportunity/agent.entity";
+import { getEmptyPropsNull } from "../../server/utils/common";
+import { getDateObj } from "../utils";
 
 export function parseOpportunity(body: ApiOpportunityPatch) {
   if (!body) {
