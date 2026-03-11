@@ -1,4 +1,8 @@
-import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
+import {
+  ApiOpportunityPatch,
+  LangPurpose,
+  TranslatedIntoType,
+} from "need4deed-sdk";
 import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -42,8 +46,8 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             ),
             phone: body?.accompanyingDetails?.refugeeNumber,
             name: body?.accompanyingDetails?.refugeeName,
-            languageToTranslate:
-              body?.accompanyingDetails?.languagesToTranslate?.at(0),
+            languageToTranslate: body?.accompanyingDetails
+              ?.languagesToTranslate as unknown as TranslatedIntoType,
           } as Partial<Accompanying>)
         : {},
       languages: [
