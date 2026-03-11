@@ -621,6 +621,7 @@
             "contact": {
               "type": "object",
               "properties": {
+                "id": { "type": "integer" },
                 "name": { "type": "string" },
                 "phone": { "type": "string" },
                 "email": { "type": "string" },
