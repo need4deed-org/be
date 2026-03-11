@@ -43,4 +43,6 @@ export default class Accompanying {
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.accompanying)
   opportunity: Opportunity;
+
+  langCode: number;
 }
