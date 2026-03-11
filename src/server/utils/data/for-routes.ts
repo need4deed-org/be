@@ -9,6 +9,7 @@ import {
   OccasionalType,
   OptionItem,
   SortOrder,
+  TranslatedIntoType,
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import {
@@ -23,7 +24,6 @@ import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
-import Deal from "../../../data/entity/deal.entity";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -355,13 +355,22 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     {
       relations: string[];
       idFieldNames: [
-        "profile" | "location" | "time",
+        "accompanying" | "profile" | "location" | "time",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
       ];
     }
   > = {
+    AccompanyingLanguage: {
+      idFieldNames: [
+        "accompanying",
+        "accompanyingId",
+        "language",
+        "languageId",
+      ],
+      relations: ["profile.profileLanguage"],
+    },
     ProfileLanguage: {
       idFieldNames: ["profile", "profileId", "language", "languageId"],
       relations: ["profile.profileLanguage"],
@@ -439,9 +448,10 @@ export async function updateOptionList<
   M extends { id: number },
   L extends { id: number | string },
 >(
-  dealId: number,
+  rootId: number,
   m2mEntity: new (_args?: unknown) => M,
   list: L[],
+  rootEntity: string = "deal",
 ): Promise<boolean> {
   const {
     relations,
@@ -450,17 +460,17 @@ export async function updateOptionList<
 
   try {
     await dataSource.transaction(async (manager) => {
-      const dealRepository = getRepository(
+      const rootRepository = getRepository(
         manager as unknown as DataSource,
-        Deal,
+        rootEntity,
       );
-      const deal = await dealRepository.findOne({
-        where: { id: dealId },
+      const root = await rootRepository.findOne({
+        where: { id: rootId },
         relations,
       });
 
-      if (!deal) {
-        throw new NotFoundError(`Deal id:${dealId} not found`);
+      if (!root) {
+        throw new NotFoundError(`Root id:${rootId} not found`);
       }
 
       const m2mRepository = getRepository(
@@ -469,7 +479,7 @@ export async function updateOptionList<
       );
 
       const where = {
-        [hostId]: deal[host].id,
+        [hostId]: root[host].id,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -480,7 +490,7 @@ export async function updateOptionList<
 
       const newList = list.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: deal[host].id,
+          [hostId]: root[host].id,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {
@@ -500,7 +510,7 @@ export async function updateOptionList<
   } catch (error) {
     dataSource.logger.log(
       "warn",
-      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${dealId}`,
+      `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${rootId}`,
     );
     return false;
   }
@@ -725,4 +735,57 @@ export async function updateAddress(
     where: { id: address.id! },
     relations: ["postcode"],
   })) as Address;
+}
+
+export async function setTranslationType(
+  translation: TranslatedIntoType,
+): Promise<number> {
+  const isoCodeMap = {
+    [TranslatedIntoType.DEUTSCHE]: "de",
+    [TranslatedIntoType.ENGLISH_OK]: "en",
+    [TranslatedIntoType.NO_TRANSLATION]: "zzz",
+  };
+
+  if (!isoCodeMap[translation]) {
+    throw new Error(
+      `Shouldn't happen that languageToTranslate is ${translation}`,
+    );
+  }
+
+  const languageRepository = getRepository(dataSource, Language);
+
+  const language = await languageRepository.findOne({
+    where: { isoCode: isoCodeMap[translation] },
+  });
+
+  if (!language) {
+    throw new Error(
+      `Shouldn't happen that language:${isoCodeMap[translation]} not found.`,
+    );
+  }
+
+  return language.id;
+}
+
+export async function getTranslationType(
+  id: number,
+): Promise<TranslatedIntoType> {
+  const languageRepository = getRepository(dataSource, Language);
+  const language = await languageRepository.findOneBy({ id });
+  if (!language) {
+    throw new NotFoundError("Language for accompanying not fond.");
+  }
+
+  switch (language.isoCode) {
+    case "de":
+      return TranslatedIntoType.DEUTSCHE;
+    case "en":
+      return TranslatedIntoType.ENGLISH_OK;
+    case "zzz":
+      return TranslatedIntoType.NO_TRANSLATION;
+    default:
+      throw new BadRequestError(
+        `Cannot interpret ${language.title} as accompanying language.`,
+      );
+  }
 }
