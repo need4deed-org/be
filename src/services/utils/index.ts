@@ -1,4 +1,5 @@
 import path from "path";
+import { BadRequestError } from "../../config";
 import { BaseError } from "../../config/error/base";
 
 type Success<T> = readonly [T, null];
@@ -134,4 +135,17 @@ export function isProbablyFileSystemPath(str: string): boolean {
     str.includes("/") ||
     str.includes("\\")
   );
+}
+
+export function getDateObj(date: string, time: string): Date {
+  const [hours, minutes] = time?.split(":") || "";
+  const dateObj = new Date(date);
+  dateObj.setHours(Number(hours));
+  dateObj.setMinutes(Number(minutes));
+
+  if (isNaN(dateObj.getTime())) {
+    throw new BadRequestError("Date and/or time is invalid.");
+  }
+
+  return dateObj;
 }
