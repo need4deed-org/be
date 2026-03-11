@@ -16,6 +16,7 @@ import {
   DeepPartial,
   FindOptionsWhere,
   In,
+  QueryFailedError,
   Repository,
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
@@ -304,7 +305,7 @@ export async function patchEntity<E extends { id: number }>(
   entity: new () => E,
   data: Partial<E>,
   entityId?: number,
-): Promise<boolean> {
+): Promise<boolean | void> {
   const repository = getRepository(dataSource, entity);
 
   const id = entityId || data?.id;
@@ -314,7 +315,14 @@ export async function patchEntity<E extends { id: number }>(
 
   return await repository
     .update({ id } as FindOptionsWhere<E>, data as QueryDeepPartialEntity<E>)
-    .then((response) => response.affected === 1);
+    .then((response) => response.affected === 1)
+    .catch((error) => {
+      if (error instanceof QueryFailedError) {
+        throw new BadRequestError(
+          `Invalid data for patching:${entity.name} object id:${id}`,
+        );
+      }
+    });
 }
 
 export async function patchAddress(
@@ -338,7 +346,7 @@ export async function patchAddress(
     }
   }
 
-  return await patchEntity(Address, address);
+  return Boolean(await patchEntity(Address, address));
 }
 
 function getDealRelationsAndIdFieldName(m2mEntityName: string) {
@@ -386,7 +394,7 @@ export async function getOrCreateTimeslot(
 
   const { day, daytime } = availabilityObject;
   if (!day || !daytime) {
-    throw new Error(errorMsg);
+    throw new BadRequestError(errorMsg);
   }
 
   let payload: FindOptionsWhere<Timeslot> | Partial<Timeslot>;
@@ -411,7 +419,7 @@ export async function getOrCreateTimeslot(
   }
 
   if (!payload) {
-    throw new Error(errorMsg);
+    throw new BadRequestError(errorMsg);
   }
 
   const repositoryTimeslot = getRepository(dataSource, Timeslot);
