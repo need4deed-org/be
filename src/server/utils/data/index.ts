@@ -3,7 +3,6 @@ export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./for-routes";
 export * from "./get-language-title";
-export * from "./get-opportunity-patch-data";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./serve-volunteer-list";
