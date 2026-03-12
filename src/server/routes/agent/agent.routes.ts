@@ -78,7 +78,7 @@ export default async function agentRoutes(
       }
 
       return reply.status(200).send({
-        message: "Agents fetched successfully",
+        message: `Agents page:${page || 1} fetched successfully`,
         data,
         count,
       });
