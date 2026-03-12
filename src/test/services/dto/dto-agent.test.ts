@@ -1,4 +1,6 @@
+import { AgentVolunteerSearchType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import { dtoAgentGetList } from "../../../services";
 
 describe("dtoAgentGetList", () => {
@@ -8,6 +10,7 @@ describe("dtoAgentGetList", () => {
     type: "NGO",
     activeVolunteers: 10,
     addressId: 101,
+    searchStatus: AgentVolunteerSearchType.SEARCHING,
     districtId: 201,
   };
 
@@ -23,56 +26,40 @@ describe("dtoAgentGetList", () => {
       district: {
         title: "Mitte",
       },
-    };
+    } as Agent & { activeVolunteers: number };
 
-    const result = dtoAgentGetList(fullAgent as any);
+    const result = dtoAgentGetList(fullAgent);
 
     expect(result).toEqual({
       id: 1,
       title: "Helping Hands",
       type: "NGO",
       activeVolunteers: 10,
-      address: {
-        id: 101,
-        street: "Main St",
-        city: "Berlin",
-        postcode: {
-          id: 501,
-          code: "10115",
-          latitude: undefined,
-          longitude: undefined,
-        },
-      },
       district: {
         id: 201,
         title: { de: "Mitte" },
       },
+      volunteerSearch: "searching",
     });
   });
 
-  it("should handle missing optional address and district properties gracefully", () => {
-    const sparseAgent = {
+  it("should handle a null district gracefully", () => {
+    const agentWithNullDistrict = {
       ...mockAgentBase,
-      address: undefined,
-      district: undefined,
-    };
+      district: null, // Test null specifically as it's common from DBs
+    } as any;
 
-    const result = dtoAgentGetList(sparseAgent as any);
+    const result = dtoAgentGetList(agentWithNullDistrict);
 
-    expect(result.address.street).toBeUndefined();
-    expect(result.address.postcode.code).toBeUndefined();
-    expect(result.district.title.de).toBeUndefined();
-
-    // Ensure IDs (which come from the root agent object) still map
-    expect(result.address.id).toBe(101);
-    expect(result.district.id).toBe(201);
+    expect(result.district).toEqual({
+      id: 201,
+      title: { de: undefined },
+    });
   });
 
-  it("should always set latitude and longitude to undefined", () => {
-    // The implementation explicitly sets these to undefined
-    const result = dtoAgentGetList(mockAgentBase as any);
-
-    expect(result.address.postcode.latitude).toBeUndefined();
-    expect(result.address.postcode.longitude).toBeUndefined();
+  it("should map the volunteerSearch enum correctly", () => {
+    // Ensure the mapping from agent.searchStatus to volunteerSearch is correct
+    const result = dtoAgentGetList({ ...mockAgentBase } as any);
+    expect(result.volunteerSearch).toBe(AgentVolunteerSearchType.SEARCHING);
   });
 });
