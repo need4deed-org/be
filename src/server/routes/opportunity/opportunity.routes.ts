@@ -78,7 +78,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
         "deal.location.locationDistrict.district",
-        "agent.representative.address.postcode",
+        "agent.agentPerson.person.address.postcode",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;

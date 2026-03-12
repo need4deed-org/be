@@ -28,11 +28,11 @@ function getOpportunityContact(
   opportunity: Opportunity,
 ): ApiOpportunityContact {
   return {
-    id: opportunity.agent.representative.id,
-    name: opportunity.agent.representative.name,
-    phone: opportunity.agent.representative.phone,
-    email: opportunity.agent.representative.email,
-    waysToContact: opportunity.agent.representative.preferredCommunicationType,
+    id: opportunity.agent.representative?.id,
+    name: opportunity.agent.representative?.name,
+    phone: opportunity.agent.representative?.phone,
+    email: opportunity.agent.representative?.email,
+    waysToContact: opportunity.agent.representative?.preferredCommunicationType,
   };
 }
 
