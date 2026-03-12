@@ -101,9 +101,11 @@ export default async function opportunityRoutes(
         await agentRepository.save(updates);
       }
 
-      opportunityComments.accompanying.langCode = await setTranslationType(
-        opportunityComments.accompanying.languageToTranslate,
-      );
+      if (opportunityComments.accompanying) {
+        opportunityComments.accompanying.langCode = await setTranslationType(
+          opportunityComments.accompanying.languageToTranslate,
+        );
+      }
 
       const data = dtoOpportunityGet(opportunityComments);
 
