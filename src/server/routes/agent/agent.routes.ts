@@ -1,14 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
-  AgentEngagementStatusType,
-  AgentTrustType,
-  AgentVolunteerSearchType,
   ApiAgentGet,
   ApiAgentGetList,
   ApiCommunicationGet,
-  CommunicationType,
-  ContactMethodType,
-  ContactType,
   UserRole,
 } from "need4deed-sdk";
 import { dtoAgentGetList } from "../../../services";
@@ -17,13 +11,20 @@ import {
   idParamSchema,
   responseSchema,
 } from "../../schema";
-import { ParamsId, QuerystringAgentGetList, ReplyDataCount } from "../../types";
+import {
+  ParamsId,
+  QuerystringAgentGetList,
+  ReplyData,
+  ReplyDataCount,
+  RoutePrefix,
+} from "../../types";
 import {
   getDistrictToAgentHandler,
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
 import { addVolunteerToAgent } from "../../utils/data/add-volunteer-to-agent";
+import { mockDataAgentCommunication, mockDataAgentGet } from "./mock-data";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -84,92 +85,42 @@ export default async function agentRoutes(
     },
   );
 
-  fastify.get<{ Params: ParamsId }>(
+  fastify.get<{ Params: ParamsId; Reply: ReplyData<ApiAgentGet> }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
+        response: responseSchema("ApiAgentGet#"),
       },
     },
     async (request, reply) => {
       const { id } = request.params;
-      const now = new Date();
-      const data: ApiAgentGet = {
-        id: Number(id),
-        title: "Hanger 1-3",
-        type: undefined,
-        createdAt: now,
-        statusEngagement: AgentEngagementStatusType.NEW,
-        volunteerSearch: AgentVolunteerSearchType.NOT_NEEDED,
-        trustLevel: AgentTrustType.UNKNOWN,
-        activeVolunteers: 0,
-        comments: [
-          {
-            id: 1,
-            timestamp: new Date("2025-01-15T10:00:00.000Z"),
-            content: "Initial contact made with agent.",
-            authorName: "Coordinator A",
-            entityId: Number(id),
-            entityType: "agent",
-          },
-          {
-            id: 2,
-            timestamp: new Date("2025-01-20T14:30:00.000Z"),
-            content: "Follow-up scheduled for next week.",
-            authorName: "Coordinator B",
-            entityId: Number(id),
-            entityType: "agent",
-          },
-        ],
-        agentDetails: {
-          about:
-            "A refugee accommodation centre providing housing and support services for newly arrived refugees in Berlin.",
-          website: "orgname.de",
-          address: "Musterstraße 12, Berlin, 10115",
-          organizationType: undefined,
-          operator: "AWO",
-          services: "Sozialrecht, Beratungsstelle",
-          clientLanguages: [
-            { id: 1, title: "Ukrainian" },
-            { id: 2, title: "Russian" },
-            { id: 3, title: "Farsi" },
-            { id: 4, title: "Arabic" },
-          ],
-        },
-      };
+
       return reply.status(200).send({
-        message: "Agent fetched successfully",
-        data,
-        count: 1,
+        message: `Agent (id:${id}) fetched successfully`,
+        data: mockDataAgentGet(id),
       });
     },
   );
 
-  fastify.get("/:id/communication", async (_request, reply) => {
-    const data: ApiCommunicationGet[] = [
-      {
-        id: 1001,
-        contactType: ContactType.CALL,
-        contactMethod: ContactMethodType.PHONE,
-        communicationType: CommunicationType.FIRST_INQUIRY,
-        date: new Date("2025-06-01T10:00:00.000Z"),
-        volunteerId: 0,
-        userId: 1,
+  fastify.get<{
+    Params: ParamsId;
+    Reply: ReplyDataCount<ApiCommunicationGet[]>;
+  }>(
+    `/:id${RoutePrefix.COMMUNICATION}`,
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema("ApiCommunicationGet#", true),
       },
-      {
-        id: 1002,
-        contactType: ContactType.TEXT_EMAIL,
-        contactMethod: ContactMethodType.EMAIL,
-        communicationType: CommunicationType.POST_FOLLOWUP,
-        date: new Date("2025-06-10T14:30:00.000Z"),
-        volunteerId: 0,
-        userId: 1,
-      },
-    ];
-    return reply.status(200).send({
-      message: "Agent communications fetched successfully",
-      data,
-      count: 2,
-    });
-  });
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      return reply.status(200).send({
+        message: `Agent (id:${id}) communications fetched successfully`,
+        data: mockDataAgentCommunication(),
+        count: 2,
+      });
+    },
+  );
 }
