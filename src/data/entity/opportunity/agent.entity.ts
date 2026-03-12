@@ -1,7 +1,7 @@
 import { IsArray, IsEnum, IsOptional, IsString } from "class-validator";
 import {
   AgentEngagementStatusType,
-  AgentOperatorType,
+  AgentRoleType,
   AgentServiceType,
   AgentTrustType,
   AgentType,
@@ -19,7 +19,9 @@ import {
 } from "typeorm";
 import Address from "../location/address.entity";
 import District from "../location/district.entity";
+import AgentPerson from "../m2m/agent-person";
 import AgentPostcode from "../m2m/agent-postcode";
+import Organization from "../organization.entity";
 import Person from "../person.entity";
 import Opportunity from "./opportunity.entity";
 
@@ -36,6 +38,9 @@ export default class Agent {
 
   @Column({ unique: true })
   title: string;
+
+  @Column({ nullable: true })
+  info?: string;
 
   @Column({ nullable: true })
   @IsOptional()
@@ -86,28 +91,18 @@ export default class Agent {
   @IsEnum(AgentServiceType, { each: true })
   services: AgentServiceType[];
 
-  @Column({
-    type: "enum",
-    enum: AgentOperatorType,
-    default: AgentOperatorType.ORGANIZATION,
-  })
-  operatorType: AgentOperatorType;
-
-  @Column()
-  operatorId: number;
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => Person)
-  @JoinColumn({ name: "person_id" })
-  representative: Person;
+  @ManyToOne(() => Organization)
+  @JoinColumn({ name: "organization_id" })
+  organization: Organization;
 
   @Column({ nullable: true })
-  personId: number;
+  organizationId: number;
 
   @ManyToOne(() => Address)
   @JoinColumn({ name: "address_id" })
@@ -128,4 +123,12 @@ export default class Agent {
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.agent)
   opportunity: Opportunity[];
+
+  @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.agent)
+  agentPerson: AgentPerson[];
+
+  get representative(): Person {
+    return this.agentPerson?.find(({ role }) => role === AgentRoleType.MANAGER)
+      .person;
+  }
 }
