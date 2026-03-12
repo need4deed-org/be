@@ -128,7 +128,14 @@ export default class Agent {
   agentPerson: AgentPerson[];
 
   get representative(): Person {
-    return this.agentPerson?.find(({ role }) => role === AgentRoleType.MANAGER)
-      .person;
+    const representative = this.agentPerson?.find(
+      ({ role }) => role === AgentRoleType.MANAGER,
+    )?.person;
+    if (!representative) {
+      return this.agentPerson?.find(
+        ({ role }) => role === AgentRoleType.VOLUNTEER_COORDINATOR,
+      )?.person;
+    }
+    return representative;
   }
 }
