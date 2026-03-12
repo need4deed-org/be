@@ -1,6 +1,6 @@
 import path from "path";
 import {
-  AgentOperatorType,
+  AgentRoleType,
   DocumentStatusType,
   OccasionalType,
   VolunteerStateAppreciationType,
@@ -15,6 +15,7 @@ import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
 import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
+import AgentPerson from "../entity/m2m/agent-person";
 import LocationDistrict from "../entity/m2m/location-district";
 import ProfileActivity from "../entity/m2m/profile-activity";
 import ProfileLanguage from "../entity/m2m/profile-language";
@@ -488,8 +489,6 @@ export async function getOrCreateAgent(
     return agent;
   }
 
-  const representative = await getOrCreatePerson(agentData.person, dataSource);
-
   const organization = await getOrCreateOrganization(
     agentData.organization,
     dataSource,
@@ -502,11 +501,20 @@ export async function getOrCreateAgent(
   const newAgent = new Agent({
     title: agentData.title,
     type: undefined,
-    representative,
-    operatorType: AgentOperatorType.ORGANIZATION,
-    operatorId: organization.id,
+    organizationId: organization.id,
   });
   await agentRepository.save(newAgent);
+
+  const person = await getOrCreatePerson(agentData.person, dataSource);
+
+  const agentPersonRepository = getRepository(dataSource, AgentPerson);
+  const agentPerson = new AgentPerson({
+    agent,
+    person,
+    role: AgentRoleType.MANAGER,
+  });
+  await agentPersonRepository.save(agentPerson);
+
   return newAgent;
 }
 
