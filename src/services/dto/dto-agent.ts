@@ -1,5 +1,6 @@
 import { ApiAgentGetList, ApiOpportunityAgent } from "need4deed-sdk";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import { serializeAddress } from "./dto-address";
 
 export function dtoAgentGetList(
   agent: Agent & { activeVolunteers: number },
@@ -28,9 +29,7 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   return {
     type: agent.type,
     name: agent.title,
-    address: agent.representative.address
-      ? `${agent.representative.address.street}, ${agent.representative.address.postcode?.value} ${agent.representative.address.city ? agent.representative.address.city : "Berlin"}`
-      : "Berlin",
+    address: serializeAddress(agent.representative?.address),
     district: { id: agent.districtId, title: { de: agent.district?.title } },
   };
 }
