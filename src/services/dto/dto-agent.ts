@@ -9,18 +9,8 @@ export function dtoAgentGetList(
     id: agent.id,
     title: agent.title,
     type: agent.type,
+    volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
-    address: {
-      id: agent.addressId,
-      street: agent.address?.street,
-      city: agent.address?.city,
-      postcode: {
-        id: agent.address?.postcodeId,
-        code: agent.address?.postcode?.value,
-        latitude: undefined,
-        longitude: undefined,
-      },
-    },
     district: { id: agent.districtId, title: { de: agent.district?.title } },
   };
 }
