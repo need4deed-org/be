@@ -4,8 +4,8 @@ import {
   ApiAgentGetList,
   ApiOpportunityAgent,
 } from "need4deed-sdk";
+import Comment from "../../data/entity/comment.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
-import Comment from "../../data/entity/volunteer/comment.entity";
 import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
