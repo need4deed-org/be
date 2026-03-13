@@ -16,9 +16,9 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { verifyPassword } from "../utils";
+import Communication from "./communication.entity";
 import Person from "./person.entity";
 import Appreciation from "./volunteer/appreciation.entity";
-import Communication from "./volunteer/communication.entity";
 
 @Entity()
 export default class User {

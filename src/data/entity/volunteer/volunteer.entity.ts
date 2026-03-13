@@ -19,12 +19,12 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
+import Communication from "../communication.entity";
 import Deal from "../deal.entity";
 import Document from "../document.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
 import Appreciation from "./appreciation.entity";
-import Communication from "./communication.entity";
 
 @Entity()
 export default class Volunteer {

@@ -1,5 +1,5 @@
 import { ApiComment } from "need4deed-sdk";
-import Comment from "../../data/entity/volunteer/comment.entity";
+import Comment from "../../data/entity/comment.entity";
 
 export function commentSerializer(comment: Comment): ApiComment {
   return {

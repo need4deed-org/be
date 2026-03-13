@@ -414,22 +414,17 @@
           "properties": {
             "id": { "type": "integer" },
             "userId": { "type": "number" },
-            "volunteerId": { "type": "number" }
+            "agentId": { "type": "integer" },
+            "volunteerId": { "type": "integer" }
           }
         }
       ],
-      "required": [
-        "id",
-        "contactType",
-        "contactMethod",
-        "date",
-        "userId",
-        "volunteerId"
-      ]
+      "oneOf": [{ "required": ["agentId"] }, { "required": ["volunteerId"] }],
+      "required": ["id", "contactType", "contactMethod", "date", "userId"]
     },
     "ApiCommunicationPost": {
       "$id": "ApiCommunicationPost",
-      "allOf": [{ "$ref": "ApiCommunication#" }],
+      "$ref": "ApiCommunication#",
       "required": ["contactType", "contactMethod", "date"]
     },
     "ApiCommunicationPatch": {
