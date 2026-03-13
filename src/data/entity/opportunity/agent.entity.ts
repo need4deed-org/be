@@ -6,6 +6,7 @@ import {
   AgentTrustType,
   AgentType,
   AgentVolunteerSearchType,
+  OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import {
   Column,
@@ -137,5 +138,25 @@ export default class Agent {
       )?.person;
     }
     return representative;
+  }
+
+  get activeVolunteers(): number {
+    return this.opportunity.reduce((numVolunteers, opportunity) => {
+      return (
+        numVolunteers +
+        opportunity.opportunityVolunteer.reduce(
+          (activeVolunteers, opportunityVolunteer) => {
+            return (
+              activeVolunteers +
+              (opportunityVolunteer.status ===
+              OpportunityVolunteerStatusType.ACTIVE
+                ? 1
+                : 0)
+            );
+          },
+          0,
+        )
+      );
+    }, 0);
   }
 }
