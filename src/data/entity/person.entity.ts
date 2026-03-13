@@ -61,6 +61,12 @@ export default class Person {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
+  @Length(7, 20) // Example phone length validation
+  landline?: string;
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
   avatarUrl?: string;
 
   @Column({
