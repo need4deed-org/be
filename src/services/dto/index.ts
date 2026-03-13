@@ -1,4 +1,5 @@
 export * from "./dto-accompanying";
+export * from "./dto-address";
 export * from "./dto-agent";
 export * from "./dto-comment";
 export * from "./dto-opportunity";

@@ -1,26 +1,43 @@
-import { ApiAgentGetList, ApiOpportunityAgent } from "need4deed-sdk";
+import {
+  AgentDetails,
+  ApiAgentGet,
+  ApiAgentGetList,
+  ApiOpportunityAgent,
+} from "need4deed-sdk";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Comment from "../../data/entity/volunteer/comment.entity";
+import { serializeAddress } from "./dto-address";
+import { commentSerializer } from "./dto-comment";
+import { dtoSerializePerson } from "./dto-person";
 
-export function dtoAgentGetList(
-  agent: Agent & { activeVolunteers: number },
-): ApiAgentGetList {
+export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
   return {
     id: agent.id,
     title: agent.title,
     type: agent.type,
+    volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
-    address: {
-      id: agent.addressId,
-      street: agent.address?.street,
-      city: agent.address?.city,
-      postcode: {
-        id: agent.address?.postcodeId,
-        code: agent.address?.postcode?.value,
-        latitude: undefined,
-        longitude: undefined,
-      },
+    district: { id: agent.districtId, title: { de: agent?.district?.title } },
+  };
+}
+
+export function dtoAgentGet(
+  agent: Agent & { comments: Comment[] },
+): ApiAgentGet {
+  return {
+    ...dtoAgentGetList(agent),
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
+    operator: agent?.organization?.title,
+    representative: {
+      ...dtoSerializePerson(agent?.representative?.person),
+      role: agent?.representative?.role,
     },
-    district: { id: agent.districtId, title: { de: agent.district?.title } },
+    serviceType: agent.services,
+    trustLevel: agent.trustLevel,
+    statusEngagement: agent.engagementStatus,
+    agentDetails: dtoAgentDetails(agent),
+    comments: agent.comments?.map(commentSerializer),
   };
 }
 
@@ -28,9 +45,23 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   return {
     type: agent.type,
     name: agent.title,
-    address: agent.representative.address
-      ? `${agent.representative.address.street}, ${agent.representative.address.postcode?.value} ${agent.representative.address.city ? agent.representative.address.city : "Berlin"}`
-      : "Berlin",
+    address: serializeAddress(agent.representative?.person?.address),
     district: { id: agent.districtId, title: { de: agent.district?.title } },
+  };
+}
+
+function dtoAgentDetails(agent: Agent): AgentDetails {
+  return {
+    about: agent.info,
+    address: serializeAddress(agent.address),
+    website: agent.website,
+    organizationType: agent.type,
+    operator: agent?.organization?.title,
+    services: agent.services?.join(", "),
+    clientLanguages:
+      agent.agentLanguage?.map((al) => ({
+        id: al.languageId,
+        title: al.language?.title,
+      })) || [],
   };
 }

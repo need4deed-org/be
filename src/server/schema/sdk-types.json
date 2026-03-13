@@ -166,6 +166,7 @@
         "middleName": { "type": "string" },
         "email": { "type": "string" },
         "phone": { "type": "string" },
+        "landline": { "type": "string" },
         "address": { "$ref": "Address#" },
         "preferredComm": { "$ref": "PreferredCommunicationType#" }
       }
@@ -707,22 +708,144 @@
         "multiple-social-support"
       ]
     },
-    "ApiAgent": {
-      "$id": "ApiAgent",
+    "AgentRoleType": {
+      "$id": "AgentRoleType",
+      "type": "string",
+      "enum": [
+        "social-worker",
+        "volunteer-coordinator",
+        "manager",
+        "project-coordinator",
+        "psychologist",
+        "project-staff",
+        "childcare-worker",
+        "other"
+      ]
+    },
+    "AgentTrustType": {
+      "$id": "AgentTrustType",
+      "type": "string",
+      "enum": ["high", "low", "unknown"]
+    },
+    "AgentVolunteerSearchType": {
+      "$id": "AgentVolunteerSearchType",
+      "type": "string",
+      "enum": ["searching", "not-needed", "volunteers-found"]
+    },
+    "AgentEngagementStatusType": {
+      "$id": "AgentEngagementStatusType",
+      "type": "string",
+      "enum": ["searching", "not-needed", "volunteers-found"]
+    },
+    "AgentService": {
+      "$id": "AgentService",
+      "type": "string",
+      "enum": [
+        "childcare",
+        "welfare",
+        "consultation",
+        "voluntary-support",
+        "tandem",
+        "sport",
+        "tutoring",
+        "refugee-accommodation",
+        "job-coaching",
+        "youth"
+      ]
+    },
+    "AgentDetails": {
+      "$id": "AgentDetails",
+      "type": "object",
+      "properties": {
+        "about": { "type": "string" },
+        "address": { "type": "string" },
+        "website": { "type": "string" },
+        "organizationType": { "type": "string" },
+        "operator": { "type": "string" },
+        "services": { "type": "string" },
+        "clientLanguages": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        }
+      }
+    },
+    "AgentRepresentative": {
+      "$id": "AgentRepresentative",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiPerson#" },
+        {
+          "type": "object",
+          "properties": {
+            "role": { "$ref": "AgentRoleType" }
+          }
+        }
+      ]
+    },
+    "AgentList": {
+      "$id": "AgentList",
       "type": "object",
       "properties": {
         "id": { "type": "integer" },
         "title": { "type": "string" },
         "type": { "$ref": "AgentType#" },
-        "address": { "$ref": "Address#" },
         "district": { "$ref": "Option#" },
-        "activeVolunteers": { "type": "integer" }
+        "activeVolunteers": { "type": "integer" },
+        "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" }
       }
     },
     "ApiAgentGetList": {
       "$id": "ApiAgentGetList",
-      "$ref": "ApiAgent#",
-      "required": ["id", "title", "type"]
+      "$ref": "AgentList#",
+      "required": [
+        "id",
+        "title",
+        "type",
+        "district",
+        "activeVolunteers",
+        "volunteerSearch"
+      ]
+    },
+    "AgentId": {
+      "$id": "AgentId",
+      "allOf": [
+        { "$ref": "AgentList#" },
+        {
+          "type": "object",
+          "properties": {
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "operator": { "type": "string" },
+            "representative": { "$ref": "AgentRepresentative#" },
+            "serviceType": {
+              "type": "array",
+              "items": { "$ref": "AgentService#" }
+            },
+            "trustLevel": { "$ref": "AgentTrustType#" },
+            "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
+            "agentDetails": { "$ref": "AgentDetails#" },
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+          }
+        }
+      ]
+    },
+    "ApiAgentGet": {
+      "$id": "ApiAgentGet",
+      "$ref": "AgentId#",
+      "required": [
+        "id",
+        "title",
+        "type",
+        "district",
+        "activeVolunteers",
+        "volunteerSearch"
+      ]
     },
     "ApiAccompanying": {
       "$id": "ApiAccompanying",
