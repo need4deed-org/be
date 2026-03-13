@@ -4,12 +4,13 @@ import Person from "../../../data/entity/person.entity";
 import { dtoParsePerson, dtoSerializePerson } from "../../../services/dto"; // Adjust the import path
 
 describe("dtoParsePerson", () => {
-  it("should map flat fields correctly", () => {
-    const apiPerson = {
+  it("should map flat fields and handle preferredCommunicationType as an array", () => {
+    const apiPerson: ApiPersonPatch = {
       firstName: "Jane",
       lastName: "Doe",
       email: "jane@example.com",
       phone: "555-0123",
+      preferredComm: ["Email"],
     };
 
     const result = dtoParsePerson(apiPerson);
@@ -21,7 +22,19 @@ describe("dtoParsePerson", () => {
       email: "jane@example.com",
       phone: "555-0123",
       avatarUrl: undefined,
+      preferredCommunicationType: ["Email"],
     });
+  });
+
+  it("should wrap a single preferredComm value into an array", () => {
+    const apiPerson = {
+      firstName: "Single",
+      preferredComm: "Phone",
+    };
+
+    const result = dtoParsePerson(apiPerson as unknown as ApiPersonPatch);
+
+    expect(result.preferredCommunicationType).toEqual(["Phone"]);
   });
 
   it("should map address without postcode correctly", () => {
@@ -59,13 +72,13 @@ describe("dtoParsePerson", () => {
 
     expect(result.address?.postcode).toEqual({
       id: "pc_123",
-      value: "10115", // Note: code maps to value
+      value: "10115",
     });
   });
 
   it("should not include an address key if apiPerson.address is undefined", () => {
     const apiPerson = { firstName: "Bob" };
-    const result = dtoParsePerson(apiPerson);
+    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
 
     expect(result).not.toHaveProperty("address");
   });
@@ -74,7 +87,6 @@ describe("dtoParsePerson", () => {
     const apiPerson = {
       address: {
         street: "Lone Street",
-        // city is missing
       },
     };
 
