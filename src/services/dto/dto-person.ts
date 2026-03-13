@@ -10,6 +10,9 @@ export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
     email: apiPerson.email,
     phone: apiPerson.phone,
     avatarUrl: apiPerson.avatarUrl,
+    preferredCommunicationType: Array.isArray(apiPerson.preferredComm)
+      ? apiPerson.preferredComm
+      : [apiPerson.preferredComm],
     ...(apiPerson.address
       ? {
           address: {
@@ -37,6 +40,7 @@ export function dtoSerializePerson(person: Person): ApiPersonGet {
     lastName: person.lastName,
     email: person.email,
     phone: person.phone,
+    landline: person.landline,
     avatarUrl: person.avatarUrl,
     address: {
       id: person.addressId,

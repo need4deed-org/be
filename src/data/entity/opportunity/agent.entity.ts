@@ -1,11 +1,12 @@
 import { IsArray, IsEnum, IsOptional, IsString } from "class-validator";
 import {
   AgentEngagementStatusType,
-  AgentOperatorType,
+  AgentRoleType,
   AgentServiceType,
   AgentTrustType,
   AgentType,
   AgentVolunteerSearchType,
+  OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import {
   Column,
@@ -19,8 +20,10 @@ import {
 } from "typeorm";
 import Address from "../location/address.entity";
 import District from "../location/district.entity";
+import AgentLanguage from "../m2m/agent-language";
+import AgentPerson from "../m2m/agent-person";
 import AgentPostcode from "../m2m/agent-postcode";
-import Person from "../person.entity";
+import Organization from "../organization.entity";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
@@ -36,6 +39,9 @@ export default class Agent {
 
   @Column({ unique: true })
   title: string;
+
+  @Column({ nullable: true })
+  info?: string;
 
   @Column({ nullable: true })
   @IsOptional()
@@ -86,28 +92,18 @@ export default class Agent {
   @IsEnum(AgentServiceType, { each: true })
   services: AgentServiceType[];
 
-  @Column({
-    type: "enum",
-    enum: AgentOperatorType,
-    default: AgentOperatorType.ORGANIZATION,
-  })
-  operatorType: AgentOperatorType;
-
-  @Column()
-  operatorId: number;
-
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => Person)
-  @JoinColumn({ name: "person_id" })
-  representative: Person;
+  @ManyToOne(() => Organization)
+  @JoinColumn({ name: "organization_id" })
+  organization: Organization;
 
   @Column({ nullable: true })
-  personId: number;
+  organizationId: number;
 
   @ManyToOne(() => Address)
   @JoinColumn({ name: "address_id" })
@@ -128,4 +124,42 @@ export default class Agent {
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.agent)
   opportunity: Opportunity[];
+
+  @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.agent)
+  agentPerson: AgentPerson[];
+
+  @OneToMany(() => AgentLanguage, (agentLanguage) => agentLanguage.agent)
+  agentLanguage: AgentLanguage[];
+
+  get representative(): AgentPerson {
+    let representative = this.agentPerson?.find(
+      ({ role }) => role === AgentRoleType.MANAGER,
+    );
+    if (!representative) {
+      representative = this.agentPerson?.find(
+        ({ role }) => role === AgentRoleType.VOLUNTEER_COORDINATOR,
+      );
+    }
+    return representative;
+  }
+
+  get activeVolunteers(): number {
+    return this.opportunity.reduce((numVolunteers, opportunity) => {
+      return (
+        numVolunteers +
+        opportunity.opportunityVolunteer.reduce(
+          (activeVolunteers, opportunityVolunteer) => {
+            return (
+              activeVolunteers +
+              (opportunityVolunteer.status ===
+              OpportunityVolunteerStatusType.ACTIVE
+                ? 1
+                : 0)
+            );
+          },
+          0,
+        )
+      );
+    }, 0);
+  }
 }

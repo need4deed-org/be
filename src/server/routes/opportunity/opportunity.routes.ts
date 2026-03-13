@@ -78,7 +78,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
         "deal.location.locationDistrict.district",
-        "agent.representative.address.postcode",
+        "agent.agentPerson.person.address.postcode",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -101,9 +101,11 @@ export default async function opportunityRoutes(
         await agentRepository.save(updates);
       }
 
-      opportunityComments.accompanying.langCode = await setTranslationType(
-        opportunityComments.accompanying.languageToTranslate,
-      );
+      if (opportunityComments.accompanying) {
+        opportunityComments.accompanying.langCode = await setTranslationType(
+          opportunityComments.accompanying.languageToTranslate,
+        );
+      }
 
       const data = dtoOpportunityGet(opportunityComments);
 

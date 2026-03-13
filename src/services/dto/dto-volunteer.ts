@@ -100,6 +100,7 @@ export function volunteerSerializer(
     lastName: volunteer.person.lastName,
     middleName: volunteer.person.middleName,
     phone: volunteer.person.phone,
+    landline: volunteer.person.landline,
     avatarUrl: volunteer.person?.avatarUrl || null,
     address,
   };
