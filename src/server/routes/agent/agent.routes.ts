@@ -1,10 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  ApiAgentGet,
-  ApiAgentGetList,
-  ApiCommunicationGet,
-  UserRole,
-} from "need4deed-sdk";
+import { ApiAgentGet, ApiAgentGetList, UserRole } from "need4deed-sdk";
 import { dtoAgentGet, dtoAgentGetList } from "../../../services";
 import {
   agentListQuerySchema,
@@ -24,16 +19,21 @@ import {
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
-import { mockDataAgentCommunication } from "./mock-data";
+import agentCommunicationRoutes from "./agent-communication.routes";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  await fastify.addHook(
+  fastify.addHook(
     "onRequest",
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
+
+  fastify.register(agentCommunicationRoutes, {
+    prefix: `/:id${RoutePrefix.COMMUNICATION}`,
+  });
+
   fastify.get<{
     Querystring: QuerystringAgentGetList;
     Reply: ReplyDataCount<ApiAgentGetList[]>;
@@ -117,27 +117,6 @@ export default async function agentRoutes(
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
         data,
-      });
-    },
-  );
-
-  fastify.get<{
-    Params: ParamsId;
-    Reply: ReplyDataCount<ApiCommunicationGet[]>;
-  }>(
-    `/:id${RoutePrefix.COMMUNICATION}`,
-    {
-      schema: {
-        params: idParamSchema,
-        response: responseSchema("ApiCommunicationGet#", true),
-      },
-    },
-    async (request, reply) => {
-      const { id } = request.params;
-      return reply.status(200).send({
-        message: `Agent (id:${id}) communications fetched successfully`,
-        data: mockDataAgentCommunication(),
-        count: 2,
       });
     },
   );

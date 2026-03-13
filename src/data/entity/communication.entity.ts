@@ -4,16 +4,22 @@ import {
   ContactType,
 } from "need4deed-sdk";
 import {
+  Check,
   Column,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import User from "../user.entity";
-import Volunteer from "./volunteer.entity";
+import Agent from "./opportunity/agent.entity";
+import User from "./user.entity";
+import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
+@Check(`
+  (CASE WHEN "volunteer_id" IS NOT NULL THEN 1 ELSE 0 END +
+   CASE WHEN "agent_id" IS NOT NULL THEN 1 ELSE 0 END) = 1
+`)
 export default class Communication {
   constructor(communication?: Partial<Communication>) {
     if (communication) {
@@ -44,6 +50,16 @@ export default class Communication {
 
   @Column({ nullable: true })
   volunteerId: number;
+
+  @ManyToOne(() => Agent, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "agent_id" })
+  agent: Agent;
+
+  @Column({ nullable: true })
+  agentId: number;
 
   @ManyToOne(() => User, {
     nullable: false,

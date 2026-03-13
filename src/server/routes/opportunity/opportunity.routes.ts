@@ -7,6 +7,7 @@ import {
 import { FindOptionsWhere } from "typeorm";
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
+import Comment from "../../../data/entity/comment.entity";
 import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import ProfileSkill from "../../../data/entity/m2m/profile-skill";
@@ -15,7 +16,6 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
-import Comment from "../../../data/entity/volunteer/comment.entity";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,

@@ -24,6 +24,7 @@ import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -34,7 +35,6 @@ import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
-import Comment from "../../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import { volunteerSerializer } from "../../../services";
