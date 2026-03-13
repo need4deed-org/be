@@ -37,6 +37,7 @@ export function dtoSerializePerson(person: Person): ApiPersonGet {
     lastName: person.lastName,
     email: person.email,
     phone: person.phone,
+    landline: person.landline,
     avatarUrl: person.avatarUrl,
     address: {
       id: person.addressId,
