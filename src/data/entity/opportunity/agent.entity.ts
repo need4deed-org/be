@@ -23,7 +23,6 @@ import District from "../location/district.entity";
 import AgentPerson from "../m2m/agent-person";
 import AgentPostcode from "../m2m/agent-postcode";
 import Organization from "../organization.entity";
-import Person from "../person.entity";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
@@ -128,14 +127,14 @@ export default class Agent {
   @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.agent)
   agentPerson: AgentPerson[];
 
-  get representative(): Person {
-    const representative = this.agentPerson?.find(
+  get representative(): AgentPerson {
+    let representative = this.agentPerson?.find(
       ({ role }) => role === AgentRoleType.MANAGER,
-    )?.person;
+    );
     if (!representative) {
-      return this.agentPerson?.find(
+      representative = this.agentPerson?.find(
         ({ role }) => role === AgentRoleType.VOLUNTEER_COORDINATOR,
-      )?.person;
+      );
     }
     return representative;
   }

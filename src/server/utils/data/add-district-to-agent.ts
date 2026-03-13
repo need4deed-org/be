@@ -9,7 +9,7 @@ export function getDistrictToAgentHandler(isRepresentative = false) {
       if (!agent.districtId) {
         const district = await getDistrictFromPostcode(
           isRepresentative
-            ? agent.representative?.address?.postcode
+            ? agent.representative?.person?.address?.postcode
             : agent.address?.postcode,
         );
         if (district) {

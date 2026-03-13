@@ -23,7 +23,9 @@ export default async function opportunityLegacyRoutes(
         const agentRepository = fastify.db.agentRepository;
         const emailDomain = (request.body.rac_email || "").split("@").pop();
         const agent: Agent = await agentRepository.findOne({
-          where: { representative: { email: ILike(`%@${emailDomain}`) } },
+          where: {
+            representative: { person: { email: ILike(`%@${emailDomain}`) } },
+          },
           relations,
         });
         if (!agent) {
