@@ -1,6 +1,6 @@
 import { EntityTableName } from "need4deed-sdk";
 import { dataSource } from "../../../data/data-source";
-import Comment from "../../../data/entity/volunteer/comment.entity";
+import Comment from "../../../data/entity/comment.entity";
 import { getRepository } from "../../../data/utils";
 import { pascal2snake } from "../../../services/utils";
 

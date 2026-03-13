@@ -5,8 +5,8 @@ import {
   ApiVolunteerOpportunityGetList,
   OpportunityType,
 } from "need4deed-sdk";
+import Comment from "../../data/entity/comment.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
-import Comment from "../../data/entity/volunteer/comment.entity";
 import { tryCatchFn } from "../utils";
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";

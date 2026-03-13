@@ -5,8 +5,8 @@ import {
   ApiVolunteerGetList,
   TimedText,
 } from "need4deed-sdk";
+import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
-import Comment from "../../data/entity/volunteer/comment.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { fastify } from "../../server";
 import {
