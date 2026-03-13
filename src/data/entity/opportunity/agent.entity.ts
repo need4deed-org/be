@@ -20,6 +20,7 @@ import {
 } from "typeorm";
 import Address from "../location/address.entity";
 import District from "../location/district.entity";
+import AgentLanguage from "../m2m/agent-language";
 import AgentPerson from "../m2m/agent-person";
 import AgentPostcode from "../m2m/agent-postcode";
 import Organization from "../organization.entity";
@@ -126,6 +127,9 @@ export default class Agent {
 
   @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.agent)
   agentPerson: AgentPerson[];
+
+  @OneToMany(() => AgentLanguage, (agentLanguage) => agentLanguage.agent)
+  agentLanguage: AgentLanguage[];
 
   get representative(): AgentPerson {
     let representative = this.agentPerson?.find(

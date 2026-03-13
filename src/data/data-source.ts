@@ -12,6 +12,7 @@ import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
 import Location from "./entity/location/location.entity";
 import Postcode from "./entity/location/postcode.entity";
+import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
 import DistrictPostcode from "./entity/m2m/district-postcode";
@@ -62,6 +63,7 @@ export const dataSource = new DataSource({
     Activity,
     Address,
     Agent,
+    AgentLanguage,
     AgentPerson,
     AgentPostcode,
     Appreciation,
