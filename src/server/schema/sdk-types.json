@@ -166,6 +166,7 @@
         "middleName": { "type": "string" },
         "email": { "type": "string" },
         "phone": { "type": "string" },
+        "landline": { "type": "string" },
         "address": { "$ref": "Address#" },
         "preferredComm": { "$ref": "PreferredCommunicationType#" }
       }
@@ -776,8 +777,7 @@
         {
           "type": "object",
           "properties": {
-            "role": { "$ref": "AgentRoleType" },
-            "landline": { "type": "string" }
+            "role": { "$ref": "AgentRoleType" }
           }
         }
       ]
@@ -822,10 +822,7 @@
               "format": "date-time"
             },
             "operator": { "type": "string" },
-            "representatives": {
-              "type": "array",
-              "items": { "$ref": "AgentRepresentative#" }
-            },
+            "representative": { "$ref": "AgentRepresentative#" },
             "serviceType": {
               "type": "array",
               "items": { "$ref": "AgentService#" }
