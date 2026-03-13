@@ -5,7 +5,7 @@ import {
   ApiCommunicationGet,
   UserRole,
 } from "need4deed-sdk";
-import { dtoAgentGetList } from "../../../services";
+import { dtoAgentGet, dtoAgentGetList } from "../../../services";
 import {
   agentListQuerySchema,
   idParamSchema,
@@ -19,12 +19,12 @@ import {
   RoutePrefix,
 } from "../../types";
 import {
+  addComments2Entity,
   getDistrictToAgentHandler,
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
-import { addVolunteerToAgent } from "../../utils/data/add-volunteer-to-agent";
-import { mockDataAgentCommunication, mockDataAgentGet } from "./mock-data";
+import { mockDataAgentCommunication } from "./mock-data";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -60,7 +60,6 @@ export default async function agentRoutes(
         "district",
         "opportunity.opportunityVolunteer",
       ];
-
       const [agents, count] = await agentRepository.findAndCount({
         where,
         relations,
@@ -70,8 +69,7 @@ export default async function agentRoutes(
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentsDistrict = await Promise.all(agents.map(addDistrictToAgent));
-      const agentsDistrictVolunteer = agentsDistrict.map(addVolunteerToAgent);
-      const data = agentsDistrictVolunteer.map(dtoAgentGetList);
+      const data = agentsDistrict.map(dtoAgentGetList);
 
       if (updates.length > 0) {
         await agentRepository.save(updates);
@@ -96,9 +94,29 @@ export default async function agentRoutes(
     async (request, reply) => {
       const { id } = request.params;
 
+      const agentRepository = fastify.db.agentRepository;
+      const relations = [
+        "address.postcode",
+        "district",
+        "opportunity.opportunityVolunteer",
+        "organization",
+        "agentPerson.person.address.postcode",
+        "agentLanguage.language",
+      ];
+      const agent = await agentRepository.findOne({ where: { id }, relations });
+
+      const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
+      const agentDistrict = await addDistrictToAgent(agent);
+      const agentComments = await addComments2Entity(agentDistrict);
+      const data = dtoAgentGet(agentComments);
+
+      if (updates.length > 0) {
+        await agentRepository.save(updates);
+      }
+
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
-        data: mockDataAgentGet(id),
+        data,
       });
     },
   );
