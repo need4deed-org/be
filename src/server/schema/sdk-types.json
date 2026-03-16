@@ -853,6 +853,16 @@
         "refugeeName": { "type": "string" },
         "languageToTranslate": { "type": "integer" }
       }
+    },
+    "ApiOrganizationPatch": {
+      "$id": "ApiOrganizationPatch",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "website": { "type": "string" }
+      }
     }
   }
 }
