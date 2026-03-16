@@ -12,6 +12,7 @@ export const RoutePrefix = {
   OPPORTUNITY: "/opportunity",
   OPPORTUNITY_LINKED: "/opportunity-linked",
   OPPORTUNITY_VOLUNTEER: "/opportunity-volunteer",
+  ORGANIZATION: "/organization",
   OPTION: "/option",
   PERSON: "/person",
   REFRESH: "/refresh",
