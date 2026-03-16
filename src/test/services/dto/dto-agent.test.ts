@@ -153,7 +153,7 @@ describe("dtoAgentGetList", () => {
         id: 201,
         title: { de: "Mitte" },
       },
-      volunteerSearch: "searching",
+      volunteerSearch: "agent-searching",
     });
   });
 
