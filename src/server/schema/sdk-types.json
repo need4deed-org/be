@@ -168,7 +168,10 @@
         "phone": { "type": "string" },
         "landline": { "type": "string" },
         "address": { "$ref": "Address#" },
-        "preferredComm": { "$ref": "PreferredCommunicationType#" }
+        "preferredComm": {
+          "type": "array",
+          "items": { "$ref": "PreferredCommunicationType#" }
+        }
       }
     },
     "ApiPersonGet": {
