@@ -12,6 +12,7 @@ import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
+import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
@@ -38,6 +39,7 @@ declare module "fastify" {
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
       profileRepository: Repository<Profile>;
       agentRepository: Repository<Agent>;
+      organizationRepository: Repository<Organization>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
