@@ -20,6 +20,7 @@ import healthRoutes from "./routes/health";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
+import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
@@ -177,6 +178,9 @@ export async function createServer(
   await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
   await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
     prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
+  });
+  await fastifyInstance.register(organizationRoutes, {
+    prefix: RoutePrefix.ORGANIZATION,
   });
 
   return fastifyInstance;
