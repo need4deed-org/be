@@ -120,4 +120,23 @@ export default async function agentRoutes(
       });
     },
   );
+
+  fastify.patch<{ Params: ParamsId; Reply: ReplyData<ApiAgentGet> }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        // body: { $ref: "ApiAgentPatch#" },
+        response: responseSchema("ApiAgentGet#"),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      fastify.log.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
+      return reply.status(200).send({
+        message: `Agent (id:${id}) patched successfully`,
+        data: request.body as ApiAgentGet,
+      });
+    },
+  );
 }
