@@ -9,10 +9,11 @@ export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
     lastName: apiPerson.lastName,
     email: apiPerson.email,
     phone: apiPerson.phone,
+    landline: apiPerson.landline,
     avatarUrl: apiPerson.avatarUrl,
     preferredCommunicationType: Array.isArray(apiPerson.preferredComm)
       ? apiPerson.preferredComm
-      : [apiPerson.preferredComm],
+      : [apiPerson.preferredComm].filter(Boolean),
     ...(apiPerson.address
       ? {
           address: {
@@ -33,25 +34,27 @@ export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
 }
 
 export function dtoSerializePerson(person: Person): ApiPersonGet {
-  return {
-    id: person.id,
-    firstName: person.firstName,
-    middleName: person.middleName,
-    lastName: person.lastName,
-    email: person.email,
-    phone: person.phone,
-    landline: person.landline,
-    avatarUrl: person.avatarUrl,
-    address: {
-      id: person.addressId,
-      street: person.address?.street,
-      city: person.address?.city,
-      postcode: {
-        id: person.address?.postcode?.id,
-        code: person.address?.postcode?.value,
-        latitude: person.address?.postcode?.latitude,
-        longitude: person.address?.postcode?.longitude,
-      },
-    },
-  };
+  return person
+    ? {
+        id: person.id,
+        firstName: person.firstName,
+        middleName: person.middleName,
+        lastName: person.lastName,
+        email: person.email,
+        phone: person.phone,
+        landline: person.landline,
+        avatarUrl: person.avatarUrl,
+        address: {
+          id: person.addressId,
+          street: person.address?.street,
+          city: person.address?.city,
+          postcode: {
+            id: person.address?.postcode?.id,
+            code: person.address?.postcode?.value,
+            latitude: person.address?.postcode?.latitude,
+            longitude: person.address?.postcode?.longitude,
+          },
+        },
+      }
+    : ({} as ApiPersonGet);
 }
