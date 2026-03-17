@@ -99,7 +99,7 @@ export default async function agentRoutes(
         "address.postcode",
         "district",
         "opportunity.opportunityVolunteer",
-        "organization",
+        "organization.address.postcode",
         "agentPerson.person.address.postcode",
         "agentLanguage.language",
       ];
@@ -126,7 +126,7 @@ export default async function agentRoutes(
     {
       schema: {
         params: idParamSchema,
-        // body: { $ref: "ApiAgentPatch#" },
+        body: { $ref: "ApiAgentPatch#" },
         response: responseSchema("ApiAgentGet#"),
       },
     },
