@@ -1,6 +1,16 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiAgentGet, ApiAgentGetList, UserRole } from "need4deed-sdk";
-import { dtoAgentGet, dtoAgentGetList } from "../../../services";
+import {
+  ApiAgentGet,
+  ApiAgentGetList,
+  ApiAgentPatch,
+  UserRole,
+} from "need4deed-sdk";
+import { NotFoundError } from "../../../config";
+import {
+  dtoAgentGet,
+  dtoAgentGetList,
+  parseAgentPatch,
+} from "../../../services";
 import {
   agentListQuerySchema,
   idParamSchema,
@@ -11,6 +21,7 @@ import {
   QuerystringAgentGetList,
   ReplyData,
   ReplyDataCount,
+  ReplyMessage,
   RoutePrefix,
 } from "../../types";
 import {
@@ -99,7 +110,7 @@ export default async function agentRoutes(
         "address.postcode",
         "district",
         "opportunity.opportunityVolunteer",
-        "organization",
+        "organization.address.postcode",
         "agentPerson.person.address.postcode",
         "agentLanguage.language",
       ];
@@ -117,6 +128,35 @@ export default async function agentRoutes(
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
         data,
+      });
+    },
+  );
+
+  fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiAgentPatch#" },
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      fastify.log.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
+      const agentRepository = fastify.db.agentRepository;
+      const agent = await agentRepository.findOneBy({ id });
+
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+
+      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
+
+      await agentRepository.save(agentObj);
+
+      return reply.status(200).send({
+        message: `Agent (id:${id}) patched successfully`,
       });
     },
   );

@@ -106,7 +106,11 @@ export async function createServer(
 
     // Handle schema errors
     if (error.validation) {
-      return reply.status(400).send({ message: "Validation failed" });
+      return reply.status(400).send({ message: "Validation failed." });
+    }
+
+    if (error.name === "UpdateValuesMissingError") {
+      return reply.status(400).send({ message: "There's nothing to update." });
     }
 
     // Handle generic TypeORM / Unexpected errors

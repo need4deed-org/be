@@ -168,7 +168,10 @@
         "phone": { "type": "string" },
         "landline": { "type": "string" },
         "address": { "$ref": "Address#" },
-        "preferredComm": { "$ref": "PreferredCommunicationType#" }
+        "preferredComm": {
+          "type": "array",
+          "items": { "$ref": "PreferredCommunicationType#" }
+        }
       }
     },
     "ApiPersonGet": {
@@ -720,17 +723,22 @@
     "AgentTrustType": {
       "$id": "AgentTrustType",
       "type": "string",
-      "enum": ["high", "low", "unknown"]
+      "enum": ["agent-high", "agent-low", "agent-unknown"]
     },
     "AgentVolunteerSearchType": {
       "$id": "AgentVolunteerSearchType",
       "type": "string",
-      "enum": ["searching", "not-needed", "volunteers-found"]
+      "enum": ["agent-searching", "agent-not-needed", "agent-volunteers-found"]
     },
     "AgentEngagementStatusType": {
       "$id": "AgentEngagementStatusType",
       "type": "string",
-      "enum": ["searching", "not-needed", "volunteers-found"]
+      "enum": [
+        "agent-new",
+        "agent-active",
+        "agent-unresponsive",
+        "agent-inactive"
+      ]
     },
     "AgentService": {
       "$id": "AgentService",
@@ -801,6 +809,26 @@
         "volunteerSearch"
       ]
     },
+    "AgentProps": {
+      "$id": "AgentProps",
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "serviceType": {
+          "type": "array",
+          "items": { "$ref": "AgentService#" }
+        },
+        "trustLevel": { "$ref": "AgentTrustType#" },
+        "statusEngagement": { "$ref": "AgentEngagementStatusType#" }
+      }
+    },
     "AgentId": {
       "$id": "AgentId",
       "allOf": [
@@ -829,6 +857,10 @@
           }
         }
       ]
+    },
+    "ApiAgentPatch": {
+      "$id": "ApiAgentPatch",
+      "$ref": "AgentProps#"
     },
     "ApiAgentGet": {
       "$id": "ApiAgentGet",

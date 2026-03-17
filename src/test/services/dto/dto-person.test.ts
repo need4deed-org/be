@@ -1,4 +1,4 @@
-import { ApiPersonPatch } from "need4deed-sdk";
+import { ApiPersonPatch, PreferredCommunicationType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import Person from "../../../data/entity/person.entity";
 import { dtoParsePerson, dtoSerializePerson } from "../../../services/dto"; // Adjust the import path
@@ -10,7 +10,7 @@ describe("dtoParsePerson", () => {
       lastName: "Doe",
       email: "jane@example.com",
       phone: "555-0123",
-      preferredComm: ["Email"],
+      preferredComm: ["email" as PreferredCommunicationType],
     };
 
     const result = dtoParsePerson(apiPerson);
@@ -22,7 +22,7 @@ describe("dtoParsePerson", () => {
       email: "jane@example.com",
       phone: "555-0123",
       avatarUrl: undefined,
-      preferredCommunicationType: ["Email"],
+      preferredCommunicationType: ["email" as PreferredCommunicationType],
     });
   });
 

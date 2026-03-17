@@ -145,6 +145,16 @@ describe("deepMerge", () => {
     const result = deepMerge(target, source);
     expect(result.list).toEqual([3]);
   });
+
+  it("should handle empty objects)", () => {
+    const obj = { a: 1, b: { c: 3, d: { e: 4 } } };
+    const empty = {};
+
+    const resultObj = deepMerge(obj, empty);
+    const resultEmpty = deepMerge(empty, obj);
+    expect(resultObj).toEqual(obj);
+    expect(resultEmpty).toEqual(obj);
+  });
 });
 
 describe("pascal2snake", () => {
