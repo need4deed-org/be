@@ -14,7 +14,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "volunteer" ALTER COLUMN "status_engagement" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "status_engagement" TYPE "public"."volunteer_status_engagement_enum" USING "status_engagement"::"text"::"public"."volunteer_status_engagement_enum"`,
+      `ALTER TABLE "volunteer" ALTER COLUMN "status_engagement" TYPE "public"."volunteer_status_engagement_enum" USING 'vol-new'::"text"::"public"."volunteer_status_engagement_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "volunteer" ALTER COLUMN "status_engagement" SET DEFAULT 'vol-new'`,
@@ -32,7 +32,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "volunteer" ALTER COLUMN "status_match" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "volunteer" ALTER COLUMN "status_match" TYPE "public"."volunteer_status_match_enum" USING "status_match"::"text"::"public"."volunteer_status_match_enum"`,
+      `ALTER TABLE "volunteer" ALTER COLUMN "status_match" TYPE "public"."volunteer_status_match_enum" USING 'vol-no-matches'::"text"::"public"."volunteer_status_match_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "volunteer" ALTER COLUMN "status_match" SET DEFAULT 'vol-no-matches'`,
@@ -47,7 +47,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `CREATE TYPE "public"."opportunity_volunteer_status_enum" AS ENUM('opp-pending', 'opp-matched', 'opp-active', 'opp-past')`,
     );
     await queryRunner.query(
-      `ALTER TABLE "opportunity_volunteer" ALTER COLUMN "status" TYPE "public"."opportunity_volunteer_status_enum" USING "status"::"text"::"public"."opportunity_volunteer_status_enum"`,
+      `ALTER TABLE "opportunity_volunteer" ALTER COLUMN "status" TYPE "public"."opportunity_volunteer_status_enum" USING 'opp-pending'::"text"::"public"."opportunity_volunteer_status_enum"`,
     );
     await queryRunner.query(
       `DROP TYPE "public"."opportunity_volunteer_status_enum_old"`,
@@ -62,7 +62,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "opportunity" ALTER COLUMN "status" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "opportunity" ALTER COLUMN "status" TYPE "public"."opportunity_status_enum" USING "status"::"text"::"public"."opportunity_status_enum"`,
+      `ALTER TABLE "opportunity" ALTER COLUMN "status" TYPE "public"."opportunity_status_enum" USING 'opp-new'::"text"::"public"."opportunity_status_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "opportunity" ALTER COLUMN "status" SET DEFAULT 'opp-new'`,
@@ -78,7 +78,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "agent" ALTER COLUMN "trust_level" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "agent" ALTER COLUMN "trust_level" TYPE "public"."agent_trust_level_enum" USING "trust_level"::"text"::"public"."agent_trust_level_enum"`,
+      `ALTER TABLE "agent" ALTER COLUMN "trust_level" TYPE "public"."agent_trust_level_enum" USING 'agent-unknown'::"text"::"public"."agent_trust_level_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "trust_level" SET DEFAULT 'agent-unknown'`,
@@ -94,7 +94,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "agent" ALTER COLUMN "search_status" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "agent" ALTER COLUMN "search_status" TYPE "public"."agent_search_status_enum" USING "search_status"::"text"::"public"."agent_search_status_enum"`,
+      `ALTER TABLE "agent" ALTER COLUMN "search_status" TYPE "public"."agent_search_status_enum" USING 'agent-searching'::"text"::"public"."agent_search_status_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "search_status" SET DEFAULT 'agent-not-needed'`,
@@ -112,7 +112,7 @@ export class UpdateCommentEtity21773746534596 implements MigrationInterface {
       `ALTER TABLE "agent" ALTER COLUMN "engagement_status" DROP DEFAULT`,
     );
     await queryRunner.query(
-      `ALTER TABLE "agent" ALTER COLUMN "engagement_status" TYPE "public"."agent_engagement_status_enum" USING "engagement_status"::"text"::"public"."agent_engagement_status_enum"`,
+      `ALTER TABLE "agent" ALTER COLUMN "engagement_status" TYPE "public"."agent_engagement_status_enum" USING 'agent-new'::"text"::"public"."agent_engagement_status_enum"`,
     );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "engagement_status" SET DEFAULT 'agent-new'`,
