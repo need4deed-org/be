@@ -8,6 +8,7 @@ export * from "./dto-opportunity-volunteer";
 export * from "./dto-person";
 export * from "./dto-volunteer";
 export * from "./parser-accompanying-legacy";
+export * from "./parser-agent";
 export * from "./parser-deal-volunteer";
 export * from "./parser-form-data";
 export * from "./parser-lead-from";
