@@ -43,9 +43,7 @@ describe("serializeAddress", () => {
   });
 
   it('should return "Berlin" if the address object is null or undefined', () => {
-    // @ts-expect-error - testing runtime robustness for JS consumers
     expect(serializeAddress(null)).toBe("Berlin");
-    // @ts-expect-error
     expect(serializeAddress(undefined)).toBe("Berlin");
   });
 
