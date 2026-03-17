@@ -723,17 +723,22 @@
     "AgentTrustType": {
       "$id": "AgentTrustType",
       "type": "string",
-      "enum": ["high", "low", "unknown"]
+      "enum": ["agent-high", "agent-low", "agent-unknown"]
     },
     "AgentVolunteerSearchType": {
       "$id": "AgentVolunteerSearchType",
       "type": "string",
-      "enum": ["searching", "not-needed", "volunteers-found"]
+      "enum": ["agent-searching", "agent-not-needed", "agent-volunteers-found"]
     },
     "AgentEngagementStatusType": {
       "$id": "AgentEngagementStatusType",
       "type": "string",
-      "enum": ["searching", "not-needed", "volunteers-found"]
+      "enum": [
+        "agent-new",
+        "agent-active",
+        "agent-unresponsive",
+        "agent-inactive"
+      ]
     },
     "AgentService": {
       "$id": "AgentService",
@@ -832,6 +837,10 @@
           }
         }
       ]
+    },
+    "ApiAgentPatch": {
+      "$id": "ApiAgentPatch",
+      "$ref": "AgentId#"
     },
     "ApiAgentGet": {
       "$id": "ApiAgentGet",
