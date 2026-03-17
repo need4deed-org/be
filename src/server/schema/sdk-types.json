@@ -809,6 +809,26 @@
         "volunteerSearch"
       ]
     },
+    "AgentProps": {
+      "$id": "AgentProps",
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "serviceType": {
+          "type": "array",
+          "items": { "$ref": "AgentService#" }
+        },
+        "trustLevel": { "$ref": "AgentTrustType#" },
+        "statusEngagement": { "$ref": "AgentEngagementStatusType#" }
+      }
+    },
     "AgentId": {
       "$id": "AgentId",
       "allOf": [
@@ -840,7 +860,7 @@
     },
     "ApiAgentPatch": {
       "$id": "ApiAgentPatch",
-      "$ref": "AgentId#"
+      "$ref": "AgentProps#"
     },
     "ApiAgentGet": {
       "$id": "ApiAgentGet",
