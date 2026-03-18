@@ -31,6 +31,7 @@ import {
   normalizeStringArrayInput,
 } from "../../utils";
 import agentCommunicationRoutes from "./agent-communication.routes";
+import agentOpportunityRoutes from "./agent-opportunity.routes";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -43,6 +44,10 @@ export default async function agentRoutes(
 
   fastify.register(agentCommunicationRoutes, {
     prefix: `/:id${RoutePrefix.COMMUNICATION}`,
+  });
+
+  fastify.register(agentOpportunityRoutes, {
+    prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
   });
 
   fastify.get<{
