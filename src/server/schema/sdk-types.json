@@ -244,7 +244,7 @@
     "OpportunityVolunteerStatusType": {
       "$id": "OpportunityVolunteerStatusType",
       "type": "string",
-      "enum": ["pending", "matched", "active", "past"]
+      "enum": ["opp-pending", "opp-matched", "opp-active", "opp-past"]
     },
     "OptionItem": {
       "$id": "OptionItem",
