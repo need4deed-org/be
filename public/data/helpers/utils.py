@@ -174,7 +174,7 @@ def get_address(address, scramble=False):
     if not isinstance(address, str) or len(address.strip()) == 0:
         return None
 
-    address = address.strip()
+    address = address.replace("<|>", ",").replace("\n", ",").strip()
     parts = [part.strip() for part in address.split(",")]
     postcode = None
 
