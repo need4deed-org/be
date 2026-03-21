@@ -26,6 +26,7 @@ import ProfileActivity from "./entity/m2m/profile-activity";
 import ProfileLanguage from "./entity/m2m/profile-language";
 import ProfileSkill from "./entity/m2m/profile-skill";
 import TimeTimeslot from "./entity/m2m/time-timeslot";
+import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
@@ -84,6 +85,7 @@ export const dataSource = new DataSource({
     LocationAddress,
     LocationDistrict,
     LocationPostcode,
+    NotionRelation,
     Opportunity,
     OpportunityVolunteer,
     Organization,
