@@ -124,6 +124,10 @@ def get_string_or_null(value, scramble=False):
     return scramble_pii(value) if scramble else value
 
 
+def get_dict_or_null(d: dict) -> dict | None:
+    return d if any(d.values()) else None
+
+
 def get_timeslot_data(timeslot):
     """
     Extracts timeslot data from a string.
