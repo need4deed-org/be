@@ -16,6 +16,7 @@ import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import logger from "../../../logger";
 import {
   leadFromParser,
   parseFormData,
@@ -127,7 +128,7 @@ export default async function volunteerRoutes(
     async (request, reply) => {
       const id = Number(request.params.id);
       if (isNaN(id)) {
-        fastify.log.error(`${id} is not a valid id.`);
+        logger.error(`${id} is not a valid id.`);
         return reply.status(400).send({ message: `${id} is not a valid id.` });
       }
 
@@ -136,7 +137,7 @@ export default async function volunteerRoutes(
       try {
         const data = await fetchVolunteerById(id, isoCode, relations);
         if (!data) {
-          fastify.log.error(`Failed fetching volunteer (id=${id}).`);
+          logger.error(`Failed fetching volunteer (id=${id}).`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
         }
         return reply.status(200).send({
@@ -144,7 +145,7 @@ export default async function volunteerRoutes(
           data,
         });
       } catch (error) {
-        fastify.log.error(`Error fetching volunteer id=${id}: ${error}`);
+        logger.error(`Error fetching volunteer id=${id}: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -193,7 +194,7 @@ export default async function volunteerRoutes(
             availability,
           },
         } = parseQueryParams(request.query);
-        fastify.log.debug(
+        logger.debug(
           `GET /volunteer parsed: ${JSON.stringify({
             page,
             limit,
@@ -237,7 +238,7 @@ export default async function volunteerRoutes(
           data,
         });
       } catch (error) {
-        fastify.log.error(`Error fetching volunteers: ${error}`);
+        logger.error(`Error fetching volunteers: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -391,9 +392,7 @@ export default async function volunteerRoutes(
           }
         }
       } catch (error) {
-        fastify.log.error(
-          `Error patching volunteer data (id=${dealId}): ${error}`,
-        );
+        logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
 
@@ -402,9 +401,7 @@ export default async function volunteerRoutes(
       try {
         const data = await fetchVolunteerById(id, isoCode, relations);
         if (!data) {
-          fastify.log.error(
-            `Failed fetching volunteer (id=${id}) after patch.`,
-          );
+          logger.error(`Failed fetching volunteer (id=${id}) after patch.`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
         }
         return reply.status(200).send({
@@ -412,7 +409,7 @@ export default async function volunteerRoutes(
           data,
         });
       } catch (error) {
-        fastify.log.error(`Error fetching volunteer (id=${id}): ${error}`);
+        logger.error(`Error fetching volunteer (id=${id}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -450,7 +447,7 @@ export default async function volunteerRoutes(
       },
     },
     async (request, reply) => {
-      fastify.log.debug(`endpoint:POST: ${JSON.stringify(request.body)}`);
+      logger.debug(`endpoint:POST: ${JSON.stringify(request.body)}`);
       try {
         const volunteer = await parseFormData(
           request.body,
@@ -472,7 +469,7 @@ export default async function volunteerRoutes(
           data: { id },
         });
       } catch (error) {
-        fastify.log.error(`Error writing volunteer: ${error}`);
+        logger.error(`Error writing volunteer: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },

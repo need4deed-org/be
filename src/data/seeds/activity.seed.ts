@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedActivityFile } from "../../config/constants";
+import logger from "../../logger";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
@@ -22,7 +23,7 @@ export async function seedActivity(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(activityRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding activities.");
+    logger.info("Skipping seeding activities.");
     return;
   }
 

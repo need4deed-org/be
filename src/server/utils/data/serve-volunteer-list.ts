@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { Brackets } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import logger from "../../../logger";
 
 // Helper function to safely ensure a value is an array, handling null/undefined/single strings
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,13 +175,13 @@ export async function getFilteredVolunteers(
     .take(limit)
     .orderBy("v.volunteer_id", "ASC");
 
-  fastify.log.debug("getFilteredVolunteers:go_query");
+  logger.debug("getFilteredVolunteers:go_query");
   const [filteredResults, totalCount] = await Promise.all([
     mvQueryBuilder.getRawMany(),
     totalCountQuery.getCount(),
   ]);
 
-  fastify.log.debug(
+  logger.debug(
     `getFilteredVolunteers:needs_hydration:totalCount: ${filteredResults?.length}/${totalCount}`,
   );
   const volunteerIds = filteredResults?.map(({ id }) => id);
@@ -188,7 +189,7 @@ export async function getFilteredVolunteers(
   if (volunteerIds.length === 0) {
     return [[], totalCount];
   }
-  fastify.log.debug(
+  logger.debug(
     `getFilteredVolunteers:needs_hydration:volunteerIds: ${volunteerIds}`,
   );
 
@@ -220,6 +221,6 @@ export async function getFilteredVolunteers(
     .map((id) => hydratedVolunteers.find((hv) => hv.id === id))
     .filter((v) => v !== undefined) as Volunteer[];
 
-  fastify.log.debug("getFilteredVolunteers:hydrated!");
+  logger.debug("getFilteredVolunteers:hydrated!");
   return [orderedHydratedVolunteers, totalCount];
 }
