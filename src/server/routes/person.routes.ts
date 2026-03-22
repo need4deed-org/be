@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiPersonGet, ApiPersonPatch, UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../config";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
+import logger from "../../logger";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
 import { deepMerge } from "../../services/utils";
 import { idParamSchema, responseSchema } from "../schema";
@@ -46,7 +47,7 @@ export default async function personRoutes(
         const persons = await personRepository.find();
         return { message: "List of persons", data: persons };
       } catch (error) {
-        fastify.log.error(`Error fetching persons: ${error}`);
+        logger.error(`Error fetching persons: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });
@@ -98,7 +99,7 @@ export default async function personRoutes(
           data: [person],
         };
       } catch (error) {
-        fastify.log.error(`Authentication error: ${error.message}`);
+        logger.error(`Authentication error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -176,7 +177,7 @@ export default async function personRoutes(
 
       const errors = await validate(newPerson);
       if (errors.length > 0) {
-        fastify.log.error(
+        logger.error(
           `Person entity validation errors (class-validator): ${JSON.stringify(errors)}`,
         );
         return reply.status(400).send({
@@ -192,7 +193,7 @@ export default async function personRoutes(
           data: savedPerson,
         });
       } catch (error) {
-        fastify.log.error(`Error creating person: ${error}`);
+        logger.error(`Error creating person: ${error}`);
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
             .status(409)

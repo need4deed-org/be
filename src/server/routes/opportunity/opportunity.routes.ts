@@ -16,6 +16,7 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import logger from "../../../logger";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
@@ -155,7 +156,7 @@ export default async function opportunityRoutes(
           : {}),
       } as FindOptionsWhere<Opportunity>;
 
-      fastify.log.debug(
+      logger.debug(
         `GET /opportunities called. where: ${JSON.stringify(where)}`,
       );
 
@@ -231,7 +232,7 @@ export default async function opportunityRoutes(
         skills,
         activities,
       } = parseOpportunity(request.body);
-      fastify.log.debug(
+      logger.debug(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
 

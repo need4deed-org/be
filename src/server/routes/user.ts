@@ -4,6 +4,7 @@ import { UserRole } from "need4deed-sdk";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
+import logger from "../../logger";
 import { sendVerificationEmail } from "../../services";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseErrors } from "../schema/responseErrors";
@@ -50,7 +51,7 @@ export default async function userRoutes(
           .status(200)
           .send({ message: "List of users", data: users });
       } catch (error) {
-        fastify.log.error(`Error fetching users: ${error}`);
+        logger.error(`Error fetching users: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -97,7 +98,7 @@ export default async function userRoutes(
           .status(200)
           .send({ message: `Details for account id:${userId}`, data: user });
       } catch (error) {
-        fastify.log.error(`Error fetching user: ${error}`);
+        logger.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -132,7 +133,7 @@ export default async function userRoutes(
     async (request, reply) => {
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
-        fastify.log.error("userRepository is not initialized!");
+        logger.error("userRepository is not initialized!");
         return reply.status(500).send({ message: "Internal Server Error." });
       }
 
@@ -151,7 +152,7 @@ export default async function userRoutes(
           .status(200)
           .send({ message: "Logged in User", data: payload });
       } catch (error) {
-        fastify.log.error(`Error fetching user: ${error}`);
+        logger.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -180,7 +181,7 @@ export default async function userRoutes(
 
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
-        fastify.log.error("userRepository is not initialized!");
+        logger.error("userRepository is not initialized!");
         return reply.status(500).send({ message: "Internal Server Error." });
       }
 
@@ -194,7 +195,7 @@ export default async function userRoutes(
       try {
         decodedToken = await fastify.jwt.verify(token);
       } catch (error) {
-        fastify.log.error(`JWT verification failed: ${error}`);
+        logger.error(`JWT verification failed: ${error}`);
         return reply.status(400).send({ message: "Invalid or expired token." });
       }
 
@@ -210,7 +211,7 @@ export default async function userRoutes(
         });
 
         if (!user) {
-          fastify.log.warn(`User with email ${email} not found.`);
+          logger.warn(`User with email ${email} not found.`);
           return reply.status(400).send({ message: "Invalid token." });
         }
 
@@ -229,7 +230,7 @@ export default async function userRoutes(
           verified: true,
         });
       } catch (error) {
-        fastify.log.error(`Error verifying email: ${error}`);
+        logger.error(`Error verifying email: ${error}`);
         return reply.status(500).send({
           message: "Failed to verify email due to an internal error.",
         });
@@ -273,7 +274,7 @@ export default async function userRoutes(
               id: personData.id,
             });
           } catch (error) {
-            fastify.log.error(`Error finding person by ID: ${error}`);
+            logger.error(`Error finding person by ID: ${error}`);
             return reply
               .status(500)
               .send({ message: "Error retrieving person data." });
@@ -289,7 +290,7 @@ export default async function userRoutes(
 
           const errors = await validate(resolvedPerson);
           if (errors.length > 0) {
-            fastify.log.error(
+            logger.error(
               `New Person entity validation errors: ${JSON.stringify(errors)}`,
             );
             return reply.status(400).send({
@@ -313,7 +314,7 @@ export default async function userRoutes(
       } = request.body;
       const userRepository = fastify.db.userRepository;
       if (!userRepository) {
-        fastify.log.error("Repository is undefined!");
+        logger.error("Repository is undefined!");
         return reply
           .status(500)
           .send({ message: "Internal Server Error: DB not loaded" });
@@ -335,7 +336,7 @@ export default async function userRoutes(
       // Validate the Account entity using class-validator
       const errors = await validate(newUser);
       if (errors.length > 0) {
-        fastify.log.error(
+        logger.error(
           `User entity validation errors: ${JSON.stringify(errors)}`,
         );
         return reply.status(400).send({
@@ -351,9 +352,7 @@ export default async function userRoutes(
 
         reply.status(201).send(savedUser);
       } catch (error) {
-        fastify.log.error(
-          `Error creating user: ${JSON.stringify(error, null, 4)}`,
-        );
+        logger.error(`Error creating user: ${JSON.stringify(error, null, 4)}`);
         if (error.code === "23505" && error.detail.includes("email")) {
           return reply
             .status(409)
