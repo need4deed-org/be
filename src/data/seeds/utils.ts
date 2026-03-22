@@ -17,6 +17,7 @@ import {
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
+import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
@@ -347,7 +348,7 @@ export async function createDeal(
   for (const title of dealData.profile.activities) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
-      // dataSource.logger.log("warn", `Activity ${title} not found. Skipping.`);
+      logger.warn(`Activity ${title} not found. Skipping.`);
       continue;
     }
     categoryIds.push(activity.categoryId);
@@ -361,7 +362,7 @@ export async function createDeal(
   for (const title of dealData.profile.skills) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
-      // dataSource.logger.log("warn", `Skill ${title} not found. Skipping.`);
+      logger.warn(`Skill ${title} not found. Skipping.`);
       continue;
     }
     const profileSkill = new ProfileSkill({ profile, skill });
@@ -371,7 +372,7 @@ export async function createDeal(
   for (const [title, level] of dealData.profile.languages) {
     const language = await getLanguage(title, languageRepository);
     if (!language) {
-      // dataSource.logger.log("warn", `Language ${title} not found. Skipping.`);
+      logger.warn(`Language ${title} not found. Skipping.`);
       continue;
     }
 

@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedSkillFile } from "../../config/constants";
+import logger from "../../logger";
 import Skill from "../entity/profile/skill.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
@@ -17,7 +18,7 @@ export async function seedSkill(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(skillRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding skills.");
+    logger.info("Skipping seeding skills.");
     return;
   }
 

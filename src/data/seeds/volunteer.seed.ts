@@ -1,6 +1,7 @@
 import { EntityTableName, OpportunityVolunteerStatusType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
+import logger from "../../logger";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
 import NotionRelation from "../entity/notion-relation.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
@@ -24,7 +25,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(volunteerRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding volunteers.");
+    logger.info("Skipping seeding volunteers.");
     return;
   }
 
@@ -75,8 +76,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         );
       });
     } catch (error) {
-      dataSource.logger.log(
-        "log",
+      logger.info(
         `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${error.message}`,
       );
     }

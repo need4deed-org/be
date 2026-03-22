@@ -5,6 +5,7 @@ import {
 } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedOpportunitiesFile } from "../../config/constants";
+import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import NotionRelation from "../entity/notion-relation.entity";
 import Accompanying from "../entity/opportunity/accompanying.entity";
@@ -28,7 +29,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(opportunityRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding opportunities.");
+    logger.info("Skipping seeding opportunities.");
     return;
   }
 
@@ -117,9 +118,8 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
         }
       });
     } catch (error) {
-      dataSource.logger.log(
-        "log",
-        `Creation of opportunity ${opportunity?.nid} rolled back due to error: ${error.message}`,
+      logger.info(
+        `Creation of opportunity ${opportunity?.title} rolled back due to error: ${error.message}`,
       );
     }
   }

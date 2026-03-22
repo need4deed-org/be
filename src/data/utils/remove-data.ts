@@ -1,4 +1,5 @@
 import { DataSource } from "typeorm";
+import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import Config from "../entity/config.entity";
 import { ConfigType } from "../types";
@@ -18,25 +19,22 @@ export async function removeData(dataSource: DataSource): Promise<void> {
     );
   }
 
-  dataSource.logger.log(
-    "info",
-    `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "skipping..." : "go ahead!"}`,
+  logger.info(
+    `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "Okay." : JSON.stringify(flagRecord)}`,
   );
 
   if (
-    flagRecord?.configKey === ConfigType.TRUNCATE_ALL &&
+    flagRecord &&
+    flagRecord.configValue === true &&
     flagRecord?.configValue === true
   ) {
-    return dataSource.logger.log(
-      "info",
+    logger.info(
       "Data is already truncated according to the config. Skipping truncation.",
     );
+    return;
   }
 
-  dataSource.logger.log(
-    "info",
-    "Attempting to remove existing data from the database...",
-  );
+  logger.info("Attempting to remove existing data from the database...");
   await dataSource.query(`
     DO $$ 
     DECLARE 
@@ -58,11 +56,8 @@ export async function removeData(dataSource: DataSource): Promise<void> {
   flagRecord.configValue = true;
   [, error] = await tryCatch(configRepository.save(flagRecord));
   if (error) {
-    dataSource.logger.log(
-      "warn",
-      `Writing config for truncating all: ${error}`,
-    );
+    logger.warn(`Writing config for truncating all: ${error}`);
   }
 
-  dataSource.logger.log("info", "Existing data has been removed successfully");
+  logger.info("Existing data has been removed successfully");
 }

@@ -2,6 +2,7 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
+import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 
@@ -68,7 +69,7 @@ export default async function commentRoutes(
 
         return { message: "Comments", data, count };
       } catch (error) {
-        fastify.log.error(`Error fetching comment: ${error}`);
+        logger.error(`Error fetching comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });
@@ -120,7 +121,7 @@ export default async function commentRoutes(
 
         return { message: `Details for comment ${id}`, data: comment };
       } catch (error) {
-        fastify.log.error(`Error fetching comment: ${error}`);
+        logger.error(`Error fetching comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });
@@ -161,9 +162,7 @@ export default async function commentRoutes(
 
       const errors = await validate(newComment);
       if (errors.length > 0) {
-        fastify.log.error(
-          `Comment validation errors: ${JSON.stringify(errors)}`,
-        );
+        logger.error(`Comment validation errors: ${JSON.stringify(errors)}`);
 
         return reply.status(400).send({
           message: "Entity validation failed during creation",
@@ -178,7 +177,7 @@ export default async function commentRoutes(
           data: saved,
         });
       } catch (error) {
-        fastify.log.error(`Error creating comment: ${error}`);
+        logger.error(`Error creating comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });
@@ -252,7 +251,7 @@ export default async function commentRoutes(
 
         const errors = await validate(comment);
         if (errors.length > 0) {
-          fastify.log.error(
+          logger.error(
             `Comment validation errors (PATCH): ${JSON.stringify(errors)}`,
           );
           return reply.status(400).send({
@@ -268,7 +267,7 @@ export default async function commentRoutes(
           data: saved,
         };
       } catch (error) {
-        fastify.log.error(`Error updating comment: ${error}`);
+        logger.error(`Error updating comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });
@@ -335,7 +334,7 @@ export default async function commentRoutes(
 
         return { message: `Successfully deleted comment ${id}` };
       } catch (error) {
-        fastify.log.error(`Error deleting comment: ${error}`);
+        logger.error(`Error deleting comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });

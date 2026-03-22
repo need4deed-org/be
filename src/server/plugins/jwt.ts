@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
 import { accessCookieName, cookieOptions } from "../../config/constants";
+import logger from "../../logger";
 import { AuthOptions } from "../types";
 
 async function jwtPlugin(
@@ -28,7 +29,7 @@ async function jwtPlugin(
         }
 
         const userId = request.user?.id;
-        fastify.log.debug(`jwtPlugin:authenticated: ${userId}`);
+        logger.debug(`jwtPlugin:authenticated: ${userId}`);
 
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
@@ -45,14 +46,16 @@ async function jwtPlugin(
         }
 
         if (user.role === UserRole.ADMIN) {
-          fastify.log.debug(`Admin user ${userId} authenticated, bypassing further checks.`);
+          logger.debug(
+            `Admin user ${userId} authenticated, bypassing further checks.`,
+          );
           reply.status(200);
           return;
         }
 
         const { role, allowSelf } = opt || {};
 
-        fastify.log.debug(
+        logger.debug(
           `authenticate role:${role}, allowSelf:${allowSelf}, userId:${userId}`,
         );
 
@@ -69,7 +72,7 @@ async function jwtPlugin(
           }
         }
       } catch (error) {
-        fastify.log.warn(`JWT verification failed: ${error.message}`); // Log the warning
+        logger.warn(`JWT verification failed: ${error.message}`); // Log the warning
         reply.send({
           message: `Authentication failed: ${error.message}`,
           error: error.message,

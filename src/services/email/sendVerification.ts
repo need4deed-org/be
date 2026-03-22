@@ -1,8 +1,8 @@
-import { FastifyInstance } from "fastify";
-
 import { TokenType } from "@fastify/jwt";
+import { FastifyInstance } from "fastify";
 import { urlEmailVerification } from "../../config/constants";
 import User from "../../data/entity/user.entity";
+import logger from "../../logger";
 import { getEmailService } from "./helpers";
 
 export async function sendVerificationEmail({
@@ -26,7 +26,7 @@ export async function sendVerificationEmail({
   try {
     token = fastify.jwt.sign(tokenPayload);
   } catch (error) {
-    fastify.log.error(`Error signing JWT token: ${error}`);
+    logger.error(`Error signing JWT token: ${error}`);
     throw new Error("Failed to create verification token");
   }
 
@@ -40,7 +40,7 @@ export async function sendVerificationEmail({
   const html = `<p>${copy}</p>
     <p><a href="${url}">${url}</a></p>`;
 
-  fastify.log.debug(`sendVerificationEmail: ${user.email}, url: ${url}`);
+  logger.debug(`sendVerificationEmail: ${user.email}, url: ${url}`);
 
   try {
     const emailService = getEmailService(fastify);
@@ -51,7 +51,7 @@ export async function sendVerificationEmail({
       html,
     });
   } catch (error) {
-    fastify.log.error(`Error sending verification email: ${error}`);
+    logger.error(`Error sending verification email: ${error}`);
     throw new Error("Failed to send verification email");
   }
 }

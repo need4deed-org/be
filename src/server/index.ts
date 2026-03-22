@@ -6,6 +6,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
 import { defaultFrom, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
+import logger from "../logger";
 import { getMailerConfigForSES, getSesClient } from "../services";
 import cors, { corsOptions } from "./plugins/cors";
 import emailPlugin from "./plugins/email";
@@ -37,15 +38,7 @@ import { RoutePrefix } from "./types";
 
 export async function createServer(): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
-    logger: {
-      level: process.env.NODE_ENV === "development" ? "debug" : undefined,
-      transport: {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-        },
-      },
-    },
+    loggerInstance: logger,
     ajv: {
       customOptions: {
         strict: false,
