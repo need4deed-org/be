@@ -548,7 +548,7 @@
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
-        "statusOpportunity": { "$ref": "OpportunityVolunteerStatusType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "numberVolunteers": { "type": "integer" },
         "description": { "type": "string" },
         "languagesMain": {
@@ -618,7 +618,7 @@
     "OpportunityStatusType": {
       "$id": "OpportunityStatusType",
       "type": "string",
-      "enum": ["new", "searching", "active", "past"]
+      "enum": ["opp-new", "opp-searching", "opp-active", "opp-past"]
     },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
