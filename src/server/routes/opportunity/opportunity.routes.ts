@@ -87,6 +87,10 @@ export default async function opportunityRoutes(
         relations,
       });
 
+      if (!opportunity) {
+        throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
+
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
 
