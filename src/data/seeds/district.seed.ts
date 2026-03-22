@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedDistrictFile } from "../../config/constants";
+import logger from "../../logger";
 import District from "../entity/location/district.entity";
 import Postcode from "../entity/location/postcode.entity";
 import DistrictPostcode from "../entity/m2m/district-postcode";
@@ -20,7 +21,7 @@ export async function seedDistrict(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(districtRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding districts.");
+    logger.info("Skipping seeding districts.");
     return;
   }
 
@@ -61,8 +62,7 @@ export async function seedDistrict(dataSource: DataSource): Promise<void> {
         where: { value: plz },
       });
       if (!postcode) {
-        dataSource.logger.log(
-          "warn",
+        logger.warn(
           `Postcode ${plz} not found for district ${title}. Skipping.`,
         );
         continue;

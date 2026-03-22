@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import { ApiOptionLists, EntityTableName, Lang } from "need4deed-sdk";
+import logger from "../../logger";
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
 import { getOptions } from "../utils";
@@ -52,7 +53,7 @@ async function optionRoutes(
           data,
         });
       } catch (error) {
-        fastify.log.error(`Error: ${error}`);
+        logger.error(`Error: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
         });

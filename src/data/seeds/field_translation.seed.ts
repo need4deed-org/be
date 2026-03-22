@@ -7,6 +7,7 @@ import {
   seedLeadFromFile,
   seedSkillFile,
 } from "../../config/constants";
+import logger from "../../logger";
 import FieldTranslation from "../entity/field_translation.entity";
 import LeadFrom from "../entity/lead.entity";
 import Activity from "../entity/profile/activity.entity";
@@ -386,7 +387,7 @@ export async function seedFieldTranslation(
 
   const count = await getCount(fieldTranslationRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding translations.");
+    logger.info("Skipping seeding translations.");
     return;
   }
 

@@ -1,4 +1,5 @@
 import { DataSource } from "typeorm";
+import logger from "../../logger";
 import Config from "../entity/config.entity";
 import { ConfigType } from "../types";
 import { getRepository } from "../utils";
@@ -9,22 +10,18 @@ export async function removeData(dataSource: DataSource): Promise<void> {
     configKey: ConfigType.TRUNCATE_ALL,
   })) as Config | null;
 
-  dataSource.logger.log(
-    "info",
+  logger.info(
     `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "Okay." : JSON.stringify(flagRecord)}`,
   );
 
   if (flagRecord && flagRecord.configValue === true) {
-    return dataSource.logger.log(
-      "info",
+    logger.info(
       "Data is already truncated according to the config. Skipping truncation.",
     );
+    return;
   }
 
-  dataSource.logger.log(
-    "info",
-    "Attempting to remove existing data from the database...",
-  );
+  logger.info("Attempting to remove existing data from the database...");
   await dataSource.query(`
     DO $$ 
     DECLARE 
@@ -46,5 +43,5 @@ export async function removeData(dataSource: DataSource): Promise<void> {
   flagRecord.configValue = true;
   await configRepository.save(flagRecord);
 
-  dataSource.logger.log("info", "Existing data has been removed successfully");
+  logger.info("Existing data has been removed successfully");
 }

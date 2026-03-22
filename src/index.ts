@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import "./data"; // initialize database connection
+import logger from "./logger";
 import { createServer } from "./server";
 
 let server: FastifyInstance;
@@ -9,10 +10,9 @@ export async function start() {
     server = await createServer();
     const port = Number(process.env.PORT) || 5000;
     await server.listen({ port, host: "0.0.0.0" });
-    // eslint-disable-next-line no-console
-    console.log("Server started.");
+    logger.info("Server started.");
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     process.exit(1);
   }
 }

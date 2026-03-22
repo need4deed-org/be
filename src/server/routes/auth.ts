@@ -7,6 +7,7 @@ import {
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../config/constants";
+import logger from "../../logger";
 import { responseErrors } from "../schema/responseErrors";
 import {
   refreshAccessResponseSchema,
@@ -51,7 +52,7 @@ async function authRoutes(
       }
 
       try {
-        fastify.log.debug(`Attempting to authenticate: ${email}`);
+        logger.debug(`Attempting to authenticate: ${email}`);
 
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
@@ -108,7 +109,7 @@ async function authRoutes(
           data: { access, refresh },
         });
       } catch (error) {
-        fastify.log.error(`Authentication error: ${error.message}`);
+        logger.error(`Authentication error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -162,7 +163,7 @@ async function authRoutes(
 
         id = decoded.id;
       } catch (error) {
-        fastify.log.error(`JWT verification failed: ${error.message}`);
+        logger.error(`JWT verification failed: ${error.message}`);
         return reply.status(400).send({ message: "Invalid refresh token." });
       }
 
@@ -193,7 +194,7 @@ async function authRoutes(
           throw new Error("No token generated.");
         }
 
-        fastify.log.debug(
+        logger.debug(
           `Generated new access token for user ID: ${id}: ${access}`,
         );
 
@@ -204,7 +205,7 @@ async function authRoutes(
 
         return reply.status(200).send({ access });
       } catch (error) {
-        fastify.log.error(`Authentication error: ${error.message}`);
+        logger.error(`Authentication error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },

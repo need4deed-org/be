@@ -8,7 +8,7 @@ import {
 import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { fastify } from "../../server";
+import logger from "../../logger";
 import {
   getAvailability,
   getLanguages,
@@ -52,9 +52,7 @@ export function volunteerListSerializer(
       locations,
     };
   } catch (error) {
-    fastify.log.error(
-      `Error serializing volunteer (id:${volunteer.id}): ${error}`,
-    );
+    logger.error(`Error serializing volunteer (id:${volunteer.id}): ${error}`);
   }
 }
 

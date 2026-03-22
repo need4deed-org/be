@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedCategoryFile } from "../../config/constants";
+import logger from "../../logger";
 import Category from "../entity/profile/category.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
@@ -17,7 +18,7 @@ export async function seedCategory(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(categoryRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding categories.");
+    logger.info("Skipping seeding categories.");
     return;
   }
 

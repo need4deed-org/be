@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import logger from "../../logger";
 import { responseErrors } from "../schema/responseErrors";
 import { RoutePrefix } from "../types";
 
@@ -28,7 +29,7 @@ async function healthRoutes(
         message: "Need4Deed API v1 is up and running.",
       });
     } catch (error) {
-      fastify.log.error(`Health check error: ${error}`);
+      logger.error(`Health check error: ${error}`);
       return reply.status(500).send({
         message: "Internal server error.",
       });
