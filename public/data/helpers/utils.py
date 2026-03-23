@@ -105,7 +105,11 @@ def get_language_split(language):
     if language == "Northern Kurdish":
         return ["Northern Kurdish", "advanced"]
     language_split = language.split(" ")
-    return language_split if len(language_split) == 2 else [language, "advanced"]
+    return (
+        [language_split[0], language_split[1].lower()]
+        if len(language_split) == 2
+        else [language, "advanced"]
+    )
 
 
 def get_list(lst):
