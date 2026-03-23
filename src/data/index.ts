@@ -1,8 +1,4 @@
-import {
-  isProd,
-  shouldRunMigrations,
-  shouldTruncateAll,
-} from "../config/constants";
+import { isProd, shouldRunMigrations } from "../config/constants";
 import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
 import { seed } from "./seeds/seed";
@@ -29,14 +25,7 @@ async function initDatabase() {
         dataSource.logger.log("info", "Migrations completed");
       }
 
-      if (shouldTruncateAll) {
-        await removeData(dataSource);
-      } else {
-        dataSource.logger.log(
-          "info",
-          "Truncate all tables skipped due to configuration",
-        );
-      }
+      await removeData(dataSource);
 
       dataSource.logger.log("info", "Attempting to seed data");
       await seed(dataSource);
