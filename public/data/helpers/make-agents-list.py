@@ -145,6 +145,9 @@ class Agent:
     def get_address(self):
         return get_address(self.agent.get("Address", ""))
 
+    def get_postcodes(self):
+        return self.agent.get("PLZ", "")
+
     def get_status(self):
         return get_string_or_null(self.agent.get("  Status", ""))
 
@@ -170,6 +173,11 @@ def get_agent(agent, scramble=False):
         "languages": agent_instance.get_languages(),
         "services": agent_instance.get_services(),
         "address": agent_instance.get_address(),
+        "postcodes": [
+            postcode.strip()
+            for postcode in agent_instance.get_postcodes().split(",")
+            if postcode
+        ],
         "phone": agent_instance.get_phone(),
         "status": agent_instance.get_status(),
         "person": agent_instance.get_person_data(),
