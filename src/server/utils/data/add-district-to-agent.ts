@@ -6,7 +6,7 @@ export function getDistrictToAgentHandler(isRepresentative = false) {
 
   return {
     async addDistrictToAgent(agent: Agent): Promise<Agent> {
-      if (!agent.districtId) {
+      if (agent && !agent.districtId) {
         const district = await getDistrictFromPostcode(
           isRepresentative
             ? agent.representative?.person?.address?.postcode
