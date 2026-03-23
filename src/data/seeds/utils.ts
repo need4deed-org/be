@@ -490,6 +490,10 @@ export async function getOrCreateAgent(
   agentData: _AgentJSON,
   dataSource: DataSource,
 ): Promise<Agent> {
+  if (!agentData) {
+    throw new Error("Agent data is empty.");
+  }
+
   const agentRepository = getRepository(dataSource, Agent);
 
   const agent = await agentRepository.findOne({
