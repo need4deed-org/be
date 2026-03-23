@@ -1,5 +1,8 @@
+import { EntityTableName, OpportunityVolunteerStatusType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
+import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
+import NotionRelation from "../entity/notion-relation.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { VolunteerJSON } from "./types";
@@ -7,6 +10,7 @@ import {
   createDeal,
   getCount,
   getDocumentStatus,
+  getEnumValue,
   getOrCreatePerson,
   getVolunteerState,
 } from "./utils";
@@ -44,6 +48,32 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         deal,
       });
       await volunteerRepository.save(newVolunteer);
+
+      const notionRelationRepository = getRepository(
+        dataSource,
+        NotionRelation,
+      );
+      const relationsOpp = await notionRelationRepository.find({
+        where: {
+          hostType: EntityTableName.OPPORTUNITY,
+          tenantType: EntityTableName.VOLUNTEER,
+          tenantNid: volunteer.nid,
+        },
+      });
+
+      const opportunityVolunteerRepository = getRepository(
+        dataSource,
+        OpportunityVolunteer,
+      );
+      relationsOpp.forEach(async ({ payroll, hostId }) => {
+        await opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({
+            status: getEnumValue(OpportunityVolunteerStatusType, payroll),
+            opportunityId: hostId,
+            volunteerId: newVolunteer.id,
+          }),
+        );
+      });
     } catch (error) {
       dataSource.logger.log(
         "log",
