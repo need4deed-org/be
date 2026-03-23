@@ -1,8 +1,15 @@
 import path from "path";
 import {
+  AgentEngagementStatusType,
   AgentRoleType,
+  AgentServiceType,
+  AgentTrustType,
+  AgentType,
+  AgentVolunteerSearchType,
   DocumentStatusType,
+  EntityTableName,
   OccasionalType,
+  TranslatedIntoType,
   VolunteerStateAppreciationType,
   VolunteerStateCommunicationType,
   VolunteerStateEngagementType,
@@ -10,6 +17,7 @@ import {
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
+import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
@@ -21,6 +29,7 @@ import ProfileActivity from "../entity/m2m/profile-activity";
 import ProfileLanguage from "../entity/m2m/profile-language";
 import ProfileSkill from "../entity/m2m/profile-skill";
 import TimeTimeslot from "../entity/m2m/time-timeslot";
+import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
 import Organization from "../entity/organization.entity";
 import Person from "../entity/person.entity";
@@ -34,8 +43,8 @@ import Timeslot from "../entity/time/timeslot.entity";
 import { categorize } from "../lib";
 import { getRepository, getRRULE, getStartEnd } from "../utils";
 import {
+  _AgentJSON,
   AddressJSON,
-  AgentJSON,
   DealJSON,
   OrganizationJSON,
   PersonJSON,
@@ -261,8 +270,8 @@ export async function getOrCreatePerson(
   const person = new Person({
     firstName: personData.firstName,
     lastName: personData.lastName,
-    email: personData?.email,
-    phone: personData?.phone,
+    email: personData.email,
+    phone: personData.phone,
     avatarUrl: noGenderAvatarUrl,
   });
   person.address = await getOrCreateAddress(personData?.address, dataSource);
@@ -434,14 +443,16 @@ export async function createDeal(
         }
       }
     } else {
-      timeslot = new Timeslot({
-        info,
-        start: start ? new Date(start) : undefined,
-      });
-      await repositoryTimeslot.save(timeslot);
+      timeslot = start
+        ? new Timeslot({
+            info: info || "one-timer",
+            start: start ? new Date(start) : undefined,
+          })
+        : undefined;
     }
 
     if (timeslot) {
+      await repositoryTimeslot.save(timeslot);
       const timeTimeslot = new TimeTimeslot({
         time,
         timeslot,
@@ -476,7 +487,7 @@ export async function createDeal(
 }
 
 export async function getOrCreateAgent(
-  agentData: AgentJSON,
+  agentData: _AgentJSON,
   dataSource: DataSource,
 ): Promise<Agent> {
   const agentRepository = getRepository(dataSource, Agent);
@@ -633,4 +644,177 @@ export function isProbablyFileSystemPath(str: string): boolean {
     str.includes("/") ||
     str.includes("\\")
   );
+}
+
+export async function writeNotionRel(
+  dataSource: DataSource,
+  notionRel: {
+    hostType: EntityTableName;
+    hostId: number;
+    hostNid: string;
+    tenantType: EntityTableName;
+    tenantId: number;
+    tenantNid: string;
+  },
+) {
+  const notionRelationRepository = getRepository(dataSource, NotionRelation);
+
+  const notionRelation = new NotionRelation(notionRel);
+  const [, error] = await tryCatch(
+    notionRelationRepository.save(notionRelation),
+  );
+  if (error) {
+    dataSource.logger.log(
+      "warn",
+      `During storing NotionRelation occurred: ${error}`,
+    );
+  }
+}
+
+export function getAgentTrustLevel(level: string): AgentTrustType {
+  if (getEnumValue(AgentTrustType, level)) {
+    return level as AgentTrustType;
+  }
+
+  switch (level) {
+    case "Low":
+      return AgentTrustType.LOW;
+    case "High":
+      return AgentTrustType.HIGH;
+  }
+  return AgentTrustType.UNKNOWN;
+}
+
+export function getAgentType(type: string): AgentType {
+  if (getEnumValue(AgentType, type)) {
+    return type as AgentType;
+  }
+
+  switch (type) {
+    case "Multiple social support":
+      return AgentType.MULTIPLE_SOCIAL_SUPPORT;
+  }
+
+  return null;
+}
+
+export function getAgentSearchStatus(status: string): AgentVolunteerSearchType {
+  if (getEnumValue(AgentVolunteerSearchType, status)) {
+    return status as AgentVolunteerSearchType;
+  }
+
+  switch (status) {
+    case "Searching":
+      return AgentVolunteerSearchType.SEARCHING;
+    case "Filled":
+      return AgentVolunteerSearchType.VOLUNTEERS_FOUND;
+  }
+}
+
+export function getAgentEngagement(status: string): AgentEngagementStatusType {
+  if (getEnumValue(AgentEngagementStatusType, status)) {
+    return status as AgentEngagementStatusType;
+  }
+
+  switch (status) {
+    case "Unresponsive":
+      return AgentEngagementStatusType.UNRESPONSIVE;
+    case "Active":
+      return AgentEngagementStatusType.ACTIVE;
+  }
+}
+
+export function getAgentService(service: string): AgentServiceType {
+  if (getEnumValue(AgentServiceType, service)) {
+    return service as AgentServiceType;
+  }
+
+  const map = {
+    Accompanying: AgentServiceType.TANDEM,
+    "addiction help": AgentServiceType.CONSULTATION,
+    Adults: AgentServiceType.CONSULTATION,
+    "anti-racism": AgentServiceType.CONSULTATION,
+    Arts: AgentServiceType.TUTORING,
+    Ausbildung: AgentServiceType.TUTORING,
+    care: AgentServiceType.WELFARE,
+    Community: AgentServiceType.WELFARE,
+    Cooking: AgentServiceType.REFUGEE_ACCOMMODATION,
+    Counselling: AgentServiceType.CONSULTATION,
+    Culture: AgentServiceType.WELFARE,
+    Education: AgentServiceType.TUTORING,
+    "Elderly Care": AgentServiceType.WELFARE,
+    Environment: AgentServiceType.TANDEM,
+    Family: AgentServiceType.TUTORING,
+    Film: AgentServiceType.WELFARE,
+    Funding: AgentServiceType.WELFARE,
+    Gardening: AgentServiceType.TANDEM,
+    Health: AgentServiceType.WELFARE,
+    "help with private housing": AgentServiceType.TUTORING,
+    homeless: AgentServiceType.WELFARE,
+    housing: AgentServiceType.WELFARE,
+    "Humanitarian aid": AgentServiceType.VOLUNTARY_SUPPORT,
+    "Job Coaching": AgentServiceType.JOB_COACHING,
+    Kids: AgentServiceType.CHILDCARE,
+    Kitas: AgentServiceType.CHILDCARE,
+    "Language help": AgentServiceType.TANDEM,
+    Law: AgentServiceType.TANDEM,
+    "LGBTQ+": AgentServiceType.CONSULTATION,
+    Library: AgentServiceType.TUTORING,
+    Men: AgentServiceType.SPORT,
+    Migrants: AgentServiceType.VOLUNTARY_SUPPORT,
+    music: AgentServiceType.TANDEM,
+    Neighbourhood: AgentServiceType.WELFARE,
+    Parents: AgentServiceType.CHILDCARE,
+    "Political work": AgentServiceType.TANDEM,
+    "Psychological help": AgentServiceType.TUTORING,
+    Refugees: AgentServiceType.VOLUNTARY_SUPPORT,
+    "social and youth service": AgentServiceType.YOUTH,
+    "Social work": AgentServiceType.TANDEM,
+    Sports: AgentServiceType.SPORT,
+    Theatre: AgentServiceType.TANDEM,
+    Tutoring: AgentServiceType.TUTORING,
+    Volunteering: AgentServiceType.VOLUNTARY_SUPPORT,
+    Women: AgentServiceType.WELFARE,
+    "workers rights": AgentServiceType.CONSULTATION,
+    workshops: AgentServiceType.REFUGEE_ACCOMMODATION,
+    Youth: AgentServiceType.YOUTH,
+  };
+
+  const res = map[service];
+  return res ? res : AgentServiceType.REFUGEE_ACCOMMODATION;
+}
+
+export function getAgentPersonRole(role: string): AgentRoleType {
+  if (getEnumValue(AgentRoleType, role)) {
+    return role as AgentRoleType;
+  }
+
+  const map = {
+    Management: AgentRoleType.MANAGER,
+    "Social Work": AgentRoleType.SOCIAL_WORKER,
+    "Volunteer coordinator": AgentRoleType.VOLUNTEER_COORDINATOR,
+    "Volunteer Coordinator": AgentRoleType.VOLUNTEER_COORDINATOR,
+  };
+
+  const res = map[role];
+  return res ? res : AgentRoleType.OTHER;
+}
+
+export function getToTranslate(translate: string): TranslatedIntoType {
+  if (getEnumValue(TranslatedIntoType, translate)) {
+    return translate as TranslatedIntoType;
+  }
+
+  const map = {
+    English: TranslatedIntoType.ENGLISH_OK,
+    "English, German": TranslatedIntoType.ENGLISH_OK,
+    "English, German, No specific language needed":
+      TranslatedIntoType.ENGLISH_OK,
+    German: TranslatedIntoType.DEUTSCHE,
+    "German, No specific language needed": TranslatedIntoType.DEUTSCHE,
+    "No specific language needed": TranslatedIntoType.NO_TRANSLATION,
+  };
+
+  const res = map[translate];
+  return res ? res : TranslatedIntoType.DEUTSCHE;
 }
