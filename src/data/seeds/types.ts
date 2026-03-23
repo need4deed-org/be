@@ -49,7 +49,7 @@ export interface OrganizationJSON {
   address: AddressJSON;
   person: PersonJSON;
 }
-export interface AgentJSON {
+export interface _AgentJSON {
   title: string;
   page_id: string;
   organization: OrganizationJSON;
@@ -57,6 +57,7 @@ export interface AgentJSON {
   postcode: string;
 }
 export interface VolunteerJSON {
+  nid: string;
   status: VolunteerStateType;
   accompanying: boolean;
   statusCGC: DocumentStatusType;
@@ -66,14 +67,45 @@ export interface VolunteerJSON {
   person: PersonJSON;
   deal: DealJSON;
 }
+export interface AccompanyingJSON {
+  address: string;
+  name: string;
+  phone: string;
+  date: string;
+  languageToTranslate: string;
+}
 export interface OpportunityJSON {
   status: string;
   title: string;
+  nid: string;
   type: OpportunityType;
   translationType: string;
   info: string;
   numberVolunteers: string;
   infoConfidential: string;
   deal: DealJSON;
-  agent: AgentJSON;
+  agent: _AgentJSON;
+  accompanying?: AccompanyingJSON;
+  volunteerNids: string[];
+}
+export interface AgentJSON {
+  nid: string;
+  title: string;
+  about: string;
+  website: string;
+  type: string;
+  district: object;
+  trustLevel: string;
+  statusEngagement: string;
+  statusSearch: string;
+  languages: string;
+  services: string[];
+  address: object;
+  postcodes: string[];
+  phone: string;
+  status: string;
+  person: (PersonJSON & { role: string })[];
+  operator: string;
+  opportunityNids: string[];
+  accompanyingRelations: string[];
 }
