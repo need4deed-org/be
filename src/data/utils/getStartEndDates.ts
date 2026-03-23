@@ -54,10 +54,8 @@ export function getStartEnd(
 
   const { startHour, endHour } = map[startEnd];
 
-  const start = new Date("2024-01-01");
-  start.setHours(startHour, 0, 0, 0);
-  const end = new Date("2024-01-01");
-  end.setHours(endHour, 0, 0, 0);
+  const start = new Date(`2024-01-01 ${startHour}:00`);
+  const end = new Date(`2024-01-01 ${endHour}:00`);
 
   return { start, end };
 }
