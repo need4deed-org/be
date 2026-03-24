@@ -37,7 +37,7 @@ class Volunteer:
         return {
             **get_name_fields(self.volunteer.get("Name", ""), scramble=self.scramble),
             "email": get_email(
-                self.volunteer.get("E-mail", ""), scramble=self.scramble
+                self.volunteer.get("﻿E-mail", ""), scramble=self.scramble
             ),
             "phone": get_string_or_null(
                 self.volunteer.get("Phone Number", ""), scramble=self.scramble
@@ -138,6 +138,12 @@ class Volunteer:
         """
         return get_string_or_null(self.volunteer.get("Status", ""))
 
+    def get_status_engagement(self):
+        """
+        Extracts Status of engagement from the volunteer dictionary.
+        """
+        return get_string_or_null(self.volunteer.get("Engagement status", ""))
+
     def get_cgc(self):
         """
         Extracts certificate of good conduct status from the volunteer dictionary.
@@ -168,6 +174,7 @@ def get_volunteer(volunteer, scramble=False):
     return {
         "nid": volunteer_instance.get_nid(),
         "status": volunteer_instance.get_status(),
+        "statusEngagement": volunteer_instance.get_status_engagement(),
         "accompanying": volunteer_instance.get_accompanying(),
         "statusVaccination": volunteer_instance.get_vaccination(),
         "statusCGC": volunteer_instance.get_cgc(),
