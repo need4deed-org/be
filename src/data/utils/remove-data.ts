@@ -1,30 +1,37 @@
 import { DataSource } from "typeorm";
+import { tryCatch } from "../../services/utils";
 import Config from "../entity/config.entity";
 import { ConfigType } from "../types";
 import { getRepository } from "../utils";
 
 export async function removeData(dataSource: DataSource): Promise<void> {
   const configRepository = getRepository(dataSource, "config");
-  let flagRecord = (await configRepository.findOneBy({
-    configKey: ConfigType.TRUNCATE_ALL,
-  })) as Config | null;
-
-  dataSource.logger.log("info", `flagRecord: ${JSON.stringify(flagRecord)}`);
+  let [flagRecord, error] = await tryCatch(
+    configRepository.findOneBy({
+      configKey: ConfigType.TRUNCATE_ALL,
+    }) as Promise<Config | null>,
+  );
+  if (error) {
+    dataSource.logger.log(
+      "warn",
+      `Fetching config for truncating all: ${error}`,
+    );
+  }
 
   dataSource.logger.log(
     "info",
     `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "skipping..." : "go ahead!"}`,
   );
 
-  // if (
-  //   flagRecord.configKey === ConfigType.TRUNCATE_ALL &&
-  //   flagRecord.configValue === true
-  // ) {
-  //   return dataSource.logger.log(
-  //     "info",
-  //     "Data is already truncated according to the config. Skipping truncation.",
-  //   );
-  // }
+  if (
+    flagRecord?.configKey === ConfigType.TRUNCATE_ALL &&
+    flagRecord?.configValue === true
+  ) {
+    return dataSource.logger.log(
+      "info",
+      "Data is already truncated according to the config. Skipping truncation.",
+    );
+  }
 
   dataSource.logger.log(
     "info",
@@ -49,7 +56,13 @@ export async function removeData(dataSource: DataSource): Promise<void> {
 
   flagRecord = flagRecord || new Config({ configKey: ConfigType.TRUNCATE_ALL });
   flagRecord.configValue = true;
-  await configRepository.save(flagRecord);
+  [, error] = await tryCatch(configRepository.save(flagRecord));
+  if (error) {
+    dataSource.logger.log(
+      "warn",
+      `Writing config for truncating all: ${error}`,
+    );
+  }
 
   dataSource.logger.log("info", "Existing data has been removed successfully");
 }
