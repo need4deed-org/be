@@ -1,4 +1,4 @@
-import { isProd, shouldRunMigrations } from "../config/constants";
+import { isProd, shouldRunMigrations } from "../config";
 import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
 import { seed } from "./seeds/seed";
