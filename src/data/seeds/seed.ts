@@ -1,7 +1,9 @@
 import { DataSource } from "typeorm";
+import { check } from "..";
 import { seedActivity } from "./activity.seed";
 import { seedAgents } from "./agent.seed";
 import { seedCategory } from "./category.seed";
+import { devTime } from "./dev-parsing";
 import { seedDistrict } from "./district.seed";
 import { seedFieldTranslation } from "./field_translation.seed";
 import { seedLanguage } from "./language.seed";
@@ -26,9 +28,13 @@ export async function seed(dataSource: DataSource) {
   await seedOptions(dataSource);
   await seedUser(dataSource);
   await seedTimeslots(dataSource);
-  await seedAgents(dataSource);
-  await seedOpportunities(dataSource);
-  await seedVolunteers(dataSource);
+  if (check.flag) {
+    devTime(dataSource);
+  } else {
+    await seedAgents(dataSource);
+    await seedOpportunities(dataSource);
+    await seedVolunteers(dataSource);
+  }
 
   return dataSource;
 }
