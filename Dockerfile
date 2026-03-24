@@ -30,7 +30,7 @@ COPY --from=builder /app/build ./build
 
 COPY ca/eu-central-1-bundle.pem ./certificates/eu-central-1-bundle.pem
 
-COPY public ./public
+COPY public ./build/public
 
 # Change ownership of all files to nodejs user
 RUN chown -R nodejs:nodejs /app
