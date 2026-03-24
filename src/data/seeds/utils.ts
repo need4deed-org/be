@@ -48,6 +48,7 @@ import {
   DealJSON,
   OrganizationJSON,
   PersonJSON,
+  TimeJSON,
   VolunteerJSON,
 } from "./types";
 
@@ -154,7 +155,7 @@ export function getVolunteerState(volunteer: VolunteerJSON): Partial<{
   statusMatch: VolunteerStateMatchType;
 }> {
   return {
-    statusEngagement: VolunteerStateEngagementType.NEW,
+    statusEngagement: getEngagementStatus(volunteer.statusEngagement),
     statusCommunication: undefined,
     statusAppreciation: undefined,
     statusType: volunteer.accompanying
@@ -324,9 +325,6 @@ export async function createDeal(
   const profileSkillRepository = getRepository(dataSource, ProfileSkill);
   const languageRepository = getRepository(dataSource, Language);
   const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
-  const timeRepository = getRepository(dataSource, Time);
-  const repositoryTimeslot = getRepository(dataSource, Timeslot);
-  const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
   const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
   const locationDistrictRepository = getRepository(
@@ -349,7 +347,7 @@ export async function createDeal(
   for (const title of dealData.profile.activities) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
-      dataSource.logger.log("warn", `Activity ${title} not found. Skipping.`);
+      // dataSource.logger.log("warn", `Activity ${title} not found. Skipping.`);
       continue;
     }
     categoryIds.push(activity.categoryId);
@@ -363,7 +361,7 @@ export async function createDeal(
   for (const title of dealData.profile.skills) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
-      dataSource.logger.log("warn", `Skill ${title} not found. Skipping.`);
+      // dataSource.logger.log("warn", `Skill ${title} not found. Skipping.`);
       continue;
     }
     const profileSkill = new ProfileSkill({ profile, skill });
@@ -373,7 +371,7 @@ export async function createDeal(
   for (const [title, level] of dealData.profile.languages) {
     const language = await getLanguage(title, languageRepository);
     if (!language) {
-      dataSource.logger.log("warn", `Language ${title} not found. Skipping.`);
+      // dataSource.logger.log("warn", `Language ${title} not found. Skipping.`);
       continue;
     }
 
@@ -387,79 +385,7 @@ export async function createDeal(
 
   profile.categoryId = categorize(categoryIds.filter(Boolean));
 
-  const time = new Time();
-  await timeRepository.save(time);
-
-  for (const timeslotData of dealData.time.timeslots) {
-    let timeslot: Timeslot;
-    const { day, daytime, start, info } = timeslotData;
-
-    if (day && daytime) {
-      if (day !== "Occasional") {
-        const rrule = getRRULE(day);
-        for (const startEnd of daytime) {
-          const timeframe = getStartEnd(startEnd);
-
-          if (timeframe) {
-            timeslot = await repositoryTimeslot.findOne({
-              where: { rrule, ...timeframe, occasional: IsNull() },
-            });
-            if (!timeslot) {
-              timeslot = new Timeslot({
-                rrule,
-                ...timeframe,
-              });
-              await repositoryTimeslot.save(timeslot);
-              await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
-            }
-          }
-        }
-      } else {
-        for (const dayTimeItem of daytime) {
-          const occasional = getEnumValue<OccasionalType>(
-            OccasionalType,
-            dayTimeItem.toLowerCase() as OccasionalType,
-          );
-          if (!occasional) {
-            dataSource.logger.log(
-              "warn",
-              `Occasional type ${dayTimeItem} not recognized. Skipping.`,
-            );
-            continue;
-          }
-          timeslot = await repositoryTimeslot.findOne({
-            where: {
-              occasional,
-              rrule: IsNull(),
-              start: IsNull(),
-              end: IsNull(),
-            },
-          });
-          if (!timeslot) {
-            timeslot = new Timeslot({ occasional });
-            await repositoryTimeslot.save(timeslot);
-            await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
-          }
-        }
-      }
-    } else {
-      timeslot = start
-        ? new Timeslot({
-            info: info || "one-timer",
-            start: start ? new Date(start) : undefined,
-          })
-        : undefined;
-    }
-
-    if (timeslot) {
-      await repositoryTimeslot.save(timeslot);
-      const timeTimeslot = new TimeTimeslot({
-        time,
-        timeslot,
-      });
-      await timeTimeslotRepository.save(timeTimeslot);
-    }
-  }
+  const time = await createTime(dataSource, dealData.time);
 
   const location = new Location();
   await locationRepository.save(location);
@@ -531,6 +457,111 @@ export async function getOrCreateAgent(
   await agentPersonRepository.save(agentPerson);
 
   return newAgent;
+}
+
+export async function createTime(
+  dataSource,
+  timeData: TimeJSON,
+): Promise<Time> {
+  const timeRepository = getRepository(dataSource, Time);
+  const timeslotRepository = getRepository(dataSource, Timeslot);
+  const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
+
+  dataSource.logger.log(
+    "info",
+    `createTime:timeData: ${JSON.stringify(timeData)}`,
+  );
+
+  const time = new Time();
+  await timeRepository.save(time);
+
+  for (const timeslotData of timeData.timeslots) {
+    let timeslot: Timeslot;
+    const { day, daytime, start, info } = timeslotData;
+    dataSource.logger.log(
+      "info",
+      `createTime:timeslotData: ${JSON.stringify(timeslotData)}`,
+    );
+
+    if (day && daytime) {
+      if (day !== "Occasional") {
+        const rrule = getRRULE(day);
+        for (const startEnd of daytime) {
+          const timeframe = getStartEnd(startEnd);
+          dataSource.logger.log(
+            "info",
+            `createTime:timeframe: ${JSON.stringify(timeframe)}`,
+          );
+
+          if (timeframe) {
+            timeslot = await timeslotRepository.findOne({
+              where: { rrule, ...timeframe, occasional: IsNull() },
+            });
+            dataSource.logger.log(
+              "info",
+              `createTime:timeSlot: ${JSON.stringify(timeslot)}`,
+            );
+            if (!timeslot) {
+              timeslot = new Timeslot({
+                rrule,
+                ...timeframe,
+              });
+              await timeslotRepository.save(timeslot);
+              await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
+            }
+          }
+        }
+      } else {
+        for (const dayTimeItem of daytime) {
+          const occasional = getEnumValue<OccasionalType>(
+            OccasionalType,
+            dayTimeItem.toLowerCase() as OccasionalType,
+          );
+          if (!occasional) {
+            dataSource.logger.log(
+              "warn",
+              `Occasional type ${dayTimeItem} not recognized. Skipping.`,
+            );
+            continue;
+          }
+          timeslot = await timeslotRepository.findOne({
+            where: {
+              occasional,
+              rrule: IsNull(),
+              start: IsNull(),
+              end: IsNull(),
+            },
+          });
+          dataSource.logger.log(
+            "info",
+            `createTime:timeSlot: ${JSON.stringify(timeslot)}`,
+          );
+          if (!timeslot) {
+            timeslot = new Timeslot({ occasional });
+            await timeslotRepository.save(timeslot);
+            await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
+          }
+        }
+      }
+    } else {
+      timeslot = start
+        ? new Timeslot({
+            info: info || "one-timer",
+            start: start ? new Date(start) : undefined,
+          })
+        : undefined;
+    }
+
+    if (timeslot) {
+      const timeTimeslot = new TimeTimeslot({
+        time,
+        timeslot,
+      });
+      await timeTimeslotRepository.save(timeTimeslot);
+    }
+  }
+
+  return time;
 }
 
 export function getDistrict(title: string) {
@@ -821,4 +852,22 @@ export function getToTranslate(translate: string): TranslatedIntoType {
 
   const res = map[translate];
   return res ? res : TranslatedIntoType.DEUTSCHE;
+}
+
+function getEngagementStatus(status: string): VolunteerStateEngagementType {
+  if (getEnumValue(VolunteerStateEngagementType, status)) {
+    return status as VolunteerStateEngagementType;
+  }
+
+  const map = {
+    Active: VolunteerStateEngagementType.ACTIVE,
+    Available: VolunteerStateEngagementType.AVAILABLE,
+    Inactive: VolunteerStateEngagementType.INACTIVE,
+    New: VolunteerStateEngagementType.NEW,
+    "Temp Unavailable": VolunteerStateEngagementType.TEMP_UNAVAILABLE,
+    Unresponsive: VolunteerStateEngagementType.UNRESPONSIVE,
+  };
+
+  const res = map[status];
+  return res ? res : VolunteerStateEngagementType.NEW;
 }
