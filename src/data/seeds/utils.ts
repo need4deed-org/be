@@ -467,40 +467,22 @@ export async function createTime(
   const timeslotRepository = getRepository(dataSource, Timeslot);
   const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
 
-  dataSource.logger.log(
-    "info",
-    `createTime:timeData: ${JSON.stringify(timeData)}`,
-  );
-
   const time = new Time();
   await timeRepository.save(time);
 
   for (const timeslotData of timeData.timeslots) {
     let timeslot: Timeslot;
     const { day, daytime, start, info } = timeslotData;
-    dataSource.logger.log(
-      "info",
-      `createTime:timeslotData: ${JSON.stringify(timeslotData)}`,
-    );
 
     if (day && daytime) {
       if (day !== "Occasional") {
         const rrule = getRRULE(day);
         for (const startEnd of daytime) {
           const timeframe = getStartEnd(startEnd);
-          dataSource.logger.log(
-            "info",
-            `createTime:timeframe: ${JSON.stringify(timeframe)}`,
-          );
-
           if (timeframe) {
             timeslot = await timeslotRepository.findOne({
               where: { rrule, ...timeframe, occasional: IsNull() },
             });
-            dataSource.logger.log(
-              "info",
-              `createTime:timeSlot: ${JSON.stringify(timeslot)}`,
-            );
             if (!timeslot) {
               timeslot = new Timeslot({
                 rrule,
@@ -532,10 +514,7 @@ export async function createTime(
               end: IsNull(),
             },
           });
-          dataSource.logger.log(
-            "info",
-            `createTime:timeSlot: ${JSON.stringify(timeslot)}`,
-          );
+
           if (!timeslot) {
             timeslot = new Timeslot({ occasional });
             await timeslotRepository.save(timeslot);
