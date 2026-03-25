@@ -9,7 +9,7 @@ const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
 
 export const check = { calls: 0, count: 0, flag: false, nid: "" };
 
-async function initDatabase() {
+export async function initDatabase() {
   await dataSource.initialize();
   if (dataSource.isInitialized) {
     dataSource.logger.log("info", "Data Source has been initialized!");
@@ -48,8 +48,4 @@ async function initDatabase() {
       dataSource.logger.log("info", "Released the lock for migrations");
     }
   }
-}
-
-if (dataSource.isInitialized === false) {
-  initDatabase();
 }
