@@ -1,9 +1,9 @@
 import "./data"; // initialize database connection
-import { getFastify } from "./server";
+import { createServer } from "./server";
 
 export async function start() {
   try {
-    const server = await getFastify();
+    const server = await createServer();
     const port = Number(process.env.PORT) || 5000;
     await server.listen({ port, host: "0.0.0.0" });
     // eslint-disable-next-line no-console
