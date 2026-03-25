@@ -10,7 +10,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { updateVolunteerMatching } from "../../utils";
 import Opportunity from "../opportunity/opportunity.entity";
 import Volunteer from "../volunteer/volunteer.entity";
 
@@ -61,7 +60,8 @@ export default class OpportunityVolunteer {
   volunteerId: number;
 
   @AfterUpdate()
-  afterUpdateHook() {
+  async afterUpdateHook() {
+    const { updateVolunteerMatching } = await import("../../utils");
     updateVolunteerMatching(this.volunteerId);
   }
 }
