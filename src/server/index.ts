@@ -35,18 +35,7 @@ import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
 
-let fastify: FastifyInstance;
-
-export async function getFastify() {
-  if (fastify) {
-    return fastify;
-  }
-
-  fastify = await createServer();
-  return fastify;
-}
-
-async function createServer(): Promise<FastifyInstance> {
+export async function createServer(): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     logger: {
       level: process.env.NODE_ENV === "development" ? "debug" : undefined,
