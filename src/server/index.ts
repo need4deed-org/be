@@ -35,26 +35,35 @@ import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
 
-export const fastify: FastifyInstance = Fastify({
-  logger: {
-    level: process.env.NODE_ENV === "development" ? "debug" : undefined,
-    transport: {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
+let fastify: FastifyInstance;
+
+export async function getFastify() {
+  if (fastify) {
+    return fastify;
+  }
+
+  fastify = await createServer();
+  return fastify;
+}
+
+async function createServer(): Promise<FastifyInstance> {
+  const fastifyInstance: FastifyInstance = Fastify({
+    logger: {
+      level: process.env.NODE_ENV === "development" ? "debug" : undefined,
+      transport: {
+        target: "pino-pretty",
+        options: {
+          colorize: true,
+        },
       },
     },
-  },
-  ajv: {
-    customOptions: {
-      strict: false,
+    ajv: {
+      customOptions: {
+        strict: false,
+      },
     },
-  },
-});
+  });
 
-export async function createServer(
-  fastifyInstance: FastifyInstance = fastify,
-): Promise<FastifyInstance> {
   // Register external schemas first so they're available for $ref resolution
   await fastifyInstance.addSchema({
     $id: "entity-types",
@@ -186,6 +195,8 @@ export async function createServer(
   await fastifyInstance.register(organizationRoutes, {
     prefix: RoutePrefix.ORGANIZATION,
   });
+
+  await fastifyInstance.ready();
 
   return fastifyInstance;
 }
