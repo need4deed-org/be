@@ -62,11 +62,11 @@ export const seedLeadFromFile = path.join(
 //   "agents.json",
 // );
 
-// export const seedOpportunitiesFile = path.join(
-//   __dirname,
-//   ...["..", "..", "dev", "pii"],
-//   "opportunities.json",
-// );
+export const seedOpportunitiesFile = path.join(
+  __dirname,
+  ...["..", "..", "dev", "pii"],
+  "opportunities.json",
+);
 
 // export const seedVolunteersFile = path.join(
 //   __dirname,
@@ -76,7 +76,7 @@ export const seedLeadFromFile = path.join(
 
 export const seedAgentsFile = awsS3BaseUrl + "agents.json";
 export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
-export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
+// export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
@@ -85,6 +85,7 @@ export const urlEmailVerification =
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24h in milliseconds
+export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 
 export const accessCookieName = "access";
 export const refreshCookieName = "refresh";
