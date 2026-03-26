@@ -17,6 +17,7 @@ import {
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
+import { check } from "..";
 import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
@@ -348,7 +349,7 @@ export async function createDeal(
   for (const title of dealData.profile.activities) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
-      logger.warn(`Activity ${title} not found. Skipping.`);
+      // logger.warn(`Activity ${title} not found. Skipping.`);
       continue;
     }
     categoryIds.push(activity.categoryId);
@@ -362,7 +363,7 @@ export async function createDeal(
   for (const title of dealData.profile.skills) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
-      logger.warn(`Skill ${title} not found. Skipping.`);
+      // logger.warn(`Skill ${title} not found. Skipping.`);
       continue;
     }
     const profileSkill = new ProfileSkill({ profile, skill });
@@ -417,11 +418,17 @@ export async function getOrCreateAgent(
   agentData: _AgentJSON,
   dataSource: DataSource,
 ): Promise<Agent> {
-  if (!agentData) {
-    throw new Error("Agent data is empty.");
-  }
-
   const agentRepository = getRepository(dataSource, Agent);
+
+  if (!agentData) {
+    const orphanage = await agentRepository.findOneBy({
+      title: "Orphanage For Opportunities",
+    });
+    if (!orphanage) {
+      throw new Error("Agent data is empty.");
+    }
+    return orphanage;
+  }
 
   const agent = await agentRepository.findOne({
     where: { title: agentData.title },
@@ -474,6 +481,7 @@ export async function createTime(
   for (const timeslotData of timeData.timeslots) {
     let timeslot: Timeslot;
     const { day, daytime, start, info } = timeslotData;
+    check.log(`createTime:start:${start}`);
 
     if (day && daytime) {
       if (day !== "Occasional") {
@@ -490,7 +498,6 @@ export async function createTime(
                 ...timeframe,
               });
               await timeslotRepository.save(timeslot);
-              await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
             }
           }
         }
@@ -519,7 +526,6 @@ export async function createTime(
           if (!timeslot) {
             timeslot = new Timeslot({ occasional });
             await timeslotRepository.save(timeslot);
-            await new Promise((resolve) => setTimeout(resolve, 400)); // To avoid unique constraint violation
           }
         }
       }
@@ -530,14 +536,16 @@ export async function createTime(
             start: start ? new Date(start) : undefined,
           })
         : undefined;
+      await timeslotRepository.save(timeslot);
     }
 
-    if (timeslot) {
+    if (timeslot && timeslot.id) {
       const timeTimeslot = new TimeTimeslot({
         time,
         timeslot,
       });
       await timeTimeslotRepository.save(timeTimeslot);
+      await timeslotRepository.save(timeslot);
     }
   }
 
