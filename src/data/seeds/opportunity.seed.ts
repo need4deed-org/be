@@ -111,8 +111,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
           ),
         );
         if (error) {
-          dataSource.logger.log(
-            "warn",
+          logger.warn(
             `Seems like pair: ${opportunity.nid}-${volunteerNid} already exists.`,
           );
         }
