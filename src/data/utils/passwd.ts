@@ -1,4 +1,5 @@
 import * as bcrypt from "bcrypt";
+import logger from "../../logger";
 
 /**
  * Hashes a plain-text password using bcrypt.
@@ -13,7 +14,7 @@ export async function hashPassword(password: string): Promise<string> {
     const hash = await bcrypt.hash(password, salt);
     return hash;
   } catch (error) {
-    console.error("Error hashing password:", error);
+    logger.error(error, "Error hashing password");
     throw new Error("Could not hash password.");
   }
 }
@@ -32,7 +33,7 @@ export async function verifyPassword(
     const isMatch = await bcrypt.compare(plainTextPassword, hashedPassword);
     return isMatch;
   } catch (error) {
-    console.error("Error verifying password:", error);
+    logger.error(error, "Error verifying password");
     throw new Error("Could not verify password.");
   }
 }

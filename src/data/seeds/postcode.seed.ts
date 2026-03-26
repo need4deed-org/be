@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedPLZFile } from "../../config/constants";
+import logger from "../../logger";
 import Postcode from "../entity/location/postcode.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
@@ -19,7 +20,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(postcodeRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding postcodes.");
+    logger.info("Skipping seeding postcodes.");
     return;
   }
 

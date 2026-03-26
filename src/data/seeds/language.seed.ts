@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedLanguageFile } from "../../config/constants";
+import logger from "../../logger";
 import Language from "../entity/profile/language.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
@@ -18,7 +19,7 @@ export async function seedLanguage(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(languageRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding languages.");
+    logger.info("Skipping seeding languages.");
     return;
   }
 

@@ -1,9 +1,9 @@
+import { SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { FastifyInstance } from "fastify";
 import { FastifyMailer, FastifyMailerOptions } from "fastify-mailer";
 import fp from "fastify-plugin";
 import { SendMailOptions } from "nodemailer"; // Nodemailer types
-
-import { SendEmailCommand } from "@aws-sdk/client-sesv2";
+import logger from "../../logger";
 import { getSesClient } from "../../services/email/ses";
 
 type SupportedTransport = "ses";
@@ -26,18 +26,19 @@ async function emailPlugin(
   fastify: FastifyInstance,
   options: EmailPluginOptions,
 ) {
-  let nodemailerTransportConfig: FastifyMailerOptions["transport"];
+  let _nodemailerTransportConfig: FastifyMailerOptions["transport"];
 
   switch (options.provider) {
-    case "ses":
+    case "ses": {
       const sesClient = getSesClient();
-      nodemailerTransportConfig = {
+      _nodemailerTransportConfig = {
         SES: {
           ses: sesClient,
           SendEmailCommand,
         },
       };
       break;
+    }
     default:
       throw new Error(`Unsupported email provider type: ${options.provider}`);
   }
@@ -50,10 +51,10 @@ async function emailPlugin(
 
       try {
         const info = await fastify.mailer.sendMail(mailOptions);
-        fastify.log.info(`Email sent: ${info.messageId}`);
+        logger.info(`Email sent: ${info.messageId}`);
         return info;
       } catch (error) {
-        fastify.log.error(`Failed to send email: ${error.message}`);
+        logger.error(`Failed to send email: ${error.message}`);
       }
     },
   });

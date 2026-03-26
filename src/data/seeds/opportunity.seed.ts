@@ -1,6 +1,7 @@
 import { OpportunityType, TranslatedIntoType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedOpportunitiesFile } from "../../config/constants";
+import logger from "../../logger";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { OpportunityJSON } from "./types";
@@ -15,7 +16,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(opportunityRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding opportunities.");
+    logger.info("Skipping seeding opportunities.");
     return;
   }
 
@@ -51,8 +52,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
       });
       await opportunityRepository.save(newOpportunity);
     } catch (error) {
-      dataSource.logger.log(
-        "log",
+      logger.info(
         `Creation of opportunity ${opportunity?.title} rolled back due to error: ${error.message}`,
       );
     }

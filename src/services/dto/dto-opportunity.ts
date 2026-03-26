@@ -7,6 +7,7 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import logger from "../../logger";
 import { tryCatchFn } from "../utils";
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";
@@ -14,7 +15,7 @@ import { commentSerializer } from "./dto-comment";
 import { getAvailability } from "./utils";
 
 const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
-  console.error(`Error getting availability for opportunity: ${error}`);
+  logger.error(`Error getting availability for opportunity: ${error}`);
 });
 
 function getOpportunityDescription(opportunity: Opportunity) {

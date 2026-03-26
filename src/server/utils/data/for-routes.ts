@@ -37,6 +37,7 @@ import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
+import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 
@@ -143,10 +144,10 @@ export async function addTranslatedFields(
       throw new Error(`Language ${isoCode} not found.`);
     }
   } catch (error) {
-    dataSource.logger.log("warn", `Error loading language: ${error}`);
+    logger.warn(`Error loading language: ${error}`);
     throw new Error(error.message);
   }
-  dataSource.logger.log("log", "Translating volunteers");
+  logger.info("Translating volunteers");
   for (const volunteer of volunteers) {
     try {
       for (const pl of volunteer.deal.profile.profileLanguage) {
@@ -186,8 +187,7 @@ export async function addTranslatedFields(
           : ps.skill.translation;
       }
     } catch (error) {
-      dataSource.logger.log(
-        "warn",
+      logger.warn(
         `Error occurred while adding translations to a volunteer id:${volunteer.id} ${error}`,
       );
     }
@@ -508,8 +508,7 @@ export async function updateOptionList<
 
     return true;
   } catch (error) {
-    dataSource.logger.log(
-      "warn",
+    logger.warn(
       `Error ${error.message} updating list: ${m2mEntity.name} for volunteer id=${rootId}`,
     );
     return false;
@@ -549,7 +548,7 @@ export async function getGerman(): Promise<Language> {
   );
 
   if (error) {
-    dataSource.logger.log("warn", `Error fetching German language: ${error}`);
+    logger.warn(`Error fetching German language: ${error}`);
   }
 
   return german;
@@ -662,10 +661,7 @@ export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
     return "ASC";
   }
 
-  dataSource.logger.log(
-    "warn",
-    `Unknown sort order: ${orderDirection}, defaulting to DESC`,
-  );
+  logger.warn(`Unknown sort order: ${orderDirection}, defaulting to DESC`);
   return "DESC";
 }
 
