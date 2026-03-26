@@ -146,16 +146,21 @@ class Opportunity:
             info = self.opportunity.get("VO Schedule", None)
             start = self.opportunity.get("Date, time", None)
             if start and not is_valid_js_date(start):
-                info = start
-                start = None
+                return {
+                    "timeslots": [{"info": start}],
+                }
             if info:
-                timeslot["info"] = info
+                timeslots = [
+                    get_timeslot_data(timeslot.strip()) for timeslot in info.split(",")
+                ]
+                return {
+                    "timeslots": get_list(timeslots),
+                }
             if start:
-                timeslot["start"] = start
-
-            return {
-                "timeslots": [timeslot],
-            }
+                return {
+                    "timeslots": [{"start": start}],
+                }
+            return None
 
         def get_location_data():
             """
