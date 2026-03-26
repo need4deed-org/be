@@ -45,6 +45,8 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
         infoAbout: volunteer.infoAbout || "",
         infoExperience: volunteer.infoExperience || "",
+        createdAt: new Date(volunteer.timestamp),
+        updatedAt: new Date(volunteer.timestamp),
         person,
         deal,
       });

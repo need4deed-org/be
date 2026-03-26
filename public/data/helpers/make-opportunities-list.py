@@ -226,6 +226,9 @@ class Opportunity:
             self.opportunity.get("Number of volunteers needed", "")
         )
 
+    def get_timestamp(self):
+        return get_string_or_null(self.opportunity.get("Timestamp", ""))
+
     def get_volunteer_nids(self):
         return (
             [
@@ -290,6 +293,7 @@ def get_opportunity(opportunity, scramble=False):
         "accompanying": get_dict_or_null(opportunity_instance.get_accompanying_data()),
         "nid": opportunity_instance.get_nid(),
         "volunteerNids": opportunity_instance.get_volunteer_nids(),
+        "timestamp": opportunity_instance.get_timestamp(),
     }
 
 
