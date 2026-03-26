@@ -6,6 +6,7 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
+import logger from "../../../logger";
 import {
   dtoAgentGet,
   dtoAgentGetList,
@@ -148,7 +149,7 @@ export default async function agentRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      fastify.log.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
+      logger.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
 

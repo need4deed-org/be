@@ -1,6 +1,7 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource, In, Repository } from "typeorm";
 import { seedLanguageInUseFile } from "../../config/constants";
+import logger from "../../logger";
 import LeadFrom from "../entity/lead.entity";
 import District from "../entity/location/district.entity";
 import Option from "../entity/option.entity";
@@ -112,7 +113,7 @@ export async function seedOptions(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(optionRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding options.");
+    logger.info("Skipping seeding options.");
     return;
   }
 

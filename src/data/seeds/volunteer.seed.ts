@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedVolunteersFile } from "../../config/constants";
+import logger from "../../logger";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { VolunteerJSON } from "./types";
@@ -20,7 +21,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(volunteerRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding volunteers.");
+    logger.info("Skipping seeding volunteers.");
     return;
   }
 
@@ -45,8 +46,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
       });
       await volunteerRepository.save(newVolunteer);
     } catch (error) {
-      dataSource.logger.log(
-        "log",
+      logger.info(
         `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${error.message}`,
       );
     }

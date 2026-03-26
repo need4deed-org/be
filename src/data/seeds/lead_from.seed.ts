@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { seedLeadFromFile } from "../../config/constants";
+import logger from "../../logger";
 import LeadFrom from "../entity/lead.entity";
 import { fetchJsonFromUrl, getRepository } from "../utils";
 import { getCount } from "./utils";
@@ -18,7 +19,7 @@ export async function seedLeadFrom(dataSource: DataSource): Promise<void> {
 
   const count = await getCount(leadFromRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding leads.");
+    logger.info("Skipping seeding leads.");
     return;
   }
 

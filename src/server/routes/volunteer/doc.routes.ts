@@ -2,6 +2,7 @@ import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { DocumentType } from "need4deed-sdk";
 import Document from "../../../data/entity/document.entity";
+import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
@@ -45,7 +46,7 @@ export default async function volunteerDocRoutes(
     const [urlObj, error] = await tryCatch(fetch(url));
 
     if (error) {
-      fastify.log.error(`Error fetching document from URL ${url}: ${error}`);
+      logger.error(`Error fetching document from URL ${url}: ${error}`);
       return reply.status(400).send({
         message: `Error fetching document from URL: ${error}`,
       });
@@ -136,7 +137,7 @@ export default async function volunteerDocRoutes(
     );
 
     if (error) {
-      fastify.log.error(
+      logger.error(
         `Error saving document for volunteer ${volunteerId}: ${error}`,
       );
       return reply.status(400).send({
@@ -182,7 +183,7 @@ export default async function volunteerDocRoutes(
       );
 
       if (error) {
-        fastify.log.error(
+        logger.error(
           `Error deleting documents for volunteer_id${id}: ${error}`,
         );
         return reply.status(400).send({
@@ -226,9 +227,7 @@ export default async function volunteerDocRoutes(
       );
 
       if (error) {
-        fastify.log.error(
-          `Error deleting document for volunteer ${id}: ${error}`,
-        );
+        logger.error(`Error deleting document for volunteer ${id}: ${error}`);
         return reply.status(400).send({
           message: `Error deleting document: ${error}`,
         });

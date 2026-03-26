@@ -1,6 +1,7 @@
 import { UserRole } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { NotFoundError } from "../../config/error/fastify";
+import logger from "../../logger";
 import Address from "../entity/location/address.entity";
 import Postcode from "../entity/location/postcode.entity";
 import Person from "../entity/person.entity";
@@ -15,7 +16,7 @@ export async function seedUser(dataSource: DataSource) {
 
   const count = await getCount(userRepository);
   if (count !== 0) {
-    dataSource.logger.log("log", "Skipping seeding users.");
+    logger.info("Skipping seeding users.");
     return;
   }
 
@@ -82,9 +83,6 @@ export async function seedUser(dataSource: DataSource) {
   try {
     await userRepository.save([userAdmin, coordinatorUser, userUser]);
   } catch (_error) {
-    dataSource.logger.log(
-      "log",
-      "Skipping seeding users as they already seeded.",
-    );
+    logger.info("Skipping seeding users as they already seeded.");
   }
 }
