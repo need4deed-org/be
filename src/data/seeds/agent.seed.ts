@@ -31,6 +31,12 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
 
   const agentsJson = (await fetchJsonFromUrl(seedAgentsFile)) as AgentJSON[];
 
+  // create an agent for orphan opportunities
+  agentsJson.unshift({
+    title: "Orphanage For Opportunities",
+    about: "the dummy agent account for parenting orphaned opportunities.",
+  } as AgentJSON);
+
   for (const agentJson of agentsJson) {
     const agentObj = new Agent({
       title: agentJson.title || agentJson.website || "unknown",
@@ -58,7 +64,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
       value: "12345",
     });
     const postcodesJson = agentJson.postcodes;
-    postcodesJson.forEach(async (postcodeJson) => {
+    postcodesJson?.forEach(async (postcodeJson) => {
       const postcode = await postcodeRepository.findOneBy({
         value: postcodeJson,
       });
@@ -77,7 +83,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     });
 
     const personsJson = agentJson.person;
-    personsJson.forEach(async (personJson) => {
+    personsJson?.forEach(async (personJson) => {
       if (Object.values(personJson).filter(Boolean).length) {
         const person = await getOrCreatePerson(personJson, dataSource);
         const agentPersonRepository = getRepository(dataSource, AgentPerson);
@@ -100,7 +106,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
 
     const notionRelationRepository = getRepository(dataSource, NotionRelation);
     const opportunityNids = agentJson.opportunityNids;
-    opportunityNids.forEach(async (opportunityNid) => {
+    opportunityNids?.forEach(async (opportunityNid) => {
       const notionRel = new NotionRelation({
         hostId: agent.id,
         hostType: EntityTableName.AGENT,
