@@ -8,7 +8,17 @@ import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
 const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
 
-export const check = { calls: 0, count: 0, flag: false, nid: "" };
+export const check = {
+  calls: 0,
+  count: 0,
+  flag: false,
+  nid: "",
+  log(msg: string) {
+    if (this.flag) {
+      logger.debug(msg);
+    }
+  },
+};
 
 export async function initDatabase() {
   await dataSource.initialize();
