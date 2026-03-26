@@ -89,6 +89,8 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
         info: opportunity.info || "",
         infoConfidential: opportunity.infoConfidential || "",
         numberVolunteers: Number(opportunity.numberVolunteers || 1),
+        createdAt: new Date(opportunity.timestamp),
+        updatedAt: new Date(opportunity.timestamp),
         ...(accompanying?.id ? { accompanyingId: accompanying.id } : {}),
         ...(notionRelation?.hostId
           ? { agentId: notionRelation?.hostId }

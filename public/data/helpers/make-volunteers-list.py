@@ -132,6 +132,14 @@ class Volunteer:
             self.volunteer.get("Coordinator Comments", ""), scramble=self.scramble
         )
 
+    def get_timestamp(self):
+        """
+        Extracts coordinator comments from the volunteer dictionary.
+        """
+        return get_string_or_null(
+            self.volunteer.get("Timestamp", ""),
+        )
+
     def get_status(self):
         """
         Extracts Status from the volunteer dictionary.
@@ -180,6 +188,7 @@ def get_volunteer(volunteer, scramble=False):
         "statusCGC": volunteer_instance.get_cgc(),
         "infoAbout": volunteer_instance.get_info_about(),
         "infoExperience": volunteer_instance.get_info_experience(),
+        "timestamp": volunteer_instance.get_timestamp(),
         "person": volunteer_instance.get_person_data(),
         "deal": volunteer_instance.get_deal_data(),
     }

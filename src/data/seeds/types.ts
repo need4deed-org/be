@@ -58,6 +58,7 @@ export interface _AgentJSON {
 }
 export interface VolunteerJSON {
   nid: string;
+  timestamp: string;
   status: VolunteerStateType;
   statusEngagement: string;
   accompanying: boolean;
@@ -79,6 +80,7 @@ export interface OpportunityJSON {
   status: string;
   title: string;
   nid: string;
+  timestamp: string;
   type: OpportunityType;
   translationType: string;
   info: string;
