@@ -62,11 +62,11 @@ export const seedLeadFromFile = path.join(
 //   "agents.json",
 // );
 
-export const seedOpportunitiesFile = path.join(
-  __dirname,
-  ...["..", "..", "dev", "pii"],
-  "opportunities.json",
-);
+// export const seedOpportunitiesFile = path.join(
+//   __dirname,
+//   ...["..", "..", "dev", "pii"],
+//   "opportunities.json",
+// );
 
 // export const seedVolunteersFile = path.join(
 //   __dirname,
@@ -76,7 +76,7 @@ export const seedOpportunitiesFile = path.join(
 
 export const seedAgentsFile = awsS3BaseUrl + "agents.json";
 export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
-// export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
+export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
