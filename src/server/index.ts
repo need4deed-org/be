@@ -4,7 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
-import { defaultFrom, selfUrl } from "../config/constants";
+import { defaultFrom, pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
 import { getMailerConfigForSES, getSesClient } from "../services";
@@ -38,6 +38,7 @@ import { RoutePrefix } from "./types";
 
 export async function createServer(): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
+    pluginTimeout,
     loggerInstance: logger,
     ajv: {
       customOptions: {
