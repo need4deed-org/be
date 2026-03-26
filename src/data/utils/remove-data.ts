@@ -13,10 +13,8 @@ export async function removeData(dataSource: DataSource): Promise<void> {
     }) as Promise<Config | null>,
   );
   if (error) {
-    dataSource.logger.log(
-      "warn",
-      `Fetching config for truncating all: ${error}`,
-    );
+    logger.warn(`Fetching config for truncating all: ${error}`);
+    return;
   }
 
   logger.info(
