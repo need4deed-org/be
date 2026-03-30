@@ -3,7 +3,7 @@ import logger from "../logger";
 import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
 import { seed } from "./seeds/seed";
-import { removeData } from "./utils";
+import { refreshMaterializedView, removeData } from "./utils";
 import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
 const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
@@ -46,6 +46,8 @@ export async function initDatabase() {
 
       await createVolunteerListMV(dataSource);
       logger.info("Created MVs");
+
+      await refreshMaterializedView(dataSource, "volunteer_list_mv");
 
       logger.info("Database initialization completed");
     } catch (error) {
