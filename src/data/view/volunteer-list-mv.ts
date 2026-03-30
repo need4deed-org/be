@@ -1,4 +1,5 @@
 import { DataSource } from "typeorm";
+import { tryCatch } from "../../services/utils";
 
 export async function createVolunteerListMV(
   dataSource: DataSource,
@@ -136,12 +137,9 @@ export async function createVolunteerListMV(
   await dataSource.query(createViewQuery);
 
   // Ensure the unique index exists for CONCURRENT refresh (required after view creation)
-  try {
-    // TODO: refactor to using tryCatch here
-    await dataSource.query(
+  await tryCatch(
+    dataSource.query(
       `CREATE UNIQUE INDEX mv_deal_id_unique_idx ON volunteer_list_mv (volunteer_id);`,
-    );
-  } catch (_) {
-    // Ignore if index already exists
-  }
+    ),
+  );
 }
