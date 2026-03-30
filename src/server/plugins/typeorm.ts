@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
+import { initDatabase } from "../../data";
 import { dataSource } from "../../data/data-source";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
@@ -23,7 +24,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
   try {
     if (!dataSource.isInitialized) {
       logger.info("Initializing TypeORM Data Source...");
-      await dataSource.initialize();
+      await initDatabase();
     }
     logger.info("TypeORM Data Source has been initialized!");
 

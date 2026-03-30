@@ -1,8 +1,4 @@
-import {
-  isProd,
-  shouldRunMigrations,
-  shouldTruncateAll,
-} from "../config/constants";
+import { isProd, shouldRunMigrations } from "../config";
 import logger from "../logger";
 import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
@@ -12,7 +8,19 @@ import { createVolunteerListMV } from "./view/volunteer-list-mv";
 
 const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
 
-async function initDatabase() {
+export const check = {
+  calls: 0,
+  count: 0,
+  flag: false,
+  nid: "",
+  log(msg: string) {
+    if (this.flag) {
+      logger.debug(msg);
+    }
+  },
+};
+
+export async function initDatabase() {
   await dataSource.initialize();
   if (dataSource.isInitialized) {
     logger.info("Data Source has been initialized!");
@@ -30,11 +38,7 @@ async function initDatabase() {
         logger.info("Migrations completed");
       }
 
-      if (shouldTruncateAll) {
-        await removeData(dataSource);
-      } else {
-        logger.info("Truncate all tables skipped due to configuration");
-      }
+      await removeData(dataSource);
 
       logger.info("Attempting to seed data");
       await seed(dataSource);
@@ -54,8 +58,4 @@ async function initDatabase() {
       logger.info("Released the lock for migrations");
     }
   }
-}
-
-if (dataSource.isInitialized === false) {
-  initDatabase();
 }

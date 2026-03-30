@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
+import { isProd, isTest } from "../config";
 import Comment from "./entity/comment.entity";
 import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
@@ -26,6 +27,7 @@ import ProfileActivity from "./entity/m2m/profile-activity";
 import ProfileLanguage from "./entity/m2m/profile-language";
 import ProfileSkill from "./entity/m2m/profile-skill";
 import TimeTimeslot from "./entity/m2m/time-timeslot";
+import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
@@ -84,6 +86,7 @@ export const dataSource = new DataSource({
     LocationAddress,
     LocationDistrict,
     LocationPostcode,
+    NotionRelation,
     Opportunity,
     OpportunityVolunteer,
     Organization,
@@ -104,21 +107,15 @@ export const dataSource = new DataSource({
     Volunteer,
     VolunteerListMV,
   ],
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? {
-          rejectUnauthorized: true,
-          ca: fs
-            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
-            .toString(),
-        }
-      : false,
-  migrations:
-    process.env.NODE_ENV === "test"
-      ? []
-      : [
-          `${__dirname}/migrations/**/*.${process.env.NODE_ENV === "production" ? "js" : "ts"}`,
-        ],
+  ssl: isProd
+    ? {
+        rejectUnauthorized: true,
+        ca: fs
+          .readFileSync("/app/certificates/eu-central-1-bundle.pem")
+          .toString(),
+      }
+    : false,
+  migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
   migrationsTableName: "be_migrations",
   subscribers: [],
   namingStrategy: new SnakeCaseNamingStrategy(),

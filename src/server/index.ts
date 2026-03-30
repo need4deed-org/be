@@ -4,7 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
-import { defaultFrom, selfUrl } from "../config/constants";
+import { defaultFrom, pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
 import { getMailerConfigForSES, getSesClient } from "../services";
@@ -36,18 +36,17 @@ import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
 
-export const fastify: FastifyInstance = Fastify({
-  loggerInstance: logger,
-  ajv: {
-    customOptions: {
-      strict: false,
+export async function createServer(): Promise<FastifyInstance> {
+  const fastifyInstance: FastifyInstance = Fastify({
+    pluginTimeout,
+    loggerInstance: logger,
+    ajv: {
+      customOptions: {
+        strict: false,
+      },
     },
-  },
-});
+  });
 
-export async function createServer(
-  fastifyInstance: FastifyInstance = fastify,
-): Promise<FastifyInstance> {
   // Register external schemas first so they're available for $ref resolution
   await fastifyInstance.addSchema({
     $id: "entity-types",
@@ -179,6 +178,8 @@ export async function createServer(
   await fastifyInstance.register(organizationRoutes, {
     prefix: RoutePrefix.ORGANIZATION,
   });
+
+  await fastifyInstance.ready();
 
   return fastifyInstance;
 }

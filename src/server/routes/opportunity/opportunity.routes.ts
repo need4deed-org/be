@@ -53,7 +53,16 @@ export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  await fastify.addHook("onRequest", fastify.authenticate());
+  fastify.addHook("onRequest", async (request, _reply) => {
+    // Access the custom config via routeOptions
+    const config = request.routeOptions.config as { public?: boolean };
+
+    if (config.public) {
+      return;
+    }
+
+    await fastify.authenticate();
+  });
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
@@ -87,6 +96,10 @@ export default async function opportunityRoutes(
         where: { id },
         relations,
       });
+
+      if (!opportunity) {
+        throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
 
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);

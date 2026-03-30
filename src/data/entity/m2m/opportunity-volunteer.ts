@@ -1,6 +1,7 @@
 import { IsEnum } from "class-validator";
 import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import {
+  AfterUpdate,
   Column,
   CreateDateColumn,
   Entity,
@@ -57,4 +58,10 @@ export default class OpportunityVolunteer {
 
   @Column()
   volunteerId: number;
+
+  @AfterUpdate()
+  async afterUpdateHook() {
+    const { updateVolunteerMatching } = await import("../../utils");
+    updateVolunteerMatching(this.volunteerId);
+  }
 }

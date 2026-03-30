@@ -12,8 +12,8 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - PORT=8000
+      - NODE_ENV=${NODE_ENV}
+      - PORT=5000
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USERNAME=postgres
@@ -21,7 +21,10 @@ services:
       - DB_NAME=postgres
       - DB_SCHEMA=public
     ports:
-      - 8000:8000
+      - 5000:5000
+    volumes:
+      - ./:/app
+    command: ["yarn", "dev"]
 
   bootstrap:
     container_name: data-bootstrap

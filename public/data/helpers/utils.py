@@ -105,7 +105,11 @@ def get_language_split(language):
     if language == "Northern Kurdish":
         return ["Northern Kurdish", "advanced"]
     language_split = language.split(" ")
-    return language_split if len(language_split) == 2 else [language, "advanced"]
+    return (
+        [language_split[0], language_split[1].lower()]
+        if len(language_split) == 2
+        else [language, "advanced"]
+    )
 
 
 def get_list(lst):
@@ -122,6 +126,10 @@ def get_string_or_null(value, scramble=False):
         return None
 
     return scramble_pii(value) if scramble else value
+
+
+def get_dict_or_null(d: dict) -> dict | None:
+    return d if any(d.values()) else None
 
 
 def get_timeslot_data(timeslot):
@@ -174,7 +182,7 @@ def get_address(address, scramble=False):
     if not isinstance(address, str) or len(address.strip()) == 0:
         return None
 
-    address = address.strip()
+    address = address.replace("<|>", ",").replace("\n", ",").strip()
     parts = [part.strip() for part in address.split(",")]
     postcode = None
 
