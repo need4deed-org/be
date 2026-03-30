@@ -2,6 +2,7 @@ import json
 import sys
 
 from utils import (
+    get_dict_or_null,
     get_email,
     get_language_split,
     get_list,
@@ -86,6 +87,26 @@ class Opportunity:
             "postcode": postcode,
         }
 
+    def get_accompanying_data(self):
+        """
+        Extracts and formats accompanying data from a opportunity dictionary.
+        """
+        return {
+            "address": get_string_or_null(
+                self.opportunity.get("Address", ""), scramble=self.scramble
+            ),
+            "name": get_string_or_null(
+                self.opportunity.get("Refugee Name", ""), scramble=self.scramble
+            ),
+            "phone": get_string_or_null(
+                self.opportunity.get("Refugee Phone", ""), scramble=self.scramble
+            ),
+            "date": get_string_or_null(self.opportunity.get("Date, time", "")),
+            "languageToTranslate": get_string_or_null(
+                self.opportunity.get("Translation", "")
+            ),
+        }
+
     def get_deal_data(self):
         """
         Extracts and formats deal data from a opportunity dictionary.
@@ -125,16 +146,21 @@ class Opportunity:
             info = self.opportunity.get("VO Schedule", None)
             start = self.opportunity.get("Date, time", None)
             if start and not is_valid_js_date(start):
-                info = start
-                start = None
+                return {
+                    "timeslots": [{"info": start}],
+                }
             if info:
-                timeslot["info"] = info
+                timeslots = [
+                    get_timeslot_data(timeslot.strip()) for timeslot in info.split(",")
+                ]
+                return {
+                    "timeslots": get_list(timeslots),
+                }
             if start:
-                timeslot["start"] = start
-
-            return {
-                "timeslots": [timeslot],
-            }
+                return {
+                    "timeslots": [{"start": start}],
+                }
+            return None
 
         def get_location_data():
             """
@@ -159,7 +185,13 @@ class Opportunity:
         """
         Extracts title from the opportunity dictionary.
         """
-        return get_string_or_null(self.opportunity.get("Name", ""))
+        return get_string_or_null(self.opportunity.get("\ufeffName", ""))
+
+    def get_nid(self):
+        """
+        Extracts notion id from the opportunity dictionary.
+        """
+        return get_string_or_null(self.opportunity.get("ID", ""))
 
     def get_info(self):
         """
@@ -174,7 +206,7 @@ class Opportunity:
         Extracts confidential info from the opportunity dictionary.
         """
         return get_string_or_null(
-            self.opportunity.get("AA information", ""), scramble=self.scramble
+            self.opportunity.get("AA Information", ""), scramble=self.scramble
         )
 
     def get_status(self):
@@ -183,9 +215,39 @@ class Opportunity:
         """
         return get_string_or_null(self.opportunity.get("Status", ""))
 
+    def get_matching_status(self):
+        """
+        Extracts Matching Status from the opportunity dictionary.
+        """
+        return get_string_or_null(self.opportunity.get("Matching status", ""))
+
     def get_number_volunteers(self):
         return get_string_or_null(
             self.opportunity.get("Number of volunteers needed", "")
+        )
+
+    def get_timestamp(self):
+        return get_string_or_null(self.opportunity.get("Timestamp", ""))
+
+    def get_volunteer_nids(self):
+        return (
+            [
+                (nid.strip(), "opp-pending")
+                for nid in self.opportunity.get("Contacted Volunteers ID ", "").split(
+                    ","
+                )
+                if nid
+            ]
+            + [
+                (nid.strip(), "opp-matched")
+                for nid in self.opportunity.get("Matched Volunteers ID", "").split(",")
+                if nid
+            ]
+            + [
+                (nid.strip(), "opp-active")
+                for nid in self.opportunity.get("Active Volunteers ID", "").split(",")
+                if nid
+            ]
         )
 
     def get_type(self):
@@ -193,12 +255,6 @@ class Opportunity:
         Extracts type from the opportunity dictionary.
         """
         return get_string_or_null(self.opportunity.get("Opp Type", ""))
-
-    def get_translation_type(self):
-        """
-        Extracts translation type from the opportunity dictionary.
-        """
-        return get_string_or_null(self.opportunity.get("Translation", ""))
 
     def get_postcode(self):
         """
@@ -229,12 +285,15 @@ def get_opportunity(opportunity, scramble=False):
         "title": opportunity_instance.get_title(),
         "status": opportunity_instance.get_status(),
         "type": opportunity_instance.get_type(),
-        "translationType": opportunity_instance.get_translation_type(),
         "numberVolunteers": opportunity_instance.get_number_volunteers(),
         "info": opportunity_instance.get_info(),
         "infoConfidential": opportunity_instance.get_info_confidential(),
+        "matchingStatus": opportunity_instance.get_matching_status(),
         "deal": opportunity_instance.get_deal_data(),
-        "agent": opportunity_instance.get_agent_data(),
+        "accompanying": get_dict_or_null(opportunity_instance.get_accompanying_data()),
+        "nid": opportunity_instance.get_nid(),
+        "volunteerNids": opportunity_instance.get_volunteer_nids(),
+        "timestamp": opportunity_instance.get_timestamp(),
     }
 
 

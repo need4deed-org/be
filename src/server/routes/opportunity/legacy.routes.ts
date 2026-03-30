@@ -1,4 +1,8 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  FastifyContextConfig,
+  FastifyInstance,
+  FastifyPluginOptions,
+} from "fastify";
 import { OpportunityLegacyFormData } from "need4deed-sdk";
 import { ILike } from "typeorm";
 import { UnauthorizedError } from "../../../config";
@@ -9,7 +13,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
-import { writeOpportunityLegacy } from "../../utils";
+import { getAgentByPostcode, writeOpportunityLegacy } from "../../utils";
 
 export default async function opportunityLegacyRoutes(
   fastify: FastifyInstance,
@@ -18,22 +22,23 @@ export default async function opportunityLegacyRoutes(
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
     {
+      config: { public: true } as FastifyContextConfig,
       preHandler: async (request) => {
-        const relations = ["representative"];
+        const relations = ["agentPerson.person", "agentPostcode.postcode"];
         const agentRepository = fastify.db.agentRepository;
-        const emailDomain = (request.body.rac_email || "").split("@").pop();
-        const agent: Agent = await agentRepository.findOne({
+        const email = (request.body.rac_email || "").split("@").pop();
+        const agents: Agent[] = await agentRepository.find({
           where: {
-            representative: { person: { email: ILike(`%@${emailDomain}`) } },
+            agentPerson: { person: { email: ILike(`%@${email}`) } },
           },
           relations,
         });
-        if (!agent) {
+        if (agents.length === 0) {
           throw new UnauthorizedError(
             "You've got no permission to submit an opportunity.",
           );
         }
-        request.agent = agent;
+        request.agents = agents;
       },
     },
     async (request, reply) => {
@@ -41,7 +46,11 @@ export default async function opportunityLegacyRoutes(
 
       opportunity.deal = await dealParserOpportunity(request.body);
       opportunity.accompanying = accompanyingParserOpportunity(request.body);
-      opportunity.agent = request.agent;
+
+      opportunity.agent = getAgentByPostcode(
+        request.agents,
+        request.body.rac_plz,
+      );
 
       const id = await writeOpportunityLegacy(opportunity);
 

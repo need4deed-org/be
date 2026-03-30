@@ -202,12 +202,12 @@
       "$id": "VolunteerStateEngagementType",
       "type": "string",
       "enum": [
-        "new",
-        "active",
-        "available",
-        "temp-unavailable",
-        "inactive",
-        "unresponsive"
+        "vol-new",
+        "vol-active",
+        "vol-available",
+        "vol-temp-unavailable",
+        "vol-inactive",
+        "vol-unresponsive"
       ]
     },
     "VolunteerStateCommunicationType": {
@@ -244,7 +244,7 @@
     "OpportunityVolunteerStatusType": {
       "$id": "OpportunityVolunteerStatusType",
       "type": "string",
-      "enum": ["pending", "matched", "active", "past"]
+      "enum": ["opp-pending", "opp-matched", "opp-active", "opp-past"]
     },
     "OptionItem": {
       "$id": "OptionItem",
@@ -548,7 +548,7 @@
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
-        "statusOpportunity": { "$ref": "OpportunityVolunteerStatusType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "numberVolunteers": { "type": "integer" },
         "description": { "type": "string" },
         "languagesMain": {
@@ -618,7 +618,7 @@
     "OpportunityStatusType": {
       "$id": "OpportunityStatusType",
       "type": "string",
-      "enum": ["new", "searching", "active", "past"]
+      "enum": ["opp-new", "opp-searching", "opp-active", "opp-past"]
     },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",

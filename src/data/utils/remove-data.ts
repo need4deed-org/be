@@ -1,20 +1,31 @@
 import { DataSource } from "typeorm";
 import logger from "../../logger";
+import { tryCatch } from "../../services/utils";
 import Config from "../entity/config.entity";
 import { ConfigType } from "../types";
 import { getRepository } from "../utils";
 
 export async function removeData(dataSource: DataSource): Promise<void> {
   const configRepository = getRepository(dataSource, "config");
-  let flagRecord = (await configRepository.findOneBy({
-    configKey: ConfigType.TRUNCATE_ALL,
-  })) as Config | null;
+  let [flagRecord, error] = await tryCatch(
+    configRepository.findOneBy({
+      configKey: ConfigType.TRUNCATE_ALL,
+    }) as Promise<Config | null>,
+  );
+  if (error) {
+    logger.warn(`Fetching config for truncating all: ${error}`);
+    return;
+  }
 
   logger.info(
     `Checking if data truncation is needed based on config: ${flagRecord && flagRecord.configValue === true ? "Okay." : JSON.stringify(flagRecord)}`,
   );
 
-  if (flagRecord && flagRecord.configValue === true) {
+  if (
+    flagRecord &&
+    flagRecord.configValue === true &&
+    flagRecord?.configValue === true
+  ) {
     logger.info(
       "Data is already truncated according to the config. Skipping truncation.",
     );
@@ -41,7 +52,10 @@ export async function removeData(dataSource: DataSource): Promise<void> {
 
   flagRecord = flagRecord || new Config({ configKey: ConfigType.TRUNCATE_ALL });
   flagRecord.configValue = true;
-  await configRepository.save(flagRecord);
+  [, error] = await tryCatch(configRepository.save(flagRecord));
+  if (error) {
+    logger.warn(`Writing config for truncating all: ${error}`);
+  }
 
   logger.info("Existing data has been removed successfully");
 }
