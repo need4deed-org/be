@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "ApiVolunteerGet#",
+  "definitions": {
+    "ApiVolunteerGet": {
+      "$id": "ApiVolunteerGet",
+      "allOf": [
+        {
+          "$ref": "ApiVolunteerProperties#"
+        },
+        {
+          "required": [
+            "id",
+            "languages",
+            "availability",
+            "activities",
+            "locations",
+            "skills",
+            "preferredCommunicationType",
+            "comments",
+            "goodConductCertificate",
+            "infoAbout",
+            "infoExperience",
+            "measlesVaccination",
+            "opportunitiesApplied",
+            "opportunitiesMatched",
+            "timelineLogs",
+            "createdAt",
+            "updatedAt"
+          ]
+        }
+      ]
+    }
+  }
+}

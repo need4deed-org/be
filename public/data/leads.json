@@ -1,0 +1,40 @@
+[
+  {
+    "id": "platform",
+    "count": 0,
+    "title": {
+      "en": "Volunteering platform",
+      "de": "Plattform für Freiwilligenarbeit"
+    }
+  },
+  {
+    "id": "media",
+    "count": 0,
+    "title": { "en": "Social media", "de": "Soziale Medien" }
+  },
+  {
+    "id": "newsletter",
+    "count": 0,
+    "title": { "en": "A newsletter", "de": "Ein Newsletter" }
+  },
+  {
+    "id": "search",
+    "count": 0,
+    "title": { "en": "Web search", "de": "Websuche" }
+  },
+  {
+    "id": "Friends",
+    "count": 0,
+    "title": { "en": "Friends", "de": "Freunde" }
+  },
+  {
+    "id": "fair",
+    "count": 0,
+    "title": { "en": "Volunteer fair", "de": "Freiwilligenmesse" }
+  },
+  {
+    "id": "Flyer",
+    "count": 0,
+    "title": { "en": "Flyer/Poster", "de": "Flyer/Plakat" }
+  }
+]

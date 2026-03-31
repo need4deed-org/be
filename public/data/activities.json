@@ -1,0 +1,133 @@
+[
+  {
+    "id": "Daycare",
+    "title": { "en": "Daycare", "de": "Kinderbetreuung" },
+    "category": "child-care"
+  },
+  {
+    "id": "Sports",
+    "title": { "en": "Sports", "de": "Sport" },
+    "category": "sport-activities"
+  },
+  {
+    "id": "Language café",
+    "title": { "en": "German language Cafe", "de": "Sprachcafé" },
+    "category": "de-lng-support"
+  },
+  {
+    "id": "Translation",
+    "title": {
+      "en": "Translation at Accommodation Centers",
+      "de": "Sprachmittlung in Unterkünften"
+    },
+    "category": "de-lng-support"
+  },
+  {
+    "id": "Fillout German forms",
+    "title": { "en": "Fillout German forms", "de": "Ausfüllhilfe" },
+    "category": "de-lng-support"
+  },
+  {
+    "id": "Arts",
+    "title": { "en": "Arts & Crafts", "de": "Basteln" },
+    "category": "child-care"
+  },
+  {
+    "id": "Gardening",
+    "title": { "en": "Gardening", "de": "Gartenarbeit" },
+    "category": "skills-based"
+  },
+  {
+    "id": "One-day",
+    "title": {
+      "en": "One-day Volunteering (e.g. Festivals, Cleanups)",
+      "de": "Eintägiges Engagement (z. B. Feier, Aufräumaktionen)"
+    },
+    "category": "events"
+  },
+  {
+    "id": "Playing",
+    "title": { "en": "Playing board games", "de": "Brettspiele spielen" },
+    "category": "child-care"
+  },
+  {
+    "id": "Reading",
+    "title": {
+      "en": "Reading books for children",
+      "de": "Bücher vorlesen für Kinder"
+    },
+    "category": "de-lng-support"
+  },
+  {
+    "id": "Activities-women",
+    "title": { "en": "Activities for women", "de": "Aktivitäten für Frauen*" },
+    "category": "skills-based"
+  },
+  {
+    "id": "Activities-men",
+    "title": { "en": "Activities for men", "de": "Aktivitäten für Männer*" },
+    "category": "skills-based"
+  },
+  {
+    "id": "Tutoring",
+    "title": { "en": "Assist with homework", "de": "Nachhilfe" },
+    "category": "de-lng-support"
+  },
+  {
+    "id": "Clothing Sorting",
+    "title": { "en": "Sorting clothing", "de": "Kleiderkammer" },
+    "category": "skills-based"
+  },
+  {
+    "id": "Excursions",
+    "title": { "en": "Organizing excursions", "de": "Ausflüge organisieren" },
+    "category": "sport-activities"
+  },
+  {
+    "id": "Miscellaneous",
+    "title": { "en": "Miscellaneous", "de": "Sonstiges" },
+    "category": "skills-based"
+  },
+  {
+    "id": "Mentorship",
+    "title": { "en": "Mentorship", "de": "Mentoren" },
+    "category": "skills-based"
+  },
+  {
+    "id": "Accompanying to government appointments",
+    "title": {
+      "en": "Accompanying to government appointments",
+      "de": "Begleitung: Termine bei Behörden* "
+    },
+    "category": "accompanying"
+  },
+  {
+    "id": "Apartment viewing accompanying",
+    "title": {
+      "en": "Apartment viewing accompanying",
+      "de": "Begleitung: Wohnungsbesichtigungen"
+    },
+    "category": "accompanying"
+  },
+  {
+    "id": "Schools meetings accompanying",
+    "title": {
+      "en": "Schools meetings accompanying",
+      "de": "Begleitung: Termine in Schulen und Kitas"
+    },
+    "category": "accompanying"
+  },
+  {
+    "id": "Accompanying",
+    "title": { "en": "Accompanying", "de": "Wegbegleitung" },
+    "category": "accompanying"
+  },
+  {
+    "id": "Accompanying to doctors'",
+    "title": {
+      "en": "Accompanying to doctors' ",
+      "de": "Begleitung: Arzttermine"
+    },
+    "category": "accompanying"
+  }
+]

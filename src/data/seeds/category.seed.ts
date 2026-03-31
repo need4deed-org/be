@@ -1,0 +1,54 @@
+import { DataSource } from "typeorm";
+import { seedCategoryFile } from "../../config/constants";
+import logger from "../../logger";
+import Category from "../entity/profile/category.entity";
+import { fetchJsonFromUrl, getRepository } from "../utils";
+import { getCount } from "./utils";
+
+interface CategoryJSON {
+  id: string;
+}
+
+export async function seedCategory(dataSource: DataSource): Promise<void> {
+  if (!dataSource) {
+    throw new Error("DataSource is not initialized.");
+  }
+
+  const categoryRepository = getRepository(dataSource, Category);
+
+  const count = await getCount(categoryRepository);
+  if (count !== 0) {
+    logger.info("Skipping seeding categories.");
+    return;
+  }
+
+  const categories = (await fetchJsonFromUrl(
+    seedCategoryFile,
+  )) as CategoryJSON[];
+
+  const existingCategories = new Set(
+    (await categoryRepository.find()).map((category) => category.title),
+  );
+
+  const categoriesForInsert = categories.reduce(
+    (result: Category[], { id }) => {
+      if (existingCategories.has(id)) {
+        return result;
+      }
+      try {
+        const newCategory = new Category({ title: id });
+        result.push(newCategory);
+      } catch (error) {
+        throw new Error(`Error creating new category ${id}: ${error.message}`);
+      }
+      return result;
+    },
+    [],
+  );
+
+  try {
+    await categoryRepository.insert(categoriesForInsert);
+  } catch (error) {
+    throw new Error(`Error inserting categories: ${error.message}`);
+  }
+}

@@ -1,0 +1,900 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "sdk-types",
+  "definitions": {
+    "OccasionalType": {
+      "$id": "OccasionalType",
+      "type": "string",
+      "enum": ["weekends", "weekdays"]
+    },
+    "Address": {
+      "$id": "Address",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "street": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "postcode": {
+          "$ref": "Postcode#"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FilterParamsType": {
+      "$id": "FilterParamsType",
+      "type": "string",
+      "enum": [
+        "accompanying",
+        "district",
+        "engagement",
+        "availability",
+        "languages"
+      ]
+    },
+    "Postcode": {
+      "$id": "Postcode",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DocumentStatusType": {
+      "$id": "DocumentStatusType",
+      "type": "string",
+      "enum": [
+        "undefined",
+        "yes",
+        "no",
+        "asked_to_apply",
+        "applied_self",
+        "applied_n4d"
+      ]
+    },
+    "PreferredCommunicationType": {
+      "$id": "PreferredCommunicationType",
+      "type": "string",
+      "enum": ["email", "mobilePhone", "whatsapp", "telegram"]
+    },
+    "VolunteerCommunicationType": {
+      "$id": "VolunteerCommunicationType",
+      "$ref": "PreferredCommunicationType#"
+    },
+    "TimedText": {
+      "$id": "TimedText",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "content": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "timestamp", "content", "authorName"],
+      "additionalProperties": false
+    },
+    "TimedTextType": {
+      "$id": "TimedTextType",
+      "type": "string",
+      "enum": ["create", "update", "remove"]
+    },
+    "OptionProps": {
+      "$id": "OptionProps",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "OptionId#"
+        },
+        "title": {
+          "$ref": "OptionTitle#"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Option": {
+      "$id": "Option",
+      "$ref": "OptionProps#",
+      "required": ["id", "title"]
+    },
+    "OptionById": {
+      "$id": "OptionById",
+      "$ref": "OptionProps#",
+      "required": ["id"]
+    },
+    "OptionId": {
+      "$id": "OptionId",
+      "type": ["string", "number"]
+    },
+    "OptionTitle": {
+      "$id": "OptionTitle",
+      "type": "object",
+      "properties": {
+        "en": {
+          "type": "string"
+        },
+        "de": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ApiComment": {
+      "$id": "ApiComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "content": { "type": "string" },
+        "entityId": { "type": "number" },
+        "entityType": { "type": "string" },
+        "authorName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ApiPerson": {
+      "$id": "ApiPerson",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "avatarUrl": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "middleName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "landline": { "type": "string" },
+        "address": { "$ref": "Address#" },
+        "preferredComm": {
+          "type": "array",
+          "items": { "$ref": "PreferredCommunicationType#" }
+        }
+      }
+    },
+    "ApiPersonGet": {
+      "$id": "ApiPersonGet",
+      "$ref": "ApiPerson#",
+      "required": ["id", "firstName", "email"]
+    },
+    "ApiPersonPatch": {
+      "$id": "ApiPersonPatch",
+      "$ref": "ApiPerson#"
+    },
+    "VolunteerStateType": {
+      "$id": "VolunteerStateType",
+      "type": "string",
+      "enum": [
+        "New",
+        "Opportunity sent",
+        "Matched",
+        "Active regular",
+        "Active accompany",
+        "Active fest",
+        "To rematch",
+        "Temp inactive",
+        "Inactive"
+      ]
+    },
+    "VolunteerStateEngagementType": {
+      "$id": "VolunteerStateEngagementType",
+      "type": "string",
+      "enum": [
+        "vol-new",
+        "vol-active",
+        "vol-available",
+        "vol-temp-unavailable",
+        "vol-inactive",
+        "vol-unresponsive"
+      ]
+    },
+    "VolunteerStateCommunicationType": {
+      "$id": "VolunteerStateCommunicationType",
+      "type": "string",
+      "enum": [
+        "called",
+        "email-sent",
+        "briefed",
+        "tried-call",
+        "not-responding"
+      ]
+    },
+    "VolunteerStateAppreciationType": {
+      "$id": "VolunteerStateAppreciationType",
+      "type": "string",
+      "enum": ["t-shirt", "benefit-card", "tote-bag"]
+    },
+    "VolunteerStateTypeType": {
+      "$id": "VolunteerStateTypeType",
+      "type": "string",
+      "enum": ["accompanying", "regular", "events", "regular-accompanying"]
+    },
+    "VolunteerStateMatchType": {
+      "$id": "VolunteerStateMatchType",
+      "type": "string",
+      "enum": ["matched", "needs-rematching"]
+    },
+    "VolunteerStateCGCType": {
+      "$id": "VolunteerStateCGCType",
+      "type": "string",
+      "enum": ["accompanying", "other"]
+    },
+    "OpportunityVolunteerStatusType": {
+      "$id": "OpportunityVolunteerStatusType",
+      "type": "string",
+      "enum": ["opp-pending", "opp-matched", "opp-active", "opp-past"]
+    },
+    "OptionItem": {
+      "$id": "OptionItem",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "id": { "type": "integer" }
+      },
+      "required": ["title", "id"],
+      "additionalProperties": false
+    },
+    "ApiLanguage": {
+      "$id": "ApiLanguage",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "proficiency": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "fluent", "native"]
+        },
+        "purpose": {
+          "type": "string",
+          "enum": ["general", "translation", "recipient"]
+        },
+        "additionalProperties": false
+      },
+      "required": ["title", "proficiency"]
+    },
+    "ApiAvailability": {
+      "$id": "ApiAvailability",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "day": {
+          "type": "string",
+          "enum": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+            "occasionally"
+          ]
+        },
+        "daytime": {
+          "type": "string",
+          "enum": ["08-11", "11-14", "14-17", "17-20", "weekdays", "weekends"]
+        }
+      }
+    },
+    "ApiUserMe": {
+      "$id": "ApiUserMe",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "admin", "coordinator", "agent", "volunteer"]
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isoCode": {
+          "type": "string"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "additionalProperties": false
+      },
+      "required": ["id", "email", "role"]
+    },
+    "DocumentType": {
+      "$id": "DocumentType",
+      "type": "string",
+      "enum": [
+        "passport-copy",
+        "CGC-application",
+        "good-conduct-cert",
+        "measles-vacc-cert"
+      ]
+    },
+    "ApiDocumentGet": {
+      "$id": "ApiDocumentGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "type": { "$ref": "DocumentType#" },
+        "originalName": { "type": "string" },
+        "url": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "originalName", "url", "mimeType"]
+    },
+    "ApiDocumentPost": {
+      "$id": "ApiDocumentPost",
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "DocumentType#" },
+        "originalName": { "type": "string" },
+        "mimeType": { "type": "string" }
+      },
+      "required": ["type", "originalName", "mimeType"]
+    },
+    "ContactType": {
+      "$id": "ContactType",
+      "type": "string",
+      "enum": ["called", "tried-to-call", "texted-or-emailed", "other"]
+    },
+    "ContactMethodType": {
+      "$id": "ContactMethodType",
+      "type": "string",
+      "enum": [
+        "email",
+        "phone-number",
+        "telegram",
+        "whatsapp",
+        "signal",
+        "sms",
+        "voicenote"
+      ]
+    },
+    "CommunicationType": {
+      "$id": "CommunicationType",
+      "type": "string",
+      "enum": [
+        "briefed",
+        "first-inquiry-sent",
+        "opportunity-list-sent",
+        "status-update",
+        "post-match-followup"
+      ]
+    },
+    "ApiCommunication": {
+      "$id": "ApiCommunication",
+      "type": "object",
+      "properties": {
+        "contactType": { "$ref": "ContactType#" },
+        "contactMethod": { "$ref": "ContactMethodType#" },
+        "communicationType": { "$ref": "CommunicationType#" },
+        "date": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ApiCommunicationGet": {
+      "$id": "ApiCommunicationGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiCommunication#" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "userId": { "type": "number" },
+            "agentId": { "type": "integer" },
+            "volunteerId": { "type": "integer" }
+          }
+        }
+      ],
+      "oneOf": [{ "required": ["agentId"] }, { "required": ["volunteerId"] }],
+      "required": ["id", "contactType", "contactMethod", "date", "userId"]
+    },
+    "ApiCommunicationPost": {
+      "$id": "ApiCommunicationPost",
+      "$ref": "ApiCommunication#",
+      "required": ["contactType", "contactMethod", "date"]
+    },
+    "ApiCommunicationPatch": {
+      "$id": "ApiCommunicationPatch",
+      "$ref": "ApiCommunication#"
+    },
+    "ApiAppreciation": {
+      "$id": "ApiAppreciation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "$ref": "VolunteerStateAppreciationType#" },
+        "dateDue": { "type": ["string", "null"], "format": "date-time" },
+        "dateDelivery": { "type": ["string", "null"], "format": "date-time" },
+        "userId": { "type": "number" },
+        "opportunityId": { "type": "number" },
+        "volunteerId": { "type": "number" }
+      }
+    },
+    "ApiAppreciationGet": {
+      "$id": "ApiAppreciationGet",
+      "$ref": "ApiAppreciation#",
+      "required": [
+        "id",
+        "title",
+        "dateDue",
+        "userId",
+        "opportunityId",
+        "volunteerId"
+      ]
+    },
+    "ApiAppreciationPost": {
+      "$id": "ApiAppreciationPost",
+      "$ref": "ApiAppreciation#",
+      "required": ["title", "dateDue"]
+    },
+    "ApiAppreciationPatch": {
+      "$id": "ApiAppreciationPatch",
+      "$ref": "ApiAppreciation#"
+    },
+    "VolunteerOpportunity": {
+      "$id": "VolunteerOpportunity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
+        "opportunityId": { "type": "number" },
+        "volunteerId": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ApiVolunteerOpportunityGet": {
+      "$id": "ApiVolunteerOpportunityGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "VolunteerOpportunity#" },
+        {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "opportunityId",
+        "volunteerId",
+        "status",
+        "updatedAt",
+        "title"
+      ]
+    },
+    "ApiOpportunityVolunteerGet": {
+      "$id": "ApiOpportunityVolunteerGet",
+      "type": "object",
+      "allOf": [
+        { "$ref": "VolunteerOpportunity#" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
+            "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "avatarUrl": { "type": "string" },
+            "activities": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "skills": { "type": "array", "items": { "$ref": "OptionItem#" } },
+            "locations": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
+            "availability": {
+              "type": "array",
+              "items": { "$ref": "ApiAvailability#" }
+            },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            }
+          }
+        }
+      ],
+      "required": [
+        "id",
+        "opportunityId",
+        "volunteerId",
+        "status",
+        "updatedAt",
+        "name",
+        "volunteeringType",
+        "engagement",
+        "avatarUrl"
+      ]
+    },
+    "ApiVolunteerOpportunityPatch": {
+      "$id": "ApiVolunteerOpportunityPatch",
+      "type": "object",
+      "properties": {
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "numberVolunteers": { "type": "integer" },
+        "description": { "type": "string" },
+        "languagesMain": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        },
+        "languagesResidents": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        },
+        "activities": { "type": "array", "items": { "$ref": "OptionItem#" } },
+        "skills": { "type": "array", "items": { "$ref": "OptionItem#" } },
+        "schedule": {
+          "type": "array",
+          "items": { "$ref": "ApiAvailability#" }
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "name": { "type": "string" },
+            "phone": { "type": "string" },
+            "email": { "type": "string" },
+            "waysToContact": {
+              "type": "array",
+              "items": { "$ref": "PreferredCommunicationType#" }
+            }
+          }
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "district": { "type": "string" }
+          }
+        },
+        "accompanyingDetails": {
+          "type": "object",
+          "properties": {
+            "appointmentAddress": { "type": "string" },
+            "appointmentDate": { "type": "string" },
+            "appointmentTime": { "type": "string" },
+            "refugeeNumber": { "type": "string" },
+            "refugeeName": { "type": "string" },
+            "languagesToTranslate": { "type": "integer" }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ApiVolunteerOpportunityPost": {
+      "$id": "ApiVolunteerOpportunityPost",
+      "type": "object",
+      "properties": {
+        "opportunityId": { "type": "integer" },
+        "volunteerId": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" }
+      },
+      "required": ["status"]
+    },
+    "OpportunityType": {
+      "$id": "OpportunityType",
+      "type": "string",
+      "enum": ["accompanying", "regular", "events"]
+    },
+    "OpportunityStatusType": {
+      "$id": "OpportunityStatusType",
+      "type": "string",
+      "enum": ["opp-new", "opp-searching", "opp-active", "opp-past"]
+    },
+    "ApiOpportunityGetList": {
+      "$id": "ApiOpportunityGetList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "volunteerType": { "$ref": "OpportunityType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "title": { "type": "string" },
+        "category": {
+          "type": "object",
+          "properties": { "id": { "type": "integer" } }
+        }
+      },
+      "required": [
+        "id",
+        "volunteerType",
+        "statusOpportunity",
+        "title",
+        "category"
+      ]
+    },
+    "ApiOpportunityGet": {
+      "$id": "ApiOpportunityGet",
+      "allOf": [
+        { "$ref": "ApiOpportunityGetList#" },
+        {
+          "type": "object",
+          "properties": {
+            "createdAt": { "type": "string", "format": "date-time" },
+            "description": { "type": "string" },
+            "numberOfVolunteers": { "type": "integer" },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            },
+            "activities": {
+              "type": "array",
+              "items": { "$ref": "OptionById#" }
+            },
+            "skills": { "type": "array", "items": { "$ref": "OptionById" } },
+            "location": { "type": "array", "items": { "$ref": "OptionById" } },
+            "availability": {
+              "type": "array",
+              "items": { "$ref": "ApiAvailability#" }
+            },
+            "contact": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "phone": { "type": "string" },
+                "email": { "type": "string" },
+                "waysToContact": { "$ref": "PreferredCommunicationType#" }
+              }
+            },
+            "agent": {
+              "type": "object",
+              "properties": {
+                "type": { "$ref": "AgentType#" },
+                "name": { "type": "string" },
+                "address": { "type": "string" },
+                "district": { "$ref": "OptionById#" }
+              }
+            },
+            "accompanyingDetails": { "$ref": "ApiAccompanying#" },
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+          }
+        }
+      ]
+    },
+    "AgentType": {
+      "$id": "AgentType",
+      "type": "string",
+      "enum": [
+        "AE",
+        "GU1",
+        "GU2",
+        "GU2+",
+        "GU3",
+        "NU",
+        "ASOG",
+        "counseling-center",
+        "tandem",
+        "multiple-social-support"
+      ]
+    },
+    "AgentRoleType": {
+      "$id": "AgentRoleType",
+      "type": "string",
+      "enum": [
+        "social-worker",
+        "volunteer-coordinator",
+        "manager",
+        "project-coordinator",
+        "psychologist",
+        "project-staff",
+        "childcare-worker",
+        "other"
+      ]
+    },
+    "AgentTrustType": {
+      "$id": "AgentTrustType",
+      "type": "string",
+      "enum": ["agent-high", "agent-low", "agent-unknown"]
+    },
+    "AgentVolunteerSearchType": {
+      "$id": "AgentVolunteerSearchType",
+      "type": "string",
+      "enum": ["agent-searching", "agent-not-needed", "agent-volunteers-found"]
+    },
+    "AgentEngagementStatusType": {
+      "$id": "AgentEngagementStatusType",
+      "type": "string",
+      "enum": [
+        "agent-new",
+        "agent-active",
+        "agent-unresponsive",
+        "agent-inactive"
+      ]
+    },
+    "AgentService": {
+      "$id": "AgentService",
+      "type": "string",
+      "enum": [
+        "childcare",
+        "welfare",
+        "consultation",
+        "voluntary-support",
+        "tandem",
+        "sport",
+        "tutoring",
+        "refugee-accommodation",
+        "job-coaching",
+        "youth"
+      ]
+    },
+    "AgentDetails": {
+      "$id": "AgentDetails",
+      "type": "object",
+      "properties": {
+        "about": { "type": "string" },
+        "address": { "type": "string" },
+        "website": { "type": "string" },
+        "organizationType": { "type": "string" },
+        "operator": { "type": "string" },
+        "services": { "type": "string" },
+        "clientLanguages": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        }
+      }
+    },
+    "AgentRepresentative": {
+      "$id": "AgentRepresentative",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiPerson#" },
+        {
+          "type": "object",
+          "properties": {
+            "role": { "$ref": "AgentRoleType" }
+          }
+        }
+      ]
+    },
+    "AgentList": {
+      "$id": "AgentList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" },
+        "type": { "$ref": "AgentType#" },
+        "district": { "$ref": "Option#" },
+        "activeVolunteers": { "type": "integer" },
+        "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" }
+      }
+    },
+    "ApiAgentGetList": {
+      "$id": "ApiAgentGetList",
+      "$ref": "AgentList#",
+      "required": [
+        "id",
+        "title",
+        "type",
+        "district",
+        "activeVolunteers",
+        "volunteerSearch"
+      ]
+    },
+    "AgentProps": {
+      "$id": "AgentProps",
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "serviceType": {
+          "type": "array",
+          "items": { "$ref": "AgentService#" }
+        },
+        "trustLevel": { "$ref": "AgentTrustType#" },
+        "statusEngagement": { "$ref": "AgentEngagementStatusType#" }
+      }
+    },
+    "AgentId": {
+      "$id": "AgentId",
+      "allOf": [
+        { "$ref": "AgentList#" },
+        {
+          "type": "object",
+          "properties": {
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updatedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "operator": { "type": "string" },
+            "representative": { "$ref": "AgentRepresentative#" },
+            "serviceType": {
+              "type": "array",
+              "items": { "$ref": "AgentService#" }
+            },
+            "trustLevel": { "$ref": "AgentTrustType#" },
+            "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
+            "agentDetails": { "$ref": "AgentDetails#" },
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+          }
+        }
+      ]
+    },
+    "ApiAgentPatch": {
+      "$id": "ApiAgentPatch",
+      "$ref": "AgentProps#"
+    },
+    "ApiAgentGet": {
+      "$id": "ApiAgentGet",
+      "$ref": "AgentId#",
+      "required": [
+        "id",
+        "title",
+        "type",
+        "district",
+        "activeVolunteers",
+        "volunteerSearch"
+      ]
+    },
+    "ApiAccompanying": {
+      "$id": "ApiAccompanying",
+      "type": "object",
+      "properties": {
+        "appointmentAddress": { "type": "string" },
+        "appointmentDate": { "type": "string" },
+        "appointmentTime": { "type": "string" },
+        "refugeeNumber": { "type": "string" },
+        "refugeeName": { "type": "string" },
+        "languageToTranslate": { "type": "integer" }
+      }
+    },
+    "ApiOrganizationPatch": {
+      "$id": "ApiOrganizationPatch",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "website": { "type": "string" }
+      }
+    }
+  }
+}

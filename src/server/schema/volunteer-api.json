@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "ApiVolunteerGetList#",
+  "definitions": {
+    "ApiVolunteerGetList": {
+      "$id": "ApiVolunteerGetList",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": ["number", "string"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "statusEngagement": {
+          "$ref": "VolunteerStateEngagementType#"
+        },
+        "statusType": {
+          "$ref": "VolunteerStateType#"
+        },
+        "stateEngagement": {
+          "$ref": "VolunteerStateEngagementType#"
+        },
+        "stateType": {
+          "$ref": "VolunteerStateTypeType#"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "Language#"
+          }
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "ApiAvailability#"
+          }
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "avatarUrl",
+        "languages",
+        "availability",
+        "activities",
+        "locations",
+        "skills"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
