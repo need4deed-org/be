@@ -4,5 +4,6 @@ export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
 export * from "./getStartEndDates";
 export * from "./passwd";
+export * from "./refresh-materialized-view";
 export * from "./remove-data";
 export * from "./update-volunteer-matching";
