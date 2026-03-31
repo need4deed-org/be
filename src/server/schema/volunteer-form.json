@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "VolunteerFormData#",
+  "definitions": {
+    "VolunteerFormData": {
+      "$id": "VolunteerFormData",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "$ref": "OptionId#"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "number"
+        },
+        "goodConductCertificate": {
+          "$ref": "DocumentStatusType#"
+        },
+        "measlesVaccination": {
+          "$ref": "DocumentStatusType#"
+        },
+        "leadFrom": {
+          "type": "array",
+          "items": { "$ref": "OptionId#" }
+        },
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "number"
+              },
+              {
+                "$ref": "OptionId#"
+              }
+            ]
+          }
+        },
+        "districts": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionId#"
+          }
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionId#"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionId#"
+          }
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "ApiLanguage#"
+          }
+        },
+        "comments": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fullName",
+        "phone",
+        "email",
+        "postcode",
+        "goodConductCertificate",
+        "measlesVaccination",
+        "leadFrom",
+        "schedule",
+        "districts",
+        "activities",
+        "skills",
+        "languages",
+        "comments"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

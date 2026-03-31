@@ -1,0 +1,62 @@
+[
+  {
+    "id": "Woodworking",
+    "title": { "en": "Woodworking", "de": "Holzverarbeitung" }
+  },
+  { "id": "Drawing", "title": { "en": "Drawing", "de": "Zeichnen" } },
+  { "id": "Painting", "title": { "en": "Painting", "de": "Malen" } },
+  { "id": "Sewing", "title": { "en": "Sewing", "de": "Nähen" } },
+  { "id": "Knitting", "title": { "en": "Knitting", "de": "Stricken" } },
+  { "id": "Repairs", "title": { "en": "Repairs", "de": "Reparaturen" } },
+  { "id": "Cooking", "title": { "en": "Cooking", "de": "Kochen" } },
+  { "id": "Teaching", "title": { "en": "Teaching", "de": "Lehren" } },
+  {
+    "id": "Programming",
+    "title": { "en": "Programming", "de": "Programmieren" }
+  },
+  {
+    "id": "Public speaking",
+    "title": { "en": "Public speaking", "de": "Öffentliches Sprechen" }
+  },
+  { "id": "Gardening", "title": { "en": "Gardening", "de": "Gartenarbeit" } },
+  {
+    "id": "Landscaping",
+    "title": { "en": "Landscaping", "de": "Landschaftsgestaltung" }
+  },
+  { "id": "Carpentry", "title": { "en": "Carpentry", "de": "Tischlerei" } },
+  { "id": "Decorating", "title": { "en": "Decorating", "de": "Dekorieren" } },
+  {
+    "id": "Bike",
+    "title": { "en": "Bike repairs", "de": "Fahrradreparaturen" }
+  },
+  { "id": "Photography", "title": { "en": "Photography", "de": "Fotografie" } },
+  {
+    "id": "Videography",
+    "title": { "en": "Videography", "de": "Videografie" }
+  },
+  { "id": "Makeup", "title": { "en": "Makeup", "de": "Make-up" } },
+  {
+    "id": "Copywriting",
+    "title": { "en": "Copywriting", "de": "Kreatives Schreiben" }
+  },
+  { "id": "Yoga", "title": { "en": "Yoga", "de": "Yoga" } },
+  { "id": "Fitness", "title": { "en": "Fitness", "de": "Fitness" } },
+  { "id": "Football", "title": { "en": "Football", "de": "Fußball" } },
+  { "id": "Basketball", "title": { "en": "Basketball", "de": "Basketball" } },
+  { "id": "Dance", "title": { "en": "Dance", "de": "Tanzen" } },
+  { "id": "Chess", "title": { "en": "Chess", "de": "Schach" } },
+  { "id": "Management", "title": { "en": "Management", "de": "Management" } },
+  {
+    "id": "SMM",
+    "title": { "en": "SMM", "de": "Social-Media-Management (SMM)" }
+  },
+  { "id": "Mediation", "title": { "en": "Mediation", "de": "Mediation" } },
+  {
+    "id": "Event",
+    "title": { "en": "Event planning", "de": "Veranstaltungsplanung" }
+  },
+  { "id": "Coaching", "title": { "en": "Coaching", "de": "Coaching" } },
+  { "id": "Guitar", "title": { "en": "Guitar", "de": "Gitarre" } },
+  { "id": "Piano", "title": { "en": "Piano", "de": "Klavier" } },
+  { "id": "Singing", "title": { "en": "Singing", "de": "Singen" } }
+]

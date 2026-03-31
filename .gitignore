@@ -5,6 +5,17 @@ build/
 tmp/
 temp/
 
+# python
+__pycache__/
+
+
 # database
 *.sqlite
 db_data
+
+# .env
+.env
+
+# dev stuff
+dev.*
+dev/
