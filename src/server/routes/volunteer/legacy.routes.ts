@@ -1,4 +1,8 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  FastifyContextConfig,
+  FastifyInstance,
+  FastifyPluginOptions,
+} from "fastify";
 import {
   OpportunityVolunteerStatusType,
   VolunteerLegacyFormData,
@@ -18,6 +22,7 @@ export default async function volunteerLegacyRoutes(
 ) {
   fastify.post<{ Querystring: { id: number }; Body: VolunteerLegacyFormData }>(
     "/",
+    { config: { public: true } as FastifyContextConfig },
     async (request, reply) => {
       const volunteerFormData = await getVolunteerFormData(request.body);
 
