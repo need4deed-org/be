@@ -66,7 +66,9 @@ export async function writeOpportunityLegacy(
 
     await dealRepository.save(opportunity.deal);
 
-    await accompanyingRepository.save(opportunity.accompanying);
+    if (opportunity.accompanying) {
+      await accompanyingRepository.save(opportunity.accompanying);
+    }
 
     await opportunityRepository.save(opportunity);
   });
