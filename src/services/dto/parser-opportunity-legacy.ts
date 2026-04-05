@@ -7,9 +7,9 @@ export function parseOpportunityLegacy(
   return {
     title: body.title,
     type:
-      body.opportunity_type === "volunteering"
-        ? OpportunityType.REGULAR
-        : OpportunityType.ACCOMPANYING,
+      body.opportunity_type === "accompanying"
+        ? OpportunityType.ACCOMPANYING
+        : OpportunityType.REGULAR,
     numberVolunteers: body.volunteers_number,
     info: body.vo_information,
     translationType: body.accomp_translation,

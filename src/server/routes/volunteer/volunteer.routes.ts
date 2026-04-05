@@ -69,10 +69,16 @@ export default async function volunteerRoutes(
     "deal.location.locationAddress.address.postcode",
   ];
 
-  await fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  fastify.addHook("onRequest", async (request, _reply) => {
+    // Access the custom config via routeOptions
+    const config = request.routeOptions.config as { public?: boolean };
+
+    if (config.public) {
+      return;
+    }
+
+    await fastify.authenticate({ role: UserRole.COORDINATOR });
+  });
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
