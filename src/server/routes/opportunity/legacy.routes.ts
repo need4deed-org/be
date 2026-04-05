@@ -49,7 +49,10 @@ export default async function opportunityLegacyRoutes(
       const opportunity = parseFormData(request.body, parseOpportunityLegacy);
 
       opportunity.deal = await dealParserOpportunity(request.body);
-      opportunity.accompanying = accompanyingParserOpportunity(request.body);
+      opportunity.accompanying =
+        request.body.opportunity_type === "accompanying"
+          ? accompanyingParserOpportunity(request.body)
+          : null;
 
       opportunity.agent = getAgentByPostcode(
         request.agents,
@@ -138,7 +141,9 @@ export default async function opportunityLegacyRoutes(
           const scheduleLabels = [];
 
           for (const { timeslot } of timeTimeslot) {
-            if (!timeslot) {continue;}
+            if (!timeslot) {
+              continue;
+            }
 
             const { info, occasional } = timeslot;
 
