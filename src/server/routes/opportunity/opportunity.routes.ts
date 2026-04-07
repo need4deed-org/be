@@ -3,6 +3,7 @@ import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiOpportunityPatch,
+  SortOrder,
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { BadRequestError, NotFoundError } from "../../../config";
@@ -142,6 +143,12 @@ export default async function opportunityRoutes(
       const page = request.query.page || 1;
       const take = request.query.limit || defaultPageSize;
       const skip = (page - 1) * take;
+      const order =
+        request.query.sortOrder === SortOrder.NewToOld
+          ? { order: { createdAt: "DESC" } as const }
+          : request.query.sortOrder === SortOrder.OldToNew
+            ? { order: { createdAt: "ASC" } as const }
+            : undefined;
 
       const where = {
         ...(request.query.type
@@ -157,7 +164,7 @@ export default async function opportunityRoutes(
       } as FindOptionsWhere<Opportunity>;
 
       logger.debug(
-        `GET /opportunities called. where: ${JSON.stringify(where)}`,
+        `GET /opportunities called. options: ${JSON.stringify({ where, queryString: request.query })}`,
       );
 
       const relations = ["deal.profile.profileActivity.activity"];
@@ -167,6 +174,7 @@ export default async function opportunityRoutes(
         relations,
         skip,
         take,
+        ...(order ? order : {}),
       });
 
       const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
