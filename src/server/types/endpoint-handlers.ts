@@ -34,16 +34,18 @@ export interface QuerystringPaginationLanguage
 
 // TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
-  type: string;
-  status: string;
-  agentId?: number;
-  search?: string;
-  language?: string;
-  german?: boolean;
-  activity?: string;
-  skill?: string;
-  availability?: string;
-  district?: string;
+  filter?: {
+    type: string;
+    status: string;
+    agentId?: number;
+    search?: string;
+    language?: string;
+    german?: boolean;
+    activity?: string;
+    skill?: string;
+    availability?: string;
+    district?: string;
+  };
 }
 
 export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &

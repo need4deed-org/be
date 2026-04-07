@@ -5,7 +5,6 @@ import {
   ApiOpportunityPatch,
   SortOrder,
 } from "need4deed-sdk";
-import { FindOptionsWhere } from "typeorm";
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
@@ -42,11 +41,11 @@ import {
   getDistrictToAgentHandler,
   getOrCreateTimeslot,
   getTranslationType,
-  normalizeStringArrayInput,
   patchEntity,
   setTranslationType,
   updateOptionList,
 } from "../../utils";
+import { getOpportunityWhere } from "../../utils/data/get-opportunity-where";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -150,21 +149,10 @@ export default async function opportunityRoutes(
             ? { order: { createdAt: "ASC" } as const }
             : undefined;
 
-      const where = {
-        ...(request.query.type
-          ? {
-              type: normalizeStringArrayInput(request.query.type),
-            }
-          : {}),
-        ...(request.query.status
-          ? {
-              status: normalizeStringArrayInput(request.query.status),
-            }
-          : {}),
-      } as FindOptionsWhere<Opportunity>;
+      const where = getOpportunityWhere(request.query.filter);
 
       logger.debug(
-        `GET /opportunities called. options: ${JSON.stringify({ where, queryString: request.query })}`,
+        `GET /opportunities called. options: ${JSON.stringify({ where })}`,
       );
 
       const relations = ["deal.profile.profileActivity.activity"];
