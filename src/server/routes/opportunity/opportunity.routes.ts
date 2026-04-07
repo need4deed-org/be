@@ -117,7 +117,7 @@ export default async function opportunityRoutes(
 
       if (opportunityComments.accompanying) {
         opportunityComments.accompanying.langCode = await setTranslationType(
-          opportunityComments.accompanying.languageToTranslate,
+          opportunityComments.accompanying.languageToTranslate, // TODO: this needs to be sorted
         );
       }
 
