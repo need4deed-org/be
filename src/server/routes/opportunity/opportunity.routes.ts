@@ -45,7 +45,7 @@ import {
   setTranslationType,
   updateOptionList,
 } from "../../utils";
-import { getOpportunityWhere } from "../../utils/data/get-opportunity-where";
+import { getOpportunityWhere } from "../../utils/data";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
