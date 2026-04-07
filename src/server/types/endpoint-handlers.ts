@@ -1,4 +1,4 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, SortOrder } from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -23,7 +23,12 @@ export interface QuerystringPagination {
   limit?: number;
 }
 
-export interface QuerystringPaginationLanguage extends QuerystringPagination {
+export interface QuerystringPaginationOrdering extends QuerystringPagination {
+  sortOrder?: SortOrder;
+}
+
+export interface QuerystringPaginationLanguage
+  extends QuerystringPaginationOrdering {
   language: Lang;
 }
 
