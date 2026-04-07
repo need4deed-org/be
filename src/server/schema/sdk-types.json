@@ -793,6 +793,7 @@
         "title": { "type": "string" },
         "type": { "$ref": "AgentType#" },
         "district": { "$ref": "Option#" },
+        "trustLevel": { "$ref": "AgentTrustType#" },
         "activeVolunteers": { "type": "integer" },
         "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" }
       }
@@ -850,7 +851,6 @@
               "type": "array",
               "items": { "$ref": "AgentService#" }
             },
-            "trustLevel": { "$ref": "AgentTrustType#" },
             "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
             "agentDetails": { "$ref": "AgentDetails#" },
             "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
