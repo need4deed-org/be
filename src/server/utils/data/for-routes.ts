@@ -449,7 +449,8 @@ export async function updateOptionList<
   L extends { id: number | string },
 >(
   rootId: number,
-  m2mEntity: new (_args?: unknown) => M,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  m2mEntity: new (_args?: any) => M,
   list: L[],
   rootEntity: string = "deal",
 ): Promise<boolean> {
