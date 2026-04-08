@@ -4,11 +4,13 @@ import {
   ApiVolunteerGetList,
   Id,
   Lang,
-  QueryParamsKeys,
+  SortOrder,
   UserRole,
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
+import { FindOptionsWhere } from "typeorm";
+import { defaultPageSize } from "../../../config";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
@@ -23,16 +25,14 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
-import { idParamSchema, responseErrors } from "../../schema";
-import { RoutePrefix } from "../../types";
+import { idParamSchema, responseErrors, responseSchema } from "../../schema";
+import { QuerystringVolunteerGetList, RoutePrefix } from "../../types";
 import {
-  EnumValuesMap,
   fetchVolunteerById,
-  getFilteredVolunteers,
   getLanguageCode,
   getOrCreateTimeslot,
   getVolunteerPatchData,
-  parseQueryParams,
+  getVolunteerWhere,
   patchAddress,
   patchEntity,
   updateLeads,
@@ -52,20 +52,15 @@ export default async function volunteerRoutes(
 ) {
   const relations = [
     "person",
-    "person.address",
     "person.address.postcode",
     "deal",
     "deal.postcode",
-    "deal.profile",
     "deal.profile.profileActivity.activity",
     "deal.profile.profileSkill.skill",
     "deal.profile.profileLanguage.language",
-    "deal.time",
     "deal.time.timeTimeslot.timeslot",
-    "deal.location",
     "deal.location.locationPostcode.postcode",
     "deal.location.locationDistrict.district",
-    "deal.location.locationAddress.address",
     "deal.location.locationAddress.address.postcode",
   ];
 
@@ -118,17 +113,7 @@ export default async function volunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { $ref: "volunteer-api-id#" },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("volunteer-api-id#"),
       },
     },
     async (request, reply) => {
@@ -158,7 +143,7 @@ export default async function volunteerRoutes(
   );
 
   fastify.get<{
-    Querystring: EnumValuesMap<typeof QueryParamsKeys>;
+    Querystring: QuerystringVolunteerGetList;
     Reply: {
       message: string;
       count?: number;
@@ -168,85 +153,48 @@ export default async function volunteerRoutes(
     "/",
     {
       schema: {
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              count: { type: "number" },
-              data: { type: "array", items: { $ref: "volunteer-api#" } },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        response: responseSchema("volunteer-api#", true),
       },
     },
     async (request, reply) => {
-      try {
-        const {
-          page,
-          limit,
-          orderDirection,
-          language,
-          filter: {
-            accompanying,
-            german,
-            search,
-            district,
-            languages,
-            statusType,
-            engagement,
-            availability,
-          },
-        } = parseQueryParams(request.query);
-        logger.debug(
-          `GET /volunteer parsed: ${JSON.stringify({
-            page,
-            limit,
-            orderDirection,
-            language,
-            filter: {
-              accompanying,
-              german,
-              search,
-              district,
-              languages,
-              statusType,
-              engagement,
-              availability,
-            },
-          })}`,
-        );
-
-        const [volunteers, count] = await getFilteredVolunteers(fastify, {
-          page,
-          limit,
-          orderDirection,
-          language,
-          filter: {
-            accompanying,
-            german,
-            search,
-            district,
-            languages,
-            statusType,
-            engagement,
-            availability,
-          },
-        });
-
-        const data = volunteers.map(volunteerListSerializer).filter(Boolean);
-
-        reply.status(200).send({
-          message: `Volunteers page ${page}`,
-          count,
-          data,
-        });
-      } catch (error) {
-        logger.error(`Error fetching volunteers: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
+      function engagementWorkaround(query: QuerystringVolunteerGetList) {
+        if (query.filter) {
+          const engagement = [query.filter.engagement]
+            .flat()
+            .filter(Boolean)
+            .map((e) => `vol-${e}`);
+          Object.assign(query.filter, {
+            engagement: engagement.length ? engagement : undefined,
+          });
+        }
+        return query;
       }
+
+      const {
+        page = 1,
+        limit = defaultPageSize,
+        sortOrder,
+        filter,
+      } = engagementWorkaround(request.query);
+
+      const volunteerRepository = fastify.db.volunteerRepository;
+      const [volunteers, count] = await volunteerRepository.findAndCount({
+        where: getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>,
+        relations,
+        skip: (page - 1) * limit,
+        take: limit,
+        order: {
+          id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
+        },
+      });
+
+      const data = volunteers.map(volunteerListSerializer).filter(Boolean);
+
+      reply.status(200).send({
+        message: `Volunteers page ${request.query.page}`,
+        count,
+        data,
+      });
     },
   );
 
@@ -288,7 +236,7 @@ export default async function volunteerRoutes(
       }
 
       const volunteerRepository = fastify.db.volunteerRepository;
-      const dealId = (await volunteerRepository.findOneBy({ id })).dealId;
+      const dealId = (await volunteerRepository.findOneByOrFail({ id })).dealId;
 
       const {
         volunteerData,
