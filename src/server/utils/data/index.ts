@@ -7,6 +7,7 @@ export * from "./get-language-title";
 export * from "./get-opportunity-where";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
+export * from "./get-volunteer-where";
 export * from "./serve-volunteer-list";
 export * from "./update-leads";
 export * from "./write-opportunity-legacy";
