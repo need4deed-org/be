@@ -4,6 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import fastifyMailer from "fastify-mailer";
+import qs from "qs";
 import { defaultFrom, pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
@@ -39,6 +40,7 @@ import { RoutePrefix } from "./types";
 export async function createServer(): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     pluginTimeout,
+    querystringParser: (str) => qs.parse(str),
     loggerInstance: logger,
     ajv: {
       customOptions: {

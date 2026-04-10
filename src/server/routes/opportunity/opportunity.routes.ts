@@ -3,8 +3,8 @@ import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiOpportunityPatch,
+  SortOrder,
 } from "need4deed-sdk";
-import { FindOptionsWhere } from "typeorm";
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
@@ -41,11 +41,11 @@ import {
   getDistrictToAgentHandler,
   getOrCreateTimeslot,
   getTranslationType,
-  normalizeStringArrayInput,
   patchEntity,
   setTranslationType,
   updateOptionList,
 } from "../../utils";
+import { getOpportunityWhere } from "../../utils/data";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -117,7 +117,7 @@ export default async function opportunityRoutes(
 
       if (opportunityComments.accompanying) {
         opportunityComments.accompanying.langCode = await setTranslationType(
-          opportunityComments.accompanying.languageToTranslate,
+          opportunityComments.accompanying.languageToTranslate, // TODO: this needs to be sorted
         );
       }
 
@@ -142,22 +142,17 @@ export default async function opportunityRoutes(
       const page = request.query.page || 1;
       const take = request.query.limit || defaultPageSize;
       const skip = (page - 1) * take;
+      const order =
+        request.query.sortOrder === SortOrder.NewToOld
+          ? { order: { createdAt: "DESC" } as const }
+          : request.query.sortOrder === SortOrder.OldToNew
+            ? { order: { createdAt: "ASC" } as const }
+            : undefined;
 
-      const where = {
-        ...(request.query.type
-          ? {
-              type: normalizeStringArrayInput(request.query.type),
-            }
-          : {}),
-        ...(request.query.status
-          ? {
-              status: normalizeStringArrayInput(request.query.status),
-            }
-          : {}),
-      } as FindOptionsWhere<Opportunity>;
+      const where = getOpportunityWhere(request.query.filter);
 
       logger.debug(
-        `GET /opportunities called. where: ${JSON.stringify(where)}`,
+        `GET /opportunities called. options: ${JSON.stringify({ where })}`,
       );
 
       const relations = ["deal.profile.profileActivity.activity"];
@@ -167,6 +162,7 @@ export default async function opportunityRoutes(
         relations,
         skip,
         take,
+        ...(order ? order : {}),
       });
 
       const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
