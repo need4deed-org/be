@@ -254,7 +254,12 @@ class Opportunity:
         """
         Extracts type from the opportunity dictionary.
         """
-        return get_string_or_null(self.opportunity.get("Opp Type", ""))
+        opp_type = get_string_or_null(self.opportunity.get("Opp Type", ""))
+        return (
+            "events"
+            if opp_type != "accompanying" and self.opportunity.get("Date, time")
+            else opp_type
+        )
 
     def get_postcode(self):
         """
