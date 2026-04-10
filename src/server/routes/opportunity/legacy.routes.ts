@@ -52,10 +52,10 @@ export default async function opportunityLegacyRoutes(
       opportunity.accompanying =
         request.body.opportunity_type === "accompanying"
           ? accompanyingParserOpportunity(request.body)
-          : null;
+          : undefined;
 
       opportunity.agent = getAgentByPostcode(
-        request.agents,
+        request.agents || [],
         request.body.rac_plz,
       );
 
