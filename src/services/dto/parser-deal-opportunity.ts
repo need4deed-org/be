@@ -139,6 +139,14 @@ export async function dealParserOpportunity(
     timeTimeslot.push(timeTimeslotEntry);
   }
 
+  if (formData.onetime_date_time) {
+    const timeslot = await getTimeslot({
+      start: new Date(formData.onetime_date_time),
+    });
+    const timeTimeslotEntry = new TimeTimeslot({ timeslot });
+    timeTimeslot.push(timeTimeslotEntry);
+  }
+
   const time = new Time({ timeTimeslot });
 
   // location
