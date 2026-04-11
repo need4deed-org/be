@@ -10,7 +10,6 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
-import { defaultPageSize } from "../../../config";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
@@ -31,6 +30,7 @@ import {
   fetchVolunteerById,
   getLanguageCode,
   getOrCreateTimeslot,
+  getSkipTake,
   getVolunteerPatchData,
   getVolunteerWhere,
   patchAddress,
@@ -170,19 +170,17 @@ export default async function volunteerRoutes(
         return query;
       }
 
-      const {
-        page = 1,
-        limit = defaultPageSize,
-        sortOrder,
-        filter,
-      } = engagementWorkaround(request.query);
+      const { page, limit, sortOrder, filter } = engagementWorkaround(
+        request.query,
+      );
+      const [skip, take] = getSkipTake({ page, limit });
 
       const volunteerRepository = fastify.db.volunteerRepository;
       const [volunteers, count] = await volunteerRepository.findAndCount({
         where: getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>,
         relations,
-        skip: (page - 1) * limit,
-        take: limit,
+        skip,
+        take,
         order: {
           id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
         },
