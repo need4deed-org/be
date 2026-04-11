@@ -3,6 +3,7 @@ import {
   ApiAgentGet,
   ApiAgentGetList,
   ApiAgentPatch,
+  SortOrder,
   UserRole,
 } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
@@ -27,9 +28,9 @@ import {
 } from "../../types";
 import {
   addComments2Entity,
+  getAgentWhere,
   getDistrictToAgentHandler,
   getSkipTake,
-  normalizeStringArrayInput,
 } from "../../utils";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
@@ -63,12 +64,13 @@ export default async function agentRoutes(
       },
     },
     async (request, reply) => {
-      const { page, limit, ...filters } = request.query;
+      logger.debug(`GET /agents: request.query:${Object.keys(request.query)}`);
+      const { page, limit, sortOrder, filter } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
-      const where = Object.fromEntries(
-        Object.entries(filters as QuerystringAgentGetList).map(
-          ([key, value]) => [key, normalizeStringArrayInput(value)],
-        ),
+      const where = getAgentWhere(filter);
+
+      logger.debug(
+        `GET /agents: filters:${JSON.stringify(filter)}, skip:${skip}, take:${take}`,
       );
 
       const agentRepository = fastify.db.agentRepository;
@@ -82,6 +84,9 @@ export default async function agentRoutes(
         relations,
         skip,
         take,
+        order: sortOrder
+          ? { id: sortOrder === SortOrder.NewToOld ? "DESC" : "ASC" }
+          : undefined,
       });
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();

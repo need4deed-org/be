@@ -3,6 +3,7 @@ export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./for-routes";
 export * from "./get-agent-by-postcode";
+export * from "./get-agent-where";
 export * from "./get-language-title";
 export * from "./get-opportunity-where";
 export * from "./get-volunteer-form-data";

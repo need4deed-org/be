@@ -44,6 +44,19 @@ export const agentListQuerySchema = {
   properties: {
     ...paginationProps,
     ...langProp,
+    ...sortOrderProps,
+    filter: {
+      type: "object",
+      properties: {
+        search: { type: "string" },
+        district: { type: "array", items: { type: "string" } },
+        type: { type: "array", items: { type: "string" } },
+        volunteerSearch: { type: "array", items: { type: "string" } },
+        engagementStatus: { type: "array", items: { type: "string" } },
+        services: { type: "array", items: { type: "string" } },
+      },
+      additionalProperties: false,
+    },
   },
   additionalProperties: false,
 };
