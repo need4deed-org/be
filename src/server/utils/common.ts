@@ -202,7 +202,7 @@ export function getRef(reference: string) {
  * const [skip, take] = getSkipTake(2, 20);
  * // returns [20, 20]
  */
-export function getSkipTake(pageLimit: {
+export function getSkipTake(pageLimit?: {
   page?: number;
   limit?: number;
 }): [number, number] {
