@@ -47,14 +47,16 @@ export default async function m2mOpportunityVolunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        body: { $ref: "ApiVolunteerOpportunityPatch#" },
+        body: { $ref: "ApiOpportunityVolunteerPatch#" },
         response: responseSchema(""),
       },
     },
     async (request, reply) => {
       const { id } = request.params;
       if (id <= 0) {
-        throw new BadRequestError(``);
+        throw new BadRequestError(
+          `Wrong id:${id} param. It must be a positive number`,
+        );
       }
 
       const opportunityVolunteerRepository =
