@@ -479,6 +479,10 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
+    "OpportunityVolunteer": {
+      "$id": "ApiOpportunityVolunteerPatch",
+      "$ref": "VolunteerOpportunity#"
+    },
     "ApiVolunteerOpportunityGet": {
       "$id": "ApiVolunteerOpportunityGet",
       "type": "object",
