@@ -1,4 +1,4 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, SortOrder } from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -23,22 +23,29 @@ export interface QuerystringPagination {
   limit?: number;
 }
 
-export interface QuerystringPaginationLanguage extends QuerystringPagination {
+export interface QuerystringPaginationOrdering extends QuerystringPagination {
+  sortOrder?: SortOrder;
+}
+
+export interface QuerystringPaginationLanguage
+  extends QuerystringPaginationOrdering {
   language: Lang;
 }
 
 // TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
-  type: string;
-  status: string;
-  agentId?: number;
-  search?: string;
-  language?: string;
-  german?: boolean;
-  activity?: string;
-  skill?: string;
-  availability?: string;
-  district?: string;
+  filter?: {
+    type: string;
+    status: string;
+    agentId?: number;
+    search?: string;
+    language?: string;
+    german?: boolean;
+    activity?: string;
+    skill?: string;
+    availability?: string;
+    district?: string;
+  };
 }
 
 export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &
@@ -50,7 +57,32 @@ export type QuerystringVolunteerOpportunityGetList =
 export type QuerystringOpportunityList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering;
 
-export interface QuerystringAgentFiltering {}
+export interface QuerystringAgentFiltering {
+  filter?: {
+    search?: string;
+    district?: string[];
+    type?: string[];
+    volunteerSearch?: string[];
+    engagementStatus?: string[];
+    services?: string[];
+  };
+}
 
 export type QuerystringAgentGetList = QuerystringPaginationLanguage &
   QuerystringAgentFiltering;
+
+export interface QuerystringVolunteerFiltering {
+  filter?: {
+    type: string;
+    search?: string;
+    language?: string;
+    activity?: string;
+    skill?: string;
+    availability?: string;
+    district?: string;
+    engagement: string | string[];
+    accompanying?: boolean;
+  };
+}
+export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
+  QuerystringVolunteerFiltering;

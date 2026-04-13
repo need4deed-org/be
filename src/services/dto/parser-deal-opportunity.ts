@@ -7,6 +7,7 @@ import {
   OpportunityLegacyFormData,
   TranslatedIntoType,
 } from "need4deed-sdk";
+import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
@@ -20,7 +21,9 @@ import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
-import { getRRULE, getStartEnd } from "../../data/utils";
+import Timeslot from "../../data/entity/time/timeslot.entity";
+import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
+import logger from "../../logger";
 import {
   getLanguageTitle,
   getPostcode,
@@ -135,6 +138,22 @@ export async function dealParserOpportunity(
       occasional = daytime.toLowerCase() as OccasionalType;
     }
     const timeslot = await getTimeslot({ rrule, ...timeframe, occasional });
+    const timeTimeslotEntry = new TimeTimeslot({ timeslot });
+    timeTimeslot.push(timeTimeslotEntry);
+  }
+
+  if (formData.onetime_date_time) {
+    const timeslotRepository = getRepository(dataSource, Timeslot);
+    const start = new Date(formData.onetime_date_time);
+    const info = `One-time event on ${formData.onetime_date_time}`;
+    const timeslot = await getTimeslot({
+      start,
+      info,
+    });
+
+    await timeslotRepository.save(timeslot); // TODO: check if id is undefined before saving
+    logger.debug(`Created one-time timeslot: ${JSON.stringify(timeslot)}`);
+
     const timeTimeslotEntry = new TimeTimeslot({ timeslot });
     timeTimeslot.push(timeTimeslotEntry);
   }

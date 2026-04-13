@@ -14,7 +14,8 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
   return {
     id: agent.id,
     title: agent.title,
-    type: agent.type,
+    type: agent.type!,
+    trustLevel: agent.trustLevel,
     volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
     district: { id: agent.districtId, title: { de: agent?.district?.title } },

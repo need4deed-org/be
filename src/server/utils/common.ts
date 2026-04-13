@@ -203,15 +203,15 @@ export function getRef(reference: string) {
  * // returns [20, 20]
  */
 export function getSkipTake(pageLimit?: {
-  page: number;
-  limit: number;
+  page?: number;
+  limit?: number;
 }): [number, number] {
-  function isValid(value: number) {
-    return !isNaN(Number(value)) && value > 0;
+  function isValid(value?: number) {
+    return !isNaN(Number(value)) && value! > 0;
   }
 
   const { page, limit } = pageLimit || {};
   const take = isValid(limit) ? limit : defaultPageSize;
-  const skip = ((isValid(page) ? page : 1) - 1) * take;
-  return [skip, take];
+  const skip = ((isValid(page) ? page : 1)! - 1) * take!;
+  return [skip, take!];
 }
