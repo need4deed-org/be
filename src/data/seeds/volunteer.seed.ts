@@ -33,7 +33,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     seedVolunteersFile,
   )) as VolunteerJSON[];
 
-  volunteers.forEach(async (volunteer) => {
+  for (const volunteer of volunteers) {
     try {
       const person = await getOrCreatePerson(volunteer.person, dataSource);
 
@@ -68,7 +68,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         dataSource,
         OpportunityVolunteer,
       );
-      relationsOpp.forEach(async ({ payroll, hostId }) => {
+      for (const { payroll, hostId } of relationsOpp) {
         await opportunityVolunteerRepository.save(
           new OpportunityVolunteer({
             status: getEnumValue(OpportunityVolunteerStatusType, payroll),
@@ -76,11 +76,11 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
             volunteerId: newVolunteer.id,
           }),
         );
-      });
+      }
     } catch (error) {
       logger.info(
-        `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${error.message}`,
+        `Creation of volunteer ${volunteer?.person?.email} rolled back due to error: ${(error as Error).message}`,
       );
     }
-  });
+  }
 }
