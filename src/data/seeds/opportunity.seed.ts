@@ -37,7 +37,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
     seedOpportunitiesFile,
   )) as OpportunityJSON[];
 
-  for (const opportunity of opportunities) {
+  for (const opportunity of opportunities ?? []) {
     try {
       const title = opportunity.title;
 
@@ -99,7 +99,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
       });
       await opportunityRepository.save(newOpportunity);
 
-      opportunity.volunteerNids.forEach(async ([volunteerNid, payroll]) => {
+      for (const [volunteerNid, payroll] of opportunity.volunteerNids) {
         const [, error] = await tryCatch(
           notionRelationRepository.save(
             new NotionRelation({
@@ -117,10 +117,10 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
             `Seems like pair: ${opportunity.nid}-${volunteerNid} already exists.`,
           );
         }
-      });
+      }
     } catch (error) {
       logger.info(
-        `Creation of opportunity ${opportunity?.title} rolled back due to error: ${error.message}`,
+        `Creation of opportunity ${opportunity?.title} rolled back due to error: ${(error as Error).message}`,
       );
     }
   }
