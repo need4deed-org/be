@@ -37,7 +37,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     about: "the dummy agent account for parenting orphaned opportunities.",
   } as AgentJSON);
 
-  for (const agentJson of agentsJson) {
+  for (const agentJson of agentsJson ?? []) {
     const agentObj = new Agent({
       title: agentJson.title || agentJson.website || "unknown",
       info: agentJson.about,

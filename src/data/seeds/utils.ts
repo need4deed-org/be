@@ -346,7 +346,7 @@ export async function createDeal(
   await profileRepository.save(profile);
 
   const categoryIds: number[] = [];
-  for (const title of dealData.profile.activities) {
+  for (const title of dealData.profile.activities ?? []) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
       // logger.warn(`Activity ${title} not found. Skipping.`);
@@ -360,7 +360,7 @@ export async function createDeal(
     await profileActivityRepository.save(profileActivity);
   }
 
-  for (const title of dealData.profile.skills) {
+  for (const title of dealData.profile.skills ?? []) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
       // logger.warn(`Skill ${title} not found. Skipping.`);
@@ -370,7 +370,7 @@ export async function createDeal(
     await profileSkillRepository.save(profileSkill);
   }
 
-  for (const [title, level] of dealData.profile.languages) {
+  for (const [title, level] of dealData.profile.languages ?? []) {
     const language = await getLanguage(title, languageRepository);
     if (!language) {
       logger.warn(`Language ${title} not found. Skipping.`);
@@ -385,14 +385,14 @@ export async function createDeal(
     await profileLanguageRepository.save(profileLanguage);
   }
 
-  profile.categoryId = categorize(categoryIds.filter(Boolean));
+  profile.categoryId = categorize(categoryIds.filter(Boolean))!;
 
   const time = await createTime(dataSource, dealData.time);
 
   const location = new Location();
   await locationRepository.save(location);
 
-  for (const title of dealData.location.districts) {
+  for (const title of dealData.location.districts ?? []) {
     let district = await districtRepository.findOne({ where: { title } });
     if (!district) {
       district = new District({ title });
@@ -458,7 +458,7 @@ export async function getOrCreateAgent(
 
   const agentPersonRepository = getRepository(dataSource, AgentPerson);
   const agentPerson = new AgentPerson({
-    agent,
+    agent: newAgent,
     person,
     role: AgentRoleType.MANAGER,
   });
@@ -468,7 +468,7 @@ export async function getOrCreateAgent(
 }
 
 export async function createTime(
-  dataSource,
+  dataSource: DataSource,
   timeData: TimeJSON,
 ): Promise<Time> {
   const timeRepository = getRepository(dataSource, Time);
@@ -478,14 +478,14 @@ export async function createTime(
   const time = new Time();
   await timeRepository.save(time);
 
-  for (const timeslotData of timeData.timeslots) {
-    let timeslot: Timeslot;
+  for (const timeslotData of timeData.timeslots ?? []) {
+    let timeslot: Timeslot | null;
     const { day, daytime, start, info } = timeslotData;
     check.log(`createTime:start:${start}`);
 
     if (day && daytime) {
       if (day !== "Occasional") {
-        const rrule = getRRULE(day);
+        const rrule = getRRULE(day)!;
         for (const startEnd of daytime) {
           const timeframe = getStartEnd(startEnd);
           if (timeframe) {

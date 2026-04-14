@@ -33,7 +33,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
     seedVolunteersFile,
   )) as VolunteerJSON[];
 
-  for (const volunteer of volunteers) {
+  for (const volunteer of volunteers ?? []) {
     try {
       const person = await getOrCreatePerson(volunteer.person, dataSource);
 
@@ -68,7 +68,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         dataSource,
         OpportunityVolunteer,
       );
-      for (const { payroll, hostId } of relationsOpp) {
+      for (const { payroll, hostId } of relationsOpp ?? []) {
         await opportunityVolunteerRepository.save(
           new OpportunityVolunteer({
             status: getEnumValue(OpportunityVolunteerStatusType, payroll),

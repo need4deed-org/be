@@ -37,7 +37,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
     seedOpportunitiesFile,
   )) as OpportunityJSON[];
 
-  for (const opportunity of opportunities) {
+  for (const opportunity of opportunities ?? []) {
     try {
       const title = opportunity.title;
 
@@ -120,7 +120,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
       }
     } catch (error) {
       logger.info(
-        `Creation of opportunity ${opportunity?.title} rolled back due to error: ${error.message}`,
+        `Creation of opportunity ${opportunity?.title} rolled back due to error: ${(error as Error).message}`,
       );
     }
   }
