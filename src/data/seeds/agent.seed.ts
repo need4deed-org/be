@@ -63,7 +63,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     const postcode12345 = await postcodeRepository.findOneBy({
       value: "12345",
     });
-    const postcodesJson = agentJson.postcodes;
+    const postcodesJson = agentJson.postcodes ?? [];
     for (const postcodeJson of postcodesJson) {
       const postcode = await postcodeRepository.findOneBy({
         value: postcodeJson,
@@ -82,7 +82,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
       }
     }
 
-    const personsJson = agentJson.person;
+    const personsJson = agentJson.person ?? [];
     for (const personJson of personsJson) {
       if (Object.values(personJson).filter(Boolean).length) {
         const person = await getOrCreatePerson(personJson, dataSource);
@@ -105,7 +105,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     }
 
     const notionRelationRepository = getRepository(dataSource, NotionRelation);
-    const opportunityNids = agentJson.opportunityNids;
+    const opportunityNids = agentJson.opportunityNids ?? [];
     for (const opportunityNid of opportunityNids) {
       const notionRel = new NotionRelation({
         hostId: agent.id,
