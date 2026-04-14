@@ -37,7 +37,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     about: "the dummy agent account for parenting orphaned opportunities.",
   } as AgentJSON);
 
-  for (const agentJson of agentsJson) {
+  for (const agentJson of agentsJson ?? []) {
     const agentObj = new Agent({
       title: agentJson.title || agentJson.website || "unknown",
       info: agentJson.about,
@@ -63,14 +63,14 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
     const postcode12345 = await postcodeRepository.findOneBy({
       value: "12345",
     });
-    const postcodesJson = agentJson.postcodes;
-    postcodesJson?.forEach(async (postcodeJson) => {
+    const postcodesJson = agentJson.postcodes ?? [];
+    for (const postcodeJson of postcodesJson) {
       const postcode = await postcodeRepository.findOneBy({
         value: postcodeJson,
       });
       const [, error] = await tryCatch(
         agentPostcodeRepository.save(
-          new AgentPostcode({ postcode: postcode || postcode12345, agent }),
+          new AgentPostcode({ postcode: postcode! || postcode12345, agent }),
         ),
       );
 
@@ -80,10 +80,10 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
           `During storing postcode:${postcodeJson} for agent:${agentJson.nid} occurred: ${error}`,
         );
       }
-    });
+    }
 
-    const personsJson = agentJson.person;
-    personsJson?.forEach(async (personJson) => {
+    const personsJson = agentJson.person ?? [];
+    for (const personJson of personsJson) {
       if (Object.values(personJson).filter(Boolean).length) {
         const person = await getOrCreatePerson(personJson, dataSource);
         const agentPersonRepository = getRepository(dataSource, AgentPerson);
@@ -102,11 +102,11 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
           );
         }
       }
-    });
+    }
 
     const notionRelationRepository = getRepository(dataSource, NotionRelation);
-    const opportunityNids = agentJson.opportunityNids;
-    opportunityNids?.forEach(async (opportunityNid) => {
+    const opportunityNids = agentJson.opportunityNids ?? [];
+    for (const opportunityNid of opportunityNids) {
       const notionRel = new NotionRelation({
         hostId: agent.id,
         hostType: EntityTableName.AGENT,
@@ -124,6 +124,6 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
           `Storing notion relation (agentNid:${agentJson.nid}, opportunityNid:${opportunityNid}) occurred: ${error}`,
         );
       }
-    });
+    }
   }
 }
