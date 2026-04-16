@@ -632,6 +632,18 @@
         "volunteerType": { "$ref": "OpportunityType#" },
         "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
+        "availability": {
+          "type": "array",
+          "items": { "$ref": "ApiAvailability#" }
+        },
+        "languages": {
+          "type": "array",
+          "items": { "$ref": "ApiLanguage#" }
+        },
+        "activities": {
+          "type": "array",
+          "items": { "$ref": "OptionById#" }
+        },
         "category": {
           "type": "object",
           "properties": { "id": { "type": "integer" } }
@@ -642,7 +654,10 @@
         "volunteerType",
         "statusOpportunity",
         "title",
-        "category"
+        "category",
+        "availability",
+        "languages",
+        "activities"
       ]
     },
     "ApiOpportunityGet": {
@@ -655,20 +670,9 @@
             "createdAt": { "type": "string", "format": "date-time" },
             "description": { "type": "string" },
             "numberOfVolunteers": { "type": "integer" },
-            "languages": {
-              "type": "array",
-              "items": { "$ref": "ApiLanguage#" }
-            },
-            "activities": {
-              "type": "array",
-              "items": { "$ref": "OptionById#" }
-            },
+
             "skills": { "type": "array", "items": { "$ref": "OptionById" } },
             "location": { "type": "array", "items": { "$ref": "OptionById" } },
-            "availability": {
-              "type": "array",
-              "items": { "$ref": "ApiAvailability#" }
-            },
             "contact": {
               "type": "object",
               "properties": {
