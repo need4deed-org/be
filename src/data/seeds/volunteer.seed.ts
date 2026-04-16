@@ -45,6 +45,7 @@ export async function seedVolunteers(dataSource: DataSource): Promise<void> {
         statusVaccination: getDocumentStatus(volunteer.statusVaccination),
         infoAbout: volunteer.infoAbout || "",
         infoExperience: volunteer.infoExperience || "",
+        notionId: volunteer.nid || null,
         createdAt: new Date(volunteer.timestamp),
         updatedAt: new Date(volunteer.timestamp),
         person,
