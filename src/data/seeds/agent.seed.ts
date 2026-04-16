@@ -1,6 +1,6 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-import { seedAgentsFile } from "../../config";
+import { seedAgentsFile, titleOrphanageAgent } from "../../config";
 import { tryCatch } from "../../services/utils";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
@@ -33,7 +33,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
 
   // create an agent for orphan opportunities
   agentsJson.unshift({
-    title: "Orphanage For Opportunities",
+    title: titleOrphanageAgent,
     about: "the dummy agent account for parenting orphaned opportunities.",
   } as AgentJSON);
 
