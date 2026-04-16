@@ -73,7 +73,8 @@
     "test:ui": "yarn test --ui",
     "prepare": "husky",
     "what": "./get-json-field-value.sh package.json",
-    "migrate:notion": "ts-node -r tsconfig-paths/register src/data/seeds/migrate-notion.ts"
+    "migrate:notion": "ts-node -r tsconfig-paths/register src/data/seeds/migrate-notion.ts",
+    "migrate:notion:prod": "node build/src/data/seeds/migrate-notion.js"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
