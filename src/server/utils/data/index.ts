@@ -5,6 +5,7 @@ export * from "./for-routes";
 export * from "./get-agent-by-postcode";
 export * from "./get-agent-where";
 export * from "./get-language-title";
+export * from "./get-opportunity-orphanage-agent";
 export * from "./get-opportunity-where";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
