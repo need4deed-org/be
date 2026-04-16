@@ -89,6 +89,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
         "deal.location.locationDistrict.district",
+        "deal.time.timeTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
       ];
 
@@ -164,7 +165,13 @@ export default async function opportunityRoutes(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
       );
 
-      const relations = ["deal.profile.profileActivity.activity"];
+      const relations = [
+        "deal.profile.profileActivity.activity",
+        "deal.profile.profileLanguage.language",
+        "deal.profile.profileActivity.activity",
+        "deal.time.timeTimeslot.timeslot",
+      ];
+
       const opportunityRepository = fastify.db.opportunityRepository;
       const [opportunities, count] = await opportunityRepository.findAndCount({
         where,

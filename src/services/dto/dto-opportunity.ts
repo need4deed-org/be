@@ -48,6 +48,21 @@ export function dtoOpportunityGetList(
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     createdAt: opportunity.createdAt,
+    languages: opportunity.deal.profile.profileLanguage
+      .filter(Boolean)
+      .map((pl) => ({
+        id: pl.language.id,
+        title: pl.language.title,
+        proficiency: pl.proficiency,
+        purpose: pl.purpose,
+      })),
+    activities: opportunity.deal.profile.profileActivity
+      .filter(Boolean)
+      .map((pa) => ({
+        id: pa.activity.id,
+      })),
+    availability:
+      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
   };
 }
 
@@ -78,7 +93,8 @@ export function dtoVolunteerOpportunityGetList(
       .map((ld) => ({
         id: ld.district.id,
       })),
-    availability: getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot),
+    availability:
+      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
   };
 }
 
@@ -117,9 +133,9 @@ export function dtoOpportunityGet(
       .map((ld) => ({
         id: ld.district.id,
       })),
-    availability: getAvailabilityTryCatch(
-      opportunityComments.deal.time?.timeTimeslot,
-    ),
+    availability:
+      getAvailabilityTryCatch(opportunityComments.deal.time?.timeTimeslot) ??
+      [],
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent),
     accompanyingDetails: dtoOpportunityAccompanying(
