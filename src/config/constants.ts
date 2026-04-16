@@ -113,3 +113,5 @@ export const authAccessTokenCookieName = "access";
 export const authRefreshTokenCookieName = "refresh";
 
 export const defaultPageSize = 12;
+
+export const titleOrphanageAgent = "Orphanage For Opportunities";
