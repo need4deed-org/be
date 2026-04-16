@@ -324,13 +324,15 @@ async function main(): Promise<void> {
   const jsonPath = process.argv[2];
   if (!jsonPath) {
     console.error(
-      "Usage: yarn migrate:notion <path-to-migration-json>\n" +
+      "Usage: yarn migrate:notion <path-or-url-to-migration-json>\n" +
         "  Generate the JSON first with: python3 scripts/csv-to-json.py <csv> <json>",
     );
     process.exit(1);
   }
 
-  if (!fs.existsSync(jsonPath)) {
+  const isUrl = jsonPath.startsWith("http://") || jsonPath.startsWith("https://");
+
+  if (!isUrl && !fs.existsSync(jsonPath)) {
     console.error(`File not found: ${jsonPath}`);
     process.exit(1);
   }
@@ -343,9 +345,13 @@ async function main(): Promise<void> {
   logger.info(`  → ${backfilled} volunteer(s) backfilled`);
 
   // Step 2: apply CSV data
-  const entries: MigrationEntry[] = JSON.parse(
-    fs.readFileSync(jsonPath, "utf-8"),
-  );
+  let entries: MigrationEntry[];
+  if (isUrl) {
+    logger.info(`Fetching migration data from URL: ${jsonPath}`);
+    entries = (await fetchJsonFromUrl(jsonPath)) as MigrationEntry[];
+  } else {
+    entries = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+  }
   logger.info(`Step 2: processing ${entries.length} entries from ${jsonPath}…`);
   await procesEntries(dataSource, entries);
 
@@ -356,3 +362,4 @@ main().catch((err) => {
   logger.error("Migration failed:", err);
   process.exit(1);
 });
+
