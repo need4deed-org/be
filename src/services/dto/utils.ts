@@ -26,6 +26,18 @@ export function getAvailability(
         daytime: getTimeSlotForDaytime(timeslot.start, timeslot.end),
       };
     }
+    if (!timeslot?.occasional && !timeslot?.rrule && timeslot?.start) {
+      return {
+        id: timeslot.id,
+        daytime: new Date(timeslot.start).toLocaleString("de-DE", {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+    }
 
     throw new Error("Timeslot is lacking required fields");
   });
