@@ -39,13 +39,14 @@ import {
   addComments2Entity,
   getCategoryToProfileHandler,
   getDistrictToAgentHandler,
+  getOpportunityOrphanageAgent,
+  getOpportunityWhere,
   getOrCreateTimeslot,
   getTranslationType,
   patchEntity,
   setTranslationType,
   updateOptionList,
 } from "../../utils";
-import { getOpportunityWhere } from "../../utils/data";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -88,6 +89,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
         "deal.location.locationDistrict.district",
+        "deal.time.timeTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
       ];
 
@@ -104,6 +106,14 @@ export default async function opportunityRoutes(
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
 
+      if (!opportunityComments.agent) {
+        const agent = await getOpportunityOrphanageAgent();
+        await opportunityRepository.update({ id }, { agentId: agent.id });
+        opportunityComments.agent = agent;
+        logger.warn(
+          `Opportunity (id:${id}) has no agent, adding to orphanage agent.`,
+        );
+      }
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler(true);
       Object.assign(
         opportunityComments.agent,
@@ -117,7 +127,7 @@ export default async function opportunityRoutes(
 
       if (opportunityComments.accompanying) {
         opportunityComments.accompanying.langCode = await setTranslationType(
-          opportunityComments.accompanying.languageToTranslate, // TODO: this needs to be sorted
+          opportunityComments.accompanying.languageToTranslate!, // TODO: this needs to be sorted
         );
       }
 
@@ -155,7 +165,13 @@ export default async function opportunityRoutes(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
       );
 
-      const relations = ["deal.profile.profileActivity.activity"];
+      const relations = [
+        "deal.profile.profileActivity.activity",
+        "deal.profile.profileLanguage.language",
+        "deal.profile.profileActivity.activity",
+        "deal.time.timeTimeslot.timeslot",
+      ];
+
       const opportunityRepository = fastify.db.opportunityRepository;
       const [opportunities, count] = await opportunityRepository.findAndCount({
         where,
