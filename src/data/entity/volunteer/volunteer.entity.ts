@@ -40,11 +40,6 @@ export default class Volunteer {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  notionId: string;
-
-  @Column({ nullable: true })
-  @IsOptional()
-  @IsString()
   infoAbout: string;
 
   @Column({ nullable: true })
