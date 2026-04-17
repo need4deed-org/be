@@ -43,18 +43,19 @@ export async function tryCatch<T, E = Error>(
  * const badResult = safeParse('invalid-json');   // Logs error and returns null
  */
 export const tryCatchFn =
-  <T extends (...args: unknown[]) => ReturnType<T>>(
-    fn: T,
-    logger: (err: unknown) => void,
-  ) =>
-  (...args: Parameters<T>): ReturnType<T> | null => {
-    try {
-      return fn(...args);
-    } catch (error) {
-      logger(error);
-      return null;
-    }
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  <T extends (...args: any[]) => ReturnType<T>>(
+      fn: T,
+      logger: (err: unknown) => void,
+    ) =>
+    (...args: Parameters<T>): ReturnType<T> | null => {
+      try {
+        return fn(...args);
+      } catch (error) {
+        logger(error);
+        return null;
+      }
+    };
 
 /**
  * Extracts the HTTP status code from an error object.
