@@ -97,7 +97,7 @@ export default class Opportunity {
 
   @ManyToOne(() => Agent)
   @JoinColumn({ name: "agent_id" })
-  agent: Agent;
+  agent?: Agent;
 
   @Column({ nullable: true })
   agentId: number;

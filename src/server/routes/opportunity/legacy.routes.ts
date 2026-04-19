@@ -4,19 +4,27 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
+  EntityTableName,
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
 import { ILike, In } from "typeorm";
-import { UnauthorizedError } from "../../../config";
+import {
+  NotFoundError,
+  titleOrphanageAgent,
+  UnauthorizedError,
+} from "../../../config";
+import Comment from "../../../data/entity/comment.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
   parseFormData,
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { tryCatchFn } from "../../../services/utils";
 import { getAgentByPostcode, writeOpportunityLegacy } from "../../utils";
 
 export default async function opportunityLegacyRoutes(
@@ -54,20 +62,45 @@ export default async function opportunityLegacyRoutes(
           ? accompanyingParserOpportunity(request.body)
           : undefined;
 
-      opportunity.agent = getAgentByPostcode(
-        request.agents || [],
-        request.body.rac_plz,
-      );
+      const getAgentTryCatch = tryCatchFn(getAgentByPostcode, (error) => {
+        logger.error(
+          `Error finding agent for opportunity with postcode ${request.body.rac_plz}: ${error}`,
+        );
+      });
+      opportunity.agent =
+        getAgentTryCatch(request.agents || [], request.body.rac_plz) ??
+        undefined;
+
+      if (!opportunity.agent) {
+        const agentRepository = fastify.db.agentRepository;
+        const agentOrphanage = await agentRepository.findOne({
+          where: { title: titleOrphanageAgent },
+        });
+
+        if (!agentOrphanage) {
+          throw new NotFoundError("Orphanage agent with not found.");
+        }
+      }
 
       const id = await writeOpportunityLegacy(opportunity);
 
+      const commentRepository = fastify.db.commentRepository;
+      await commentRepository.save(
+        new Comment({
+          text: `${request.body.rac_email}<|>${request.body.rac_full_name}<|>${request.body.rac_address}<|>${request.body.rac_plz}`,
+          entityId: id,
+          entityType: EntityTableName.OPPORTUNITY,
+          userId: 1,
+        }),
+      );
+
       return reply.status(200).send({
-        message: "Opportunity has been stored.",
+        message: `Your opportunity (${id}) has been submitted successfully!`,
         data: { id },
       });
     },
   );
-
+  // TODO: define type
   const _opp45 = {
     id: 8693,
     title: "Ukrainian language translation for Stammtisch, etc.",
