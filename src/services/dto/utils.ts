@@ -22,7 +22,7 @@ export function getAvailability(
     if (timeslot?.rrule && timeslot?.start && timeslot?.end) {
       return {
         id: timeslot.id,
-        day: getByDay(timeslot.rrule),
+        day: getByDay(timeslot.rrule)!,
         daytime: getTimeSlotForDaytime(timeslot.start, timeslot.end),
       };
     }
@@ -43,7 +43,7 @@ export function getAvailability(
   });
 }
 
-export function getByDay(rrule: string): ByDay {
+export function getByDay(rrule: string): ByDay | null {
   if (!rrule) {
     throw new Error("RRule is required to get ByDay");
   }
@@ -55,7 +55,7 @@ export function getByDay(rrule: string): ByDay {
   if (!(byDay in ByDay)) {
     throw new Error("RRule BYDAY value is not recognized");
   }
-  return ByDay[byDay];
+  return ByDay[byDay as keyof typeof ByDay];
 }
 
 export function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
