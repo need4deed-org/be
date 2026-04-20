@@ -133,6 +133,7 @@ export default async function opportunityLegacyRoutes(
 
   fastify.get<{ Reply: OpportunityLegacyResponse[] }>(
     "/",
+    { config: { public: true } as FastifyContextConfig },
     async (_request, reply) => {
       function parseOpportunityLegacyResponse(
         rawList: Opportunity[],
