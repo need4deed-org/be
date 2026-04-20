@@ -4,6 +4,7 @@ import {
   ApiOpportunityGetList,
   ApiOpportunityPatch,
   SortOrder,
+  UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
@@ -54,16 +55,10 @@ export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook("onRequest", async (request, _reply) => {
-    // Access the custom config via routeOptions
-    const config = request.routeOptions.config as { public?: boolean };
-
-    if (config.public) {
-      return;
-    }
-
-    await fastify.authenticate();
-  });
+  fastify.addHook(
+    "onRequest",
+    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  );
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
