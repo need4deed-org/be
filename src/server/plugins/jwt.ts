@@ -20,6 +20,17 @@ async function jwtPlugin(
 
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
+      logger.debug(
+        `jwtPlugin:authenticate called with request.routeOptions.config: ${JSON.stringify(request.routeOptions.config)}`,
+      );
+      const config = request.routeOptions.config as
+        | { public?: boolean }
+        | undefined;
+
+      if (config?.public === true) {
+        return;
+      }
+
       try {
         try {
           await request.jwtVerify();
