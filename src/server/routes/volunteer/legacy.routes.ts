@@ -32,7 +32,7 @@ export default async function volunteerLegacyRoutes(
       );
 
       const leads = await parseFormData(
-        volunteerFormData.leadFrom,
+        volunteerFormData.leadFrom as string[],
         leadFromParser,
       );
 
