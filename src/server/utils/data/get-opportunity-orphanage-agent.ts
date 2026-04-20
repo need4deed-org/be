@@ -11,7 +11,7 @@ export async function getOpportunityOrphanageAgent() {
   });
 
   if (!orphanageAgent) {
-    throw new NotFoundError("Orphanage agent not found");
+    throw new NotFoundError("Orphanage agent not found.");
   }
 
   return orphanageAgent;
