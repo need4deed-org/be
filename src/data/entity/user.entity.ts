@@ -61,7 +61,7 @@ export default class User {
     nullable: true,
     cascade: true,
   })
-  @JoinColumn({ name: "personId" })
+  @JoinColumn({ name: "person_id" })
   person: Person;
 
   @Column({ nullable: true })
