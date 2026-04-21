@@ -7,7 +7,7 @@ export function commentSerializer(comment: Comment): ApiComment {
     content: comment.text,
     entityId: comment.entityId,
     entityType: comment.entityType,
-    authorName: comment.user.person.name,
+    authorName: comment.user?.person?.name,
     timestamp: comment.updatedAt,
   };
 }
