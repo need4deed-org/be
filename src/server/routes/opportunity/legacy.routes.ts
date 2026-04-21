@@ -13,12 +13,14 @@ import { UnauthorizedError } from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
   parseFormData,
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
   getOpportunityOrphanageAgent,
@@ -60,9 +62,16 @@ export default async function opportunityLegacyRoutes(
           ? accompanyingParserOpportunity(request.body)
           : undefined;
 
+      const getAgentByPostcodeTryCatch = tryCatchFn(getAgentByPostcode, (err) =>
+        logger.debug(
+          `Did not find agent by postcode${request.body.rac_plz}: ${err}`,
+        ),
+      );
       opportunity.agent =
-        getAgentByPostcode(request.agents || [], request.body.rac_plz) ??
-        undefined;
+        getAgentByPostcodeTryCatch(
+          request.agents || [],
+          request.body.rac_plz,
+        ) ?? undefined;
 
       if (!opportunity.agent) {
         opportunity.agent = await getOpportunityOrphanageAgent();
