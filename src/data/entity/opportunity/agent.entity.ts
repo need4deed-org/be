@@ -133,12 +133,10 @@ export default class Agent {
 
   get representative(): AgentPerson {
     let representative = this.agentPerson?.find(
-      ({ role }) => role === AgentRoleType.MANAGER,
+      ({ role }) => role === AgentRoleType.VOLUNTEER_COORDINATOR,
     );
     if (!representative) {
-      representative = this.agentPerson?.find(
-        ({ role }) => role === AgentRoleType.VOLUNTEER_COORDINATOR,
-      );
+      representative = this.agentPerson?.[0];
     }
     return representative;
   }

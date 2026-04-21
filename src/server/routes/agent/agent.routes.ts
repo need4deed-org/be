@@ -126,6 +126,9 @@ export default async function agentRoutes(
         "agentLanguage.language",
       ];
       const agent = await agentRepository.findOne({ where: { id }, relations });
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentDistrict = await addDistrictToAgent(agent);
