@@ -96,6 +96,7 @@ export function dtoVolunteerOpportunityGetList(
       })),
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
   };
 }
 
