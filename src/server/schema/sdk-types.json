@@ -658,7 +658,8 @@
         "category",
         "availability",
         "languages",
-        "activities"
+        "activities",
+        "accompanyingDetails"
       ]
     },
     "ApiOpportunityGet": {
