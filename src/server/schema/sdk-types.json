@@ -644,6 +644,7 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
+        "accompanyingDetails": { "$ref": "ApiAccompanying#" },
         "category": {
           "type": "object",
           "properties": { "id": { "type": "integer" } }
@@ -657,7 +658,8 @@
         "category",
         "availability",
         "languages",
-        "activities"
+        "activities",
+        "accompanyingDetails"
       ]
     },
     "ApiOpportunityGet": {
@@ -692,7 +694,6 @@
                 "district": { "$ref": "OptionById#" }
               }
             },
-            "accompanyingDetails": { "$ref": "ApiAccompanying#" },
             "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
           }
         }
