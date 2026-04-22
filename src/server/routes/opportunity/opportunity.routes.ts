@@ -165,6 +165,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileLanguage.language",
         "deal.profile.profileActivity.activity",
         "deal.time.timeTimeslot.timeslot",
+        "accompanying",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
