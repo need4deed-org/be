@@ -37,17 +37,21 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             title: body?.agent?.name,
           } as Partial<Agent>)
         : {},
-      accompanying: body?.accompanyingDetails
+      accompanying: body.accompanyingDetails
         ? ({
-            address: body?.accompanyingDetails?.appointmentAddress,
-            date: getDateObj(
-              body?.accompanyingDetails?.appointmentDate,
-              body?.accompanyingDetails?.appointmentTime,
-            ),
-            phone: body?.accompanyingDetails?.refugeeNumber,
-            name: body?.accompanyingDetails?.refugeeName,
-            languageToTranslate: body?.accompanyingDetails
-              ?.languagesToTranslate as unknown as TranslatedIntoType,
+            address: body.accompanyingDetails?.appointmentAddress,
+            date:
+              body.accompanyingDetails?.appointmentDate &&
+              body.accompanyingDetails?.appointmentTime
+                ? getDateObj(
+                    body.accompanyingDetails?.appointmentDate,
+                    body.accompanyingDetails?.appointmentTime,
+                  )
+                : undefined,
+            phone: body.accompanyingDetails?.refugeeNumber,
+            name: body.accompanyingDetails?.refugeeName,
+            languageToTranslate: body.accompanyingDetails
+              ?.languageToTranslate as unknown as TranslatedIntoType,
           } as Partial<Accompanying>)
         : {},
       languages: [
