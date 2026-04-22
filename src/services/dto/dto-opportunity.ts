@@ -63,6 +63,7 @@ export function dtoOpportunityGetList(
       })),
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
   };
 }
 
