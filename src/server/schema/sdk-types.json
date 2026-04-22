@@ -644,6 +644,7 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
+        "accompanyingDetails": { "$ref": "ApiAccompanying#" },
         "category": {
           "type": "object",
           "properties": { "id": { "type": "integer" } }
@@ -692,7 +693,6 @@
                 "district": { "$ref": "OptionById#" }
               }
             },
-            "accompanyingDetails": { "$ref": "ApiAccompanying#" },
             "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
           }
         }
