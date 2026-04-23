@@ -160,4 +160,9 @@ export default class Volunteer {
 
   @OneToMany(() => Appreciation, (appreciation) => appreciation.volunteer)
   appreciations: Appreciation[];
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  nid?: string;
 }

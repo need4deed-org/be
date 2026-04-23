@@ -110,4 +110,9 @@ export default class Opportunity {
 
   @OneToMany(() => Appreciation, (appreciation) => appreciation.opportunity)
   appreciations: Appreciation[];
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  nid?: string;
 }
