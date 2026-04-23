@@ -18,6 +18,7 @@ import {
 } from "need4deed-sdk";
 import { DataSource, IsNull, Repository } from "typeorm";
 import { check } from "..";
+import { titleOrphanageAgent } from "../../config";
 import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
@@ -422,7 +423,7 @@ export async function getOrCreateAgent(
 
   if (!agentData) {
     const orphanage = await agentRepository.findOneBy({
-      title: "Orphanage For Opportunities",
+      title: titleOrphanageAgent,
     });
     if (!orphanage) {
       throw new Error("Agent data is empty.");
