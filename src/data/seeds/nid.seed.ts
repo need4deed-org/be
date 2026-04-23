@@ -69,7 +69,9 @@ export async function seedNids(dataSource: DataSource): Promise<void> {
       return matched;
     }, volunteersMatched[0]);
 
-    return volunteerMatched;
+    return volunteerMatched
+      ? Object.assign(volunteerMatched, { nid: volunteerRaw.nid })
+      : null;
   });
 
   [, error] = await tryCatch(
