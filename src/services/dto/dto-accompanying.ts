@@ -11,7 +11,7 @@ export function dtoOpportunityAccompanying(
         appointmentTime: accompanying.date.toTimeString().slice(0, 5),
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
-        languageToTranslate: String(accompanying.langCode),
+        languageToTranslate: accompanying.langCode,
       }
     : {};
 }
