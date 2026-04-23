@@ -26,6 +26,7 @@ import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
+import workerRoutes from "./routes/worker.routes";
 import entityTypesSchema from "./schema/entity-types.json";
 import optionListsSchema from "./schema/option-lists.json";
 import sdkTypesSchema from "./schema/sdk-types.json";
@@ -179,6 +180,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(organizationRoutes, {
     prefix: RoutePrefix.ORGANIZATION,
+  });
+  await fastifyInstance.register(workerRoutes, {
+    prefix: RoutePrefix.WORKER,
   });
 
   await fastifyInstance.ready();
