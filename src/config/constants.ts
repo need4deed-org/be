@@ -104,10 +104,13 @@ export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
 export const isProd = process.env.NODE_ENV === "production";
-export const shouldTruncateAll = positives.includes(process.env.TRUNCATE_ALL);
-export const shouldRunMigrations = positives.includes(
-  process.env.RUN_MIGRATIONS,
+export const shouldTruncateAll = positives.includes(
+  process.env.TRUNCATE_ALL || "",
 );
+export const shouldRunMigrations = positives.includes(
+  process.env.RUN_MIGRATIONS || "",
+);
+export const nidsToken = process.env.NIDS_TOKEN || "";
 
 export const authAccessTokenCookieName = "access";
 export const authRefreshTokenCookieName = "refresh";

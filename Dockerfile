@@ -11,10 +11,12 @@ FROM node:22-alpine AS production
 # not as build args for security reasons
 ARG NODE_ENV=${NODE_ENV:-production}
 ARG AWS_S3_BASE
+ARG NITS_TOKEN
 
 ENV NODE_ENV=${NODE_ENV}
 ENV PORT=8000
 ENV AWS_S3_BASE=${AWS_S3_BASE}
+ENV NITS_TOKEN=${NITS_TOKEN}
 WORKDIR /app
 
 RUN apk update && apk add --no-cache curl dumb-init
