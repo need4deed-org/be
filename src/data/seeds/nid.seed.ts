@@ -21,6 +21,11 @@ interface NidJSON {
 }
 
 export async function seedNids(dataSource: DataSource): Promise<void> {
+  dataSource.transaction(async (transactionalEntityManager) => {
+    await _seedNids(transactionalEntityManager as unknown as DataSource);
+  });
+}
+async function _seedNids(dataSource: DataSource): Promise<void> {
   let error: Error | null = null;
 
   if (!dataSource) {
@@ -85,7 +90,7 @@ export async function seedNids(dataSource: DataSource): Promise<void> {
   logger.info("Seeding NIDs to opportunities...");
   const opportunityRepository = getRepository(dataSource, Opportunity);
   const opportunities = await opportunityRepository.find({
-    relations: ["deal.location.district"],
+    relations: ["deal.location.locationDistrict.district"],
   });
 
   const opportunitiesRaw = (await fetchJsonFromUrl(
