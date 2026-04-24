@@ -1,7 +1,7 @@
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityManager, ObjectLiteral, Repository } from "typeorm";
 
-export function getRepository<T>(
-  dataSource: DataSource,
+export function getRepository<T extends ObjectLiteral>(
+  dataSource: DataSource | EntityManager,
   entity: (new () => T) | string,
 ): Repository<T> {
   const repository = dataSource.getRepository(entity);
