@@ -1,4 +1,4 @@
-import { DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import {
   seedAgentsFile,
   seedOpportunitiesFile,
@@ -6,7 +6,6 @@ import {
 } from "../../config/constants";
 import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
-import { dataSource } from "../data-source";
 import Agent from "../entity/opportunity/agent.entity";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
@@ -20,20 +19,17 @@ interface NidJSON {
   deal?: { location?: { districts?: string[] } };
 }
 
-export async function seedNids(dataSource: DataSource): Promise<void> {
-  dataSource.transaction(async (transactionalEntityManager) => {
-    await _seedNids(transactionalEntityManager as unknown as DataSource);
-  });
-}
-async function _seedNids(dataSource: DataSource): Promise<void> {
+async function _seedNids(
+  transactionalEntityManager: EntityManager,
+): Promise<void> {
   let error: Error | null = null;
 
-  if (!dataSource) {
+  if (!transactionalEntityManager) {
     throw new Error("DataSource is not initialized.");
   }
 
   logger.info("Seeding NIDs to agents...");
-  const agentRepository = getRepository(dataSource, Agent);
+  const agentRepository = getRepository(transactionalEntityManager, Agent);
   const agents = await agentRepository.find();
 
   const agentsRaw = (await fetchJsonFromUrl(seedAgentsFile)) as NidJSON[];
@@ -53,7 +49,10 @@ async function _seedNids(dataSource: DataSource): Promise<void> {
   logger.info("NIDs seeded to agents.");
 
   logger.info("Seeding NIDs to volunteers...");
-  const volunteerRepository = getRepository(dataSource, Volunteer);
+  const volunteerRepository = getRepository(
+    transactionalEntityManager,
+    Volunteer,
+  );
   const volunteers = await volunteerRepository.find({ relations: ["person"] });
 
   const volunteersRaw = (await fetchJsonFromUrl(
@@ -88,7 +87,10 @@ async function _seedNids(dataSource: DataSource): Promise<void> {
   logger.info("NIDs seeded to volunteers.");
 
   logger.info("Seeding NIDs to opportunities...");
-  const opportunityRepository = getRepository(dataSource, Opportunity);
+  const opportunityRepository = getRepository(
+    transactionalEntityManager,
+    Opportunity,
+  );
   const opportunities = await opportunityRepository.find({
     relations: ["deal.location.locationDistrict.district"],
   });
@@ -137,7 +139,8 @@ async function _seedNids(dataSource: DataSource): Promise<void> {
   logger.info("NIDs seeded to opportunities.");
 }
 
-// for direct execution
-if (require.main === module) {
-  seedNids(dataSource);
+export async function seedNids(dataSource: DataSource): Promise<void> {
+  dataSource.transaction(async (transactionalEntityManager) => {
+    await _seedNids(transactionalEntityManager);
+  });
 }
