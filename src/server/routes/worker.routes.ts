@@ -1,8 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { nidsToken } from "../../config";
-import { dataSource } from "../../data/data-source";
-import { seedNids } from "../../data/seeds/nid.seed";
 import { responseSchema } from "../schema";
 import { ReplyMessage } from "../types";
 
@@ -12,7 +10,10 @@ export default async function workerRoutes(
 ) {
   fastify.addHook("onRequest", fastify.authenticate({ role: UserRole.ADMIN }));
 
-  fastify.get<{ Querystring: { nids: string }; Reply: ReplyMessage }>(
+  fastify.get<{
+    Querystring: { nids: string; dumps: string };
+    Reply: ReplyMessage;
+  }>(
     "/",
     {
       schema: {
@@ -31,7 +32,6 @@ export default async function workerRoutes(
         });
       }
       if (nids === nidsToken) {
-        await seedNids(dataSource);
         return reply.status(200).send({
           message: "NID seeding completed.",
         });
