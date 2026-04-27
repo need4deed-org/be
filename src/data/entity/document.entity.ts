@@ -57,6 +57,12 @@ export default class Document {
   @Column({ nullable: true })
   volunteerId: number;
 
+  @Column({ default: false })
+  received: boolean;
+
+  @Column({ nullable: true, type: "timestamp" })
+  receivedOn: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

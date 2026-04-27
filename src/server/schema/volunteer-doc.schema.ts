@@ -33,6 +33,14 @@ export const volunteerDocSchemaGetMeta200 = {
   required: ["url", "fields"],
 };
 
+export const volunteerDocSchemaPatchBody = {
+  type: "object",
+  properties: {
+    received: { type: "boolean" },
+  },
+  required: ["received"],
+};
+
 export const volunteerDocSchemaUploadMeta = {
   type: "object",
   properties: {
