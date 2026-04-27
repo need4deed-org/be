@@ -10,6 +10,7 @@ import {
   responseErrors,
   volunteerDocSchemaGet200,
   volunteerDocSchemaGetMeta200,
+  volunteerDocSchemaPatchBody,
   volunteerDocSchemaUploadMeta,
 } from "../../schema";
 import { getVolunteerDocuments } from "../../utils";
@@ -241,6 +242,59 @@ export default async function volunteerDocRoutes(
 
       return reply.send({
         message: `Document ${affected} of type:${type} for volunteer_id:${id} successfully deleted.`,
+      });
+    },
+  );
+
+  fastify.patch<{
+    Params: { id: number; type: DocumentType };
+    Body: { received: boolean };
+  }>(
+    "/:type",
+    {
+      schema: {
+        params: idTypeParamSchema,
+        body: volunteerDocSchemaPatchBody,
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id, type } = request.params;
+      const { received } = request.body;
+      const documentRepository = fastify.db.documentRepository;
+
+      const doc = await documentRepository.findOneBy({ volunteerId: id, type });
+
+      if (!doc) {
+        return reply.status(404).send({
+          message: `Document of type:${type} for volunteer_id:${id} not found.`,
+        });
+      }
+
+      const [, error] = await tryCatch(
+        documentRepository.save({
+          ...doc,
+          received,
+          receivedOn: received ? new Date() : null,
+        }),
+      );
+
+      if (error) {
+        logger.error(`Error updating document for volunteer ${id}: ${error}`);
+        return reply.status(400).send({
+          message: `Error updating document: ${error}`,
+        });
+      }
+
+      return reply.send({
+        message: `Document of type:${type} for volunteer_id:${id} successfully updated.`,
       });
     },
   );
