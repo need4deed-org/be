@@ -10,5 +10,7 @@ export function documentSerializer(doc: Document): ApiDocumentGet {
     url: getDocumentUrl(doc.s3Key),
     mimeType: doc.mimeType,
     createdAt: doc.createdAt,
+    received: doc.received ?? false,
+    receivedOn: doc.receivedOn ?? null,
   };
 }
