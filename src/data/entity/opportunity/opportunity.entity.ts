@@ -1,5 +1,6 @@
 import { IsEnum, IsInt, IsOptional, IsString } from "class-validator";
 import {
+  OpportunityMatchStatusType,
   OpportunityStatusType,
   OpportunityType,
   TranslatedIntoType,
@@ -50,6 +51,14 @@ export default class Opportunity {
   })
   @IsEnum(OpportunityStatusType)
   status: OpportunityStatusType;
+
+  @Column({
+    type: "enum",
+    enum: OpportunityMatchStatusType,
+    default: OpportunityMatchStatusType.NO_MATCHES,
+  })
+  @IsEnum(OpportunityMatchStatusType)
+  statusMatch: OpportunityMatchStatusType;
 
   @Column({ default: 1 })
   @IsInt()
