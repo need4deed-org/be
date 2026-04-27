@@ -1,3 +1,4 @@
+import logger from "../../logger";
 import { tryCatch } from "../../services/utils";
 import { dataSource } from "../data-source";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
@@ -9,10 +10,8 @@ export async function updateOpportunityMatching(id: number): Promise<void> {
   const opportunityRepository = getRepository(dataSource, Opportunity);
   const opportunity = await opportunityRepository.findOneBy({ id });
   if (!opportunity) {
-    return dataSource.logger.log(
-      "warn",
-      `Opportunity id:${id} not found during match status update.`,
-    );
+    logger.warn(`Opportunity id:${id} not found during match status update.`);
+    return;
   }
 
   const opportunityVolunteerRepository = getRepository(
@@ -40,10 +39,7 @@ export async function updateOpportunityMatching(id: number): Promise<void> {
     );
 
     if (error) {
-      dataSource.logger.log(
-        "warn",
-        `During saving opportunity (id:${id}) occurred: ${error}`,
-      );
+      logger.warn(`During saving opportunity (id:${id}) occurred: ${error}`);
     }
   }
 }
