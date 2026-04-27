@@ -160,4 +160,9 @@ export default class Agent {
       );
     }, 0);
   }
+
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  nid?: string;
 }
