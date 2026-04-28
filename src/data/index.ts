@@ -1,6 +1,5 @@
 import { isProd, shouldRunMigrations } from "../config";
 import logger from "../logger";
-import { tryCatch } from "../services/utils";
 import { dataSource } from "./data-source";
 
 const lockNumber = 0x639b4e2a1c8d79a9n; // random BIGINT (for PostgreSQL)
@@ -24,12 +23,7 @@ export async function initDatabase() {
     await dataSource.query(`SELECT pg_advisory_lock(${lockNumber})`);
     logger.info("Acquired the lock for migrations");
     try {
-      const [[migrationsTable]] = await tryCatch<[{ exists: boolean }]>(
-        dataSource.query(
-          `SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'be_migrations') AS exists;`,
-        ),
-      );
-      if (isProd || !migrationsTable?.exists || shouldRunMigrations) {
+      if (isProd || shouldRunMigrations) {
         logger.info("Attempting to run migrations");
         await dataSource.runMigrations();
         logger.info("Migrations completed");
