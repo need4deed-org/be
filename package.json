@@ -57,7 +57,7 @@
     "dev": "nodemon",
     "typeorm": "typeorm-ts-node-commonjs -d src/data/data-source.ts",
     "migration:generate": "yarn typeorm migration:generate",
-    "migration:create": "yarn typeorm migration:create",
+    "migration:create": "yarn typeorm-ts-node-commonjs migration:create",
     "migration:run": "yarn typeorm migration:run",
     "migration:revert": "yarn typeorm migration:revert",
     "migration:show": "yarn typeorm migration:show",
