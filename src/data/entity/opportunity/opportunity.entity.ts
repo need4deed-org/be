@@ -1,9 +1,9 @@
 import { IsEnum, IsInt, IsOptional, IsString } from "class-validator";
 import {
+  OpportunityStateMatchType,
   OpportunityStatusType,
   OpportunityType,
   TranslatedIntoType,
-  VolunteerStateMatchType,
 } from "need4deed-sdk";
 import {
   Column,
@@ -71,11 +71,11 @@ export default class Opportunity {
 
   @Column({
     type: "enum",
-    enum: VolunteerStateMatchType,
-    default: VolunteerStateMatchType.NO_MATCHES,
+    enum: OpportunityStateMatchType,
+    default: OpportunityStateMatchType.NO_MATCHES,
   })
-  @IsEnum(VolunteerStateMatchType)
-  statusMatch: VolunteerStateMatchType;
+  @IsEnum(OpportunityStateMatchType)
+  statusMatch: OpportunityStateMatchType;
 
   @Column({ nullable: true })
   @IsOptional()
