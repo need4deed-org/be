@@ -3,6 +3,7 @@ import {
   OpportunityStatusType,
   OpportunityType,
   TranslatedIntoType,
+  VolunteerStateMatchType,
 } from "need4deed-sdk";
 import {
   Column,
@@ -67,6 +68,14 @@ export default class Opportunity {
   })
   @IsEnum(TranslatedIntoType)
   translationType: TranslatedIntoType;
+
+  @Column({
+    type: "enum",
+    enum: VolunteerStateMatchType,
+    default: VolunteerStateMatchType.NO_MATCHES,
+  })
+  @IsEnum(VolunteerStateMatchType)
+  statusMatch: VolunteerStateMatchType;
 
   @Column({ nullable: true })
   @IsOptional()
