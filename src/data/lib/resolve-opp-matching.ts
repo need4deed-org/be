@@ -6,21 +6,22 @@ import {
 
 export function resolveOpportunityMatchStatus(
   volunteers: { status: OpportunityVolunteerStatusType }[],
-  numberNeeded: number,
 ): OpportunityMatchStatusType {
-  const active = volunteers.filter(
-    (v) => v.status === OpportunityVolunteerStatusType.ACTIVE,
-  ).length;
-  const matched = volunteers.filter(
-    (v) => v.status === OpportunityVolunteerStatusType.MATCHED,
-  ).length;
-  const pending = volunteers.filter(
+  const hasMatched = volunteers.some(
+    (v) =>
+      v.status === OpportunityVolunteerStatusType.MATCHED ||
+      v.status === OpportunityVolunteerStatusType.ACTIVE,
+  );
+  const hasPending = volunteers.some(
     (v) => v.status === OpportunityVolunteerStatusType.PENDING,
-  ).length;
+  );
+  const hasPast = volunteers.some(
+    (v) => v.status === OpportunityVolunteerStatusType.PAST,
+  );
 
-  if (active > 0 && active < numberNeeded) return OpportunityMatchStatusType.PAST;
-  if (matched > 0) return OpportunityMatchStatusType.MATCHED;
-  if (pending > 0) return OpportunityMatchStatusType.PENDING_MATCH;
+  if (hasMatched) return OpportunityMatchStatusType.MATCHED;
+  if (hasPending) return OpportunityMatchStatusType.PENDING_MATCH;
+  if (hasPast) return OpportunityMatchStatusType.PAST;
   return OpportunityMatchStatusType.NO_MATCHES;
 }
 
@@ -31,6 +32,15 @@ export function resolveOpportunityStatus(
   const hasActive = volunteers.some(
     (v) => v.status === OpportunityVolunteerStatusType.ACTIVE,
   );
+  const hasPendingOrMatched = volunteers.some(
+    (v) =>
+      v.status === OpportunityVolunteerStatusType.PENDING ||
+      v.status === OpportunityVolunteerStatusType.MATCHED,
+  );
+
   if (hasActive) return OpportunityStatusType.ACTIVE;
+  if (hasPendingOrMatched && currentStatus === OpportunityStatusType.NEW) {
+    return OpportunityStatusType.SEARCHING;
+  }
   return currentStatus;
 }
