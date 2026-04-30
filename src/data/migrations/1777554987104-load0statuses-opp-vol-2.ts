@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
 const sqlUser = `
-INSERT INTO public."user" (email, password_hash, role)
+INSERT INTO public."user" (email, password, role)
 VALUES ('volunteer@need4deed.org', '$2b$10$I36WRFrCIJgygZqrHtzYhOzdl6Wyjib2Dlz9PZYgLoJFWG8YON/HC', 'coordinator')
 ON CONFLICT (email) DO NOTHING;
 `;
