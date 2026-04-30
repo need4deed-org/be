@@ -64,6 +64,7 @@ export function dtoOpportunityGetList(
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
+    statusMatch: opportunity.statusMatch,
   };
 }
 
@@ -97,6 +98,7 @@ export function dtoVolunteerOpportunityGetList(
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
+    statusMatch: opportunity.statusMatch,
   };
 }
 
@@ -110,7 +112,7 @@ export function dtoOpportunityGet(
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
     category: { id: opportunityComments.deal.profile.categoryId },
-    description: getOpportunityDescription(opportunityComments),
+    description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     languages: opportunityComments.deal.profile.profileLanguage
       .filter(Boolean)
@@ -139,10 +141,11 @@ export function dtoOpportunityGet(
       getAvailabilityTryCatch(opportunityComments.deal.time?.timeTimeslot) ??
       [],
     contact: getOpportunityContact(opportunityComments),
-    agent: dtoOpportunityAgent(opportunityComments.agent),
+    agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunityComments.accompanying,
+      opportunityComments.accompanying!,
     ),
     comments: opportunityComments.comments.map(commentSerializer),
+    statusMatch: opportunityComments.statusMatch,
   };
 }

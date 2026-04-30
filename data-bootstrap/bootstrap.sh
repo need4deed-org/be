@@ -3,7 +3,7 @@
 set -e
 
 echo "Importing database dump..."
-PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/dump.sql
+PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/dev.dump.sql
 
 if [ $? -eq 0 ]; then
     echo "Database import completed successfully"
