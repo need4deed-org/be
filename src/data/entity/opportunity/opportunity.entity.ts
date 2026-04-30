@@ -52,6 +52,14 @@ export default class Opportunity {
   @IsEnum(OpportunityStatusType)
   status: OpportunityStatusType;
 
+  @Column({
+    type: "enum",
+    enum: OpportunityMatchStatusType,
+    default: OpportunityMatchStatusType.NO_MATCHES,
+  })
+  @IsEnum(OpportunityMatchStatusType)
+  statusMatch: OpportunityMatchStatusType;
+
   @Column({ default: 1 })
   @IsInt()
   numberVolunteers: number;
