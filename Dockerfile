@@ -11,10 +11,14 @@ FROM node:22-alpine AS production
 # not as build args for security reasons
 ARG NODE_ENV=${NODE_ENV:-production}
 ARG AWS_S3_BASE
+ARG NIDS_TOKEN
+ARG RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
 
 ENV NODE_ENV=${NODE_ENV}
 ENV PORT=8000
 ENV AWS_S3_BASE=${AWS_S3_BASE}
+ENV NIDS_TOKEN=${NIDS_TOKEN}
+ENV RUN_MIGRATIONS=${RUN_MIGRATIONS}
 WORKDIR /app
 
 RUN apk update && apk add --no-cache curl dumb-init

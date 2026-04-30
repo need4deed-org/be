@@ -6,10 +6,9 @@ import {
   IsString,
 } from "class-validator";
 import { EntityTableName } from "need4deed-sdk";
-import { Column, Entity, PrimaryGeneratedColumn, Unique } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity()
-@Unique(["hostNid", "tenantNid"])
 export default class NotionRelation {
   constructor(notionRelation?: Partial<NotionRelation>) {
     if (notionRelation) {

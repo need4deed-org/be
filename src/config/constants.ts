@@ -56,27 +56,27 @@ export const seedLeadFromFile = path.join(
   "leads.json",
 );
 
-// export const seedAgentsFile = path.join(
-//   __dirname,
-//   ...["..", "..", "dev", "pii"],
-//   "agents.json",
-// );
+export const seedAgentsFile = path.join(
+  __dirname,
+  ...["..", "..", "dev", "files", "notion"],
+  "nid-agents.json",
+);
 
-// export const seedOpportunitiesFile = path.join(
-//   __dirname,
-//   ...["..", "..", "dev", "pii"],
-//   "opportunities.json",
-// );
+export const seedOpportunitiesFile = path.join(
+  __dirname,
+  ...["..", "..", "dev", "files", "notion"],
+  "nid-opportunities.json",
+);
 
-// export const seedVolunteersFile = path.join(
-//   __dirname,
-//   ...["..", "..", "dev", "pii"],
-//   "volunteers.json",
-// );
+export const seedVolunteersFile = path.join(
+  __dirname,
+  ...["..", "..", "dev", "files", "notion"],
+  "nid-volunteers.json",
+);
 
-export const seedAgentsFile = awsS3BaseUrl + "agents.json";
-export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
-export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
+// export const seedAgentsFile = awsS3BaseUrl + "agents.json";
+// export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
+// export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
@@ -104,10 +104,13 @@ export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
 export const isProd = process.env.NODE_ENV === "production";
-export const shouldTruncateAll = positives.includes(process.env.TRUNCATE_ALL);
-export const shouldRunMigrations = positives.includes(
-  process.env.RUN_MIGRATIONS,
+export const shouldTruncateAll = positives.includes(
+  process.env.TRUNCATE_ALL || "",
 );
+export const shouldRunMigrations = positives.includes(
+  process.env.RUN_MIGRATIONS || "",
+);
+export const nidsToken = process.env.NIDS_TOKEN || "";
 
 export const authAccessTokenCookieName = "access";
 export const authRefreshTokenCookieName = "refresh";
