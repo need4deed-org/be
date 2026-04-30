@@ -3,8 +3,8 @@ import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
-  OpportunityMatchStatusType,
   OpportunityType,
+  VolunteerStateMatchType,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -48,7 +48,7 @@ export function dtoOpportunityGetList(
     category: { id: opportunity.deal.profile.categoryId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
-    statusMatch: opportunity.statusMatch ?? OpportunityMatchStatusType.NO_MATCHES,
+    statusMatch: opportunity.statusMatch ?? VolunteerStateMatchType.NO_MATCHES,
     createdAt: opportunity.createdAt,
     languages: opportunity.deal.profile.profileLanguage
       .filter(Boolean)
@@ -110,7 +110,7 @@ export function dtoOpportunityGet(
     title: opportunityComments.title,
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
-    statusMatch: opportunityComments.statusMatch ?? OpportunityMatchStatusType.NO_MATCHES,
+    statusMatch: opportunityComments.statusMatch ?? VolunteerStateMatchType.NO_MATCHES,
     createdAt: opportunityComments.createdAt,
     category: { id: opportunityComments.deal.profile.categoryId },
     description: getOpportunityDescription(opportunityComments),

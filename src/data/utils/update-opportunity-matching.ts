@@ -22,10 +22,7 @@ export async function updateOpportunityMatching(id: number): Promise<void> {
     where: { opportunityId: id },
   });
 
-  const statusMatch = resolveOpportunityMatchStatus(
-    volunteersLinked,
-    opportunity.numberVolunteers,
-  );
+  const statusMatch = resolveOpportunityMatchStatus(volunteersLinked);
   const status = resolveOpportunityStatus(volunteersLinked, opportunity.status);
 
   const changed =
