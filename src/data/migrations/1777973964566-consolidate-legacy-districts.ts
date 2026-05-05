@@ -43,14 +43,20 @@ export class ConsolidateLegacyDistricts1777973964566
         [compound, legacy],
       );
 
-      // Remove any remaining rows still pointing to the legacy district
-      // (duplicates that were skipped above because the compound already existed).
+      // Remove any remaining rows still pointing to the legacy district,
+      // but only where the compound district is already linked for that location —
+      // guarantees no location is left with zero districts if the remap failed.
       await queryRunner.query(
         `
-        DELETE FROM location_district
-        WHERE district_id = (SELECT id FROM district WHERE title = $1)
+        DELETE FROM location_district ld
+        WHERE ld.district_id = (SELECT id FROM district WHERE title = $1)
+          AND EXISTS (
+            SELECT 1 FROM location_district ld2
+            WHERE ld2.location_id = ld.location_id
+              AND ld2.district_id = (SELECT id FROM district WHERE title = $2)
+          )
         `,
-        [legacy],
+        [legacy, compound],
       );
 
       // Delete the legacy district record itself.
