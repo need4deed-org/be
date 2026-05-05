@@ -76,12 +76,19 @@ export function volunteerSerializer(
       }
     : null;
 
-  const comments: TimedText[] = volunteerComments.map((comment) => ({
-    id: comment.id,
-    timestamp: comment.updatedAt,
-    content: comment.text,
-    authorName: comment.user.person.name,
-  }));
+  const comments: TimedText[] = volunteerComments.map((comment) => {
+    if (!comment.user.person) {
+      logger.warn(
+        `Comment: user with id ${comment.user.id} is missing person relation.`,
+      );
+    }
+    return {
+      id: comment.id,
+      timestamp: comment.updatedAt,
+      content: comment.text,
+      authorName: comment.user.person?.name || "Unknown Author",
+    };
+  });
 
   const timelineLogs: TimedText[] = timedEvents.map(
     ({ id, timestamp, content }) => ({
