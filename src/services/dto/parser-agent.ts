@@ -1,7 +1,10 @@
 import { ApiAgentPatch } from "need4deed-sdk";
 import Agent from "../../data/entity/opportunity/agent.entity";
 
-export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
+// districtId will be added to ApiAgentPatch in SDK issue #93
+type ApiAgentPatchExtended = ApiAgentPatch & { districtId?: number };
+
+export function parseAgentPatch(agent: ApiAgentPatchExtended): Partial<Agent> {
   return {
     title: agent.title,
     info: agent.about,
@@ -11,5 +14,6 @@ export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
     searchStatus: agent.statusSearch,
     engagementStatus: agent.statusEngagement,
     services: agent.services,
+    districtId: agent.districtId,
   };
 }
