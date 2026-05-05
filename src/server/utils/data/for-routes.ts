@@ -497,6 +497,7 @@ export async function updateOptionList<
             ? {
                 proficiency: (item as unknown as { proficiency: string })
                   .proficiency,
+                purpose: (item as unknown as { purpose: string }).purpose,
               }
             : {}),
         });
