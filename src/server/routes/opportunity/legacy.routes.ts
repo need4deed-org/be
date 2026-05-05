@@ -82,7 +82,7 @@ export default async function opportunityLegacyRoutes(
       const commentRepository = fastify.db.commentRepository;
       await commentRepository.save(
         new Comment({
-          text: `${request.body.rac_email}<|>${request.body.rac_full_name}<|>${request.body.rac_address}<|>${request.body.rac_plz}`,
+          text: `${request.body.rac_email}<|>${request.body.rac_full_name}<|>${request.body.rac_address}<|>${request.body.rac_plz}<|>${request.body.rac_phone}`,
           entityId: id,
           entityType: EntityTableName.OPPORTUNITY,
           userId: 1,
