@@ -48,6 +48,7 @@ import {
   setTranslationType,
   updateOptionList,
 } from "../../utils";
+import { getDistrictToOpportunityHandler } from "../../utils/data/add-district-to-opp";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -109,15 +110,28 @@ export default async function opportunityRoutes(
           `Opportunity (id:${id}) has no agent, adding to orphanage agent.`,
         );
       }
-      const { addDistrictToAgent, updates } = getDistrictToAgentHandler(true);
+      const { addDistrictToAgent, updates: districtUpdates } =
+        getDistrictToAgentHandler(true);
       Object.assign(
         opportunityComments.agent,
         await addDistrictToAgent(opportunityComments.agent),
       );
 
-      if (updates.length) {
+      if (districtUpdates.length) {
         const agentRepository = fastify.db.agentRepository;
-        await agentRepository.save(updates);
+        await agentRepository.save(districtUpdates);
+      }
+
+      const { addDistrictToOpportunity, updates: opportunityUpdates } =
+        getDistrictToOpportunityHandler();
+      Object.assign(
+        opportunityComments,
+        await addDistrictToOpportunity(opportunityComments),
+      );
+
+      if (opportunityUpdates.length) {
+        const opportunityRepository = fastify.db.opportunityRepository;
+        await opportunityRepository.save(opportunityUpdates);
       }
 
       if (opportunityComments.accompanying) {
@@ -178,18 +192,29 @@ export default async function opportunityRoutes(
         ...(order ? order : {}),
       });
 
-      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
+      const { addCategoryToProfile, updates: profileUpdates } =
+        getCategoryToProfileHandler();
+
+      const { addDistrictToOpportunity, updates: opportunityUpdates } =
+        getDistrictToOpportunityHandler();
+
       const opportunitiesCategory = opportunities.map((opportunity) => {
         Object.assign(
           opportunity.deal.profile,
           addCategoryToProfile(opportunity.deal.profile),
+          addDistrictToOpportunity(opportunity),
         );
         return opportunity;
       });
 
-      if (updates.length > 0) {
+      if (profileUpdates.length > 0) {
         const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(updates);
+        await profileRepository.save(profileUpdates);
+      }
+
+      if (opportunityUpdates.length) {
+        const opportunityRepository = fastify.db.opportunityRepository;
+        await opportunityRepository.save(opportunityUpdates);
       }
 
       const data = opportunitiesCategory.map(dtoOpportunityGetList);

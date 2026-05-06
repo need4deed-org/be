@@ -11,8 +11,10 @@ import {
 import { ILike, In } from "typeorm";
 import { UnauthorizedError } from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -75,6 +77,15 @@ export default async function opportunityLegacyRoutes(
 
       if (!opportunity.agent) {
         opportunity.agent = await getOpportunityOrphanageAgent();
+      }
+
+      opportunity.districtId = opportunity.agent.districtId;
+      if (!opportunity.districtId) {
+        const postcode = new Postcode({ value: request.body.rac_plz });
+        const district = await getDistrictFromPostcode(postcode);
+        if (district) {
+          opportunity.district = district;
+        }
       }
 
       const id = await writeOpportunityLegacy(opportunity);
