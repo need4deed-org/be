@@ -61,6 +61,11 @@ export function dtoOpportunityGetList(
       .map((pa) => ({
         id: pa.activity.id,
       })),
+    location: opportunity.deal.location.locationDistrict
+      .filter(Boolean)
+      .map((ld) => ({
+        id: ld.district.id,
+      })),
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
