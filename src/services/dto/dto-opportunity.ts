@@ -45,6 +45,7 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
+    district: { id: opportunity.districtId! },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     createdAt: opportunity.createdAt,
@@ -81,6 +82,7 @@ export function dtoVolunteerOpportunityGetList(
     title: opportunity.title,
     createdAt: opportunity.createdAt,
     category: { id: opportunity.deal.profile.categoryId },
+    district: { id: opportunity.districtId! },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     languages: opportunity.deal.profile.profileLanguage
@@ -117,6 +119,7 @@ export function dtoOpportunityGet(
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
     category: { id: opportunityComments.deal.profile.categoryId },
+    district: { id: opportunityComments.districtId! },
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     languages: opportunityComments.deal.profile.profileLanguage
