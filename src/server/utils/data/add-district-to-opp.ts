@@ -17,7 +17,7 @@ export function getDistrictToOpportunityHandler() {
         return opportunity;
       }
       const district = await getDistrictFromPostcode(
-        opportunity.agent?.address?.postcode!,
+        opportunity.agent?.address?.postcode,
       );
       if (district) {
         opportunity.district = district;
