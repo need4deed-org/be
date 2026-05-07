@@ -40,6 +40,7 @@ import {
   addComments2Entity,
   getCategoryToProfileHandler,
   getDistrictToAgentHandler,
+  getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
@@ -48,7 +49,6 @@ import {
   setTranslationType,
   updateOptionList,
 } from "../../utils";
-import { getDistrictToOpportunityHandler } from "../../utils/data/add-district-to-opp";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -180,6 +180,7 @@ export default async function opportunityRoutes(
         "deal.profile.profileActivity.activity",
         "deal.time.timeTimeslot.timeslot",
         "deal.location.locationDistrict.district",
+        "agent",
         "accompanying",
       ];
 
@@ -198,26 +199,33 @@ export default async function opportunityRoutes(
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
 
-      const opportunitiesCategory = opportunities.map((opportunity) => {
-        Object.assign(
-          opportunity.deal.profile,
-          addCategoryToProfile(opportunity.deal.profile),
-          addDistrictToOpportunity(opportunity),
-        );
-        return opportunity;
-      });
+      const opportunitiesCategoryDistrict = await Promise.all(
+        opportunities.map(async (opportunity) => {
+          Object.assign(
+            opportunity,
+            await addDistrictToOpportunity(opportunity),
+          );
+          Object.assign(
+            opportunity.deal.profile,
+            addCategoryToProfile(opportunity.deal.profile),
+          );
+          return opportunity;
+        }),
+      );
 
       if (profileUpdates.length > 0) {
         const profileRepository = fastify.db.profileRepository;
         await profileRepository.save(profileUpdates);
       }
 
-      if (opportunityUpdates.length) {
-        const opportunityRepository = fastify.db.opportunityRepository;
+      if (opportunityUpdates.length > 0) {
         await opportunityRepository.save(opportunityUpdates);
       }
+      logger.debug(
+        `Saving category updates: ${profileUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+      );
 
-      const data = opportunitiesCategory.map(dtoOpportunityGetList);
+      const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
 
       return reply.status(200).send({
         message: `Opportunities page:${page}.`,
