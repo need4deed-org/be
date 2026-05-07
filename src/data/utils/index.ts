@@ -1,4 +1,5 @@
 export * from "./fetch-json";
+export * from "./get-district";
 export * from "./get-repository";
 export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
