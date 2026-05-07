@@ -11,10 +11,8 @@ import {
 import { ILike, In } from "typeorm";
 import { UnauthorizedError } from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
-import Postcode from "../../../data/entity/location/postcode.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -25,6 +23,7 @@ import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportu
 import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
+  getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -79,14 +78,8 @@ export default async function opportunityLegacyRoutes(
         opportunity.agent = await getOpportunityOrphanageAgent();
       }
 
-      opportunity.districtId = opportunity.agent.districtId;
-      if (!opportunity.districtId) {
-        const postcode = new Postcode({ value: request.body.rac_plz });
-        const district = await getDistrictFromPostcode(postcode);
-        if (district) {
-          opportunity.district = district;
-        }
-      }
+      const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
+      Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       const id = await writeOpportunityLegacy(opportunity);
 
