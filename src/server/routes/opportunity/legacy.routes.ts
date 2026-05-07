@@ -23,6 +23,7 @@ import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportu
 import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
+  getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -76,6 +77,9 @@ export default async function opportunityLegacyRoutes(
       if (!opportunity.agent) {
         opportunity.agent = await getOpportunityOrphanageAgent();
       }
+
+      const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
+      Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       const id = await writeOpportunityLegacy(opportunity);
 
