@@ -9,9 +9,9 @@ import {
 import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -38,7 +38,7 @@ import {
 } from "../../types";
 import {
   addComments2Entity,
-  getCategoryToProfileHandler,
+  getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
@@ -81,9 +81,9 @@ export default async function opportunityRoutes(
       const id = request.params.id;
       const relations = [
         "accompanying",
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
-        "deal.profile.profileSkill.skill",
+        "deal.dealLanguage.language",
+        "deal.dealActivity.activity",
+        "deal.dealSkill.skill",
         "deal.location.locationDistrict.district",
         "deal.time.timeTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
@@ -175,9 +175,9 @@ export default async function opportunityRoutes(
       );
 
       const relations = [
-        "deal.profile.profileActivity.activity",
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
+        "deal.dealActivity.activity",
+        "deal.dealLanguage.language",
+        "deal.dealActivity.activity",
         "deal.time.timeTimeslot.timeslot",
         "deal.location.locationDistrict.district",
         "agent",
@@ -193,8 +193,8 @@ export default async function opportunityRoutes(
         ...(order ? order : {}),
       });
 
-      const { addCategoryToProfile, updates: profileUpdates } =
-        getCategoryToProfileHandler();
+      const { addCategoryToDeal, updates: dealUpdates } =
+        getCategoryToDealHandler();
 
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
@@ -206,23 +206,23 @@ export default async function opportunityRoutes(
             await addDistrictToOpportunity(opportunity),
           );
           Object.assign(
-            opportunity.deal.profile,
-            addCategoryToProfile(opportunity.deal.profile),
+            opportunity.deal,
+            addCategoryToDeal(opportunity.deal),
           );
           return opportunity;
         }),
       );
 
-      if (profileUpdates.length > 0) {
-        const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(profileUpdates);
+      if (dealUpdates.length > 0) {
+        const dealRepository = fastify.db.dealRepository;
+        await dealRepository.save(dealUpdates);
       }
 
       if (opportunityUpdates.length > 0) {
         await opportunityRepository.save(opportunityUpdates);
       }
       logger.debug(
-        `Saving category updates: ${profileUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+        `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
       const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
@@ -344,7 +344,7 @@ export default async function opportunityRoutes(
       if (languages) {
         const success = await updateOptionList(
           dealId,
-          ProfileLanguage,
+          DealLanguage,
           languages,
         );
         if (!success) {
@@ -357,7 +357,7 @@ export default async function opportunityRoutes(
       if (activities) {
         const success = await updateOptionList(
           dealId,
-          ProfileActivity,
+          DealActivity,
           activities,
         );
         if (!success) {
@@ -368,7 +368,7 @@ export default async function opportunityRoutes(
       }
 
       if (skills) {
-        const success = await updateOptionList(dealId, ProfileSkill, skills);
+        const success = await updateOptionList(dealId, DealSkill, skills);
         if (!success) {
           throw new BadRequestError(
             `Skills for opportunity (deal_id:${dealId}) not updated.`,

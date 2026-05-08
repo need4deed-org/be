@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type Profile from "../../../../data/entity/profile/profile.entity";
+import type Deal from "../../../../data/entity/deal.entity";
 import { categorize } from "../../../../data/lib";
-import { getCategoryToProfileHandler } from "../../../../server/utils";
+import { getCategoryToDealHandler } from "../../../../server/utils";
 
 vi.mock("../../../../data/lib", () => ({
   categorize: vi.fn(),
@@ -10,147 +10,147 @@ vi.mock("../../../../data/lib", () => ({
 
 const mockedCategorize = vi.mocked(categorize);
 
-function makeProfile(overrides: Partial<Profile> = {}): Profile {
+function makeDeal(overrides: Partial<Deal> = {}): Deal {
   return {
-    id: "profile-1",
+    id: 1,
     categoryId: undefined,
-    profileActivity: [],
+    dealActivity: [],
     ...overrides,
-  } as Profile;
+  } as Deal;
 }
 
-describe("getCategoryToProfileHandler", () => {
+describe("getCategoryToDealHandler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("addCategoryToProfile", () => {
-    it("returns the profile unchanged when it already has a categoryId", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ categoryId: 100 });
+  describe("addCategoryToDeal", () => {
+    it("returns the deal unchanged when it already has a categoryId", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ categoryId: 100 });
 
-      const result = handler.addCategoryToProfile(profile);
+      const result = handler.addCategoryToDeal(deal);
 
-      expect(result).toBe(profile);
+      expect(result).toBe(deal);
       expect(result.categoryId).toBe(100);
       expect(mockedCategorize).not.toHaveBeenCalled();
     });
 
-    it("calls categorize with activity categoryIds from profileActivity", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({
-        profileActivity: [
+    it("calls categorize with activity categoryIds from dealActivity", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({
+        dealActivity: [
           { activity: { categoryId: 100 } },
           { activity: { categoryId: 200 } },
         ] as any,
       });
       mockedCategorize.mockReturnValue(undefined);
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(mockedCategorize).toHaveBeenCalledWith([100, 200]);
     });
 
-    it("calls categorize with an empty array when profileActivity is absent", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: undefined as any });
+    it("calls categorize with an empty array when dealActivity is absent", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: undefined as any });
       mockedCategorize.mockReturnValue(undefined);
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(mockedCategorize).toHaveBeenCalledWith([]);
     });
 
-    it("calls categorize with an empty array when profileActivity is empty", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+    it("calls categorize with an empty array when dealActivity is empty", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(undefined);
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(mockedCategorize).toHaveBeenCalledWith([]);
     });
 
-    it("assigns the categoryId returned by categorize and returns the mutated profile", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+    it("assigns the categoryId returned by categorize and returns the mutated deal", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(300);
 
-      const result = handler.addCategoryToProfile(profile);
+      const result = handler.addCategoryToDeal(deal);
 
-      expect(result).toBe(profile); // same reference — Object.assign mutates in place
+      expect(result).toBe(deal); // same reference — Object.assign mutates in place
       expect(result.categoryId).toBe(300);
     });
 
-    it("returns the profile unchanged when categorize returns falsy", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+    it("returns the deal unchanged when categorize returns falsy", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(undefined);
 
-      const result = handler.addCategoryToProfile(profile);
+      const result = handler.addCategoryToDeal(deal);
 
-      expect(result).toBe(profile);
+      expect(result).toBe(deal);
       expect(result.categoryId).toBeUndefined();
     });
   });
 
   describe("updates tracking", () => {
     it("starts with an empty updates array", () => {
-      const handler = getCategoryToProfileHandler();
+      const handler = getCategoryToDealHandler();
       expect(handler.updates).toEqual([]);
     });
 
-    it("adds a profile to updates when categorize resolves a categoryId", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+    it("adds a deal to updates when categorize resolves a categoryId", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(300);
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(handler.updates).toHaveLength(1);
-      expect(handler.updates[0]).toBe(profile);
+      expect(handler.updates[0]).toBe(deal);
     });
 
-    it("does not add to updates when profile already has a categoryId", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ categoryId: 200 });
+    it("does not add to updates when deal already has a categoryId", () => {
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ categoryId: 200 });
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(handler.updates).toHaveLength(0);
     });
 
     it("does not add to updates when categorize returns falsy", () => {
-      const handler = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+      const handler = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(undefined);
 
-      handler.addCategoryToProfile(profile);
+      handler.addCategoryToDeal(deal);
 
       expect(handler.updates).toHaveLength(0);
     });
 
-    it("accumulates multiple profiles across calls", () => {
-      const handler = getCategoryToProfileHandler();
-      const p1 = makeProfile({ id: 1000, profileActivity: [] });
-      const p2 = makeProfile({ id: 2000, profileActivity: [] });
+    it("accumulates multiple deals across calls", () => {
+      const handler = getCategoryToDealHandler();
+      const d1 = makeDeal({ id: 1000, dealActivity: [] });
+      const d2 = makeDeal({ id: 2000, dealActivity: [] });
       mockedCategorize.mockReturnValue(300);
 
-      handler.addCategoryToProfile(p1);
-      handler.addCategoryToProfile(p2);
+      handler.addCategoryToDeal(d1);
+      handler.addCategoryToDeal(d2);
 
       expect(handler.updates).toHaveLength(2);
-      expect(handler.updates).toContain(p1);
-      expect(handler.updates).toContain(p2);
+      expect(handler.updates).toContain(d1);
+      expect(handler.updates).toContain(d2);
     });
 
     it("each handler instance has its own independent updates array", () => {
-      const h1 = getCategoryToProfileHandler();
-      const h2 = getCategoryToProfileHandler();
-      const profile = makeProfile({ profileActivity: [] });
+      const h1 = getCategoryToDealHandler();
+      const h2 = getCategoryToDealHandler();
+      const deal = makeDeal({ dealActivity: [] });
       mockedCategorize.mockReturnValue(300);
 
-      h1.addCategoryToProfile(profile);
+      h1.addCategoryToDeal(deal);
 
       expect(h1.updates).toHaveLength(1);
       expect(h2.updates).toHaveLength(0);

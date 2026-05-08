@@ -11,23 +11,22 @@ import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
+import DealActivity from "../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../data/entity/m2m/deal-language";
+import DealSkill from "../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileActivity from "../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
-import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
 import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
 import logger from "../../logger";
 import {
+  getDealEntityByTitle,
   getLanguageTitle,
   getPostcode,
-  getProfileEntityByTitle,
   getTimeslot,
 } from "../../server/utils";
 
@@ -38,37 +37,37 @@ export async function dealParserOpportunity(
   const postcode = await getPostcode(String(formData.rac_plz));
 
   // activities
-  const profileActivity: ProfileActivity[] = [];
+  const dealActivity: DealActivity[] = [];
   const opportunityActivities = (formData.activities || []) as string[];
   for (const opportunityActivity of opportunityActivities) {
-    const profileEntity = await getProfileEntityByTitle(
+    const dealEntity = await getDealEntityByTitle(
       opportunityActivity,
       EntityTableName.ACTIVITY,
       Activity,
-      ProfileActivity,
+      DealActivity,
     );
-    if (profileEntity) {
-      profileActivity.push(profileEntity);
+    if (dealEntity) {
+      dealActivity.push(dealEntity);
     }
   }
 
   // skills
-  const profileSkill: ProfileSkill[] = [];
+  const dealSkill: DealSkill[] = [];
   const opportunitySkills = (formData.skills || []) as string[];
   for (const opportunitySkill of opportunitySkills) {
-    const profileEntity = await getProfileEntityByTitle(
+    const dealEntity = await getDealEntityByTitle(
       opportunitySkill,
       EntityTableName.SKILL,
       Skill,
-      ProfileSkill,
+      DealSkill,
     );
-    if (profileEntity) {
-      profileSkill.push(profileEntity);
+    if (dealEntity) {
+      dealSkill.push(dealEntity);
     }
   }
 
   // languages
-  const profileLanguage: ProfileLanguage[] = [];
+  const dealLanguage: DealLanguage[] = [];
 
   const opportunityLanguages: ApiLanguage[] = (await Promise.all(
     (formData.languages || [])
@@ -91,27 +90,18 @@ export async function dealParserOpportunity(
   )) as ApiLanguage[];
 
   for (const opportunityLanguage of opportunityLanguages) {
-    const profileEntity = await getProfileEntityByTitle(
+    const dealEntity = await getDealEntityByTitle(
       opportunityLanguage.title,
       EntityTableName.LANGUAGE,
       Language,
-      ProfileLanguage,
+      DealLanguage,
     );
 
-    if (profileEntity) {
-      profileEntity.proficiency = opportunityLanguage.proficiency;
-      profileLanguage.push(profileEntity);
+    if (dealEntity) {
+      dealEntity.proficiency = opportunityLanguage.proficiency;
+      dealLanguage.push(dealEntity);
     }
   }
-
-  // profile
-  const category = null;
-  const profile = new Profile({
-    category,
-    profileActivity,
-    profileSkill,
-    profileLanguage,
-  });
 
   // time
   const timeTimeslot: TimeTimeslot[] = [];
@@ -164,15 +154,15 @@ export async function dealParserOpportunity(
   const locationDistrict: LocationDistrict[] = [];
   const volunteerDistricts = (formData.berlin_locations || []) as string[];
   for (const volunteerDistrict of volunteerDistricts) {
-    const profileEntity = await getProfileEntityByTitle(
+    const dealEntity = await getDealEntityByTitle(
       volunteerDistrict,
       EntityTableName.NONE,
       District,
       LocationDistrict,
       "district",
     );
-    if (profileEntity) {
-      locationDistrict.push(profileEntity);
+    if (dealEntity) {
+      locationDistrict.push(dealEntity);
     }
   }
   const location = new Location({ locationDistrict });
@@ -181,7 +171,9 @@ export async function dealParserOpportunity(
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
     type,
-    profile,
+    dealActivity,
+    dealSkill,
+    dealLanguage,
     postcode,
     time,
     location,

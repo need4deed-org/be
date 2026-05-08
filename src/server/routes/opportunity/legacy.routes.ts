@@ -300,9 +300,9 @@ export default async function opportunityLegacyRoutes(
         },
         take: 300,
         relations: [
-          "deal.profile.profileLanguage.language",
-          "deal.profile.profileActivity.activity",
-          "deal.profile.profileSkill.skill",
+          "deal.dealLanguage.language",
+          "deal.dealActivity.activity",
+          "deal.dealSkill.skill",
           "deal.time.timeTimeslot.timeslot",
           "deal.location.locationDistrict.district",
           "accompanying",

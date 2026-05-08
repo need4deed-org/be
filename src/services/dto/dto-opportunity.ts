@@ -44,11 +44,11 @@ export function dtoOpportunityGetList(
   return {
     id: opportunity.id,
     title: opportunity.title,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     createdAt: opportunity.createdAt,
-    languages: opportunity.deal.profile.profileLanguage
+    languages: opportunity.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
         id: pl.language.id,
@@ -56,7 +56,7 @@ export function dtoOpportunityGetList(
         proficiency: pl.proficiency,
         purpose: pl.purpose,
       })),
-    activities: opportunity.deal.profile.profileActivity
+    activities: opportunity.deal.dealActivity
       .filter(Boolean)
       .map((pa) => ({
         id: pa.activity.id,
@@ -80,17 +80,17 @@ export function dtoVolunteerOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     createdAt: opportunity.createdAt,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
-    languages: opportunity.deal.profile.profileLanguage
+    languages: opportunity.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
         id: pl.language.id,
         title: pl.language.title,
         proficiency: pl.proficiency,
       })),
-    activities: opportunity.deal.profile.profileActivity
+    activities: opportunity.deal.dealActivity
       .filter(Boolean)
       .map((pa) => ({
         id: pa.activity.id,
@@ -116,10 +116,10 @@ export function dtoOpportunityGet(
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
-    category: { id: opportunityComments.deal.profile.categoryId },
+    category: { id: opportunityComments.deal.categoryId },
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
-    languages: opportunityComments.deal.profile.profileLanguage
+    languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
         id: pl.language.id,
@@ -127,12 +127,12 @@ export function dtoOpportunityGet(
         proficiency: pl.proficiency,
         purpose: pl.purpose,
       })),
-    activities: opportunityComments.deal.profile.profileActivity
+    activities: opportunityComments.deal.dealActivity
       .filter(Boolean)
       .map((pa) => ({
         id: pa.activity.id,
       })),
-    skills: opportunityComments.deal.profile.profileSkill
+    skills: opportunityComments.deal.dealSkill
       .filter(Boolean)
       .map((ps) => ({
         id: ps.skill.id,

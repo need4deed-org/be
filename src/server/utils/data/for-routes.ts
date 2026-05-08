@@ -54,7 +54,7 @@ export async function getPostcode(code: string): Promise<Postcode | null> {
   return postcode;
 }
 
-export async function getProfileEntityByTitle<
+export async function getDealEntityByTitle<
   E extends new () => { title: string; id: number },
   M extends object,
 >(
@@ -71,11 +71,11 @@ export async function getProfileEntityByTitle<
   );
 
   if (instance) {
-    const profileEntity = new m2mEntity({
+    const dealEntity = new m2mEntity({
       [key ? key : entityType.toLowerCase()]: instance,
     });
 
-    return profileEntity;
+    return dealEntity;
   }
 
   return null;
@@ -150,7 +150,7 @@ export async function addTranslatedFields(
   logger.info("Translating volunteers");
   for (const volunteer of volunteers) {
     try {
-      for (const pl of volunteer.deal.profile.profileLanguage) {
+      for (const pl of volunteer.deal.dealLanguage) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -162,7 +162,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal.profile.profileActivity) {
+      for (const pa of volunteer.deal.dealActivity) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -174,7 +174,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal.profile.profileSkill) {
+      for (const ps of volunteer.deal.dealSkill) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -355,7 +355,7 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     {
       relations: string[];
       idFieldNames: [
-        "accompanying" | "profile" | "location" | "time",
+        "accompanying" | "self" | "location" | "time",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
@@ -369,19 +369,19 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
         "language",
         "languageId",
       ],
-      relations: ["profile.profileLanguage"],
+      relations: ["dealLanguage"],
     },
-    ProfileLanguage: {
-      idFieldNames: ["profile", "profileId", "language", "languageId"],
-      relations: ["profile.profileLanguage"],
+    DealLanguage: {
+      idFieldNames: ["self", "dealId", "language", "languageId"],
+      relations: ["dealLanguage"],
     },
-    ProfileActivity: {
-      idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["profile.profileActivity"],
+    DealActivity: {
+      idFieldNames: ["self", "dealId", "activity", "activityId"],
+      relations: ["dealActivity"],
     },
-    ProfileSkill: {
-      idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["profile.profileSkill"],
+    DealSkill: {
+      idFieldNames: ["self", "dealId", "skill", "skillId"],
+      relations: ["dealSkill"],
     },
     LocationDistrict: {
       idFieldNames: ["location", "locationId", "district", "districtId"],
@@ -479,9 +479,8 @@ export async function updateOptionList<
         m2mEntity,
       );
 
-      const where = {
-        [hostId]: root[host].id,
-      } as FindOptionsWhere<M>;
+      const rootEntityId = host === "self" ? root.id : (root as Record<string, { id: number }>)[host].id;
+      const where = { [hostId]: rootEntityId } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
 
@@ -491,7 +490,7 @@ export async function updateOptionList<
 
       const newList = list.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: root[host].id,
+          [hostId]: rootEntityId,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {

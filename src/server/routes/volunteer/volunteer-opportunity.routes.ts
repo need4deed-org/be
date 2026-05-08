@@ -10,7 +10,7 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
-  getCategoryToProfileHandler,
+  getCategoryToDealHandler,
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
@@ -32,8 +32,8 @@ export default async function volunteerOpportunityRoutes(
     },
     async (request, reply) => {
       const relations = [
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
+        "deal.dealLanguage.language",
+        "deal.dealActivity.activity",
         "deal.location.locationDistrict.district",
         "deal.time.timeTimeslot.timeslot",
       ];
@@ -57,18 +57,18 @@ export default async function volunteerOpportunityRoutes(
         take,
       });
 
-      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
+      const { addCategoryToDeal, updates } = getCategoryToDealHandler();
       const opportunitiesCategory = opportunities.map((opportunity) => {
         Object.assign(
-          opportunity.deal.profile,
-          addCategoryToProfile(opportunity.deal.profile),
+          opportunity.deal,
+          addCategoryToDeal(opportunity.deal),
         );
         return opportunity;
       });
 
       if (updates.length > 0) {
-        const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(updates);
+        const dealRepository = fastify.db.dealRepository;
+        await dealRepository.save(updates);
       }
 
       const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);

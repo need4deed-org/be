@@ -2,13 +2,12 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
-import Profile from "../../../data/entity/profile/profile.entity";
 import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 
@@ -20,13 +19,12 @@ export async function writeVolunteerLegacy(
     // 1. Get all necessary repositories using the transactional entity manager
     const addressRepository = transactionalEntityManager.getRepository(Address);
     const personRepository = transactionalEntityManager.getRepository(Person);
-    const profileRepository = transactionalEntityManager.getRepository(Profile);
-    const profileActivityRepository =
-      transactionalEntityManager.getRepository(ProfileActivity);
-    const profileSkillRepository =
-      transactionalEntityManager.getRepository(ProfileSkill);
-    const profileLanguageRepository =
-      transactionalEntityManager.getRepository(ProfileLanguage);
+    const dealActivityRepository =
+      transactionalEntityManager.getRepository(DealActivity);
+    const dealSkillRepository =
+      transactionalEntityManager.getRepository(DealSkill);
+    const dealLanguageRepository =
+      transactionalEntityManager.getRepository(DealLanguage);
     const timeRepository = transactionalEntityManager.getRepository(Time);
     const timeTimeslotRepository =
       transactionalEntityManager.getRepository(TimeTimeslot);
@@ -44,30 +42,6 @@ export async function writeVolunteerLegacy(
 
     // Person
     await personRepository.save(volunteer.person);
-
-    // Profile
-    await profileRepository.save(volunteer.deal.profile);
-    const profileId = volunteer.deal.profile.id;
-
-    // Profile m2m relations (activities, skills, languages)
-    for (const profileActivity of volunteer.deal.profile.profileActivity) {
-      profileActivity.profileId = profileId;
-    }
-    await profileActivityRepository.save(
-      volunteer.deal.profile.profileActivity,
-    );
-
-    for (const profileSkill of volunteer.deal.profile.profileSkill) {
-      profileSkill.profileId = profileId;
-    }
-    await profileSkillRepository.save(volunteer.deal.profile.profileSkill);
-
-    for (const profileLanguage of volunteer.deal.profile.profileLanguage) {
-      profileLanguage.profileId = profileId;
-    }
-    await profileLanguageRepository.save(
-      volunteer.deal.profile.profileLanguage,
-    );
 
     // Time
     await timeRepository.save(volunteer.deal.time);
@@ -91,8 +65,27 @@ export async function writeVolunteerLegacy(
       volunteer.deal.location.locationDistrict,
     );
 
-    // Deal
+    // Deal (save first to get id)
     await dealRepository.save(volunteer.deal);
+    const dealId = volunteer.deal.id;
+
+    // DealActivity
+    for (const dealActivity of volunteer.deal.dealActivity) {
+      dealActivity.dealId = dealId;
+    }
+    await dealActivityRepository.save(volunteer.deal.dealActivity);
+
+    // DealSkill
+    for (const dealSkill of volunteer.deal.dealSkill) {
+      dealSkill.dealId = dealId;
+    }
+    await dealSkillRepository.save(volunteer.deal.dealSkill);
+
+    // DealLanguage
+    for (const dealLanguage of volunteer.deal.dealLanguage) {
+      dealLanguage.dealId = dealId;
+    }
+    await dealLanguageRepository.save(volunteer.deal.dealLanguage);
 
     // Volunteer
     await volunteerRepository.save(volunteer);

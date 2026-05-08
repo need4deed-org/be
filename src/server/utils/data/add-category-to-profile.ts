@@ -1,23 +1,22 @@
-import Profile from "../../../data/entity/profile/profile.entity";
+import Deal from "../../../data/entity/deal.entity";
 import { categorize } from "../../../data/lib";
 
-export function getCategoryToProfileHandler() {
-  const updates: Profile[] = [];
+export function getCategoryToDealHandler() {
+  const updates: Deal[] = [];
 
   return {
-    addCategoryToProfile(profile: Profile): Profile {
-      if (profile.categoryId) {
-        return profile;
+    addCategoryToDeal(deal: Deal): Deal {
+      if (deal.categoryId) {
+        return deal;
       }
       const categoryId = categorize(
-        profile?.profileActivity?.map(({ activity }) => activity.categoryId) ||
-          [],
+        deal.dealActivity?.map(({ activity }) => activity.categoryId) || [],
       );
       if (categoryId) {
-        updates.push(profile);
-        return Object.assign(profile, { categoryId });
+        updates.push(deal);
+        return Object.assign(deal, { categoryId });
       }
-      return profile;
+      return deal;
     },
     updates,
   };

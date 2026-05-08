@@ -27,10 +27,10 @@ import District from "../entity/location/district.entity";
 import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
+import DealActivity from "../entity/m2m/deal-activity";
+import DealLanguage from "../entity/m2m/deal-language";
+import DealSkill from "../entity/m2m/deal-skill";
 import LocationDistrict from "../entity/m2m/location-district";
-import ProfileActivity from "../entity/m2m/profile-activity";
-import ProfileLanguage from "../entity/m2m/profile-language";
-import ProfileSkill from "../entity/m2m/profile-skill";
 import TimeTimeslot from "../entity/m2m/time-timeslot";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
@@ -39,7 +39,6 @@ import Person from "../entity/person.entity";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
-import Profile from "../entity/profile/profile.entity";
 import Skill from "../entity/profile/skill.entity";
 import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
@@ -322,12 +321,11 @@ export async function createDeal(
   dataSource: DataSource,
 ): Promise<Deal> {
   const activityRepository = getRepository(dataSource, Activity);
-  const profileRepository = getRepository(dataSource, Profile);
-  const profileActivityRepository = getRepository(dataSource, ProfileActivity);
+  const dealActivityRepository = getRepository(dataSource, DealActivity);
   const skillRepository = getRepository(dataSource, Skill);
-  const profileSkillRepository = getRepository(dataSource, ProfileSkill);
+  const dealSkillRepository = getRepository(dataSource, DealSkill);
   const languageRepository = getRepository(dataSource, Language);
-  const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
+  const dealLanguageRepository = getRepository(dataSource, DealLanguage);
   const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
   const locationDistrictRepository = getRepository(
@@ -340,53 +338,6 @@ export async function createDeal(
     postcodeGetter = await getPostcodeGetter(dataSource);
   }
   const postcode = await postcodeGetter(dealData?.postcode);
-
-  const profile = new Profile({
-    info: dealData.profile.info,
-  });
-  await profileRepository.save(profile);
-
-  const categoryIds: number[] = [];
-  for (const title of dealData.profile.activities ?? []) {
-    const activity = await activityRepository.findOne({ where: { title } });
-    if (!activity) {
-      // logger.warn(`Activity ${title} not found. Skipping.`);
-      continue;
-    }
-    categoryIds.push(activity.categoryId);
-    const profileActivity = new ProfileActivity({
-      profile: profile,
-      activity,
-    });
-    await profileActivityRepository.save(profileActivity);
-  }
-
-  for (const title of dealData.profile.skills ?? []) {
-    const skill = await skillRepository.findOne({ where: { title } });
-    if (!skill) {
-      // logger.warn(`Skill ${title} not found. Skipping.`);
-      continue;
-    }
-    const profileSkill = new ProfileSkill({ profile, skill });
-    await profileSkillRepository.save(profileSkill);
-  }
-
-  for (const [title, level] of dealData.profile.languages ?? []) {
-    const language = await getLanguage(title, languageRepository);
-    if (!language) {
-      logger.warn(`Language ${title} not found. Skipping.`);
-      continue;
-    }
-
-    const profileLanguage = new ProfileLanguage({
-      profile,
-      language,
-      proficiency: level,
-    });
-    await profileLanguageRepository.save(profileLanguage);
-  }
-
-  profile.categoryId = categorize(categoryIds.filter(Boolean))!;
 
   const time = await createTime(dataSource, dealData.time);
 
@@ -407,11 +358,54 @@ export async function createDeal(
   const deal = new Deal({
     type: dealData.type,
     postcode,
-    profile,
     time,
     location,
   });
   await dealRepository.save(deal);
+
+  const categoryIds: number[] = [];
+  for (const title of dealData.profile.activities ?? []) {
+    const activity = await activityRepository.findOne({ where: { title } });
+    if (!activity) {
+      // logger.warn(`Activity ${title} not found. Skipping.`);
+      continue;
+    }
+    categoryIds.push(activity.categoryId);
+    const dealActivity = new DealActivity({
+      deal,
+      activity,
+    });
+    await dealActivityRepository.save(dealActivity);
+  }
+
+  for (const title of dealData.profile.skills ?? []) {
+    const skill = await skillRepository.findOne({ where: { title } });
+    if (!skill) {
+      // logger.warn(`Skill ${title} not found. Skipping.`);
+      continue;
+    }
+    const dealSkill = new DealSkill({ deal, skill });
+    await dealSkillRepository.save(dealSkill);
+  }
+
+  for (const [title, level] of dealData.profile.languages ?? []) {
+    const language = await getLanguage(title, languageRepository);
+    if (!language) {
+      logger.warn(`Language ${title} not found. Skipping.`);
+      continue;
+    }
+
+    const dealLanguage = new DealLanguage({
+      deal,
+      language,
+      proficiency: level,
+    });
+    await dealLanguageRepository.save(dealLanguage);
+  }
+
+  deal.categoryId = categorize(categoryIds.filter(Boolean))!;
+  await dealRepository.save(deal);
+
   return deal;
 }
 

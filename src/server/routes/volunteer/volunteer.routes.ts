@@ -10,10 +10,10 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
@@ -55,9 +55,9 @@ export default async function volunteerRoutes(
     "person.address.postcode",
     "deal",
     "deal.postcode",
-    "deal.profile.profileActivity.activity",
-    "deal.profile.profileSkill.skill",
-    "deal.profile.profileLanguage.language",
+    "deal.dealActivity.activity",
+    "deal.dealSkill.skill",
+    "deal.dealLanguage.language",
     "deal.time.timeTimeslot.timeslot",
     "deal.location.locationPostcode.postcode",
     "deal.location.locationDistrict.district",
@@ -273,7 +273,7 @@ export default async function volunteerRoutes(
         if (languages) {
           const success = await updateOptionList(
             id,
-            ProfileLanguage,
+            DealLanguage,
             languages,
           );
           if (!success) {
@@ -306,7 +306,7 @@ export default async function volunteerRoutes(
         if (activities) {
           const success = await updateOptionList(
             dealId,
-            ProfileActivity,
+            DealActivity,
             activities,
           );
           if (!success) {
@@ -317,7 +317,7 @@ export default async function volunteerRoutes(
         }
 
         if (skills) {
-          const success = await updateOptionList(dealId, ProfileSkill, skills);
+          const success = await updateOptionList(dealId, DealSkill, skills);
           if (!success) {
             return reply.status(400).send({
               message: `Skills for volunteer (deal_id:${dealId}) not updated.`,
