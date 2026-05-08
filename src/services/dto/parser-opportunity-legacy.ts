@@ -1,9 +1,15 @@
-import { OpportunityLegacyFormData, OpportunityType } from "need4deed-sdk";
+import {
+  OpportunityLegacyFormData,
+  OpportunityType,
+  TranslatedIntoType,
+} from "need4deed-sdk";
+import Postcode from "../../data/entity/location/postcode.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import { getDistrictByTitle, getDistrictFromPostcode } from "../../data/utils";
 
-export function parseOpportunityLegacy(
+export async function parseOpportunityLegacy(
   body: OpportunityLegacyFormData,
-): Opportunity {
+): Promise<Opportunity> {
   const type =
     body.opportunity_type === "accompanying"
       ? OpportunityType.ACCOMPANYING
@@ -11,12 +17,21 @@ export function parseOpportunityLegacy(
         ? OpportunityType.EVENTS
         : OpportunityType.REGULAR;
 
-  return {
+  return new Opportunity({
     title: body.title,
     type,
     numberVolunteers: body.volunteers_number,
     info: body.vo_information,
-    translationType: body.accomp_translation,
+    ...(body.accomp_translation
+      ? { translationType: body.accomp_translation as TranslatedIntoType }
+      : {}),
     infoConfidential: body.accomp_information,
-  } as Opportunity;
+    district:
+      type === OpportunityType.ACCOMPANYING
+        ? ((await getDistrictFromPostcode(
+            new Postcode({ value: body.accomp_postcode }),
+          )) ?? undefined)
+        : ((await getDistrictByTitle(body.berlin_locations?.[0] ?? "")) ??
+          undefined),
+  });
 }
