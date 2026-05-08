@@ -55,7 +55,10 @@ export default async function opportunityLegacyRoutes(
       },
     },
     async (request, reply) => {
-      const opportunity = parseFormData(request.body, parseOpportunityLegacy);
+      const opportunity = await parseFormData(
+        request.body,
+        parseOpportunityLegacy,
+      );
 
       opportunity.deal = await dealParserOpportunity(request.body);
       opportunity.accompanying =
