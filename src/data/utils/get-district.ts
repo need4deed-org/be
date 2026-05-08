@@ -23,3 +23,13 @@ export async function getDistrictFromPostcode(
   }
   return null;
 }
+
+export async function getDistrictByTitle(
+  title: string,
+): Promise<District | null> {
+  const districtRepository = getRepository(dataSource, District);
+  const district = await districtRepository.findOne({
+    where: { title },
+  });
+  return district;
+}
