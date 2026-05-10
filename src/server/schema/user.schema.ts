@@ -7,7 +7,11 @@ export const createUserBodySchema = {
     email: { type: "string", format: "email" },
     password: { type: ["string", "null"], minLength: 8, maxLength: 50 },
     isActive: { type: "boolean", default: false },
-    role: { type: "string", default: "user", enum: ["user", "admin"] }, // Example roles
+    role: {
+      type: "string",
+      default: "user",
+      enum: ["user", "admin", "coordinator", "volunteer", "agent"],
+    },
     language: { type: "string", default: "en", pattern: "^[a-z]{2}$" }, // e.g., 'en', 'es'
     timezone: { type: "string", default: "CET" },
     person: {
