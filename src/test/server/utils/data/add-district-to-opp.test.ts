@@ -73,7 +73,7 @@ describe("getDistrictToOpportunityHandler", () => {
         const handler = getDistrictToOpportunityHandler();
         const district = makeDistrict({ id: 5 });
         const opportunity = makeOpportunity({
-          type: OpportunityType.BREAD_DELIVERY, // Non-accompanying type
+          type: OpportunityType.REGULAR, // Non-accompanying type
           deal: {
             location: {
               locationDistrict: [{ district }],
