@@ -8,7 +8,7 @@ export function dtoOpportunityAccompanying(
     ? {
         appointmentAddress: accompanying.address,
         appointmentDate: accompanying.date.toDateString(),
-        appointmentTime: accompanying.date.toTimeString().slice(0, 5),
+        appointmentTime: `${String(accompanying.date.getUTCHours()).padStart(2, "0")}:${String(accompanying.date.getUTCMinutes()).padStart(2, "0")}`,
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
         languageToTranslate: accompanying.langCode,
