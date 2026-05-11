@@ -268,15 +268,15 @@ describe("getDateObj()", () => {
     expect(result.getFullYear()).toBe(2026);
     expect(result.getMonth()).toBe(2); // March is 0-indexed
     expect(result.getDate()).toBe(11);
-    expect(result.getHours()).toBe(14);
-    expect(result.getMinutes()).toBe(30);
+    expect(result.getUTCHours()).toBe(14);
+    expect(result.getUTCMinutes()).toBe(30);
   });
 
   it("should handle single digit hours and minutes correctly", () => {
     const result = getDateObj("2026-05-20", "09:05");
 
-    expect(result.getHours()).toBe(9);
-    expect(result.getMinutes()).toBe(5);
+    expect(result.getUTCHours()).toBe(9);
+    expect(result.getUTCMinutes()).toBe(5);
   });
 
   it("should throw BadRequestError if the date string is invalid", () => {
