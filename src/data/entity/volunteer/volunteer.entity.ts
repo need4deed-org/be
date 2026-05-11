@@ -122,6 +122,18 @@ export default class Volunteer {
   })
   preferredCommunicationType: VolunteerCommunicationType[];
 
+  @Column({ nullable: true, type: "timestamp" })
+  @IsOptional()
+  statusVaccinationDate: Date | null;
+
+  @Column({ nullable: true, type: "timestamp" })
+  @IsOptional()
+  statusCGCApplicationDate: Date | null;
+
+  @Column({ nullable: true, type: "timestamp" })
+  @IsOptional()
+  statusCGCDate: Date | null;
+
   @Column({ nullable: true })
   @IsOptional()
   dateReturn: Date;
