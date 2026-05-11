@@ -141,8 +141,8 @@ export function isProbablyFileSystemPath(str: string): boolean {
 export function getDateObj(date: string, time: string): Date {
   const [hours, minutes] = time?.split(":") || "";
   const dateObj = new Date(date);
-  dateObj.setHours(Number(hours));
-  dateObj.setMinutes(Number(minutes));
+  dateObj.setUTCHours(Number(hours));
+  dateObj.setUTCMinutes(Number(minutes));
 
   if (isNaN(dateObj.getTime())) {
     throw new BadRequestError("Date and/or time is invalid.");
