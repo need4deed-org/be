@@ -85,6 +85,7 @@ existing migration files — create a new migration instead.
 3. Keep PRs small and focused on one thing
 4. Never commit `.env` or any credentials
 5. If unsure about data protection implications of a change, ask before implementing
+6. default branch is `develop`. always merge feature branches to it!
 
 ---
 
@@ -95,6 +96,7 @@ existing migration files — create a new migration instead.
 - Do not change existing migration files
 - Do not duplicate types that already exist in the SDK
 - Do not merge your own PRs — always get a review
+- do not merge anything into `main`. it's solely for production deployments
 
 ---
 
