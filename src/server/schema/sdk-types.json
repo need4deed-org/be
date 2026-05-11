@@ -622,7 +622,7 @@
     "OpportunityStatusType": {
       "$id": "OpportunityStatusType",
       "type": "string",
-      "enum": ["opp-new", "opp-searching", "opp-active", "opp-past"]
+      "enum": ["opp-new", "opp-searching", "opp-active", "opp-inactive", "opp-past"]
     },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
