@@ -17,6 +17,14 @@ export async function parseOpportunityLegacy(
         ? OpportunityType.EVENTS
         : OpportunityType.REGULAR;
 
+  const district =
+    type === OpportunityType.ACCOMPANYING
+      ? ((await getDistrictFromPostcode(
+          new Postcode({ value: body.accomp_postcode }),
+        )) ?? undefined)
+      : ((await getDistrictByTitle(body.berlin_locations?.[0] ?? "")) ??
+        undefined);
+
   return new Opportunity({
     title: body.title,
     type,
@@ -26,12 +34,6 @@ export async function parseOpportunityLegacy(
       ? { translationType: body.accomp_translation as TranslatedIntoType }
       : {}),
     infoConfidential: body.accomp_information,
-    district:
-      type === OpportunityType.ACCOMPANYING
-        ? ((await getDistrictFromPostcode(
-            new Postcode({ value: body.accomp_postcode }),
-          )) ?? undefined)
-        : ((await getDistrictByTitle(body.berlin_locations?.[0] ?? "")) ??
-          undefined),
+    districtId: district?.id,
   });
 }
