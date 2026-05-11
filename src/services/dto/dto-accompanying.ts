@@ -7,7 +7,7 @@ export function dtoOpportunityAccompanying(
   return accompanying
     ? {
         appointmentAddress: accompanying.address,
-        appointmentDate: accompanying.date.toDateString(),
+        appointmentDate: accompanying.date.toISOString().split("T")[0],
         appointmentTime: accompanying.date.toTimeString().slice(0, 5),
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
