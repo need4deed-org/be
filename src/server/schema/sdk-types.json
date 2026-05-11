@@ -383,7 +383,8 @@
         "whatsapp",
         "signal",
         "sms",
-        "voicenote"
+        "voicenote",
+        "video-call"
       ]
     },
     "CommunicationType": {
