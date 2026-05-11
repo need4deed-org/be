@@ -1,4 +1,4 @@
-import { OpportunityType } from "need4deed-sdk";
+import District from "../../../data/entity/location/district.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 
@@ -12,13 +12,11 @@ export function getDistrictToOpportunityHandler() {
       if (!opportunity || opportunity.districtId) {
         return opportunity;
       }
-      if (opportunity.type !== OpportunityType.ACCOMPANYING) {
-        const district =
-          opportunity.deal?.location?.locationDistrict?.[0]?.district;
-        if (district) {
-          opportunity.district = district;
-          updates.push(opportunity);
-        }
+      let district: District | null =
+        opportunity.deal?.location?.locationDistrict?.[0]?.district;
+      if (district) {
+        opportunity.district = district;
+        updates.push(opportunity);
         return opportunity;
       }
       if (opportunity.agent?.districtId) {
@@ -26,7 +24,7 @@ export function getDistrictToOpportunityHandler() {
         updates.push(opportunity);
         return opportunity;
       }
-      const district = await getDistrictFromPostcode(
+      district = await getDistrictFromPostcode(
         opportunity.agent?.address?.postcode,
       );
       if (district) {
