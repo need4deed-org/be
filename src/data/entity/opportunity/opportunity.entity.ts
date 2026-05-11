@@ -16,6 +16,7 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import Deal from "../deal.entity";
+import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Appreciation from "../volunteer/appreciation.entity";
 import Accompanying from "./accompanying.entity";
@@ -93,23 +94,26 @@ export default class Opportunity {
   })
   @JoinColumn({ name: "accompanying_id" })
   accompanying?: Accompanying;
-
   @Column({ nullable: true })
-  accompanyingId: number;
+  accompanyingId?: number;
 
   @ManyToOne(() => Deal)
   @JoinColumn({ name: "deal_id" })
   deal: Deal;
-
   @Column({ nullable: true })
   dealId: number;
 
   @ManyToOne(() => Agent)
   @JoinColumn({ name: "agent_id" })
   agent?: Agent;
-
   @Column({ nullable: true })
-  agentId: number;
+  agentId?: number;
+
+  @ManyToOne(() => District)
+  @JoinColumn({ name: "district_id" })
+  district?: District;
+  @Column({ nullable: true })
+  districtId?: number;
 
   @OneToMany(
     () => OpportunityVolunteer,
