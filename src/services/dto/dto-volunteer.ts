@@ -16,7 +16,6 @@ import {
   getTitles,
 } from "./utils";
 
-const city = "Berlin";
 
 export function volunteerListSerializer(
   volunteer: Volunteer,
@@ -65,7 +64,6 @@ export function volunteerSerializer(
     ? {
         ...volunteer.person.address,
         id: volunteer.person.address.id,
-        city,
         postcode: {
           ...volunteer.person.address.postcode,
           id: volunteer.person.address.postcode.id,
