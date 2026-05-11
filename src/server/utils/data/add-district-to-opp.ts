@@ -9,9 +9,6 @@ export function getDistrictToOpportunityHandler() {
     async addDistrictToOpportunity(
       opportunity: Opportunity,
     ): Promise<Opportunity> {
-      if (!opportunity || opportunity.districtId) {
-        return opportunity;
-      }
       if (opportunity.type !== OpportunityType.ACCOMPANYING) {
         const district =
           opportunity.deal?.location?.locationDistrict?.[0]?.district;
@@ -21,16 +18,26 @@ export function getDistrictToOpportunityHandler() {
         }
         return opportunity;
       }
+      // accompanying: use appointment postcode from the form
+      const district = await getDistrictFromPostcode(
+        opportunity.deal?.postcode,
+      );
+      if (district) {
+        opportunity.district = district;
+        updates.push(opportunity);
+        return opportunity;
+      }
+      // fallback to agent
       if (opportunity.agent?.districtId) {
         opportunity.districtId = opportunity.agent.districtId;
         updates.push(opportunity);
         return opportunity;
       }
-      const district = await getDistrictFromPostcode(
+      const districtFromAgent = await getDistrictFromPostcode(
         opportunity.agent?.address?.postcode,
       );
-      if (district) {
-        opportunity.district = district;
+      if (districtFromAgent) {
+        opportunity.district = districtFromAgent;
         updates.push(opportunity);
       }
       return opportunity;
