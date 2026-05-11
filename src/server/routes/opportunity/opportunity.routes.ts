@@ -306,12 +306,15 @@ export default async function opportunityRoutes(
       }
 
       if (accompanying) {
-        const languageToTranslate = await getTranslationType(
-          Number(accompanying.languageToTranslate),
-        );
+        const languageToTranslate = accompanying.languageToTranslate
+          ? await getTranslationType(Number(accompanying.languageToTranslate))
+          : undefined;
+        const patchData = languageToTranslate !== undefined
+          ? Object.assign(accompanying, { languageToTranslate })
+          : accompanying;
         const success = await patchEntity(
           Accompanying,
-          Object.assign(accompanying, { languageToTranslate }),
+          patchData,
           opportunity.accompanyingId,
         );
         if (!success) {
