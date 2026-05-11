@@ -1,3 +1,4 @@
+import { Voidable } from "../../server/utils";
 import { dataSource } from "../data-source";
 import District from "../entity/location/district.entity";
 import Postcode from "../entity/location/postcode.entity";
@@ -5,7 +6,7 @@ import DistrictPostcode from "../entity/m2m/district-postcode";
 import { getRepository } from "./get-repository";
 
 export async function getDistrictFromPostcode(
-  postcode: Postcode,
+  postcode: Voidable<Postcode>,
 ): Promise<District | null> {
   if (postcode?.id) {
     const districtPostcodeRepository = getRepository(
@@ -21,4 +22,14 @@ export async function getDistrictFromPostcode(
     }
   }
   return null;
+}
+
+export async function getDistrictByTitle(
+  title: string,
+): Promise<District | null> {
+  const districtRepository = getRepository(dataSource, District);
+  const district = await districtRepository.findOne({
+    where: { title },
+  });
+  return district;
 }
