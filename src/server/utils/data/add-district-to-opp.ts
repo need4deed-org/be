@@ -9,6 +9,9 @@ export function getDistrictToOpportunityHandler() {
     async addDistrictToOpportunity(
       opportunity: Opportunity,
     ): Promise<Opportunity> {
+      if (opportunity.districtId) {
+        return opportunity;
+      }
       if (opportunity.type !== OpportunityType.ACCOMPANYING) {
         const district =
           opportunity.deal?.location?.locationDistrict?.[0]?.district;
