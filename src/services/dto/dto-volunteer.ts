@@ -130,6 +130,7 @@ export function volunteerSerializer(
   const languages = getLanguages(volunteer.deal.profile.profileLanguage);
   const availability = getAvailability(volunteer.deal.time.timeTimeslot);
 
+  // TODO: remove cast once need4deed-sdk >= 0.0.82 is published (adds statusVaccinationDate etc.)
   return {
     id: volunteer.id,
     person,
@@ -160,5 +161,5 @@ export function volunteerSerializer(
     activities,
     skills,
     locations,
-  };
+  } as unknown as ApiVolunteerGet;
 }
