@@ -42,6 +42,8 @@ export function volunteerListSerializer(
       id,
       statusEngagement,
       statusType,
+      statusMatch: volunteer.statusMatch,
+      statusCommunication: volunteer.statusCommunication,
       name,
       avatarUrl,
       languages,
