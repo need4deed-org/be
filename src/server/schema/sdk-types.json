@@ -644,8 +644,13 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
+        "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
         "category": {
+          "type": "object",
+          "properties": { "id": { "type": "integer" } }
+        },
+        "district": {
           "type": "object",
           "properties": { "id": { "type": "integer" } }
         }
@@ -672,7 +677,6 @@
             "createdAt": { "type": "string", "format": "date-time" },
             "description": { "type": "string" },
             "numberOfVolunteers": { "type": "integer" },
-
             "skills": { "type": "array", "items": { "$ref": "OptionById" } },
             "location": { "type": "array", "items": { "$ref": "OptionById" } },
             "contact": {

@@ -45,6 +45,9 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
+    ...(opportunity.districtId
+      ? { district: { id: opportunity.districtId } }
+      : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     createdAt: opportunity.createdAt,
@@ -61,11 +64,16 @@ export function dtoOpportunityGetList(
       .map((pa) => ({
         id: pa.activity.id,
       })),
+    location: opportunity.deal.location.locationDistrict
+      .filter(Boolean)
+      .map((ld) => ({
+        id: ld.district.id,
+      })),
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     statusMatch: opportunity.statusMatch,
-  };
+  } as ApiOpportunityGetList;
 }
 
 export function dtoVolunteerOpportunityGetList(
@@ -76,6 +84,9 @@ export function dtoVolunteerOpportunityGetList(
     title: opportunity.title,
     createdAt: opportunity.createdAt,
     category: { id: opportunity.deal.profile.categoryId },
+    ...(opportunity.districtId
+      ? { district: { id: opportunity.districtId } }
+      : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     languages: opportunity.deal.profile.profileLanguage
@@ -99,7 +110,7 @@ export function dtoVolunteerOpportunityGetList(
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     statusMatch: opportunity.statusMatch,
-  };
+  } as ApiVolunteerOpportunityGetList;
 }
 
 export function dtoOpportunityGet(
@@ -112,6 +123,9 @@ export function dtoOpportunityGet(
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
     category: { id: opportunityComments.deal.profile.categoryId },
+    ...(opportunityComments.districtId
+      ? { district: { id: opportunityComments.districtId } }
+      : {}),
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     languages: opportunityComments.deal.profile.profileLanguage
@@ -147,5 +161,5 @@ export function dtoOpportunityGet(
     ),
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
-  };
+  } as ApiOpportunityGet;
 }
