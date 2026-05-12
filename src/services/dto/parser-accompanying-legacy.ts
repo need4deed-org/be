@@ -1,14 +1,15 @@
 import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
+import { getPostcode } from "../../server/utils/data/for-routes";
 
 // Parses a datetime string as Europe/Berlin time when no timezone is specified.
 // Uses the Intl API so DST transitions (CET⇔CEST) are handled automatically.
 function parseAccompDatetime(value: string | undefined): Date {
-  if (!value) return new Date(NaN);
-  if (/Z|[+-]\d{2}:?\d{2}$/.test(value)) return new Date(value);
+  if (!value) {return new Date(NaN);}
+  if (/Z|[+-]\d{2}:?\d{2}$/.test(value)) {return new Date(value);}
 
   const asIfUtc = new Date(value + "Z");
-  if (isNaN(asIfUtc.getTime())) return asIfUtc;
+  if (isNaN(asIfUtc.getTime())) {return asIfUtc;}
 
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Berlin",
@@ -33,9 +34,9 @@ function parseAccompDatetime(value: string | undefined): Date {
   return new Date(asIfUtc.getTime() - (berlinAsUtcMs - asIfUtc.getTime()));
 }
 
-export function accompanyingParserOpportunity(
+export async function accompanyingParserOpportunity(
   body: OpportunityLegacyFormData,
-): Accompanying {
+): Promise<Accompanying> {
   const accompanying = new Accompanying({
     address: body.accomp_address,
     name: body.accomp_name,
@@ -43,6 +44,10 @@ export function accompanyingParserOpportunity(
     date: parseAccompDatetime(body.accomp_datetime),
     languageToTranslate: body.accomp_translation as TranslatedIntoType,
   });
+
+  if (body.accomp_postcode) {
+    accompanying.postcode = await getPostcode(body.accomp_postcode);
+  }
 
   return accompanying;
 }

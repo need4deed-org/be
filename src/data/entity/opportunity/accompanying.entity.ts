@@ -1,6 +1,14 @@
 import { IsDate, IsEnum, IsOptional, IsString } from "class-validator";
 import { TranslatedIntoType } from "need4deed-sdk";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import Postcode from "../location/postcode.entity";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
@@ -40,6 +48,13 @@ export default class Accompanying {
   @IsOptional()
   @IsEnum(TranslatedIntoType)
   languageToTranslate?: TranslatedIntoType;
+
+  @ManyToOne(() => Postcode, (postcode) => postcode.accompanying, {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "postcode_id" })
+  postcode?: Postcode;
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.accompanying)
   opportunity: Opportunity;
