@@ -246,6 +246,11 @@
       "type": "string",
       "enum": ["opp-pending", "opp-matched", "opp-active", "opp-past"]
     },
+    "TranslatedIntoType": {
+      "$id": "TranslatedIntoType",
+      "type": "string",
+      "enum": ["deutsche", "englishOk", "noTranslation"]
+    },
     "OptionItem": {
       "$id": "OptionItem",
       "type": "object",
@@ -590,17 +595,7 @@
             "district": { "type": "string" }
           }
         },
-        "accompanyingDetails": {
-          "type": "object",
-          "properties": {
-            "appointmentAddress": { "type": "string" },
-            "appointmentDate": { "type": "string" },
-            "appointmentTime": { "type": "string" },
-            "refugeeNumber": { "type": "string" },
-            "refugeeName": { "type": "string" },
-            "languagesToTranslate": { "type": "integer" }
-          }
-        }
+        "accompanyingDetails": { "$ref": "ApiAccompanying#" }
       },
       "additionalProperties": false
     },
@@ -896,7 +891,11 @@
         "appointmentTime": { "type": "string" },
         "refugeeNumber": { "type": "string" },
         "refugeeName": { "type": "string" },
-        "languageToTranslate": { "type": "integer" }
+        "appointmentLanguage": { "$ref": "TranslatedIntoType#" },
+        "refugeeLanguage": {
+          "type": "array",
+          "items": { "$ref": "OptionById#" }
+        }
       }
     },
     "ApiOrganizationPatch": {
