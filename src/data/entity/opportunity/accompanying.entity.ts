@@ -51,7 +51,7 @@ export default class Accompanying {
 
   @ManyToOne(() => Postcode, (postcode) => postcode.accompanying, {
     nullable: true,
-    onDelete: "CASCADE",
+    onDelete: "SET NULL",
   })
   @JoinColumn({ name: "postcode_id" })
   postcode?: Postcode;
