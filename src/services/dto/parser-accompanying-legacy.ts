@@ -1,15 +1,21 @@
 import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
-import { getPostcode } from "../../server/utils/data/for-routes";
+import { getPostcode } from "../../data/utils";
 
 // Parses a datetime string as Europe/Berlin time when no timezone is specified.
 // Uses the Intl API so DST transitions (CET⇔CEST) are handled automatically.
 function parseAccompDatetime(value: string | undefined): Date {
-  if (!value) {return new Date(NaN);}
-  if (/Z|[+-]\d{2}:?\d{2}$/.test(value)) {return new Date(value);}
+  if (!value) {
+    return new Date(NaN);
+  }
+  if (/Z|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(value);
+  }
 
   const asIfUtc = new Date(value + "Z");
-  if (isNaN(asIfUtc.getTime())) {return asIfUtc;}
+  if (isNaN(asIfUtc.getTime())) {
+    return asIfUtc;
+  }
 
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Berlin",
