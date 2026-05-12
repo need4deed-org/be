@@ -41,18 +41,7 @@ import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 
-export async function getPostcode(code: string): Promise<Postcode | null> {
-  const postcodeRepository = getRepository(dataSource, Postcode);
-
-  let postcode = await postcodeRepository.findOneBy({ value: code });
-
-  if (!postcode) {
-    postcode = new Postcode({ value: code });
-    await postcodeRepository.save(postcode);
-  }
-
-  return postcode;
-}
+export { getPostcode } from "../../../data/utils";
 
 export async function getProfileEntityByTitle<
   E extends new () => { title: string; id: number },
