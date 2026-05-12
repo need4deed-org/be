@@ -63,7 +63,7 @@ export default async function opportunityLegacyRoutes(
       opportunity.deal = await dealParserOpportunity(request.body);
       opportunity.accompanying =
         request.body.opportunity_type === "accompanying"
-          ? accompanyingParserOpportunity(request.body)
+          ? await accompanyingParserOpportunity(request.body)
           : undefined;
 
       const getAgentByPostcodeTryCatch = tryCatchFn(getAgentByPostcode, (err) =>
