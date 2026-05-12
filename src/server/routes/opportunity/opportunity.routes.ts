@@ -44,7 +44,6 @@ import {
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
-  getTranslationType,
   patchEntity,
   updateOptionList,
 } from "../../utils";
@@ -300,16 +299,9 @@ export default async function opportunityRoutes(
       }
 
       if (accompanying) {
-        const languageToTranslate = accompanying.languageToTranslate
-          ? await getTranslationType(Number(accompanying.languageToTranslate))
-          : undefined;
-        const patchData =
-          languageToTranslate !== undefined
-            ? Object.assign(accompanying, { languageToTranslate })
-            : accompanying;
         const success = await patchEntity(
           Accompanying,
-          patchData,
+          accompanying,
           opportunity.accompanyingId,
         );
         if (!success) {
