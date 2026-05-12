@@ -595,17 +595,7 @@
             "district": { "type": "string" }
           }
         },
-        "accompanyingDetails": {
-          "type": "object",
-          "properties": {
-            "appointmentAddress": { "type": "string" },
-            "appointmentDate": { "type": "string" },
-            "appointmentTime": { "type": "string" },
-            "refugeeNumber": { "type": "string" },
-            "refugeeName": { "type": "string" },
-            "languagesToTranslate": { "type": "integer" }
-          }
-        }
+        "accompanyingDetails": { "$ref": "ApiAccompanying#" }
       },
       "additionalProperties": false
     },
