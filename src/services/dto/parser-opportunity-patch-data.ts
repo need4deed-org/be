@@ -1,7 +1,6 @@
 import {
   ApiOpportunityPatch,
   LangPurpose,
-  TranslatedIntoType,
 } from "need4deed-sdk";
 import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
@@ -50,8 +49,7 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
                 : undefined,
             phone: body.accompanyingDetails?.refugeeNumber,
             name: body.accompanyingDetails?.refugeeName,
-            languageToTranslate: body.accompanyingDetails
-              ?.languageToTranslate as unknown as TranslatedIntoType,
+            languageToTranslate: body.accompanyingDetails?.appointmentLanguage,
           } as Partial<Accompanying>)
         : {},
       languages: [
