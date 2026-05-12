@@ -46,7 +46,6 @@ import {
   getOrCreateTimeslot,
   getTranslationType,
   patchEntity,
-  setTranslationType,
   updateOptionList,
 } from "../../utils";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -81,6 +80,7 @@ export default async function opportunityRoutes(
       const id = request.params.id;
       const relations = [
         "accompanying",
+        "accompanying.postcode",
         "deal.profile.profileLanguage.language",
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
@@ -132,12 +132,6 @@ export default async function opportunityRoutes(
       if (opportunityUpdates.length) {
         const opportunityRepository = fastify.db.opportunityRepository;
         await opportunityRepository.save(opportunityUpdates);
-      }
-
-      if (opportunityComments.accompanying) {
-        opportunityComments.accompanying.langCode = await setTranslationType(
-          opportunityComments.accompanying.languageToTranslate!, // TODO: this needs to be sorted
-        );
       }
 
       const data = dtoOpportunityGet(opportunityComments);
@@ -309,9 +303,10 @@ export default async function opportunityRoutes(
         const languageToTranslate = accompanying.languageToTranslate
           ? await getTranslationType(Number(accompanying.languageToTranslate))
           : undefined;
-        const patchData = languageToTranslate !== undefined
-          ? Object.assign(accompanying, { languageToTranslate })
-          : accompanying;
+        const patchData =
+          languageToTranslate !== undefined
+            ? Object.assign(accompanying, { languageToTranslate })
+            : accompanying;
         const success = await patchEntity(
           Accompanying,
           patchData,
