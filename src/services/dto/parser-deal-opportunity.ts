@@ -22,11 +22,15 @@ import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
-import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
+import {
+  getPostcode,
+  getRepository,
+  getRRULE,
+  getStartEnd,
+} from "../../data/utils";
 import logger from "../../logger";
 import {
   getLanguageTitle,
-  getPostcode,
   getProfileEntityByTitle,
   getTimeslot,
 } from "../../server/utils";
