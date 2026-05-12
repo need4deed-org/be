@@ -37,8 +37,8 @@ yarn lint                   # ESLint
 yarn typecheck              # TypeScript type checking (no emit)
 yarn format                 # Prettier
 yarn migration:run          # run pending migrations
-yarn migration:generate src/data/migrations/MigrationName  # generate migration from entity diff
-yarn migration:create src/data/migrations/MigrationName  # create bare migration
+yarn migration:generate src/data/migrations/kebab-case-name  # generate migration from entity diff
+yarn migration:create src/data/migrations/kebab-case-name    # create bare migration
 yarn migration:revert       # revert last migration
 yarn migration:show         # show migration status
 ```
@@ -116,7 +116,8 @@ All route prefixes are defined in `RoutePrefix` in `src/server/types/enums.ts`. 
 - **Never duplicate SDK types** — import from `need4deed-sdk`
 - **Never merge into `main`** — it's for production deploys only; target `develop`
 - **Never log `req.body`** wholesale — may contain personal data
-- Branch naming: `yourname/feature-name`
+- **Migration file names must use kebab-case** — e.g. `add-postcode-to-accompanying`, never PascalCase
+- Branch naming: `<issue-number>-short-description` (e.g. `502-add-postcode-to-accompanying`)
 - Default branch is `develop`
 
 ---
