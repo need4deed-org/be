@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "title": "Opportunity 1",
+    "description": "Description for opportunity 1",
+    "contactEmail": "stefan.schwarz@example.com"
+  },
+  {
+    "id": 2,
+    "title": "Opportunity 2",
+    "description": "Description for opportunity 2",
+    "contactEmail": "inga.klein@example.com"
+  },
+  {
+    "id": 3,
+    "title": "Opportunity 3",
+    "description": "Description for opportunity 3",
+    "contactEmail": "tina.richter@example.com"
+  },
+  {
+    "id": 4,
+    "title": "Opportunity 4",
+    "description": "Description for opportunity 4",
+    "contactEmail": "leon.becker@example.com"
+  },
+  {
+    "id": 5,
+    "title": "Opportunity 5",
+    "description": "Description for opportunity 5",
+    "contactEmail": "emma.neumann@example.com"
+  },
+  {
+    "id": 6,
+    "title": "Opportunity 6",
+    "description": "Description for opportunity 6",
+    "contactEmail": "paul.schneider@example.com"
+  },
+  {
+    "id": 7,
+    "title": "Opportunity 7",
+    "description": "Description for opportunity 7",
+    "contactEmail": "bernd.fischer@example.com"
+  },
+  {
+    "id": 8,
+    "title": "Opportunity 8",
+    "description": "Description for opportunity 8",
+    "contactEmail": "emma.meyer@example.com"
+  },
+  {
+    "id": 9,
+    "title": "Opportunity 9",
+    "description": "Description for opportunity 9",
+    "contactEmail": "nils.schneider@example.com"
+  },
+  {
+    "id": 10,
+    "title": "Opportunity 10",
+    "description": "Description for opportunity 10",
+    "contactEmail": "maria.richter@example.com"
+  }
+]

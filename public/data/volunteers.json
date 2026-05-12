@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "firstName": "David",
+    "lastName": "Müller",
+    "email": "david.müller@example.com",
+    "phone": "+491647655242",
+    "language": "en",
+    "status": "active"
+  },
+  {
+    "id": 2,
+    "firstName": "Emma",
+    "lastName": "Fischer",
+    "email": "emma.fischer@example.com",
+    "phone": "+491792791430",
+    "language": "de",
+    "status": "pending"
+  },
+  {
+    "id": 3,
+    "firstName": "Nils",
+    "lastName": "Schmidt",
+    "email": "nils.schmidt@example.com",
+    "phone": "+491515997261",
+    "language": "de",
+    "status": "active"
+  },
+  {
+    "id": 4,
+    "firstName": "Hans",
+    "lastName": "Neumann",
+    "email": "hans.neumann@example.com",
+    "phone": "+491514246390",
+    "language": "en",
+    "status": "pending"
+  },
+  {
+    "id": 5,
+    "firstName": "Stefan",
+    "lastName": "Klein",
+    "email": "stefan.klein@example.com",
+    "phone": "+491618348156",
+    "language": "fr",
+    "status": "pending"
+  },
+  {
+    "id": 6,
+    "firstName": "Inga",
+    "lastName": "Müller",
+    "email": "inga.müller@example.com",
+    "phone": "+491585716440",
+    "language": "fr",
+    "status": "inactive"
+  },
+  {
+    "id": 7,
+    "firstName": "Inga",
+    "lastName": "Weber",
+    "email": "inga.weber@example.com",
+    "phone": "+491615595695",
+    "language": "ar",
+    "status": "active"
+  },
+  {
+    "id": 8,
+    "firstName": "Clara",
+    "lastName": "Richter",
+    "email": "clara.richter@example.com",
+    "phone": "+491551924210",
+    "language": "ar",
+    "status": "inactive"
+  },
+  {
+    "id": 9,
+    "firstName": "Uwe",
+    "lastName": "Hoffmann",
+    "email": "uwe.hoffmann@example.com",
+    "phone": "+491523327276",
+    "language": "fr",
+    "status": "pending"
+  },
+  {
+    "id": 10,
+    "firstName": "David",
+    "lastName": "Richter",
+    "email": "david.richter@example.com",
+    "phone": "+491542305533",
+    "language": "ar",
+    "status": "pending"
+  },
+  {
+    "id": 11,
+    "firstName": "Uwe",
+    "lastName": "Bauer",
+    "email": "uwe.bauer@example.com",
+    "phone": "+491603234149",
+    "language": "de",
+    "status": "active"
+  },
+  {
+    "id": 12,
+    "firstName": "Hans",
+    "lastName": "Schäfer",
+    "email": "hans.schäfer@example.com",
+    "phone": "+491542837990",
+    "language": "en",
+    "status": "active"
+  },
+  {
+    "id": 13,
+    "firstName": "Maria",
+    "lastName": "Hoffmann",
+    "email": "maria.hoffmann@example.com",
+    "phone": "+491743422802",
+    "language": "ar",
+    "status": "active"
+  },
+  {
+    "id": 14,
+    "firstName": "Leon",
+    "lastName": "Bauer",
+    "email": "leon.bauer@example.com",
+    "phone": "+491612478229",
+    "language": "ar",
+    "status": "pending"
+  },
+  {
+    "id": 15,
+    "firstName": "Clara",
+    "lastName": "Meyer",
+    "email": "clara.meyer@example.com",
+    "phone": "+491786764160",
+    "language": "en",
+    "status": "active"
+  },
+  {
+    "id": 16,
+    "firstName": "Olga",
+    "lastName": "Richter",
+    "email": "olga.richter@example.com",
+    "phone": "+491644927134",
+    "language": "en",
+    "status": "pending"
+  },
+  {
+    "id": 17,
+    "firstName": "Klara",
+    "lastName": "Schmidt",
+    "email": "klara.schmidt@example.com",
+    "phone": "+491622969247",
+    "language": "de",
+    "status": "inactive"
+  },
+  {
+    "id": 18,
+    "firstName": "Maria",
+    "lastName": "Hoffmann",
+    "email": "maria.hoffmann@example.com",
+    "phone": "+491535534736",
+    "language": "en",
+    "status": "pending"
+  },
+  {
+    "id": 19,
+    "firstName": "Klara",
+    "lastName": "Wagner",
+    "email": "klara.wagner@example.com",
+    "phone": "+491768022742",
+    "language": "fr",
+    "status": "pending"
+  },
+  {
+    "id": 20,
+    "firstName": "Olga",
+    "lastName": "Weber",
+    "email": "olga.weber@example.com",
+    "phone": "+491642206459",
+    "language": "en",
+    "status": "active"
+  }
+]
