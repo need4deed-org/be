@@ -108,7 +108,10 @@ export function dtoVolunteerOpportunityGetList(
       })),
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
-    accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
+    accompanyingDetails: dtoOpportunityAccompanying(
+      opportunity.accompanying!,
+      opportunity.deal.profile.profileLanguage,
+    ),
     statusMatch: opportunity.statusMatch,
   } as ApiVolunteerOpportunityGetList;
 }
@@ -158,6 +161,7 @@ export function dtoOpportunityGet(
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunityComments.accompanying!,
+      opportunityComments.deal.profile.profileLanguage,
     ),
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
