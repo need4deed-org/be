@@ -896,7 +896,7 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
-        "appointmentPostcode": { "$ref": "OptionById#" },
+        "appointmentPostcode": { "type": "string" },
         "appointmentDistrict": { "$ref": "OptionById#" }
       }
     },
@@ -914,7 +914,7 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
-        "appointmentPostcode": { "$ref": "OptionById#" }
+        "appointmentPostcode": { "type": "string" }
       },
       "additionalProperties": false
     },
