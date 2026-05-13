@@ -58,11 +58,11 @@ describe("dtoOpportunityAccompanying", () => {
     expect(result).not.toHaveProperty("appointmentPostcode");
   });
 
-  it("emits appointmentPostcode { id } when accompanying.postcode is loaded", () => {
+  it("emits appointmentPostcode value when accompanying.postcode is loaded", () => {
     const postcode = new Postcode({ id: 42, value: "10115" });
     const result = dtoOpportunityAccompanying(buildAccompanying({ postcode }));
 
-    expect(result.appointmentPostcode).toEqual({ id: 42 });
+    expect(result.appointmentPostcode).toBe("10115");
   });
 
   it("omits appointmentDistrict when district is undefined", () => {
@@ -98,7 +98,7 @@ describe("dtoOpportunityAccompanying", () => {
       district,
     );
 
-    expect(result.appointmentPostcode).toEqual({ id: 42 });
+    expect(result.appointmentPostcode).toBe("10115");
     expect(result.appointmentDistrict).toEqual({ id: 3 });
   });
 });

@@ -19,8 +19,8 @@ export function dtoOpportunityAccompanying(
         refugeeLanguage: profileLanguage
           .filter(Boolean)
           .map((pl): OptionById => ({ id: pl.language.id })),
-        ...(accompanying.postcode
-          ? { appointmentPostcode: { id: accompanying.postcode.id } }
+        ...(accompanying.postcode?.value
+          ? { appointmentPostcode: accompanying.postcode.value }
           : {}),
         ...(district ? { appointmentDistrict: { id: district.id } } : {}),
       }
