@@ -595,7 +595,7 @@
             "district": { "type": "string" }
           }
         },
-        "accompanyingDetails": { "$ref": "ApiAccompanying#" }
+        "accompanyingDetails": { "$ref": "ApiAccompanyingPatch#" }
       },
       "additionalProperties": false
     },
@@ -899,6 +899,24 @@
         "appointmentPostcode": { "$ref": "OptionById#" },
         "appointmentDistrict": { "$ref": "OptionById#" }
       }
+    },
+    "ApiAccompanyingPatch": {
+      "$id": "ApiAccompanyingPatch",
+      "type": "object",
+      "properties": {
+        "appointmentAddress": { "type": "string" },
+        "appointmentDate": { "type": "string" },
+        "appointmentTime": { "type": "string" },
+        "refugeeNumber": { "type": "string" },
+        "refugeeName": { "type": "string" },
+        "appointmentLanguage": { "$ref": "TranslatedIntoType#" },
+        "refugeeLanguage": {
+          "type": "array",
+          "items": { "$ref": "OptionById#" }
+        },
+        "appointmentPostcode": { "$ref": "OptionById#" }
+      },
+      "additionalProperties": false
     },
     "ApiOrganizationPatch": {
       "$id": "ApiOrganizationPatch",

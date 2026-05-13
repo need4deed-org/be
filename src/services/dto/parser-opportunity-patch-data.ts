@@ -1,7 +1,4 @@
-import {
-  ApiOpportunityPatch,
-  LangPurpose,
-} from "need4deed-sdk";
+import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
 import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -10,10 +7,25 @@ import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
 import { getDateObj } from "../utils";
 
+type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
+
+function dedupeLanguages(items: LanguagePatchItem[]): LanguagePatchItem[] {
+  const seen = new Set<string>();
+  return items.filter(({ id, purpose }) => {
+    const key = `${id}:${purpose}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 export function parseOpportunity(body: ApiOpportunityPatch) {
   if (!body) {
     throw new BadRequestError("invalid body for parseOpportunity.");
   }
+  const accompanyingDetails = body.accompanyingDetails;
   return {
     ...getEmptyPropsNull({
       opportunity: {
@@ -36,23 +48,23 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             title: body?.agent?.name,
           } as Partial<Agent>)
         : {},
-      accompanying: body.accompanyingDetails
+      accompanying: accompanyingDetails
         ? ({
-            address: body.accompanyingDetails?.appointmentAddress,
+            address: accompanyingDetails.appointmentAddress,
             date:
-              body.accompanyingDetails?.appointmentDate &&
-              body.accompanyingDetails?.appointmentTime
+              accompanyingDetails.appointmentDate &&
+              accompanyingDetails.appointmentTime
                 ? getDateObj(
-                    body.accompanyingDetails?.appointmentDate,
-                    body.accompanyingDetails?.appointmentTime,
+                    accompanyingDetails.appointmentDate,
+                    accompanyingDetails.appointmentTime,
                   )
                 : undefined,
-            phone: body.accompanyingDetails?.refugeeNumber,
-            name: body.accompanyingDetails?.refugeeName,
-            languageToTranslate: body.accompanyingDetails?.appointmentLanguage,
+            phone: accompanyingDetails.refugeeNumber,
+            name: accompanyingDetails.refugeeName,
+            languageToTranslate: accompanyingDetails.appointmentLanguage,
           } as Partial<Accompanying>)
         : {},
-      languages: [
+      languages: dedupeLanguages([
         ...(body?.languagesMain || []).map((l) => ({
           id: l.id,
           purpose: LangPurpose.GENERAL,
@@ -61,7 +73,11 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
           id: l.id,
           purpose: LangPurpose.TRANSLATION,
         })),
-      ] as DataId[],
+        ...(accompanyingDetails?.refugeeLanguage || []).map((l) => ({
+          id: l.id,
+          purpose: LangPurpose.TRANSLATION,
+        })),
+      ]) as DataId[],
       skills: (body?.skills || []) as DataId[],
       activities: (body?.activities || []) as DataId[],
       schedule: (body.schedule || []) as DataId[],

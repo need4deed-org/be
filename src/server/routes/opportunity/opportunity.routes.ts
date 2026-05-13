@@ -306,6 +306,19 @@ export default async function opportunityRoutes(
       }
 
       if (accompanying) {
+        const appointmentPostcodeId =
+          request.body.accompanyingDetails?.appointmentPostcode?.id;
+        if (appointmentPostcodeId !== undefined) {
+          const postcode = await fastify.db.postcodeRepository.findOneBy({
+            id: Number(appointmentPostcodeId),
+          });
+          if (!postcode) {
+            throw new BadRequestError(
+              `Postcode id:${appointmentPostcodeId} not found.`,
+            );
+          }
+          accompanying.postcode = postcode;
+        }
         const success = await patchEntity(
           Accompanying,
           accompanying,
