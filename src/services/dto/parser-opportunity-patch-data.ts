@@ -1,7 +1,6 @@
 import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
 import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
-import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import { DataId } from "../../server/types";
@@ -27,7 +26,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
     throw new BadRequestError("invalid body for parseOpportunity.");
   }
   const accompanyingDetails = body.accompanyingDetails;
-  const postcodeId = accompanyingDetails?.appointmentPostcode?.id;
   return {
     ...getEmptyPropsNull({
       opportunity: {
@@ -64,9 +62,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             phone: accompanyingDetails.refugeeNumber,
             name: accompanyingDetails.refugeeName,
             languageToTranslate: accompanyingDetails.appointmentLanguage,
-            ...(postcodeId !== undefined && postcodeId !== null
-              ? { postcode: { id: postcodeId } as Postcode }
-              : {}),
           } as Partial<Accompanying>)
         : {},
       languages: dedupeLanguages([

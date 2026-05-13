@@ -48,20 +48,10 @@ describe("parseOpportunity", () => {
     expect(result.accompanying?.date).toBeInstanceOf(Date);
   });
 
-  it("sets accompanying.postcode relation from appointmentPostcode.id", () => {
+  it("does not set accompanying.postcode (resolved in route handler instead)", () => {
     const result = parseOpportunity({
       accompanyingDetails: {
         appointmentPostcode: { id: 42 },
-      },
-    });
-
-    expect(result.accompanying?.postcode).toEqual({ id: 42 });
-  });
-
-  it("omits accompanying.postcode when appointmentPostcode is absent", () => {
-    const result = parseOpportunity({
-      accompanyingDetails: {
-        appointmentAddress: "Musterstraße 1",
       },
     });
 
