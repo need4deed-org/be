@@ -895,7 +895,9 @@
         "refugeeLanguage": {
           "type": "array",
           "items": { "$ref": "OptionById#" }
-        }
+        },
+        "appointmentPostcode": { "$ref": "OptionById#" },
+        "appointmentDistrict": { "$ref": "OptionById#" }
       }
     },
     "ApiOrganizationPatch": {

@@ -17,6 +17,7 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   dtoOpportunityGet,
@@ -133,7 +134,13 @@ export default async function opportunityRoutes(
         await opportunityRepository.save(opportunityUpdates);
       }
 
-      const data = dtoOpportunityGet(opportunityComments);
+      const accompanyingDistrict = opportunityComments.accompanying?.postcode
+        ? await getDistrictFromPostcode(
+            opportunityComments.accompanying.postcode,
+          )
+        : null;
+
+      const data = dtoOpportunityGet(opportunityComments, accompanyingDistrict);
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
