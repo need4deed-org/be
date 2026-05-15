@@ -36,7 +36,7 @@ describe("dtoOpportunityAccompanying", () => {
     expect(result.refugeeNumber).toBe("030123456");
     expect(result.appointmentLanguage).toBe(TranslatedIntoType.DEUTSCHE);
     expect(result.appointmentDate).toBe(
-      new Date("2026-06-01T10:30:00Z").toDateString(),
+      new Date("2026-06-01T10:30:00Z").toISOString().split("T")[0],
     );
     expect(result.appointmentTime).toBe("10:30");
     expect(result.refugeeLanguage).toEqual([]);
