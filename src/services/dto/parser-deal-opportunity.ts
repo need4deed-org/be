@@ -5,7 +5,6 @@ import {
   LangPurpose,
   OccasionalType,
   OpportunityLegacyFormData,
-  TranslatedIntoType,
 } from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
@@ -77,17 +76,6 @@ export async function dealParserOpportunity(
   const opportunityLanguages: ApiLanguage[] = (await Promise.all(
     (formData.languages || [])
       .map((l) => ({ isoCode: l, purpose: LangPurpose.RECIPIENT }))
-      .concat(
-        formData.accomp_translation !== TranslatedIntoType.NO_TRANSLATION
-          ? [
-              { isoCode: "de", purpose: LangPurpose.TRANSLATION },
-              ...(formData.accomp_translation === TranslatedIntoType.ENGLISH_OK
-                ? [{ isoCode: "en", purpose: LangPurpose.TRANSLATION }]
-                : []),
-            ]
-          : [],
-      )
-      .flat()
       .map(async ({ isoCode, purpose }) => ({
         title: await getLanguageTitle(isoCode),
         purpose,
