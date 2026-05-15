@@ -51,7 +51,7 @@ describe("parseOpportunity", () => {
   it("does not set accompanying.postcode (resolved in route handler instead)", () => {
     const result = parseOpportunity({
       accompanyingDetails: {
-        appointmentPostcode: { id: 42 },
+        appointmentPostcode: "10115",
       },
     });
 
