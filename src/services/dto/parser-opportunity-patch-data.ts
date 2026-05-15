@@ -51,14 +51,12 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
       accompanying: accompanyingDetails
         ? ({
             address: accompanyingDetails.appointmentAddress,
-            date:
-              accompanyingDetails.appointmentDate &&
-              accompanyingDetails.appointmentTime
-                ? getDateObj(
-                    accompanyingDetails.appointmentDate,
-                    accompanyingDetails.appointmentTime,
-                  )
-                : undefined,
+            date: accompanyingDetails.appointmentDate
+              ? getDateObj(
+                  accompanyingDetails.appointmentDate,
+                  accompanyingDetails.appointmentTime || "00:00",
+                )
+              : undefined,
             phone: accompanyingDetails.refugeeNumber,
             name: accompanyingDetails.refugeeName,
             languageToTranslate: accompanyingDetails.appointmentLanguage,
