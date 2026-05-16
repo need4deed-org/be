@@ -92,7 +92,7 @@ describe("dtoOpportunityAgent", () => {
       address: "serialized_address",
       district: {
         id: "dist_1",
-        title: { de: "Mitte" },
+        title: { de: "Mitte", en: "Mitte" },
       },
     });
   });
