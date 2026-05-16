@@ -77,6 +77,10 @@ export default async function opportunityLegacyRoutes(
           request.body.rac_plz,
         ) ?? undefined;
 
+      if (!opportunity.agent && request.agents?.length) {
+        opportunity.agent = request.agents[0];
+      }
+
       if (!opportunity.agent) {
         opportunity.agent = await getOpportunityOrphanageAgent();
       }
