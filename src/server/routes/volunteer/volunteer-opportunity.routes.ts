@@ -1,5 +1,10 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
+import {
+  ApiVolunteerOpportunityGetList,
+  OpportunityStatusType,
+  VolunteerStateTypeType,
+} from "need4deed-sdk";
+import { BadRequestError } from "../../../config";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
   responseSchema,
@@ -39,6 +44,14 @@ export default async function volunteerOpportunityRoutes(
       ];
 
       const { page, limit, ...filters } = request.query;
+
+      const { status, type } = filters as QuerystringVolunteerOpportunityGetList;
+      if (status && !Object.values(OpportunityStatusType).includes(status as OpportunityStatusType)) {
+        throw new BadRequestError(`Invalid status value: "${status}"`);
+      }
+      if (type && !Object.values(VolunteerStateTypeType).includes(type as VolunteerStateTypeType)) {
+        throw new BadRequestError(`Invalid type value: "${type}"`);
+      }
 
       const [skip, take] = getSkipTake({ page, limit });
 
