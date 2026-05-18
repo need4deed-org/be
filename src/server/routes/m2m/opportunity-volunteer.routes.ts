@@ -22,7 +22,7 @@ export default async function m2mOpportunityVolunteerRoutes(
     {
       schema: {
         body: { $ref: "ApiVolunteerOpportunityPost#" },
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 201 }),
       },
     },
     async (request, reply) => {
@@ -32,7 +32,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       const opportunityVolunteer = new OpportunityVolunteer(request.body);
       await opportunityVolunteerRepository.save(opportunityVolunteer);
 
-      return reply.status(200).send({
+      return reply.status(201).send({
         message: `Created M2M opportunityId:${opportunityVolunteer.opportunityId}, volunteerId:${opportunityVolunteer.volunteerId}, status:${opportunityVolunteer.status}.`,
       });
     },
@@ -40,7 +40,7 @@ export default async function m2mOpportunityVolunteerRoutes(
 
   fastify.patch<{
     Params: ParamsId;
-    Reply: ReplyMessage;
+    Reply: null;
     Body: { status: OpportunityVolunteerStatusType };
   }>(
     "/:id",
@@ -48,7 +48,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiOpportunityVolunteerPatch#" },
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
@@ -77,21 +77,19 @@ export default async function m2mOpportunityVolunteerRoutes(
         reload: true,
       });
 
-      return reply.status(200).send({
-        message: `M2M relation id:${id} has been updated.`,
-      });
+      return reply.status(204).send();
     },
   );
 
   fastify.delete<{
     Params: ParamsId;
-    Reply: ReplyMessage;
+    Reply: null;
   }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
@@ -113,9 +111,7 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       await opportunityVolunteerRepository.delete({ id });
 
-      return reply.status(200).send({
-        message: `M2M relation id:${id} has been deleted.`,
-      });
+      return reply.status(204).send();
     },
   );
 }

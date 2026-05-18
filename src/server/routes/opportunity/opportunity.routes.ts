@@ -239,14 +239,14 @@ export default async function opportunityRoutes(
   fastify.patch<{
     Params: ParamsId;
     Body: ApiOpportunityPatch;
-    Reply: ReplyMessage;
+    Reply: null;
   }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
@@ -387,9 +387,7 @@ export default async function opportunityRoutes(
         }
       }
 
-      return reply
-        .status(200)
-        .send({ message: "Opportunity has been patched." });
+      return reply.status(204).send();
     },
   );
 }
