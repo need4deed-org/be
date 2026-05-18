@@ -174,4 +174,29 @@ export default async function agentRoutes(
       });
     },
   );
+
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const agentRepository = fastify.db.agentRepository;
+      const agent = await agentRepository.findOneBy({ id });
+
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+
+      await agentRepository.delete({ id });
+
+      return reply.status(200).send({
+        message: `Agent (id:${id}) deleted successfully`,
+      });
+    },
+  );
 }
