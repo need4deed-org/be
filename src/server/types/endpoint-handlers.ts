@@ -81,6 +81,7 @@ export interface QuerystringVolunteerFiltering {
     availability?: string;
     district?: string;
     engagement: string | string[];
+    match?: string | string[];
     accompanying?: boolean;
   };
 }
