@@ -24,6 +24,11 @@ ON CONFLICT (language_id, entity_type, entity_id, field_name)
 DO UPDATE SET translation = EXCLUDED.translation;
 `;
 
+const sqlAddDariToOption = `
+INSERT INTO option (item_id, item_type)
+  SELECT id, 'language' FROM language WHERE iso_code = 'prs'
+`;
+
 export class FixTranslationOfLanguageTitles1779186682996
   implements MigrationInterface
 {
@@ -32,6 +37,7 @@ export class FixTranslationOfLanguageTitles1779186682996
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(sqlDeleteDanish);
     await queryRunner.query(sqlFixTranslations);
+    await queryRunner.query(sqlAddDariToOption);
   }
 
   public async down(_queryRunner: QueryRunner): Promise<void> {}
