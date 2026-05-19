@@ -7,6 +7,17 @@ import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
 import { getDateObj } from "../utils";
 
+export type OpportunityAgentPatchBody = {
+  id?: number;
+  name?: string;
+  address?: string;
+  district?: string;
+};
+
+export type OpportunityPatchBody = Omit<ApiOpportunityPatch, "agent"> & {
+  agent?: OpportunityAgentPatchBody;
+};
+
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
 
 function dedupeLanguages(items: LanguagePatchItem[]): LanguagePatchItem[] {
@@ -21,11 +32,14 @@ function dedupeLanguages(items: LanguagePatchItem[]): LanguagePatchItem[] {
   });
 }
 
-export function parseOpportunity(body: ApiOpportunityPatch) {
+export function parseOpportunity(body: OpportunityPatchBody) {
   if (!body) {
     throw new BadRequestError("invalid body for parseOpportunity.");
   }
   const accompanyingDetails = body.accompanyingDetails;
+  const agentBody = body?.agent;
+  const agentLinkId =
+    typeof agentBody?.id === "number" ? agentBody.id : undefined;
   return {
     ...getEmptyPropsNull({
       opportunity: {
@@ -43,11 +57,12 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             preferredCommunicationType: body?.contact?.waysToContact,
           }
         : {},
-      agent: body?.agent
-        ? ({
-            title: body?.agent?.name,
-          } as Partial<Agent>)
-        : {},
+      agent:
+        agentBody && agentLinkId === undefined
+          ? ({
+              title: agentBody.name,
+            } as Partial<Agent>)
+          : {},
       accompanying: accompanyingDetails
         ? ({
             address: accompanyingDetails.appointmentAddress,
@@ -80,5 +95,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
       activities: (body?.activities || []) as DataId[],
       schedule: (body.schedule || []) as DataId[],
     }),
+    agentLinkId,
   };
 }

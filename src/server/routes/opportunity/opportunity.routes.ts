@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
-  ApiOpportunityPatch,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -22,6 +21,7 @@ import logger from "../../../logger";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
+  OpportunityPatchBody,
   parseOpportunity,
 } from "../../../services";
 import {
@@ -238,7 +238,7 @@ export default async function opportunityRoutes(
 
   fastify.patch<{
     Params: ParamsId;
-    Body: ApiOpportunityPatch;
+    Body: OpportunityPatchBody;
     Reply: ReplyMessage;
   }>(
     "/:id",
@@ -269,6 +269,7 @@ export default async function opportunityRoutes(
         opportunity: opportunityObj,
         contact,
         agent,
+        agentLinkId,
         accompanying,
         languages,
         schedule,
@@ -299,7 +300,22 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (agent) {
+      if (agentLinkId !== undefined) {
+        const linkedAgent = await fastify.db.agentRepository.findOne({
+          where: { id: agentLinkId },
+        });
+        if (!linkedAgent) {
+          throw new BadRequestError(`Agent (id:${agentLinkId}) not found.`);
+        }
+        const success = await patchEntity(
+          Opportunity,
+          { agentId: agentLinkId } as Partial<Opportunity>,
+          opportunity.id,
+        );
+        if (!success) {
+          throw new Error("Relinking opportunity agent failed.");
+        }
+      } else if (agent) {
         const success = await patchEntity(Agent, agent, opportunity.agentId);
         if (!success) {
           throw new Error("Patching agent failed while patching opportunity.");
