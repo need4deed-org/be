@@ -104,12 +104,11 @@ describe("parseOpportunity", () => {
     ]);
   });
 
-  it("surfaces agent.id as agentLinkId and skips in-place agent edit", () => {
+  it("skips in-place agent edit when agent.id is sent (relink intent)", () => {
     const result = parseOpportunity({
       agent: { id: 42 },
     });
 
-    expect(result.agentLinkId).toBe(42);
     expect(result.agent).toBeNull();
   });
 
@@ -118,11 +117,10 @@ describe("parseOpportunity", () => {
       agent: { name: "RAC Tegel" },
     });
 
-    expect(result.agentLinkId).toBeUndefined();
     expect(result.agent).toMatchObject({ title: "RAC Tegel" });
   });
 
-  it("treats agent.id as a relink even when other fields are present", () => {
+  it("skips in-place agent edit when agent.id is sent even with other fields", () => {
     const result = parseOpportunity({
       agent: {
         id: 7,
@@ -132,7 +130,6 @@ describe("parseOpportunity", () => {
       },
     });
 
-    expect(result.agentLinkId).toBe(7);
     expect(result.agent).toBeNull();
   });
 });

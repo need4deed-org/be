@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
+  ApiOpportunityPatch,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -21,7 +22,6 @@ import logger from "../../../logger";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
-  OpportunityPatchBody,
   parseOpportunity,
 } from "../../../services";
 import {
@@ -238,7 +238,7 @@ export default async function opportunityRoutes(
 
   fastify.patch<{
     Params: ParamsId;
-    Body: OpportunityPatchBody;
+    Body: ApiOpportunityPatch;
     Reply: ReplyMessage;
   }>(
     "/:id",
@@ -269,13 +269,13 @@ export default async function opportunityRoutes(
         opportunity: opportunityObj,
         contact,
         agent,
-        agentLinkId,
         accompanying,
         languages,
         schedule,
         skills,
         activities,
       } = parseOpportunity(request.body);
+      const agentLinkId = request.body.agent?.id;
       logger.debug(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
@@ -305,7 +305,7 @@ export default async function opportunityRoutes(
           where: { id: agentLinkId },
         });
         if (!linkedAgent) {
-          throw new BadRequestError(`Agent (id:${agentLinkId}) not found.`);
+          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
         }
         const success = await patchEntity(
           Opportunity,
@@ -313,7 +313,7 @@ export default async function opportunityRoutes(
           opportunity.id,
         );
         if (!success) {
-          throw new Error("Relinking opportunity agent failed.");
+          throw new BadRequestError("Relinking opportunity agent failed.");
         }
       } else if (agent) {
         const success = await patchEntity(Agent, agent, opportunity.agentId);

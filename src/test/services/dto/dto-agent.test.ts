@@ -77,6 +77,7 @@ describe("dtoAgentGet", () => {
 describe("dtoOpportunityAgent", () => {
   it("should map agent to opportunity format with localized district", () => {
     const mockAgent = {
+      id: 7,
       type: "Provider",
       title: "Clinic X",
       districtId: "dist_1",
@@ -87,6 +88,7 @@ describe("dtoOpportunityAgent", () => {
     const result = dtoOpportunityAgent(mockAgent as any);
 
     expect(result).toEqual({
+      id: 7,
       type: "Provider",
       name: "Clinic X",
       address: "serialized_address",

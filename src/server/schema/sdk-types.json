@@ -694,6 +694,7 @@
             "agent": {
               "type": "object",
               "properties": {
+                "id": { "type": "integer" },
                 "type": { "$ref": "AgentType#" },
                 "name": { "type": "string" },
                 "address": { "type": "string" },
