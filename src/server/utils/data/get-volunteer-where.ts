@@ -9,7 +9,7 @@ export function getVolunteerWhere(
   return {
     ...(filter?.type
       ? {
-          type: normalizeStringArrayInput(filter.type),
+          statusType: normalizeStringArrayInput(filter.type),
         }
       : {}),
     ...(filter?.accompanying
