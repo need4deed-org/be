@@ -1,12 +1,15 @@
 import path from "path";
 import { describe, expect, it, vi } from "vitest";
 import { BadRequestError } from "../../../config/error";
+import { BaseError } from "../../../config/error/base";
 import {
   deepMerge,
   getDateObj,
+  getErrorStatusCode,
   isObject,
   isProbablyFileSystemPath,
   pascal2snake,
+  tryCatch,
   tryCatchFn,
 } from "../../../services/utils";
 
@@ -303,5 +306,54 @@ describe("getDateObj()", () => {
     expect(() => getDateObj("2026-01-01", null as any)).toThrow(
       BadRequestError,
     );
+  });
+});
+
+describe("tryCatch", () => {
+  it("returns [value, null] when the promise resolves", async () => {
+    const [result, error] = await tryCatch(Promise.resolve(42));
+    expect(result).toBe(42);
+    expect(error).toBeNull();
+  });
+
+  it("returns [null, error] when the promise rejects", async () => {
+    const boom = new Error("async failure");
+    const [result, error] = await tryCatch(Promise.reject(boom));
+    expect(result).toBeNull();
+    expect(error).toBe(boom);
+  });
+
+  it("captures the correct error type", async () => {
+    const [, error] = await tryCatch<number, TypeError>(
+      Promise.reject(new TypeError("type mismatch")),
+    );
+    expect(error).toBeInstanceOf(TypeError);
+    expect(error?.message).toBe("type mismatch");
+  });
+
+  it("handles a resolved promise with a falsy value", async () => {
+    const [result, error] = await tryCatch(Promise.resolve(0));
+    expect(result).toBe(0);
+    expect(error).toBeNull();
+  });
+});
+
+describe("getErrorStatusCode", () => {
+  it("returns the statusCode from a BaseError", () => {
+    const err = new BaseError("Not found", 404);
+    expect(getErrorStatusCode(err)).toBe(404);
+  });
+
+  it("returns 500 for a plain Error", () => {
+    expect(getErrorStatusCode(new Error("oops"))).toBe(500);
+  });
+
+  it("returns 500 when the error is not a BaseError instance", () => {
+    expect(getErrorStatusCode({ message: "raw object" } as any)).toBe(500);
+  });
+
+  it("returns 500 for null/undefined input", () => {
+    expect(getErrorStatusCode(null as any)).toBe(500);
+    expect(getErrorStatusCode(undefined as any)).toBe(500);
   });
 });
