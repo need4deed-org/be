@@ -28,6 +28,7 @@ import {
 } from "../../types";
 import {
   addComments2Entity,
+  createAddress,
   getAgentWhere,
   getDistrictToAgentHandler,
   getSkipTake,
@@ -169,23 +170,33 @@ export default async function agentRoutes(
 
       const { addressStreet, addressPostcode, languages } = request.body;
 
-      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
-      await agentRepository.save(agentObj);
+      if (addressStreet || addressPostcode) {
+        const addressData = addressStreet ? { street: addressStreet } : {};
+        const postcodeData = addressPostcode ? { value: addressPostcode } : {};
 
-      if ((addressStreet || addressPostcode) && agent.addressId) {
-        const success = await patchAddress(
-          {
-            id: agent.addressId,
-            ...(addressStreet ? { street: addressStreet } : {}),
-          },
-          addressPostcode ? { value: addressPostcode } : {},
-        );
-        if (!success) {
-          return reply.status(400).send({
-            message: `Address (id=${agent.addressId}) not updated.`,
-          });
+        if (agent.addressId) {
+          const success = await patchAddress(
+            { id: agent.addressId, ...addressData },
+            postcodeData,
+          );
+          if (!success) {
+            return reply.status(400).send({
+              message: `Address (id=${agent.addressId}) not updated.`,
+            });
+          }
+        } else {
+          const address = await createAddress(addressData, postcodeData);
+          if (!address) {
+            return reply.status(400).send({
+              message: `Address for agent (id=${id}) not created; a valid postcode is required.`,
+            });
+          }
+          agent.addressId = address.id;
         }
       }
+
+      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
+      await agentRepository.save(agentObj);
 
       if (languages) {
         const success = await updateAgentLanguages(id, languages);

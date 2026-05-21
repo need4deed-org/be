@@ -341,6 +341,34 @@ export async function patchAddress(
 }
 
 /**
+ * Create and persist a new Address from the given data, resolving the postcode
+ * string to a Postcode by value. Returns `null` when no postcode can be
+ * resolved, since an Address cannot exist without one (NOT NULL).
+ */
+export async function createAddress(
+  addressData: Partial<Address>,
+  postcodeData: Partial<Postcode>,
+): Promise<Address | null> {
+  const addressRepository = getRepository(dataSource, Address);
+  const postcodeRepository = getRepository(dataSource, Postcode);
+
+  let postcodeId = postcodeData?.id;
+  if (!postcodeId && postcodeData?.value) {
+    const postcode = await postcodeRepository.findOneBy({
+      value: postcodeData.value,
+    });
+    postcodeId = postcode?.id;
+  }
+
+  if (!postcodeId) {
+    return null;
+  }
+
+  const address = addressRepository.create({ ...addressData, postcodeId });
+  return await addressRepository.save(address);
+}
+
+/**
  * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
  * de-selected rows and insert the newly selected ones (rows that are unchanged
  * are left untouched). Language `id`s come from the SDK as `OptionById`.
