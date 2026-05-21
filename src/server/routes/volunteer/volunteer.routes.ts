@@ -382,7 +382,7 @@ export default async function volunteerRoutes(
       schema: {
         body: { $ref: "volunteer-form-data" },
         response: {
-          200: {
+          201: {
             type: "object",
             properties: {
               message: { type: "string" },
@@ -416,7 +416,7 @@ export default async function volunteerRoutes(
           await updateLeads(leads);
         }
 
-        return reply.status(200).send({
+        return reply.status(201).send({
           message: "Volunteer stored.",
           data: { id },
         });

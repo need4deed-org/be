@@ -146,13 +146,13 @@ export default async function agentRoutes(
     },
   );
 
-  fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: ReplyMessage }>(
+  fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: null }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAgentPatch#" },
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
@@ -169,9 +169,7 @@ export default async function agentRoutes(
 
       await agentRepository.save(agentObj);
 
-      return reply.status(200).send({
-        message: `Agent (id:${id}) patched successfully`,
-      });
+      return reply.status(204).send();
     },
   );
 
