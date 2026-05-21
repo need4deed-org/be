@@ -146,13 +146,13 @@ export default async function agentRoutes(
     },
   );
 
-  fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: ReplyMessage }>(
+  fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: null }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAgentPatch#" },
-        response: responseSchema(""),
+        response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
@@ -169,8 +169,31 @@ export default async function agentRoutes(
 
       await agentRepository.save(agentObj);
 
+      return reply.status(204).send();
+    },
+  );
+
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const agentRepository = fastify.db.agentRepository;
+      const agent = await agentRepository.findOneBy({ id });
+
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+
+      await agentRepository.delete({ id });
+
       return reply.status(200).send({
-        message: `Agent (id:${id}) patched successfully`,
+        message: `Agent (id:${id}) deleted successfully`,
       });
     },
   );
