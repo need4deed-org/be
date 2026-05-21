@@ -7,7 +7,6 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config";
-import { defaultPageSize } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
 import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
@@ -45,6 +44,7 @@ import {
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
+  getSkipTake,
   patchEntity,
   updateOptionList,
 } from "../../utils";
@@ -159,9 +159,7 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      const page = request.query.page || 1;
-      const take = request.query.limit || defaultPageSize;
-      const skip = (page - 1) * take;
+      const [skip, take] = getSkipTake({ page: request.query.page, limit: request.query.limit });
       const order =
         request.query.sortOrder === SortOrder.NewToOld
           ? { order: { createdAt: "DESC" } as const }
