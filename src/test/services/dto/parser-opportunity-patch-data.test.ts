@@ -103,4 +103,33 @@ describe("parseOpportunity", () => {
       { id: 5, purpose: LangPurpose.TRANSLATION },
     ]);
   });
+
+  it("skips in-place agent edit when agent.id is sent (relink intent)", () => {
+    const result = parseOpportunity({
+      agent: { id: 42 },
+    });
+
+    expect(result.agent).toBeNull();
+  });
+
+  it("keeps existing in-place agent edit when no agent.id is sent", () => {
+    const result = parseOpportunity({
+      agent: { name: "RAC Tegel" },
+    });
+
+    expect(result.agent).toMatchObject({ title: "RAC Tegel" });
+  });
+
+  it("skips in-place agent edit when agent.id is sent even with other fields", () => {
+    const result = parseOpportunity({
+      agent: {
+        id: 7,
+        name: "ignored",
+        address: "ignored",
+        district: "ignored",
+      },
+    });
+
+    expect(result.agent).toBeNull();
+  });
 });
