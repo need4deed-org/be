@@ -227,7 +227,7 @@ export default async function opportunityRoutes(
       const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
 
       return reply.status(200).send({
-        message: `Opportunities page:${page}.`,
+        message: `Opportunities page:${request.query.page}.`,
         data,
         count,
       });
