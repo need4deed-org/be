@@ -75,11 +75,11 @@ export interface QuerystringVolunteerFiltering {
   filter?: {
     type: string;
     search?: string;
-    language?: string;
-    activity?: string;
-    skill?: string;
+    language?: string | string[];
+    activity?: string | string[];
+    skill?: string | string[];
     availability?: string;
-    district?: string;
+    district?: string | string[];
     engagement: string | string[];
     match?: string | string[];
     accompanying?: boolean;
