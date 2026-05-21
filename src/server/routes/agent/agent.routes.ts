@@ -31,6 +31,8 @@ import {
   getAgentWhere,
   getDistrictToAgentHandler,
   getSkipTake,
+  patchAddress,
+  updateAgentLanguages,
 } from "../../utils";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
@@ -157,7 +159,7 @@ export default async function agentRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      logger.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
+      logger.debug(`PATCH /agent/${id}, body:${JSON.stringify(request.body)}`);
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
 
@@ -165,9 +167,34 @@ export default async function agentRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 
-      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
+      const { addressStreet, addressPostcode, languages } = request.body;
 
+      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
       await agentRepository.save(agentObj);
+
+      if ((addressStreet || addressPostcode) && agent.addressId) {
+        const success = await patchAddress(
+          {
+            id: agent.addressId,
+            ...(addressStreet ? { street: addressStreet } : {}),
+          },
+          addressPostcode ? { value: addressPostcode } : {},
+        );
+        if (!success) {
+          return reply.status(400).send({
+            message: `Address (id=${agent.addressId}) not updated.`,
+          });
+        }
+      }
+
+      if (languages) {
+        const success = await updateAgentLanguages(id, languages);
+        if (!success) {
+          return reply.status(400).send({
+            message: `Languages for agent (id=${id}) not updated.`,
+          });
+        }
+      }
 
       return reply.status(200).send({
         message: `Agent (id:${id}) patched successfully`,
