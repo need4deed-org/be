@@ -278,13 +278,13 @@ export default async function volunteerRoutes(
 
         if (languages) {
           const success = await updateOptionList(
-            id,
+            dealId,
             ProfileLanguage,
             languages,
           );
           if (!success) {
             return reply.status(400).send({
-              message: `Languages for volunteer (deal_id:${id}) not updated.`,
+              message: `Languages for volunteer (deal_id:${dealId}) not updated.`,
             });
           }
         }
