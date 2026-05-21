@@ -61,6 +61,32 @@ export const agentListQuerySchema = {
   additionalProperties: false,
 };
 
+export const volunteerListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    ...langProp,
+    ...sortOrderProps,
+    filter: {
+      type: "object",
+      properties: {
+        type: { type: "string" },
+        search: { type: "string" },
+        language: { type: "string" },
+        activity: { type: "string" },
+        skill: { type: "string" },
+        availability: { type: "string" },
+        district: { type: "string" },
+        engagement: { type: "array", items: { type: "string" } },
+        match: { type: "array", items: { type: "string" } },
+        accompanying: { type: "boolean" },
+      },
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+};
+
 export const volunteerOpportunityListQuerySchema = {
   type: "object",
   properties: {
