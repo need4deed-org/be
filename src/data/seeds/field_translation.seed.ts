@@ -297,7 +297,7 @@ async function seedSkills(
 
     if (!existingSkillTranslationsSet.has(`${isoCodeEN}_${en}`)) {
       const translationEN = new FieldTranslation();
-      translationEN.translation = de;
+      translationEN.translation = en;
       translationEN.entityType = EntityTableName.SKILL;
       translationEN.entityId = skill.id;
       translationEN.languageId = langEN.id;

@@ -140,3 +140,13 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `RUN_MIGRATIONS` — set to `true` to auto-run migrations on startup
 - `AWS_SES_*` — email sending via AWS SES
 - `CORS_ORIGINS` — comma-separated list of allowed origins
+
+---
+
+## API contract
+
+The runtime contract is at https://app.need4deed.org/swagger/json
+
+The transpile time contract is at SDK (`yarn upgrade need4deed-sdk --latest`)
+
+All amendments have to land in schemas for endpoint handlers and in SDK

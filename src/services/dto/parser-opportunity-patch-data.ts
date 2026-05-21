@@ -26,6 +26,7 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
     throw new BadRequestError("invalid body for parseOpportunity.");
   }
   const accompanyingDetails = body.accompanyingDetails;
+  const agentBody = body?.agent;
   return {
     ...getEmptyPropsNull({
       opportunity: {
@@ -43,11 +44,12 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
             preferredCommunicationType: body?.contact?.waysToContact,
           }
         : {},
-      agent: body?.agent
-        ? ({
-            title: body?.agent?.name,
-          } as Partial<Agent>)
-        : {},
+      agent:
+        agentBody && agentBody.id === undefined
+          ? ({
+              title: agentBody.name,
+            } as Partial<Agent>)
+          : {},
       accompanying: accompanyingDetails
         ? ({
             address: accompanyingDetails.appointmentAddress,
