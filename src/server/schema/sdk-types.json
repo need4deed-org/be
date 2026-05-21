@@ -590,6 +590,7 @@
         "agent": {
           "type": "object",
           "properties": {
+            "id": { "type": "integer" },
             "name": { "type": "string" },
             "address": { "type": "string" },
             "district": { "type": "string" }
@@ -617,7 +618,13 @@
     "OpportunityStatusType": {
       "$id": "OpportunityStatusType",
       "type": "string",
-      "enum": ["opp-new", "opp-searching", "opp-active", "opp-inactive", "opp-past"]
+      "enum": [
+        "opp-new",
+        "opp-searching",
+        "opp-active",
+        "opp-inactive",
+        "opp-past"
+      ]
     },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
@@ -687,6 +694,7 @@
             "agent": {
               "type": "object",
               "properties": {
+                "id": { "type": "integer" },
                 "type": { "$ref": "AgentType#" },
                 "name": { "type": "string" },
                 "address": { "type": "string" },

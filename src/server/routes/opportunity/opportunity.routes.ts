@@ -275,6 +275,7 @@ export default async function opportunityRoutes(
         skills,
         activities,
       } = parseOpportunity(request.body);
+      const agentLinkId = request.body.agent?.id;
       logger.debug(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
@@ -299,7 +300,22 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (agent) {
+      if (agentLinkId !== undefined) {
+        const linkedAgent = await fastify.db.agentRepository.findOne({
+          where: { id: agentLinkId },
+        });
+        if (!linkedAgent) {
+          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
+        }
+        const success = await patchEntity(
+          Opportunity,
+          { agentId: agentLinkId } as Partial<Opportunity>,
+          opportunity.id,
+        );
+        if (!success) {
+          throw new BadRequestError("Relinking opportunity agent failed.");
+        }
+      } else if (agent) {
         const success = await patchEntity(Agent, agent, opportunity.agentId);
         if (!success) {
           throw new Error("Patching agent failed while patching opportunity.");
