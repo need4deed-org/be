@@ -7,6 +7,7 @@ import {
   Lang,
   Occasionally,
   OccasionalType,
+  OptionById,
   OptionItem,
   SortOrder,
   TranslatedIntoType,
@@ -30,6 +31,7 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
@@ -336,6 +338,52 @@ export async function patchAddress(
   }
 
   return Boolean(await patchEntity(Address, address));
+}
+
+/**
+ * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
+ * de-selected rows and insert the newly selected ones (rows that are unchanged
+ * are left untouched). Language `id`s come from the SDK as `OptionById`.
+ */
+export async function updateAgentLanguages(
+  agentId: number,
+  languages: OptionById[],
+): Promise<boolean> {
+  const agentLanguageRepository = getRepository(dataSource, AgentLanguage);
+
+  const desiredLanguageIds = [
+    ...new Set(languages.map(({ id }) => Number(id))),
+  ];
+  const current = await agentLanguageRepository.find({ where: { agentId } });
+  const currentLanguageIds = current.map(({ languageId }) => languageId);
+
+  const toRemove = current.filter(
+    ({ languageId }) => !desiredLanguageIds.includes(languageId),
+  );
+  const toAdd = desiredLanguageIds
+    .filter((languageId) => !currentLanguageIds.includes(languageId))
+    .map((languageId) => new AgentLanguage({ agentId, languageId }));
+
+  try {
+    await dataSource.transaction(async (manager) => {
+      const repository = getRepository(
+        manager as unknown as DataSource,
+        AgentLanguage,
+      );
+      if (toRemove.length > 0) {
+        await repository.delete(toRemove.map(({ id }) => id));
+      }
+      if (toAdd.length > 0) {
+        await repository.save(toAdd);
+      }
+    });
+    return true;
+  } catch (error) {
+    logger.warn(
+      `Error ${error.message} updating languages for agent id=${agentId}`,
+    );
+    return false;
+  }
 }
 
 function getDealRelationsAndIdFieldName(m2mEntityName: string) {
