@@ -246,6 +246,11 @@
       "type": "string",
       "enum": ["opp-pending", "opp-matched", "opp-active", "opp-past"]
     },
+    "TranslatedIntoType": {
+      "$id": "TranslatedIntoType",
+      "type": "string",
+      "enum": ["deutsche", "englishOk", "noTranslation"]
+    },
     "OptionItem": {
       "$id": "OptionItem",
       "type": "object",
@@ -585,22 +590,13 @@
         "agent": {
           "type": "object",
           "properties": {
+            "id": { "type": "integer" },
             "name": { "type": "string" },
             "address": { "type": "string" },
             "district": { "type": "string" }
           }
         },
-        "accompanyingDetails": {
-          "type": "object",
-          "properties": {
-            "appointmentAddress": { "type": "string" },
-            "appointmentDate": { "type": "string" },
-            "appointmentTime": { "type": "string" },
-            "refugeeNumber": { "type": "string" },
-            "refugeeName": { "type": "string" },
-            "languagesToTranslate": { "type": "integer" }
-          }
-        }
+        "accompanyingDetails": { "$ref": "ApiAccompanyingPatch#" }
       },
       "additionalProperties": false
     },
@@ -622,7 +618,13 @@
     "OpportunityStatusType": {
       "$id": "OpportunityStatusType",
       "type": "string",
-      "enum": ["opp-new", "opp-searching", "opp-active", "opp-past"]
+      "enum": [
+        "opp-new",
+        "opp-searching",
+        "opp-active",
+        "opp-inactive",
+        "opp-past"
+      ]
     },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
@@ -644,8 +646,13 @@
           "type": "array",
           "items": { "$ref": "OptionById#" }
         },
+        "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
         "category": {
+          "type": "object",
+          "properties": { "id": { "type": "integer" } }
+        },
+        "district": {
           "type": "object",
           "properties": { "id": { "type": "integer" } }
         }
@@ -672,7 +679,6 @@
             "createdAt": { "type": "string", "format": "date-time" },
             "description": { "type": "string" },
             "numberOfVolunteers": { "type": "integer" },
-
             "skills": { "type": "array", "items": { "$ref": "OptionById" } },
             "location": { "type": "array", "items": { "$ref": "OptionById" } },
             "contact": {
@@ -688,6 +694,7 @@
             "agent": {
               "type": "object",
               "properties": {
+                "id": { "type": "integer" },
                 "type": { "$ref": "AgentType#" },
                 "name": { "type": "string" },
                 "address": { "type": "string" },
@@ -892,8 +899,32 @@
         "appointmentTime": { "type": "string" },
         "refugeeNumber": { "type": "string" },
         "refugeeName": { "type": "string" },
-        "languageToTranslate": { "type": "integer" }
+        "appointmentLanguage": { "$ref": "TranslatedIntoType#" },
+        "refugeeLanguage": {
+          "type": "array",
+          "items": { "$ref": "OptionById#" }
+        },
+        "appointmentPostcode": { "type": "string" },
+        "appointmentDistrict": { "$ref": "OptionById#" }
       }
+    },
+    "ApiAccompanyingPatch": {
+      "$id": "ApiAccompanyingPatch",
+      "type": "object",
+      "properties": {
+        "appointmentAddress": { "type": "string" },
+        "appointmentDate": { "type": "string" },
+        "appointmentTime": { "type": "string" },
+        "refugeeNumber": { "type": "string" },
+        "refugeeName": { "type": "string" },
+        "appointmentLanguage": { "$ref": "TranslatedIntoType#" },
+        "refugeeLanguage": {
+          "type": "array",
+          "items": { "$ref": "OptionById#" }
+        },
+        "appointmentPostcode": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "ApiOrganizationPatch": {
       "$id": "ApiOrganizationPatch",

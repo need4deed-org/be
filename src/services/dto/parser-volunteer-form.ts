@@ -2,7 +2,7 @@ import { VolunteerFormData } from "need4deed-sdk";
 import Address from "../../data/entity/location/address.entity";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { getPostcode } from "../../server/utils";
+import { getPostcode } from "../../data/utils";
 import { dealParser } from "./parser-deal-volunteer";
 import { getNameFields } from "./utils";
 

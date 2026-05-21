@@ -18,12 +18,8 @@ import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
-import { getRRULE, getStartEnd } from "../../data/utils";
-import {
-  getPostcode,
-  getProfileEntityByTitle,
-  getTimeslot,
-} from "../../server/utils";
+import { getPostcode, getRRULE, getStartEnd } from "../../data/utils";
+import { getProfileEntityByTitle, getTimeslot } from "../../server/utils";
 
 export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   // postcode

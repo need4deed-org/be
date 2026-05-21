@@ -23,6 +23,7 @@ import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportu
 import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
+  getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -54,12 +55,15 @@ export default async function opportunityLegacyRoutes(
       },
     },
     async (request, reply) => {
-      const opportunity = parseFormData(request.body, parseOpportunityLegacy);
+      const opportunity = await parseFormData(
+        request.body,
+        parseOpportunityLegacy,
+      );
 
       opportunity.deal = await dealParserOpportunity(request.body);
       opportunity.accompanying =
         request.body.opportunity_type === "accompanying"
-          ? accompanyingParserOpportunity(request.body)
+          ? await accompanyingParserOpportunity(request.body)
           : undefined;
 
       const getAgentByPostcodeTryCatch = tryCatchFn(getAgentByPostcode, (err) =>
@@ -73,9 +77,16 @@ export default async function opportunityLegacyRoutes(
           request.body.rac_plz,
         ) ?? undefined;
 
+      if (!opportunity.agent && request.agents?.length) {
+        opportunity.agent = request.agents[0];
+      }
+
       if (!opportunity.agent) {
         opportunity.agent = await getOpportunityOrphanageAgent();
       }
+
+      const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
+      Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       const id = await writeOpportunityLegacy(opportunity);
 

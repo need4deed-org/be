@@ -5,7 +5,6 @@ import {
   LangPurpose,
   OccasionalType,
   OpportunityLegacyFormData,
-  TranslatedIntoType,
 } from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
@@ -22,11 +21,15 @@ import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
-import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
+import {
+  getPostcode,
+  getRepository,
+  getRRULE,
+  getStartEnd,
+} from "../../data/utils";
 import logger from "../../logger";
 import {
   getLanguageTitle,
-  getPostcode,
   getProfileEntityByTitle,
   getTimeslot,
 } from "../../server/utils";
@@ -73,17 +76,6 @@ export async function dealParserOpportunity(
   const opportunityLanguages: ApiLanguage[] = (await Promise.all(
     (formData.languages || [])
       .map((l) => ({ isoCode: l, purpose: LangPurpose.RECIPIENT }))
-      .concat(
-        formData.accomp_translation !== TranslatedIntoType.NO_TRANSLATION
-          ? [
-              { isoCode: "de", purpose: LangPurpose.TRANSLATION },
-              ...(formData.accomp_translation === TranslatedIntoType.ENGLISH_OK
-                ? [{ isoCode: "en", purpose: LangPurpose.TRANSLATION }]
-                : []),
-            ]
-          : [],
-      )
-      .flat()
       .map(async ({ isoCode, purpose }) => ({
         title: await getLanguageTitle(isoCode),
         purpose,

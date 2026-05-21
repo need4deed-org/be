@@ -1,4 +1,4 @@
-import { VolunteerPatchBodyData } from "need4deed-sdk";
+import { DocumentStatusType, VolunteerPatchBodyData } from "need4deed-sdk";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Person from "../../../data/entity/person.entity";
@@ -13,23 +13,41 @@ export function getVolunteerPatchData(
   body: VolunteerPatchBodyData,
   nullable?: Array<keyof VolunteerPatchBodyData>,
 ) {
-  const volunteerData: Partial<Volunteer> = stripNullishAttributes(
-    {
-      infoAbout: body.infoAbout,
-      infoExperience: body.infoExperience,
-      statusCGC: body.goodConductCertificate,
-      statusVaccination: body.measlesVaccination,
-      statusEngagement: body.statusEngagement,
-      statusCommunication: body.statusCommunication,
-      statusAppreciation: body.statusAppreciation,
-      statusType: body.statusType,
-      statusMatch: body.statusMatch,
-      statusCgcProcess: body.statusCgcProcess,
-      dateReturn: body.dateReturn,
-      preferredCommunicationType: body.preferredCommunicationType,
-    },
-    nullable,
-  );
+  const statusDates: Partial<Volunteer> = {};
+  if (body.goodConductCertificate === DocumentStatusType.APPLIED_N4D) {
+    statusDates.statusCGCApplicationDate = new Date();
+  } else if (body.goodConductCertificate === DocumentStatusType.YES) {
+    statusDates.statusCGCDate = new Date();
+  } else if (body.goodConductCertificate === DocumentStatusType.NO) {
+    statusDates.statusCGCDate = null;
+    statusDates.statusCGCApplicationDate = null;
+  }
+  if (body.measlesVaccination === DocumentStatusType.YES) {
+    statusDates.statusVaccinationDate = new Date();
+  } else if (body.measlesVaccination === DocumentStatusType.NO) {
+    statusDates.statusVaccinationDate = null;
+  }
+
+  const volunteerData: Partial<Volunteer> = {
+    ...stripNullishAttributes(
+      {
+        infoAbout: body.infoAbout,
+        infoExperience: body.infoExperience,
+        statusCGC: body.goodConductCertificate,
+        statusVaccination: body.measlesVaccination,
+        statusEngagement: body.statusEngagement,
+        statusCommunication: body.statusCommunication,
+        statusAppreciation: body.statusAppreciation,
+        statusType: body.statusType,
+        statusMatch: body.statusMatch,
+        statusCgcProcess: body.statusCgcProcess,
+        dateReturn: body.dateReturn,
+        preferredCommunicationType: body.preferredCommunicationType,
+      },
+      nullable,
+    ),
+    ...statusDates,
+  };
   const personData: Partial<Person> = stripNullishAttributes(
     {
       id: body.person?.id,

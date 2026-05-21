@@ -14,3 +14,5 @@ type Primitive = string | number | boolean | null | undefined;
 export type DeeplyNestedObject = {
   [key: string]: Primitive | DeeplyNestedObject | DeeplyNestedObject[];
 };
+
+export type Voidable<T> = T | null | undefined;

@@ -48,5 +48,18 @@ export function getOpportunityWhere(
           },
         }
       : {}),
+    ...(filter?.activity
+      ? {
+          deal: {
+            profile: {
+              profileActivity: {
+                activity: {
+                  id: normalizeStringArrayInput(filter.activity),
+                },
+              },
+            },
+          },
+        }
+      : {}),
   } as FindOptionsWhere<Opportunity>;
 }

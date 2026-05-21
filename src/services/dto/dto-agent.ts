@@ -44,10 +44,14 @@ export function dtoAgentGet(
 
 export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   return {
+    id: agent.id,
     type: agent.type,
     name: agent.title,
     address: serializeAddress(agent.representative?.person?.address),
-    district: { id: agent.districtId, title: { de: agent.district?.title } },
+    district: {
+      id: agent.districtId,
+      title: { de: agent.district?.title, en: agent.district?.title },
+    },
   };
 }
 

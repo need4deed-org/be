@@ -17,6 +17,7 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   dtoOpportunityGet,
@@ -40,12 +41,11 @@ import {
   addComments2Entity,
   getCategoryToProfileHandler,
   getDistrictToAgentHandler,
+  getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
-  getTranslationType,
   patchEntity,
-  setTranslationType,
   updateOptionList,
 } from "../../utils";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -80,12 +80,14 @@ export default async function opportunityRoutes(
       const id = request.params.id;
       const relations = [
         "accompanying",
+        "accompanying.postcode",
         "deal.profile.profileLanguage.language",
         "deal.profile.profileActivity.activity",
         "deal.profile.profileSkill.skill",
         "deal.location.locationDistrict.district",
         "deal.time.timeTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
+        "agent.district",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -109,24 +111,37 @@ export default async function opportunityRoutes(
           `Opportunity (id:${id}) has no agent, adding to orphanage agent.`,
         );
       }
-      const { addDistrictToAgent, updates } = getDistrictToAgentHandler(true);
+      const { addDistrictToAgent, updates: districtUpdates } =
+        getDistrictToAgentHandler(true);
       Object.assign(
         opportunityComments.agent,
         await addDistrictToAgent(opportunityComments.agent),
       );
 
-      if (updates.length) {
+      if (districtUpdates.length) {
         const agentRepository = fastify.db.agentRepository;
-        await agentRepository.save(updates);
+        await agentRepository.save(districtUpdates);
       }
 
-      if (opportunityComments.accompanying) {
-        opportunityComments.accompanying.langCode = await setTranslationType(
-          opportunityComments.accompanying.languageToTranslate!, // TODO: this needs to be sorted
-        );
+      const { addDistrictToOpportunity, updates: opportunityUpdates } =
+        getDistrictToOpportunityHandler();
+      Object.assign(
+        opportunityComments,
+        await addDistrictToOpportunity(opportunityComments),
+      );
+
+      if (opportunityUpdates.length) {
+        const opportunityRepository = fastify.db.opportunityRepository;
+        await opportunityRepository.save(opportunityUpdates);
       }
 
-      const data = dtoOpportunityGet(opportunityComments);
+      const accompanyingDistrict = opportunityComments.accompanying?.postcode
+        ? await getDistrictFromPostcode(
+            opportunityComments.accompanying.postcode,
+          )
+        : null;
+
+      const data = dtoOpportunityGet(opportunityComments, accompanyingDistrict);
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
@@ -165,6 +180,8 @@ export default async function opportunityRoutes(
         "deal.profile.profileLanguage.language",
         "deal.profile.profileActivity.activity",
         "deal.time.timeTimeslot.timeslot",
+        "deal.location.locationDistrict.district",
+        "agent",
         "accompanying",
       ];
 
@@ -177,21 +194,39 @@ export default async function opportunityRoutes(
         ...(order ? order : {}),
       });
 
-      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
-      const opportunitiesCategory = opportunities.map((opportunity) => {
-        Object.assign(
-          opportunity.deal.profile,
-          addCategoryToProfile(opportunity.deal.profile),
-        );
-        return opportunity;
-      });
+      const { addCategoryToProfile, updates: profileUpdates } =
+        getCategoryToProfileHandler();
 
-      if (updates.length > 0) {
+      const { addDistrictToOpportunity, updates: opportunityUpdates } =
+        getDistrictToOpportunityHandler();
+
+      const opportunitiesCategoryDistrict = await Promise.all(
+        opportunities.map(async (opportunity) => {
+          Object.assign(
+            opportunity,
+            await addDistrictToOpportunity(opportunity),
+          );
+          Object.assign(
+            opportunity.deal.profile,
+            addCategoryToProfile(opportunity.deal.profile),
+          );
+          return opportunity;
+        }),
+      );
+
+      if (profileUpdates.length > 0) {
         const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(updates);
+        await profileRepository.save(profileUpdates);
       }
 
-      const data = opportunitiesCategory.map(dtoOpportunityGetList);
+      if (opportunityUpdates.length > 0) {
+        await opportunityRepository.save(opportunityUpdates);
+      }
+      logger.debug(
+        `Saving category updates: ${profileUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+      );
+
+      const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
 
       return reply.status(200).send({
         message: `Opportunities page:${page}.`,
@@ -240,6 +275,7 @@ export default async function opportunityRoutes(
         skills,
         activities,
       } = parseOpportunity(request.body);
+      const agentLinkId = request.body.agent?.id;
       logger.debug(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
@@ -264,7 +300,22 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (agent) {
+      if (agentLinkId !== undefined) {
+        const linkedAgent = await fastify.db.agentRepository.findOne({
+          where: { id: agentLinkId },
+        });
+        if (!linkedAgent) {
+          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
+        }
+        const success = await patchEntity(
+          Opportunity,
+          { agentId: agentLinkId } as Partial<Opportunity>,
+          opportunity.id,
+        );
+        if (!success) {
+          throw new BadRequestError("Relinking opportunity agent failed.");
+        }
+      } else if (agent) {
         const success = await patchEntity(Agent, agent, opportunity.agentId);
         if (!success) {
           throw new Error("Patching agent failed while patching opportunity.");
@@ -272,12 +323,22 @@ export default async function opportunityRoutes(
       }
 
       if (accompanying) {
-        const languageToTranslate = await getTranslationType(
-          Number(accompanying.languageToTranslate),
-        );
+        const appointmentPostcodeValue =
+          request.body.accompanyingDetails?.appointmentPostcode;
+        if (appointmentPostcodeValue !== undefined) {
+          const postcode = await fastify.db.postcodeRepository.findOneBy({
+            value: appointmentPostcodeValue,
+          });
+          if (!postcode) {
+            throw new BadRequestError(
+              `Postcode "${appointmentPostcodeValue}" not found.`,
+            );
+          }
+          accompanying.postcode = postcode;
+        }
         const success = await patchEntity(
           Accompanying,
-          Object.assign(accompanying, { languageToTranslate }),
+          accompanying,
           opportunity.accompanyingId,
         );
         if (!success) {
