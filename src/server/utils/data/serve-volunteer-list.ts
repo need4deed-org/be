@@ -119,7 +119,15 @@ export async function getFilteredVolunteers(
   }
 
   // ----------------------------------------------------------------------
-  // 4. STATUS TYPE FILTER (v.volunteer_type)
+  // 4. MATCH STATUS FILTER (v.status_match)
+  // ----------------------------------------------------------------------
+  if (filterParams?.filter?.match?.length) {
+    const matches = toArray(filterParams.filter.match);
+    mvQueryBuilder.andWhere("v.status_match IN (:...matches)", { matches });
+  }
+
+  // ----------------------------------------------------------------------
+  // 5. STATUS TYPE FILTER (v.volunteer_type)
   // ----------------------------------------------------------------------
   if (filterParams?.filter?.statusType?.length) {
     const statusTypes = toArray(filterParams.filter.statusType);

@@ -22,6 +22,11 @@ export function getVolunteerWhere(
           statusEngagement: normalizeStringArrayInput(filter.engagement),
         }
       : {}),
+    ...(filter?.match
+      ? {
+          statusMatch: normalizeStringArrayInput(filter.match),
+        }
+      : {}),
     ...(filter?.search
       ? {
           person: [

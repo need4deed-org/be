@@ -24,7 +24,7 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
-import { idParamSchema, responseErrors, responseSchema } from "../../schema";
+import { idParamSchema, responseErrors, responseSchema, volunteerListQuerySchema } from "../../schema";
 import { QuerystringVolunteerGetList, RoutePrefix } from "../../types";
 import {
   fetchVolunteerById,
@@ -147,24 +147,30 @@ export default async function volunteerRoutes(
     "/",
     {
       schema: {
+        querystring: volunteerListQuerySchema,
         response: responseSchema("volunteer-api#", true),
       },
     },
     async (request, reply) => {
-      function engagementWorkaround(query: QuerystringVolunteerGetList) {
+      function filterWorkaround(query: QuerystringVolunteerGetList) {
         if (query.filter) {
           const engagement = [query.filter.engagement]
             .flat()
             .filter(Boolean)
             .map((e) => `vol-${e}`);
+          const match = [query.filter.match]
+            .flat()
+            .filter(Boolean)
+            .map((m) => `vol-${m}`);
           Object.assign(query.filter, {
             engagement: engagement.length ? engagement : undefined,
+            match: match.length ? match : undefined,
           });
         }
         return query;
       }
 
-      const { page, limit, sortOrder, filter } = engagementWorkaround(
+      const { page, limit, sortOrder, filter } = filterWorkaround(
         request.query,
       );
       const [skip, take] = getSkipTake({ page, limit });
