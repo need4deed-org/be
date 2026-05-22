@@ -157,11 +157,11 @@ export default async function volunteerRoutes(
           const engagement = [query.filter.engagement]
             .flat()
             .filter(Boolean)
-            .map((e) => `vol-${e}`);
+            .map((e) => (e.startsWith("vol-") ? e : `vol-${e}`));
           const match = [query.filter.match]
             .flat()
             .filter(Boolean)
-            .map((m) => `vol-${m}`);
+            .map((m) => (m.startsWith("vol-") ? m : `vol-${m}`));
           Object.assign(query.filter, {
             engagement: engagement.length ? engagement : undefined,
             match: match.length ? match : undefined,
