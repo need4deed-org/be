@@ -33,7 +33,6 @@ import {
   QuerystringOpportunityList,
   ReplyData,
   ReplyDataCount,
-  ReplyMessage,
   RoutePrefix,
 } from "../../types";
 import {
@@ -159,7 +158,10 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      const [skip, take] = getSkipTake({ page: request.query.page, limit: request.query.limit });
+      const [skip, take] = getSkipTake({
+        page: request.query.page,
+        limit: request.query.limit,
+      });
       const order =
         request.query.sortOrder === SortOrder.NewToOld
           ? { order: { createdAt: "DESC" } as const }
@@ -227,7 +229,7 @@ export default async function opportunityRoutes(
       const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
 
       return reply.status(200).send({
-        message: `Opportunities page:${page}.`,
+        message: `Opportunities page:${request.query.page}.`,
         data,
         count,
       });
