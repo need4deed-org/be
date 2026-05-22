@@ -1,12 +1,14 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { ApiUserGet, UserRole } from "need4deed-sdk";
+import { FindOptionsWhere } from "typeorm";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { sendVerificationEmail } from "../../services";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
+import { responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
   createUserBodySchema,
@@ -14,46 +16,45 @@ import {
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
 } from "../schema/user.schema";
-import { RoutePrefix } from "../types";
+import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
+import { getSkipTake, getUserWhere } from "../utils";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
   fastify.get<{
-    Reply: {
-      message: string;
-      data?: Array<User>;
-    };
+    Querystring: QuerystringUserList;
+    Reply: ReplyDataCount<ApiUserGet[]>;
   }>(
     "/",
     {
       schema: {
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: { type: "array", items: userResponseSchema },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
+        querystring: userListQuerySchema,
+        response: responseSchema("ApiUserMe#", true),
       },
       onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
     },
     async (request, reply) => {
-      try {
-        const userRepository = fastify.db.userRepository;
-        const users = await userRepository.find();
-        return reply
-          .status(200)
-          .send({ message: "List of users", data: users });
-      } catch (error) {
-        logger.error(`Error fetching users: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
-      }
+      const { page, limit, search } = request.query;
+      const [skip, take] = getSkipTake({ page, limit });
+
+      const userRepository = fastify.db.userRepository;
+      const [users, count] = await userRepository.findAndCount({
+        where: getUserWhere(search) as FindOptionsWhere<User>,
+        relations: ["person"],
+        skip,
+        take,
+        order: { id: "DESC" },
+      });
+
+      const data = users.map(serializeUserToMeDTO);
+
+      return reply.status(200).send({
+        message: `List of users page:${page || 1}`,
+        data,
+        count,
+      });
     },
   );
 
