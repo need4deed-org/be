@@ -33,7 +33,7 @@ export default async function userRoutes(
         querystring: userListQuerySchema,
         response: responseSchema("ApiUserMe#", true),
       },
-      onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
+      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const { page, limit, search } = request.query;
