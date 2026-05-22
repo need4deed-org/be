@@ -1,4 +1,3 @@
-import { VolunteerStateTypeType } from "need4deed-sdk";
 import { ILike } from "typeorm";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
@@ -29,7 +28,6 @@ export function getVolunteerWhere(
 
   return {
     ...(filter?.type ? { statusType: normalizeStringArrayInput(filter.type) } : {}),
-    ...(filter?.accompanying ? { statusType: VolunteerStateTypeType.ACCOMPANYING } : {}),
     ...(filter?.engagement ? { statusEngagement: normalizeStringArrayInput(filter.engagement) } : {}),
     ...(filter?.match ? { statusMatch: normalizeStringArrayInput(filter.match) } : {}),
     ...(filter?.search
