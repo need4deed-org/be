@@ -8,11 +8,15 @@ import {
 
 vi.mock("../../../services/dto/utils", () => ({
   getOptionItems: vi.fn(() => [{ id: 1, title: "Reading" }]),
-  getLanguages: vi.fn(() => [{ id: "en", title: "English", proficiency: "fluent" }]),
+  getLanguages: vi.fn(() => [
+    { id: "en", title: "English", proficiency: "fluent" },
+  ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
 }));
 
-function makeOV(overrides: Partial<OpportunityVolunteer> = {}): OpportunityVolunteer {
+function makeOV(
+  overrides: Partial<OpportunityVolunteer> = {},
+): OpportunityVolunteer {
   return new OpportunityVolunteer({
     id: 1,
     status: OpportunityVolunteerStatusType.PENDING,

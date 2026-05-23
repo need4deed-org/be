@@ -834,20 +834,26 @@
       "$id": "AgentProps",
       "type": "object",
       "properties": {
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
+        "title": { "type": "string" },
+        "type": { "$ref": "AgentType#" },
+        "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" },
+        "trustLevel": { "$ref": "AgentTrustType#" },
         "serviceType": {
           "type": "array",
           "items": { "$ref": "AgentService#" }
         },
-        "trustLevel": { "$ref": "AgentTrustType#" },
-        "statusEngagement": { "$ref": "AgentEngagementStatusType#" }
+        "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
+        "about": { "type": "string" },
+        "website": { "type": "string" },
+        "addressStreet": { "type": "string" },
+        "addressPostcode": { "type": "string" },
+        "statusSearch": { "$ref": "AgentVolunteerSearchType#" },
+        "services": {
+          "type": "array",
+          "items": { "$ref": "AgentService#" }
+        },
+        "languages": { "type": "array", "items": { "$ref": "OptionById#" } },
+        "districtId": { "type": "number" }
       }
     },
     "AgentId": {
