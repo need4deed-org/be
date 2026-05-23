@@ -86,3 +86,7 @@ export interface QuerystringVolunteerFiltering {
 }
 export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
   QuerystringVolunteerFiltering;
+
+export interface QuerystringUserList extends QuerystringPagination {
+  search?: string;
+}
