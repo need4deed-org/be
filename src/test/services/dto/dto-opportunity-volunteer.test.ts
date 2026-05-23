@@ -8,14 +8,18 @@ import {
 
 vi.mock("../../../services/dto/utils", () => ({
   getOptionItems: vi.fn(() => [{ id: 1, title: "Reading" }]),
-  getLanguages: vi.fn(() => [{ id: "en", title: "English", proficiency: "fluent" }]),
+  getLanguages: vi.fn(() => [
+    { id: "en", title: "English", proficiency: "fluent" },
+  ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
 }));
 
-function makeOV(overrides: Partial<OpportunityVolunteer> = {}): OpportunityVolunteer {
+function makeOV(
+  overrides: Partial<OpportunityVolunteer> = {},
+): OpportunityVolunteer {
   return new OpportunityVolunteer({
     id: 1,
-    status: OpportunityVolunteerStatusType.APPLIED,
+    status: OpportunityVolunteerStatusType.PENDING,
     volunteerId: 10,
     opportunityId: 20,
     updatedAt: new Date("2025-01-01"),
@@ -40,7 +44,7 @@ describe("volunteerOpportunityVolunteerDTO", () => {
     const result = volunteerOpportunityVolunteerDTO(ov);
 
     expect(result.id).toBe(1);
-    expect(result.status).toBe(OpportunityVolunteerStatusType.APPLIED);
+    expect(result.status).toBe(OpportunityVolunteerStatusType.PENDING);
     expect(result.volunteerId).toBe(10);
     expect(result.opportunityId).toBe(20);
     expect(result.title).toBe("German Lessons");

@@ -49,6 +49,9 @@ export default class Accompanying {
   @IsEnum(TranslatedIntoType)
   languageToTranslate?: TranslatedIntoType;
 
+  @Column({ name: "postcode_id", nullable: true })
+  postcodeId?: number;
+
   @ManyToOne(() => Postcode, (postcode) => postcode.accompanying, {
     nullable: true,
     onDelete: "SET NULL",

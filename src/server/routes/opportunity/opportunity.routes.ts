@@ -43,6 +43,7 @@ import {
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
+  getPostcode,
   getSkipTake,
   patchEntity,
   updateOptionList,
@@ -326,15 +327,13 @@ export default async function opportunityRoutes(
         const appointmentPostcodeValue =
           request.body.accompanyingDetails?.appointmentPostcode;
         if (appointmentPostcodeValue !== undefined) {
-          const postcode = await fastify.db.postcodeRepository.findOneBy({
-            value: appointmentPostcodeValue,
-          });
+          const postcode = await getPostcode(appointmentPostcodeValue);
           if (!postcode) {
             throw new BadRequestError(
               `Postcode "${appointmentPostcodeValue}" not found.`,
             );
           }
-          accompanying.postcode = postcode;
+          accompanying.postcodeId = postcode.id;
         }
         const success = await patchEntity(
           Accompanying,

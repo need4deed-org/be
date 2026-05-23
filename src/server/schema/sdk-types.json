@@ -811,6 +811,8 @@
         "district": { "$ref": "Option#" },
         "trustLevel": { "$ref": "AgentTrustType#" },
         "activeVolunteers": { "type": "integer" },
+        "numActiveVolunteers": { "type": "integer" },
+        "email": { "type": "string" },
         "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" }
       }
     },
@@ -821,8 +823,10 @@
         "id",
         "title",
         "type",
-        "district",
+        "trustLevel",
         "activeVolunteers",
+        "numActiveVolunteers",
+        "email",
         "volunteerSearch"
       ]
     },
@@ -874,7 +878,11 @@
             },
             "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
             "agentDetails": { "$ref": "AgentDetails#" },
-            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            }
           }
         }
       ]
@@ -890,9 +898,16 @@
         "id",
         "title",
         "type",
-        "district",
+        "trustLevel",
         "activeVolunteers",
-        "volunteerSearch"
+        "numActiveVolunteers",
+        "email",
+        "volunteerSearch",
+        "createdAt",
+        "statusEngagement",
+        "agentDetails",
+        "comments",
+        "languages"
       ]
     },
     "ApiAccompanying": {

@@ -70,19 +70,62 @@ export const volunteerListQuerySchema = {
     filter: {
       type: "object",
       properties: {
-        type: { type: "string" },
+        type: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         search: { type: "string" },
-        language: { type: "string" },
-        activity: { type: "string" },
-        skill: { type: "string" },
+        language: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        activity: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        skill: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         availability: { type: "string" },
-        district: { type: "string" },
-        engagement: { type: "array", items: { type: "string" } },
-        match: { type: "array", items: { type: "string" } },
-        accompanying: { type: "boolean" },
+        district: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        engagement: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        match: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
       },
       additionalProperties: false,
     },
+  },
+  additionalProperties: false,
+};
+
+export const userListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    search: { type: "string" },
   },
   additionalProperties: false,
 };
