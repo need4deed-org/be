@@ -6,7 +6,8 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { NotFoundError } from "../../../config";
+import { BadRequestError, NotFoundError } from "../../../config";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import logger from "../../../logger";
 import {
   dtoAgentGet,
@@ -162,7 +163,7 @@ export default async function agentRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      logger.debug(`PATCH /agent/${id}, body:${JSON.stringify(request.body)}`);
+      logger.debug(`PATCH /agent/${id}, fields:${Object.keys(request.body)}`);
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
 
@@ -172,42 +173,48 @@ export default async function agentRoutes(
 
       const { addressStreet, addressPostcode, languages } = request.body;
 
-      if (addressStreet || addressPostcode) {
-        const addressData = addressStreet ? { street: addressStreet } : {};
-        const postcodeData = addressPostcode ? { value: addressPostcode } : {};
+      // Persist address, scalar fields and languages atomically so a partial
+      // failure can't leave the agent half-updated.
+      await agentRepository.manager.transaction(async (manager) => {
+        if (addressStreet || addressPostcode) {
+          const addressData = addressStreet ? { street: addressStreet } : {};
+          const postcodeData = addressPostcode
+            ? { value: addressPostcode }
+            : {};
 
-        if (agent.addressId) {
-          const success = await patchAddress(
-            { id: agent.addressId, ...addressData },
-            postcodeData,
-          );
-          if (!success) {
-            return reply.status(400).send({
-              message: `Address (id=${agent.addressId}) not updated.`,
-            });
+          if (agent.addressId) {
+            const success = await patchAddress(
+              { id: agent.addressId, ...addressData },
+              postcodeData,
+              manager,
+            );
+            if (!success) {
+              throw new BadRequestError(
+                `Address (id=${agent.addressId}) not updated.`,
+              );
+            }
+          } else {
+            const address = await createAddress(
+              addressData,
+              postcodeData,
+              manager,
+            );
+            if (!address) {
+              throw new BadRequestError(
+                `Address for agent (id=${id}) not created; a valid postcode is required.`,
+              );
+            }
+            agent.addressId = address.id;
           }
-        } else {
-          const address = await createAddress(addressData, postcodeData);
-          if (!address) {
-            return reply.status(400).send({
-              message: `Address for agent (id=${id}) not created; a valid postcode is required.`,
-            });
-          }
-          agent.addressId = address.id;
         }
-      }
 
-      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
-      await agentRepository.save(agentObj);
+        Object.assign(agent, parseAgentPatch(request.body));
+        await manager.getRepository(Agent).save(agent);
 
-      if (languages) {
-        const success = await updateAgentLanguages(id, languages);
-        if (!success) {
-          return reply.status(400).send({
-            message: `Languages for agent (id=${id}) not updated.`,
-          });
+        if (languages) {
+          await updateAgentLanguages(id, languages, manager);
         }
-      }
+      });
 
       return reply.status(204).send();
     },

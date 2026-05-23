@@ -16,6 +16,7 @@ import {
 import {
   DataSource,
   DeepPartial,
+  EntityManager,
   FindOptionsWhere,
   In,
   QueryFailedError,
@@ -296,8 +297,9 @@ export async function patchEntity<E extends { id: number }>(
   entity: new () => E,
   data: Partial<E>,
   entityId?: number,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean | void> {
-  const repository = getRepository(dataSource, entity);
+  const repository = getRepository(manager, entity);
 
   const id = entityId || data?.id;
   if (!id) {
@@ -319,8 +321,9 @@ export async function patchEntity<E extends { id: number }>(
 export async function patchAddress(
   addressData: Partial<Address>,
   postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const postcodeRepository = getRepository(dataSource, Postcode);
+  const postcodeRepository = getRepository(manager, Postcode);
 
   const address = { ...addressData } as Address;
 
@@ -337,7 +340,7 @@ export async function patchAddress(
     }
   }
 
-  return Boolean(await patchEntity(Address, address));
+  return Boolean(await patchEntity(Address, address, undefined, manager));
 }
 
 /**
@@ -348,9 +351,10 @@ export async function patchAddress(
 export async function createAddress(
   addressData: Partial<Address>,
   postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<Address | null> {
-  const addressRepository = getRepository(dataSource, Address);
-  const postcodeRepository = getRepository(dataSource, Postcode);
+  const addressRepository = getRepository(manager, Address);
+  const postcodeRepository = getRepository(manager, Postcode);
 
   let postcodeId = postcodeData?.id;
   if (!postcodeId && postcodeData?.value) {
@@ -372,12 +376,16 @@ export async function createAddress(
  * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
  * de-selected rows and insert the newly selected ones (rows that are unchanged
  * are left untouched). Language `id`s come from the SDK as `OptionById`.
+ *
+ * Runs on the given `manager` so the caller can wrap it in a transaction; pass
+ * the transactional EntityManager to make it atomic with surrounding writes.
  */
 export async function updateAgentLanguages(
   agentId: number,
   languages: OptionById[],
-): Promise<boolean> {
-  const agentLanguageRepository = getRepository(dataSource, AgentLanguage);
+  manager: DataSource | EntityManager = dataSource,
+): Promise<void> {
+  const agentLanguageRepository = getRepository(manager, AgentLanguage);
 
   const desiredLanguageIds = [
     ...new Set(languages.map(({ id }) => Number(id))),
@@ -392,25 +400,11 @@ export async function updateAgentLanguages(
     .filter((languageId) => !currentLanguageIds.includes(languageId))
     .map((languageId) => new AgentLanguage({ agentId, languageId }));
 
-  try {
-    await dataSource.transaction(async (manager) => {
-      const repository = getRepository(
-        manager as unknown as DataSource,
-        AgentLanguage,
-      );
-      if (toRemove.length > 0) {
-        await repository.delete(toRemove.map(({ id }) => id));
-      }
-      if (toAdd.length > 0) {
-        await repository.save(toAdd);
-      }
-    });
-    return true;
-  } catch (error) {
-    logger.warn(
-      `Error ${error.message} updating languages for agent id=${agentId}`,
-    );
-    return false;
+  if (toRemove.length > 0) {
+    await agentLanguageRepository.delete(toRemove.map(({ id }) => id));
+  }
+  if (toAdd.length > 0) {
+    await agentLanguageRepository.save(toAdd);
   }
 }
 

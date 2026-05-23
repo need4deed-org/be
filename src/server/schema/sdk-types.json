@@ -852,7 +852,8 @@
           "type": "array",
           "items": { "$ref": "AgentService#" }
         },
-        "languages": { "type": "array", "items": { "$ref": "OptionById#" } }
+        "languages": { "type": "array", "items": { "$ref": "OptionById#" } },
+        "districtId": { "type": "number" }
       }
     },
     "AgentId": {

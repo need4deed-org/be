@@ -11,5 +11,6 @@ export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
     searchStatus: agent.statusSearch,
     engagementStatus: agent.statusEngagement,
     services: agent.services,
+    districtId: agent.districtId,
   };
 }
