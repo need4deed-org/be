@@ -78,6 +78,8 @@ export default async function agentRoutes(
         "address.postcode",
         "district",
         "opportunity.opportunityVolunteer",
+        "agentPerson.person",
+        "organization",
       ];
       const [agents, count] = await agentRepository.findAndCount({
         where,
