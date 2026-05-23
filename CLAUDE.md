@@ -150,3 +150,7 @@ The runtime contract is at https://app.need4deed.org/swagger/json
 The transpile time contract is at SDK (`yarn upgrade need4deed-sdk --latest`)
 
 All amendments have to land in schemas for endpoint handlers and in SDK
+
+## Private instructions
+
+@dev/CLAUDE.md
