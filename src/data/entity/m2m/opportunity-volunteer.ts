@@ -8,12 +8,14 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from "typeorm";
 import Opportunity from "../opportunity/opportunity.entity";
 import Volunteer from "../volunteer/volunteer.entity";
 
 @Entity()
+@Unique(["opportunityId", "volunteerId"])
 export default class OpportunityVolunteer {
   constructor(opportunityVolunteer?: Partial<OpportunityVolunteer>) {
     if (opportunityVolunteer) {
