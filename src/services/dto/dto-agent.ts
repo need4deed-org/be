@@ -18,6 +18,9 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
     trustLevel: agent.trustLevel,
     volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
+    numActiveVolunteers: agent.activeVolunteers,
+    email:
+      agent.representative?.person?.email || agent.organization?.email || "",
     district: { id: agent.districtId, title: { de: agent?.district?.title } },
   };
 }
@@ -39,6 +42,11 @@ export function dtoAgentGet(
     statusEngagement: agent.engagementStatus,
     agentDetails: dtoAgentDetails(agent),
     comments: agent.comments?.map(commentSerializer),
+    languages:
+      agent.agentLanguage?.map((al) => ({
+        id: al.languageId,
+        title: al.language?.title ?? "",
+      })) || [],
   };
 }
 

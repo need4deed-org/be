@@ -151,6 +151,8 @@ describe("dtoAgentGetList", () => {
       title: "Helping Hands",
       type: "NGO",
       activeVolunteers: 10,
+      numActiveVolunteers: 10,
+      email: "",
       district: {
         id: 201,
         title: { de: "Mitte" },

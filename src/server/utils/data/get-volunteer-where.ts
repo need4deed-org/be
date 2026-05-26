@@ -9,13 +9,19 @@ export function getVolunteerWhere(
   // relations are active (language, activity, skill all share the same deal key).
   const profileFilter: Record<string, unknown> = {};
   if (filter?.language) {
-    profileFilter.profileLanguage = { language: { id: normalizeStringArrayInput(filter.language) } };
+    profileFilter.profileLanguage = {
+      language: { id: normalizeStringArrayInput(filter.language) },
+    };
   }
   if (filter?.activity) {
-    profileFilter.profileActivity = { activity: { id: normalizeStringArrayInput(filter.activity) } };
+    profileFilter.profileActivity = {
+      activity: { id: normalizeStringArrayInput(filter.activity) },
+    };
   }
   if (filter?.skill) {
-    profileFilter.profileSkill = { skill: { id: normalizeStringArrayInput(filter.skill) } };
+    profileFilter.profileSkill = {
+      skill: { id: normalizeStringArrayInput(filter.skill) },
+    };
   }
 
   const dealFilter: Record<string, unknown> = {};
@@ -23,13 +29,23 @@ export function getVolunteerWhere(
     dealFilter.profile = profileFilter;
   }
   if (filter?.district) {
-    dealFilter.location = { locationDistrict: { district: { id: normalizeStringArrayInput(filter.district) } } };
+    dealFilter.location = {
+      locationDistrict: {
+        district: { id: normalizeStringArrayInput(filter.district) },
+      },
+    };
   }
 
   return {
-    ...(filter?.type ? { statusType: normalizeStringArrayInput(filter.type) } : {}),
-    ...(filter?.engagement ? { statusEngagement: normalizeStringArrayInput(filter.engagement) } : {}),
-    ...(filter?.match ? { statusMatch: normalizeStringArrayInput(filter.match) } : {}),
+    ...(filter?.type
+      ? { statusType: normalizeStringArrayInput(filter.type) }
+      : {}),
+    ...(filter?.engagement
+      ? { statusEngagement: normalizeStringArrayInput(filter.engagement) }
+      : {}),
+    ...(filter?.match
+      ? { statusMatch: normalizeStringArrayInput(filter.match) }
+      : {}),
     ...(filter?.search
       ? {
           person: [

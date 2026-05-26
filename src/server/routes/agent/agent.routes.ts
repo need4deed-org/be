@@ -6,7 +6,8 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { NotFoundError } from "../../../config";
+import { BadRequestError, NotFoundError } from "../../../config";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import logger from "../../../logger";
 import {
   dtoAgentGet,
@@ -28,9 +29,12 @@ import {
 } from "../../types";
 import {
   addComments2Entity,
+  createAddress,
   getAgentWhere,
   getDistrictToAgentHandler,
   getSkipTake,
+  patchAddress,
+  updateAgentLanguages,
 } from "../../utils";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
@@ -78,6 +82,8 @@ export default async function agentRoutes(
         "address.postcode",
         "district",
         "opportunity.opportunityVolunteer",
+        "agentPerson.person",
+        "organization",
       ];
       const [agents, count] = await agentRepository.findAndCount({
         where,
@@ -157,7 +163,7 @@ export default async function agentRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      logger.debug(`id:${id}, body:${JSON.stringify(request.body)}`);
+      logger.debug(`PATCH /agent/${id}, fields:${Object.keys(request.body)}`);
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
 
@@ -165,9 +171,50 @@ export default async function agentRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 
-      const agentObj = Object.assign(agent, parseAgentPatch(request.body));
+      const { addressStreet, addressPostcode, languages } = request.body;
 
-      await agentRepository.save(agentObj);
+      // Persist address, scalar fields and languages atomically so a partial
+      // failure can't leave the agent half-updated.
+      await agentRepository.manager.transaction(async (manager) => {
+        if (addressStreet || addressPostcode) {
+          const addressData = addressStreet ? { street: addressStreet } : {};
+          const postcodeData = addressPostcode
+            ? { value: addressPostcode }
+            : {};
+
+          if (agent.addressId) {
+            const success = await patchAddress(
+              { id: agent.addressId, ...addressData },
+              postcodeData,
+              manager,
+            );
+            if (!success) {
+              throw new BadRequestError(
+                `Address (id=${agent.addressId}) not updated.`,
+              );
+            }
+          } else {
+            const address = await createAddress(
+              addressData,
+              postcodeData,
+              manager,
+            );
+            if (!address) {
+              throw new BadRequestError(
+                `Address for agent (id=${id}) not created; a valid postcode is required.`,
+              );
+            }
+            agent.addressId = address.id;
+          }
+        }
+
+        Object.assign(agent, parseAgentPatch(request.body));
+        await manager.getRepository(Agent).save(agent);
+
+        if (languages) {
+          await updateAgentLanguages(id, languages, manager);
+        }
+      });
 
       return reply.status(204).send();
     },

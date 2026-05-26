@@ -143,6 +143,16 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 
 ---
 
+## TypeORM entities sync to database DDL
+
+Any changes in entities that are registered in `src/data/data-source.ts` must be synced with the database DDL by running:
+
+```
+yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
+```
+
+---
+
 ## API contract
 
 The runtime contract is at https://app.need4deed.org/swagger/json
@@ -150,3 +160,9 @@ The runtime contract is at https://app.need4deed.org/swagger/json
 The transpile time contract is at SDK (`yarn upgrade need4deed-sdk --latest`)
 
 All amendments have to land in schemas for endpoint handlers and in SDK
+
+---
+
+## Private instructions
+
+@dev/CLAUDE.md
