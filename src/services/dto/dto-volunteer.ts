@@ -9,13 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
-import {
-  getAvailability,
-  getLanguages,
-  getOptionItems,
-  getTitles,
-} from "./utils";
-
+import { getAvailability, getLanguages, getOptionItems } from "./utils";
 
 export function volunteerListSerializer(
   volunteer: Volunteer,
@@ -24,16 +18,19 @@ export function volunteerListSerializer(
     const id = volunteer.id;
     const statusEngagement = volunteer.statusEngagement;
     const statusType = volunteer.statusType;
+    const statusMatch = volunteer.statusMatch ?? null;
+    const statusCommunication = volunteer.statusCommunication ?? null;
     const name = volunteer.person.name;
+    const email = volunteer.person.email;
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
-    const activities = getTitles(
+    const activities = getOptionItems(
       volunteer.deal.profile.profileActivity,
       "activity",
     );
-    const skills = getTitles(volunteer.deal.profile.profileSkill, "skill");
-    const locations = getTitles(
+    const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
+    const locations = getOptionItems(
       volunteer.deal.location?.locationDistrict,
       "district",
     );
@@ -42,7 +39,10 @@ export function volunteerListSerializer(
       id,
       statusEngagement,
       statusType,
+      statusMatch,
+      statusCommunication,
       name,
+      email,
       avatarUrl,
       languages,
       availability,

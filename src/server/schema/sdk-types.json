@@ -234,7 +234,13 @@
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
       "type": "string",
-      "enum": ["matched", "needs-rematching"]
+      "enum": [
+        "vol-no-matches",
+        "vol-pending-match",
+        "vol-matched",
+        "vol-needs-rematch",
+        "vol-past"
+      ]
     },
     "VolunteerStateCGCType": {
       "$id": "VolunteerStateCGCType",
@@ -626,47 +632,63 @@
         "opp-past"
       ]
     },
+    "OpportunityMatchStatusType": {
+      "$id": "OpportunityMatchStatusType",
+      "type": "string",
+      "enum": [
+        "opp-vol-pending-match",
+        "opp-vol-no-matches",
+        "opp-vol-matched",
+        "opp-vol-needs-rematch",
+        "opp-vol-unmatched",
+        "opp-vol-past"
+      ]
+    },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
       "type": "object",
       "properties": {
         "id": { "type": "integer" },
-        "volunteerType": { "$ref": "OpportunityType#" },
-        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
-        "availability": {
+        "category": { "$ref": "OptionById#" },
+        "district": { "$ref": "OptionById#" },
+        "volunteerType": { "$ref": "VolunteerStateTypeType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "statusMatch": { "$ref": "OpportunityMatchStatusType#" },
+        "numberOfVolunteers": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "activities": {
           "type": "array",
-          "items": { "$ref": "ApiAvailability#" }
+          "items": { "$ref": "OptionById#" }
         },
         "languages": {
           "type": "array",
           "items": { "$ref": "ApiLanguage#" }
         },
-        "activities": {
+        "availability": {
           "type": "array",
-          "items": { "$ref": "OptionById#" }
+          "items": { "$ref": "ApiAvailability#" }
         },
         "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
-        "category": {
-          "type": "object",
-          "properties": { "id": { "type": "integer" } }
-        },
-        "district": {
-          "type": "object",
-          "properties": { "id": { "type": "integer" } }
-        }
+        "agentTitle": { "type": "string" }
       },
       "required": [
         "id",
-        "volunteerType",
-        "statusOpportunity",
         "title",
         "category",
-        "availability",
-        "languages",
+        "district",
+        "volunteerType",
+        "statusOpportunity",
+        "statusMatch",
+        "numberOfVolunteers",
+        "createdAt",
         "activities",
-        "accompanyingDetails"
+        "languages",
+        "availability",
+        "location",
+        "accompanyingDetails",
+        "agentTitle"
       ]
     },
     "ApiOpportunityGet": {

@@ -18,7 +18,6 @@ import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import User from "../../data/entity/user.entity";
-import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { AuthOptions } from "./auth";
 
@@ -31,7 +30,6 @@ declare module "fastify" {
       languageRepository: Repository<Language>;
       fieldTranslationRepository: Repository<FieldTranslation>;
       optionRepository: Repository<Option>;
-      volunteerListMvRepository: Repository<VolunteerListMV>;
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
       communicationRepository: Repository<Communication>;
