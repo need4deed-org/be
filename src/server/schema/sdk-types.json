@@ -234,7 +234,13 @@
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
       "type": "string",
-      "enum": ["matched", "needs-rematching"]
+      "enum": [
+        "vol-no-matches",
+        "vol-pending-match",
+        "vol-matched",
+        "vol-needs-rematch",
+        "vol-past"
+      ]
     },
     "VolunteerStateCGCType": {
       "$id": "VolunteerStateCGCType",
