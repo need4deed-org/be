@@ -12,7 +12,6 @@ export * from "./get-user-where";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
-export * from "./serve-volunteer-list";
 export * from "./update-leads";
 export * from "./write-opportunity-legacy";
 export * from "./write-volunteer-legacy";

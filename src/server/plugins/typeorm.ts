@@ -17,7 +17,6 @@ import Language from "../../data/entity/profile/language.entity";
 import Profile from "../../data/entity/profile/profile.entity";
 import User from "../../data/entity/user.entity";
 import Appreciation from "../../data/entity/volunteer/appreciation.entity";
-import VolunteerListMV from "../../data/entity/volunteer/volunteer-list-mv.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
 
@@ -37,7 +36,6 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       languageRepository: dataSource.getRepository(Language),
       fieldTranslationRepository: dataSource.getRepository(FieldTranslation),
       optionRepository: dataSource.getRepository(Option),
-      volunteerListMvRepository: dataSource.getRepository(VolunteerListMV),
       commentRepository: dataSource.getRepository(Comment),
       documentRepository: dataSource.getRepository(Document),
       communicationRepository: dataSource.getRepository(Communication),
