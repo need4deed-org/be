@@ -12,25 +12,31 @@
         "name": {
           "type": "string"
         },
-        "avatarUrl": {
+        "email": {
           "type": "string"
+        },
+        "avatarUrl": {
+          "type": ["string", "null"]
         },
         "statusEngagement": {
           "$ref": "VolunteerStateEngagementType#"
         },
         "statusType": {
-          "$ref": "VolunteerStateType#"
-        },
-        "stateEngagement": {
-          "$ref": "VolunteerStateEngagementType#"
-        },
-        "stateType": {
           "$ref": "VolunteerStateTypeType#"
+        },
+        "statusMatch": {
+          "oneOf": [{ "$ref": "VolunteerStateMatchType#" }, { "type": "null" }]
+        },
+        "statusCommunication": {
+          "oneOf": [
+            { "$ref": "VolunteerStateCommunicationType#" },
+            { "type": "null" }
+          ]
         },
         "languages": {
           "type": "array",
           "items": {
-            "$ref": "Language#"
+            "$ref": "ApiLanguage#"
           }
         },
         "availability": {
@@ -42,31 +48,34 @@
         "activities": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "OptionItem#"
           }
         },
         "skills": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "OptionItem#"
           }
         },
         "locations": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "OptionItem#"
           }
         }
       },
       "required": [
         "id",
         "name",
+        "email",
         "avatarUrl",
+        "statusEngagement",
+        "statusType",
         "languages",
         "availability",
         "activities",
-        "locations",
-        "skills"
+        "skills",
+        "locations"
       ],
       "additionalProperties": false
     }
