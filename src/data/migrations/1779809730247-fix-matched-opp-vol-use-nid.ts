@@ -5,7 +5,47 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 // NOT the integer primary keys.  The previous migration (1779739039589) used
 // the raw numbers extracted from the nid strings as integer IDs, which was
 // wrong: the database auto-assigned integer IDs have no relation to those
-// numbers.  This migration corrects that by joining on the nid column.
+// numbers.  This migration:
+//   1. Deletes the wrong rows created by the previous migration (wrong integer
+//      ID pairs that matched random volunteers to random opportunities).
+//   2. Inserts the correct rows by joining on the nid column.
+
+// The wrong integer pairs inserted by 1779739039589 — [opportunityId, volunteerId]
+// (note: the previous migration mapped [volunteerId, opportunityId] → VALUES(oppId, volId))
+const WRONG_INT_PAIRS: [number, number][] = [
+  [847, 377], [841, 755], [831, 114], [828, 447], [826, 375], [826, 804],
+  [825, 271], [809, 325], [803, 325], [808, 817], [808, 451], [797, 356],
+  [787, 673], [779, 805], [16, 805],  [779, 449], [765, 430], [825, 430],
+  [754, 33],  [753, 400], [749, 414], [748, 434], [748, 440], [748, 423],
+  [736, 435], [736, 394], [733, 348], [731, 405], [728, 302], [720, 302],
+  [728, 370], [728, 58],  [717, 429], [715, 379], [714, 387], [712, 826],
+  [712, 452], [709, 283], [706, 437], [698, 442], [692, 369], [691, 738],
+  [691, 808], [690, 411], [690, 521], [685, 214], [685, 418], [680, 462],
+  [675, 357], [673, 417], [673, 401], [673, 376], [672, 354], [671, 303],
+  [669, 626], [667, 129], [660, 65],  [287, 65],  [656, 438], [656, 426],
+  [649, 242], [639, 389], [634, 806], [618, 409], [618, 455], [615, 350],
+  [715, 350], [613, 378], [612, 380], [601, 443], [588, 683], [586, 385],
+  [576, 277], [574, 299], [574, 282], [565, 386], [523, 99],  [523, 809],
+  [520, 295], [515, 178], [652, 178], [479, 178], [515, 205], [515, 164],
+  [507, 234], [506, 308], [497, 686], [496, 191], [496, 238], [491, 161],
+  [485, 588], [479, 67],  [631, 67],  [465, 163], [479, 163], [465, 173],
+  [465, 171], [451, 151], [448, 21],  [446, 533], [445, 549], [445, 763],
+  [445, 337], [441, 40],  [441, 297], [435, 700], [427, 613], [436, 613],
+  [425, 94],  [410, 210], [4, 351],   [395, 149], [392, 74],  [389, 101],
+  [386, 110], [339, 110], [384, 266], [374, 217], [370, 762], [37, 595],
+  [361, 81],  [356, 674], [346, 507], [343, 69],  [342, 658], [338, 272],
+  [337, 333], [720, 333], [333, 113], [331, 373], [323, 7],   [322, 77],
+  [387, 77],  [313, 361], [302, 25],  [348, 25],  [296, 527], [295, 527],
+  [439, 527], [290, 37],  [429, 37],  [271, 697], [464, 697], [270, 309],
+  [267, 428], [267, 395], [266, 107], [754, 107], [265, 819], [265, 162],
+  [257, 19],  [253, 612], [24, 712],  [239, 476], [235, 291], [787, 291],
+  [235, 97],  [218, 499], [207, 366], [206, 620], [202, 751], [200, 494],
+  [196, 735], [329, 735], [616, 735], [192, 718], [448, 718], [192, 741],
+  [193, 741], [301, 741], [315, 741], [368, 741], [190, 474], [186, 472],
+  [185, 615], [181, 615], [195, 615], [197, 615], [176, 609], [16, 391],
+  [150, 676], [146, 493], [207, 493], [146, 662], [207, 662], [142, 122],
+  [13, 174],  [12, 301],  [116, 421],
+];
 const MATCHED_PAIRS: [string, string][] = [
   ["VOLVO-377", "VOL-847"],
   ["VOLVO-755", "VOL-841"],
@@ -201,13 +241,26 @@ const MATCHED_PAIRS: [string, string][] = [
 export class FixMatchedOppVolUseNid1779809730247 implements MigrationInterface {
   name = "FixMatchedOppVolUseNid1779809730247";
 
-  // Re-seeds the confirmed volunteer-opportunity matches by joining on the
-  // nid column (e.g. volunteer.nid = 'VOLVO-377') instead of assuming the
-  // integer primary key equals the number in the nid string.
-  // Pairs whose volunteer or opportunity nid no longer exists are skipped.
+  // Step 1: delete the wrong rows written by migration 1779739039589.
+  // Step 2: insert the correct rows by joining on nid.
   // Safe to re-run (idempotent).
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const values = MATCHED_PAIRS.map(
+    // ── 1. Remove the wrongly-created pairs ───────────────────────────────
+    // These are rows that were inserted with raw integer IDs mistakenly
+    // extracted from the nid strings.  Only remove them if they are still
+    // opp-matched (never touch active/past rows — those are authoritative).
+    const wrongValues = WRONG_INT_PAIRS.map(
+      ([oppId, volId]) => `(${oppId}, ${volId})`,
+    ).join(", ");
+
+    await queryRunner.query(`
+      DELETE FROM opportunity_volunteer
+      WHERE (opportunity_id, volunteer_id) IN (${wrongValues})
+        AND status = 'opp-matched';
+    `);
+
+    // ── 2. Insert the correct pairs via nid join ───────────────────────────
+    const correctValues = MATCHED_PAIRS.map(
       ([volNid, oppNid]) => `('${volNid}', '${oppNid}')`,
     ).join(",\n        ");
 
@@ -216,9 +269,9 @@ export class FixMatchedOppVolUseNid1779809730247 implements MigrationInterface {
       SELECT o.id, v.id, 'opp-matched'
       FROM (
         VALUES
-        ${values}
+        ${correctValues}
       ) AS p(vol_nid, opp_nid)
-      JOIN volunteer  v ON v.nid = p.vol_nid
+      JOIN volunteer   v ON v.nid = p.vol_nid
       JOIN opportunity o ON o.nid = p.opp_nid
       ON CONFLICT (opportunity_id, volunteer_id)
       DO UPDATE SET status = 'opp-matched', updated_at = now()
