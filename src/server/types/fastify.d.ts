@@ -7,6 +7,7 @@ import Appreciation from "../../data/entity/appreciation.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Document from "../../data/entity/document.entity";
+import EventN4D from "../../data/entity/event/event.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
@@ -40,6 +41,7 @@ declare module "fastify" {
       agentRepository: Repository<Agent>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
+      eventRepository: Repository<EventN4D>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

@@ -5,6 +5,7 @@ export const RoutePrefix = {
   COMMENT: "/comment",
   COMMUNICATION: "/communication",
   DOC: "/doc",
+  EVENT: "/event",
   HEALTH_CHECK: "/health-check",
   LEGACY: "/legacy",
   LOGIN: "/login",

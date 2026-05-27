@@ -5,6 +5,7 @@ import { dataSource } from "../../data/data-source";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Document from "../../data/entity/document.entity";
+import EventN4D from "../../data/entity/event/event.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
@@ -47,6 +48,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       agentRepository: dataSource.getRepository(Agent),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
+      eventRepository: dataSource.getRepository(EventN4D),
     });
 
     // TODO: add validation of others

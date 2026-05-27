@@ -18,6 +18,7 @@ import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
+import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
@@ -173,6 +174,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(appreciationRoutes, {
     prefix: RoutePrefix.APPRECIATION,
+  });
+  await fastifyInstance.register(eventRoutes, {
+    prefix: RoutePrefix.EVENT,
   });
   await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
   await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
