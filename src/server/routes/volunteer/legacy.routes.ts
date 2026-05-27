@@ -56,6 +56,11 @@ export default async function volunteerLegacyRoutes(
       const opportunityMessage = request.body.origin_opportunity
         ? ` with opportunity id:${request.body.origin_opportunity}`
         : "";
+
+      if (id) {
+        fastify.notify.volunteerSubmitted(request.body.email);
+      }
+
       return reply.status(200).send({
         message: `Volunteer has been created.${opportunityMessage}`,
         data: { id },

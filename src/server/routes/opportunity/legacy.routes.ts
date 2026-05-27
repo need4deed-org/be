@@ -100,6 +100,8 @@ export default async function opportunityLegacyRoutes(
         }),
       );
 
+      fastify.notify.opportunitySubmitted(opportunity.title);
+
       return reply.status(200).send({
         message: `Your opportunity (${id}) has been submitted successfully!`,
         data: { id },

@@ -6,7 +6,6 @@ import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
-import { sendVerificationEmail } from "../../services";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
@@ -349,7 +348,11 @@ export default async function userRoutes(
       try {
         const savedUser = await userRepository.save(newUser);
 
-        sendVerificationEmail({ fastify, user: savedUser });
+        fastify.notify.emailVerification(savedUser).catch((err) => {
+          logger.error(
+            `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
 
         reply.status(201).send(savedUser);
       } catch (error) {
