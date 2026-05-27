@@ -46,11 +46,11 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: opportunity.deal.profile.categoryId },
-    ...(opportunity.districtId
-      ? { district: { id: opportunity.districtId } }
-      : {}),
+    district: { id: opportunity.district?.id ?? opportunity.districtId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
+    statusMatch: opportunity.statusMatch,
+    numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
     languages: opportunity.deal.profile.profileLanguage
       .filter(Boolean)
@@ -73,7 +73,7 @@ export function dtoOpportunityGetList(
     availability:
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
-    statusMatch: opportunity.statusMatch,
+    agentTitle: opportunity.agent?.title ?? "",
   } as ApiOpportunityGetList;
 }
 
@@ -128,11 +128,12 @@ export function dtoOpportunityGet(
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
     category: { id: opportunityComments.deal.profile.categoryId },
-    ...(opportunityComments.districtId
-      ? { district: { id: opportunityComments.districtId } }
-      : {}),
+    district: {
+      id: opportunityComments.district?.id ?? opportunityComments.districtId,
+    },
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
+    agentTitle: opportunityComments.agent?.title ?? "",
     languages: opportunityComments.deal.profile.profileLanguage
       .filter(Boolean)
       .map((pl) => ({

@@ -73,16 +73,20 @@ export type QuerystringAgentGetList = QuerystringPaginationLanguage &
 
 export interface QuerystringVolunteerFiltering {
   filter?: {
-    type: string;
+    type?: string | string[];
     search?: string;
-    language?: string;
-    activity?: string;
-    skill?: string;
+    language?: string | string[];
+    activity?: string | string[];
+    skill?: string | string[];
     availability?: string;
-    district?: string;
-    engagement: string | string[];
-    accompanying?: boolean;
+    district?: string | string[];
+    engagement?: string | string[];
+    match?: string | string[];
   };
 }
 export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
   QuerystringVolunteerFiltering;
+
+export interface QuerystringUserList extends QuerystringPagination {
+  search?: string;
+}

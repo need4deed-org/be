@@ -16,11 +16,11 @@ export default async function organizationRoutes(
   fastify.patch<{
     Params: ParamsId;
     Body: ApiOrganizationPatch;
-    Reply: ReplyMessage;
+    Reply: null;
   }>(
     "/:id",
     {
-      schema: { params: idParamSchema, response: responseSchema("") },
+      schema: { params: idParamSchema, response: responseSchema({ statusCode: 204 }) },
     },
     async (request, reply) => {
       const { id } = request.params;
@@ -36,9 +36,7 @@ export default async function organizationRoutes(
 
       await organizationRepository.save(organizationPatched);
 
-      return reply
-        .status(200)
-        .send({ message: `Organization (id:${id} has been patched.)` });
+      return reply.status(204).send();
     },
   );
 }

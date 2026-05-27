@@ -7,6 +7,7 @@ import {
   Lang,
   Occasionally,
   OccasionalType,
+  OptionById,
   OptionItem,
   SortOrder,
   TranslatedIntoType,
@@ -15,6 +16,7 @@ import {
 import {
   DataSource,
   DeepPartial,
+  EntityManager,
   FindOptionsWhere,
   In,
   QueryFailedError,
@@ -30,6 +32,7 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
@@ -294,8 +297,9 @@ export async function patchEntity<E extends { id: number }>(
   entity: new () => E,
   data: Partial<E>,
   entityId?: number,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean | void> {
-  const repository = getRepository(dataSource, entity);
+  const repository = getRepository(manager, entity);
 
   const id = entityId || data?.id;
   if (!id) {
@@ -317,8 +321,9 @@ export async function patchEntity<E extends { id: number }>(
 export async function patchAddress(
   addressData: Partial<Address>,
   postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const postcodeRepository = getRepository(dataSource, Postcode);
+  const postcodeRepository = getRepository(manager, Postcode);
 
   const address = { ...addressData } as Address;
 
@@ -335,7 +340,72 @@ export async function patchAddress(
     }
   }
 
-  return Boolean(await patchEntity(Address, address));
+  return Boolean(await patchEntity(Address, address, undefined, manager));
+}
+
+/**
+ * Create and persist a new Address from the given data, resolving the postcode
+ * string to a Postcode by value. Returns `null` when no postcode can be
+ * resolved, since an Address cannot exist without one (NOT NULL).
+ */
+export async function createAddress(
+  addressData: Partial<Address>,
+  postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<Address | null> {
+  const addressRepository = getRepository(manager, Address);
+  const postcodeRepository = getRepository(manager, Postcode);
+
+  let postcodeId = postcodeData?.id;
+  if (!postcodeId && postcodeData?.value) {
+    const postcode = await postcodeRepository.findOneBy({
+      value: postcodeData.value,
+    });
+    postcodeId = postcode?.id;
+  }
+
+  if (!postcodeId) {
+    return null;
+  }
+
+  const address = addressRepository.create({ ...addressData, postcodeId });
+  return await addressRepository.save(address);
+}
+
+/**
+ * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
+ * de-selected rows and insert the newly selected ones (rows that are unchanged
+ * are left untouched). Language `id`s come from the SDK as `OptionById`.
+ *
+ * Runs on the given `manager` so the caller can wrap it in a transaction; pass
+ * the transactional EntityManager to make it atomic with surrounding writes.
+ */
+export async function updateAgentLanguages(
+  agentId: number,
+  languages: OptionById[],
+  manager: DataSource | EntityManager = dataSource,
+): Promise<void> {
+  const agentLanguageRepository = getRepository(manager, AgentLanguage);
+
+  const desiredLanguageIds = [
+    ...new Set(languages.map(({ id }) => Number(id))),
+  ];
+  const current = await agentLanguageRepository.find({ where: { agentId } });
+  const currentLanguageIds = current.map(({ languageId }) => languageId);
+
+  const toRemove = current.filter(
+    ({ languageId }) => !desiredLanguageIds.includes(languageId),
+  );
+  const toAdd = desiredLanguageIds
+    .filter((languageId) => !currentLanguageIds.includes(languageId))
+    .map((languageId) => new AgentLanguage({ agentId, languageId }));
+
+  if (toRemove.length > 0) {
+    await agentLanguageRepository.delete(toRemove.map(({ id }) => id));
+  }
+  if (toAdd.length > 0) {
+    await agentLanguageRepository.save(toAdd);
+  }
 }
 
 function getDealRelationsAndIdFieldName(m2mEntityName: string) {

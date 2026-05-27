@@ -8,8 +8,11 @@ export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
     website: agent.website,
     type: agent.type,
     trustLevel: agent.trustLevel,
-    searchStatus: agent.statusSearch,
+    // GET emits volunteerSearch/serviceType while PATCH uses statusSearch/services;
+    // accept either so round-tripped fields aren't silently dropped.
+    searchStatus: agent.statusSearch ?? agent.volunteerSearch,
     engagementStatus: agent.statusEngagement,
-    services: agent.services,
+    services: agent.services ?? agent.serviceType,
+    districtId: agent.districtId,
   };
 }
