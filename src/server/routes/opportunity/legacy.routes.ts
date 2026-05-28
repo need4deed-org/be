@@ -24,6 +24,7 @@ import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
   getDistrictToOpportunityHandler,
+  getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -100,7 +101,9 @@ export default async function opportunityLegacyRoutes(
         }),
       );
 
-      fastify.notify.opportunitySubmitted(opportunity.title);
+      fastify.notify.opsAlert(
+        getOpportunityNotificationText(opportunity.title),
+      );
 
       return reply.status(200).send({
         message: `Your opportunity (${id}) has been submitted successfully!`,

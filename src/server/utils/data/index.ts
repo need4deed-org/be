@@ -9,6 +9,7 @@ export * from "./get-language-title";
 export * from "./get-opportunity-orphanage-agent";
 export * from "./get-opportunity-where";
 export * from "./get-user-where";
+export * from "./get-volunteer-clones";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";

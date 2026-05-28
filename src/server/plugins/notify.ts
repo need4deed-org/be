@@ -4,9 +4,8 @@ import User from "../../data/entity/user.entity";
 import {
   createSesClient,
   EmailTransport,
-  notifyOpportunitySubmitted,
-  notifyVolunteerSubmitted,
   sendEmailVerification,
+  sendOpsAlert,
   SesEmailTransport,
   SlackTransport,
   SlackWebhookTransport,
@@ -14,8 +13,7 @@ import {
 
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
-  opportunitySubmitted(title: string): Promise<void>;
-  volunteerSubmitted(email: string): Promise<void>;
+  opsAlert(text: string): Promise<void>;
 }
 
 declare module "fastify" {
@@ -51,10 +49,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
       sendEmailVerification({ email, jwt: fastify.jwt }, user),
-    opportunitySubmitted: (title: string) =>
-      notifyOpportunitySubmitted({ slack }, title),
-    volunteerSubmitted: (userEmail: string) =>
-      notifyVolunteerSubmitted({ slack }, userEmail),
+    opsAlert: (text: string) => sendOpsAlert({ slack }, text),
   });
 }
 
