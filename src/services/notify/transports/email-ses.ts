@@ -35,10 +35,11 @@ export function createSesClient(): SESv2Client {
     accessKeyId && secretAccessKey
       ? { accessKeyId, secretAccessKey }
       : undefined;
+  const endpoint = process.env.AWS_SES_ENDPOINT;
 
   return new SESv2Client({
     region: process.env.AWS_SES_REGION,
     credentials,
-    endpoint: process.env.AWS_SES_ENDPOINT,
+    ...(endpoint ? { endpoint } : {}),
   });
 }
