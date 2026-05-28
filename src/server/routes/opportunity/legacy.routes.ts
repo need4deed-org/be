@@ -24,6 +24,7 @@ import { tryCatchFn } from "../../../services/utils";
 import {
   getAgentByPostcode,
   getDistrictToOpportunityHandler,
+  getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -98,6 +99,10 @@ export default async function opportunityLegacyRoutes(
           entityType: EntityTableName.OPPORTUNITY,
           userId: 1,
         }),
+      );
+
+      fastify.notify.opsAlert(
+        getOpportunityNotificationText(opportunity.title),
       );
 
       return reply.status(200).send({

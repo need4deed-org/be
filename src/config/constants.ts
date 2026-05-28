@@ -118,3 +118,14 @@ export const authRefreshTokenCookieName = "refresh";
 export const defaultPageSize = 12;
 
 export const titleOrphanageAgent = "Orphanage For Opportunities";
+
+// sv-SE locale yields ISO-like formatting
+export const berlinDateTimeFormat = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Berlin",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});

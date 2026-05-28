@@ -1,6 +1,6 @@
 import * as crypto from "node:crypto";
 import { Lang, UserRole } from "need4deed-sdk";
-import { defaultPageSize } from "../../config";
+import { berlinDateTimeFormat, defaultPageSize } from "../../config";
 
 /**
  * Generates a cryptographically secure, pseudo-random hexadecimal string of a specified length.
@@ -214,4 +214,20 @@ export function getSkipTake(pageLimit?: {
   const take = isValid(limit) ? limit : defaultPageSize;
   const skip = ((isValid(page) ? page : 1)! - 1) * take!;
   return [skip, take!];
+}
+
+export function formatBerlinTimestamp(d: Date = new Date()): string {
+  return berlinDateTimeFormat.format(d);
+}
+
+export function getVolunteerNotificationText(
+  email: string,
+  name: string,
+  cloneIds: number[] = [],
+): string {
+  return `New volunteer arrived: ${name} (${email}) at ${formatBerlinTimestamp()}${cloneIds.length > 0 ? ` (Clone IDs: ${cloneIds.join(", ")})` : ""}`;
+}
+
+export function getOpportunityNotificationText(title: string): string {
+  return `New opportunity arrived: "${title}" at ${formatBerlinTimestamp()}`;
 }
