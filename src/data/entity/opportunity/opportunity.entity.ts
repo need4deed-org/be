@@ -18,6 +18,7 @@ import {
 import Deal from "../deal.entity";
 import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
+import Person from "../person.entity";
 import Appreciation from "../volunteer/appreciation.entity";
 import Accompanying from "./accompanying.entity";
 import Agent from "./agent.entity";
@@ -108,6 +109,12 @@ export default class Opportunity {
   agent?: Agent;
   @Column({ nullable: true })
   agentId?: number;
+
+  @ManyToOne(() => Person, { nullable: true })
+  @JoinColumn({ name: "submitted_by_person_id" })
+  submittedByPerson?: Person;
+  @Column({ nullable: true })
+  submittedByPersonId?: number;
 
   @ManyToOne(() => District)
   @JoinColumn({ name: "district_id" })
