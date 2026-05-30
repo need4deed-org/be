@@ -89,11 +89,9 @@ export class BackfillOpportunitySubmittedByPerson1780169787517
           row.agent_id,
           manager,
         );
-
-        if (!person) {
-          counts.skippedNoEmail++;
-          continue;
-        }
+        // helper only returns null when rac_email is empty, which the
+        // explicit check above already short-circuits, so this is safe.
+        if (!person) {continue;}
 
         await manager.query(
           `UPDATE opportunity SET submitted_by_person_id = $1 WHERE id = $2 AND submitted_by_person_id IS NULL`,
@@ -114,8 +112,23 @@ export class BackfillOpportunitySubmittedByPerson1780169787517
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `UPDATE opportunity SET submitted_by_person_id = NULL WHERE submitted_by_person_id IS NOT NULL`,
-    );
+    // Narrow the reversal to opportunities that still have a blob comment —
+    // the same set up() considered. A row that was populated only by the
+    // runtime handler (#589) won't match, so its FK is preserved. Not
+    // perfectly correct (a runtime-set FK on a row that coincidentally also
+    // has a blob comment would still get nulled), but much closer to "undo
+    // what up() did" than a blanket UPDATE.
+    await queryRunner.query(`
+      UPDATE opportunity o
+      SET submitted_by_person_id = NULL
+      WHERE submitted_by_person_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM comment c
+          WHERE c.entity_type = 'opportunity'
+            AND c.entity_id = o.id
+            AND c.user_id = 1
+            AND c.text ~ '^[^|]*(<\\|>[^|]*){4}$'
+        )
+    `);
   }
 }
