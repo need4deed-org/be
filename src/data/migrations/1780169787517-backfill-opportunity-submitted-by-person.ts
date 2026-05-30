@@ -10,9 +10,10 @@ import Person from "../entity/person.entity";
 // helper the runtime handler uses (#589). The Comment row is left in place.
 //
 // Idempotent: only touches opportunities whose submitted_by_person_id is null.
-// Reversible: down() nulls the column on all rows; Person / AgentPerson rows
-// possibly created by up() are kept (they can't be reliably identified after
-// the fact and are safe to retain).
+// Reversible: down() nulls the column on opportunities that still have a
+// blob comment, preserving FKs set by the runtime handler on post-backfill
+// submissions. Person / AgentPerson rows possibly created by up() are kept
+// (they can't be reliably identified after the fact and are safe to retain).
 
 interface BlobRow {
   opportunity_id: number;
@@ -91,7 +92,9 @@ export class BackfillOpportunitySubmittedByPerson1780169787517
         );
         // helper only returns null when rac_email is empty, which the
         // explicit check above already short-circuits, so this is safe.
-        if (!person) {continue;}
+        if (!person) {
+          continue;
+        }
 
         await manager.query(
           `UPDATE opportunity SET submitted_by_person_id = $1 WHERE id = $2 AND submitted_by_person_id IS NULL`,
