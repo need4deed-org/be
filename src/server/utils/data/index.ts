@@ -8,6 +8,7 @@ export * from "./get-agent-where";
 export * from "./get-language-title";
 export * from "./get-opportunity-orphanage-agent";
 export * from "./get-opportunity-where";
+export * from "./get-or-create-submitter-person";
 export * from "./get-user-where";
 export * from "./get-volunteer-clones";
 export * from "./get-volunteer-form-data";

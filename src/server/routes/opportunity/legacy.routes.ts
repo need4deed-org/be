@@ -4,13 +4,11 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
-  EntityTableName,
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
 import { ILike, In } from "typeorm";
 import { UnauthorizedError } from "../../../config";
-import Comment from "../../../data/entity/comment.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import logger from "../../../logger";
@@ -26,6 +24,7 @@ import {
   getDistrictToOpportunityHandler,
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
+  getOrCreateSubmitterPerson,
   writeOpportunityLegacy,
 } from "../../utils";
 
@@ -89,17 +88,17 @@ export default async function opportunityLegacyRoutes(
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
-      const id = await writeOpportunityLegacy(opportunity);
+      if (opportunity.agent?.id) {
+        const submitter = await getOrCreateSubmitterPerson(
+          request.body,
+          opportunity.agent.id,
+        );
+        if (submitter) {
+          opportunity.submittedByPersonId = submitter.id;
+        }
+      }
 
-      const commentRepository = fastify.db.commentRepository;
-      await commentRepository.save(
-        new Comment({
-          text: `${request.body.rac_email}<|>${request.body.rac_full_name}<|>${request.body.rac_address}<|>${request.body.rac_plz}<|>${request.body.rac_phone}`,
-          entityId: id,
-          entityType: EntityTableName.OPPORTUNITY,
-          userId: 1,
-        }),
-      );
+      const id = await writeOpportunityLegacy(opportunity);
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
