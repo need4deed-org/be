@@ -43,6 +43,8 @@ yarn migration:revert       # revert last migration
 yarn migration:show         # show migration status
 ```
 
+Pending migrations are auto-run on server startup only when `RUN_MIGRATIONS=true` (or `NODE_ENV=production`); see `src/data/index.ts:26`. Without it, run `yarn migration:run` yourself. `docker compose up` sets `RUN_MIGRATIONS=true` by default; bare `yarn dev` honours whatever is in your `.env`.
+
 Docker alternative (includes Postgres):
 
 ```bash
@@ -137,7 +139,7 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SCHEMA` — Postgres connection
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
-- `RUN_MIGRATIONS` — set to `true` to auto-run migrations on startup
+- `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
 - `AWS_SES_*` — email sending via AWS SES
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 
