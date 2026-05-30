@@ -1,0 +1,124 @@
+import { describe, expect, it } from "vitest";
+import { getOpportunityContact } from "../../../services/dto/dto-opportunity";
+
+const representativePerson = {
+  id: 100,
+  name: "Coord Carla",
+  phone: "+49-30-1111111",
+  email: "carla@center.de",
+  preferredCommunicationType: ["email"],
+};
+
+const agentWithRepresentative = {
+  id: 42,
+  representative: { person: representativePerson },
+};
+
+describe("getOpportunityContact", () => {
+  it("returns the submitter when submittedByPerson has an agent_person row for the agent", () => {
+    const submitter = {
+      id: 7,
+      name: "Submitter Sam",
+      phone: "+49-30-2222222",
+      email: "sam@center.de",
+      preferredCommunicationType: ["mobilePhone"],
+      agentPerson: [{ agentId: 42 }, { agentId: 999 }],
+    };
+
+    const opportunity = {
+      agentId: 42,
+      agent: agentWithRepresentative,
+      submittedByPersonId: 7,
+      submittedByPerson: submitter,
+    };
+
+    const result = getOpportunityContact(opportunity as any);
+
+    expect(result).toEqual({
+      id: 7,
+      name: "Submitter Sam",
+      phone: "+49-30-2222222",
+      email: "sam@center.de",
+      waysToContact: ["mobilePhone"],
+    });
+  });
+
+  it("falls back to the agent representative when submittedByPerson is unset", () => {
+    const opportunity = {
+      agentId: 42,
+      agent: agentWithRepresentative,
+      submittedByPersonId: null,
+      submittedByPerson: null,
+    };
+
+    const result = getOpportunityContact(opportunity as any);
+
+    expect(result).toEqual({
+      id: 100,
+      name: "Coord Carla",
+      phone: "+49-30-1111111",
+      email: "carla@center.de",
+      waysToContact: ["email"],
+    });
+  });
+
+  it("falls back to the agent representative when the submitter no longer has an agent_person row for this agent", () => {
+    const formerSubmitter = {
+      id: 7,
+      name: "Former Submitter",
+      email: "old@center.de",
+      agentPerson: [{ agentId: 999 }],
+    };
+
+    const opportunity = {
+      agentId: 42,
+      agent: agentWithRepresentative,
+      submittedByPersonId: 7,
+      submittedByPerson: formerSubmitter,
+    };
+
+    const result = getOpportunityContact(opportunity as any);
+
+    expect(result.id).toBe(100);
+    expect(result.name).toBe("Coord Carla");
+  });
+
+  it("falls back when the submitter has no agentPerson rows at all", () => {
+    const looseSubmitter = {
+      id: 7,
+      name: "Loose Submitter",
+      email: "loose@center.de",
+      agentPerson: [],
+    };
+
+    const opportunity = {
+      agentId: 42,
+      agent: agentWithRepresentative,
+      submittedByPersonId: 7,
+      submittedByPerson: looseSubmitter,
+    };
+
+    const result = getOpportunityContact(opportunity as any);
+
+    expect(result.id).toBe(100);
+  });
+
+  it("falls back when the opportunity has no agentId, even if submittedByPerson is set", () => {
+    const submitter = {
+      id: 7,
+      name: "Sam",
+      agentPerson: [{ agentId: 42 }],
+    };
+
+    const opportunity = {
+      agentId: null,
+      agent: agentWithRepresentative,
+      submittedByPersonId: 7,
+      submittedByPerson: submitter,
+    };
+
+    const result = getOpportunityContact(opportunity as any);
+
+    expect(result.id).toBe(100);
+  });
+});
