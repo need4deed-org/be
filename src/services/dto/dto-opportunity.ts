@@ -26,16 +26,28 @@ function getOpportunityDescription(opportunity: Opportunity) {
   return opportunity.info;
 }
 
-function getOpportunityContact(
+// Best-effort: returns the original submitter if they still hold an
+// agent_person row for the opportunity's agent; otherwise falls back to
+// the current agent representative. Not guaranteed to be the submitter.
+export function getOpportunityContact(
   opportunity: Opportunity,
 ): ApiOpportunityContact {
+  const submitter = opportunity.submittedByPerson;
+  const submitterStillAtAgent =
+    !!submitter &&
+    !!opportunity.agentId &&
+    !!submitter.agentPerson?.some((ap) => ap.agentId === opportunity.agentId);
+
+  const person = submitterStillAtAgent
+    ? submitter
+    : opportunity.agent?.representative?.person;
+
   return {
-    id: opportunity.agent?.representative?.person?.id,
-    name: opportunity.agent?.representative?.person?.name,
-    phone: opportunity.agent?.representative?.person?.phone,
-    email: opportunity.agent?.representative?.person?.email,
-    waysToContact:
-      opportunity.agent?.representative?.person?.preferredCommunicationType,
+    id: person?.id,
+    name: person?.name,
+    phone: person?.phone,
+    email: person?.email,
+    waysToContact: person?.preferredCommunicationType,
   };
 }
 
