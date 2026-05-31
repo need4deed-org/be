@@ -38,6 +38,7 @@ import {
 } from "../../utils";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
+import agentRegisterRoutes from "./register.routes";
 
 export default async function agentRoutes(
   fastify: FastifyInstance,
@@ -47,6 +48,8 @@ export default async function agentRoutes(
     "onRequest",
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
+
+  fastify.register(agentRegisterRoutes, { prefix: RoutePrefix.REGISTER });
 
   fastify.register(agentCommunicationRoutes, {
     prefix: `/:id${RoutePrefix.COMMUNICATION}`,

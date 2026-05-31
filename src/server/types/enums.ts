@@ -16,6 +16,7 @@ export const RoutePrefix = {
   OPTION: "/option",
   PERSON: "/person",
   REFRESH: "/refresh",
+  REGISTER: "/register",
   SWAGGER: "/swagger",
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",
