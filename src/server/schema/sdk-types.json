@@ -710,7 +710,10 @@
                 "name": { "type": "string" },
                 "phone": { "type": "string" },
                 "email": { "type": "string" },
-                "waysToContact": { "$ref": "PreferredCommunicationType#" }
+                "waysToContact": {
+                  "type": "array",
+                  "items": { "$ref": "PreferredCommunicationType#" }
+                }
               }
             },
             "agent": {
