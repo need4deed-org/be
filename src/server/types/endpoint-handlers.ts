@@ -1,4 +1,4 @@
-import { Lang, SortOrder } from "need4deed-sdk";
+import { Lang, SortOrder, UserRole } from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -89,4 +89,6 @@ export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
 
 export interface QuerystringUserList extends QuerystringPagination {
   search?: string;
+  sortOrder?: SortOrder;
+  role?: UserRole;
 }

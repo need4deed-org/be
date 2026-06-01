@@ -125,7 +125,9 @@ export const userListQuerySchema = {
   type: "object",
   properties: {
     ...paginationProps,
+    ...sortOrderProps,
     search: { type: "string" },
+    role: getRef("UserRole#"),
   },
   additionalProperties: false,
 };

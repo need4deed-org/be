@@ -1,6 +1,6 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiUserGet, UserRole } from "need4deed-sdk";
+import { ApiUserGet, SortOrder, UserRole } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
@@ -35,16 +35,17 @@ export default async function userRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { page, limit, search } = request.query;
+      const { page, limit, search, role, sortOrder } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
+      const direction = sortOrder === SortOrder.OldToNew ? "ASC" : "DESC";
 
       const userRepository = fastify.db.userRepository;
       const [users, count] = await userRepository.findAndCount({
-        where: getUserWhere(search) as FindOptionsWhere<User>,
+        where: getUserWhere(search, role) as FindOptionsWhere<User>,
         relations: ["person"],
         skip,
         take,
-        order: { id: "DESC" },
+        order: { id: direction },
       });
 
       const data = users.map(serializeUserToMeDTO);

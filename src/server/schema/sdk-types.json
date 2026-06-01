@@ -766,6 +766,11 @@
       "type": "string",
       "enum": ["agent-high", "agent-low", "agent-unknown"]
     },
+    "UserRole": {
+      "$id": "UserRole",
+      "type": "string",
+      "enum": ["user", "coordinator", "agent", "volunteer", "admin"]
+    },
     "AgentVolunteerSearchType": {
       "$id": "AgentVolunteerSearchType",
       "type": "string",
