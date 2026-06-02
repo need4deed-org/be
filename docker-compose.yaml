@@ -62,6 +62,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=ses
 
 volumes:
   be_database:
