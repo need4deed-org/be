@@ -1,6 +1,8 @@
 import { DataSource, EntityManager, In } from "typeorm";
+import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import CommentPerson from "../../../data/entity/m2m/comment-person";
+import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 
 /**
@@ -33,6 +35,24 @@ export async function syncCommentTags(
     ({ personId }) => !desired.includes(personId),
   );
   const toAddPersonIds = desired.filter((id) => !currentPersonIds.includes(id));
+
+  if (toAddPersonIds.length) {
+    // Pre-validate person ids exist so a bad input becomes a 400 with a
+    // clear message instead of a Postgres 23503 buried in the route's
+    // generic-error path.
+    const personRepository = getRepository(manager, Person);
+    const existing = await personRepository.find({
+      where: { id: In(toAddPersonIds) },
+      select: ["id"],
+    });
+    const existingIds = new Set(existing.map(({ id }) => id));
+    const missing = toAddPersonIds.filter((id) => !existingIds.has(id));
+    if (missing.length) {
+      throw new BadRequestError(
+        `Invalid tagged person id(s): ${missing.join(", ")}`,
+      );
+    }
+  }
 
   if (toRemove.length) {
     await commentPersonRepository.delete({

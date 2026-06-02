@@ -1,6 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
+import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import logger from "../../logger";
 import { commentSerializer } from "../../services";
@@ -194,10 +195,13 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         });
       } catch (error) {
-        // Match on the failing table rather than parsing detail text — the
-        // only INSERT into `comment_person` from this handler is the tag
-        // sync, so a 23503 there means the caller supplied an unknown
-        // person id.
+        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
+        // to the global handler so it surfaces as 400 with its own message.
+        if (error instanceof BadRequestError) {throw error;}
+        // Safety net: pre-validation should have caught this, but if a
+        // concurrent delete removed the Person between the check and the
+        // INSERT, a 23503 still slips through. Match on the failing table
+        // so it can't misfire on unrelated person-named constraints.
         if (
           (error as { code?: string }).code === "23503" &&
           (error as { table?: string }).table === "comment_person"
@@ -317,10 +321,13 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         };
       } catch (error) {
-        // Match on the failing table rather than parsing detail text — the
-        // only INSERT into `comment_person` from this handler is the tag
-        // sync, so a 23503 there means the caller supplied an unknown
-        // person id.
+        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
+        // to the global handler so it surfaces as 400 with its own message.
+        if (error instanceof BadRequestError) {throw error;}
+        // Safety net: pre-validation should have caught this, but if a
+        // concurrent delete removed the Person between the check and the
+        // INSERT, a 23503 still slips through. Match on the failing table
+        // so it can't misfire on unrelated person-named constraints.
         if (
           (error as { code?: string }).code === "23503" &&
           (error as { table?: string }).table === "comment_person"
