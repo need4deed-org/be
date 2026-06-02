@@ -55,16 +55,20 @@ export default async function volunteerRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  const relations = [
+  const listRelations = [
     "person",
-    "person.address.postcode",
     "deal",
-    "deal.postcode",
     "deal.dealActivity.activity",
     "deal.dealSkill.skill",
     "deal.dealLanguage.language",
     "deal.dealTimeslot.timeslot",
     "deal.dealDistrict.district",
+  ];
+
+  const profileRelations = [
+    ...listRelations,
+    "person.address.postcode",
+    "deal.postcode",
   ];
 
   fastify.addHook(
@@ -123,7 +127,7 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(id, isoCode, profileRelations);
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}).`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
@@ -181,7 +185,7 @@ export default async function volunteerRoutes(
       const volunteerRepository = fastify.db.volunteerRepository;
       const [volunteers, count] = await volunteerRepository.findAndCount({
         where: getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>,
-        relations,
+        relations: listRelations,
         skip,
         take,
         order: {
@@ -354,7 +358,7 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(id, isoCode, profileRelations);
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}) after patch.`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
