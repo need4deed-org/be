@@ -121,6 +121,10 @@
         "entityType": {
           "type": "string",
           "enum": ["volunteer", "opportunity", "agent"]
+        },
+        "taggedPersonIds": {
+          "type": "array",
+          "items": { "type": "integer" }
         }
       },
       "additionalProperties": false

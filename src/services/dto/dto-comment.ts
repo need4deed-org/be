@@ -9,5 +9,7 @@ export function commentSerializer(comment: Comment): ApiComment {
     entityType: comment.entityType,
     authorName: comment.user?.person?.name,
     timestamp: comment.updatedAt,
+    taggedPersonIds:
+      comment.commentPerson?.map((cp) => cp.personId).filter(Boolean) ?? [],
   };
 }
