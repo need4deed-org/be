@@ -1,12 +1,11 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiUserGet, UserRole } from "need4deed-sdk";
+import { ApiUserGet, SortOrder, UserRole } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import Person, { PersonUpdateType } from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
-import { sendVerificationEmail } from "../../services";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
@@ -36,16 +35,17 @@ export default async function userRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { page, limit, search } = request.query;
+      const { page, limit, search, role, sortOrder } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
+      const direction = sortOrder === SortOrder.OldToNew ? "ASC" : "DESC";
 
       const userRepository = fastify.db.userRepository;
       const [users, count] = await userRepository.findAndCount({
-        where: getUserWhere(search) as FindOptionsWhere<User>,
+        where: getUserWhere(search, role) as FindOptionsWhere<User>,
         relations: ["person"],
         skip,
         take,
-        order: { id: "DESC" },
+        order: { id: direction },
       });
 
       const data = users.map(serializeUserToMeDTO);
@@ -349,7 +349,11 @@ export default async function userRoutes(
       try {
         const savedUser = await userRepository.save(newUser);
 
-        sendVerificationEmail({ fastify, user: savedUser });
+        fastify.notify.emailVerification(savedUser).catch((err) => {
+          logger.error(
+            `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
 
         reply.status(201).send(savedUser);
       } catch (error) {
