@@ -1,8 +1,10 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
+import CommentPerson from "../../data/entity/m2m/comment-person";
 import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
@@ -20,6 +22,7 @@ export default async function commentRoutes(
       userId?: number;
       entityId?: number;
       entityType?: EntityTableName;
+      taggedPersonId?: number;
     };
     Reply: {
       message: string;
@@ -36,6 +39,7 @@ export default async function commentRoutes(
             userId: { type: "number" },
             entityId: { type: "number" },
             entityType: { type: "string" },
+            taggedPersonId: { type: "number" },
           },
         },
         response: {
@@ -55,11 +59,37 @@ export default async function commentRoutes(
     },
     async (request, reply) => {
       try {
-        const { userId, entityId, entityType } = request.query;
+        const { userId, entityId, entityType, taggedPersonId } = request.query;
 
         const commentRepository = fastify.db.commentRepository;
+
+        // Two-step lookup for the tag filter: a relation-filtered findAndCount
+        // would constrain the loaded commentPerson array to only the matching
+        // row, which would lie to the DTO about how many people the comment
+        // actually tags. Resolve the comment ids first, then load fully.
+        let commentIdFilter: number[] | undefined;
+        if (taggedPersonId !== undefined) {
+          const tagRows = await commentRepository.manager
+            .getRepository(CommentPerson)
+            .find({
+              where: { personId: taggedPersonId },
+              select: ["commentId"],
+            });
+          commentIdFilter = tagRows.map((r) => r.commentId);
+          if (commentIdFilter.length === 0) {
+            return reply
+              .status(200)
+              .send({ message: "Comments", data: [], count: 0 });
+          }
+        }
+
         const [comments, count] = await commentRepository.findAndCount({
-          where: { userId, entityId, entityType },
+          where: {
+            userId,
+            entityId,
+            entityType,
+            ...(commentIdFilter ? { id: In(commentIdFilter) } : {}),
+          },
           relations: ["user", "user.person", "language", "commentPerson"],
         });
 
@@ -197,7 +227,9 @@ export default async function commentRoutes(
       } catch (error) {
         // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
         // to the global handler so it surfaces as 400 with its own message.
-        if (error instanceof BadRequestError) {throw error;}
+        if (error instanceof BadRequestError) {
+          throw error;
+        }
         // Safety net: pre-validation should have caught this, but if a
         // concurrent delete removed the Person between the check and the
         // INSERT, a 23503 still slips through. Match on the failing table
@@ -323,7 +355,9 @@ export default async function commentRoutes(
       } catch (error) {
         // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
         // to the global handler so it surfaces as 400 with its own message.
-        if (error instanceof BadRequestError) {throw error;}
+        if (error instanceof BadRequestError) {
+          throw error;
+        }
         // Safety net: pre-validation should have caught this, but if a
         // concurrent delete removed the Person between the check and the
         // INSERT, a 23503 still slips through. Match on the failing table
