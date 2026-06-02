@@ -16,6 +16,7 @@ import {
 } from "typeorm";
 import Address from "./location/address.entity";
 import AgentPerson from "./m2m/agent-person";
+import CommentPerson from "./m2m/comment-person";
 import Organization from "./organization.entity";
 import Testimonial from "./testimonial.entity";
 import User from "./user.entity"; // Ensure this import is correct
@@ -109,6 +110,9 @@ export default class Person {
 
   @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.person)
   agentPerson: AgentPerson[];
+
+  @OneToMany(() => CommentPerson, (commentPerson) => commentPerson.person)
+  commentPerson: CommentPerson[];
 
   get name(): string {
     return [this.firstName, this.middleName, this.lastName]

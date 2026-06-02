@@ -1,10 +1,12 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
+import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
+import { syncCommentTags } from "../utils";
 
 export default async function commentRoutes(
   fastify: FastifyInstance,
@@ -58,7 +60,7 @@ export default async function commentRoutes(
         const commentRepository = fastify.db.commentRepository;
         const [comments, count] = await commentRepository.findAndCount({
           where: { userId, entityId, entityType },
-          relations: ["user", "user.person", "language"],
+          relations: ["user", "user.person", "language", "commentPerson"],
         });
 
         if (!comments) {
@@ -110,7 +112,7 @@ export default async function commentRoutes(
         const commentRepository = fastify.db.commentRepository;
         const comment = await commentRepository.findOne({
           where: { id },
-          relations: ["user", "user.person", "language"],
+          relations: ["user", "user.person", "language", "commentPerson"],
         });
 
         if (!comment) {
@@ -142,7 +144,7 @@ export default async function commentRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { $ref: "Comment#" },
+              data: { $ref: "ApiComment#" },
             },
             required: ["message", "data"],
           },
@@ -153,7 +155,9 @@ export default async function commentRoutes(
     },
     async (request, reply) => {
       const commentRepository = fastify.db.commentRepository;
-      const body = request.body as Partial<Comment>;
+      const { taggedPersonIds, ...body } = request.body as Partial<Comment> & {
+        taggedPersonIds?: number[];
+      };
 
       const newComment = commentRepository.create({
         ...body,
@@ -171,12 +175,41 @@ export default async function commentRoutes(
       }
 
       try {
-        const saved = await commentRepository.save(newComment);
+        const reloaded = await commentRepository.manager.transaction(
+          async (manager) => {
+            const saved = await manager.getRepository(Comment).save(newComment);
+            await syncCommentTags(saved.id, taggedPersonIds, manager);
+            return manager.getRepository(Comment).findOne({
+              where: { id: saved.id },
+              relations: ["user", "user.person", "language", "commentPerson"],
+            });
+          },
+        );
+
+        if (!reloaded) {
+          throw new Error(`Failed to reload comment after create`);
+        }
+
         return reply.status(201).send({
           message: "Successfully created a new comment",
-          data: saved,
+          data: commentSerializer(reloaded),
         });
       } catch (error) {
+        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
+        // to the global handler so it surfaces as 400 with its own message.
+        if (error instanceof BadRequestError) {throw error;}
+        // Safety net: pre-validation should have caught this, but if a
+        // concurrent delete removed the Person between the check and the
+        // INSERT, a 23503 still slips through. Match on the failing table
+        // so it can't misfire on unrelated person-named constraints.
+        if (
+          (error as { code?: string }).code === "23503" &&
+          (error as { table?: string }).table === "comment_person"
+        ) {
+          return reply
+            .status(400)
+            .send({ message: "Invalid tagged person id." });
+        }
         logger.error(`Error creating comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
@@ -198,7 +231,7 @@ export default async function commentRoutes(
             type: "object",
             properties: {
               message: { type: "string" },
-              data: { $ref: "Comment#" },
+              data: { $ref: "ApiComment#" },
             },
             required: ["message", "data"],
           },
@@ -245,9 +278,12 @@ export default async function commentRoutes(
             .send({ message: "Insufficient permissions." });
         }
 
-        Object.assign(comment, request.body, {
-          updatedAt: new Date(),
-        });
+        const { taggedPersonIds, ...patch } =
+          request.body as Partial<Comment> & {
+            taggedPersonIds?: number[];
+          };
+
+        Object.assign(comment, patch, { updatedAt: new Date() });
 
         const errors = await validate(comment);
         if (errors.length > 0) {
@@ -260,13 +296,46 @@ export default async function commentRoutes(
           });
         }
 
-        const saved = await commentRepository.save(comment);
+        const reloaded = await commentRepository.manager.transaction(
+          async (manager) => {
+            await manager.getRepository(Comment).save(comment);
+            // Only sync tags when the field was sent in the patch — passing
+            // undefined leaves existing comment_person rows untouched, which
+            // matches PATCH semantics (only update fields the caller provided).
+            if (taggedPersonIds !== undefined) {
+              await syncCommentTags(id, taggedPersonIds, manager);
+            }
+            return manager.getRepository(Comment).findOne({
+              where: { id },
+              relations: ["user", "user.person", "language", "commentPerson"],
+            });
+          },
+        );
+
+        if (!reloaded) {
+          throw new Error(`Failed to reload comment after update`);
+        }
 
         return {
           message: `Successfully updated comment ${id}`,
-          data: saved,
+          data: commentSerializer(reloaded),
         };
       } catch (error) {
+        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
+        // to the global handler so it surfaces as 400 with its own message.
+        if (error instanceof BadRequestError) {throw error;}
+        // Safety net: pre-validation should have caught this, but if a
+        // concurrent delete removed the Person between the check and the
+        // INSERT, a 23503 still slips through. Match on the failing table
+        // so it can't misfire on unrelated person-named constraints.
+        if (
+          (error as { code?: string }).code === "23503" &&
+          (error as { table?: string }).table === "comment_person"
+        ) {
+          return reply
+            .status(400)
+            .send({ message: "Invalid tagged person id." });
+        }
         logger.error(`Error updating comment: ${error}`);
         return reply.status(500).send({
           message: "Internal server error.",
