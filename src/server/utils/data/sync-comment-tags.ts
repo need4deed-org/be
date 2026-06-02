@@ -11,6 +11,11 @@ import { getRepository } from "../../../data/utils";
  * `manager` defaults to the global dataSource; pass a transactional
  * EntityManager so the diff is atomic with surrounding writes
  * (commentRepository.save, etc.).
+ *
+ * NOTE on `undefined`: treated as `[]` here, i.e. clears all existing tags.
+ * If a caller wants "leave tags untouched" semantics (e.g. PATCH where the
+ * field was omitted), they must guard at the call site and not invoke this
+ * helper at all. The comment.ts PATCH handler does exactly that.
  */
 export async function syncCommentTags(
   commentId: number,

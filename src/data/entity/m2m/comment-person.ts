@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -9,6 +10,7 @@ import Comment from "../comment.entity";
 import Person from "../person.entity";
 
 @Entity()
+@Index(["commentId", "personId"], { unique: true })
 export default class CommentPerson {
   constructor(commentPerson?: Partial<CommentPerson>) {
     if (commentPerson) {

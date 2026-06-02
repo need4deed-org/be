@@ -194,9 +194,13 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         });
       } catch (error) {
+        // Match on the failing table rather than parsing detail text — the
+        // only INSERT into `comment_person` from this handler is the tag
+        // sync, so a 23503 there means the caller supplied an unknown
+        // person id.
         if (
           (error as { code?: string }).code === "23503" &&
-          (error as { detail?: string }).detail?.includes("person")
+          (error as { table?: string }).table === "comment_person"
         ) {
           return reply
             .status(400)
@@ -313,9 +317,13 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         };
       } catch (error) {
+        // Match on the failing table rather than parsing detail text — the
+        // only INSERT into `comment_person` from this handler is the tag
+        // sync, so a 23503 there means the caller supplied an unknown
+        // person id.
         if (
           (error as { code?: string }).code === "23503" &&
-          (error as { detail?: string }).detail?.includes("person")
+          (error as { table?: string }).table === "comment_person"
         ) {
           return reply
             .status(400)
