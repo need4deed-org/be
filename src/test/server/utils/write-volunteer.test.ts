@@ -3,10 +3,10 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
-import LocationDistrict from "../../../data/entity/m2m/location-district";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { writeVolunteerLegacy } from "../../../server/utils/data";
@@ -28,8 +28,8 @@ describe("writeVolunteer", () => {
   const dealSkillSave = vi.fn();
   const dealLanguageSave = vi.fn();
   const dealTimeslotSave = vi.fn();
+  const dealDistrictSave = vi.fn();
   const locationSave = vi.fn();
-  const locationDistrictSave = vi.fn();
   const dealSave = vi.fn();
   const volunteerSave = vi.fn();
 
@@ -50,10 +50,10 @@ describe("writeVolunteer", () => {
           return { save: dealLanguageSave };
         case DealTimeslot:
           return { save: dealTimeslotSave };
+        case DealDistrict:
+          return { save: dealDistrictSave };
         case Location:
           return { save: locationSave };
-        case LocationDistrict:
-          return { save: locationDistrictSave };
         case Deal:
           return { save: dealSave };
         case Volunteer:
@@ -81,11 +81,11 @@ describe("writeVolunteer", () => {
       arr.forEach((it, i) => (it.id = 400 + i));
       return arr;
     });
-    locationSave.mockImplementation(async (o: any) => ((o.id = 55), o));
-    locationDistrictSave.mockImplementation(async (arr: any[]) => {
+    dealDistrictSave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 500 + i));
       return arr;
     });
+    locationSave.mockImplementation(async (o: any) => ((o.id = 55), o));
     dealSave.mockImplementation(async (o: any) => ((o.id = 66), o));
     volunteerSave.mockImplementation(async (o: any) => ((o.id = 77), o));
   });
@@ -100,7 +100,8 @@ describe("writeVolunteer", () => {
         dealSkill: [{}, {}],
         dealLanguage: [{}, {}],
         dealTimeslot: [{}, {}],
-        location: { id: undefined, locationDistrict: [{}, {}] },
+        dealDistrict: [{}, {}],
+        location: { id: undefined },
       },
     };
 
@@ -112,10 +113,8 @@ describe("writeVolunteer", () => {
     expect(dealSkillSave).toHaveBeenCalledWith(volunteer.deal.dealSkill);
     expect(dealLanguageSave).toHaveBeenCalledWith(volunteer.deal.dealLanguage);
     expect(dealTimeslotSave).toHaveBeenCalledWith(volunteer.deal.dealTimeslot);
+    expect(dealDistrictSave).toHaveBeenCalledWith(volunteer.deal.dealDistrict);
     expect(locationSave).toHaveBeenCalledWith(volunteer.deal.location);
-    expect(locationDistrictSave).toHaveBeenCalledWith(
-      volunteer.deal.location.locationDistrict,
-    );
     expect(dealSave).toHaveBeenCalledWith(volunteer.deal);
     expect(volunteerSave).toHaveBeenCalledWith(volunteer);
 
@@ -127,7 +126,7 @@ describe("writeVolunteer", () => {
     expect(volunteer.deal.dealSkill[0].dealId).toBe(66);
     expect(volunteer.deal.dealLanguage[0].dealId).toBe(66);
     expect(volunteer.deal.dealTimeslot[0].dealId).toBe(66);
-    expect(volunteer.deal.location.locationDistrict[0].locationId).toBe(55);
+    expect(volunteer.deal.dealDistrict[0].dealId).toBe(66);
   });
 
   it("propagates repository error from a nested save", async () => {
@@ -143,7 +142,8 @@ describe("writeVolunteer", () => {
         dealSkill: [],
         dealLanguage: [],
         dealTimeslot: [],
-        location: { id: undefined, locationDistrict: [] },
+        dealDistrict: [],
+        location: { id: undefined },
       },
     };
 

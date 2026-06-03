@@ -3,10 +3,10 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
-import LocationDistrict from "../../../data/entity/m2m/location-district";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 
@@ -26,10 +26,10 @@ export async function writeVolunteerLegacy(
       transactionalEntityManager.getRepository(DealLanguage);
     const dealTimeslotRepository =
       transactionalEntityManager.getRepository(DealTimeslot);
+    const dealDistrictRepository =
+      transactionalEntityManager.getRepository(DealDistrict);
     const locationRepository =
       transactionalEntityManager.getRepository(Location);
-    const locationDistrictRepository =
-      transactionalEntityManager.getRepository(LocationDistrict);
     const dealRepository = transactionalEntityManager.getRepository(Deal);
     const volunteerRepository =
       transactionalEntityManager.getRepository(Volunteer);
@@ -41,24 +41,15 @@ export async function writeVolunteerLegacy(
     // Person
     await personRepository.save(volunteer.person);
 
-    // Location
+    // Location (wrapper retained until #618; districts now live on the deal)
     await locationRepository.save(volunteer.deal.location);
-    const locationId = volunteer.deal.location.id;
-
-    // Location m2m relations (districts)
-    for (const locationDistrict of volunteer.deal.location.locationDistrict) {
-      locationDistrict.locationId = locationId;
-    }
-    await locationDistrictRepository.save(
-      volunteer.deal.location.locationDistrict,
-    );
 
     // Deal
     await dealRepository.save(volunteer.deal);
     const dealId = volunteer.deal.id;
 
-    // Deal m2m relations (activities, skills, languages, timeslots) — saved
-    // after the deal so dealId exists
+    // Deal m2m relations (activities, skills, languages, timeslots, districts)
+    // — saved after the deal so dealId exists
     for (const dealActivity of volunteer.deal.dealActivity) {
       dealActivity.dealId = dealId;
     }
@@ -78,6 +69,11 @@ export async function writeVolunteerLegacy(
       dealTimeslot.dealId = dealId;
     }
     await dealTimeslotRepository.save(volunteer.deal.dealTimeslot);
+
+    for (const dealDistrict of volunteer.deal.dealDistrict) {
+      dealDistrict.dealId = dealId;
+    }
+    await dealDistrictRepository.save(volunteer.deal.dealDistrict);
 
     // Volunteer
     await volunteerRepository.save(volunteer);

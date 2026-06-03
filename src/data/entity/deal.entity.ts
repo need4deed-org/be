@@ -11,6 +11,7 @@ import { DealType } from "../types";
 import Location from "./location/location.entity";
 import Postcode from "./location/postcode.entity";
 import DealActivity from "./m2m/deal-activity";
+import DealDistrict from "./m2m/deal-district";
 import DealLanguage from "./m2m/deal-language";
 import DealSkill from "./m2m/deal-skill";
 import DealTimeslot from "./m2m/deal-timeslot";
@@ -80,6 +81,9 @@ export default class Deal {
 
   @OneToMany(() => DealTimeslot, (dealTimeslot) => dealTimeslot.deal)
   dealTimeslot: DealTimeslot[];
+
+  @OneToMany(() => DealDistrict, (dealDistrict) => dealDistrict.deal)
+  dealDistrict: DealDistrict[];
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
   opportunity: Opportunity[];

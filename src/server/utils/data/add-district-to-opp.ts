@@ -13,8 +13,7 @@ export function getDistrictToOpportunityHandler() {
         return opportunity;
       }
       if (opportunity.type !== OpportunityType.ACCOMPANYING) {
-        const district =
-          opportunity.deal?.location?.locationDistrict?.[0]?.district;
+        const district = opportunity.deal?.dealDistrict?.[0]?.district;
         if (district) {
           opportunity.district = district;
           updates.push(opportunity);

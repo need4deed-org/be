@@ -73,11 +73,9 @@ export function dtoOpportunityGetList(
     activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
-    location: opportunity.deal.location.locationDistrict
-      .filter(Boolean)
-      .map((ld) => ({
-        id: ld.district.id,
-      })),
+    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+      id: ld.district.id,
+    })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
@@ -105,11 +103,9 @@ export function dtoVolunteerOpportunityGetList(
     activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
-    location: opportunity.deal.location.locationDistrict
-      .filter(Boolean)
-      .map((ld) => ({
-        id: ld.district.id,
-      })),
+    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+      id: ld.district.id,
+    })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunity.accompanying!,
@@ -152,7 +148,7 @@ export function dtoOpportunityGet(
     skills: opportunityComments.deal.dealSkill.filter(Boolean).map((ps) => ({
       id: ps.skill.id,
     })),
-    location: opportunityComments.deal.location.locationDistrict
+    location: opportunityComments.deal.dealDistrict
       .filter(Boolean)
       .map((ld) => ({
         id: ld.district.id,

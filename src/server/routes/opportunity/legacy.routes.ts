@@ -249,7 +249,6 @@ export default async function opportunityLegacyRoutes(
 
         function mapOpportunityToDelivery(raw) {
           const deal = raw.deal ?? {};
-          const location = deal.location ?? {};
 
           const activities = (deal.dealActivity ?? [])
             .map((pa) => pa.activity?.title ?? null)
@@ -263,7 +262,7 @@ export default async function opportunityLegacyRoutes(
             .map((ps) => ps.skill?.title ?? null)
             .filter(Boolean);
 
-          const berlin_locations = (location.locationDistrict ?? [])
+          const berlin_locations = (deal.dealDistrict ?? [])
             .map((ld) => ld.district?.title ?? null)
             .filter(Boolean);
 
@@ -313,7 +312,7 @@ export default async function opportunityLegacyRoutes(
           "deal.dealActivity.activity",
           "deal.dealSkill.skill",
           "deal.dealTimeslot.timeslot",
-          "deal.location.locationDistrict.district",
+          "deal.dealDistrict.district",
           "accompanying",
         ],
       });

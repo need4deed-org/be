@@ -22,10 +22,8 @@ export function getVolunteerWhere(
     };
   }
   if (filter?.district) {
-    dealFilter.location = {
-      locationDistrict: {
-        district: { id: normalizeStringArrayInput(filter.district) },
-      },
+    dealFilter.dealDistrict = {
+      district: { id: normalizeStringArrayInput(filter.district) },
     };
   }
 
