@@ -39,7 +39,7 @@ export function opportunityOpportunityVolunteerDTO(
     volunteeringType: opportunityVolunteer.volunteer.statusType,
     engagement: opportunityVolunteer.volunteer.statusEngagement,
     activities: getOptionItems(
-      opportunityVolunteer.volunteer.deal.profile?.profileActivity,
+      opportunityVolunteer.volunteer.deal.dealActivity,
       "activity",
     ),
     skills: getOptionItems(

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
@@ -27,7 +27,7 @@ describe("writeVolunteer", () => {
   const addrSave = vi.fn();
   const personSave = vi.fn();
   const profileSave = vi.fn();
-  const profileActivitySave = vi.fn();
+  const dealActivitySave = vi.fn();
   const profileSkillSave = vi.fn();
   const profileLanguageSave = vi.fn();
   const timeSave = vi.fn();
@@ -48,8 +48,8 @@ describe("writeVolunteer", () => {
           return { save: personSave };
         case Profile:
           return { save: profileSave };
-        case ProfileActivity:
-          return { save: profileActivitySave };
+        case DealActivity:
+          return { save: dealActivitySave };
         case ProfileSkill:
           return { save: profileSkillSave };
         case ProfileLanguage:
@@ -74,7 +74,7 @@ describe("writeVolunteer", () => {
     addrSave.mockImplementation(async (o: any) => ((o.id = 11), o));
     personSave.mockImplementation(async (o: any) => ((o.id = 22), o));
     profileSave.mockImplementation(async (o: any) => ((o.id = 33), o));
-    profileActivitySave.mockImplementation(async (arr: any[]) => {
+    dealActivitySave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 100 + i));
       return arr;
     });
@@ -108,10 +108,10 @@ describe("writeVolunteer", () => {
         id: undefined,
         profile: {
           id: undefined,
-          profileActivity: [{}, {}],
           profileSkill: [{}, {}],
           profileLanguage: [{}, {}],
         },
+        dealActivity: [{}, {}],
         time: { id: undefined, timeTimeslot: [{}, {}] },
         location: { id: undefined, locationDistrict: [{}, {}] },
       },
@@ -122,9 +122,7 @@ describe("writeVolunteer", () => {
     expect(addrSave).toHaveBeenCalledWith(volunteer.person.address);
     expect(personSave).toHaveBeenCalledWith(volunteer.person);
     expect(profileSave).toHaveBeenCalledWith(volunteer.deal.profile);
-    expect(profileActivitySave).toHaveBeenCalledWith(
-      volunteer.deal.profile.profileActivity,
-    );
+    expect(dealActivitySave).toHaveBeenCalledWith(volunteer.deal.dealActivity);
     expect(profileSkillSave).toHaveBeenCalledWith(
       volunteer.deal.profile.profileSkill,
     );
@@ -145,15 +143,15 @@ describe("writeVolunteer", () => {
     expect(result).toBe(77);
     expect(volunteer.id).toBe(77);
 
-    // ensure m2m propagation happened
-    expect(volunteer.deal.profile.profileActivity[0].profileId).toBe(33);
+    // ensure m2m propagation happened — activities now key off the deal id
+    expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
     expect(volunteer.deal.time.timeTimeslot[0].timeId).toBe(44);
     expect(volunteer.deal.location.locationDistrict[0].locationId).toBe(55);
   });
 
   it("propagates repository error from a nested save", async () => {
-    // make profileActivity save fail
-    profileActivitySave.mockRejectedValueOnce(new Error("m2m failed"));
+    // make dealActivity save fail
+    dealActivitySave.mockRejectedValueOnce(new Error("m2m failed"));
 
     const volunteer: any = {
       id: undefined,
@@ -162,10 +160,10 @@ describe("writeVolunteer", () => {
         id: undefined,
         profile: {
           id: undefined,
-          profileActivity: [{}],
           profileSkill: [],
           profileLanguage: [],
         },
+        dealActivity: [{}],
         time: { id: undefined, timeTimeslot: [] },
         location: { id: undefined, locationDistrict: [] },
       },
@@ -175,8 +173,8 @@ describe("writeVolunteer", () => {
       "m2m failed",
     );
 
-    // profile id should still have been set before trying to save m2m
-    expect(volunteer.deal.profile.id).toBe(33);
-    expect(volunteer.deal.profile.profileActivity[0].profileId).toBe(33);
+    // deal id should have been set before trying to save the activity m2m
+    expect(volunteer.deal.id).toBe(66);
+    expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
   });
 });

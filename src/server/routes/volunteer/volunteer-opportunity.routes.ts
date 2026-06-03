@@ -33,7 +33,7 @@ export default async function volunteerOpportunityRoutes(
     async (request, reply) => {
       const relations = [
         "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
+        "deal.dealActivity.activity",
         "deal.location.locationDistrict.district",
         "deal.time.timeTimeslot.timeslot",
       ];
@@ -61,7 +61,7 @@ export default async function volunteerOpportunityRoutes(
       const opportunitiesCategory = opportunities.map((opportunity) => {
         Object.assign(
           opportunity.deal.profile,
-          addCategoryToProfile(opportunity.deal.profile),
+          addCategoryToProfile(opportunity.deal),
         );
         return opportunity;
       });

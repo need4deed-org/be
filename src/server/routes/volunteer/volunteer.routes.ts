@@ -10,8 +10,8 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
@@ -24,7 +24,12 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
-import { idParamSchema, responseErrors, responseSchema, volunteerListQuerySchema } from "../../schema";
+import {
+  idParamSchema,
+  responseErrors,
+  responseSchema,
+  volunteerListQuerySchema,
+} from "../../schema";
 import { QuerystringVolunteerGetList, RoutePrefix } from "../../types";
 import {
   fetchVolunteerById,
@@ -55,7 +60,7 @@ export default async function volunteerRoutes(
     "person.address.postcode",
     "deal",
     "deal.postcode",
-    "deal.profile.profileActivity.activity",
+    "deal.dealActivity.activity",
     "deal.profile.profileSkill.skill",
     "deal.profile.profileLanguage.language",
     "deal.time.timeTimeslot.timeslot",
@@ -312,7 +317,7 @@ export default async function volunteerRoutes(
         if (activities) {
           const success = await updateOptionList(
             dealId,
-            ProfileActivity,
+            DealActivity,
             activities,
           );
           if (!success) {

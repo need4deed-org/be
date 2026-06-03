@@ -8,8 +8,8 @@ import {
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
+import DealActivity from "../../data/entity/m2m/deal-activity";
 import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileActivity from "../../data/entity/m2m/profile-activity";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import ProfileSkill from "../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
@@ -26,17 +26,17 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   const postcode = await getPostcode(String(formData.postcode));
 
   // activities
-  const profileActivity: ProfileActivity[] = [];
+  const dealActivity: DealActivity[] = [];
   const volunteerActivities = (formData.activities || []) as string[];
   for (const volunteerActivity of volunteerActivities) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerActivity,
       EntityTableName.ACTIVITY,
       Activity,
-      ProfileActivity,
+      DealActivity,
     );
     if (profileEntity) {
-      profileActivity.push(profileEntity);
+      dealActivity.push(profileEntity);
     }
   }
 
@@ -77,7 +77,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   const category = null;
   const profile = new Profile({
     category,
-    profileActivity,
     profileSkill,
     profileLanguage,
   });
@@ -135,6 +134,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   const deal = new Deal({
     type,
     profile,
+    dealActivity,
     postcode,
     time,
     location,
