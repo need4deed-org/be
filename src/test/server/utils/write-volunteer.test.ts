@@ -3,12 +3,11 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
-import Profile from "../../../data/entity/profile/profile.entity";
 import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { writeVolunteerLegacy } from "../../../server/utils/data";
@@ -26,10 +25,9 @@ vi.mock("../../../data/data-source", () => ({
 describe("writeVolunteer", () => {
   const addrSave = vi.fn();
   const personSave = vi.fn();
-  const profileSave = vi.fn();
   const dealActivitySave = vi.fn();
   const dealSkillSave = vi.fn();
-  const profileLanguageSave = vi.fn();
+  const dealLanguageSave = vi.fn();
   const timeSave = vi.fn();
   const timeTimeslotSave = vi.fn();
   const locationSave = vi.fn();
@@ -46,14 +44,12 @@ describe("writeVolunteer", () => {
           return { save: addrSave };
         case Person:
           return { save: personSave };
-        case Profile:
-          return { save: profileSave };
         case DealActivity:
           return { save: dealActivitySave };
         case DealSkill:
           return { save: dealSkillSave };
-        case ProfileLanguage:
-          return { save: profileLanguageSave };
+        case DealLanguage:
+          return { save: dealLanguageSave };
         case Time:
           return { save: timeSave };
         case TimeTimeslot:
@@ -73,7 +69,6 @@ describe("writeVolunteer", () => {
 
     addrSave.mockImplementation(async (o: any) => ((o.id = 11), o));
     personSave.mockImplementation(async (o: any) => ((o.id = 22), o));
-    profileSave.mockImplementation(async (o: any) => ((o.id = 33), o));
     dealActivitySave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 100 + i));
       return arr;
@@ -82,7 +77,7 @@ describe("writeVolunteer", () => {
       arr.forEach((it, i) => (it.id = 200 + i));
       return arr;
     });
-    profileLanguageSave.mockImplementation(async (arr: any[]) => {
+    dealLanguageSave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 300 + i));
       return arr;
     });
@@ -106,12 +101,9 @@ describe("writeVolunteer", () => {
       person: { id: undefined, address: { id: undefined, street: "s" } },
       deal: {
         id: undefined,
-        profile: {
-          id: undefined,
-          profileLanguage: [{}, {}],
-        },
         dealActivity: [{}, {}],
         dealSkill: [{}, {}],
+        dealLanguage: [{}, {}],
         time: { id: undefined, timeTimeslot: [{}, {}] },
         location: { id: undefined, locationDistrict: [{}, {}] },
       },
@@ -121,12 +113,9 @@ describe("writeVolunteer", () => {
 
     expect(addrSave).toHaveBeenCalledWith(volunteer.person.address);
     expect(personSave).toHaveBeenCalledWith(volunteer.person);
-    expect(profileSave).toHaveBeenCalledWith(volunteer.deal.profile);
     expect(dealActivitySave).toHaveBeenCalledWith(volunteer.deal.dealActivity);
     expect(dealSkillSave).toHaveBeenCalledWith(volunteer.deal.dealSkill);
-    expect(profileLanguageSave).toHaveBeenCalledWith(
-      volunteer.deal.profile.profileLanguage,
-    );
+    expect(dealLanguageSave).toHaveBeenCalledWith(volunteer.deal.dealLanguage);
     expect(timeSave).toHaveBeenCalledWith(volunteer.deal.time);
     expect(timeTimeslotSave).toHaveBeenCalledWith(
       volunteer.deal.time.timeTimeslot,
@@ -141,9 +130,10 @@ describe("writeVolunteer", () => {
     expect(result).toBe(77);
     expect(volunteer.id).toBe(77);
 
-    // ensure m2m propagation happened — activities/skills now key off the deal id
+    // ensure deal m2m propagation happened — all key off the deal id
     expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
     expect(volunteer.deal.dealSkill[0].dealId).toBe(66);
+    expect(volunteer.deal.dealLanguage[0].dealId).toBe(66);
     expect(volunteer.deal.time.timeTimeslot[0].timeId).toBe(44);
     expect(volunteer.deal.location.locationDistrict[0].locationId).toBe(55);
   });
@@ -157,12 +147,9 @@ describe("writeVolunteer", () => {
       person: { id: undefined, address: { id: undefined } },
       deal: {
         id: undefined,
-        profile: {
-          id: undefined,
-          profileLanguage: [],
-        },
         dealActivity: [{}],
         dealSkill: [],
+        dealLanguage: [],
         time: { id: undefined, timeTimeslot: [] },
         location: { id: undefined, locationDistrict: [] },
       },

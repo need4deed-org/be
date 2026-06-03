@@ -25,11 +25,9 @@ export function getOpportunityWhere(
     ...(filter?.language
       ? {
           deal: {
-            profile: {
-              profileLanguage: {
-                language: {
-                  id: normalizeStringArrayInput(filter.language),
-                },
+            dealLanguage: {
+              language: {
+                id: normalizeStringArrayInput(filter.language),
               },
             },
           },

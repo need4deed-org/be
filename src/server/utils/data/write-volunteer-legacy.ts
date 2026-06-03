@@ -3,12 +3,11 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
-import Profile from "../../../data/entity/profile/profile.entity";
 import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 
@@ -20,13 +19,12 @@ export async function writeVolunteerLegacy(
     // 1. Get all necessary repositories using the transactional entity manager
     const addressRepository = transactionalEntityManager.getRepository(Address);
     const personRepository = transactionalEntityManager.getRepository(Person);
-    const profileRepository = transactionalEntityManager.getRepository(Profile);
     const dealActivityRepository =
       transactionalEntityManager.getRepository(DealActivity);
     const dealSkillRepository =
       transactionalEntityManager.getRepository(DealSkill);
-    const profileLanguageRepository =
-      transactionalEntityManager.getRepository(ProfileLanguage);
+    const dealLanguageRepository =
+      transactionalEntityManager.getRepository(DealLanguage);
     const timeRepository = transactionalEntityManager.getRepository(Time);
     const timeTimeslotRepository =
       transactionalEntityManager.getRepository(TimeTimeslot);
@@ -44,18 +42,6 @@ export async function writeVolunteerLegacy(
 
     // Person
     await personRepository.save(volunteer.person);
-
-    // Profile
-    await profileRepository.save(volunteer.deal.profile);
-    const profileId = volunteer.deal.profile.id;
-
-    // Profile m2m relations (languages)
-    for (const profileLanguage of volunteer.deal.profile.profileLanguage) {
-      profileLanguage.profileId = profileId;
-    }
-    await profileLanguageRepository.save(
-      volunteer.deal.profile.profileLanguage,
-    );
 
     // Time
     await timeRepository.save(volunteer.deal.time);
@@ -83,8 +69,8 @@ export async function writeVolunteerLegacy(
     await dealRepository.save(volunteer.deal);
     const dealId = volunteer.deal.id;
 
-    // Deal m2m relations (activities, skills) — saved after the deal so
-    // dealId exists
+    // Deal m2m relations (activities, skills, languages) — saved after the
+    // deal so dealId exists
     for (const dealActivity of volunteer.deal.dealActivity) {
       dealActivity.dealId = dealId;
     }
@@ -94,6 +80,11 @@ export async function writeVolunteerLegacy(
       dealSkill.dealId = dealId;
     }
     await dealSkillRepository.save(volunteer.deal.dealSkill);
+
+    for (const dealLanguage of volunteer.deal.dealLanguage) {
+      dealLanguage.dealId = dealId;
+    }
+    await dealLanguageRepository.save(volunteer.deal.dealLanguage);
 
     // Volunteer
     await volunteerRepository.save(volunteer);

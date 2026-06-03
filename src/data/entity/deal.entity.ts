@@ -1,4 +1,4 @@
-import { IsEnum } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import {
   Column,
   Entity,
@@ -11,9 +11,10 @@ import { DealType } from "../types";
 import Location from "./location/location.entity";
 import Postcode from "./location/postcode.entity";
 import DealActivity from "./m2m/deal-activity";
+import DealLanguage from "./m2m/deal-language";
 import DealSkill from "./m2m/deal-skill";
 import Opportunity from "./opportunity/opportunity.entity";
-import Profile from "./profile/profile.entity";
+import Category from "./profile/category.entity";
 import Time from "./time/time.entity";
 import Volunteer from "./volunteer/volunteer.entity";
 
@@ -36,11 +37,19 @@ export default class Deal {
   @IsEnum(DealType)
   type: DealType;
 
-  @ManyToOne(() => Profile, (profile) => profile.deal, {
-    onDelete: "CASCADE",
+  @Column({ nullable: true })
+  @IsOptional()
+  @IsString()
+  info?: string;
+
+  @ManyToOne(() => Category, (category) => category.deal, {
+    nullable: true,
   })
-  @JoinColumn({ name: "profile_id" })
-  profile: Profile;
+  @JoinColumn({ name: "category_id" })
+  category?: Category;
+
+  @Column({ nullable: true })
+  categoryId: number;
 
   @ManyToOne(() => Postcode, (postcode) => postcode.deal, {
     onDelete: "CASCADE",
@@ -74,6 +83,9 @@ export default class Deal {
 
   @OneToMany(() => DealSkill, (dealSkill) => dealSkill.deal)
   dealSkill: DealSkill[];
+
+  @OneToMany(() => DealLanguage, (dealLanguage) => dealLanguage.deal)
+  dealLanguage: DealLanguage[];
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
   opportunity: Opportunity[];

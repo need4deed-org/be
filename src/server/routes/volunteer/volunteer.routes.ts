@@ -11,9 +11,9 @@ import {
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
@@ -62,7 +62,7 @@ export default async function volunteerRoutes(
     "deal.postcode",
     "deal.dealActivity.activity",
     "deal.dealSkill.skill",
-    "deal.profile.profileLanguage.language",
+    "deal.dealLanguage.language",
     "deal.time.timeTimeslot.timeslot",
     "deal.location.locationPostcode.postcode",
     "deal.location.locationDistrict.district",
@@ -284,7 +284,7 @@ export default async function volunteerRoutes(
         if (languages) {
           const success = await updateOptionList(
             dealId,
-            ProfileLanguage,
+            DealLanguage,
             languages,
           );
           if (!success) {

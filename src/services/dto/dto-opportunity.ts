@@ -57,21 +57,19 @@ export function dtoOpportunityGetList(
   return {
     id: opportunity.id,
     title: opportunity.title,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     district: { id: opportunity.district?.id ?? opportunity.districtId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
     numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
-    languages: opportunity.deal.profile.profileLanguage
-      .filter(Boolean)
-      .map((pl) => ({
-        id: pl.language.id,
-        title: pl.language.title,
-        proficiency: pl.proficiency,
-        purpose: pl.purpose,
-      })),
+    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+      id: pl.language.id,
+      title: pl.language.title,
+      proficiency: pl.proficiency,
+      purpose: pl.purpose,
+    })),
     activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
@@ -94,19 +92,17 @@ export function dtoVolunteerOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     createdAt: opportunity.createdAt,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     ...(opportunity.districtId
       ? { district: { id: opportunity.districtId } }
       : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
-    languages: opportunity.deal.profile.profileLanguage
-      .filter(Boolean)
-      .map((pl) => ({
-        id: pl.language.id,
-        title: pl.language.title,
-        proficiency: pl.proficiency,
-      })),
+    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+      id: pl.language.id,
+      title: pl.language.title,
+      proficiency: pl.proficiency,
+    })),
     activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
@@ -119,7 +115,7 @@ export function dtoVolunteerOpportunityGetList(
       getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunity.accompanying!,
-      opportunity.deal.profile.profileLanguage,
+      opportunity.deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
   } as ApiVolunteerOpportunityGetList;
@@ -135,14 +131,14 @@ export function dtoOpportunityGet(
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
-    category: { id: opportunityComments.deal.profile.categoryId },
+    category: { id: opportunityComments.deal.categoryId },
     district: {
       id: opportunityComments.district?.id ?? opportunityComments.districtId,
     },
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
-    languages: opportunityComments.deal.profile.profileLanguage
+    languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
         id: pl.language.id,
@@ -170,7 +166,7 @@ export function dtoOpportunityGet(
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunityComments.accompanying!,
-      opportunityComments.deal.profile.profileLanguage,
+      opportunityComments.deal.dealLanguage,
       accompanyingDistrict,
     ),
     comments: opportunityComments.comments.map(commentSerializer),

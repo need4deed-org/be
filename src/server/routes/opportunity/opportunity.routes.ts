@@ -9,8 +9,8 @@ import {
 import { BadRequestError, NotFoundError } from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -37,7 +37,7 @@ import {
 } from "../../types";
 import {
   addComments2Entity,
-  getCategoryToProfileHandler,
+  getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
   getOpportunityOrphanageAgent,
@@ -81,7 +81,7 @@ export default async function opportunityRoutes(
       const relations = [
         "accompanying",
         "accompanying.postcode",
-        "deal.profile.profileLanguage.language",
+        "deal.dealLanguage.language",
         "deal.dealActivity.activity",
         "deal.dealSkill.skill",
         "deal.location.locationDistrict.district",
@@ -179,7 +179,7 @@ export default async function opportunityRoutes(
 
       const relations = [
         "deal.dealActivity.activity",
-        "deal.profile.profileLanguage.language",
+        "deal.dealLanguage.language",
         "deal.time.timeTimeslot.timeslot",
         "deal.location.locationDistrict.district",
         "agent",
@@ -195,8 +195,8 @@ export default async function opportunityRoutes(
         ...(order ? order : {}),
       });
 
-      const { addCategoryToProfile, updates: profileUpdates } =
-        getCategoryToProfileHandler();
+      const { addCategoryToDeal, updates: dealUpdates } =
+        getCategoryToDealHandler();
 
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
@@ -207,24 +207,21 @@ export default async function opportunityRoutes(
             opportunity,
             await addDistrictToOpportunity(opportunity),
           );
-          Object.assign(
-            opportunity.deal.profile,
-            addCategoryToProfile(opportunity.deal),
-          );
+          addCategoryToDeal(opportunity.deal);
           return opportunity;
         }),
       );
 
-      if (profileUpdates.length > 0) {
-        const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(profileUpdates);
+      if (dealUpdates.length > 0) {
+        const dealRepository = fastify.db.dealRepository;
+        await dealRepository.save(dealUpdates);
       }
 
       if (opportunityUpdates.length > 0) {
         await opportunityRepository.save(opportunityUpdates);
       }
       logger.debug(
-        `Saving category updates: ${profileUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+        `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
       const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
@@ -368,11 +365,7 @@ export default async function opportunityRoutes(
       }
 
       if (languages) {
-        const success = await updateOptionList(
-          dealId,
-          ProfileLanguage,
-          languages,
-        );
+        const success = await updateOptionList(dealId, DealLanguage, languages);
         if (!success) {
           throw new BadRequestError(
             `Languages for opportunity (deal_id:${dealId}) not updated.`,
