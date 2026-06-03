@@ -25,7 +25,6 @@ import DealLanguage from "./entity/m2m/deal-language";
 import DealSkill from "./entity/m2m/deal-skill";
 import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
-import LocationAddress from "./entity/m2m/location-address";
 import LocationPostcode from "./entity/m2m/location-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import NotionRelation from "./entity/notion-relation.entity";
@@ -87,7 +86,6 @@ export const dataSource = new DataSource({
     Language,
     LeadFrom,
     Location,
-    LocationAddress,
     LocationPostcode,
     NotionRelation,
     Opportunity,
