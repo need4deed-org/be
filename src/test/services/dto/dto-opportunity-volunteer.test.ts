@@ -29,9 +29,9 @@ function makeOV(
       statusEngagement: "active",
       person: { name: "Jane Doe", avatarUrl: "https://cdn.example.com/a.png" },
       deal: {
-        profile: { profileLanguage: [] },
         dealActivity: [],
         dealSkill: [],
+        dealLanguage: [],
         time: { timeTimeslot: [] },
         location: { locationDistrict: [] },
       },

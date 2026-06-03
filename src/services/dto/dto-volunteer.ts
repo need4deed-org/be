@@ -23,7 +23,7 @@ export function volunteerListSerializer(
     const name = volunteer.person.name;
     const email = volunteer.person.email;
     const avatarUrl = volunteer.person?.avatarUrl || null;
-    const languages = getLanguages(volunteer.deal.profile.profileLanguage);
+    const languages = getLanguages(volunteer.deal.dealLanguage);
     const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
     const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
     const skills = getOptionItems(volunteer.deal.dealSkill, "skill");
@@ -121,7 +121,7 @@ export function volunteerSerializer(
     "district",
   );
 
-  const languages = getLanguages(volunteer.deal.profile.profileLanguage);
+  const languages = getLanguages(volunteer.deal.dealLanguage);
   const availability = getAvailability(volunteer.deal.time.timeTimeslot);
 
   // TODO: remove cast once need4deed-sdk >= 0.0.82 is published (adds statusVaccinationDate etc.)

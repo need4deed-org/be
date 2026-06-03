@@ -1,4 +1,4 @@
-export * from "./add-category-to-profile";
+export * from "./add-category-to-deal";
 export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./add-district-to-opp";

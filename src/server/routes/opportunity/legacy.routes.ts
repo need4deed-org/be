@@ -249,7 +249,6 @@ export default async function opportunityLegacyRoutes(
 
         function mapOpportunityToDelivery(raw) {
           const deal = raw.deal ?? {};
-          const profile = deal.profile ?? {};
           const time = deal.time ?? {};
           const location = deal.location ?? {};
 
@@ -257,7 +256,7 @@ export default async function opportunityLegacyRoutes(
             .map((pa) => pa.activity?.title ?? null)
             .filter(Boolean);
 
-          const languages = (profile.profileLanguage ?? [])
+          const languages = (deal.dealLanguage ?? [])
             .map((pl) => pl.language?.title ?? null)
             .filter(Boolean);
 
@@ -292,7 +291,7 @@ export default async function opportunityLegacyRoutes(
             created_at: raw.createdAt ?? null,
             updated_at: raw.updatedAt ?? null,
             category: null,
-            category_id: profile.categoryId ?? null,
+            category_id: deal.categoryId ?? null,
             last_edited_time_notion: null,
           };
         }
@@ -311,7 +310,7 @@ export default async function opportunityLegacyRoutes(
         },
         take: 300,
         relations: [
-          "deal.profile.profileLanguage.language",
+          "deal.dealLanguage.language",
           "deal.dealActivity.activity",
           "deal.dealSkill.skill",
           "deal.time.timeTimeslot.timeslot",

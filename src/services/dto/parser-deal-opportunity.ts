@@ -11,13 +11,12 @@ import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealSkill from "../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../data/entity/m2m/location-district";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
-import Profile from "../../data/entity/profile/profile.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Time from "../../data/entity/time/time.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
@@ -71,7 +70,7 @@ export async function dealParserOpportunity(
   }
 
   // languages
-  const profileLanguage: ProfileLanguage[] = [];
+  const dealLanguage: DealLanguage[] = [];
 
   const opportunityLanguages: ApiLanguage[] = (await Promise.all(
     (formData.languages || [])
@@ -87,21 +86,14 @@ export async function dealParserOpportunity(
       opportunityLanguage.title,
       EntityTableName.LANGUAGE,
       Language,
-      ProfileLanguage,
+      DealLanguage,
     );
 
     if (profileEntity) {
       profileEntity.proficiency = opportunityLanguage.proficiency;
-      profileLanguage.push(profileEntity);
+      dealLanguage.push(profileEntity);
     }
   }
-
-  // profile
-  const category = null;
-  const profile = new Profile({
-    category,
-    profileLanguage,
-  });
 
   // time
   const timeTimeslot: TimeTimeslot[] = [];
@@ -171,9 +163,9 @@ export async function dealParserOpportunity(
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
     type,
-    profile,
     dealActivity,
     dealSkill,
+    dealLanguage,
     postcode,
     time,
     location,

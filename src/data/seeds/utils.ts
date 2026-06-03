@@ -8,6 +8,7 @@ import {
   AgentVolunteerSearchType,
   DocumentStatusType,
   EntityTableName,
+  LangProficiency,
   OccasionalType,
   TranslatedIntoType,
   VolunteerStateAppreciationType,
@@ -28,9 +29,9 @@ import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
 import DealActivity from "../entity/m2m/deal-activity";
+import DealLanguage from "../entity/m2m/deal-language";
 import DealSkill from "../entity/m2m/deal-skill";
 import LocationDistrict from "../entity/m2m/location-district";
-import ProfileLanguage from "../entity/m2m/profile-language";
 import TimeTimeslot from "../entity/m2m/time-timeslot";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
@@ -39,7 +40,6 @@ import Person from "../entity/person.entity";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
-import Profile from "../entity/profile/profile.entity";
 import Skill from "../entity/profile/skill.entity";
 import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
@@ -322,12 +322,11 @@ export async function createDeal(
   dataSource: DataSource,
 ): Promise<Deal> {
   const activityRepository = getRepository(dataSource, Activity);
-  const profileRepository = getRepository(dataSource, Profile);
   const dealActivityRepository = getRepository(dataSource, DealActivity);
   const skillRepository = getRepository(dataSource, Skill);
   const dealSkillRepository = getRepository(dataSource, DealSkill);
   const languageRepository = getRepository(dataSource, Language);
-  const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
+  const dealLanguageRepository = getRepository(dataSource, DealLanguage);
   const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
   const locationDistrictRepository = getRepository(
@@ -340,11 +339,6 @@ export async function createDeal(
     postcodeGetter = await getPostcodeGetter(dataSource);
   }
   const postcode = await postcodeGetter(dealData?.postcode);
-
-  const profile = new Profile({
-    info: dealData.profile.info,
-  });
-  await profileRepository.save(profile);
 
   const categoryIds: number[] = [];
   const activities: Activity[] = [];
@@ -370,22 +364,18 @@ export async function createDeal(
     skills.push(skill);
   }
 
+  const languages: { language: Language; level: LangProficiency }[] = [];
   for (const [title, level] of dealData.profile.languages ?? []) {
     const language = await getLanguage(title, languageRepository);
     if (!language) {
       logger.warn(`Language ${title} not found. Skipping.`);
       continue;
     }
-
-    const profileLanguage = new ProfileLanguage({
-      profile,
-      language,
-      proficiency: level,
-    });
-    await profileLanguageRepository.save(profileLanguage);
+    // DealLanguage rows are created after the deal is saved (need dealId).
+    languages.push({ language, level });
   }
 
-  profile.categoryId = categorize(categoryIds.filter(Boolean))!;
+  const categoryId = categorize(categoryIds.filter(Boolean))!;
 
   const time = await createTime(dataSource, dealData.time);
 
@@ -405,8 +395,9 @@ export async function createDeal(
 
   const deal = new Deal({
     type: dealData.type,
+    info: dealData.profile.info,
+    categoryId,
     postcode,
-    profile,
     time,
     location,
   });
@@ -420,6 +411,15 @@ export async function createDeal(
   for (const skill of skills) {
     const dealSkill = new DealSkill({ deal, skill });
     await dealSkillRepository.save(dealSkill);
+  }
+
+  for (const { language, level } of languages) {
+    const dealLanguage = new DealLanguage({
+      deal,
+      language,
+      proficiency: level,
+    });
+    await dealLanguageRepository.save(dealLanguage);
   }
 
   return deal;

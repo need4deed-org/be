@@ -5,18 +5,11 @@ import { normalizeStringArrayInput } from "./for-routes";
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ) {
-  // Build deal.profile sub-filter to avoid overwriting when multiple profile
-  // relations are active (language shares the same deal key).
-  const profileFilter: Record<string, unknown> = {};
+  const dealFilter: Record<string, unknown> = {};
   if (filter?.language) {
-    profileFilter.profileLanguage = {
+    dealFilter.dealLanguage = {
       language: { id: normalizeStringArrayInput(filter.language) },
     };
-  }
-
-  const dealFilter: Record<string, unknown> = {};
-  if (Object.keys(profileFilter).length) {
-    dealFilter.profile = profileFilter;
   }
   if (filter?.activity) {
     dealFilter.dealActivity = {

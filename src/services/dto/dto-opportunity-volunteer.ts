@@ -46,9 +46,7 @@ export function opportunityOpportunityVolunteerDTO(
       opportunityVolunteer.volunteer.deal.dealSkill,
       "skill",
     ),
-    languages: getLanguages(
-      opportunityVolunteer.volunteer.deal.profile?.profileLanguage,
-    ),
+    languages: getLanguages(opportunityVolunteer.volunteer.deal.dealLanguage),
     availability: getAvailability(
       opportunityVolunteer.volunteer.deal.time?.timeTimeslot,
     ),

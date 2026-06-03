@@ -5,7 +5,7 @@ import {
   OptionItem,
   TimeSlot,
 } from "need4deed-sdk";
-import ProfileLanguage from "../../data/entity/m2m/profile-language";
+import DealLanguage from "../../data/entity/m2m/deal-language";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 
 export function getAvailability(
@@ -71,8 +71,8 @@ export function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
   throw new Error("From or To hour value is not supported");
 }
 
-export function getLanguages(profileLanguage: ProfileLanguage[]) {
-  return profileLanguage?.map((pl) => ({
+export function getLanguages(dealLanguage: DealLanguage[]) {
+  return dealLanguage?.map((pl) => ({
     id: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,

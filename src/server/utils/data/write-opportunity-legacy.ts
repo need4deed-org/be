@@ -2,13 +2,12 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import Profile from "../../../data/entity/profile/profile.entity";
 import Time from "../../../data/entity/time/time.entity";
 
 export async function writeOpportunityLegacy(
@@ -18,13 +17,12 @@ export async function writeOpportunityLegacy(
     const opportunityRepository =
       transactionalEntityManager.getRepository(Opportunity);
     const dealRepository = transactionalEntityManager.getRepository(Deal);
-    const profileRepository = transactionalEntityManager.getRepository(Profile);
     const dealActivityRepository =
       transactionalEntityManager.getRepository(DealActivity);
     const dealSkillRepository =
       transactionalEntityManager.getRepository(DealSkill);
-    const profileLanguageRepository =
-      transactionalEntityManager.getRepository(ProfileLanguage);
+    const dealLanguageRepository =
+      transactionalEntityManager.getRepository(DealLanguage);
     const timeRepository = transactionalEntityManager.getRepository(Time);
     const timeTimeslotRepository =
       transactionalEntityManager.getRepository(TimeTimeslot);
@@ -34,13 +32,6 @@ export async function writeOpportunityLegacy(
       transactionalEntityManager.getRepository(LocationDistrict);
     const accompanyingRepository =
       transactionalEntityManager.getRepository(Accompanying);
-
-    await profileRepository.save(opportunity.deal.profile);
-
-    for (const profileLanguage of opportunity.deal.profile.profileLanguage) {
-      profileLanguage.profileId = opportunity.deal.profile.id;
-      await profileLanguageRepository.save(profileLanguage);
-    }
 
     await timeRepository.save(opportunity.deal.time);
     for (const timeTimeslot of opportunity.deal.time.timeTimeslot) {
@@ -67,6 +58,11 @@ export async function writeOpportunityLegacy(
       dealSkill.dealId = opportunity.deal.id;
     }
     await dealSkillRepository.save(opportunity.deal.dealSkill);
+
+    for (const dealLanguage of opportunity.deal.dealLanguage) {
+      dealLanguage.dealId = opportunity.deal.id;
+    }
+    await dealLanguageRepository.save(opportunity.deal.dealLanguage);
 
     if (opportunity.accompanying) {
       await accompanyingRepository.save(opportunity.accompanying);
