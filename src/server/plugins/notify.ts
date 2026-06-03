@@ -40,8 +40,8 @@ function buildEmailTransport(): EmailTransport {
 
 function buildSlackTransport(): SlackTransport | undefined {
   const urls: Partial<Record<SlackChannel, string>> = {};
-  if (process.env.SLACK_WEBHOOK_URL) {
-    urls.ops = process.env.SLACK_WEBHOOK_URL;
+  if (process.env.SLACK_OPS_WEBHOOK_URL) {
+    urls.ops = process.env.SLACK_OPS_WEBHOOK_URL;
   }
   if (process.env.SLACK_COMMENTS_WEBHOOK_URL) {
     urls.comments = process.env.SLACK_COMMENTS_WEBHOOK_URL;
