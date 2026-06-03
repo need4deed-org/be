@@ -1,10 +1,10 @@
 import {
-  DealType,
   DocumentStatusType,
   LangProficiency,
   OpportunityType,
   VolunteerStateType,
 } from "need4deed-sdk";
+import { DealType } from "../types";
 
 export interface ProfileJSON {
   info: string;
