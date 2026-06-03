@@ -1,6 +1,5 @@
 import {
   ApiLanguage,
-  DealType,
   EntityTableName,
   LangPurpose,
   OccasionalType,
@@ -18,6 +17,7 @@ import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
+import { DealType } from "../../data/types";
 import {
   getPostcode,
   getRepository,

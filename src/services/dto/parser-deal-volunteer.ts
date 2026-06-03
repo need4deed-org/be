@@ -1,6 +1,5 @@
 import {
   ApiLanguage,
-  DealType,
   EntityTableName,
   OccasionalType,
   VolunteerFormData,
@@ -15,6 +14,7 @@ import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
+import { DealType } from "../../data/types";
 import { getPostcode, getRRULE, getStartEnd } from "../../data/utils";
 import { getProfileEntityByTitle, getTimeslot } from "../../server/utils";
 
