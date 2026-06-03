@@ -13,7 +13,6 @@ import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
-import Location from "./entity/location/location.entity";
 import Postcode from "./entity/location/postcode.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
@@ -25,7 +24,6 @@ import DealLanguage from "./entity/m2m/deal-language";
 import DealSkill from "./entity/m2m/deal-skill";
 import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
-import LocationPostcode from "./entity/m2m/location-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
@@ -85,8 +83,6 @@ export const dataSource = new DataSource({
     FieldTranslation,
     Language,
     LeadFrom,
-    Location,
-    LocationPostcode,
     NotionRelation,
     Opportunity,
     OpportunityVolunteer,

@@ -7,7 +7,6 @@ import {
 } from "need4deed-sdk";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
-import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
@@ -116,9 +115,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     }
   }
 
-  // location (wrapper retained until #618; no longer holds districts)
-  const location = new Location({});
-
   // deal
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
@@ -129,7 +125,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     dealTimeslot,
     dealDistrict,
     postcode,
-    location,
   });
 
   return deal;

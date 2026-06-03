@@ -16,13 +16,6 @@ export enum GermanCity {
   POTSDAM = "Potsdam",
 }
 
-export enum LocationType {
-  POSTCODE = "postcode",
-  DISTRICT = "district",
-  ADDRESS = "address",
-  GEOLOCATION = "geolocation",
-}
-
 export enum DealType {
   VOLUNTEER = "volunteer",
   OPPORTUNITY = "opportunity",

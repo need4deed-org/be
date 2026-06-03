@@ -65,7 +65,6 @@ export default async function volunteerRoutes(
     "deal.dealLanguage.language",
     "deal.dealTimeslot.timeslot",
     "deal.dealDistrict.district",
-    "deal.location.locationPostcode.postcode",
   ];
 
   fastify.addHook(
