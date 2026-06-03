@@ -29,10 +29,10 @@ import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
 import DealActivity from "../entity/m2m/deal-activity";
+import DealDistrict from "../entity/m2m/deal-district";
 import DealLanguage from "../entity/m2m/deal-language";
 import DealSkill from "../entity/m2m/deal-skill";
 import DealTimeslot from "../entity/m2m/deal-timeslot";
-import LocationDistrict from "../entity/m2m/location-district";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
 import Organization from "../entity/organization.entity";
@@ -327,12 +327,9 @@ export async function createDeal(
   const languageRepository = getRepository(dataSource, Language);
   const dealLanguageRepository = getRepository(dataSource, DealLanguage);
   const dealTimeslotRepository = getRepository(dataSource, DealTimeslot);
+  const dealDistrictRepository = getRepository(dataSource, DealDistrict);
   const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
-  const locationDistrictRepository = getRepository(
-    dataSource,
-    LocationDistrict,
-  );
   const dealRepository = getRepository(dataSource, Deal);
 
   if (!postcodeGetter) {
@@ -379,18 +376,19 @@ export async function createDeal(
 
   const timeslots = await createDealTimeslots(dataSource, dealData.time);
 
+  // location wrapper retained until #618; districts now live on the deal
   const location = new Location();
   await locationRepository.save(location);
 
+  const districts: District[] = [];
   for (const title of dealData.location.districts ?? []) {
     let district = await districtRepository.findOne({ where: { title } });
     if (!district) {
       district = new District({ title });
       await districtRepository.save(district);
     }
-
-    const locationDistrict = new LocationDistrict({ location, district });
-    await locationDistrictRepository.save(locationDistrict);
+    // DealDistrict rows are created after the deal is saved (need dealId).
+    districts.push(district);
   }
 
   const deal = new Deal({
@@ -424,6 +422,11 @@ export async function createDeal(
   for (const timeslot of timeslots) {
     const dealTimeslot = new DealTimeslot({ deal, timeslot });
     await dealTimeslotRepository.save(dealTimeslot);
+  }
+
+  for (const district of districts) {
+    const dealDistrict = new DealDistrict({ deal, district });
+    await dealDistrictRepository.save(dealDistrict);
   }
 
   return deal;

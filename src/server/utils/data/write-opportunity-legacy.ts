@@ -2,10 +2,10 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
-import LocationDistrict from "../../../data/entity/m2m/location-district";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 
@@ -24,23 +24,20 @@ export async function writeOpportunityLegacy(
       transactionalEntityManager.getRepository(DealLanguage);
     const dealTimeslotRepository =
       transactionalEntityManager.getRepository(DealTimeslot);
+    const dealDistrictRepository =
+      transactionalEntityManager.getRepository(DealDistrict);
     const locationRepository =
       transactionalEntityManager.getRepository(Location);
-    const locationDistrictRepository =
-      transactionalEntityManager.getRepository(LocationDistrict);
     const accompanyingRepository =
       transactionalEntityManager.getRepository(Accompanying);
 
+    // Location (wrapper retained until #618; districts now live on the deal)
     await locationRepository.save(opportunity.deal.location);
-    for (const locationDistrict of opportunity.deal.location.locationDistrict) {
-      locationDistrict.locationId = opportunity.deal.location.id;
-      await locationDistrictRepository.save(locationDistrict);
-    }
 
     await dealRepository.save(opportunity.deal);
 
-    // Deal m2m relations (activities, skills, languages, timeslots) — saved
-    // after the deal so dealId exists
+    // Deal m2m relations (activities, skills, languages, timeslots, districts)
+    // — saved after the deal so dealId exists
     for (const dealActivity of opportunity.deal.dealActivity) {
       dealActivity.dealId = opportunity.deal.id;
     }
@@ -60,6 +57,11 @@ export async function writeOpportunityLegacy(
       dealTimeslot.dealId = opportunity.deal.id;
     }
     await dealTimeslotRepository.save(opportunity.deal.dealTimeslot);
+
+    for (const dealDistrict of opportunity.deal.dealDistrict) {
+      dealDistrict.dealId = opportunity.deal.id;
+    }
+    await dealDistrictRepository.save(opportunity.deal.dealDistrict);
 
     if (opportunity.accompanying) {
       await accompanyingRepository.save(opportunity.accompanying);

@@ -51,7 +51,7 @@ export function opportunityOpportunityVolunteerDTO(
       opportunityVolunteer.volunteer.deal.dealTimeslot,
     ),
     locations: getOptionItems(
-      opportunityVolunteer.volunteer.deal.location?.locationDistrict,
+      opportunityVolunteer.volunteer.deal.dealDistrict,
       "district",
     ),
   };

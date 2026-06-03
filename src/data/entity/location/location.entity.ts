@@ -3,7 +3,6 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { LocationType } from "../../types";
 import Deal from "../deal.entity";
 import LocationAddress from "../m2m/location-address";
-import LocationDistrict from "../m2m/location-district";
 import LocationPostcode from "../m2m/location-postcode";
 
 @Entity()
@@ -36,12 +35,6 @@ export default class Location {
     (locationPostcode) => locationPostcode.location,
   )
   locationPostcode: LocationPostcode[];
-
-  @OneToMany(
-    () => LocationDistrict,
-    (locationDistrict) => locationDistrict.location,
-  )
-  locationDistrict: LocationDistrict[];
 
   @OneToMany(
     () => LocationAddress,

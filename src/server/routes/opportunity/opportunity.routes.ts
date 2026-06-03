@@ -84,7 +84,7 @@ export default async function opportunityRoutes(
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
         "deal.dealSkill.skill",
-        "deal.location.locationDistrict.district",
+        "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
@@ -181,7 +181,7 @@ export default async function opportunityRoutes(
         "deal.dealActivity.activity",
         "deal.dealLanguage.language",
         "deal.dealTimeslot.timeslot",
-        "deal.location.locationDistrict.district",
+        "deal.dealDistrict.district",
         "agent",
         "accompanying",
       ];

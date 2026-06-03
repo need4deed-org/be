@@ -50,7 +50,7 @@ function makeVolunteer(overrides = {}) {
       dealSkill: [],
       dealLanguage: [],
       dealTimeslot: [],
-      location: { locationDistrict: [] },
+      dealDistrict: [],
     },
     ...overrides,
   };

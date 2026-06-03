@@ -27,10 +27,7 @@ export function volunteerListSerializer(
     const availability = getAvailability(volunteer.deal.dealTimeslot);
     const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
     const skills = getOptionItems(volunteer.deal.dealSkill, "skill");
-    const locations = getOptionItems(
-      volunteer.deal.location?.locationDistrict,
-      "district",
-    );
+    const locations = getOptionItems(volunteer.deal.dealDistrict, "district");
 
     return {
       id,
@@ -116,10 +113,7 @@ export function volunteerSerializer(
   const updatedAt = volunteer.updatedAt;
   const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
   const skills = getOptionItems(volunteer.deal.dealSkill, "skill");
-  const locations = getOptionItems(
-    volunteer.deal.location.locationDistrict,
-    "district",
-  );
+  const locations = getOptionItems(volunteer.deal.dealDistrict, "district");
 
   const languages = getLanguages(volunteer.deal.dealLanguage);
   const availability = getAvailability(volunteer.deal.dealTimeslot);

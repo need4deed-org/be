@@ -33,7 +33,7 @@ function makeOV(
         dealSkill: [],
         dealLanguage: [],
         dealTimeslot: [],
-        location: { locationDistrict: [] },
+        dealDistrict: [],
       },
     } as any,
     ...overrides,

@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import DealDistrict from "../m2m/deal-district";
 import DistrictPostcode from "../m2m/district-postcode";
-import LocationDistrict from "../m2m/location-district";
 import Agent from "../opportunity/agent.entity";
 import Opportunity from "../opportunity/opportunity.entity";
 
@@ -28,11 +28,8 @@ export default class District {
   @OneToMany(() => Opportunity, (opportunity) => opportunity.district)
   opportunities: Opportunity[];
 
-  @OneToMany(
-    () => LocationDistrict,
-    (locationDistrict) => locationDistrict.district,
-  )
-  locationDistrict: LocationDistrict[];
+  @OneToMany(() => DealDistrict, (dealDistrict) => dealDistrict.district)
+  dealDistrict: DealDistrict[];
 
   @OneToMany(
     () => DistrictPostcode,

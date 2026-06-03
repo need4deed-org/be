@@ -36,11 +36,9 @@ export function getOpportunityWhere(
     ...(filter?.district
       ? {
           deal: {
-            location: {
-              locationDistrict: {
-                district: {
-                  id: normalizeStringArrayInput(filter.district),
-                },
+            dealDistrict: {
+              district: {
+                id: normalizeStringArrayInput(filter.district),
               },
             },
           },

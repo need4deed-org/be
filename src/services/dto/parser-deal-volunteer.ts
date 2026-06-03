@@ -9,10 +9,10 @@ import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
+import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealSkill from "../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
-import LocationDistrict from "../../data/entity/m2m/location-district";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
@@ -100,22 +100,24 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     dealTimeslot.push(dealTimeslotEntry);
   }
 
-  // location
-  const locationDistrict: LocationDistrict[] = [];
+  // districts
+  const dealDistrict: DealDistrict[] = [];
   const volunteerDistricts = (formData.districts || []) as string[];
   for (const volunteerDistrict of volunteerDistricts) {
     const profileEntity = await getProfileEntityByTitle(
       volunteerDistrict,
       EntityTableName.NONE,
       District,
-      LocationDistrict,
+      DealDistrict,
       "district",
     );
     if (profileEntity) {
-      locationDistrict.push(profileEntity);
+      dealDistrict.push(profileEntity);
     }
   }
-  const location = new Location({ locationDistrict });
+
+  // location (wrapper retained until #618; no longer holds districts)
+  const location = new Location({});
 
   // deal
   const type = DealType.VOLUNTEER;
@@ -125,6 +127,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     dealSkill,
     dealLanguage,
     dealTimeslot,
+    dealDistrict,
     postcode,
     location,
   });

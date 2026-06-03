@@ -34,7 +34,7 @@ export default async function volunteerOpportunityRoutes(
       const relations = [
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
-        "deal.location.locationDistrict.district",
+        "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
       ];
 

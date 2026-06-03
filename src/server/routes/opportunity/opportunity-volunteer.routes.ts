@@ -40,7 +40,7 @@ export default function opportunityOpportunityVolunteerRoutes(
           "volunteer.deal.dealSkill.skill",
           "volunteer.deal.dealLanguage.language",
           "volunteer.deal.dealTimeslot.timeslot",
-          "volunteer.deal.location.locationDistrict.district",
+          "volunteer.deal.dealDistrict.district",
         ],
       });
 
