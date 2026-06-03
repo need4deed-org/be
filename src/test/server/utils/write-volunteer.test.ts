@@ -5,10 +5,9 @@ import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
-import Time from "../../../data/entity/time/time.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { writeVolunteerLegacy } from "../../../server/utils/data";
 
@@ -28,8 +27,7 @@ describe("writeVolunteer", () => {
   const dealActivitySave = vi.fn();
   const dealSkillSave = vi.fn();
   const dealLanguageSave = vi.fn();
-  const timeSave = vi.fn();
-  const timeTimeslotSave = vi.fn();
+  const dealTimeslotSave = vi.fn();
   const locationSave = vi.fn();
   const locationDistrictSave = vi.fn();
   const dealSave = vi.fn();
@@ -50,10 +48,8 @@ describe("writeVolunteer", () => {
           return { save: dealSkillSave };
         case DealLanguage:
           return { save: dealLanguageSave };
-        case Time:
-          return { save: timeSave };
-        case TimeTimeslot:
-          return { save: timeTimeslotSave };
+        case DealTimeslot:
+          return { save: dealTimeslotSave };
         case Location:
           return { save: locationSave };
         case LocationDistrict:
@@ -81,8 +77,7 @@ describe("writeVolunteer", () => {
       arr.forEach((it, i) => (it.id = 300 + i));
       return arr;
     });
-    timeSave.mockImplementation(async (o: any) => ((o.id = 44), o));
-    timeTimeslotSave.mockImplementation(async (arr: any[]) => {
+    dealTimeslotSave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 400 + i));
       return arr;
     });
@@ -104,7 +99,7 @@ describe("writeVolunteer", () => {
         dealActivity: [{}, {}],
         dealSkill: [{}, {}],
         dealLanguage: [{}, {}],
-        time: { id: undefined, timeTimeslot: [{}, {}] },
+        dealTimeslot: [{}, {}],
         location: { id: undefined, locationDistrict: [{}, {}] },
       },
     };
@@ -116,10 +111,7 @@ describe("writeVolunteer", () => {
     expect(dealActivitySave).toHaveBeenCalledWith(volunteer.deal.dealActivity);
     expect(dealSkillSave).toHaveBeenCalledWith(volunteer.deal.dealSkill);
     expect(dealLanguageSave).toHaveBeenCalledWith(volunteer.deal.dealLanguage);
-    expect(timeSave).toHaveBeenCalledWith(volunteer.deal.time);
-    expect(timeTimeslotSave).toHaveBeenCalledWith(
-      volunteer.deal.time.timeTimeslot,
-    );
+    expect(dealTimeslotSave).toHaveBeenCalledWith(volunteer.deal.dealTimeslot);
     expect(locationSave).toHaveBeenCalledWith(volunteer.deal.location);
     expect(locationDistrictSave).toHaveBeenCalledWith(
       volunteer.deal.location.locationDistrict,
@@ -134,7 +126,7 @@ describe("writeVolunteer", () => {
     expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
     expect(volunteer.deal.dealSkill[0].dealId).toBe(66);
     expect(volunteer.deal.dealLanguage[0].dealId).toBe(66);
-    expect(volunteer.deal.time.timeTimeslot[0].timeId).toBe(44);
+    expect(volunteer.deal.dealTimeslot[0].dealId).toBe(66);
     expect(volunteer.deal.location.locationDistrict[0].locationId).toBe(55);
   });
 
@@ -150,7 +142,7 @@ describe("writeVolunteer", () => {
         dealActivity: [{}],
         dealSkill: [],
         dealLanguage: [],
-        time: { id: undefined, timeTimeslot: [] },
+        dealTimeslot: [],
         location: { id: undefined, locationDistrict: [] },
       },
     };

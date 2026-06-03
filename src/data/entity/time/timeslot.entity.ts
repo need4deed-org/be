@@ -1,8 +1,7 @@
 import { IsDate, IsEnum, IsOptional, IsString } from "class-validator";
 import { OccasionalType } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-
-import TimeTimeslot from "../m2m/time-timeslot";
+import DealTimeslot from "../m2m/deal-timeslot";
 
 @Entity()
 export default class Timeslot {
@@ -44,6 +43,6 @@ export default class Timeslot {
   @IsEnum(OccasionalType)
   occasional: OccasionalType;
 
-  @OneToMany(() => TimeTimeslot, (timeTimeslot) => timeTimeslot.timeslot)
-  timeTimeslot: TimeTimeslot[];
+  @OneToMany(() => DealTimeslot, (dealTimeslot) => dealTimeslot.timeslot)
+  dealTimeslot: DealTimeslot[];
 }

@@ -78,8 +78,7 @@ export function dtoOpportunityGetList(
       .map((ld) => ({
         id: ld.district.id,
       })),
-    availability:
-      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
   } as ApiOpportunityGetList;
@@ -111,8 +110,7 @@ export function dtoVolunteerOpportunityGetList(
       .map((ld) => ({
         id: ld.district.id,
       })),
-    availability:
-      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunity.accompanying!,
       opportunity.deal.dealLanguage,
@@ -160,8 +158,7 @@ export function dtoOpportunityGet(
         id: ld.district.id,
       })),
     availability:
-      getAvailabilityTryCatch(opportunityComments.deal.time?.timeTimeslot) ??
-      [],
+      getAvailabilityTryCatch(opportunityComments.deal.dealTimeslot) ?? [],
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(

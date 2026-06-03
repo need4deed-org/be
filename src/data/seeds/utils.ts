@@ -31,8 +31,8 @@ import AgentPerson from "../entity/m2m/agent-person";
 import DealActivity from "../entity/m2m/deal-activity";
 import DealLanguage from "../entity/m2m/deal-language";
 import DealSkill from "../entity/m2m/deal-skill";
+import DealTimeslot from "../entity/m2m/deal-timeslot";
 import LocationDistrict from "../entity/m2m/location-district";
-import TimeTimeslot from "../entity/m2m/time-timeslot";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
 import Organization from "../entity/organization.entity";
@@ -41,7 +41,6 @@ import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
 import Skill from "../entity/profile/skill.entity";
-import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import { categorize } from "../lib";
 import { getRepository, getRRULE, getStartEnd } from "../utils";
@@ -327,6 +326,7 @@ export async function createDeal(
   const dealSkillRepository = getRepository(dataSource, DealSkill);
   const languageRepository = getRepository(dataSource, Language);
   const dealLanguageRepository = getRepository(dataSource, DealLanguage);
+  const dealTimeslotRepository = getRepository(dataSource, DealTimeslot);
   const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
   const locationDistrictRepository = getRepository(
@@ -377,7 +377,7 @@ export async function createDeal(
 
   const categoryId = categorize(categoryIds.filter(Boolean))!;
 
-  const time = await createTime(dataSource, dealData.time);
+  const timeslots = await createDealTimeslots(dataSource, dealData.time);
 
   const location = new Location();
   await locationRepository.save(location);
@@ -398,7 +398,6 @@ export async function createDeal(
     info: dealData.profile.info,
     categoryId,
     postcode,
-    time,
     location,
   });
   await dealRepository.save(deal);
@@ -420,6 +419,11 @@ export async function createDeal(
       proficiency: level,
     });
     await dealLanguageRepository.save(dealLanguage);
+  }
+
+  for (const timeslot of timeslots) {
+    const dealTimeslot = new DealTimeslot({ deal, timeslot });
+    await dealTimeslotRepository.save(dealTimeslot);
   }
 
   return deal;
@@ -478,16 +482,12 @@ export async function getOrCreateAgent(
   return newAgent;
 }
 
-export async function createTime(
+export async function createDealTimeslots(
   dataSource: DataSource,
   timeData: TimeJSON,
-): Promise<Time> {
-  const timeRepository = getRepository(dataSource, Time);
+): Promise<Timeslot[]> {
   const timeslotRepository = getRepository(dataSource, Timeslot);
-  const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
-
-  const time = new Time();
-  await timeRepository.save(time);
+  const timeslots: Timeslot[] = [];
 
   for (const timeslotData of timeData.timeslots ?? []) {
     let timeslot: Timeslot | null;
@@ -551,16 +551,11 @@ export async function createTime(
     }
 
     if (timeslot && timeslot.id) {
-      const timeTimeslot = new TimeTimeslot({
-        time,
-        timeslot,
-      });
-      await timeTimeslotRepository.save(timeTimeslot);
-      await timeslotRepository.save(timeslot);
+      timeslots.push(timeslot);
     }
   }
 
-  return time;
+  return timeslots;
 }
 
 export function getDistrict(title: string) {

@@ -32,7 +32,7 @@ function makeOV(
         dealActivity: [],
         dealSkill: [],
         dealLanguage: [],
-        time: { timeTimeslot: [] },
+        dealTimeslot: [],
         location: { locationDistrict: [] },
       },
     } as any,

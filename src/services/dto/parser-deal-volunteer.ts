@@ -11,12 +11,11 @@ import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealSkill from "../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import LocationDistrict from "../../data/entity/m2m/location-district";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
-import Time from "../../data/entity/time/time.entity";
 import { getPostcode, getRRULE, getStartEnd } from "../../data/utils";
 import { getProfileEntityByTitle, getTimeslot } from "../../server/utils";
 
@@ -73,7 +72,7 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
   }
 
   // time
-  const timeTimeslot: TimeTimeslot[] = [];
+  const dealTimeslot: DealTimeslot[] = [];
   const volunteerTimes = formData.schedule || [];
   for (const volunteerTime of volunteerTimes) {
     const [day, daytime] = volunteerTime;
@@ -97,11 +96,9 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
       occasional = daytime as OccasionalType;
     }
     const timeslot = await getTimeslot({ rrule, ...timeframe, occasional });
-    const timeTimeslotEntry = new TimeTimeslot({ timeslot });
-    timeTimeslot.push(timeTimeslotEntry);
+    const dealTimeslotEntry = new DealTimeslot({ timeslot });
+    dealTimeslot.push(dealTimeslotEntry);
   }
-
-  const time = new Time({ timeTimeslot });
 
   // location
   const locationDistrict: LocationDistrict[] = [];
@@ -127,8 +124,8 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     dealActivity,
     dealSkill,
     dealLanguage,
+    dealTimeslot,
     postcode,
-    time,
     location,
   });
 

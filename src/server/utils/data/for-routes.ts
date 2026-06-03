@@ -443,9 +443,11 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
       idFieldNames: ["location", "locationId", "district", "districtId"],
       relations: ["location.locationDistrict"],
     },
-    TimeTimeslot: {
-      idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
-      relations: ["time.timeTimeslot"],
+    DealTimeslot: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "timeslot", "timeslotId"],
+      relations: [],
     },
   };
 

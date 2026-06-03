@@ -249,7 +249,6 @@ export default async function opportunityLegacyRoutes(
 
         function mapOpportunityToDelivery(raw) {
           const deal = raw.deal ?? {};
-          const time = deal.time ?? {};
           const location = deal.location ?? {};
 
           const activities = (deal.dealActivity ?? [])
@@ -268,7 +267,7 @@ export default async function opportunityLegacyRoutes(
             .map((ld) => ld.district?.title ?? null)
             .filter(Boolean);
 
-          const { timeslots, schedule_str } = parseTimeslots(time.timeTimeslot);
+          const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
             parseAccompanying(raw.accompanying);
 
@@ -313,7 +312,7 @@ export default async function opportunityLegacyRoutes(
           "deal.dealLanguage.language",
           "deal.dealActivity.activity",
           "deal.dealSkill.skill",
-          "deal.time.timeTimeslot.timeslot",
+          "deal.dealTimeslot.timeslot",
           "deal.location.locationDistrict.district",
           "accompanying",
         ],

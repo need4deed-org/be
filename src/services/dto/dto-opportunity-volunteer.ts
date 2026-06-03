@@ -48,7 +48,7 @@ export function opportunityOpportunityVolunteerDTO(
     ),
     languages: getLanguages(opportunityVolunteer.volunteer.deal.dealLanguage),
     availability: getAvailability(
-      opportunityVolunteer.volunteer.deal.time?.timeTimeslot,
+      opportunityVolunteer.volunteer.deal.dealTimeslot,
     ),
     locations: getOptionItems(
       opportunityVolunteer.volunteer.deal.location?.locationDistrict,
