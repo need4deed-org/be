@@ -2,11 +2,14 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import User from "../../data/entity/user.entity";
 import {
+  CommentTaggedInput,
   createSesClient,
   EmailTransport,
+  sendCommentTagged,
   sendEmailVerification,
   sendOpsAlert,
   SesEmailTransport,
+  SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
 } from "../../services/notify";
@@ -14,6 +17,7 @@ import {
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
+  commentTagged(input: CommentTaggedInput): Promise<void>;
 }
 
 declare module "fastify" {
@@ -35,11 +39,17 @@ function buildEmailTransport(): EmailTransport {
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
-  const opsUrl = process.env.SLACK_WEBHOOK_URL;
-  if (!opsUrl) {
+  const urls: Partial<Record<SlackChannel, string>> = {};
+  if (process.env.SLACK_WEBHOOK_URL) {
+    urls.ops = process.env.SLACK_WEBHOOK_URL;
+  }
+  if (process.env.SLACK_COMMENTS_WEBHOOK_URL) {
+    urls.comments = process.env.SLACK_COMMENTS_WEBHOOK_URL;
+  }
+  if (Object.keys(urls).length === 0) {
     return undefined;
   }
-  return new SlackWebhookTransport({ ops: opsUrl });
+  return new SlackWebhookTransport(urls);
 }
 
 async function notifyPlugin(fastify: FastifyInstance) {
@@ -50,6 +60,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailVerification: (user: User) =>
       sendEmailVerification({ email, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
+    commentTagged: (input: CommentTaggedInput) =>
+      sendCommentTagged({ slack }, input),
   });
 }
 
