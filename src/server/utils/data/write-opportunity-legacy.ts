@@ -64,8 +64,8 @@ export async function writeOpportunityLegacy(
     // Deal m2m relations (activities) — saved after the deal so dealId exists
     for (const dealActivity of opportunity.deal.dealActivity) {
       dealActivity.dealId = opportunity.deal.id;
-      await dealActivityRepository.save(dealActivity);
     }
+    await dealActivityRepository.save(opportunity.deal.dealActivity);
 
     if (opportunity.accompanying) {
       await accompanyingRepository.save(opportunity.accompanying);

@@ -435,8 +435,10 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
       relations: ["profile.profileLanguage"],
     },
     DealActivity: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "activity", "activityId"],
-      relations: ["dealActivity"],
+      relations: [],
     },
     ProfileSkill: {
       idFieldNames: ["profile", "profileId", "skill", "skillId"],
@@ -552,7 +554,18 @@ export async function updateOptionList<
         await m2mRepository.delete(currentList.map(({ id }) => id));
       }
 
-      const newList = list.map((item) => {
+      // De-dupe incoming ids so a repeated selection can't violate a
+      // (host, item) unique constraint (e.g. deal_activity) on re-insert.
+      const seen = new Set<L["id"]>();
+      const uniqueList = list.filter((item) => {
+        if (seen.has(item.id)) {
+          return false;
+        }
+        seen.add(item.id);
+        return true;
+      });
+
+      const newList = uniqueList.map((item) => {
         const newItem = new m2mEntity({
           [hostId]: hostIdValue,
           [listItemId]: item.id,
