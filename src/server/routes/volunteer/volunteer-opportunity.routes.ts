@@ -35,7 +35,7 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
         "deal.location.locationDistrict.district",
-        "deal.time.timeTimeslot.timeslot",
+        "deal.dealTimeslot.timeslot",
       ];
 
       const { page, limit, ...filters } = request.query;

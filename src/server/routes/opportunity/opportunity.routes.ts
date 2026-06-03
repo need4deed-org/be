@@ -11,7 +11,7 @@ import Comment from "../../../data/entity/comment.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -85,7 +85,7 @@ export default async function opportunityRoutes(
         "deal.dealActivity.activity",
         "deal.dealSkill.skill",
         "deal.location.locationDistrict.district",
-        "deal.time.timeTimeslot.timeslot",
+        "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
         "submittedByPerson.agentPerson",
@@ -180,7 +180,7 @@ export default async function opportunityRoutes(
       const relations = [
         "deal.dealActivity.activity",
         "deal.dealLanguage.language",
-        "deal.time.timeTimeslot.timeslot",
+        "deal.dealTimeslot.timeslot",
         "deal.location.locationDistrict.district",
         "agent",
         "accompanying",
@@ -347,7 +347,7 @@ export default async function opportunityRoutes(
       if (schedule) {
         const success = await updateOptionList(
           dealId,
-          TimeTimeslot,
+          DealTimeslot,
           await Promise.all(
             schedule.map((scheduleObject) => {
               if (scheduleObject.id) {

@@ -22,12 +22,12 @@ import CommentPerson from "./entity/m2m/comment-person";
 import DealActivity from "./entity/m2m/deal-activity";
 import DealLanguage from "./entity/m2m/deal-language";
 import DealSkill from "./entity/m2m/deal-skill";
+import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import LocationAddress from "./entity/m2m/location-address";
 import LocationDistrict from "./entity/m2m/location-district";
 import LocationPostcode from "./entity/m2m/location-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
-import TimeTimeslot from "./entity/m2m/time-timeslot";
 import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
@@ -40,7 +40,6 @@ import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
 import Skill from "./entity/profile/skill.entity";
 import Testimonial from "./entity/testimonial.entity";
-import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
 import User from "./entity/user.entity";
@@ -77,6 +76,7 @@ export const dataSource = new DataSource({
     DealActivity,
     DealLanguage,
     DealSkill,
+    DealTimeslot,
     District,
     DistrictPostcode,
     Document,
@@ -98,9 +98,7 @@ export const dataSource = new DataSource({
     Option,
     Skill,
     Testimonial,
-    Time,
     Timeline,
-    TimeTimeslot,
     Timeslot,
     User,
     Volunteer,

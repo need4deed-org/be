@@ -13,8 +13,8 @@ import { FindOptionsWhere } from "typeorm";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import logger from "../../../logger";
@@ -63,7 +63,7 @@ export default async function volunteerRoutes(
     "deal.dealActivity.activity",
     "deal.dealSkill.skill",
     "deal.dealLanguage.language",
-    "deal.time.timeTimeslot.timeslot",
+    "deal.dealTimeslot.timeslot",
     "deal.location.locationPostcode.postcode",
     "deal.location.locationDistrict.district",
     "deal.location.locationAddress.address.postcode",
@@ -297,7 +297,7 @@ export default async function volunteerRoutes(
         if (availability) {
           const success = await updateOptionList(
             dealId,
-            TimeTimeslot,
+            DealTimeslot,
             await Promise.all(
               availability.map((availabilityObject) => {
                 if (availabilityObject.id) {

@@ -6,12 +6,12 @@ import {
   TimeSlot,
 } from "need4deed-sdk";
 import DealLanguage from "../../data/entity/m2m/deal-language";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
+import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 
 export function getAvailability(
-  timeTimeslot: TimeTimeslot[],
+  dealTimeslot: DealTimeslot[],
 ): ApiAvailability[] {
-  return timeTimeslot?.map(({ timeslot }): ApiAvailability => {
+  return dealTimeslot?.map(({ timeslot }): ApiAvailability => {
     if (timeslot?.occasional) {
       return {
         id: timeslot.id,

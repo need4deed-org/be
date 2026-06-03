@@ -13,9 +13,9 @@ import Postcode from "./location/postcode.entity";
 import DealActivity from "./m2m/deal-activity";
 import DealLanguage from "./m2m/deal-language";
 import DealSkill from "./m2m/deal-skill";
+import DealTimeslot from "./m2m/deal-timeslot";
 import Opportunity from "./opportunity/opportunity.entity";
 import Category from "./profile/category.entity";
-import Time from "./time/time.entity";
 import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
@@ -60,15 +60,6 @@ export default class Deal {
   @Column()
   postcodeId: number;
 
-  @ManyToOne(() => Time, (time) => time.deal, {
-    onDelete: "CASCADE",
-  })
-  @JoinColumn({ name: "time_id" })
-  time: Time;
-
-  @Column()
-  timeId: number;
-
   @ManyToOne(() => Location, (location) => location.deal, {
     onDelete: "CASCADE",
   })
@@ -86,6 +77,9 @@ export default class Deal {
 
   @OneToMany(() => DealLanguage, (dealLanguage) => dealLanguage.deal)
   dealLanguage: DealLanguage[];
+
+  @OneToMany(() => DealTimeslot, (dealTimeslot) => dealTimeslot.deal)
+  dealTimeslot: DealTimeslot[];
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
   opportunity: Opportunity[];

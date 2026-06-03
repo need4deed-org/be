@@ -13,12 +13,11 @@ import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealSkill from "../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import LocationDistrict from "../../data/entity/m2m/location-district";
-import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
-import Time from "../../data/entity/time/time.entity";
 import Timeslot from "../../data/entity/time/timeslot.entity";
 import {
   getPostcode,
@@ -96,7 +95,7 @@ export async function dealParserOpportunity(
   }
 
   // time
-  const timeTimeslot: TimeTimeslot[] = [];
+  const dealTimeslot: DealTimeslot[] = [];
   const opportunityTimes = formData.timeslots || [];
   for (const opportunityTime of opportunityTimes) {
     const [day, daytime] = opportunityTime;
@@ -120,8 +119,8 @@ export async function dealParserOpportunity(
       occasional = daytime.toLowerCase() as OccasionalType;
     }
     const timeslot = await getTimeslot({ rrule, ...timeframe, occasional });
-    const timeTimeslotEntry = new TimeTimeslot({ timeslot });
-    timeTimeslot.push(timeTimeslotEntry);
+    const dealTimeslotEntry = new DealTimeslot({ timeslot });
+    dealTimeslot.push(dealTimeslotEntry);
   }
 
   if (formData.onetime_date_time) {
@@ -136,11 +135,9 @@ export async function dealParserOpportunity(
     await timeslotRepository.save(timeslot); // TODO: check if id is undefined before saving
     logger.debug(`Created one-time timeslot: ${JSON.stringify(timeslot)}`);
 
-    const timeTimeslotEntry = new TimeTimeslot({ timeslot });
-    timeTimeslot.push(timeTimeslotEntry);
+    const dealTimeslotEntry = new DealTimeslot({ timeslot });
+    dealTimeslot.push(dealTimeslotEntry);
   }
-
-  const time = new Time({ timeTimeslot });
 
   // location
   const locationDistrict: LocationDistrict[] = [];
@@ -166,8 +163,8 @@ export async function dealParserOpportunity(
     dealActivity,
     dealSkill,
     dealLanguage,
+    dealTimeslot,
     postcode,
-    time,
     location,
   });
 
