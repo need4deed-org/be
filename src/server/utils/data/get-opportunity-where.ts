@@ -51,11 +51,9 @@ export function getOpportunityWhere(
     ...(filter?.activity
       ? {
           deal: {
-            profile: {
-              profileActivity: {
-                activity: {
-                  id: normalizeStringArrayInput(filter.activity),
-                },
+            dealActivity: {
+              activity: {
+                id: normalizeStringArrayInput(filter.activity),
               },
             },
           },

@@ -25,10 +25,7 @@ export function volunteerListSerializer(
     const avatarUrl = volunteer.person?.avatarUrl || null;
     const languages = getLanguages(volunteer.deal.profile.profileLanguage);
     const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
-    const activities = getOptionItems(
-      volunteer.deal.profile.profileActivity,
-      "activity",
-    );
+    const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
     const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
     const locations = getOptionItems(
       volunteer.deal.location?.locationDistrict,
@@ -117,10 +114,7 @@ export function volunteerSerializer(
   const opportunitiesMatched = [];
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
-  const activities = getOptionItems(
-    volunteer.deal.profile.profileActivity,
-    "activity",
-  );
+  const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
   const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
   const locations = getOptionItems(
     volunteer.deal.location.locationDistrict,

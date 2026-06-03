@@ -72,11 +72,9 @@ export function dtoOpportunityGetList(
         proficiency: pl.proficiency,
         purpose: pl.purpose,
       })),
-    activities: opportunity.deal.profile.profileActivity
-      .filter(Boolean)
-      .map((pa) => ({
-        id: pa.activity.id,
-      })),
+    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+      id: pa.activity.id,
+    })),
     location: opportunity.deal.location.locationDistrict
       .filter(Boolean)
       .map((ld) => ({
@@ -109,11 +107,9 @@ export function dtoVolunteerOpportunityGetList(
         title: pl.language.title,
         proficiency: pl.proficiency,
       })),
-    activities: opportunity.deal.profile.profileActivity
-      .filter(Boolean)
-      .map((pa) => ({
-        id: pa.activity.id,
-      })),
+    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+      id: pa.activity.id,
+    })),
     location: opportunity.deal.location.locationDistrict
       .filter(Boolean)
       .map((ld) => ({
@@ -154,7 +150,7 @@ export function dtoOpportunityGet(
         proficiency: pl.proficiency,
         purpose: pl.purpose,
       })),
-    activities: opportunityComments.deal.profile.profileActivity
+    activities: opportunityComments.deal.dealActivity
       .filter(Boolean)
       .map((pa) => ({
         id: pa.activity.id,

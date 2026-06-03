@@ -27,8 +27,8 @@ import District from "../entity/location/district.entity";
 import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
+import DealActivity from "../entity/m2m/deal-activity";
 import LocationDistrict from "../entity/m2m/location-district";
-import ProfileActivity from "../entity/m2m/profile-activity";
 import ProfileLanguage from "../entity/m2m/profile-language";
 import ProfileSkill from "../entity/m2m/profile-skill";
 import TimeTimeslot from "../entity/m2m/time-timeslot";
@@ -323,7 +323,7 @@ export async function createDeal(
 ): Promise<Deal> {
   const activityRepository = getRepository(dataSource, Activity);
   const profileRepository = getRepository(dataSource, Profile);
-  const profileActivityRepository = getRepository(dataSource, ProfileActivity);
+  const dealActivityRepository = getRepository(dataSource, DealActivity);
   const skillRepository = getRepository(dataSource, Skill);
   const profileSkillRepository = getRepository(dataSource, ProfileSkill);
   const languageRepository = getRepository(dataSource, Language);
@@ -347,6 +347,7 @@ export async function createDeal(
   await profileRepository.save(profile);
 
   const categoryIds: number[] = [];
+  const activities: Activity[] = [];
   for (const title of dealData.profile.activities ?? []) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
@@ -354,11 +355,8 @@ export async function createDeal(
       continue;
     }
     categoryIds.push(activity.categoryId);
-    const profileActivity = new ProfileActivity({
-      profile: profile,
-      activity,
-    });
-    await profileActivityRepository.save(profileActivity);
+    // DealActivity rows are created after the deal is saved (need dealId).
+    activities.push(activity);
   }
 
   for (const title of dealData.profile.skills ?? []) {
@@ -412,6 +410,12 @@ export async function createDeal(
     location,
   });
   await dealRepository.save(deal);
+
+  for (const activity of activities) {
+    const dealActivity = new DealActivity({ deal, activity });
+    await dealActivityRepository.save(dealActivity);
+  }
+
   return deal;
 }
 

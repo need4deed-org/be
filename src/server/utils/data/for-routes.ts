@@ -154,7 +154,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal.profile.profileActivity) {
+      for (const pa of volunteer.deal.dealActivity) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -414,7 +414,7 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     {
       relations: string[];
       idFieldNames: [
-        "accompanying" | "profile" | "location" | "time",
+        "accompanying" | "profile" | "location" | "time" | "deal",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
@@ -434,9 +434,9 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
       idFieldNames: ["profile", "profileId", "language", "languageId"],
       relations: ["profile.profileLanguage"],
     },
-    ProfileActivity: {
-      idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["profile.profileActivity"],
+    DealActivity: {
+      idFieldNames: ["deal", "dealId", "activity", "activityId"],
+      relations: ["dealActivity"],
     },
     ProfileSkill: {
       idFieldNames: ["profile", "profileId", "skill", "skillId"],
@@ -538,8 +538,12 @@ export async function updateOptionList<
         m2mEntity,
       );
 
+      // When the m2m hangs directly off the root (e.g. DealActivity off Deal),
+      // the host *is* the root; otherwise resolve through the nested relation.
+      const hostIdValue = host === rootEntity ? root.id : root[host].id;
+
       const where = {
-        [hostId]: root[host].id,
+        [hostId]: hostIdValue,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -550,7 +554,7 @@ export async function updateOptionList<
 
       const newList = list.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: root[host].id,
+          [hostId]: hostIdValue,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {

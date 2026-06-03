@@ -19,6 +19,7 @@ import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
 import CommentPerson from "./entity/m2m/comment-person";
+import DealActivity from "./entity/m2m/deal-activity";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import LocationAddress from "./entity/m2m/location-address";
 import LocationDistrict from "./entity/m2m/location-district";
@@ -75,6 +76,7 @@ export const dataSource = new DataSource({
     Communication,
     Config,
     Deal,
+    DealActivity,
     District,
     DistrictPostcode,
     Document,
