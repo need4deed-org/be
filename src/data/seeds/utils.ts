@@ -28,9 +28,9 @@ import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
 import DealActivity from "../entity/m2m/deal-activity";
+import DealSkill from "../entity/m2m/deal-skill";
 import LocationDistrict from "../entity/m2m/location-district";
 import ProfileLanguage from "../entity/m2m/profile-language";
-import ProfileSkill from "../entity/m2m/profile-skill";
 import TimeTimeslot from "../entity/m2m/time-timeslot";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
@@ -325,7 +325,7 @@ export async function createDeal(
   const profileRepository = getRepository(dataSource, Profile);
   const dealActivityRepository = getRepository(dataSource, DealActivity);
   const skillRepository = getRepository(dataSource, Skill);
-  const profileSkillRepository = getRepository(dataSource, ProfileSkill);
+  const dealSkillRepository = getRepository(dataSource, DealSkill);
   const languageRepository = getRepository(dataSource, Language);
   const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
   const locationRepository = getRepository(dataSource, Location);
@@ -359,14 +359,15 @@ export async function createDeal(
     activities.push(activity);
   }
 
+  const skills: Skill[] = [];
   for (const title of dealData.profile.skills ?? []) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
       // logger.warn(`Skill ${title} not found. Skipping.`);
       continue;
     }
-    const profileSkill = new ProfileSkill({ profile, skill });
-    await profileSkillRepository.save(profileSkill);
+    // DealSkill rows are created after the deal is saved (need dealId).
+    skills.push(skill);
   }
 
   for (const [title, level] of dealData.profile.languages ?? []) {
@@ -414,6 +415,11 @@ export async function createDeal(
   for (const activity of activities) {
     const dealActivity = new DealActivity({ deal, activity });
     await dealActivityRepository.save(dealActivity);
+  }
+
+  for (const skill of skills) {
+    const dealSkill = new DealSkill({ deal, skill });
+    await dealSkillRepository.save(dealSkill);
   }
 
   return deal;

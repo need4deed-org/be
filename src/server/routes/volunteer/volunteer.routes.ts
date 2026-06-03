@@ -11,9 +11,9 @@ import {
 } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
@@ -61,7 +61,7 @@ export default async function volunteerRoutes(
     "deal",
     "deal.postcode",
     "deal.dealActivity.activity",
-    "deal.profile.profileSkill.skill",
+    "deal.dealSkill.skill",
     "deal.profile.profileLanguage.language",
     "deal.time.timeTimeslot.timeslot",
     "deal.location.locationPostcode.postcode",
@@ -328,7 +328,7 @@ export default async function volunteerRoutes(
         }
 
         if (skills) {
-          const success = await updateOptionList(dealId, ProfileSkill, skills);
+          const success = await updateOptionList(dealId, DealSkill, skills);
           if (!success) {
             return reply.status(400).send({
               message: `Skills for volunteer (deal_id:${dealId}) not updated.`,

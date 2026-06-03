@@ -2,9 +2,9 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -21,8 +21,8 @@ export async function writeOpportunityLegacy(
     const profileRepository = transactionalEntityManager.getRepository(Profile);
     const dealActivityRepository =
       transactionalEntityManager.getRepository(DealActivity);
-    const profileSkillRepository =
-      transactionalEntityManager.getRepository(ProfileSkill);
+    const dealSkillRepository =
+      transactionalEntityManager.getRepository(DealSkill);
     const profileLanguageRepository =
       transactionalEntityManager.getRepository(ProfileLanguage);
     const timeRepository = transactionalEntityManager.getRepository(Time);
@@ -36,11 +36,6 @@ export async function writeOpportunityLegacy(
       transactionalEntityManager.getRepository(Accompanying);
 
     await profileRepository.save(opportunity.deal.profile);
-
-    for (const profileSkill of opportunity.deal.profile.profileSkill) {
-      profileSkill.profileId = opportunity.deal.profile.id;
-      await profileSkillRepository.save(profileSkill);
-    }
 
     for (const profileLanguage of opportunity.deal.profile.profileLanguage) {
       profileLanguage.profileId = opportunity.deal.profile.id;
@@ -61,11 +56,17 @@ export async function writeOpportunityLegacy(
 
     await dealRepository.save(opportunity.deal);
 
-    // Deal m2m relations (activities) — saved after the deal so dealId exists
+    // Deal m2m relations (activities, skills) — saved after the deal so
+    // dealId exists
     for (const dealActivity of opportunity.deal.dealActivity) {
       dealActivity.dealId = opportunity.deal.id;
     }
     await dealActivityRepository.save(opportunity.deal.dealActivity);
+
+    for (const dealSkill of opportunity.deal.dealSkill) {
+      dealSkill.dealId = opportunity.deal.id;
+    }
+    await dealSkillRepository.save(opportunity.deal.dealSkill);
 
     if (opportunity.accompanying) {
       await accompanyingRepository.save(opportunity.accompanying);

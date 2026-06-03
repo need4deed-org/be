@@ -20,6 +20,7 @@ import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
 import CommentPerson from "./entity/m2m/comment-person";
 import DealActivity from "./entity/m2m/deal-activity";
+import DealSkill from "./entity/m2m/deal-skill";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import LocationAddress from "./entity/m2m/location-address";
 import LocationDistrict from "./entity/m2m/location-district";
@@ -77,6 +78,7 @@ export const dataSource = new DataSource({
     Config,
     Deal,
     DealActivity,
+    DealSkill,
     District,
     DistrictPostcode,
     Document,

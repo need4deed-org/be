@@ -43,7 +43,7 @@ export function opportunityOpportunityVolunteerDTO(
       "activity",
     ),
     skills: getOptionItems(
-      opportunityVolunteer.volunteer.deal.profile?.profileSkill,
+      opportunityVolunteer.volunteer.deal.dealSkill,
       "skill",
     ),
     languages: getLanguages(

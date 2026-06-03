@@ -37,7 +37,7 @@ export default function opportunityOpportunityVolunteerRoutes(
         relations: [
           "volunteer.person",
           "volunteer.deal.dealActivity.activity",
-          "volunteer.deal.profile.profileSkill.skill",
+          "volunteer.deal.dealSkill.skill",
           "volunteer.deal.profile.profileLanguage.language",
           "volunteer.deal.time.timeTimeslot.timeslot",
           "volunteer.deal.location.locationDistrict.district",

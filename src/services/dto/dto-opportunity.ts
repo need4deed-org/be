@@ -155,11 +155,9 @@ export function dtoOpportunityGet(
       .map((pa) => ({
         id: pa.activity.id,
       })),
-    skills: opportunityComments.deal.profile.profileSkill
-      .filter(Boolean)
-      .map((ps) => ({
-        id: ps.skill.id,
-      })),
+    skills: opportunityComments.deal.dealSkill.filter(Boolean).map((ps) => ({
+      id: ps.skill.id,
+    })),
     location: opportunityComments.deal.location.locationDistrict
       .filter(Boolean)
       .map((ld) => ({

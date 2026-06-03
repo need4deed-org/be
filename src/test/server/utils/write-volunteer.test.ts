@@ -3,9 +3,9 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Profile from "../../../data/entity/profile/profile.entity";
@@ -28,7 +28,7 @@ describe("writeVolunteer", () => {
   const personSave = vi.fn();
   const profileSave = vi.fn();
   const dealActivitySave = vi.fn();
-  const profileSkillSave = vi.fn();
+  const dealSkillSave = vi.fn();
   const profileLanguageSave = vi.fn();
   const timeSave = vi.fn();
   const timeTimeslotSave = vi.fn();
@@ -50,8 +50,8 @@ describe("writeVolunteer", () => {
           return { save: profileSave };
         case DealActivity:
           return { save: dealActivitySave };
-        case ProfileSkill:
-          return { save: profileSkillSave };
+        case DealSkill:
+          return { save: dealSkillSave };
         case ProfileLanguage:
           return { save: profileLanguageSave };
         case Time:
@@ -78,7 +78,7 @@ describe("writeVolunteer", () => {
       arr.forEach((it, i) => (it.id = 100 + i));
       return arr;
     });
-    profileSkillSave.mockImplementation(async (arr: any[]) => {
+    dealSkillSave.mockImplementation(async (arr: any[]) => {
       arr.forEach((it, i) => (it.id = 200 + i));
       return arr;
     });
@@ -108,10 +108,10 @@ describe("writeVolunteer", () => {
         id: undefined,
         profile: {
           id: undefined,
-          profileSkill: [{}, {}],
           profileLanguage: [{}, {}],
         },
         dealActivity: [{}, {}],
+        dealSkill: [{}, {}],
         time: { id: undefined, timeTimeslot: [{}, {}] },
         location: { id: undefined, locationDistrict: [{}, {}] },
       },
@@ -123,9 +123,7 @@ describe("writeVolunteer", () => {
     expect(personSave).toHaveBeenCalledWith(volunteer.person);
     expect(profileSave).toHaveBeenCalledWith(volunteer.deal.profile);
     expect(dealActivitySave).toHaveBeenCalledWith(volunteer.deal.dealActivity);
-    expect(profileSkillSave).toHaveBeenCalledWith(
-      volunteer.deal.profile.profileSkill,
-    );
+    expect(dealSkillSave).toHaveBeenCalledWith(volunteer.deal.dealSkill);
     expect(profileLanguageSave).toHaveBeenCalledWith(
       volunteer.deal.profile.profileLanguage,
     );
@@ -143,8 +141,9 @@ describe("writeVolunteer", () => {
     expect(result).toBe(77);
     expect(volunteer.id).toBe(77);
 
-    // ensure m2m propagation happened — activities now key off the deal id
+    // ensure m2m propagation happened — activities/skills now key off the deal id
     expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
+    expect(volunteer.deal.dealSkill[0].dealId).toBe(66);
     expect(volunteer.deal.time.timeTimeslot[0].timeId).toBe(44);
     expect(volunteer.deal.location.locationDistrict[0].locationId).toBe(55);
   });
@@ -160,10 +159,10 @@ describe("writeVolunteer", () => {
         id: undefined,
         profile: {
           id: undefined,
-          profileSkill: [],
           profileLanguage: [],
         },
         dealActivity: [{}],
+        dealSkill: [],
         time: { id: undefined, timeTimeslot: [] },
         location: { id: undefined, locationDistrict: [] },
       },

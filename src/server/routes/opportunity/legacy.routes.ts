@@ -261,7 +261,7 @@ export default async function opportunityLegacyRoutes(
             .map((pl) => pl.language?.title ?? null)
             .filter(Boolean);
 
-          const skills = (profile.profileSkill ?? [])
+          const skills = (deal.dealSkill ?? [])
             .map((ps) => ps.skill?.title ?? null)
             .filter(Boolean);
 
@@ -313,7 +313,7 @@ export default async function opportunityLegacyRoutes(
         relations: [
           "deal.profile.profileLanguage.language",
           "deal.dealActivity.activity",
-          "deal.profile.profileSkill.skill",
+          "deal.dealSkill.skill",
           "deal.time.timeTimeslot.timeslot",
           "deal.location.locationDistrict.district",
           "accompanying",

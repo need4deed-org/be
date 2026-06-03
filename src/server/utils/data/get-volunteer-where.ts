@@ -6,16 +6,11 @@ export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ) {
   // Build deal.profile sub-filter to avoid overwriting when multiple profile
-  // relations are active (language, skill all share the same deal key).
+  // relations are active (language shares the same deal key).
   const profileFilter: Record<string, unknown> = {};
   if (filter?.language) {
     profileFilter.profileLanguage = {
       language: { id: normalizeStringArrayInput(filter.language) },
-    };
-  }
-  if (filter?.skill) {
-    profileFilter.profileSkill = {
-      skill: { id: normalizeStringArrayInput(filter.skill) },
     };
   }
 
@@ -26,6 +21,11 @@ export function getVolunteerWhere(
   if (filter?.activity) {
     dealFilter.dealActivity = {
       activity: { id: normalizeStringArrayInput(filter.activity) },
+    };
+  }
+  if (filter?.skill) {
+    dealFilter.dealSkill = {
+      skill: { id: normalizeStringArrayInput(filter.skill) },
     };
   }
   if (filter?.district) {
