@@ -25,7 +25,6 @@ import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
-import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
 import DealActivity from "../entity/m2m/deal-activity";
@@ -328,7 +327,6 @@ export async function createDeal(
   const dealLanguageRepository = getRepository(dataSource, DealLanguage);
   const dealTimeslotRepository = getRepository(dataSource, DealTimeslot);
   const dealDistrictRepository = getRepository(dataSource, DealDistrict);
-  const locationRepository = getRepository(dataSource, Location);
   const districtRepository = getRepository(dataSource, District);
   const dealRepository = getRepository(dataSource, Deal);
 
@@ -376,10 +374,6 @@ export async function createDeal(
 
   const timeslots = await createDealTimeslots(dataSource, dealData.time);
 
-  // location wrapper retained until #618; districts now live on the deal
-  const location = new Location();
-  await locationRepository.save(location);
-
   const districts: District[] = [];
   for (const title of dealData.location.districts ?? []) {
     let district = await districtRepository.findOne({ where: { title } });
@@ -396,7 +390,6 @@ export async function createDeal(
     info: dealData.profile.info,
     categoryId,
     postcode,
-    location,
   });
   await dealRepository.save(deal);
 

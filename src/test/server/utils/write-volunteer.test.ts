@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
-import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -29,7 +28,6 @@ describe("writeVolunteer", () => {
   const dealLanguageSave = vi.fn();
   const dealTimeslotSave = vi.fn();
   const dealDistrictSave = vi.fn();
-  const locationSave = vi.fn();
   const dealSave = vi.fn();
   const volunteerSave = vi.fn();
 
@@ -52,8 +50,6 @@ describe("writeVolunteer", () => {
           return { save: dealTimeslotSave };
         case DealDistrict:
           return { save: dealDistrictSave };
-        case Location:
-          return { save: locationSave };
         case Deal:
           return { save: dealSave };
         case Volunteer:
@@ -85,7 +81,6 @@ describe("writeVolunteer", () => {
       arr.forEach((it, i) => (it.id = 500 + i));
       return arr;
     });
-    locationSave.mockImplementation(async (o: any) => ((o.id = 55), o));
     dealSave.mockImplementation(async (o: any) => ((o.id = 66), o));
     volunteerSave.mockImplementation(async (o: any) => ((o.id = 77), o));
   });
@@ -101,7 +96,6 @@ describe("writeVolunteer", () => {
         dealLanguage: [{}, {}],
         dealTimeslot: [{}, {}],
         dealDistrict: [{}, {}],
-        location: { id: undefined },
       },
     };
 
@@ -114,7 +108,6 @@ describe("writeVolunteer", () => {
     expect(dealLanguageSave).toHaveBeenCalledWith(volunteer.deal.dealLanguage);
     expect(dealTimeslotSave).toHaveBeenCalledWith(volunteer.deal.dealTimeslot);
     expect(dealDistrictSave).toHaveBeenCalledWith(volunteer.deal.dealDistrict);
-    expect(locationSave).toHaveBeenCalledWith(volunteer.deal.location);
     expect(dealSave).toHaveBeenCalledWith(volunteer.deal);
     expect(volunteerSave).toHaveBeenCalledWith(volunteer);
 
@@ -143,7 +136,6 @@ describe("writeVolunteer", () => {
         dealLanguage: [],
         dealTimeslot: [],
         dealDistrict: [],
-        location: { id: undefined },
       },
     };
 

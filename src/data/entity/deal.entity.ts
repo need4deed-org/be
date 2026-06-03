@@ -8,7 +8,6 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { DealType } from "../types";
-import Location from "./location/location.entity";
 import Postcode from "./location/postcode.entity";
 import DealActivity from "./m2m/deal-activity";
 import DealDistrict from "./m2m/deal-district";
@@ -60,15 +59,6 @@ export default class Deal {
 
   @Column()
   postcodeId: number;
-
-  @ManyToOne(() => Location, (location) => location.deal, {
-    onDelete: "CASCADE",
-  })
-  @JoinColumn({ name: "location_id" })
-  location: Location;
-
-  @Column()
-  locationId: number;
 
   @OneToMany(() => DealActivity, (dealActivity) => dealActivity.deal)
   dealActivity: DealActivity[];

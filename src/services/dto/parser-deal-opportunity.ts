@@ -9,7 +9,6 @@ import {
 import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
-import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
@@ -155,9 +154,6 @@ export async function dealParserOpportunity(
     }
   }
 
-  // location (wrapper retained until #618; no longer holds districts)
-  const location = new Location({});
-
   // deal
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
@@ -168,7 +164,6 @@ export async function dealParserOpportunity(
     dealTimeslot,
     dealDistrict,
     postcode,
-    location,
   });
 
   return deal;

@@ -1,7 +1,6 @@
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
-import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -28,8 +27,6 @@ export async function writeVolunteerLegacy(
       transactionalEntityManager.getRepository(DealTimeslot);
     const dealDistrictRepository =
       transactionalEntityManager.getRepository(DealDistrict);
-    const locationRepository =
-      transactionalEntityManager.getRepository(Location);
     const dealRepository = transactionalEntityManager.getRepository(Deal);
     const volunteerRepository =
       transactionalEntityManager.getRepository(Volunteer);
@@ -40,9 +37,6 @@ export async function writeVolunteerLegacy(
 
     // Person
     await personRepository.save(volunteer.person);
-
-    // Location (wrapper retained until #618; districts now live on the deal)
-    await locationRepository.save(volunteer.deal.location);
 
     // Deal
     await dealRepository.save(volunteer.deal);
