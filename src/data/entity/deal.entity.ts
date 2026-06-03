@@ -11,6 +11,7 @@ import { DealType } from "../types";
 import Location from "./location/location.entity";
 import Postcode from "./location/postcode.entity";
 import DealActivity from "./m2m/deal-activity";
+import DealSkill from "./m2m/deal-skill";
 import Opportunity from "./opportunity/opportunity.entity";
 import Profile from "./profile/profile.entity";
 import Time from "./time/time.entity";
@@ -70,6 +71,9 @@ export default class Deal {
 
   @OneToMany(() => DealActivity, (dealActivity) => dealActivity.deal)
   dealActivity: DealActivity[];
+
+  @OneToMany(() => DealSkill, (dealSkill) => dealSkill.deal)
+  dealSkill: DealSkill[];
 
   @OneToMany(() => Opportunity, (opportunity) => opportunity.deal)
   opportunity: Opportunity[];

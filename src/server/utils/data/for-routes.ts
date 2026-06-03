@@ -166,7 +166,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal.profile.profileSkill) {
+      for (const ps of volunteer.deal.dealSkill) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -440,9 +440,11 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
       idFieldNames: ["deal", "dealId", "activity", "activityId"],
       relations: [],
     },
-    ProfileSkill: {
-      idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["profile.profileSkill"],
+    DealSkill: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "skill", "skillId"],
+      relations: [],
     },
     LocationDistrict: {
       idFieldNames: ["location", "locationId", "district", "districtId"],

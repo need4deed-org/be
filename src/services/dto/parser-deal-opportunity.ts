@@ -11,9 +11,9 @@ import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Location from "../../data/entity/location/location.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
+import DealSkill from "../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../data/entity/m2m/location-district";
 import ProfileLanguage from "../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../data/entity/m2m/time-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
@@ -56,17 +56,17 @@ export async function dealParserOpportunity(
   }
 
   // skills
-  const profileSkill: ProfileSkill[] = [];
+  const dealSkill: DealSkill[] = [];
   const opportunitySkills = (formData.skills || []) as string[];
   for (const opportunitySkill of opportunitySkills) {
     const profileEntity = await getProfileEntityByTitle(
       opportunitySkill,
       EntityTableName.SKILL,
       Skill,
-      ProfileSkill,
+      DealSkill,
     );
     if (profileEntity) {
-      profileSkill.push(profileEntity);
+      dealSkill.push(profileEntity);
     }
   }
 
@@ -100,7 +100,6 @@ export async function dealParserOpportunity(
   const category = null;
   const profile = new Profile({
     category,
-    profileSkill,
     profileLanguage,
   });
 
@@ -174,6 +173,7 @@ export async function dealParserOpportunity(
     type,
     profile,
     dealActivity,
+    dealSkill,
     postcode,
     time,
     location,

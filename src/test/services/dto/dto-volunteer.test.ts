@@ -48,9 +48,9 @@ function makeVolunteer(overrides = {}) {
     deal: {
       profile: {
         profileLanguage: [],
-        profileSkill: [],
       },
       dealActivity: [],
+      dealSkill: [],
       time: { timeTimeslot: [] },
       location: { locationDistrict: [] },
     },

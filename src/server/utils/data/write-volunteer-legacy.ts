@@ -3,9 +3,9 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Location from "../../../data/entity/location/location.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
 import LocationDistrict from "../../../data/entity/m2m/location-district";
 import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
 import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Profile from "../../../data/entity/profile/profile.entity";
@@ -23,8 +23,8 @@ export async function writeVolunteerLegacy(
     const profileRepository = transactionalEntityManager.getRepository(Profile);
     const dealActivityRepository =
       transactionalEntityManager.getRepository(DealActivity);
-    const profileSkillRepository =
-      transactionalEntityManager.getRepository(ProfileSkill);
+    const dealSkillRepository =
+      transactionalEntityManager.getRepository(DealSkill);
     const profileLanguageRepository =
       transactionalEntityManager.getRepository(ProfileLanguage);
     const timeRepository = transactionalEntityManager.getRepository(Time);
@@ -49,12 +49,7 @@ export async function writeVolunteerLegacy(
     await profileRepository.save(volunteer.deal.profile);
     const profileId = volunteer.deal.profile.id;
 
-    // Profile m2m relations (skills, languages)
-    for (const profileSkill of volunteer.deal.profile.profileSkill) {
-      profileSkill.profileId = profileId;
-    }
-    await profileSkillRepository.save(volunteer.deal.profile.profileSkill);
-
+    // Profile m2m relations (languages)
     for (const profileLanguage of volunteer.deal.profile.profileLanguage) {
       profileLanguage.profileId = profileId;
     }
@@ -88,11 +83,17 @@ export async function writeVolunteerLegacy(
     await dealRepository.save(volunteer.deal);
     const dealId = volunteer.deal.id;
 
-    // Deal m2m relations (activities) — saved after the deal so dealId exists
+    // Deal m2m relations (activities, skills) — saved after the deal so
+    // dealId exists
     for (const dealActivity of volunteer.deal.dealActivity) {
       dealActivity.dealId = dealId;
     }
     await dealActivityRepository.save(volunteer.deal.dealActivity);
+
+    for (const dealSkill of volunteer.deal.dealSkill) {
+      dealSkill.dealId = dealId;
+    }
+    await dealSkillRepository.save(volunteer.deal.dealSkill);
 
     // Volunteer
     await volunteerRepository.save(volunteer);
