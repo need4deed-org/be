@@ -168,3 +168,10 @@ All amendments have to land in schemas for endpoint handlers and in SDK
 ## Private instructions
 
 @dev/CLAUDE.md
+
+---
+
+## Exposing PII
+
+User role `coordinator` is granted to deal with PII.
+Slack channels for notification and tagging are closed and PII safe.
