@@ -41,6 +41,13 @@ export class FlattenDealLanguageDropProfile1780492917105
     );
 
     // 4. Drop the Deal->Profile link and the Profile graph entirely.
+    //    The legacy volunteer_list_mv materialized view (present in prod/staging
+    //    snapshots, never created by repo code) reads deal.profile_id and blocks
+    //    the DROP COLUMN below. It is already deprecated, so drop it first;
+    //    IF EXISTS keeps this a no-op on databases that never had it.
+    await queryRunner.query(
+      `DROP MATERIALIZED VIEW IF EXISTS volunteer_list_mv`,
+    );
     await queryRunner.query(
       `ALTER TABLE "deal" DROP CONSTRAINT "FK_9f36d6cf04687b811690d82a3c1"`,
     );
