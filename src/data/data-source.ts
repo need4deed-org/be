@@ -13,20 +13,18 @@ import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
-import Location from "./entity/location/location.entity";
 import Postcode from "./entity/location/postcode.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
+import CommentPerson from "./entity/m2m/comment-person";
+import DealActivity from "./entity/m2m/deal-activity";
+import DealDistrict from "./entity/m2m/deal-district";
+import DealLanguage from "./entity/m2m/deal-language";
+import DealSkill from "./entity/m2m/deal-skill";
+import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
-import LocationAddress from "./entity/m2m/location-address";
-import LocationDistrict from "./entity/m2m/location-district";
-import LocationPostcode from "./entity/m2m/location-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
-import ProfileActivity from "./entity/m2m/profile-activity";
-import ProfileLanguage from "./entity/m2m/profile-language";
-import ProfileSkill from "./entity/m2m/profile-skill";
-import TimeTimeslot from "./entity/m2m/time-timeslot";
 import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
@@ -37,10 +35,8 @@ import Person from "./entity/person.entity";
 import Activity from "./entity/profile/activity.entity";
 import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
-import Profile from "./entity/profile/profile.entity";
 import Skill from "./entity/profile/skill.entity";
 import Testimonial from "./entity/testimonial.entity";
-import Time from "./entity/time/time.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
 import User from "./entity/user.entity";
@@ -70,9 +66,15 @@ export const dataSource = new DataSource({
     Appreciation,
     Category,
     Comment,
+    CommentPerson,
     Communication,
     Config,
     Deal,
+    DealActivity,
+    DealDistrict,
+    DealLanguage,
+    DealSkill,
+    DealTimeslot,
     District,
     DistrictPostcode,
     Document,
@@ -81,26 +83,16 @@ export const dataSource = new DataSource({
     FieldTranslation,
     Language,
     LeadFrom,
-    Location,
-    LocationAddress,
-    LocationDistrict,
-    LocationPostcode,
     NotionRelation,
     Opportunity,
     OpportunityVolunteer,
     Organization,
     Person,
-    Profile,
-    ProfileActivity,
-    ProfileLanguage,
-    ProfileSkill,
     Postcode,
     Option,
     Skill,
     Testimonial,
-    Time,
     Timeline,
-    TimeTimeslot,
     Timeslot,
     User,
     Volunteer,

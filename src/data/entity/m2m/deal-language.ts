@@ -7,14 +7,14 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import Deal from "../deal.entity";
 import Language from "../profile/language.entity";
-import Profile from "../profile/profile.entity";
 
 @Entity()
-export default class ProfileLanguage {
-  constructor(profileLanguage?: Partial<ProfileLanguage>) {
-    if (profileLanguage) {
-      Object.assign(this, profileLanguage);
+export default class DealLanguage {
+  constructor(dealLanguage?: Partial<DealLanguage>) {
+    if (dealLanguage) {
+      Object.assign(this, dealLanguage);
     }
   }
 
@@ -39,16 +39,16 @@ export default class ProfileLanguage {
   @IsEnum(LangPurpose)
   purpose: LangPurpose;
 
-  @ManyToOne(() => Profile, (profile) => profile.profileLanguage, {
+  @ManyToOne(() => Deal, (deal) => deal.dealLanguage, {
     onDelete: "CASCADE",
   })
-  @JoinColumn({ name: "profile_id" })
-  profile: Profile;
+  @JoinColumn({ name: "deal_id" })
+  deal: Deal;
 
   @Column()
-  profileId: number;
+  dealId: number;
 
-  @ManyToOne(() => Language, (language) => language.profileLanguage, {
+  @ManyToOne(() => Language, (language) => language.dealLanguage, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "language_id" })

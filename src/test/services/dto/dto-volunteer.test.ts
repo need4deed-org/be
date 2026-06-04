@@ -5,7 +5,9 @@ import {
 } from "../../../services/dto/dto-volunteer";
 
 vi.mock("../../../services/dto/utils", () => ({
-  getLanguages: vi.fn(() => [{ id: "de", title: "German", proficiency: "fluent" }]),
+  getLanguages: vi.fn(() => [
+    { id: "de", title: "German", proficiency: "fluent" },
+  ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
   getOptionItems: vi.fn(() => [{ id: 1, title: "Teaching" }]),
   getTitles: vi.fn(() => ["Teaching"]),
@@ -44,13 +46,11 @@ function makeVolunteer(overrides = {}) {
       address: null,
     },
     deal: {
-      profile: {
-        profileLanguage: [],
-        profileActivity: [],
-        profileSkill: [],
-      },
-      time: { timeTimeslot: [] },
-      location: { locationDistrict: [] },
+      dealActivity: [],
+      dealSkill: [],
+      dealLanguage: [],
+      dealTimeslot: [],
+      dealDistrict: [],
     },
     ...overrides,
   };
@@ -73,7 +73,9 @@ describe("volunteerListSerializer", () => {
   });
 
   it("returns null avatarUrl when person has no avatar", () => {
-    const v = makeVolunteer({ person: { ...makeVolunteer().person, avatarUrl: null } });
+    const v = makeVolunteer({
+      person: { ...makeVolunteer().person, avatarUrl: null },
+    });
     const result = volunteerListSerializer(v as any);
     expect(result).toBeDefined();
     expect(result!.avatarUrl).toBeNull();
@@ -124,7 +126,11 @@ describe("volunteerSerializer", () => {
       },
     ];
 
-    const result = volunteerSerializer(makeVolunteer() as any, comments as any, []);
+    const result = volunteerSerializer(
+      makeVolunteer() as any,
+      comments as any,
+      [],
+    );
     expect(result.comments[0].authorName).toBe("Unknown Author");
   });
 });

@@ -1,8 +1,7 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-
+import Deal from "../deal.entity";
 import Activity from "./activity.entity";
-import Profile from "./profile.entity";
 
 @Entity()
 export default class Category {
@@ -24,6 +23,6 @@ export default class Category {
   @OneToMany(() => Activity, (activity) => activity.category)
   activities: Activity[];
 
-  @OneToMany(() => Profile, (profile) => profile.category)
-  profile: Profile[];
+  @OneToMany(() => Deal, (deal) => deal.category)
+  deal: Deal[];
 }

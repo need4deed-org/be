@@ -249,27 +249,24 @@ export default async function opportunityLegacyRoutes(
 
         function mapOpportunityToDelivery(raw) {
           const deal = raw.deal ?? {};
-          const profile = deal.profile ?? {};
-          const time = deal.time ?? {};
-          const location = deal.location ?? {};
 
-          const activities = (profile.profileActivity ?? [])
+          const activities = (deal.dealActivity ?? [])
             .map((pa) => pa.activity?.title ?? null)
             .filter(Boolean);
 
-          const languages = (profile.profileLanguage ?? [])
+          const languages = (deal.dealLanguage ?? [])
             .map((pl) => pl.language?.title ?? null)
             .filter(Boolean);
 
-          const skills = (profile.profileSkill ?? [])
+          const skills = (deal.dealSkill ?? [])
             .map((ps) => ps.skill?.title ?? null)
             .filter(Boolean);
 
-          const berlin_locations = (location.locationDistrict ?? [])
+          const berlin_locations = (deal.dealDistrict ?? [])
             .map((ld) => ld.district?.title ?? null)
             .filter(Boolean);
 
-          const { timeslots, schedule_str } = parseTimeslots(time.timeTimeslot);
+          const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
             parseAccompanying(raw.accompanying);
 
@@ -292,7 +289,7 @@ export default async function opportunityLegacyRoutes(
             created_at: raw.createdAt ?? null,
             updated_at: raw.updatedAt ?? null,
             category: null,
-            category_id: profile.categoryId ?? null,
+            category_id: deal.categoryId ?? null,
             last_edited_time_notion: null,
           };
         }
@@ -311,11 +308,11 @@ export default async function opportunityLegacyRoutes(
         },
         take: 300,
         relations: [
-          "deal.profile.profileLanguage.language",
-          "deal.profile.profileActivity.activity",
-          "deal.profile.profileSkill.skill",
-          "deal.time.timeTimeslot.timeslot",
-          "deal.location.locationDistrict.district",
+          "deal.dealLanguage.language",
+          "deal.dealActivity.activity",
+          "deal.dealSkill.skill",
+          "deal.dealTimeslot.timeslot",
+          "deal.dealDistrict.district",
           "accompanying",
         ],
       });

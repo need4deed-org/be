@@ -2,6 +2,7 @@ import { AgentRoleType } from "need4deed-sdk";
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -10,6 +11,10 @@ import Agent from "../opportunity/agent.entity";
 import Person from "../person.entity";
 
 @Entity()
+// Three-column unique: a person may legitimately hold multiple roles at one
+// agent (the dev DB has exactly this case), so the constraint is on the
+// full triple, not (agentId, personId) alone.
+@Index(["agentId", "personId", "role"], { unique: true })
 export default class AgentPerson {
   constructor(agentPerson?: Partial<AgentPerson>) {
     if (agentPerson) {

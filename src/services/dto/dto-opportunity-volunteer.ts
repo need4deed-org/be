@@ -39,21 +39,19 @@ export function opportunityOpportunityVolunteerDTO(
     volunteeringType: opportunityVolunteer.volunteer.statusType,
     engagement: opportunityVolunteer.volunteer.statusEngagement,
     activities: getOptionItems(
-      opportunityVolunteer.volunteer.deal.profile?.profileActivity,
+      opportunityVolunteer.volunteer.deal.dealActivity,
       "activity",
     ),
     skills: getOptionItems(
-      opportunityVolunteer.volunteer.deal.profile?.profileSkill,
+      opportunityVolunteer.volunteer.deal.dealSkill,
       "skill",
     ),
-    languages: getLanguages(
-      opportunityVolunteer.volunteer.deal.profile?.profileLanguage,
-    ),
+    languages: getLanguages(opportunityVolunteer.volunteer.deal.dealLanguage),
     availability: getAvailability(
-      opportunityVolunteer.volunteer.deal.time?.timeTimeslot,
+      opportunityVolunteer.volunteer.deal.dealTimeslot,
     ),
     locations: getOptionItems(
-      opportunityVolunteer.volunteer.deal.location?.locationDistrict,
+      opportunityVolunteer.volunteer.deal.dealDistrict,
       "district",
     ),
   };
