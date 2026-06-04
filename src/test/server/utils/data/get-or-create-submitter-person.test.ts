@@ -145,6 +145,55 @@ describe("getOrCreateSubmitterPerson", () => {
     });
   });
 
+  it("clears a stale lastName — single-token resubmit over a multi-token name sets lastName to null", async () => {
+    personFind.mockResolvedValueOnce({
+      id: 7,
+      email: "sam@center.de",
+      firstName: "Mary",
+      lastName: "van der Berg",
+    });
+    personSave.mockImplementation(async (p: any) => p);
+    agentPersonFind.mockResolvedValueOnce({
+      id: 100,
+      agentId: 42,
+      personId: 7,
+    });
+
+    await getOrCreateSubmitterPerson(
+      { ...baseBody, rac_full_name: "Cher" },
+      42,
+      fakeManager,
+    );
+
+    expect(personSave).toHaveBeenCalledTimes(1);
+    const saved = personSave.mock.calls[0][0];
+    expect(saved).toMatchObject({ id: 7, firstName: "Cher" });
+    // null (not undefined) so TypeORM actually clears the column on update.
+    expect(saved.lastName).toBeNull();
+  });
+
+  it("ignores a whitespace-only rac_phone — does not overwrite or mark dirty", async () => {
+    personFind.mockResolvedValueOnce({
+      id: 7,
+      email: "sam@center.de",
+      firstName: "Sam",
+      phone: "+49-30-1111111",
+    });
+    agentPersonFind.mockResolvedValueOnce({
+      id: 100,
+      agentId: 42,
+      personId: 7,
+    });
+
+    await getOrCreateSubmitterPerson(
+      { ...baseBody, rac_full_name: "  ", rac_phone: "   " },
+      42,
+      fakeManager,
+    );
+
+    expect(personSave).not.toHaveBeenCalled();
+  });
+
   it("branch 4 — person not found: creates Person from rac_*, then upserts AgentPerson", async () => {
     personFind.mockResolvedValueOnce(null);
     personSave.mockImplementation(async (p: any) => ({ ...p, id: 55 }));

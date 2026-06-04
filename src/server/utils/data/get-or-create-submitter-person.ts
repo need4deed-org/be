@@ -79,11 +79,15 @@ export async function getOrCreateSubmitterPerson(
     if (fullName) {
       const { firstName, lastName } = splitName(fullName, email);
       person.firstName = firstName;
-      person.lastName = lastName;
+      // Use null (not undefined) when the new name has no last token: TypeORM
+      // skips undefined on update, which would leave a stale last name behind
+      // (e.g. resubmitting "Cher" over "Mary van der Berg" -> "Cher van der Berg").
+      person.lastName = lastName ?? (null as unknown as undefined);
       dirty = true;
     }
-    if (body.rac_phone) {
-      person.phone = body.rac_phone;
+    const phone = (body.rac_phone ?? "").trim();
+    if (phone) {
+      person.phone = phone;
       dirty = true;
     }
     if (dirty) {
