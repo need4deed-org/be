@@ -23,11 +23,16 @@ export function volunteerListSerializer(
     const name = volunteer.person.name;
     const email = volunteer.person.email;
     const avatarUrl = volunteer.person?.avatarUrl || null;
-    const languages = getLanguages(volunteer.deal.dealLanguage);
-    const availability = getAvailability(volunteer.deal.dealTimeslot);
-    const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
-    const skills = getOptionItems(volunteer.deal.dealSkill, "skill");
-    const locations = getOptionItems(volunteer.deal.dealDistrict, "district");
+    // Collections may be absent when the list loads a reduced relation set
+    // (listType "table" skips activities/skills/availability) — default to []
+    // so the response shape stays stable.
+    const languages = getLanguages(volunteer.deal.dealLanguage) ?? [];
+    const availability = getAvailability(volunteer.deal.dealTimeslot) ?? [];
+    const activities =
+      getOptionItems(volunteer.deal.dealActivity, "activity") ?? [];
+    const skills = getOptionItems(volunteer.deal.dealSkill, "skill") ?? [];
+    const locations =
+      getOptionItems(volunteer.deal.dealDistrict, "district") ?? [];
 
     return {
       id,

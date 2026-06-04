@@ -84,8 +84,10 @@ export interface QuerystringVolunteerFiltering {
     match?: string | string[];
   };
 }
+export type VolunteerListType = "card" | "table";
+
 export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
-  QuerystringVolunteerFiltering;
+  QuerystringVolunteerFiltering & { listType?: VolunteerListType };
 
 export interface QuerystringUserList extends QuerystringPagination {
   search?: string;
