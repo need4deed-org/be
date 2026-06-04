@@ -211,13 +211,32 @@ export default async function commentRoutes(
             await syncCommentTags(saved.id, taggedPersonIds, manager);
             return manager.getRepository(Comment).findOne({
               where: { id: saved.id },
-              relations: ["user", "user.person", "language", "commentPerson"],
+              relations: [
+                "user",
+                "user.person",
+                "language",
+                "commentPerson",
+                "commentPerson.person",
+              ],
             });
           },
         );
 
         if (!reloaded) {
           throw new Error(`Failed to reload comment after create`);
+        }
+
+        // Notify on Slack when the new comment tags people. Fire-and-forget:
+        // commentTagged swallows its own errors and no-ops when the comments
+        // Slack webhook is not configured, so it never affects the response.
+        if (taggedPersonIds && taggedPersonIds.length > 0) {
+          fastify.notify.commentTagged({
+            authorName: reloaded.user.person?.name ?? "Someone",
+            taggedNames: (reloaded.commentPerson ?? [])
+              .map((cp) => cp.person?.name)
+              .filter((n): n is string => Boolean(n)),
+            text: reloaded.text,
+          });
         }
 
         return reply.status(201).send({
