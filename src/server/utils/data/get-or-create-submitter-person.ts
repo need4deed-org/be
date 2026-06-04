@@ -6,6 +6,7 @@ import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
+import { getNameFields } from "../../../services/dto/utils";
 import { createAddress, patchAddress } from "./for-routes";
 
 // rac_address / rac_plz are optional so existing callers that only carry the
@@ -90,18 +91,23 @@ async function syncSubmitterAddress(
   }
 }
 
-function splitName(
+/**
+ * Split a full name into first / middle / last via the shared getNameFields
+ * helper (first token -> firstName, last token -> lastName, the rest ->
+ * middleName). Falls back to the email local-part for firstName when the name
+ * is empty, since Person.firstName is required.
+ */
+function resolveName(
   rawName: string | undefined,
   email: string,
-): { firstName: string; lastName?: string } {
-  const trimmed = (rawName ?? "").trim();
-  if (!trimmed) {
-    return { firstName: email.split("@")[0] || "unknown" };
-  }
-  const [first, ...rest] = trimmed.split(/\s+/);
+): { firstName: string; middleName?: string; lastName?: string } {
+  const { firstName, middleName, lastName } = getNameFields(
+    (rawName ?? "").trim(),
+  );
   return {
-    firstName: first,
-    lastName: rest.length ? rest.join(" ") : undefined,
+    firstName: firstName || email.split("@")[0] || "unknown",
+    middleName,
+    lastName,
   };
 }
 
@@ -143,10 +149,14 @@ export async function getOrCreateSubmitterPerson(
   });
 
   if (!person) {
-    const { firstName, lastName } = splitName(body.rac_full_name, email);
+    const { firstName, middleName, lastName } = resolveName(
+      body.rac_full_name,
+      email,
+    );
     person = await personRepository.save(
       new Person({
         firstName,
+        middleName,
         lastName,
         email,
         phone: body.rac_phone || undefined,
@@ -159,11 +169,12 @@ export async function getOrCreateSubmitterPerson(
     let dirty = false;
     const fullName = (body.rac_full_name ?? "").trim();
     if (fullName) {
-      const { firstName, lastName } = splitName(fullName, email);
+      const { firstName, middleName, lastName } = resolveName(fullName, email);
       person.firstName = firstName;
-      // Use null (not undefined) when the new name has no last token: TypeORM
-      // skips undefined on update, which would leave a stale last name behind
-      // (e.g. resubmitting "Cher" over "Mary van der Berg" -> "Cher van der Berg").
+      // Use null (not undefined) for absent name parts: TypeORM skips undefined
+      // on update, which would leave stale middle/last names behind (e.g.
+      // resubmitting "Cher" over "Mary van der Berg" -> "Cher van der Berg").
+      person.middleName = middleName ?? (null as unknown as undefined);
       person.lastName = lastName ?? (null as unknown as undefined);
       dirty = true;
     }

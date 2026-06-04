@@ -171,12 +171,13 @@ describe("getOrCreateSubmitterPerson", () => {
     });
   });
 
-  it("clears a stale lastName — single-token resubmit over a multi-token name sets lastName to null", async () => {
+  it("clears stale middle/last names — single-token resubmit over a multi-token name sets them to null", async () => {
     personFind.mockResolvedValueOnce({
       id: 7,
       email: "sam@center.de",
       firstName: "Mary",
-      lastName: "van der Berg",
+      middleName: "van der",
+      lastName: "Berg",
     });
     personSave.mockImplementation(async (p: any) => p);
     agentPersonFind.mockResolvedValueOnce({
@@ -194,7 +195,8 @@ describe("getOrCreateSubmitterPerson", () => {
     expect(personSave).toHaveBeenCalledTimes(1);
     const saved = personSave.mock.calls[0][0];
     expect(saved).toMatchObject({ id: 7, firstName: "Cher" });
-    // null (not undefined) so TypeORM actually clears the column on update.
+    // null (not undefined) so TypeORM actually clears the columns on update.
+    expect(saved.middleName).toBeNull();
     expect(saved.lastName).toBeNull();
   });
 
@@ -261,7 +263,7 @@ describe("getOrCreateSubmitterPerson", () => {
     });
   });
 
-  it("branch 4 (single-token name) — leaves lastName undefined", async () => {
+  it("branch 4 (single-token name) — leaves middle/last name undefined", async () => {
     personFind.mockResolvedValueOnce(null);
     personSave.mockImplementation(async (p: any) => ({ ...p, id: 57 }));
     agentPersonFind.mockResolvedValueOnce(null);
@@ -274,11 +276,12 @@ describe("getOrCreateSubmitterPerson", () => {
 
     expect(personSave.mock.calls[0][0]).toMatchObject({
       firstName: "Cher",
+      middleName: undefined,
       lastName: undefined,
     });
   });
 
-  it("branch 4 (multi-word last name) — joins trailing tokens", async () => {
+  it("branch 4 (multi-word name) — first/last tokens split out, the rest become middleName", async () => {
     personFind.mockResolvedValueOnce(null);
     personSave.mockImplementation(async (p: any) => ({ ...p, id: 58 }));
     agentPersonFind.mockResolvedValueOnce(null);
@@ -291,7 +294,8 @@ describe("getOrCreateSubmitterPerson", () => {
 
     expect(personSave.mock.calls[0][0]).toMatchObject({
       firstName: "Mary",
-      lastName: "van der Berg",
+      middleName: "van der",
+      lastName: "Berg",
     });
   });
 
