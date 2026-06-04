@@ -30,11 +30,14 @@ function splitName(
  * opportunity:
  *
  *   1. Empty/missing rac_email -> return null (no Person manufactured).
- *   2. Lookup by email (case-insensitive). If found + AgentPerson row already
- *      exists for (person, agentId), no-op.
- *   3. Found + no link -> upsert AgentPerson with VOLUNTEER_COORDINATOR role.
- *   4. Not found -> create Person from rac_*; upsert AgentPerson with same
- *      role.
+ *   2. Lookup by email (case-insensitive).
+ *        - Found     -> overwrite the rac_* fields (name/phone) from this
+ *                       submission so blank/stale records get corrected. Only
+ *                       fields the form actually provides are touched, so a
+ *                       later submission omitting one does not wipe good data.
+ *        - Not found -> create Person from rac_*.
+ *   3. Either way, upsert an AgentPerson link (VOLUNTEER_COORDINATOR) for
+ *      (person, agentId) when one does not already exist.
  *
  * `manager` defaults to the global dataSource; pass a transactional
  * EntityManager (or a migration's QueryRunner.manager) to make the writes
@@ -67,6 +70,25 @@ export async function getOrCreateSubmitterPerson(
         phone: body.rac_phone || undefined,
       }),
     );
+  } else {
+    // Refresh the rac_* fields from this submission so blank/stale records get
+    // corrected. Only overwrite a field the form actually provides — an empty
+    // rac_full_name / rac_phone must not wipe an existing good value.
+    let dirty = false;
+    const fullName = (body.rac_full_name ?? "").trim();
+    if (fullName) {
+      const { firstName, lastName } = splitName(fullName, email);
+      person.firstName = firstName;
+      person.lastName = lastName;
+      dirty = true;
+    }
+    if (body.rac_phone) {
+      person.phone = body.rac_phone;
+      dirty = true;
+    }
+    if (dirty) {
+      person = await personRepository.save(person);
+    }
   }
 
   const existingLink = await agentPersonRepository.findOne({

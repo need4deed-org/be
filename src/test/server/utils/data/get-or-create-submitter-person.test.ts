@@ -47,8 +47,9 @@ describe("getOrCreateSubmitterPerson", () => {
     expect(agentPersonSave).not.toHaveBeenCalled();
   });
 
-  it("branch 2 — person found and AgentPerson link already exists: no upsert", async () => {
+  it("branch 2 — person found and AgentPerson link already exists: overwrites rac_* fields, no link upsert", async () => {
     personFind.mockResolvedValueOnce({ id: 7, email: "sam@center.de" });
+    personSave.mockImplementation(async (p: any) => p);
     agentPersonFind.mockResolvedValueOnce({
       id: 100,
       agentId: 42,
@@ -57,25 +58,90 @@ describe("getOrCreateSubmitterPerson", () => {
 
     const result = await getOrCreateSubmitterPerson(baseBody, 42, fakeManager);
 
-    expect(result).toEqual({ id: 7, email: "sam@center.de" });
-    expect(personSave).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 7, email: "sam@center.de" });
+    // Existing record refreshed from this submission's rac_* fields.
+    expect(personSave).toHaveBeenCalledTimes(1);
+    expect(personSave.mock.calls[0][0]).toMatchObject({
+      id: 7,
+      firstName: "Sam",
+      lastName: "Submitter",
+      phone: "+49-30-2222222",
+    });
     expect(agentPersonSave).not.toHaveBeenCalled();
   });
 
-  it("branch 3 — person found without link: upserts AgentPerson with VOLUNTEER_COORDINATOR role", async () => {
+  it("branch 3 — person found without link: overwrites rac_* fields and upserts AgentPerson with VOLUNTEER_COORDINATOR role", async () => {
     personFind.mockResolvedValueOnce({ id: 7, email: "sam@center.de" });
+    personSave.mockImplementation(async (p: any) => p);
     agentPersonFind.mockResolvedValueOnce(null);
     agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 999 }));
 
     const result = await getOrCreateSubmitterPerson(baseBody, 42, fakeManager);
 
     expect(result?.id).toBe(7);
-    expect(personSave).not.toHaveBeenCalled();
+    expect(personSave).toHaveBeenCalledTimes(1);
+    expect(personSave.mock.calls[0][0]).toMatchObject({
+      id: 7,
+      firstName: "Sam",
+      lastName: "Submitter",
+      phone: "+49-30-2222222",
+    });
     expect(agentPersonSave).toHaveBeenCalledTimes(1);
     expect(agentPersonSave.mock.calls[0][0]).toMatchObject({
       agentId: 42,
       personId: 7,
       role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    });
+  });
+
+  it("branch 2 (no incoming values) — leaves an existing record untouched when rac_full_name and rac_phone are empty", async () => {
+    personFind.mockResolvedValueOnce({
+      id: 7,
+      email: "sam@center.de",
+      firstName: "Sam",
+    });
+    agentPersonFind.mockResolvedValueOnce({
+      id: 100,
+      agentId: 42,
+      personId: 7,
+    });
+
+    await getOrCreateSubmitterPerson(
+      { ...baseBody, rac_full_name: "  ", rac_phone: "" },
+      42,
+      fakeManager,
+    );
+
+    expect(personSave).not.toHaveBeenCalled();
+    expect(agentPersonSave).not.toHaveBeenCalled();
+  });
+
+  it("overwrite is selective — fills only the provided field (phone) without clobbering the name", async () => {
+    personFind.mockResolvedValueOnce({
+      id: 7,
+      email: "sam@center.de",
+      firstName: "Existing",
+      lastName: "Name",
+    });
+    personSave.mockImplementation(async (p: any) => p);
+    agentPersonFind.mockResolvedValueOnce({
+      id: 100,
+      agentId: 42,
+      personId: 7,
+    });
+
+    await getOrCreateSubmitterPerson(
+      { ...baseBody, rac_full_name: "  ", rac_phone: "+49-30-9999999" },
+      42,
+      fakeManager,
+    );
+
+    expect(personSave).toHaveBeenCalledTimes(1);
+    expect(personSave.mock.calls[0][0]).toMatchObject({
+      id: 7,
+      firstName: "Existing",
+      lastName: "Name",
+      phone: "+49-30-9999999",
     });
   });
 
