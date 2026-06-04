@@ -21,6 +21,7 @@ const addressSave = vi.fn();
 const addressUpdate = vi.fn((..._args: any[]) =>
   Promise.resolve({ affected: 1 }),
 );
+const addressFindOneBy = vi.fn();
 const postcodeFindOneBy = vi.fn();
 
 const fakeManager: any = {
@@ -35,6 +36,7 @@ const fakeManager: any = {
           create: addressCreate,
           save: addressSave,
           update: addressUpdate,
+          findOneBy: addressFindOneBy,
         };
       case Postcode:
         return { findOneBy: postcodeFindOneBy };
@@ -306,13 +308,14 @@ describe("getOrCreateSubmitterPerson", () => {
       rac_plz: "12345",
     };
 
-    it("existing person with an address — patches street and resolved postcode", async () => {
+    it("existing person owning a real address — patches street and resolved postcode in place", async () => {
       personFind.mockResolvedValueOnce({
         id: 7,
         email: "sam@center.de",
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
+      addressFindOneBy.mockResolvedValueOnce({ id: 500, title: "Echtstr." });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -333,13 +336,14 @@ describe("getOrCreateSubmitterPerson", () => {
       expect(addressCreate).not.toHaveBeenCalled();
     });
 
-    it("existing address + unknown rac_plz — updates street but leaves postcode untouched", async () => {
+    it("real address + unknown rac_plz — updates street but leaves postcode untouched", async () => {
       personFind.mockResolvedValueOnce({
         id: 7,
         email: "sam@center.de",
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
+      addressFindOneBy.mockResolvedValueOnce({ id: 500, title: "Echtstr." });
       postcodeFindOneBy.mockResolvedValueOnce(null); // rac_plz not found
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -360,6 +364,35 @@ describe("getOrCreateSubmitterPerson", () => {
       });
       // postcodeId must not be set when rac_plz does not resolve.
       expect(addressUpdate.mock.calls[0][1]).not.toHaveProperty("postcodeId");
+    });
+
+    it("person on the shared Dummy address — creates a fresh address and re-points, never patches the Dummy", async () => {
+      personFind.mockResolvedValueOnce({
+        id: 7,
+        email: "sam@center.de",
+        addressId: 1,
+      });
+      personSave.mockImplementation(async (p: any) => p);
+      addressFindOneBy.mockResolvedValueOnce({ id: 1, title: "Dummy" });
+      postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
+      addressSave.mockResolvedValueOnce({ id: 888 });
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(addressBody, 42, fakeManager);
+
+      // The shared Dummy row is never updated.
+      expect(addressUpdate).not.toHaveBeenCalled();
+      // A new address is created and the person re-pointed at it.
+      expect(addressCreate).toHaveBeenCalledTimes(1);
+      expect(addressCreate.mock.calls[0][0]).toMatchObject({
+        street: "Musterstr. 1",
+        postcodeId: 9,
+      });
+      expect(personUpdate).toHaveBeenCalledWith({ id: 7 }, { addressId: 888 });
     });
 
     it("new person without an address — creates one and links it to the person", async () => {

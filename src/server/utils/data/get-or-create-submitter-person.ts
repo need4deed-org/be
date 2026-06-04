@@ -22,6 +22,11 @@ type SubmitterFields = Pick<
 // fall back to this value rather than dropping the address entirely.
 const FALLBACK_PLZ = "12345";
 
+// Seeded placeholder address (see seeds/user.seed.ts) used for "unknown
+// address". It is shared by many Person rows, so it must never be patched in
+// place — a fresh Address is minted instead.
+const DUMMY_ADDRESS_TITLE = "Dummy";
+
 /**
  * Extract the street portion of a free-text address, cutting the German 5-digit
  * postcode and the city that follows it (e.g. "Musterstr. 1, 12345 Berlin" ->
@@ -42,9 +47,15 @@ export function streetFromAddress(raw: string | undefined): string {
  *
  *   - rac_address -> address.street (postcode + city stripped).
  *   - rac_plz     -> resolved to an existing Postcode by value (never created).
- *       - existing address + plz resolves -> update postcode.
- *       - existing address + plz unknown  -> leave the postcode as is.
- *       - no address yet                  -> create one, falling back to
+ *
+ * The person's address is patched in place only when they own a real,
+ * non-placeholder Address. When they have no address, or only the shared
+ * "Dummy" placeholder, a fresh Address is created and the person re-pointed at
+ * it (so we never mutate an address other Person rows depend on):
+ *
+ *       - own real address + plz resolves -> update street/postcode.
+ *       - own real address + plz unknown  -> update street, leave postcode.
+ *       - no address / Dummy              -> create one, falling back to
  *         FALLBACK_PLZ when rac_plz does not resolve (Address needs a Postcode).
  */
 async function syncSubmitterAddress(
@@ -63,8 +74,24 @@ async function syncSubmitterAddress(
     ? await postcodeRepository.findOneBy({ value: plz })
     : null;
 
+  // Only patch an address the submitter exclusively owns. The seeded "Dummy"
+  // placeholder is shared across many Person rows, so treat it as "no address"
+  // and mint a dedicated one below instead of corrupting the shared row.
+  let ownAddress: Address | null = null;
   if (person.addressId) {
-    const addressData: Partial<Address> = { id: person.addressId };
+    const current = await getRepository(manager, Address).findOneBy({
+      id: person.addressId,
+    });
+    if (current && current.title !== DUMMY_ADDRESS_TITLE) {
+      ownAddress = current;
+    }
+  }
+
+  if (ownAddress) {
+    if (!street && !resolved) {
+      return; // nothing to change (street empty, plz unknown)
+    }
+    const addressData: Partial<Address> = { id: ownAddress.id };
     if (street) {
       addressData.street = street;
     }
