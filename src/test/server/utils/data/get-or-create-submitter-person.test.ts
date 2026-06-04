@@ -1,31 +1,57 @@
 import { AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import Address from "../../../../data/entity/location/address.entity";
+import Postcode from "../../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Person from "../../../../data/entity/person.entity";
-import { getOrCreateSubmitterPerson } from "../../../../server/utils/data/get-or-create-submitter-person";
+import {
+  getOrCreateSubmitterPerson,
+  streetFromAddress,
+} from "../../../../server/utils/data/get-or-create-submitter-person";
 
 const personFind = vi.fn();
 const personSave = vi.fn();
+const personUpdate = vi.fn((..._args: any[]) =>
+  Promise.resolve({ affected: 1 }),
+);
 const agentPersonFind = vi.fn();
 const agentPersonSave = vi.fn();
+const addressCreate = vi.fn((d: any) => d);
+const addressSave = vi.fn();
+const addressUpdate = vi.fn((..._args: any[]) =>
+  Promise.resolve({ affected: 1 }),
+);
+const postcodeFindOneBy = vi.fn();
 
 const fakeManager: any = {
   getRepository: (entity: any) => {
     switch (entity) {
       case Person:
-        return { findOne: personFind, save: personSave };
+        return { findOne: personFind, save: personSave, update: personUpdate };
       case AgentPerson:
         return { findOne: agentPersonFind, save: agentPersonSave };
+      case Address:
+        return {
+          create: addressCreate,
+          save: addressSave,
+          update: addressUpdate,
+        };
+      case Postcode:
+        return { findOneBy: postcodeFindOneBy };
       default:
         throw new Error(`unexpected repo: ${entity?.name}`);
     }
   },
 };
 
+// rac_address / rac_plz default to empty so the address step is a no-op for the
+// person/link-focused cases below; address behaviour is exercised separately.
 const baseBody = {
   rac_email: "sam@center.de",
   rac_full_name: "Sam Submitter",
   rac_phone: "+49-30-2222222",
+  rac_address: "",
+  rac_plz: "",
 };
 
 beforeEach(() => {
@@ -266,6 +292,148 @@ describe("getOrCreateSubmitterPerson", () => {
     expect(personSave.mock.calls[0][0]).toMatchObject({
       firstName: "Mary",
       lastName: "van der Berg",
+    });
+  });
+
+  describe("address (rac_address / rac_plz)", () => {
+    const addressBody = {
+      ...baseBody,
+      rac_address: "Musterstr. 1, 12345 Berlin",
+      rac_plz: "12345",
+    };
+
+    it("existing person with an address — patches street and resolved postcode", async () => {
+      personFind.mockResolvedValueOnce({
+        id: 7,
+        email: "sam@center.de",
+        addressId: 500,
+      });
+      personSave.mockImplementation(async (p: any) => p);
+      postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(addressBody, 42, fakeManager);
+
+      // patchAddress -> patchEntity -> Address.update({ id }, data)
+      expect(addressUpdate).toHaveBeenCalledTimes(1);
+      expect(addressUpdate.mock.calls[0][0]).toMatchObject({ id: 500 });
+      expect(addressUpdate.mock.calls[0][1]).toMatchObject({
+        id: 500,
+        street: "Musterstr. 1",
+        postcodeId: 9,
+      });
+      expect(addressCreate).not.toHaveBeenCalled();
+    });
+
+    it("existing address + unknown rac_plz — updates street but leaves postcode untouched", async () => {
+      personFind.mockResolvedValueOnce({
+        id: 7,
+        email: "sam@center.de",
+        addressId: 500,
+      });
+      personSave.mockImplementation(async (p: any) => p);
+      postcodeFindOneBy.mockResolvedValueOnce(null); // rac_plz not found
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(
+        { ...addressBody, rac_plz: "99999" },
+        42,
+        fakeManager,
+      );
+
+      expect(addressUpdate).toHaveBeenCalledTimes(1);
+      expect(addressUpdate.mock.calls[0][1]).toMatchObject({
+        id: 500,
+        street: "Musterstr. 1",
+      });
+      // postcodeId must not be set when rac_plz does not resolve.
+      expect(addressUpdate.mock.calls[0][1]).not.toHaveProperty("postcodeId");
+    });
+
+    it("new person without an address — creates one and links it to the person", async () => {
+      personFind.mockResolvedValueOnce(null);
+      personSave.mockImplementation(async (p: any) => ({ ...p, id: 55 }));
+      postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
+      addressSave.mockResolvedValueOnce({ id: 777 });
+      agentPersonFind.mockResolvedValueOnce(null);
+
+      const result = await getOrCreateSubmitterPerson(
+        addressBody,
+        42,
+        fakeManager,
+      );
+
+      // createAddress: create({ street, postcodeId }) then save
+      expect(addressCreate).toHaveBeenCalledTimes(1);
+      expect(addressCreate.mock.calls[0][0]).toMatchObject({
+        street: "Musterstr. 1",
+        postcodeId: 9,
+      });
+      // Person.addressId backfilled to the new address.
+      expect(personUpdate).toHaveBeenCalledWith({ id: 55 }, { addressId: 777 });
+      expect(result?.addressId).toBe(777);
+    });
+
+    it("new address + unknown rac_plz — falls back to 12345 for the postcode", async () => {
+      personFind.mockResolvedValueOnce(null);
+      personSave.mockImplementation(async (p: any) => ({ ...p, id: 55 }));
+      // First lookup (rac_plz 99999) misses; createAddress then resolves the
+      // FALLBACK_PLZ "12345".
+      postcodeFindOneBy
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 1, value: "12345" });
+      addressSave.mockResolvedValueOnce({ id: 778 });
+      agentPersonFind.mockResolvedValueOnce(null);
+
+      await getOrCreateSubmitterPerson(
+        { ...addressBody, rac_plz: "99999" },
+        42,
+        fakeManager,
+      );
+
+      expect(postcodeFindOneBy.mock.calls[0][0]).toEqual({ value: "99999" });
+      expect(postcodeFindOneBy.mock.calls[1][0]).toEqual({ value: "12345" });
+      expect(addressCreate.mock.calls[0][0]).toMatchObject({
+        street: "Musterstr. 1",
+        postcodeId: 1,
+      });
+    });
+
+    it("no rac_address and no rac_plz — touches neither Address nor Postcode", async () => {
+      personFind.mockResolvedValueOnce({ id: 7, email: "sam@center.de" });
+      personSave.mockImplementation(async (p: any) => p);
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(baseBody, 42, fakeManager);
+
+      expect(postcodeFindOneBy).not.toHaveBeenCalled();
+      expect(addressCreate).not.toHaveBeenCalled();
+      expect(addressUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("streetFromAddress", () => {
+    it.each([
+      ["Musterstr. 1, 12345 Berlin", "Musterstr. 1"],
+      ["Musterstr. 1 12345 Berlin", "Musterstr. 1"],
+      ["Some Street 12", "Some Street 12"],
+      ["", ""],
+      ["   ", ""],
+      ["12345 Berlin", ""],
+    ])("%j -> %j", (input, expected) => {
+      expect(streetFromAddress(input)).toBe(expected);
     });
   });
 });

@@ -1,14 +1,94 @@
 import { AgentRoleType, OpportunityLegacyFormData } from "need4deed-sdk";
 import { DataSource, EntityManager, ILike } from "typeorm";
 import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
+import { createAddress, patchAddress } from "./for-routes";
 
+// rac_address / rac_plz are optional so existing callers that only carry the
+// name/phone/email blob (e.g. backfill migrations) still satisfy the type.
 type SubmitterFields = Pick<
   OpportunityLegacyFormData,
   "rac_email" | "rac_full_name" | "rac_phone"
->;
+> &
+  Partial<Pick<OpportunityLegacyFormData, "rac_address" | "rac_plz">>;
+
+// An Address row cannot exist without a Postcode (NOT NULL). When a brand-new
+// submitter address is created and rac_plz doesn't resolve to a known Postcode,
+// fall back to this value rather than dropping the address entirely.
+const FALLBACK_PLZ = "12345";
+
+/**
+ * Extract the street portion of a free-text address, cutting the German 5-digit
+ * postcode and the city that follows it (e.g. "Musterstr. 1, 12345 Berlin" ->
+ * "Musterstr. 1"). Returns "" when nothing usable remains.
+ */
+export function streetFromAddress(raw: string | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  // Drop the first 5-digit postcode and everything after it, plus any
+  // separator (comma/whitespace) immediately preceding it.
+  return trimmed.replace(/[\s,]*\b\d{5}\b.*$/, "").trim();
+}
+
+/**
+ * Patch (or create) the submitter Person's Address from rac_address / rac_plz.
+ *
+ *   - rac_address -> address.street (postcode + city stripped).
+ *   - rac_plz     -> resolved to an existing Postcode by value (never created).
+ *       - existing address + plz resolves -> update postcode.
+ *       - existing address + plz unknown  -> leave the postcode as is.
+ *       - no address yet                  -> create one, falling back to
+ *         FALLBACK_PLZ when rac_plz does not resolve (Address needs a Postcode).
+ */
+async function syncSubmitterAddress(
+  person: Person,
+  body: SubmitterFields,
+  manager: DataSource | EntityManager,
+): Promise<void> {
+  const street = streetFromAddress(body.rac_address);
+  const plz = (body.rac_plz ?? "").trim();
+  if (!street && !plz) {
+    return;
+  }
+
+  const postcodeRepository = getRepository(manager, Postcode);
+  const resolved = plz
+    ? await postcodeRepository.findOneBy({ value: plz })
+    : null;
+
+  if (person.addressId) {
+    const addressData: Partial<Address> = { id: person.addressId };
+    if (street) {
+      addressData.street = street;
+    }
+    // resolved ? set postcode : leave the existing postcode untouched.
+    await patchAddress(
+      addressData,
+      resolved ? { id: resolved.id } : {},
+      manager,
+    );
+    return;
+  }
+
+  const address = await createAddress(
+    { street: street || undefined },
+    resolved ? { id: resolved.id } : { value: FALLBACK_PLZ },
+    manager,
+  );
+  if (address) {
+    person.addressId = address.id;
+    await getRepository(manager, Person).update(
+      { id: person.id },
+      { addressId: address.id },
+    );
+  }
+}
 
 function splitName(
   rawName: string | undefined,
@@ -36,7 +116,9 @@ function splitName(
  *                       fields the form actually provides are touched, so a
  *                       later submission omitting one does not wipe good data.
  *        - Not found -> create Person from rac_*.
- *   3. Either way, upsert an AgentPerson link (VOLUNTEER_COORDINATOR) for
+ *   3. Patch the Person's Address from rac_address / rac_plz (see
+ *      syncSubmitterAddress).
+ *   4. Either way, upsert an AgentPerson link (VOLUNTEER_COORDINATOR) for
  *      (person, agentId) when one does not already exist.
  *
  * `manager` defaults to the global dataSource; pass a transactional
@@ -94,6 +176,8 @@ export async function getOrCreateSubmitterPerson(
       person = await personRepository.save(person);
     }
   }
+
+  await syncSubmitterAddress(person, body, manager);
 
   const existingLink = await agentPersonRepository.findOne({
     where: { agentId, personId: person.id },
