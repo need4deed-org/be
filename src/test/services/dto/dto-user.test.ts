@@ -37,6 +37,7 @@ describe("serializeUserToMeDTO", () => {
   it("falls back to empty strings when person fields are missing", () => {
     const user = {
       id: 2,
+      personId: null,
       email: "no-person@example.com",
       isActive: false,
       role: "coordinator",
@@ -50,6 +51,8 @@ describe("serializeUserToMeDTO", () => {
     expect(result.firstName).toBe("");
     expect(result.fullName).toBe("");
     expect(result.avatarUrl).toBe("");
+    // personId is nullable: a person-less user must not serialize to 0.
+    expect(result.personId).toBeUndefined();
   });
 
   it("falls back to default isoCode 'en' and timezone 'CET' when not set", () => {
