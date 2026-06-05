@@ -312,22 +312,8 @@ export default async function commentRoutes(
             .send({ message: `Comment id:${id} not found.` });
         }
 
-        // Only creator or admin can edit
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: request.user.id },
-        });
-
-        if (!user) {
-          throw new Error(
-            `Error updating comment ${id}: user ${request.user.id} not found`,
-          );
-        }
-
-        if (user.role !== UserRole.ADMIN && user.id !== comment.user.id) {
-          return reply
-            .status(403)
-            .send({ message: "Insufficient permissions." });
-        }
+        // Any coordinator can edit any comment — the dashboard is an internal
+        // tool and coordinators regularly update each other's contact comments.
 
         const { taggedPersonIds, ...patch } =
           request.body as Partial<Comment> & {

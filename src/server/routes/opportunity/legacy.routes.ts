@@ -4,10 +4,13 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
+  EntityTableName,
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
 import { ILike, In } from "typeorm";
+import Comment from "../../../data/entity/comment.entity";
+import User from "../../../data/entity/user.entity";
 import { UnauthorizedError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -99,6 +102,39 @@ export default async function opportunityLegacyRoutes(
       }
 
       const id = await writeOpportunityLegacy(opportunity);
+
+      // Write RAC contact details as a piped comment so the dashboard
+      // contact section is pre-populated with the submitter's details.
+      // Format: email<|>name<|>address<|>plz<|>phone
+      const { rac_email, rac_full_name, rac_phone, rac_address, rac_plz } = request.body;
+      if (rac_email || rac_full_name || rac_phone) {
+        try {
+          const agentId = opportunity.agent?.id;
+          const coordinatorUser = agentId
+            ? await fastify.db.userRepository
+                .createQueryBuilder("u")
+                .innerJoin("u.person", "p")
+                .innerJoin("agent_person", "ap", "ap.person_id = p.id AND ap.agent_id = :agentId", { agentId })
+                .getOne()
+            : null;
+
+          const systemUser = coordinatorUser
+            ?? await fastify.db.userRepository.findOne({ where: {}, order: { id: "ASC" } });
+
+          if (systemUser) {
+            const text = `${rac_email ?? ""}<|>${rac_full_name ?? ""}<|>${rac_address ?? ""}<|>${rac_plz ?? ""}<|>${rac_phone ?? ""}`;
+            const comment = fastify.db.commentRepository.create({
+              text,
+              entityType: EntityTableName.OPPORTUNITY,
+              entityId: id,
+              userId: systemUser.id,
+            });
+            await fastify.db.commentRepository.save(comment);
+          }
+        } catch (err) {
+          logger.error(`Failed to write contact comment for opportunity ${id}: ${err}`);
+        }
+      }
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
