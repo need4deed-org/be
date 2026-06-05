@@ -9,8 +9,6 @@ import {
   OpportunityStatusType,
 } from "need4deed-sdk";
 import { ILike, In } from "typeorm";
-import Comment from "../../../data/entity/comment.entity";
-import User from "../../../data/entity/user.entity";
 import { UnauthorizedError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
