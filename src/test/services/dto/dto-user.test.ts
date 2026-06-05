@@ -5,6 +5,7 @@ describe("serializeUserToMeDTO", () => {
   it("maps all user fields from entity to API shape", () => {
     const user = {
       id: 1,
+      personId: 42,
       email: "test@example.com",
       isActive: true,
       role: "admin",
@@ -21,6 +22,7 @@ describe("serializeUserToMeDTO", () => {
 
     expect(result).toEqual({
       id: 1,
+      personId: 42,
       email: "test@example.com",
       isActive: true,
       role: "admin",

@@ -4,6 +4,7 @@ import User from "../../data/entity/user.entity";
 export function serializeUserToMeDTO(user: User): ApiUserGet {
   return {
     id: user.id,
+    personId: user.personId,
     email: user.email,
     isActive: user.isActive,
     role: user.role,
