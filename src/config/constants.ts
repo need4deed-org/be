@@ -99,7 +99,10 @@ export const cookieOptions = {
   path: "/",
 };
 
-export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
+// Provider-neutral from address. AWS_SES_FROM_EMAIL is a transitional fallback
+// until deployed environments set EMAIL_FROM; drop it once they do.
+export const defaultFrom =
+  process.env.EMAIL_FROM || process.env.AWS_SES_FROM_EMAIL || "";
 
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
