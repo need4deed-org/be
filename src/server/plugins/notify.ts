@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import User from "../../data/entity/user.entity";
 import {
+  BrevoEmailTransport,
   CommentTaggedInput,
   createSesClient,
   EmailTransport,
@@ -26,11 +27,13 @@ declare module "fastify" {
   }
 }
 
-type EmailProvider = "ses";
+type EmailProvider = "brevo" | "ses";
 
 function buildEmailTransport(): EmailTransport {
-  const provider = (process.env.EMAIL_PROVIDER ?? "ses") as EmailProvider;
+  const provider = (process.env.EMAIL_PROVIDER ?? "brevo") as EmailProvider;
   switch (provider) {
+    case "brevo":
+      return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
     case "ses":
       return new SesEmailTransport(createSesClient());
     default:
