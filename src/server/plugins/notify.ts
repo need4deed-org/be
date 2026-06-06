@@ -2,13 +2,12 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import User from "../../data/entity/user.entity";
 import {
+  BrevoEmailTransport,
   CommentTaggedInput,
-  createSesClient,
   EmailTransport,
   sendCommentTagged,
   sendEmailVerification,
   sendOpsAlert,
-  SesEmailTransport,
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
@@ -26,16 +25,8 @@ declare module "fastify" {
   }
 }
 
-type EmailProvider = "ses";
-
 function buildEmailTransport(): EmailTransport {
-  const provider = (process.env.EMAIL_PROVIDER ?? "ses") as EmailProvider;
-  switch (provider) {
-    case "ses":
-      return new SesEmailTransport(createSesClient());
-    default:
-      throw new Error(`Unsupported email provider: ${provider}`);
-  }
+  return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
 }
 
 function buildSlackTransport(): SlackTransport | undefined {

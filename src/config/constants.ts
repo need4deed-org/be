@@ -99,7 +99,8 @@ export const cookieOptions = {
   path: "/",
 };
 
-export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
+// Provider-neutral from address; must be a verified sender in the email provider.
+export const defaultFrom = process.env.EMAIL_FROM || "";
 
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
