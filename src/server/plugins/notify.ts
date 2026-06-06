@@ -4,12 +4,10 @@ import User from "../../data/entity/user.entity";
 import {
   BrevoEmailTransport,
   CommentTaggedInput,
-  createSesClient,
   EmailTransport,
   sendCommentTagged,
   sendEmailVerification,
   sendOpsAlert,
-  SesEmailTransport,
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
@@ -27,18 +25,8 @@ declare module "fastify" {
   }
 }
 
-type EmailProvider = "brevo" | "ses";
-
 function buildEmailTransport(): EmailTransport {
-  const provider = (process.env.EMAIL_PROVIDER ?? "brevo") as EmailProvider;
-  switch (provider) {
-    case "brevo":
-      return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
-    case "ses":
-      return new SesEmailTransport(createSesClient());
-    default:
-      throw new Error(`Unsupported email provider: ${provider}`);
-  }
+  return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
