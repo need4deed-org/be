@@ -8,6 +8,7 @@ export const RoutePrefix = {
   HEALTH_CHECK: "/health-check",
   LEGACY: "/legacy",
   LOGIN: "/login",
+  LOGOUT: "/logout",
   ME: "/me",
   OPPORTUNITY: "/opportunity",
   OPPORTUNITY_LINKED: "/opportunity-linked",

@@ -210,9 +210,35 @@ async function authRoutes(
       }
     },
   );
+
+  fastify.post<{ Reply: { message: string } }>(
+    prefixedPath + RoutePrefix.LOGOUT,
+    {
+      onRequest: [fastify.authenticate()],
+      schema: {
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (_request, reply) => {
+      // Clear the httpOnly auth cookies on the caller's browser. The options
+      // must match those used when setting them (path/sameSite/secure) so the
+      // browser actually removes them.
+      reply.clearCookie(accessCookieName, cookieOptions);
+      reply.clearCookie(refreshCookieName, cookieOptions);
+
+      return reply.status(200).send({ message: "Logout successful." });
+    },
+  );
 }
 
 export default fp(authRoutes, {
   name: "auth-routes",
-  dependencies: ["typeorm-plugin"],
+  dependencies: ["typeorm-plugin", "jwt-auth-plugin"],
 });
