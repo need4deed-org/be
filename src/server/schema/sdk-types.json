@@ -775,6 +775,11 @@
       "type": "string",
       "enum": ["agent-high", "agent-low", "agent-unknown"]
     },
+    "Lang": {
+      "$id": "Lang",
+      "type": "string",
+      "enum": ["en", "de"]
+    },
     "UserRole": {
       "$id": "UserRole",
       "type": "string",
