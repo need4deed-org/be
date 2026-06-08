@@ -214,7 +214,6 @@ async function authRoutes(
   fastify.post<{ Reply: { message: string } }>(
     prefixedPath + RoutePrefix.LOGOUT,
     {
-      onRequest: [fastify.authenticate()],
       schema: {
         response: {
           200: {
@@ -227,9 +226,10 @@ async function authRoutes(
       },
     },
     async (_request, reply) => {
-      // Clear the httpOnly auth cookies on the caller's browser. The options
-      // must match those used when setting them (path/sameSite/secure) so the
-      // browser actually removes them.
+      // Logout is open (no auth guard) so a stale/expired session can always
+      // clear its cookies. Clear the httpOnly auth cookies on the caller's
+      // browser using the same options they were set with (path/sameSite/secure)
+      // so the browser actually removes them.
       reply.clearCookie(accessCookieName, cookieOptions);
       reply.clearCookie(refreshCookieName, cookieOptions);
 
@@ -240,5 +240,5 @@ async function authRoutes(
 
 export default fp(authRoutes, {
   name: "auth-routes",
-  dependencies: ["typeorm-plugin", "jwt-auth-plugin"],
+  dependencies: ["typeorm-plugin"],
 });
