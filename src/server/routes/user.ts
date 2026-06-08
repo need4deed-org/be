@@ -259,22 +259,26 @@ export default async function userRoutes(
         },
       },
       // Pre-handler hook: authorize the registration and resolve the Person.
-      preHandler: async (request, reply) => {
+      preHandler: async (request) => {
         const { person: personData, email, role } = request.body;
 
-        // Nobody may self-register as admin.
-        if (role === UserRole.ADMIN) {
+        // Privileged roles cannot be self-assigned via registration.
+        if (role === UserRole.ADMIN || role === UserRole.COORDINATOR) {
           throw new UnauthorizedError();
         }
 
-        // Authorize by email domain, the same way POST /opportunity/legacy does:
-        // the domain must belong to a known agent's contact person.
-        const domain = (email || "").split("@").pop();
-        const matchingAgent = await fastify.db.agentRepository.findOne({
-          where: { agentPerson: { person: { email: ILike(`%@${domain}`) } } },
-        });
-        if (!matchingAgent) {
-          throw new NotFoundError();
+        // Agents must register from a known agent's email domain (same gate as
+        // POST /opportunity/legacy). Volunteers and users self-register freely.
+        if (role === UserRole.AGENT) {
+          const domain = (email || "").split("@").pop();
+          const matchingAgent = await fastify.db.agentRepository.findOne({
+            where: {
+              agentPerson: { person: { email: ILike(`%@${domain}`) } },
+            },
+          });
+          if (!matchingAgent) {
+            throw new NotFoundError();
+          }
         }
 
         const personRepository = fastify.db.personRepository;
@@ -300,12 +304,12 @@ export default async function userRoutes(
           logger.error(
             `New Person entity validation errors: ${JSON.stringify(errors)}`,
           );
-          return reply.status(400).send({
-            message: "Validation failed for new person data",
-            errors: errors.flatMap((err) =>
-              Object.values(err.constraints || {}),
-            ),
-          });
+          const messages = errors.flatMap((err) =>
+            Object.values(err.constraints || {}),
+          );
+          throw new BadRequestError(
+            `Validation failed for new person data: ${messages.join("; ")}`,
+          );
         }
         request.resolvedPerson = newPerson;
       },
