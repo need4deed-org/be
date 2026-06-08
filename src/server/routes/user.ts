@@ -1,6 +1,12 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiUserGet, ApiUserPost, SortOrder, UserRole } from "need4deed-sdk";
+import {
+  ApiUserGet,
+  ApiUserPost,
+  Lang,
+  SortOrder,
+  UserRole,
+} from "need4deed-sdk";
 import { FindOptionsWhere, ILike } from "typeorm";
 import {
   BadRequestError,
@@ -329,7 +335,7 @@ export default async function userRoutes(
         password: await hashPassword(passwordPlain),
         role,
         isActive: false,
-        language,
+        language: language ?? Lang.EN,
         person: request.resolvedPerson,
       });
 

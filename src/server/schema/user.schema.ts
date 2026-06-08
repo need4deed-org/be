@@ -1,16 +1,18 @@
 import { existingPersonSchema, newPersonSchema } from "./person.schema";
 
 // Matches the SDK ApiUserPost contract: email, password, role (UserRole),
-// language (Lang), person. (isActive is server-controlled; timezone uses the
-// entity default.)
+// optional language (Lang, defaults to "en"), person. (isActive is
+// server-controlled; timezone uses the entity default.)
 export const createUserBodySchema = {
   type: "object",
-  required: ["email", "password", "role", "language", "person"],
+  required: ["email", "password", "role", "person"],
   properties: {
     email: { type: "string", format: "email" },
     password: { type: "string", minLength: 8, maxLength: 50 },
     role: { $ref: "UserRole#" },
-    language: { $ref: "Lang#" },
+    // Optional: defaults to "en" when omitted (allOf keeps the Lang enum while
+    // allowing a sibling default, which a bare $ref would ignore in draft-07).
+    language: { allOf: [{ $ref: "Lang#" }], default: "en" },
     person: {
       oneOf: [
         // The 'person' property must match one of these schemas
