@@ -533,6 +533,7 @@
             "name": { "type": "string" },
             "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
             "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "communication": { "$ref": "VolunteerStateCommunicationType#" },
             "avatarUrl": { "type": "string" },
             "activities": {
               "type": "array",
@@ -563,6 +564,7 @@
         "name",
         "volunteeringType",
         "engagement",
+        "communication",
         "avatarUrl"
       ]
     },
