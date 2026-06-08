@@ -140,7 +140,7 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
 - `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
-- `AWS_SES_*` — email sending via AWS SES
+- `EMAIL_FROM`, `BREVO_API_KEY` — transactional email via Brevo (verified sender + API key)
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 
 ---
@@ -152,6 +152,18 @@ Any changes in entities that are registered in `src/data/data-source.ts` must be
 ```
 yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
 ```
+
+The runtime contract is at https://app.need4deed.org/swagger/json
+
+---
+
+## Handling throws in endpoint handlers
+
+Avoid `try {} catch {}` blocks relaying on error handling by fastify.
+
+Just throw specific error based on `src/config/error`
+
+If needed update error handling in `src/server/index.ts`
 
 ---
 
