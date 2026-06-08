@@ -153,8 +153,6 @@ Any changes in entities that are registered in `src/data/data-source.ts` must be
 yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
 ```
 
-The runtime contract is at https://app.need4deed.org/swagger/json
-
 ---
 
 ## Handling throws in endpoint handlers
