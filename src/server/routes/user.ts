@@ -336,6 +336,10 @@ export default async function userRoutes(
         role,
         isActive: false,
         language: language ?? Lang.EN,
+        // Server-controlled (not in ApiUserPost). Set explicitly to the entity
+        // default so class-validator's @IsString passes (the DB default only
+        // applies at INSERT, not to the in-memory entity being validated).
+        timezone: "CET",
         person: request.resolvedPerson,
       });
 
