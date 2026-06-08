@@ -16,5 +16,6 @@ export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./sync-comment-tags";
 export * from "./update-leads";
+export * from "./write-opportunity-contact-comment";
 export * from "./write-opportunity-legacy";
 export * from "./write-volunteer-legacy";

@@ -25,6 +25,7 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOrCreateSubmitterPerson,
+  writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
 
@@ -99,6 +100,15 @@ export default async function opportunityLegacyRoutes(
       }
 
       const id = await writeOpportunityLegacy(opportunity);
+
+      // Durable backup of the submitter's contact as a piped <|> comment, in
+      // addition to the Person-based contact set above. Best-effort: never
+      // blocks the submission.
+      await writeOpportunityContactComment(
+        id,
+        opportunity.agent?.id,
+        request.body,
+      );
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
