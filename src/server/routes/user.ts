@@ -1,8 +1,13 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiUserGet, ApiUserPost, SortOrder } from "need4deed-sdk";
-import { FindOptionsWhere } from "typeorm";
-import { ConflictError } from "../../config";
+import { ApiUserGet, ApiUserPost, SortOrder, UserRole } from "need4deed-sdk";
+import { FindOptionsWhere, ILike } from "typeorm";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../config";
 import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
@@ -253,42 +258,56 @@ export default async function userRoutes(
           ...responseErrors,
         },
       },
-      // Pre-handler hook to resolve/create the Person entity
+      // Pre-handler hook: authorize the registration and resolve the Person.
       preHandler: async (request, reply) => {
-        const { person: personData } = request.body;
+        const { person: personData, email, role } = request.body;
+
+        // Nobody may self-register as admin.
+        if (role === UserRole.ADMIN) {
+          throw new UnauthorizedError();
+        }
+
+        // Authorize by email domain, the same way POST /opportunity/legacy does:
+        // the domain must belong to a known agent's contact person.
+        const domain = (email || "").split("@").pop();
+        const matchingAgent = await fastify.db.agentRepository.findOne({
+          where: { agentPerson: { person: { email: ILike(`%@${domain}`) } } },
+        });
+        if (!matchingAgent) {
+          throw new NotFoundError();
+        }
+
         const personRepository = fastify.db.personRepository;
 
-        let resolvedPerson: Person | null = null;
-
+        // Existing person by id.
         if (personData.id) {
-          // Case 1: person.id is provided - find existing person.
-          // DB errors propagate to the global error handler.
-          resolvedPerson = await personRepository.findOneBy({
+          const resolvedPerson = await personRepository.findOneBy({
             id: personData.id,
           });
-
           if (!resolvedPerson) {
-            return reply
-              .status(404)
-              .send({ message: `Person with ID ${personData.id} not found.` });
-          }
-        } else {
-          resolvedPerson = new Person(personData);
-
-          const errors = await validate(resolvedPerson);
-          if (errors.length > 0) {
-            logger.error(
-              `New Person entity validation errors: ${JSON.stringify(errors)}`,
+            throw new BadRequestError(
+              `Person with ID ${personData.id} not found.`,
             );
-            return reply.status(400).send({
-              message: "Validation failed for new person data",
-              errors: errors.flatMap((err) =>
-                Object.values(err.constraints || {}),
-              ),
-            });
           }
+          request.resolvedPerson = resolvedPerson;
+          return;
         }
-        request.resolvedPerson = resolvedPerson;
+
+        // New person.
+        const newPerson = new Person(personData);
+        const errors = await validate(newPerson);
+        if (errors.length > 0) {
+          logger.error(
+            `New Person entity validation errors: ${JSON.stringify(errors)}`,
+          );
+          return reply.status(400).send({
+            message: "Validation failed for new person data",
+            errors: errors.flatMap((err) =>
+              Object.values(err.constraints || {}),
+            ),
+          });
+        }
+        request.resolvedPerson = newPerson;
       },
     },
     async (request, reply) => {
