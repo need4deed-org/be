@@ -141,7 +141,7 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `NODE_ENV` — `development` | `test` | `production`
 - `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
 - `EMAIL_FROM`, `BREVO_API_KEY` — transactional email via Brevo (verified sender + API key)
-- `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${AWS_S3_BASE}emails/verification.json`); falls back to built-in copy
+- `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${CDN_BASE_URL}emails/verification.json`); falls back to built-in copy
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 
 ---

@@ -4,8 +4,8 @@ const publicFixturesFromHere = ["..", "..", "public", "data"];
 
 const positives = ["1", "YES", "Yes", "yes", "TRUE", "True", "true"];
 
-export const awsS3BaseUrl =
-  process.env.AWS_S3_BASE || "https://d2nwrdddg8skub.cloudfront.net/dev/";
+export const CDNBaseUrl =
+  process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
 
 export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
 
@@ -74,9 +74,9 @@ export const seedVolunteersFile = path.join(
   "nid-volunteers.json",
 );
 
-// export const seedAgentsFile = awsS3BaseUrl + "agents.json";
-// export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
-// export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
+// export const seedAgentsFile = CDNBaseUrl + "/dev/agents.json";
+// export const seedVolunteersFile = CDNBaseUrl + "/dev/volunteers.json";
+// export const seedOpportunitiesFile = CDNBaseUrl + "/dev/opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
@@ -84,7 +84,7 @@ export const urlEmailVerification =
 
 // CDN manifest (per-locale subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
-  awsS3BaseUrl + "emails/verification.json";
+  CDNBaseUrl + "emails/verification.json";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
