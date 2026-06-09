@@ -3,7 +3,6 @@ import {
   AgentRoleType,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
-import { ILike } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -90,24 +89,37 @@ export async function createAgentForPerson(
  * (i.e. an existing member shares the domain). Registrant emails are already
  * restricted to allowlisted RAC domains, so a domain match is a strong "same
  * org" signal. No match -> PENDING, surfaced to an ADMIN/COORDINATOR.
+ *
+ * Per member the match uses Person.email, falling back to the linked User
+ * email(s) when the Person has none (Person.email is often unset, but the User
+ * always has one).
  */
 export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
 ): Promise<AgentMembershipStatus> {
-  const domain = registrantEmail.split("@").pop();
+  const domain = registrantEmail.split("@").pop()?.toLowerCase();
   if (!domain) {
     return AgentMembershipStatus.PENDING;
   }
+  const suffix = `@${domain}`;
 
-  const existing = await dataSource.getRepository(AgentPerson).findOne({
-    where: { agentId, person: { email: ILike(`%@${domain}`) } },
-    relations: ["person"],
+  const members = await dataSource.getRepository(AgentPerson).find({
+    where: { agentId },
+    relations: ["person", "person.users"],
   });
 
-  return existing
-    ? AgentMembershipStatus.ACTIVE
-    : AgentMembershipStatus.PENDING;
+  const matched = members.some((member) => {
+    const personEmail = member.person?.email;
+    if (personEmail) {
+      return personEmail.toLowerCase().endsWith(suffix);
+    }
+    return (member.person?.users ?? []).some((user) =>
+      user.email?.toLowerCase().endsWith(suffix),
+    );
+  });
+
+  return matched ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
 /**

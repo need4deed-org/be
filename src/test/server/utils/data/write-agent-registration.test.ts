@@ -17,6 +17,7 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
 
 const txnManager: any = { getRepository: vi.fn() };
 const agentPersonRepoFindOne = vi.fn();
+const agentPersonRepoFind = vi.fn();
 const agentPersonRepoSave = vi.fn();
 
 vi.mock("../../../../data/data-source", () => ({
@@ -24,6 +25,7 @@ vi.mock("../../../../data/data-source", () => ({
     manager: { transaction: async (cb: any) => cb(txnManager) },
     getRepository: () => ({
       findOne: agentPersonRepoFindOne,
+      find: agentPersonRepoFind,
       save: agentPersonRepoSave,
     }),
   },
@@ -136,24 +138,35 @@ describe("createAgentForPerson", () => {
 });
 
 describe("resolveJoinStatus", () => {
-  it("returns ACTIVE when an existing member shares the registrant's email domain", async () => {
-    agentPersonRepoFindOne.mockResolvedValueOnce({ id: 1 });
+  it("returns ACTIVE when a member's Person.email shares the registrant's domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      { person: { email: "existing@center.de", users: [] } },
+    ]);
     const status = await resolveJoinStatus(33, "newcomer@center.de");
     expect(status).toBe(AgentMembershipStatus.ACTIVE);
   });
 
-  it("returns PENDING when no existing member shares the domain", async () => {
-    agentPersonRepoFindOne.mockResolvedValueOnce(null);
-    const status = await resolveJoinStatus(33, "stranger@elsewhere.de");
+  it("falls back to a member's User email when Person.email is null", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      { person: { email: null, users: [{ email: "boss@center.de" }] } },
+    ]);
+    const status = await resolveJoinStatus(33, "newcomer@center.de");
+    expect(status).toBe(AgentMembershipStatus.ACTIVE);
+  });
+
+  it("returns PENDING when neither Person nor User emails share the domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      { person: { email: null, users: [{ email: "boss@elsewhere.de" }] } },
+      { person: { email: "other@elsewhere.de", users: [] } },
+    ]);
+    const status = await resolveJoinStatus(33, "stranger@center.de");
     expect(status).toBe(AgentMembershipStatus.PENDING);
   });
 
   it("returns PENDING for a malformed email with no domain", async () => {
-    const status = await resolveJoinStatus(33, "no-at-sign");
-    // "no-at-sign".split("@").pop() === "no-at-sign", so it still queries;
-    // ensure a non-match resolves PENDING.
-    agentPersonRepoFindOne.mockResolvedValueOnce(null);
-    expect(status === AgentMembershipStatus.PENDING).toBe(true);
+    const status = await resolveJoinStatus(33, "");
+    expect(status).toBe(AgentMembershipStatus.PENDING);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
   });
 });
 
