@@ -48,6 +48,7 @@ declare module "fastify" {
     resolvedPerson?: Person; // Optional resolved person for account creation
     personId?: number; // Optional foreign key ID for the Person entity
     agents?: Agent[];
+    registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
   }
 }
 

@@ -1,147 +1,154 @@
-import { AgentRoleType, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentRoleType,
+  ApiAgentRegisterNew,
+} from "need4deed-sdk";
+import { ILike } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
-import Person from "../../../data/entity/person.entity";
-import User from "../../../data/entity/user.entity";
-import { hashPassword } from "../../../data/utils";
 import { createAddress } from "./for-routes";
 
-export interface RegisterAgentInput {
-  email: string;
-  password: string;
-  language?: string;
-  timezone?: string;
-  person: {
-    firstName: string;
-    lastName: string;
-    phone?: string;
-  };
-  agent: {
-    title: string;
-    type?: Agent["type"];
-    info?: string;
-    website?: string;
-    services?: Agent["services"];
-    addressStreet?: string;
-    addressPostcode?: string;
-    districtId?: number;
-    languages?: number[];
-  };
-}
-
 export interface RegisterAgentResult {
-  userId: number;
   agentId: number;
-  personId: number;
+  membershipStatus: AgentMembershipStatus;
 }
 
 /**
- * Persist a self-registered agent in one transaction:
- *   1. Person (with optional Address resolved from street + postcode)
- *   2. User (role: AGENT, isActive: false, password hashed, person linked)
- *   3. Agent (with optional Address from the same street + postcode)
- *   4. AgentPerson linking the Person to the Agent as VOLUNTEER_COORDINATOR
- *   5. AgentLanguage rows for the selected language ids (best-effort)
+ * CREATE path: a verified user creates a brand-new agent and becomes its first
+ * VOLUNTEER_COORDINATOR. The creator owns the record, so the membership is
+ * ACTIVE immediately. Persisted in one transaction:
+ *   1. Agent (with optional Address resolved from street + postcode)
+ *   2. AgentPerson linking the registrant's Person as VOLUNTEER_COORDINATOR
+ *   3. AgentLanguage rows for the selected language ids
  *
- * Address creation is best-effort: createAddress returns null when the
- * postcode value can't be resolved, in which case the entity is saved without
- * an addressId (the column is nullable on both Person and Agent).
- *
- * The caller fires the email-verification side effect AFTER this returns
- * successfully, mirroring the POST /user pattern (fire-and-forget, not in
- * the txn — verification failure shouldn't roll back the registration).
+ * The user + person already exist (created via POST /user + email verification);
+ * this only writes agent-side records. A unique-title violation bubbles up for
+ * the route to convert into a 409 + join suggestion.
  */
-export async function writeAgentRegistration(
-  input: RegisterAgentInput,
+export async function createAgentForPerson(
+  personId: number,
+  input: ApiAgentRegisterNew,
 ): Promise<RegisterAgentResult> {
-  const passwordHash = await hashPassword(input.password);
-
   let result!: RegisterAgentResult;
 
   await dataSource.manager.transaction(async (manager) => {
-    const street = input.agent.addressStreet;
-    const postcodeValue = input.agent.addressPostcode;
     const address =
-      street && postcodeValue
-        ? await createAddress({ street }, { value: postcodeValue }, manager)
+      input.addressStreet && input.addressPostcode
+        ? await createAddress(
+            { street: input.addressStreet },
+            { value: input.addressPostcode },
+            manager,
+          )
         : null;
 
-    const personRepository = manager.getRepository(Person);
-    const person = await personRepository.save(
-      new Person({
-        firstName: input.person.firstName,
-        lastName: input.person.lastName,
-        email: input.email,
-        phone: input.person.phone || undefined,
-        addressId: address?.id,
-      }),
-    );
-
-    const userRepository = manager.getRepository(User);
-    const user = await userRepository.save(
-      new User({
-        email: input.email,
-        password: passwordHash,
-        role: UserRole.AGENT,
-        isActive: false,
-        language: input.language ?? "en",
-        timezone: input.timezone ?? "CET",
-        personId: person.id,
-      }),
-    );
-
-    const agentRepository = manager.getRepository(Agent);
-    const agent = await agentRepository.save(
+    const agent = await manager.getRepository(Agent).save(
       new Agent({
-        title: input.agent.title,
-        type: input.agent.type,
-        info: input.agent.info,
-        website: input.agent.website,
-        services: input.agent.services,
-        districtId: input.agent.districtId,
+        title: input.title,
+        type: input.type ?? undefined,
+        info: input.info ?? undefined,
+        website: input.website ?? undefined,
+        services: input.services ?? undefined,
+        districtId: input.districtId ?? undefined,
         addressId: address?.id,
       }),
     );
 
-    const agentPersonRepository = manager.getRepository(AgentPerson);
-    await agentPersonRepository.save(
+    await manager.getRepository(AgentPerson).save(
       new AgentPerson({
         agentId: agent.id,
-        personId: person.id,
+        personId,
         role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
       }),
     );
 
-    if (input.agent.languages?.length) {
-      const agentLanguageRepository = manager.getRepository(AgentLanguage);
-      await agentLanguageRepository.save(
-        input.agent.languages.map(
-          (languageId) => ({ agentId: agent.id, languageId }) as AgentLanguage,
-        ),
-      );
+    if (input.languages?.length) {
+      await manager
+        .getRepository(AgentLanguage)
+        .save(
+          input.languages.map(
+            (languageId) =>
+              ({ agentId: agent.id, languageId }) as AgentLanguage,
+          ),
+        );
     }
 
-    result = { userId: user.id, agentId: agent.id, personId: person.id };
+    result = {
+      agentId: agent.id,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    };
   });
 
   return result;
 }
 
 /**
- * Maps the underlying Postgres unique-violation errors to a small shape the
- * route handler can use to return a 409 with a useful field hint, without
- * leaking the raw error.
+ * Resolve whether a join may be auto-approved. Mirrors the POST /opportunity/legacy
+ * authorization: the registrant's email domain must already belong to the agent
+ * (i.e. an existing member shares the domain). Registrant emails are already
+ * restricted to allowlisted RAC domains, so a domain match is a strong "same
+ * org" signal. No match -> PENDING, surfaced to an ADMIN/COORDINATOR.
  */
-export function classifyRegisterAgentConflict(
-  err: unknown,
-): "email" | "title" | null {
+export async function resolveJoinStatus(
+  agentId: number,
+  registrantEmail: string,
+): Promise<AgentMembershipStatus> {
+  const domain = registrantEmail.split("@").pop();
+  if (!domain) {
+    return AgentMembershipStatus.PENDING;
+  }
+
+  const existing = await dataSource.getRepository(AgentPerson).findOne({
+    where: { agentId, person: { email: ILike(`%@${domain}`) } },
+    relations: ["person"],
+  });
+
+  return existing
+    ? AgentMembershipStatus.ACTIVE
+    : AgentMembershipStatus.PENDING;
+}
+
+/**
+ * JOIN path: link a verified user's Person to an existing agent. Idempotent —
+ * an existing link for the same (agent, person, role) is returned as-is rather
+ * than duplicated. Status is decided by the caller via resolveJoinStatus.
+ */
+export async function joinAgent(
+  personId: number,
+  agentId: number,
+  status: AgentMembershipStatus,
+): Promise<RegisterAgentResult> {
+  const repo = dataSource.getRepository(AgentPerson);
+
+  const existing = await repo.findOne({
+    where: { agentId, personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
+  });
+
+  if (!existing) {
+    await repo.save(
+      new AgentPerson({
+        agentId,
+        personId,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status,
+      }),
+    );
+  }
+
+  return { agentId, membershipStatus: existing?.status ?? status };
+}
+
+/**
+ * Maps a Postgres unique-violation on agent.title to a small shape the route
+ * can use to return a 409 + the existing agent id (so the client can offer to
+ * JOIN instead of minting a duplicate), without leaking the raw error.
+ */
+export function classifyRegisterAgentConflict(err: unknown): "title" | null {
   const e = err as { code?: string; detail?: string };
   if (e?.code !== "23505" || !e.detail) {
     return null;
   }
-  if (e.detail.includes("email")) {return "email";}
-  if (e.detail.includes("title")) {return "title";}
-  return null;
+  return e.detail.includes("title") ? "title" : null;
 }

@@ -1,66 +1,91 @@
-// Request body for POST /agent/register (public self-registration).
+// Schemas for POST /agent/register?token=<verify-jwt>.
 //
-// Captures user/person credentials + agent profile in one payload; the
-// handler persists all four (Person, User, Agent, AgentPerson) inside a
-// single transaction. Address fields are best-effort — postcode must exist
-// in the Postcode table or the address is silently omitted (matches
-// createAddress in for-routes.ts).
-export const registerAgentBodySchema = {
+// The user + person already exist (created via POST /user + email verification).
+// Authorization is the verify token carried in the querystring (see the route's
+// preHandler); the body only describes the agent action: JOIN an existing agent
+// by id, or CREATE a new one.
+//
+// NOTE: the create field names (`info`, `languages: number[]`) follow the
+// registration write contract (SDK ApiAgentRegisterNew) and intentionally
+// differ from the agent PATCH shape (`about`, `languages: OptionById[]`).
+
+export const registerAgentQuerySchema = {
   type: "object",
-  required: ["email", "password", "person", "agent"],
+  required: ["token"],
   additionalProperties: false,
   properties: {
-    email: { type: "string", format: "email" },
-    password: { type: "string", minLength: 8, maxLength: 50 },
-    language: { type: "string", default: "en", pattern: "^[a-z]{2}$" },
-    timezone: { type: "string", default: "CET" },
-    person: {
+    token: { type: "string", minLength: 1 },
+  },
+};
+
+const registerAgentNewSchema = {
+  type: "object",
+  required: ["title"],
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", minLength: 1 },
+    type: { $ref: "AgentType#" },
+    info: { type: "string" },
+    website: { type: "string" },
+    services: {
+      type: "array",
+      items: { $ref: "AgentServiceType#" },
+    },
+    addressStreet: { type: "string" },
+    addressPostcode: { type: "string" },
+    districtId: { type: "integer" },
+    languages: {
+      type: "array",
+      items: { type: "integer" },
+    },
+  },
+};
+
+export const registerAgentBodySchema = {
+  oneOf: [
+    {
       type: "object",
-      required: ["firstName", "lastName"],
+      required: ["agentId"],
       additionalProperties: false,
       properties: {
-        firstName: { type: "string", minLength: 1 },
-        lastName: { type: "string", minLength: 1 },
-        phone: { type: "string", minLength: 7, maxLength: 20 },
+        agentId: { type: "integer" },
       },
     },
-    agent: {
+    {
       type: "object",
-      required: ["title"],
+      required: ["agent"],
       additionalProperties: false,
       properties: {
-        title: { type: "string", minLength: 1 },
-        type: { $ref: "AgentType#" },
-        info: { type: "string" },
-        website: { type: "string" },
-        services: {
-          type: "array",
-          items: { $ref: "AgentServiceType#" },
-        },
-        addressStreet: { type: "string" },
-        addressPostcode: { type: "string" },
-        districtId: { type: "integer" },
-        languages: {
-          type: "array",
-          items: { type: "integer" },
-        },
+        agent: registerAgentNewSchema,
+      },
+    },
+  ],
+};
+
+export const registerAgentResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "object",
+      required: ["agentId", "membershipStatus"],
+      properties: {
+        agentId: { type: "integer" },
+        membershipStatus: { type: "string", enum: ["active", "pending"] },
       },
     },
   },
 };
 
-export const registerAgentResponseSchema = {
+// 409 on CREATE when the title is taken — carries the existing agent id so the
+// client can offer to JOIN instead. Overrides the generic 409 in responseErrors.
+export const registerAgentConflictSchema = {
   type: "object",
+  required: ["message", "conflict"],
   properties: {
     message: { type: "string" },
-    data: {
-      type: "object",
-      properties: {
-        userId: { type: "integer" },
-        agentId: { type: "integer" },
-      },
-      required: ["userId", "agentId"],
-    },
+    conflict: { type: "string", enum: ["title"] },
+    agentId: { type: "integer" },
   },
-  required: ["message", "data"],
 };
