@@ -288,7 +288,7 @@
         },
         "additionalProperties": false
       },
-      "required": ["title", "proficiency"]
+      "required": ["title"]
     },
     "ApiAvailability": {
       "$id": "ApiAvailability",
