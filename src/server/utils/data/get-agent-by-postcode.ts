@@ -9,11 +9,16 @@ function normalizeStreet(s: string): string {
     .replace(/\s+str\b/g, "str");            // " str" → str
 }
 
-// Strips trailing house number in common German formats:
-//   "21"    "21a"   "5-7"   "12 A"  "5-7 A"
-// [\w-]* covers attached suffixes/ranges; (\s+[a-z]+)? covers "12 A"
+const HOUSE_NUMBER_RE = /\s+(\d+[\w-]*(?:\s+[a-z]+)?)$/;
+
+// "Hausvaterweg 21" → "hausvaterweg", "Berliner Str. 5 A" → "berlinerstr"
 function extractStreetName(s: string): string {
-  return normalizeStreet(s).replace(/\s+\d+[\w-]*(\s+[a-z]+)?$/, "").trim();
+  return normalizeStreet(s).replace(HOUSE_NUMBER_RE, "").trim();
+}
+
+// "Hausvaterweg 21" → "21", "Berliner Str. 5 A" → "5 a", undefined if none
+function extractHouseNumber(s: string): string | undefined {
+  return normalizeStreet(s).match(HOUSE_NUMBER_RE)?.[1];
 }
 
 function agentHasPlz(a: Agent, plz: string): boolean {
@@ -43,8 +48,6 @@ export function getAgentByAddress(
 
   // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
   //    whole word in agent title + PLZ from either address.postcode or agentPostcode.
-  //    Only used when exactly one agent matches — multiple matches are ambiguous
-  //    (e.g. 5 centers on the same street) and must not guess.
   const streetName = extractStreetName(street);
   if (!streetName) return undefined;
   const streetRegex = streetNameWordRegex(streetName);
@@ -53,7 +56,23 @@ export function getAgentByAddress(
       agentHasPlz(a, plz) &&
       streetRegex.test(normalizeStreet(a.title ?? "")),
   );
-  return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
+
+  if (fuzzyMatches.length === 1) return fuzzyMatches[0];
+
+  // Multiple agents on the same street — narrow by house number in title
+  // (~70% of agents include the number in their title, e.g. "Refugium Staukowerstrase 5")
+  if (fuzzyMatches.length > 1) {
+    const houseNumber = extractHouseNumber(street);
+    if (houseNumber) {
+      const numberRegex = streetNameWordRegex(houseNumber);
+      const byNumber = fuzzyMatches.filter((a) =>
+        numberRegex.test(normalizeStreet(a.title ?? "")),
+      );
+      if (byNumber.length === 1) return byNumber[0];
+    }
+  }
+
+  return undefined;
 }
 
 export function getAgentByPostcode(
