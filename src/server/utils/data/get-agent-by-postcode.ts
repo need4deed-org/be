@@ -42,15 +42,18 @@ export function getAgentByAddress(
   if (strict) return strict;
 
   // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
-  //    whole word in agent title + PLZ from either address.postcode or agentPostcode
+  //    whole word in agent title + PLZ from either address.postcode or agentPostcode.
+  //    Only used when exactly one agent matches — multiple matches are ambiguous
+  //    (e.g. 5 centers on the same street) and must not guess.
   const streetName = extractStreetName(street);
   if (!streetName) return undefined;
   const streetRegex = streetNameWordRegex(streetName);
-  return agents.find(
+  const fuzzyMatches = agents.filter(
     (a) =>
       agentHasPlz(a, plz) &&
       streetRegex.test(normalizeStreet(a.title ?? "")),
   );
+  return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
 }
 
 export function getAgentByPostcode(

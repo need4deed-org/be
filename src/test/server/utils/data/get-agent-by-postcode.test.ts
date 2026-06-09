@@ -75,6 +75,16 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     expect(getAgentByAddress(agents, "Berliner Straße 5", plz)).toBeUndefined();
   });
 
+  it("returns undefined when multiple agents share the same street and PLZ (ambiguous)", () => {
+    const second = {
+      id: 5,
+      title: "AWO Hausvaterweg",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    expect(getAgentByAddress([legacyAgent, second], "Hausvaterweg 21", plz)).toBeUndefined();
+  });
+
   it("does not false-match when street name is a substring of a different street in title", () => {
     const agent = {
       id: 4,
