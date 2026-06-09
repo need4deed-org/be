@@ -1,3 +1,4 @@
+export * from "./agent-membership.schema";
 export * from "./agent-register.schema";
 export * from "./param";
 export * from "./person.schema";

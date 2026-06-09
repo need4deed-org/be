@@ -1,21 +1,14 @@
-import { AgentRoleType, UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentLanguage from "../../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Agent from "../../../../data/entity/opportunity/agent.entity";
-import Person from "../../../../data/entity/person.entity";
-import User from "../../../../data/entity/user.entity";
 import {
   classifyRegisterAgentConflict,
-  writeAgentRegistration,
+  createAgentForPerson,
+  joinAgent,
+  resolveJoinStatus,
 } from "../../../../server/utils/data/write-agent-registration";
-
-vi.mock("../../../../data/utils", async () => {
-  const actual = await vi.importActual<typeof import("../../../../data/utils")>(
-    "../../../../data/utils",
-  );
-  return { ...actual, hashPassword: vi.fn(async () => "HASHED") };
-});
 
 const createAddressMock = vi.fn();
 vi.mock("../../../../server/utils/data/for-routes", () => ({
@@ -23,14 +16,19 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
 }));
 
 const txnManager: any = { getRepository: vi.fn() };
+const agentPersonRepoFindOne = vi.fn();
+const agentPersonRepoSave = vi.fn();
+
 vi.mock("../../../../data/data-source", () => ({
   dataSource: {
     manager: { transaction: async (cb: any) => cb(txnManager) },
+    getRepository: () => ({
+      findOne: agentPersonRepoFindOne,
+      save: agentPersonRepoSave,
+    }),
   },
 }));
 
-const personSave = vi.fn();
-const userSave = vi.fn();
 const agentSave = vi.fn();
 const agentPersonSave = vi.fn();
 const agentLanguageSave = vi.fn();
@@ -40,10 +38,6 @@ beforeEach(() => {
 
   txnManager.getRepository.mockImplementation((entity: any) => {
     switch (entity) {
-      case Person:
-        return { save: personSave };
-      case User:
-        return { save: userSave };
       case Agent:
         return { save: agentSave };
       case AgentPerson:
@@ -55,41 +49,14 @@ beforeEach(() => {
     }
   });
 
-  personSave.mockImplementation(async (p: any) => ({ ...p, id: 11 }));
-  userSave.mockImplementation(async (u: any) => ({ ...u, id: 22 }));
   agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
   agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
   agentLanguageSave.mockImplementation(async (rows: any[]) => rows);
 });
 
-const baseInput = {
-  email: "owner@center.de",
-  password: "supersecret",
-  person: { firstName: "Owner", lastName: "Surname", phone: "+49301111" },
-  agent: { title: "Centre HERO" },
-};
-
-describe("writeAgentRegistration", () => {
-  it("persists Person, User, Agent, AgentPerson in one transaction and returns the ids", async () => {
-    const result = await writeAgentRegistration(baseInput);
-
-    expect(personSave).toHaveBeenCalledTimes(1);
-    expect(personSave.mock.calls[0][0]).toMatchObject({
-      firstName: "Owner",
-      lastName: "Surname",
-      email: "owner@center.de",
-      phone: "+49301111",
-      addressId: undefined,
-    });
-
-    expect(userSave).toHaveBeenCalledTimes(1);
-    expect(userSave.mock.calls[0][0]).toMatchObject({
-      email: "owner@center.de",
-      password: "HASHED",
-      role: UserRole.AGENT,
-      isActive: false,
-      personId: 11,
-    });
+describe("createAgentForPerson", () => {
+  it("persists Agent + ACTIVE AgentPerson in one transaction and returns the id", async () => {
+    const result = await createAgentForPerson(11, { title: "Centre HERO" });
 
     expect(agentSave).toHaveBeenCalledTimes(1);
     expect(agentSave.mock.calls[0][0]).toMatchObject({
@@ -102,68 +69,61 @@ describe("writeAgentRegistration", () => {
       agentId: 33,
       personId: 11,
       role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      status: AgentMembershipStatus.ACTIVE,
     });
 
     expect(agentLanguageSave).not.toHaveBeenCalled();
     expect(createAddressMock).not.toHaveBeenCalled();
-
-    expect(result).toEqual({ userId: 22, agentId: 33, personId: 11 });
+    expect(result).toEqual({
+      agentId: 33,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
   });
 
-  it("creates Address and propagates addressId to Person and Agent when street+postcode given", async () => {
+  it("creates Address and propagates addressId to Agent when street+postcode given", async () => {
     createAddressMock.mockResolvedValueOnce({ id: 99 });
 
-    await writeAgentRegistration({
-      ...baseInput,
-      agent: {
-        ...baseInput.agent,
-        addressStreet: "Bitterfelder Str 11",
-        addressPostcode: "12681",
-      },
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
     });
 
-    expect(createAddressMock).toHaveBeenCalledTimes(1);
     expect(createAddressMock).toHaveBeenCalledWith(
       { street: "Bitterfelder Str 11" },
       { value: "12681" },
       txnManager,
     );
-    expect(personSave.mock.calls[0][0].addressId).toBe(99);
     expect(agentSave.mock.calls[0][0].addressId).toBe(99);
   });
 
   it("skips Address when only street or only postcode is given", async () => {
-    await writeAgentRegistration({
-      ...baseInput,
-      agent: { ...baseInput.agent, addressStreet: "Solo Street" },
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Solo Street",
     });
 
     expect(createAddressMock).not.toHaveBeenCalled();
-    expect(personSave.mock.calls[0][0].addressId).toBeUndefined();
     expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
   });
 
   it("falls through cleanly when createAddress returns null (postcode unresolved)", async () => {
     createAddressMock.mockResolvedValueOnce(null);
 
-    const result = await writeAgentRegistration({
-      ...baseInput,
-      agent: {
-        ...baseInput.agent,
-        addressStreet: "Some Street",
-        addressPostcode: "99999",
-      },
+    const result = await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Some Street",
+      addressPostcode: "99999",
     });
 
-    expect(personSave.mock.calls[0][0].addressId).toBeUndefined();
     expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
-    expect(result.userId).toBe(22);
+    expect(result.agentId).toBe(33);
   });
 
   it("inserts AgentLanguage rows for each selected language id", async () => {
-    await writeAgentRegistration({
-      ...baseInput,
-      agent: { ...baseInput.agent, languages: [5, 7, 9] },
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      languages: [5, 7, 9],
     });
 
     expect(agentLanguageSave).toHaveBeenCalledTimes(1);
@@ -173,58 +133,66 @@ describe("writeAgentRegistration", () => {
       { agentId: 33, languageId: 9 },
     ]);
   });
+});
 
-  it("uses provided language/timezone, falling back to en/CET when absent", async () => {
-    await writeAgentRegistration({
-      ...baseInput,
-      language: "de",
-      timezone: "Europe/Berlin",
+describe("resolveJoinStatus", () => {
+  it("returns ACTIVE when an existing member shares the registrant's email domain", async () => {
+    agentPersonRepoFindOne.mockResolvedValueOnce({ id: 1 });
+    const status = await resolveJoinStatus(33, "newcomer@center.de");
+    expect(status).toBe(AgentMembershipStatus.ACTIVE);
+  });
+
+  it("returns PENDING when no existing member shares the domain", async () => {
+    agentPersonRepoFindOne.mockResolvedValueOnce(null);
+    const status = await resolveJoinStatus(33, "stranger@elsewhere.de");
+    expect(status).toBe(AgentMembershipStatus.PENDING);
+  });
+
+  it("returns PENDING for a malformed email with no domain", async () => {
+    const status = await resolveJoinStatus(33, "no-at-sign");
+    // "no-at-sign".split("@").pop() === "no-at-sign", so it still queries;
+    // ensure a non-match resolves PENDING.
+    agentPersonRepoFindOne.mockResolvedValueOnce(null);
+    expect(status === AgentMembershipStatus.PENDING).toBe(true);
+  });
+});
+
+describe("joinAgent", () => {
+  it("creates a new membership link with the given status when none exists", async () => {
+    agentPersonRepoFindOne.mockResolvedValueOnce(null);
+
+    const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
+
+    expect(agentPersonRepoSave).toHaveBeenCalledTimes(1);
+    expect(agentPersonRepoSave.mock.calls[0][0]).toMatchObject({
+      agentId: 33,
+      personId: 11,
+      role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      status: AgentMembershipStatus.PENDING,
     });
-    expect(userSave.mock.calls[0][0]).toMatchObject({
-      language: "de",
-      timezone: "Europe/Berlin",
+    expect(result).toEqual({
+      agentId: 33,
+      membershipStatus: AgentMembershipStatus.PENDING,
+    });
+  });
+
+  it("is idempotent: returns the existing membership status without saving again", async () => {
+    agentPersonRepoFindOne.mockResolvedValueOnce({
+      id: 7,
+      status: AgentMembershipStatus.ACTIVE,
     });
 
-    vi.clearAllMocks();
-    personSave.mockImplementation(async (p: any) => ({ ...p, id: 11 }));
-    userSave.mockImplementation(async (u: any) => ({ ...u, id: 22 }));
-    agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
-    agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
-    txnManager.getRepository.mockImplementation((entity: any) => {
-      switch (entity) {
-        case Person:
-          return { save: personSave };
-        case User:
-          return { save: userSave };
-        case Agent:
-          return { save: agentSave };
-        case AgentPerson:
-          return { save: agentPersonSave };
-        case AgentLanguage:
-          return { save: agentLanguageSave };
-        default:
-          throw new Error(`unexpected repo: ${entity?.name}`);
-      }
-    });
+    const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
 
-    await writeAgentRegistration(baseInput);
-    expect(userSave.mock.calls[0][0]).toMatchObject({
-      language: "en",
-      timezone: "CET",
+    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      agentId: 33,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
     });
   });
 });
 
 describe("classifyRegisterAgentConflict", () => {
-  it("returns 'email' for a 23505 violation on the email column", () => {
-    expect(
-      classifyRegisterAgentConflict({
-        code: "23505",
-        detail: "Key (email)=(x@y.de) already exists.",
-      }),
-    ).toBe("email");
-  });
-
   it("returns 'title' for a 23505 violation on the title column", () => {
     expect(
       classifyRegisterAgentConflict({

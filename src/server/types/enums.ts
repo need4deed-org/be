@@ -10,6 +10,7 @@ export const RoutePrefix = {
   LOGIN: "/login",
   LOGOUT: "/logout",
   ME: "/me",
+  MEMBERSHIP: "/membership",
   OPPORTUNITY: "/opportunity",
   OPPORTUNITY_LINKED: "/opportunity-linked",
   OPPORTUNITY_VOLUNTEER: "/opportunity-volunteer",
