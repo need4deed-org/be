@@ -102,6 +102,32 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     expect(getAgentByAddress([legacyAgent, second], "Hausvaterweg 21", plz)).toBeUndefined();
   });
 
+  it("does not match 'Heerstr 10' when form submits 'Heerstr 110' (number prefix false positive)", () => {
+    const heerstr10 = {
+      id: 6,
+      title: "Heerstr 10",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    expect(getAgentByAddress([heerstr10], "Heerstr 110", "13353")).toBeUndefined();
+  });
+
+  it("matches 'Heerstr 110' agent when form submits 'Heerstr 110'", () => {
+    const heerstr10 = {
+      id: 6,
+      title: "Heerstr 10",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    const heerstr110 = {
+      id: 7,
+      title: "Heerstr 110",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    expect(getAgentByAddress([heerstr10, heerstr110], "Heerstr 110", "13353")).toEqual(heerstr110);
+  });
+
   it("does not false-match when street name is a substring of a different street in title", () => {
     const agent = {
       id: 4,
