@@ -4,15 +4,19 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
+  AgentRoleType,
   EntityTableName,
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
-import { ILike, In } from "typeorm";
-import { UnauthorizedError } from "../../../config";
-import Comment from "../../../data/entity/comment.entity";
+import { In } from "typeorm";
+import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Person from "../../../data/entity/person.entity";
+import Comment from "../../../data/entity/comment.entity";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -20,13 +24,61 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
-import { tryCatchFn } from "../../../services/utils";
+import { getPostcode, getRepository } from "../../../data/utils";
 import {
-  getAgentByPostcode,
+  getAgentByAddress,
   getDistrictToOpportunityHandler,
-  getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
+
+function parseContactPerson(formData: OpportunityLegacyFormData): Person {
+  const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
+  return new Person({
+    firstName: parts[0] || formData.rac_full_name || "Unknown",
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : undefined,
+    email: formData.rac_email || undefined,
+    phone: formData.rac_phone || undefined,
+  });
+}
+
+async function findOrCreateAgent(
+  formData: OpportunityLegacyFormData,
+): Promise<Agent> {
+  const agentRepository = getRepository(dataSource, Agent);
+  const agents = await agentRepository.find({
+    relations: ["address.postcode"],
+  });
+
+  const match = getAgentByAddress(agents, formData.rac_address, formData.rac_plz);
+  if (match) return match;
+
+  logger.info(
+    `No agent found for address "${formData.rac_address}" ${formData.rac_plz} — creating new agent`,
+  );
+
+  const postcode = await getPostcode(formData.rac_plz);
+
+  const addressRepository = getRepository(dataSource, Address);
+  const address = new Address({ street: formData.rac_address, postcodeId: postcode.id });
+  await addressRepository.save(address);
+
+  const personRepository = getRepository(dataSource, Person);
+  const person = parseContactPerson(formData);
+  await personRepository.save(person);
+
+  const agentPersonRepository = getRepository(dataSource, AgentPerson);
+  const agent = new Agent({ title: formData.rac_address, addressId: address.id });
+  await agentRepository.save(agent);
+
+  const agentPerson = new AgentPerson({
+    agentId: agent.id,
+    personId: person.id,
+    role: AgentRoleType.VOLUNTEER_COORDINATOR,
+  });
+  await agentPersonRepository.save(agentPerson);
+
+  return agent;
+}
 
 export default async function opportunityLegacyRoutes(
   fastify: FastifyInstance,
@@ -34,26 +86,7 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    {
-      config: { public: true } as FastifyContextConfig,
-      preHandler: async (request) => {
-        const relations = ["agentPerson.person", "agentPostcode.postcode"];
-        const agentRepository = fastify.db.agentRepository;
-        const email = (request.body.rac_email || "").split("@").pop();
-        const agents: Agent[] = await agentRepository.find({
-          where: {
-            agentPerson: { person: { email: ILike(`%@${email}`) } },
-          },
-          relations,
-        });
-        if (agents.length === 0) {
-          throw new UnauthorizedError(
-            "You've got no permission to submit an opportunity.",
-          );
-        }
-        request.agents = agents;
-      },
-    },
+    { config: { public: true } as FastifyContextConfig },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,
@@ -66,24 +99,12 @@ export default async function opportunityLegacyRoutes(
           ? await accompanyingParserOpportunity(request.body)
           : undefined;
 
-      const getAgentByPostcodeTryCatch = tryCatchFn(getAgentByPostcode, (err) =>
-        logger.debug(
-          `Did not find agent by postcode${request.body.rac_plz}: ${err}`,
-        ),
-      );
-      opportunity.agent =
-        getAgentByPostcodeTryCatch(
-          request.agents || [],
-          request.body.rac_plz,
-        ) ?? undefined;
+      opportunity.agent = await findOrCreateAgent(request.body);
 
-      if (!opportunity.agent && request.agents?.length) {
-        opportunity.agent = request.agents[0];
-      }
-
-      if (!opportunity.agent) {
-        opportunity.agent = await getOpportunityOrphanageAgent();
-      }
+      const personRepository = getRepository(dataSource, Person);
+      const contactPerson = parseContactPerson(request.body);
+      await personRepository.save(contactPerson);
+      opportunity.contactPersonId = contactPerson.id;
 
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));

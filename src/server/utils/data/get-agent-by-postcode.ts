@@ -1,15 +1,30 @@
-import { NotFoundError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 
-export function getAgentByPostcode(agents: Agent[], plz: string): Agent {
-  for (const { agentPostcode } of agents) {
-    const bingo = agentPostcode.find(({ postcode }) => {
-      return postcode.value === plz;
-    });
-    if (bingo) {
-      return bingo.agent;
-    }
-  }
+function normalizeStreet(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s*stra(?:ße|sse)\b/g, "str") // straße / strasse → str
+    .replace(/\s*str\./g, "str")             // str.  → str
+    .replace(/\s+str\b/g, "str");            // " str" → str
+}
 
-  throw new NotFoundError(`Agent for postcode:${plz} not found.`);
+export function getAgentByAddress(
+  agents: Agent[],
+  street: string,
+  plz: string,
+): Agent | undefined {
+  const normStreet = normalizeStreet(street);
+  return agents.find(
+    (a) =>
+      a.address?.postcode?.value === plz &&
+      normalizeStreet(a.address?.street ?? "") === normStreet,
+  );
+}
+
+export function getAgentByPostcode(
+  agents: Agent[],
+  plz: string,
+): Agent | undefined {
+  return agents.find((a) => a.address?.postcode?.value === plz);
 }

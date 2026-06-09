@@ -29,13 +29,14 @@ function getOpportunityDescription(opportunity: Opportunity) {
 function getOpportunityContact(
   opportunity: Opportunity,
 ): ApiOpportunityContact {
+  const person =
+    opportunity.contactPerson ?? opportunity.agent?.representative?.person;
   return {
-    id: opportunity.agent?.representative?.person?.id,
-    name: opportunity.agent?.representative?.person?.name,
-    phone: opportunity.agent?.representative?.person?.phone,
-    email: opportunity.agent?.representative?.person?.email,
-    waysToContact:
-      opportunity.agent?.representative?.person?.preferredCommunicationType,
+    id: person?.id,
+    name: person?.name,
+    phone: person?.phone,
+    email: person?.email,
+    waysToContact: person?.preferredCommunicationType,
   };
 }
 

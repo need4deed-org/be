@@ -88,6 +88,7 @@ export default async function opportunityRoutes(
         "deal.time.timeTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
+        "contactPerson",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
