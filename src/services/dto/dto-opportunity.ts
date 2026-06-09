@@ -38,9 +38,10 @@ export function getOpportunityContact(
     !!opportunity.agentId &&
     !!submitter.agentPerson?.some((ap) => ap.agentId === opportunity.agentId);
 
-  const person = submitterStillAtAgent
-    ? submitter
-    : opportunity.agent?.representative?.person;
+  const person =
+    opportunity.contactPerson ??
+    (submitterStillAtAgent ? submitter : opportunity.agent?.representative?.person);
+
 
   return {
     id: person?.id,

@@ -1,56 +1,54 @@
 import { describe, expect, it } from "vitest";
-import { NotFoundError } from "../../../../config";
-import { getAgentByPostcode } from "../../../../server/utils";
+import {
+  getAgentByAddress,
+  getAgentByPostcode,
+} from "../../../../server/utils";
 
-// Mocking the error if necessary, though usually, you can just check the instance
 describe("getAgentByPostcode", () => {
-  const mockAgent1 = { id: 1, name: "Agent Smith" };
-  const mockAgent2 = { id: 2, name: "Agent Brown" };
-
   const agents = [
-    {
-      agentPostcode: [
-        { postcode: { value: "12345" }, agent: mockAgent1 },
-        { postcode: { value: "67890" }, agent: mockAgent1 },
-      ],
-    },
-    {
-      agentPostcode: [{ postcode: { value: "55555" }, agent: mockAgent2 }],
-    },
-  ] as any; // Using 'as any' to bypass complex Entity typing for the test
+    { id: 1, address: { postcode: { value: "12345" }, street: "Müllerstraße 48" } },
+    { id: 2, address: { postcode: { value: "55555" }, street: "Hauptstr. 10" } },
+  ] as any;
 
-  it("should return the correct agent when a matching postcode is found", () => {
-    const result = getAgentByPostcode(agents, "12345");
-    expect(result).toEqual(mockAgent1);
-
-    const result2 = getAgentByPostcode(agents, "55555");
-    expect(result2).toEqual(mockAgent2);
+  it("returns agent for matching postcode", () => {
+    expect(getAgentByPostcode(agents, "12345")).toEqual(agents[0]);
+    expect(getAgentByPostcode(agents, "55555")).toEqual(agents[1]);
   });
 
-  it("should throw a NotFoundError if the postcode does not exist", () => {
-    const invalidPlz = "99999";
+  it("returns undefined for unknown postcode", () => {
+    expect(getAgentByPostcode(agents, "99999")).toBeUndefined();
+  });
+});
 
-    expect(() => getAgentByPostcode(agents, invalidPlz)).toThrow(NotFoundError);
-    expect(() => getAgentByPostcode(agents, invalidPlz)).toThrow(
-      `Agent for postcode:${invalidPlz} not found.`,
-    );
+describe("getAgentByAddress — street normalisation", () => {
+  const agent = {
+    id: 1,
+    address: { postcode: { value: "13353" }, street: "Müllerstraße 48" },
+  } as any;
+  const agents = [agent];
+  const plz = "13353";
+
+  const variants = [
+    "Müllerstraße 48",
+    "Müllerstr. 48",
+    "Müllerstr 48",
+    "Müller Straße 48",
+    "Müller str. 48",
+    "Müller str 48",
+    "MÜLLERSTRASSE 48",
+  ];
+
+  variants.forEach((street) => {
+    it(`matches "${street}"`, () => {
+      expect(getAgentByAddress(agents, street, plz)).toEqual(agent);
+    });
   });
 
-  it("should throw a NotFoundError if the agents array is empty", () => {
-    expect(() => getAgentByPostcode([], "12345")).toThrow(NotFoundError);
+  it("does not match wrong postcode", () => {
+    expect(getAgentByAddress(agents, "Müllerstraße 48", "00000")).toBeUndefined();
   });
 
-  it("should return the agent from the first matching postcode if duplicates exist", () => {
-    const duplicateAgents = [
-      {
-        agentPostcode: [{ postcode: { value: "11111" }, agent: mockAgent1 }],
-      },
-      {
-        agentPostcode: [{ postcode: { value: "11111" }, agent: mockAgent2 }],
-      },
-    ] as any;
-
-    const result = getAgentByPostcode(duplicateAgents, "11111");
-    expect(result).toEqual(mockAgent1);
+  it("does not match wrong street", () => {
+    expect(getAgentByAddress(agents, "Hauptstraße 1", plz)).toBeUndefined();
   });
 });

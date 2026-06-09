@@ -131,6 +131,12 @@ export default class Opportunity {
   @OneToMany(() => Appreciation, (appreciation) => appreciation.opportunity)
   appreciations: Appreciation[];
 
+  @ManyToOne(() => Person, { nullable: true })
+  @JoinColumn({ name: "contact_person_id" })
+  contactPerson?: Person;
+  @Column({ nullable: true })
+  contactPersonId?: number;
+
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
