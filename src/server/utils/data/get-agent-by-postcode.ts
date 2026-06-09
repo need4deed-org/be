@@ -48,31 +48,24 @@ export function getAgentByAddress(
 
   // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
   //    whole word in agent title + PLZ from either address.postcode or agentPostcode.
+  //    Number consistency: if the agent title contains a number it must match the
+  //    form's number — prevents "Heerstr 10" matching form input "Heerstr 110".
+  //    Agents with no number in title (e.g. "Refugium Hausvaterweg") match on
+  //    street name alone.
   const streetName = extractStreetName(street);
   if (!streetName) return undefined;
   const streetRegex = streetNameWordRegex(streetName);
-  const fuzzyMatches = agents.filter(
-    (a) =>
-      agentHasPlz(a, plz) &&
-      streetRegex.test(normalizeStreet(a.title ?? "")),
-  );
+  const houseNumber = extractHouseNumber(street);
 
-  if (fuzzyMatches.length === 1) return fuzzyMatches[0];
+  const fuzzyMatches = agents.filter((a) => {
+    if (!agentHasPlz(a, plz)) return false;
+    if (!streetRegex.test(normalizeStreet(a.title ?? ""))) return false;
+    const titleNumber = extractHouseNumber(a.title ?? "");
+    if (titleNumber && houseNumber && titleNumber !== houseNumber) return false;
+    return true;
+  });
 
-  // Multiple agents on the same street — narrow by house number in title
-  // (~70% of agents include the number in their title, e.g. "Refugium Staukowerstrase 5")
-  if (fuzzyMatches.length > 1) {
-    const houseNumber = extractHouseNumber(street);
-    if (houseNumber) {
-      const numberRegex = streetNameWordRegex(houseNumber);
-      const byNumber = fuzzyMatches.filter((a) =>
-        numberRegex.test(normalizeStreet(a.title ?? "")),
-      );
-      if (byNumber.length === 1) return byNumber[0];
-    }
-  }
-
-  return undefined;
+  return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
 }
 
 export function getAgentByPostcode(
