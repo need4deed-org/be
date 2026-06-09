@@ -28,6 +28,7 @@ import { getPostcode, getRepository } from "../../../data/utils";
 import {
   getAgentByAddress,
   getDistrictToOpportunityHandler,
+  getOpportunityOrphanageAgent,
   writeOpportunityLegacy,
 } from "../../utils";
 
@@ -44,6 +45,11 @@ function parseContactPerson(formData: OpportunityLegacyFormData): Person {
 async function findOrCreateAgent(
   formData: OpportunityLegacyFormData,
 ): Promise<Agent> {
+  if (!formData.rac_address || !formData.rac_plz) {
+    logger.warn("Legacy form missing rac_address or rac_plz — falling back to orphanage agent");
+    return getOpportunityOrphanageAgent();
+  }
+
   const agentRepository = getRepository(dataSource, Agent);
   const agents = await agentRepository.find({
     relations: ["address.postcode"],
@@ -58,26 +64,24 @@ async function findOrCreateAgent(
 
   const postcode = await getPostcode(formData.rac_plz);
 
-  const addressRepository = getRepository(dataSource, Address);
-  const address = new Address({ street: formData.rac_address, postcodeId: postcode.id });
-  await addressRepository.save(address);
+  return dataSource.manager.transaction(async (em) => {
+    const address = new Address({ street: formData.rac_address, postcodeId: postcode.id });
+    await em.save(address);
 
-  const personRepository = getRepository(dataSource, Person);
-  const person = parseContactPerson(formData);
-  await personRepository.save(person);
+    const person = parseContactPerson(formData);
+    await em.save(person);
 
-  const agentPersonRepository = getRepository(dataSource, AgentPerson);
-  const agent = new Agent({ title: formData.rac_address, addressId: address.id });
-  await agentRepository.save(agent);
+    const agent = new Agent({ title: formData.rac_address, addressId: address.id });
+    await em.save(agent);
 
-  const agentPerson = new AgentPerson({
-    agentId: agent.id,
-    personId: person.id,
-    role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    await em.save(new AgentPerson({
+      agentId: agent.id,
+      personId: person.id,
+      role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    }));
+
+    return agent;
   });
-  await agentPersonRepository.save(agentPerson);
-
-  return agent;
 }
 
 export default async function opportunityLegacyRoutes(
