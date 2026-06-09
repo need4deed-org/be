@@ -110,6 +110,12 @@ export default class Opportunity {
   @Column({ nullable: true })
   agentId?: number;
 
+  @ManyToOne(() => Person, { nullable: true })
+  @JoinColumn({ name: "submitted_by_person_id" })
+  submittedByPerson?: Person;
+  @Column({ nullable: true })
+  submittedByPersonId?: number;
+
   @ManyToOne(() => District)
   @JoinColumn({ name: "district_id" })
   district?: District;

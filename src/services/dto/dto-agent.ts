@@ -2,13 +2,30 @@ import {
   AgentDetails,
   ApiAgentGet,
   ApiAgentGetList,
+  ApiAgentMembership,
   ApiOpportunityAgent,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
+
+// Serializes an agent<->person membership for the moderation endpoints.
+// Expects the `agent` and `person` relations to be loaded.
+export function dtoSerializeAgentMembership(
+  agentPerson: AgentPerson,
+): ApiAgentMembership {
+  return {
+    id: agentPerson.id,
+    agentId: agentPerson.agentId,
+    agentTitle: agentPerson.agent?.title,
+    person: dtoSerializePerson(agentPerson.person),
+    role: agentPerson.role,
+    status: agentPerson.status,
+  };
+}
 
 export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
   return {

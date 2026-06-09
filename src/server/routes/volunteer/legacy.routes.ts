@@ -13,7 +13,12 @@ import {
   parseFormData,
   volunteerFormParser,
 } from "../../../services";
-import { getVolunteerFormData, writeVolunteerLegacy } from "../../utils";
+import {
+  getVolunteerClones,
+  getVolunteerFormData,
+  getVolunteerNotificationText,
+  writeVolunteerLegacy,
+} from "../../utils";
 import { updateLeads } from "../../utils/data/update-leads";
 
 export default async function volunteerLegacyRoutes(
@@ -53,9 +58,22 @@ export default async function volunteerLegacyRoutes(
         }
       }
 
+      const volunteerCloneIds = await getVolunteerClones(id);
+
       const opportunityMessage = request.body.origin_opportunity
         ? ` with opportunity id:${request.body.origin_opportunity}`
         : "";
+
+      if (id) {
+        fastify.notify.opsAlert(
+          getVolunteerNotificationText(
+            volunteer.person.email || "No email",
+            volunteer.person.name,
+            volunteerCloneIds,
+          ),
+        );
+      }
+
       return reply.status(200).send({
         message: `Volunteer has been created.${opportunityMessage}`,
         data: { id },

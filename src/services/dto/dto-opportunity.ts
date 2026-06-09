@@ -26,11 +26,23 @@ function getOpportunityDescription(opportunity: Opportunity) {
   return opportunity.info;
 }
 
-function getOpportunityContact(
+// Best-effort: returns the original submitter if they still hold an
+// agent_person row for the opportunity's agent; otherwise falls back to
+// the current agent representative. Not guaranteed to be the submitter.
+export function getOpportunityContact(
   opportunity: Opportunity,
 ): ApiOpportunityContact {
+  const submitter = opportunity.submittedByPerson;
+  const submitterStillAtAgent =
+    !!submitter &&
+    !!opportunity.agentId &&
+    !!submitter.agentPerson?.some((ap) => ap.agentId === opportunity.agentId);
+
   const person =
-    opportunity.contactPerson ?? opportunity.agent?.representative?.person;
+    opportunity.contactPerson ??
+    (submitterStillAtAgent ? submitter : opportunity.agent?.representative?.person);
+
+
   return {
     id: person?.id,
     name: person?.name,
@@ -46,33 +58,26 @@ export function dtoOpportunityGetList(
   return {
     id: opportunity.id,
     title: opportunity.title,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     district: { id: opportunity.district?.id ?? opportunity.districtId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
     numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
-    languages: opportunity.deal.profile.profileLanguage
-      .filter(Boolean)
-      .map((pl) => ({
-        id: pl.language.id,
-        title: pl.language.title,
-        proficiency: pl.proficiency,
-        purpose: pl.purpose,
-      })),
-    activities: opportunity.deal.profile.profileActivity
-      .filter(Boolean)
-      .map((pa) => ({
-        id: pa.activity.id,
-      })),
-    location: opportunity.deal.location.locationDistrict
-      .filter(Boolean)
-      .map((ld) => ({
-        id: ld.district.id,
-      })),
-    availability:
-      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+      id: pl.language.id,
+      title: pl.language.title,
+      proficiency: pl.proficiency,
+      purpose: pl.purpose,
+    })),
+    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+      id: pa.activity.id,
+    })),
+    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+      id: ld.district.id,
+    })),
+    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
   } as ApiOpportunityGetList;
@@ -85,34 +90,27 @@ export function dtoVolunteerOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     createdAt: opportunity.createdAt,
-    category: { id: opportunity.deal.profile.categoryId },
+    category: { id: opportunity.deal.categoryId },
     ...(opportunity.districtId
       ? { district: { id: opportunity.districtId } }
       : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
-    languages: opportunity.deal.profile.profileLanguage
-      .filter(Boolean)
-      .map((pl) => ({
-        id: pl.language.id,
-        title: pl.language.title,
-        proficiency: pl.proficiency,
-      })),
-    activities: opportunity.deal.profile.profileActivity
-      .filter(Boolean)
-      .map((pa) => ({
-        id: pa.activity.id,
-      })),
-    location: opportunity.deal.location.locationDistrict
-      .filter(Boolean)
-      .map((ld) => ({
-        id: ld.district.id,
-      })),
-    availability:
-      getAvailabilityTryCatch(opportunity.deal.time?.timeTimeslot) ?? [],
+    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+      id: pl.language.id,
+      title: pl.language.title,
+      proficiency: pl.proficiency,
+    })),
+    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+      id: pa.activity.id,
+    })),
+    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+      id: ld.district.id,
+    })),
+    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunity.accompanying!,
-      opportunity.deal.profile.profileLanguage,
+      opportunity.deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
   } as ApiVolunteerOpportunityGetList;
@@ -128,14 +126,14 @@ export function dtoOpportunityGet(
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
-    category: { id: opportunityComments.deal.profile.categoryId },
+    category: { id: opportunityComments.deal.categoryId },
     district: {
       id: opportunityComments.district?.id ?? opportunityComments.districtId,
     },
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
-    languages: opportunityComments.deal.profile.profileLanguage
+    languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
         id: pl.language.id,
@@ -143,29 +141,26 @@ export function dtoOpportunityGet(
         proficiency: pl.proficiency,
         purpose: pl.purpose,
       })),
-    activities: opportunityComments.deal.profile.profileActivity
+    activities: opportunityComments.deal.dealActivity
       .filter(Boolean)
       .map((pa) => ({
         id: pa.activity.id,
       })),
-    skills: opportunityComments.deal.profile.profileSkill
-      .filter(Boolean)
-      .map((ps) => ({
-        id: ps.skill.id,
-      })),
-    location: opportunityComments.deal.location.locationDistrict
+    skills: opportunityComments.deal.dealSkill.filter(Boolean).map((ps) => ({
+      id: ps.skill.id,
+    })),
+    location: opportunityComments.deal.dealDistrict
       .filter(Boolean)
       .map((ld) => ({
         id: ld.district.id,
       })),
     availability:
-      getAvailabilityTryCatch(opportunityComments.deal.time?.timeTimeslot) ??
-      [],
+      getAvailabilityTryCatch(opportunityComments.deal.dealTimeslot) ?? [],
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunityComments.accompanying!,
-      opportunityComments.deal.profile.profileLanguage,
+      opportunityComments.deal.dealLanguage,
       accompanyingDistrict,
     ),
     comments: opportunityComments.comments.map(commentSerializer),

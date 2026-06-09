@@ -4,7 +4,6 @@ import { IsPostcode } from "../../../services/validators/custom";
 import { Country, GermanCity } from "../../types";
 import Deal from "../deal.entity";
 import DistrictPostcode from "../m2m/district-postcode";
-import LocationPostcode from "../m2m/location-postcode";
 import Accompanying from "../opportunity/accompanying.entity";
 import Address from "./address.entity";
 
@@ -29,12 +28,6 @@ export default class Postcode {
   @IsNotEmpty()
   @IsPostcode(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM])
   value: string;
-
-  @OneToMany(
-    () => LocationPostcode,
-    (locationPostcode) => locationPostcode.postcode,
-  )
-  locationPostcode: LocationPostcode[];
 
   @OneToMany(
     () => DistrictPostcode,

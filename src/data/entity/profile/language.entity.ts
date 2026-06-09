@@ -3,7 +3,7 @@ import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import EventTranslation from "../event/event_translation.entity";
 import EventN4D from "../event/event.entity";
 import AgentLanguage from "../m2m/agent-language";
-import ProfileLanguage from "../m2m/profile-language";
+import DealLanguage from "../m2m/deal-language";
 import Testimonial from "../testimonial.entity";
 
 @Entity()
@@ -29,11 +29,8 @@ export default class Language {
   @Length(100)
   title: string;
 
-  @OneToMany(
-    () => ProfileLanguage,
-    (profileLanguage) => profileLanguage.language,
-  )
-  profileLanguage: ProfileLanguage[];
+  @OneToMany(() => DealLanguage, (dealLanguage) => dealLanguage.language)
+  dealLanguage: DealLanguage[];
 
   @OneToMany(() => AgentLanguage, (agentLanguage) => agentLanguage.language)
   agentLanguage: AgentLanguage[];

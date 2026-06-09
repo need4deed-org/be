@@ -7,7 +7,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import ProfileActivity from "../m2m/profile-activity";
+import DealActivity from "../m2m/deal-activity";
 import Category from "./category.entity";
 
 @Entity()
@@ -36,11 +36,8 @@ export default class Activity {
   @Column({ nullable: true })
   categoryId: number;
 
-  @OneToMany(
-    () => ProfileActivity,
-    (profileActivity) => profileActivity.activity,
-  )
-  profileActivity: ProfileActivity[];
+  @OneToMany(() => DealActivity, (dealActivity) => dealActivity.activity)
+  dealActivity: DealActivity[];
 
   translation: string;
 }

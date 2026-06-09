@@ -25,11 +25,9 @@ export function getOpportunityWhere(
     ...(filter?.language
       ? {
           deal: {
-            profile: {
-              profileLanguage: {
-                language: {
-                  id: normalizeStringArrayInput(filter.language),
-                },
+            dealLanguage: {
+              language: {
+                id: normalizeStringArrayInput(filter.language),
               },
             },
           },
@@ -38,11 +36,9 @@ export function getOpportunityWhere(
     ...(filter?.district
       ? {
           deal: {
-            location: {
-              locationDistrict: {
-                district: {
-                  id: normalizeStringArrayInput(filter.district),
-                },
+            dealDistrict: {
+              district: {
+                id: normalizeStringArrayInput(filter.district),
               },
             },
           },
@@ -51,11 +47,9 @@ export function getOpportunityWhere(
     ...(filter?.activity
       ? {
           deal: {
-            profile: {
-              profileActivity: {
-                activity: {
-                  id: normalizeStringArrayInput(filter.activity),
-                },
+            dealActivity: {
+              activity: {
+                id: normalizeStringArrayInput(filter.activity),
               },
             },
           },

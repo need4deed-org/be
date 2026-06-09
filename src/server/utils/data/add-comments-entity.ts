@@ -14,7 +14,7 @@ export async function addComments2Entity<E extends { id: number }>(
     entityId: instance.id,
     entityType: pascal2snake(instanceMetadata.name, "lower") as EntityTableName,
   };
-  const relations = ["user.person"];
+  const relations = ["user.person", "commentPerson"];
 
   const comments = await commentRepository.find({
     where,

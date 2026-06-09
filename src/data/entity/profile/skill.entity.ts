@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
-import ProfileSkill from "../m2m/profile-skill";
+import DealSkill from "../m2m/deal-skill";
 
 @Entity()
 export default class Skill {
@@ -19,8 +19,8 @@ export default class Skill {
   @Length(100)
   title: string;
 
-  @OneToMany(() => ProfileSkill, (profileSkill) => profileSkill.skill)
-  profileSkill: ProfileSkill[];
+  @OneToMany(() => DealSkill, (dealSkill) => dealSkill.skill)
+  dealSkill: DealSkill[];
 
   translation: string;
 }

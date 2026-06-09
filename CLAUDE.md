@@ -43,6 +43,8 @@ yarn migration:revert       # revert last migration
 yarn migration:show         # show migration status
 ```
 
+Pending migrations are auto-run on server startup only when `RUN_MIGRATIONS=true` (or `NODE_ENV=production`); see `src/data/index.ts:26`. Without it, run `yarn migration:run` yourself. `docker compose up` sets `RUN_MIGRATIONS=true` by default; bare `yarn dev` honours whatever is in your `.env`.
+
 Docker alternative (includes Postgres):
 
 ```bash
@@ -137,8 +139,9 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SCHEMA` — Postgres connection
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
-- `RUN_MIGRATIONS` — set to `true` to auto-run migrations on startup
-- `AWS_SES_*` — email sending via AWS SES
+- `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
+- `EMAIL_FROM`, `BREVO_API_KEY` — transactional email via Brevo (verified sender + API key)
+- `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${CDN_BASE_URL}emails/verification.json`); falls back to built-in copy
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 
 ---
@@ -150,6 +153,16 @@ Any changes in entities that are registered in `src/data/data-source.ts` must be
 ```
 yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
 ```
+
+---
+
+## Handling throws in endpoint handlers
+
+Avoid `try {} catch {}` blocks relaying on error handling by fastify.
+
+Just throw specific error based on `src/config/error`
+
+If needed update error handling in `src/server/index.ts`
 
 ---
 
@@ -166,3 +179,10 @@ All amendments have to land in schemas for endpoint handlers and in SDK
 ## Private instructions
 
 @dev/CLAUDE.md
+
+---
+
+## Exposing PII
+
+User role `coordinator` is granted to deal with PII.
+Slack channels for notification and tagging are closed and PII safe.
