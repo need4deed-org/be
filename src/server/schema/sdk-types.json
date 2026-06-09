@@ -152,7 +152,11 @@
         "entityId": { "type": "number" },
         "entityType": { "type": "string" },
         "authorName": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "taggedPersonIds": {
+          "type": "array",
+          "items": { "type": "integer" }
+        }
       }
     },
     "ApiPerson": {
@@ -315,6 +319,9 @@
       "type": "object",
       "properties": {
         "id": {
+          "type": "number"
+        },
+        "personId": {
           "type": "number"
         },
         "email": {
@@ -526,6 +533,7 @@
             "name": { "type": "string" },
             "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
             "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "communication": { "$ref": "VolunteerStateCommunicationType#" },
             "avatarUrl": { "type": "string" },
             "activities": {
               "type": "array",
@@ -556,6 +564,7 @@
         "name",
         "volunteeringType",
         "engagement",
+        "communication",
         "avatarUrl"
       ]
     },
@@ -781,6 +790,16 @@
       "$id": "AgentTrustType",
       "type": "string",
       "enum": ["agent-high", "agent-low", "agent-unknown"]
+    },
+    "Lang": {
+      "$id": "Lang",
+      "type": "string",
+      "enum": ["en", "de"]
+    },
+    "UserRole": {
+      "$id": "UserRole",
+      "type": "string",
+      "enum": ["user", "coordinator", "agent", "volunteer", "admin"]
     },
     "AgentVolunteerSearchType": {
       "$id": "AgentVolunteerSearchType",

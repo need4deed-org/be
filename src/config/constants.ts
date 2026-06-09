@@ -4,8 +4,8 @@ const publicFixturesFromHere = ["..", "..", "public", "data"];
 
 const positives = ["1", "YES", "Yes", "yes", "TRUE", "True", "true"];
 
-export const awsS3BaseUrl =
-  process.env.AWS_S3_BASE || "https://d2nwrdddg8skub.cloudfront.net/dev/";
+export const CDNBaseUrl =
+  process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
 
 export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
 
@@ -74,13 +74,23 @@ export const seedVolunteersFile = path.join(
   "nid-volunteers.json",
 );
 
-// export const seedAgentsFile = awsS3BaseUrl + "agents.json";
-// export const seedVolunteersFile = awsS3BaseUrl + "volunteers.json";
-// export const seedOpportunitiesFile = awsS3BaseUrl + "opportunities.json";
+// export const seedAgentsFile = CDNBaseUrl + "/dev/agents.json";
+// export const seedVolunteersFile = CDNBaseUrl + "/dev/volunteers.json";
+// export const seedOpportunitiesFile = CDNBaseUrl + "/dev/opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
   "https://app.need4deed.org/verify-email";
+
+// CDN manifest (per-locale subject + html/text) for the verification email.
+export const emailVerificationManifestUrl =
+  CDNBaseUrl + "emails/verification.json";
+// How long a fetched email manifest is cached in-memory (default 10 min).
+export const emailTemplateTtlMs =
+  Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
+// Timeout for fetching the email manifest from the CDN (default 5s).
+export const emailTemplateFetchTimeoutMs =
+  Number(process.env.EMAIL_TEMPLATE_FETCH_TIMEOUT_MS) || 5000;
 
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -99,7 +109,8 @@ export const cookieOptions = {
   path: "/",
 };
 
-export const defaultFrom = process.env.AWS_SES_FROM_EMAIL || "";
+// Provider-neutral from address; must be a verified sender in the email provider.
+export const defaultFrom = process.env.EMAIL_FROM || "";
 
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";

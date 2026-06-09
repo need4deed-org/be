@@ -8,6 +8,7 @@ import {
   AgentVolunteerSearchType,
   DocumentStatusType,
   EntityTableName,
+  LangProficiency,
   OccasionalType,
   TranslatedIntoType,
   VolunteerStateAppreciationType,
@@ -24,14 +25,13 @@ import { tryCatch } from "../../services/utils";
 import Deal from "../entity/deal.entity";
 import Address from "../entity/location/address.entity";
 import District from "../entity/location/district.entity";
-import Location from "../entity/location/location.entity";
 import Postcode from "../entity/location/postcode.entity";
 import AgentPerson from "../entity/m2m/agent-person";
-import LocationDistrict from "../entity/m2m/location-district";
-import ProfileActivity from "../entity/m2m/profile-activity";
-import ProfileLanguage from "../entity/m2m/profile-language";
-import ProfileSkill from "../entity/m2m/profile-skill";
-import TimeTimeslot from "../entity/m2m/time-timeslot";
+import DealActivity from "../entity/m2m/deal-activity";
+import DealDistrict from "../entity/m2m/deal-district";
+import DealLanguage from "../entity/m2m/deal-language";
+import DealSkill from "../entity/m2m/deal-skill";
+import DealTimeslot from "../entity/m2m/deal-timeslot";
 import NotionRelation from "../entity/notion-relation.entity";
 import Agent from "../entity/opportunity/agent.entity";
 import Organization from "../entity/organization.entity";
@@ -39,9 +39,7 @@ import Person from "../entity/person.entity";
 import Activity from "../entity/profile/activity.entity";
 import Category from "../entity/profile/category.entity";
 import Language from "../entity/profile/language.entity";
-import Profile from "../entity/profile/profile.entity";
 import Skill from "../entity/profile/skill.entity";
-import Time from "../entity/time/time.entity";
 import Timeslot from "../entity/time/timeslot.entity";
 import { categorize } from "../lib";
 import { getRepository, getRRULE, getStartEnd } from "../utils";
@@ -322,18 +320,14 @@ export async function createDeal(
   dataSource: DataSource,
 ): Promise<Deal> {
   const activityRepository = getRepository(dataSource, Activity);
-  const profileRepository = getRepository(dataSource, Profile);
-  const profileActivityRepository = getRepository(dataSource, ProfileActivity);
+  const dealActivityRepository = getRepository(dataSource, DealActivity);
   const skillRepository = getRepository(dataSource, Skill);
-  const profileSkillRepository = getRepository(dataSource, ProfileSkill);
+  const dealSkillRepository = getRepository(dataSource, DealSkill);
   const languageRepository = getRepository(dataSource, Language);
-  const profileLanguageRepository = getRepository(dataSource, ProfileLanguage);
-  const locationRepository = getRepository(dataSource, Location);
+  const dealLanguageRepository = getRepository(dataSource, DealLanguage);
+  const dealTimeslotRepository = getRepository(dataSource, DealTimeslot);
+  const dealDistrictRepository = getRepository(dataSource, DealDistrict);
   const districtRepository = getRepository(dataSource, District);
-  const locationDistrictRepository = getRepository(
-    dataSource,
-    LocationDistrict,
-  );
   const dealRepository = getRepository(dataSource, Deal);
 
   if (!postcodeGetter) {
@@ -341,12 +335,8 @@ export async function createDeal(
   }
   const postcode = await postcodeGetter(dealData?.postcode);
 
-  const profile = new Profile({
-    info: dealData.profile.info,
-  });
-  await profileRepository.save(profile);
-
   const categoryIds: number[] = [];
+  const activities: Activity[] = [];
   for (const title of dealData.profile.activities ?? []) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
@@ -354,64 +344,84 @@ export async function createDeal(
       continue;
     }
     categoryIds.push(activity.categoryId);
-    const profileActivity = new ProfileActivity({
-      profile: profile,
-      activity,
-    });
-    await profileActivityRepository.save(profileActivity);
+    // DealActivity rows are created after the deal is saved (need dealId).
+    activities.push(activity);
   }
 
+  const skills: Skill[] = [];
   for (const title of dealData.profile.skills ?? []) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
       // logger.warn(`Skill ${title} not found. Skipping.`);
       continue;
     }
-    const profileSkill = new ProfileSkill({ profile, skill });
-    await profileSkillRepository.save(profileSkill);
+    // DealSkill rows are created after the deal is saved (need dealId).
+    skills.push(skill);
   }
 
+  const languages: { language: Language; level: LangProficiency }[] = [];
   for (const [title, level] of dealData.profile.languages ?? []) {
     const language = await getLanguage(title, languageRepository);
     if (!language) {
       logger.warn(`Language ${title} not found. Skipping.`);
       continue;
     }
-
-    const profileLanguage = new ProfileLanguage({
-      profile,
-      language,
-      proficiency: level,
-    });
-    await profileLanguageRepository.save(profileLanguage);
+    // DealLanguage rows are created after the deal is saved (need dealId).
+    languages.push({ language, level });
   }
 
-  profile.categoryId = categorize(categoryIds.filter(Boolean))!;
+  const categoryId = categorize(categoryIds.filter(Boolean))!;
 
-  const time = await createTime(dataSource, dealData.time);
+  const timeslots = await createDealTimeslots(dataSource, dealData.time);
 
-  const location = new Location();
-  await locationRepository.save(location);
-
+  const districts: District[] = [];
   for (const title of dealData.location.districts ?? []) {
     let district = await districtRepository.findOne({ where: { title } });
     if (!district) {
       district = new District({ title });
       await districtRepository.save(district);
     }
-
-    const locationDistrict = new LocationDistrict({ location, district });
-    await locationDistrictRepository.save(locationDistrict);
+    // DealDistrict rows are created after the deal is saved (need dealId).
+    districts.push(district);
   }
 
   const deal = new Deal({
     type: dealData.type,
+    info: dealData.profile.info,
+    categoryId,
     postcode,
-    profile,
-    time,
-    location,
   });
   await dealRepository.save(deal);
+
+  for (const activity of activities) {
+    const dealActivity = new DealActivity({ deal, activity });
+    await dealActivityRepository.save(dealActivity);
+  }
+
+  for (const skill of skills) {
+    const dealSkill = new DealSkill({ deal, skill });
+    await dealSkillRepository.save(dealSkill);
+  }
+
+  for (const { language, level } of languages) {
+    const dealLanguage = new DealLanguage({
+      deal,
+      language,
+      proficiency: level,
+    });
+    await dealLanguageRepository.save(dealLanguage);
+  }
+
+  for (const timeslot of timeslots) {
+    const dealTimeslot = new DealTimeslot({ deal, timeslot });
+    await dealTimeslotRepository.save(dealTimeslot);
+  }
+
+  for (const district of districts) {
+    const dealDistrict = new DealDistrict({ deal, district });
+    await dealDistrictRepository.save(dealDistrict);
+  }
+
   return deal;
 }
 
@@ -468,16 +478,12 @@ export async function getOrCreateAgent(
   return newAgent;
 }
 
-export async function createTime(
+export async function createDealTimeslots(
   dataSource: DataSource,
   timeData: TimeJSON,
-): Promise<Time> {
-  const timeRepository = getRepository(dataSource, Time);
+): Promise<Timeslot[]> {
   const timeslotRepository = getRepository(dataSource, Timeslot);
-  const timeTimeslotRepository = getRepository(dataSource, TimeTimeslot);
-
-  const time = new Time();
-  await timeRepository.save(time);
+  const timeslots: Timeslot[] = [];
 
   for (const timeslotData of timeData.timeslots ?? []) {
     let timeslot: Timeslot | null;
@@ -541,16 +547,11 @@ export async function createTime(
     }
 
     if (timeslot && timeslot.id) {
-      const timeTimeslot = new TimeTimeslot({
-        time,
-        timeslot,
-      });
-      await timeTimeslotRepository.save(timeTimeslot);
-      await timeslotRepository.save(timeslot);
+      timeslots.push(timeslot);
     }
   }
 
-  return time;
+  return timeslots;
 }
 
 export function getDistrict(title: string) {

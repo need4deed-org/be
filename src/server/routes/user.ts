@@ -1,8 +1,20 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiUserGet, UserRole } from "need4deed-sdk";
-import { FindOptionsWhere } from "typeorm";
-import Person, { PersonUpdateType } from "../../data/entity/person.entity";
+import {
+  ApiUserGet,
+  ApiUserPost,
+  Lang,
+  SortOrder,
+  UserRole,
+} from "need4deed-sdk";
+import { FindOptionsWhere, ILike } from "typeorm";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../config";
+import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
@@ -35,16 +47,17 @@ export default async function userRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { page, limit, search } = request.query;
+      const { page, limit, search, role, sortOrder } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
+      const direction = sortOrder === SortOrder.OldToNew ? "ASC" : "DESC";
 
       const userRepository = fastify.db.userRepository;
       const [users, count] = await userRepository.findAndCount({
-        where: getUserWhere(search) as FindOptionsWhere<User>,
+        where: getUserWhere(search, role) as FindOptionsWhere<User>,
         relations: ["person"],
         skip,
         take,
-        order: { id: "DESC" },
+        order: { id: direction },
       });
 
       const data = users.map(serializeUserToMeDTO);
@@ -239,16 +252,7 @@ export default async function userRoutes(
   );
 
   fastify.post<{
-    Body: {
-      email: string;
-      password?: string;
-      isActive?: boolean;
-      role?: UserRole;
-      language?: string;
-      timezone?: string;
-      person: PersonUpdateType;
-      resolvedPerson: Partial<Person>;
-    };
+    Body: ApiUserPost;
     Reply: User | { message: string; errors?: any };
   }>(
     "/",
@@ -260,80 +264,86 @@ export default async function userRoutes(
           ...responseErrors,
         },
       },
-      // Pre-handler hook to resolve/create the Person entity
-      preHandler: async (request, reply) => {
-        const { person: personData } = request.body;
-        const personRepository = fastify.db.personRepository;
+      // Pre-handler hook: authorize the registration and resolve the Person.
+      preHandler: async (request) => {
+        const { person: personData, email, role } = request.body;
 
-        let resolvedPerson: Person | null = null;
+        // Privileged roles cannot be self-assigned via registration.
+        if (role === UserRole.ADMIN || role === UserRole.COORDINATOR) {
+          throw new UnauthorizedError();
+        }
 
-        if (personData.id) {
-          // Case 1: person.id is provided - find existing person
-          try {
-            resolvedPerson = await personRepository.findOneBy({
-              id: personData.id,
-            });
-          } catch (error) {
-            logger.error(`Error finding person by ID: ${error}`);
-            return reply
-              .status(500)
-              .send({ message: "Error retrieving person data." });
-          }
-
-          if (!resolvedPerson) {
-            return reply
-              .status(404)
-              .send({ message: `Person with ID ${personData.id} not found.` });
-          }
-        } else {
-          resolvedPerson = new Person(personData);
-
-          const errors = await validate(resolvedPerson);
-          if (errors.length > 0) {
-            logger.error(
-              `New Person entity validation errors: ${JSON.stringify(errors)}`,
-            );
-            return reply.status(400).send({
-              message: "Validation failed for new person data",
-              errors: errors.flatMap((err) =>
-                Object.values(err.constraints || {}),
-              ),
-            });
+        // Agents must register from a known agent's email domain (same gate as
+        // POST /opportunity/legacy). Volunteers and users self-register freely.
+        if (role === UserRole.AGENT) {
+          const domain = (email || "").split("@").pop();
+          const matchingAgent = await fastify.db.agentRepository.findOne({
+            where: {
+              agentPerson: { person: { email: ILike(`%@${domain}`) } },
+            },
+          });
+          if (!matchingAgent) {
+            throw new NotFoundError();
           }
         }
-        request.resolvedPerson = resolvedPerson;
+
+        const personRepository = fastify.db.personRepository;
+
+        // Existing person by id.
+        if (personData.id) {
+          const resolvedPerson = await personRepository.findOneBy({
+            id: personData.id,
+          });
+          if (!resolvedPerson) {
+            throw new BadRequestError(
+              `Person with ID ${personData.id} not found.`,
+            );
+          }
+          request.resolvedPerson = resolvedPerson;
+          return;
+        }
+
+        // New person.
+        const newPerson = new Person(personData);
+        const errors = await validate(newPerson);
+        if (errors.length > 0) {
+          logger.error(
+            `New Person entity validation errors: ${JSON.stringify(errors)}`,
+          );
+          const messages = errors.flatMap((err) =>
+            Object.values(err.constraints || {}),
+          );
+          throw new BadRequestError(
+            `Validation failed for new person data: ${messages.join("; ")}`,
+          );
+        }
+        request.resolvedPerson = newPerson;
       },
     },
     async (request, reply) => {
-      const {
-        email,
-        password: passwordPlain,
-        role,
-        language,
-        timezone,
-      } = request.body;
+      const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
-      if (!userRepository) {
-        logger.error("Repository is undefined!");
-        return reply
-          .status(500)
-          .send({ message: "Internal Server Error: DB not loaded" });
+
+      // Surface the duplicate-email case as 409 up front (the DB unique
+      // constraint remains the ultimate guard for the rare race).
+      if (await userRepository.findOneBy({ email })) {
+        throw new ConflictError("User with this email already exists.");
       }
 
-      const person = request.resolvedPerson;
-      const password = await hashPassword(passwordPlain);
-      const isActive = false;
       const newUser = new User({
         email,
-        password,
+        password: await hashPassword(passwordPlain),
         role,
-        isActive,
-        language,
-        timezone,
-        person,
+        isActive: false,
+        language: language ?? Lang.EN,
+        // Server-controlled (not in ApiUserPost). Set explicitly to the entity
+        // default so class-validator's @IsString passes (the DB default only
+        // applies at INSERT, not to the in-memory entity being validated).
+        timezone: "CET",
+        person: request.resolvedPerson,
       });
 
-      // Validate the Account entity using class-validator
+      // Validate the User entity using class-validator
       const errors = await validate(newUser);
       if (errors.length > 0) {
         logger.error(
@@ -345,27 +355,16 @@ export default async function userRoutes(
         });
       }
 
-      try {
-        const savedUser = await userRepository.save(newUser);
+      // Unexpected DB errors propagate to the global error handler.
+      const savedUser = await userRepository.save(newUser);
 
-        fastify.notify.emailVerification(savedUser).catch((err) => {
-          logger.error(
-            `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
-          );
-        });
+      fastify.notify.emailVerification(savedUser).catch((err) => {
+        logger.error(
+          `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
+        );
+      });
 
-        reply.status(201).send(savedUser);
-      } catch (error) {
-        logger.error(`Error creating user: ${JSON.stringify(error, null, 4)}`);
-        if (error.code === "23505" && error.detail.includes("email")) {
-          return reply
-            .status(409)
-            .send({ message: "User with this email already exists." });
-        }
-        reply.status(500).send({
-          message: "Failed to create user due to an internal error.",
-        });
-      }
+      return reply.status(201).send(savedUser);
     },
   );
 }

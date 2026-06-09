@@ -1,4 +1,4 @@
-export * from "./add-category-to-profile";
+export * from "./add-category-to-deal";
 export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./add-district-to-opp";
@@ -14,7 +14,9 @@ export * from "./get-volunteer-clones";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
+export * from "./sync-comment-tags";
 export * from "./update-leads";
 export * from "./write-agent-registration";
+export * from "./write-opportunity-contact-comment";
 export * from "./write-opportunity-legacy";
 export * from "./write-volunteer-legacy";

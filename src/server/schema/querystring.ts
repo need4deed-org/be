@@ -68,6 +68,10 @@ export const volunteerListQuerySchema = {
     ...paginationProps,
     ...langProp,
     ...sortOrderProps,
+    // Selects which relations the list loads: "table" loads only what the
+    // table view renders (languages + locations); "card" (default) loads all
+    // collections. Lets the table view skip activities/skills/availability.
+    listType: { type: "string", enum: ["card", "table"] },
     filter: {
       type: "object",
       properties: {
@@ -126,7 +130,9 @@ export const userListQuerySchema = {
   type: "object",
   properties: {
     ...paginationProps,
+    ...sortOrderProps,
     search: { type: "string" },
+    role: getRef("UserRole#"),
   },
   additionalProperties: false,
 };

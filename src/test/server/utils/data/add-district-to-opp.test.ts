@@ -50,9 +50,7 @@ describe("getDistrictToOpportunityHandler", () => {
         const opportunity = makeOpportunity({
           type: OpportunityType.REGULAR,
           deal: {
-            location: {
-              locationDistrict: [{ district }],
-            },
+            dealDistrict: [{ district }],
           } as any,
         });
 

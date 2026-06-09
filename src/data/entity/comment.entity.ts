@@ -6,8 +6,10 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import CommentPerson from "./m2m/comment-person";
 import Language from "./profile/language.entity";
 import User from "./user.entity";
 
@@ -66,6 +68,9 @@ export default class Comment {
   @Column()
   @IsNotEmpty()
   entityId: number;
+
+  @OneToMany(() => CommentPerson, (commentPerson) => commentPerson.comment)
+  commentPerson: CommentPerson[];
 
   translation?: string;
 }

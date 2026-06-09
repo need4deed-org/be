@@ -1,4 +1,4 @@
-import { Lang, SortOrder } from "need4deed-sdk";
+import { Lang, SortOrder, UserRole } from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -85,9 +85,13 @@ export interface QuerystringVolunteerFiltering {
     match?: string | string[];
   };
 }
+export type VolunteerListType = "card" | "table";
+
 export type QuerystringVolunteerGetList = QuerystringPaginationLanguage &
-  QuerystringVolunteerFiltering;
+  QuerystringVolunteerFiltering & { listType?: VolunteerListType };
 
 export interface QuerystringUserList extends QuerystringPagination {
   search?: string;
+  sortOrder?: SortOrder;
+  role?: UserRole;
 }

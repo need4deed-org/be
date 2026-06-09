@@ -2,7 +2,7 @@ import { TranslatedIntoType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import { dtoOpportunityAccompanying } from "../../../services/dto/dto-accompanying";
 
@@ -16,9 +16,9 @@ const buildAccompanying = (overrides: Partial<Accompanying> = {}) =>
     ...overrides,
   });
 
-const buildProfileLanguage = (languageId: number) =>
-  new ProfileLanguage({
-    language: { id: languageId } as ProfileLanguage["language"],
+const buildDealLanguage = (languageId: number) =>
+  new DealLanguage({
+    language: { id: languageId } as DealLanguage["language"],
   });
 
 describe("dtoOpportunityAccompanying", () => {
@@ -42,11 +42,11 @@ describe("dtoOpportunityAccompanying", () => {
     expect(result.refugeeLanguage).toEqual([]);
   });
 
-  it("maps refugeeLanguage from profileLanguage, skipping falsy entries", () => {
+  it("maps refugeeLanguage from dealLanguage, skipping falsy entries", () => {
     const result = dtoOpportunityAccompanying(buildAccompanying(), [
-      buildProfileLanguage(7),
-      null as unknown as ProfileLanguage,
-      buildProfileLanguage(9),
+      buildDealLanguage(7),
+      null as unknown as DealLanguage,
+      buildDealLanguage(9),
     ]);
 
     expect(result.refugeeLanguage).toEqual([{ id: 7 }, { id: 9 }]);

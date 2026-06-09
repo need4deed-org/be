@@ -36,11 +36,11 @@ export default function opportunityOpportunityVolunteerRoutes(
         },
         relations: [
           "volunteer.person",
-          "volunteer.deal.profile.profileActivity.activity",
-          "volunteer.deal.profile.profileSkill.skill",
-          "volunteer.deal.profile.profileLanguage.language",
-          "volunteer.deal.time.timeTimeslot.timeslot",
-          "volunteer.deal.location.locationDistrict.district",
+          "volunteer.deal.dealActivity.activity",
+          "volunteer.deal.dealSkill.skill",
+          "volunteer.deal.dealLanguage.language",
+          "volunteer.deal.dealTimeslot.timeslot",
+          "volunteer.deal.dealDistrict.district",
         ],
       });
 

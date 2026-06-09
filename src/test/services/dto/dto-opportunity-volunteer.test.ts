@@ -27,11 +27,14 @@ function makeOV(
     volunteer: {
       statusType: "regular",
       statusEngagement: "active",
+      statusCommunication: "called",
       person: { name: "Jane Doe", avatarUrl: "https://cdn.example.com/a.png" },
       deal: {
-        profile: { profileActivity: [], profileSkill: [], profileLanguage: [] },
-        time: { timeTimeslot: [] },
-        location: { locationDistrict: [] },
+        dealActivity: [],
+        dealSkill: [],
+        dealLanguage: [],
+        dealTimeslot: [],
+        dealDistrict: [],
       },
     } as any,
     ...overrides,
@@ -71,6 +74,7 @@ describe("opportunityOpportunityVolunteerDTO", () => {
     expect(result.avatarUrl).toBe("https://cdn.example.com/a.png");
     expect(result.volunteeringType).toBe("regular");
     expect(result.engagement).toBe("active");
+    expect(result.communication).toBe("called");
     expect(result.activities).toBeDefined();
     expect(result.languages).toBeDefined();
     expect(result.availability).toBeDefined();
