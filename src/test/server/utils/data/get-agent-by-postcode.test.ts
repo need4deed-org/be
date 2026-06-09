@@ -52,3 +52,72 @@ describe("getAgentByAddress — street normalisation", () => {
     expect(getAgentByAddress(agents, "Hauptstraße 1", plz)).toBeUndefined();
   });
 });
+
+describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
+  const legacyAgent = {
+    id: 3,
+    title: "Refugium Hausvaterweg",
+    address: null,
+    agentPostcode: [{ postcode: { value: "13353" } }],
+  } as any;
+  const agents = [legacyAgent];
+  const plz = "13353";
+
+  it("matches form address street name against agent title via agentPostcode PLZ", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21", plz)).toEqual(legacyAgent);
+  });
+
+  it("does not match when PLZ differs", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21", "99999")).toBeUndefined();
+  });
+
+  it("does not match when street name not in title", () => {
+    expect(getAgentByAddress(agents, "Berliner Straße 5", plz)).toBeUndefined();
+  });
+
+  it("narrows to the agent whose title contains the house number when multiple share the street", () => {
+    const agentAt21 = {
+      id: 5,
+      title: "Refugium Hausvaterweg 21",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    const agentAt45 = {
+      id: 6,
+      title: "AWO Hausvaterweg 45",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    expect(getAgentByAddress([agentAt21, agentAt45], "Hausvaterweg 21", plz)).toEqual(agentAt21);
+    expect(getAgentByAddress([agentAt21, agentAt45], "Hausvaterweg 45", plz)).toEqual(agentAt45);
+  });
+
+  it("returns undefined when multiple agents share street and PLZ and none has the number in title", () => {
+    const second = {
+      id: 5,
+      title: "AWO Hausvaterweg",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    expect(getAgentByAddress([legacyAgent, second], "Hausvaterweg 21", plz)).toBeUndefined();
+  });
+
+  it("does not false-match when street name is a substring of a different street in title", () => {
+    const agent = {
+      id: 4,
+      title: "Unterkunft Ostringstraße",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    // "Ringstraße 3" → street name "ringstr" — must NOT match "ostringstr"
+    expect(getAgentByAddress([agent], "Ringstraße 3", "13353")).toBeUndefined();
+  });
+
+  it("matches address with hyphenated house number range", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 5-7", plz)).toEqual(legacyAgent);
+  });
+
+  it("matches address with space-separated letter suffix (e.g. '21 A')", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21 A", plz)).toEqual(legacyAgent);
+  });
+});

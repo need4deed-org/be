@@ -54,7 +54,7 @@ async function findOrCreateAgent(
 
   const agentRepository = getRepository(dataSource, Agent);
   const agents = await agentRepository.find({
-    relations: ["address.postcode"],
+    relations: ["address.postcode", "agentPostcode.postcode"],
   });
 
   const match = getAgentByAddress(agents, formData.rac_address, formData.rac_plz);
