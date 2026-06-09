@@ -52,3 +52,26 @@ describe("getAgentByAddress — street normalisation", () => {
     expect(getAgentByAddress(agents, "Hauptstraße 1", plz)).toBeUndefined();
   });
 });
+
+describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
+  const legacyAgent = {
+    id: 3,
+    title: "Refugium Hausvaterweg",
+    address: null,
+    agentPostcode: [{ postcode: { value: "13353" } }],
+  } as any;
+  const agents = [legacyAgent];
+  const plz = "13353";
+
+  it("matches form address street name against agent title via agentPostcode PLZ", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21", plz)).toEqual(legacyAgent);
+  });
+
+  it("does not match when PLZ differs", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21", "99999")).toBeUndefined();
+  });
+
+  it("does not match when street name not in title", () => {
+    expect(getAgentByAddress(agents, "Berliner Straße 5", plz)).toBeUndefined();
+  });
+});
