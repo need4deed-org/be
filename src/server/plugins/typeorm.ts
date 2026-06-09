@@ -8,6 +8,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -45,6 +46,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       opportunityRepository: dataSource.getRepository(Opportunity),
       dealRepository: dataSource.getRepository(Deal),
       agentRepository: dataSource.getRepository(Agent),
+      agentPersonRepository: dataSource.getRepository(AgentPerson),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
     });

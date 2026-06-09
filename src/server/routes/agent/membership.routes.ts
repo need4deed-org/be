@@ -1,7 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { AgentMembershipStatus, ApiAgentMembership } from "need4deed-sdk";
-import { dataSource } from "../../../data/data-source";
-import AgentPerson from "../../../data/entity/m2m/agent-person";
 import logger from "../../../logger";
 import { dtoSerializeAgentMembership } from "../../../services";
 import {
@@ -31,7 +29,7 @@ export default async function agentMembershipRoutes(
     },
     async (request, reply) => {
       const status = request.query.status ?? AgentMembershipStatus.PENDING;
-      const rows = await dataSource.getRepository(AgentPerson).find({
+      const rows = await fastify.db.agentPersonRepository.find({
         where: { status },
         relations: [
           "agent",
@@ -60,7 +58,7 @@ export default async function agentMembershipRoutes(
       },
     },
     async (request, reply) => {
-      const repo = dataSource.getRepository(AgentPerson);
+      const repo = fastify.db.agentPersonRepository;
       const membership = await repo.findOne({
         where: { id: request.params.id },
       });
@@ -86,9 +84,9 @@ export default async function agentMembershipRoutes(
       },
     },
     async (request, reply) => {
-      const result = await dataSource
-        .getRepository(AgentPerson)
-        .delete(request.params.id);
+      const result = await fastify.db.agentPersonRepository.delete(
+        request.params.id,
+      );
       if (!result.affected) {
         return reply.status(404).send({ message: "Membership not found." });
       }

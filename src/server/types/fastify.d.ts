@@ -10,6 +10,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -38,6 +39,7 @@ declare module "fastify" {
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
       dealRepository: Repository<Deal>;
       agentRepository: Repository<Agent>;
+      agentPersonRepository: Repository<AgentPerson>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
     };

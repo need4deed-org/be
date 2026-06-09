@@ -10,7 +10,6 @@ import {
   ApiAgentRegister,
   UserRole,
 } from "need4deed-sdk";
-import { ILike } from "typeorm";
 import { UnauthenticatedError, UnauthorizedError } from "../../../config";
 import logger from "../../../logger";
 import {
@@ -86,19 +85,35 @@ export default async function agentRegisterRoutes(
     },
     async (request, reply) => {
       const street = (request.query.street ?? "").trim();
-      if (street.length < 3) {
+      const domain = request.registrant?.email.split("@").pop()?.toLowerCase();
+      if (street.length < 3 || !domain) {
         return reply.status(200).send({ message: "No query", data: [] });
       }
 
-      const agents = await fastify.db.agentRepository.find({
-        where: { address: { street: ILike(`%${street}%`) } },
-        relations: ["address"],
-        take: 10,
-      });
+      // Only surface agents the registrant is tied to by email domain — i.e.
+      // an existing member shares their domain (Person.email, falling back to
+      // the linked User.email). This keeps the picker to orgs they can join and
+      // narrows enumeration. Mirrors resolveJoinStatus, so a picked agent
+      // auto-approves to ACTIVE.
+      const rows = await fastify.db.agentRepository
+        .createQueryBuilder("agent")
+        .select("agent.id", "id")
+        .addSelect("agent.title", "title")
+        .distinct(true)
+        .innerJoin("agent.address", "address")
+        .innerJoin("agent.agentPerson", "ap")
+        .innerJoin("ap.person", "person")
+        .leftJoin("person.users", "usr")
+        .where("address.street ILIKE :street", { street: `%${street}%` })
+        .andWhere("(person.email ILIKE :suffix OR usr.email ILIKE :suffix)", {
+          suffix: `%@${domain}`,
+        })
+        .limit(10)
+        .getRawMany<{ id: number; title: string }>();
 
-      const data = agents.map((agent) => ({
-        id: agent.id,
-        title: agent.title,
+      const data = rows.map((row) => ({
+        id: Number(row.id),
+        title: row.title,
       }));
       return reply
         .status(200)
