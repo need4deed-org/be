@@ -18,6 +18,37 @@ export const registerAgentQuerySchema = {
   },
 };
 
+// GET /agent/register/search?token=&street= — picker lookup during registration.
+export const registerSearchQuerySchema = {
+  type: "object",
+  required: ["token"],
+  additionalProperties: false,
+  properties: {
+    token: { type: "string", minLength: 1 },
+    street: { type: "string" },
+  },
+};
+
+export const registerSearchResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "title"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer" },
+          title: { type: "string" },
+        },
+      },
+    },
+  },
+};
+
 const registerAgentNewSchema = {
   type: "object",
   required: ["title"],
