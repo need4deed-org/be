@@ -60,6 +60,7 @@ export type QuerystringOpportunityList = QuerystringPaginationLanguage &
 export interface QuerystringAgentFiltering {
   filter?: {
     search?: string;
+    street?: string;
     district?: string[];
     type?: string[];
     volunteerSearch?: string[];

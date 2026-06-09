@@ -12,8 +12,12 @@ const personFind = vi.fn();
 
 const fakeManager: any = {
   getRepository: (entity: any) => {
-    if (entity === CommentPerson) {return { find, save, delete: del };}
-    if (entity === Person) {return { find: personFind };}
+    if (entity === CommentPerson) {
+      return { find, save, delete: del };
+    }
+    if (entity === Person) {
+      return { find: personFind };
+    }
     throw new Error(`unexpected repo: ${entity?.name}`);
   },
 };

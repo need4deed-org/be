@@ -17,6 +17,14 @@ export function getAgentWhere(
           title: ILike(`%${filter.search}%`),
         }
       : {}),
+    ...(filter?.street
+      ? {
+          // Powers the self-registration picker: match agents by street so the
+          // user can find their org before creating a duplicate. The address
+          // relation is already loaded by the GET /agent list handler.
+          address: { street: ILike(`%${filter.street}%`) },
+        }
+      : {}),
     ...(filter?.volunteerSearch
       ? {
           searchStatus: normalizeStringArrayInput(filter.volunteerSearch),

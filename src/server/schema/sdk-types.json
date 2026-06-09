@@ -770,6 +770,22 @@
         "other"
       ]
     },
+    "AgentServiceType": {
+      "$id": "AgentServiceType",
+      "type": "string",
+      "enum": [
+        "childcare",
+        "welfare",
+        "consultation",
+        "voluntary-support",
+        "tandem",
+        "sport",
+        "tutoring",
+        "refugee-accommodation",
+        "job-coaching",
+        "youth"
+      ]
+    },
     "AgentTrustType": {
       "$id": "AgentTrustType",
       "type": "string",
