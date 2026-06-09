@@ -89,4 +89,8 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
   it("matches address with hyphenated house number range", () => {
     expect(getAgentByAddress(agents, "Hausvaterweg 5-7", plz)).toEqual(legacyAgent);
   });
+
+  it("matches address with space-separated letter suffix (e.g. '21 A')", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 21 A", plz)).toEqual(legacyAgent);
+  });
 });

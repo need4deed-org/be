@@ -9,10 +9,11 @@ function normalizeStreet(s: string): string {
     .replace(/\s+str\b/g, "str");            // " str" → str
 }
 
-// "Hausvaterweg 21" → "hausvaterweg", "Berliner Str. 5-7" → "berlinerstr"
-// [\w-]* handles hyphenated ranges like "5-7"
+// Strips trailing house number in common German formats:
+//   "21"    "21a"   "5-7"   "12 A"  "5-7 A"
+// [\w-]* covers attached suffixes/ranges; (\s+[a-z]+)? covers "12 A"
 function extractStreetName(s: string): string {
-  return normalizeStreet(s).replace(/\s+\d+[\w-]*$/, "").trim();
+  return normalizeStreet(s).replace(/\s+\d+[\w-]*(\s+[a-z]+)?$/, "").trim();
 }
 
 function agentHasPlz(a: Agent, plz: string): boolean {
