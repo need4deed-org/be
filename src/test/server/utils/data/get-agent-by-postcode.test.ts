@@ -74,4 +74,19 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
   it("does not match when street name not in title", () => {
     expect(getAgentByAddress(agents, "Berliner Straße 5", plz)).toBeUndefined();
   });
+
+  it("does not false-match when street name is a substring of a different street in title", () => {
+    const agent = {
+      id: 4,
+      title: "Unterkunft Ostringstraße",
+      address: null,
+      agentPostcode: [{ postcode: { value: "13353" } }],
+    } as any;
+    // "Ringstraße 3" → street name "ringstr" — must NOT match "ostringstr"
+    expect(getAgentByAddress([agent], "Ringstraße 3", "13353")).toBeUndefined();
+  });
+
+  it("matches address with hyphenated house number range", () => {
+    expect(getAgentByAddress(agents, "Hausvaterweg 5-7", plz)).toEqual(legacyAgent);
+  });
 });

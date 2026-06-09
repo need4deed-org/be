@@ -9,14 +9,20 @@ function normalizeStreet(s: string): string {
     .replace(/\s+str\b/g, "str");            // " str" → str
 }
 
-// "Hausvaterweg 21" → "hausvaterweg" (strips trailing house number)
+// "Hausvaterweg 21" → "hausvaterweg", "Berliner Str. 5-7" → "berlinerstr"
+// [\w-]* handles hyphenated ranges like "5-7"
 function extractStreetName(s: string): string {
-  return normalizeStreet(s).replace(/\s+\d+\w*$/, "").trim();
+  return normalizeStreet(s).replace(/\s+\d+[\w-]*$/, "").trim();
 }
 
 function agentHasPlz(a: Agent, plz: string): boolean {
   if (a.address?.postcode?.value === plz) return true;
   return !!a.agentPostcode?.some((ap) => ap.postcode?.value === plz);
+}
+
+function streetNameWordRegex(streetName: string): RegExp {
+  const escaped = streetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`);
 }
 
 export function getAgentByAddress(
@@ -34,14 +40,15 @@ export function getAgentByAddress(
   );
   if (strict) return strict;
 
-  // 2. Fuzzy fallback for legacy agents: street name (no number) found in agent
-  //    title + PLZ from either address.postcode or agentPostcode
+  // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
+  //    whole word in agent title + PLZ from either address.postcode or agentPostcode
   const streetName = extractStreetName(street);
   if (!streetName) return undefined;
+  const streetRegex = streetNameWordRegex(streetName);
   return agents.find(
     (a) =>
       agentHasPlz(a, plz) &&
-      normalizeStreet(a.title ?? "").includes(streetName),
+      streetRegex.test(normalizeStreet(a.title ?? "")),
   );
 }
 
