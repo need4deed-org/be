@@ -116,6 +116,15 @@ export default async function opportunityLegacyRoutes(
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       if (opportunity.agent?.id) {
+        const agentPersonRepository = getRepository(dataSource, AgentPerson);
+        await agentPersonRepository.save(
+          new AgentPerson({
+            agentId: opportunity.agent.id,
+            personId: contactPerson.id,
+            role: AgentRoleType.VOLUNTEER_COORDINATOR,
+          }),
+        );
+
         const submitter = await getOrCreateSubmitterPerson(
           request.body,
           opportunity.agent.id,
