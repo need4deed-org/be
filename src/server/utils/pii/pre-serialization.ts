@@ -6,12 +6,6 @@ import { resolveVisiblePersonIds } from "./visible-persons";
 type Envelope = { message?: string; data?: unknown; count?: number };
 
 /**
- * Masks Person/Address the caller may not see, in place, on `data`. No-op for
- * COORDINATOR/ADMIN and unauthenticated requests. Use directly in handlers
- * whose DTO needs extra (handler-computed) args; otherwise prefer the
- * `makePiiSerialization` hook.
- */
-/**
  * The set of person ids this caller may see UNMASKED, or `null` when no masking
  * applies (COORDINATOR/ADMIN or unauthenticated). For routes that build DTOs in
  * helpers — pass this through and `maskPii(entity, set)` before serializing.
@@ -22,17 +16,29 @@ export async function resolveCallerMask(
   const user = request.authUser;
   const privileged =
     user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN;
-  if (!user || privileged) {return null;}
+  if (!user || privileged) {
+    return null;
+  }
   return resolveVisiblePersonIds(request.server, user);
 }
 
+/**
+ * Masks Person/Address the caller may not see, in place, on `data`. No-op for
+ * COORDINATOR/ADMIN and unauthenticated requests. Use directly in handlers
+ * whose DTO needs extra (handler-computed) args; otherwise prefer the
+ * `makePiiSerialization` hook.
+ */
 export async function maskForCaller(
   request: FastifyRequest,
   data: unknown,
 ): Promise<void> {
-  if (data === null || data === undefined) {return;}
+  if (data === null || data === undefined) {
+    return;
+  }
   const visible = await resolveCallerMask(request);
-  if (visible) {maskPii(data, visible);}
+  if (visible) {
+    maskPii(data, visible);
+  }
 }
 
 /**

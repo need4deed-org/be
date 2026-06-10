@@ -612,13 +612,17 @@ export async function fetchVolunteerById(
 
   addTranslatedFields([volunteer], isoCode);
 
-  // Mask PII the caller may not see before the serializer reads it.
-  if (maskVisiblePersonIds) {
-    maskPii(volunteer, maskVisiblePersonIds);
-  }
-
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);
+
+  // Mask PII the caller may not see before the serializer reads it. Comments are
+  // loaded separately (they aren't part of the volunteer graph), so they must be
+  // masked too — otherwise comment authors' Person PII leaks to non-privileged
+  // callers.
+  if (maskVisiblePersonIds) {
+    maskPii(volunteer, maskVisiblePersonIds);
+    maskPii(comments, maskVisiblePersonIds);
+  }
 
   const data = volunteerSerializer(volunteer, comments, timedEvents);
 
