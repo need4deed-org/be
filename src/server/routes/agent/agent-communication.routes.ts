@@ -1,8 +1,13 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiCommunicationGet, ApiCommunicationPost } from "need4deed-sdk";
+import {
+  ApiCommunicationGet,
+  ApiCommunicationPost,
+  UserRole,
+} from "need4deed-sdk";
 import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
+import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentCommunicationRoutes(
   fastify: FastifyInstance,
@@ -18,6 +23,7 @@ export default function agentCommunicationRoutes(
         params: idParamSchema,
         response: responseSchema("ApiCommunicationGet#", true),
       },
+      preSerialization: makePiiSerialization(dtoCommunication),
     },
     async (request, reply) => {
       const { id } = request.params;
@@ -28,11 +34,10 @@ export default function agentCommunicationRoutes(
           where: { agentId: id },
         });
 
-      const data = communications.map(dtoCommunication);
-
+      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) communications fetched successfully`,
-        data,
+        data: communications as unknown as ApiCommunicationGet[],
         count,
       });
     },
@@ -41,6 +46,7 @@ export default function agentCommunicationRoutes(
   fastify.post<{ Params: ParamsId; Body: ApiCommunicationPost }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiCommunicationPost#" },

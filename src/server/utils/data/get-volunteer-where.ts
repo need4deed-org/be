@@ -2,6 +2,8 @@ import { ILike } from "typeorm";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 
+// SECURITY (#666): `search` filters on unmasked DB columns, so a non-privileged
+// caller can infer PII masked in the response by probing which rows match.
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ) {

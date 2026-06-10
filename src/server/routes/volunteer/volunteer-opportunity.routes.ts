@@ -14,6 +14,7 @@ import {
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default async function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
@@ -68,6 +69,7 @@ export default async function volunteerOpportunityRoutes(
         await dealRepository.save(updates);
       }
 
+      await maskForCaller(request, opportunitiesCategory);
       const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);
 
       return reply.status(200).send({

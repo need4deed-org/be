@@ -3,6 +3,8 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import { QuerystringAgentFiltering } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 
+// SECURITY (#666): `search`/`street` filter on unmasked DB columns, so a
+// non-privileged caller can infer PII masked in the response by probing matches.
 export function getAgentWhere(
   filter: QuerystringAgentFiltering["filter"],
 ): FindOptionsWhere<Agent> {

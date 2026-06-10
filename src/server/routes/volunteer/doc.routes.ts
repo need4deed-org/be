@@ -1,6 +1,6 @@
 import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { DocumentType } from "need4deed-sdk";
+import { DocumentType, UserRole } from "need4deed-sdk";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
@@ -109,59 +109,64 @@ export default async function volunteerDocRoutes(
       id: number;
       Body: {};
     };
-  }>("/s3-upload-mock", async (request, reply) => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }>(
+    "/s3-upload-mock",
+    { onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }) },
+    async (request, reply) => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const {
-      "x-amz-meta-original-name": originalName,
-      "x-amz-meta-mime-type": mimeType,
-      "x-amz-meta-document-type": type,
-      "x-amz-meta-volunteer-id": volunteerId,
-      "x-amz-meta-s3-key": s3Key,
-    } = request.body as {
-      "x-amz-meta-volunteer-id": string;
-      "x-amz-meta-original-name": string;
-      "x-amz-meta-document-type": DocumentType;
-      "x-amz-meta-mime-type": string;
-      "x-amz-meta-s3-key": string;
-    };
-    const document = new Document({
-      volunteerId: Number(volunteerId),
-      originalName,
-      mimeType,
-      s3Key,
-      type,
-    });
-    const [, error] = await tryCatch(
-      fastify.db.documentRepository.save(document),
-    );
-
-    if (error) {
-      logger.error(
-        `Error saving document for volunteer ${volunteerId}: ${error}`,
-      );
-      return reply.status(400).send({
-        message: `Error saving document: ${error}`,
+      const {
+        "x-amz-meta-original-name": originalName,
+        "x-amz-meta-mime-type": mimeType,
+        "x-amz-meta-document-type": type,
+        "x-amz-meta-volunteer-id": volunteerId,
+        "x-amz-meta-s3-key": s3Key,
+      } = request.body as {
+        "x-amz-meta-volunteer-id": string;
+        "x-amz-meta-original-name": string;
+        "x-amz-meta-document-type": DocumentType;
+        "x-amz-meta-mime-type": string;
+        "x-amz-meta-s3-key": string;
+      };
+      const document = new Document({
+        volunteerId: Number(volunteerId),
+        originalName,
+        mimeType,
+        s3Key,
+        type,
       });
-    }
+      const [, error] = await tryCatch(
+        fastify.db.documentRepository.save(document),
+      );
 
-    return reply
-      .code(201)
-      .type("application/xml")
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?>
+      if (error) {
+        logger.error(
+          `Error saving document for volunteer ${volunteerId}: ${error}`,
+        );
+        return reply.status(400).send({
+          message: `Error saving document: ${error}`,
+        });
+      }
+
+      return reply
+        .code(201)
+        .type("application/xml")
+        .send(
+          `<?xml version="1.0" encoding="UTF-8"?>
         <PostResponse>
           <Location>http://vmpub:5000/uploads/test.png</Location>
           <Bucket>mock-bucket</Bucket>
           <Key>test.png</Key>
           <ETag>"mock-etag-123"</ETag>
         </PostResponse>`,
-      );
-  });
+        );
+    },
+  );
 
   fastify.delete<{ Params: { id: number } }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -206,6 +211,7 @@ export default async function volunteerDocRoutes(
   fastify.delete<{ Params: { id: number; type: DocumentType } }>(
     "/:type",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idTypeParamSchema,
         response: {

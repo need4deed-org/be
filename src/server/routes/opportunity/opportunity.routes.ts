@@ -48,6 +48,10 @@ import {
   patchEntity,
   updateOptionList,
 } from "../../utils";
+import {
+  makePiiSerialization,
+  maskForCaller,
+} from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -55,10 +59,9 @@ export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  // GETs open to any logged-in user (PII masked per role); writes stay
+  // COORDINATOR-only (re-gated per-route).
+  fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
@@ -143,6 +146,9 @@ export default async function opportunityRoutes(
           )
         : null;
 
+      // dtoOpportunityGet takes a handler-computed arg, so mask inline (rather
+      // than via the makePiiSerialization hook) before serializing.
+      await maskForCaller(request, opportunityComments);
       const data = dtoOpportunityGet(opportunityComments, accompanyingDistrict);
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
@@ -159,6 +165,7 @@ export default async function opportunityRoutes(
         querystring: opportunityListQuerySchema,
         response: responseSchema("ApiOpportunityGetList#", true),
       },
+      preSerialization: makePiiSerialization(dtoOpportunityGetList),
     },
     async (request, reply) => {
       const [skip, take] = getSkipTake({
@@ -225,11 +232,10 @@ export default async function opportunityRoutes(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
-      const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
-
+      // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Opportunities page:${request.query.page}.`,
-        data,
+        data: opportunitiesCategoryDistrict as unknown as ApiOpportunityGetList[],
         count,
       });
     },
@@ -242,6 +248,7 @@ export default async function opportunityRoutes(
   }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },

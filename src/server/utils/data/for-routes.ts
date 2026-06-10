@@ -43,6 +43,7 @@ import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
+import { maskPii } from "../pii/mask";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -596,6 +597,7 @@ export async function fetchVolunteerById(
   id: number,
   isoCode: Lang,
   relations: string[],
+  maskVisiblePersonIds?: ReadonlySet<number> | null,
 ): Promise<ApiVolunteerGet | null> {
   const volunteerRepository = getRepository(dataSource, Volunteer);
 
@@ -609,6 +611,11 @@ export async function fetchVolunteerById(
   }
 
   addTranslatedFields([volunteer], isoCode);
+
+  // Mask PII the caller may not see before the serializer reads it.
+  if (maskVisiblePersonIds) {
+    maskPii(volunteer, maskVisiblePersonIds);
+  }
 
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);

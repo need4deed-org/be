@@ -3,6 +3,7 @@ import { ApiVolunteerOpportunityGet } from "need4deed-sdk";
 import { BadRequestError } from "../../../config/error/fastify";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
+import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";
 
@@ -20,6 +21,9 @@ export default function opportunityOpportunityVolunteerRoutes(
         params: idParamSchema,
         response: responseSchema("ApiOpportunityVolunteerGet#", true, false),
       },
+      preSerialization: makePiiSerialization(
+        opportunityOpportunityVolunteerDTO,
+      ),
     },
     async (request, reply) => {
       const opportunityId = request.params.id;
@@ -44,11 +48,10 @@ export default function opportunityOpportunityVolunteerRoutes(
         ],
       });
 
-      const data = volunteers.map(opportunityOpportunityVolunteerDTO);
-
+      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Volunteers for opportunity id:${opportunityId}.`,
-        data,
+        data: volunteers as unknown as ApiVolunteerOpportunityGet[],
       });
     },
   );

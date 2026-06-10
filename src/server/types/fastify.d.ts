@@ -51,6 +51,7 @@ declare module "fastify" {
     personId?: number; // Optional foreign key ID for the Person entity
     agents?: Agent[];
     registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
+    authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
   }
 }
 
