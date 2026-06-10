@@ -131,6 +131,7 @@ export default async function agentRoutes(
       const agentRepository = fastify.db.agentRepository;
       const relations = [
         "address.postcode",
+        "agentPostcode.postcode",
         "district",
         "opportunity.opportunityVolunteer",
         "organization.address.postcode",

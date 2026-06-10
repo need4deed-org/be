@@ -81,9 +81,14 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
 }
 
 function dtoAgentDetails(agent: Agent): AgentDetails {
+  let address = serializeAddress(agent.address);
+  if (!agent.address && agent.agentPostcode?.length) {
+    const plz = agent.agentPostcode[0].postcode?.value;
+    if (plz) address = `${plz} Berlin`;
+  }
   return {
     about: agent.info,
-    address: serializeAddress(agent.address),
+    address,
     website: agent.website,
     organizationType: agent.type,
     operator: agent?.organization?.title,
