@@ -1,11 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  ApiAgentGet,
-  ApiAgentGetList,
-  ApiAgentPatch,
-  SortOrder,
-  UserRole,
-} from "need4deed-sdk";
+import { ApiAgentPatch, SortOrder, UserRole } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import logger from "../../../logger";
@@ -65,7 +59,9 @@ export default async function agentRoutes(
 
   fastify.get<{
     Querystring: QuerystringAgentGetList;
-    Reply: ReplyDataCount<ApiAgentGetList[]>;
+    // Handler sends entities; the DTO (ApiAgentGetList) runs in the
+    // preSerialization hook, so the send is typed as the entity.
+    Reply: ReplyDataCount<Agent[]>;
   }>(
     "/",
     {
@@ -110,17 +106,16 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
-      // DTO (dtoAgentGetList) runs in the preSerialization hook after PII
-      // masking, so the wire shape is ApiAgentGetList[] despite sending entities.
+      // DTO (dtoAgentGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agents page:${page || 1} fetched successfully`,
-        data: agentsDistrict as unknown as ApiAgentGetList[],
+        data: agentsDistrict,
         count,
       });
     },
   );
 
-  fastify.get<{ Params: ParamsId; Reply: ReplyData<ApiAgentGet> }>(
+  fastify.get<{ Params: ParamsId; Reply: ReplyData<Agent> }>(
     "/:id",
     {
       schema: {
@@ -157,7 +152,7 @@ export default async function agentRoutes(
       // DTO (dtoAgentGet) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
-        data: agentComments as unknown as ApiAgentGet,
+        data: agentComments,
       });
     },
   );

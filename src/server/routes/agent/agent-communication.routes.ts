@@ -1,9 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  ApiCommunicationGet,
-  ApiCommunicationPost,
-  UserRole,
-} from "need4deed-sdk";
+import { ApiCommunicationPost, UserRole } from "need4deed-sdk";
+import Communication from "../../../data/entity/communication.entity";
 import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
@@ -15,7 +12,9 @@ export default function agentCommunicationRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    Reply: ReplyDataCount<ApiCommunicationGet[]>;
+    // Handler sends entities; the DTO (ApiCommunicationGet) runs in the
+    // preSerialization hook.
+    Reply: ReplyDataCount<Communication[]>;
   }>(
     `/`,
     {
@@ -37,7 +36,7 @@ export default function agentCommunicationRoutes(
       // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) communications fetched successfully`,
-        data: communications as unknown as ApiCommunicationGet[],
+        data: communications,
         count,
       });
     },

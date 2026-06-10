@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
-  ApiOpportunityGetList,
   ApiOpportunityPatch,
   SortOrder,
   UserRole,
@@ -157,7 +156,9 @@ export default async function opportunityRoutes(
 
   fastify.get<{
     Querystring: QuerystringOpportunityList;
-    Reply: ReplyDataCount<ApiOpportunityGetList[]>;
+    // Handler sends entities; the DTO (ApiOpportunityGetList) runs in the
+    // preSerialization hook.
+    Reply: ReplyDataCount<Opportunity[]>;
   }>(
     "/",
     {
@@ -235,7 +236,7 @@ export default async function opportunityRoutes(
       // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Opportunities page:${request.query.page}.`,
-        data: opportunitiesCategoryDistrict as unknown as ApiOpportunityGetList[],
+        data: opportunitiesCategoryDistrict,
         count,
       });
     },
