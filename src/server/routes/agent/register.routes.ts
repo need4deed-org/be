@@ -22,8 +22,10 @@ import {
   responseErrors,
 } from "../../schema";
 import {
+  AgentAddressConflictError,
   classifyRegisterAgentConflict,
   createAgentForPerson,
+  getAgentByAddress,
   joinAgent,
   resolveJoinStatus,
 } from "../../utils";
@@ -72,7 +74,9 @@ export default async function agentRegisterRoutes(
   // GET /agent/register/search?token=&street= — minimal agent lookup for the
   // self-registration picker, so a registrant can JOIN their org instead of
   // creating a duplicate. Token-gated (not the COORDINATOR-only GET /agent).
-  fastify.get<{ Querystring: { token: string; street?: string } }>(
+  fastify.get<{
+    Querystring: { token: string; street?: string; postcode?: string };
+  }>(
     "/search",
     {
       config: { public: true } as FastifyContextConfig,
@@ -85,36 +89,35 @@ export default async function agentRegisterRoutes(
     },
     async (request, reply) => {
       const street = (request.query.street ?? "").trim();
+      const postcode = (request.query.postcode ?? "").trim();
       const domain = request.registrant?.email.split("@").pop()?.toLowerCase();
-      if (street.length < 3 || !domain) {
+      if (street.length < 3 || !postcode || !domain) {
         return reply.status(200).send({ message: "No query", data: [] });
       }
 
-      // Only surface agents the registrant is tied to by email domain — i.e.
-      // an existing member shares their domain (Person.email, falling back to
-      // the linked User.email). This keeps the picker to orgs they can join and
-      // narrows enumeration. Mirrors resolveJoinStatus, so a picked agent
-      // auto-approves to ACTIVE.
-      const rows = await fastify.db.agentRepository
+      // Candidates: only agents the registrant is tied to by email domain — an
+      // existing member shares their domain (Person.email, falling back to the
+      // linked User.email). Keeps the picker to orgs they can join (mirrors
+      // resolveJoinStatus, so a picked agent auto-approves to ACTIVE) and
+      // narrows enumeration. Load the relations getAgentByAddress reads.
+      const candidates = await fastify.db.agentRepository
         .createQueryBuilder("agent")
-        .select("agent.id", "id")
-        .addSelect("agent.title", "title")
-        .distinct(true)
-        .innerJoin("agent.address", "address")
+        .leftJoinAndSelect("agent.address", "address")
+        .leftJoinAndSelect("address.postcode", "postcode")
+        .leftJoinAndSelect("agent.agentPostcode", "agentPostcode")
+        .leftJoinAndSelect("agentPostcode.postcode", "agentPostcodePostcode")
         .innerJoin("agent.agentPerson", "ap")
         .innerJoin("ap.person", "person")
         .leftJoin("person.users", "usr")
-        .where("address.street ILIKE :street", { street: `%${street}%` })
-        .andWhere("(person.email ILIKE :suffix OR usr.email ILIKE :suffix)", {
+        .where("(person.email ILIKE :suffix OR usr.email ILIKE :suffix)", {
           suffix: `%@${domain}`,
         })
-        .limit(10)
-        .getRawMany<{ id: number; title: string }>();
+        .getMany();
 
-      const data = rows.map((row) => ({
-        id: Number(row.id),
-        title: row.title,
-      }));
+      // Reuse the POST /opportunity/legacy picker (strict street+PLZ, then fuzzy
+      // street-name) — returns the single best match (or none).
+      const match = getAgentByAddress(candidates, street, postcode);
+      const data = match ? [{ id: match.id, title: match.title }] : [];
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });
@@ -170,6 +173,13 @@ export default async function agentRegisterRoutes(
 
         return reply.status(201).send({ message, data: result });
       } catch (err) {
+        if (err instanceof AgentAddressConflictError) {
+          return reply.status(409).send({
+            message: "An agent at this address already exists.",
+            conflict: "address",
+            agentId: err.agentId,
+          });
+        }
         if (classifyRegisterAgentConflict(err) === "title") {
           const title = "agent" in body ? body.agent.title : undefined;
           const existing = title
