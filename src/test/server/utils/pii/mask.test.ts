@@ -181,6 +181,16 @@ describe("maskPii", () => {
       expect(c.text).toBe("internal note about someone");
     });
 
+    it("defaults a missing author role to USER, so entity visibility decides", () => {
+      const visibleParent = makeComment({ user: undefined });
+      maskPii(visibleParent, ctx({ userId: 1, opportunityIds: [5] }));
+      expect(visibleParent.text).toBe("internal note about someone");
+
+      const hiddenParent = makeComment({ user: undefined });
+      maskPii(hiddenParent, ctx({ userId: 1, opportunityIds: [] }));
+      expect(hiddenParent.text).toMatch(MASKED);
+    });
+
     it("masks a comment on a non-opportunity/agent entity (conservative)", () => {
       const c = makeComment({
         entityType: EntityTableName.VOLUNTEER,

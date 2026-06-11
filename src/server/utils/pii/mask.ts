@@ -64,7 +64,9 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
   if (comment.userId === ctx.userId) {
     return true;
   }
-  const authorRole = comment.user?.role;
+  // A missing author role defaults to USER (non-privileged) — entity visibility
+  // then decides.
+  const authorRole = comment.user?.role ?? UserRole.USER;
   if (authorRole === UserRole.COORDINATOR || authorRole === UserRole.ADMIN) {
     return false;
   }
