@@ -4,6 +4,7 @@ import AgentLanguage from "../../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Agent from "../../../../data/entity/opportunity/agent.entity";
 import {
+  AgentAddressConflictError,
   classifyRegisterAgentConflict,
   createAgentForPerson,
   joinAgent,
@@ -51,6 +52,10 @@ beforeEach(() => {
     }
   });
 
+  // Default: the address-dedup lookup (dataSource.getRepository(Agent).find)
+  // finds no existing agent, so createAgentForPerson proceeds to create.
+  agentPersonRepoFind.mockResolvedValue([]);
+
   agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
   agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
   agentLanguageSave.mockImplementation(async (rows: any[]) => rows);
@@ -97,6 +102,30 @@ describe("createAgentForPerson", () => {
       txnManager,
     );
     expect(agentSave.mock.calls[0][0].addressId).toBe(99);
+  });
+
+  it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {
+    // The dedup lookup finds an agent at the same address (getAgentByAddress
+    // strict match on normalized street + postcode).
+    agentPersonRepoFind.mockResolvedValueOnce([
+      {
+        id: 77,
+        address: {
+          street: "Bitterfelder Str 11",
+          postcode: { value: "12681" },
+        },
+      },
+    ]);
+
+    const err = await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(AgentAddressConflictError);
+    expect(err.agentId).toBe(77);
+    expect(agentSave).not.toHaveBeenCalled();
   });
 
   it("skips Address when only street or only postcode is given", async () => {

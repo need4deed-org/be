@@ -8,10 +8,23 @@ import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { createAddress } from "./for-routes";
+import { getAgentByAddress } from "./get-agent-by-postcode";
 
 export interface RegisterAgentResult {
   agentId: number;
   membershipStatus: AgentMembershipStatus;
+}
+
+/**
+ * Raised by createAgentForPerson when the street+postcode already match an
+ * existing agent (via the same getAgentByAddress picker POST /opportunity/legacy
+ * uses). The route maps it to a 409 + agentId so the client can offer JOIN.
+ */
+export class AgentAddressConflictError extends Error {
+  constructor(public readonly agentId: number) {
+    super("An agent at this address already exists.");
+    this.name = "AgentAddressConflictError";
+  }
 }
 
 /**
@@ -30,6 +43,23 @@ export async function createAgentForPerson(
   personId: number,
   input: ApiAgentRegisterNew,
 ): Promise<RegisterAgentResult> {
+  // Dedup: if the street+postcode already resolve to an existing agent (same
+  // picker POST /opportunity/legacy uses), don't mint a duplicate — surface it
+  // so the client can offer JOIN instead.
+  if (input.addressStreet && input.addressPostcode) {
+    const agents = await dataSource.getRepository(Agent).find({
+      relations: ["address.postcode", "agentPostcode.postcode"],
+    });
+    const match = getAgentByAddress(
+      agents,
+      input.addressStreet,
+      input.addressPostcode,
+    );
+    if (match) {
+      throw new AgentAddressConflictError(match.id);
+    }
+  }
+
   let result!: RegisterAgentResult;
 
   await dataSource.manager.transaction(async (manager) => {
