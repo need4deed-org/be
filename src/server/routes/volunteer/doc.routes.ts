@@ -18,9 +18,13 @@ export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  // Documents can't be PII-masked (they're files/metadata), so these GETs stay
+  // COORDINATOR-only — the parent /volunteer hook was relaxed to logged-in for
+  // the masked GET work, which would otherwise expose them to any user.
   fastify.get<{ Params: { id: number } }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -39,27 +43,31 @@ export default async function volunteerDocRoutes(
     },
   );
 
-  fastify.get("/download", async (request, reply) => {
-    const { url } = request.query as { url: string };
-    const fileName = "test_pdf.pdf";
+  fastify.get(
+    "/download",
+    { onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }) },
+    async (request, reply) => {
+      const { url } = request.query as { url: string };
+      const fileName = "test_pdf.pdf";
 
-    const [urlObj, error] = await tryCatch(fetch(url));
+      const [urlObj, error] = await tryCatch(fetch(url));
 
-    if (error) {
-      logger.error(`Error fetching document from URL ${url}: ${error}`);
-      return reply.status(400).send({
-        message: `Error fetching document from URL: ${error}`,
+      if (error) {
+        logger.error(`Error fetching document from URL ${url}: ${error}`);
+        return reply.status(400).send({
+          message: `Error fetching document from URL: ${error}`,
+        });
+      }
+
+      reply.raw.writeHead(200, {
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Type": "application/pdf",
+        "Content-Length": urlObj.headers.get("Content-Length") || "",
       });
-    }
 
-    reply.raw.writeHead(200, {
-      "Content-Disposition": `attachment; filename="${fileName}"`,
-      "Content-Type": "application/pdf",
-      "Content-Length": urlObj.headers.get("Content-Length") || "",
-    });
-
-    Readable.fromWeb(urlObj.body).pipe(reply.raw);
-  });
+      Readable.fromWeb(urlObj.body).pipe(reply.raw);
+    },
+  );
 
   fastify.get<{
     Params: { id: number };
@@ -67,6 +75,7 @@ export default async function volunteerDocRoutes(
   }>(
     "/upload-meta",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         querystring: volunteerDocSchemaUploadMeta,
