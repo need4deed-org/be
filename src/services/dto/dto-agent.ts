@@ -3,11 +3,13 @@ import {
   ApiAgentGet,
   ApiAgentGetList,
   ApiAgentMembership,
+  ApiAgentOpportunity,
   ApiOpportunityAgent,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
@@ -93,5 +95,33 @@ function dtoAgentDetails(agent: Agent): AgentDetails {
         id: al.languageId,
         title: al.language?.title,
       })) || [],
+  };
+}
+
+/**
+ * One of an agent's opportunities plus the volunteers linked to it. Response
+ * item of GET /agent/:id/opportunity-linked. Expects the
+ * `opportunityVolunteer.volunteer.person` relation loaded; person PII is masked
+ * upstream by the route's preSerialization hook, so masked values pass through.
+ */
+export function dtoAgentOpportunity(
+  opportunity: Opportunity,
+): ApiAgentOpportunity {
+  return {
+    id: opportunity.id,
+    title: opportunity.title,
+    statusOpportunity: opportunity.status,
+    statusMatch: opportunity.statusMatch,
+    numberOfVolunteers: opportunity.numberVolunteers,
+    createdAt: opportunity.createdAt,
+    volunteers: (opportunity.opportunityVolunteer ?? [])
+      .filter(Boolean)
+      .map((ov) => ({
+        id: ov.id,
+        volunteerId: ov.volunteerId,
+        status: ov.status,
+        name: ov.volunteer?.person?.name,
+        avatarUrl: ov.volunteer?.person?.avatarUrl,
+      })),
   };
 }

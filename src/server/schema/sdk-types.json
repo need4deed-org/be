@@ -740,6 +740,43 @@
         }
       ]
     },
+    "ApiAgentOpportunityVolunteer": {
+      "$id": "ApiAgentOpportunityVolunteer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "volunteerId": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      },
+      "required": ["id", "volunteerId", "status"]
+    },
+    "ApiAgentOpportunity": {
+      "$id": "ApiAgentOpportunity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "statusMatch": { "$ref": "OpportunityMatchStatusType#" },
+        "numberOfVolunteers": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "volunteers": {
+          "type": "array",
+          "items": { "$ref": "ApiAgentOpportunityVolunteer#" }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "statusOpportunity",
+        "statusMatch",
+        "numberOfVolunteers",
+        "createdAt",
+        "volunteers"
+      ]
+    },
     "AgentType": {
       "$id": "AgentType",
       "type": "string",
