@@ -299,12 +299,19 @@ export default async function userRoutes(
               `Person with ID ${personData.id} not found.`,
             );
           }
+          // Backfill the account email onto the person when it has none
+          // (cascade-saved with the user); never overwrite an existing value.
+          if (!resolvedPerson.email) {
+            resolvedPerson.email = email;
+          }
           request.resolvedPerson = resolvedPerson;
           return;
         }
 
-        // New person.
+        // New person. Mirror the account email onto the person so the person
+        // record carries the same email the user registered with.
         const newPerson = new Person(personData);
+        newPerson.email = email;
         const errors = await validate(newPerson);
         if (errors.length > 0) {
           logger.error(
