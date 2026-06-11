@@ -1,8 +1,9 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerOpportunityGet } from "need4deed-sdk";
 import { BadRequestError } from "../../../config/error/fastify";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
+import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";
 
@@ -12,7 +13,8 @@ export default function opportunityOpportunityVolunteerRoutes(
 ) {
   fastify.get<{
     Params: { id: number };
-    Reply: { message: string; data: ApiVolunteerOpportunityGet[] };
+    // Handler sends entities; the DTO runs in the preSerialization hook.
+    Reply: { message: string; data: OpportunityVolunteer[] };
   }>(
     "/",
     {
@@ -20,6 +22,9 @@ export default function opportunityOpportunityVolunteerRoutes(
         params: idParamSchema,
         response: responseSchema("ApiOpportunityVolunteerGet#", true, false),
       },
+      preSerialization: makePiiSerialization(
+        opportunityOpportunityVolunteerDTO,
+      ),
     },
     async (request, reply) => {
       const opportunityId = request.params.id;
@@ -44,11 +49,10 @@ export default function opportunityOpportunityVolunteerRoutes(
         ],
       });
 
-      const data = volunteers.map(opportunityOpportunityVolunteerDTO);
-
+      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Volunteers for opportunity id:${opportunityId}.`,
-        data,
+        data: volunteers,
       });
     },
   );

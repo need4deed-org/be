@@ -48,6 +48,10 @@ import {
   updateOptionList,
   writeVolunteerLegacy,
 } from "../../utils";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
@@ -91,10 +95,9 @@ export default async function volunteerRoutes(
       ? listRelationsCommon
       : [...listRelationsCommon, ...listRelationsCardExtra];
 
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  // GETs open to any logged-in user (PII masked per role); writes stay
+  // COORDINATOR-only (re-gated per-route).
+  fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
@@ -147,7 +150,12 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(
+          id,
+          isoCode,
+          relations,
+          await resolveCallerMask(request),
+        );
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}).`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
@@ -232,6 +240,7 @@ export default async function volunteerRoutes(
           })
         : [];
 
+      await maskForCaller(request, volunteers);
       const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
       reply.status(200).send({
@@ -255,6 +264,7 @@ export default async function volunteerRoutes(
   }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "volunteer-api-id-part#" },
@@ -397,7 +407,12 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(
+          id,
+          isoCode,
+          relations,
+          await resolveCallerMask(request),
+        );
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}) after patch.`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
@@ -425,6 +440,7 @@ export default async function volunteerRoutes(
   }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         body: { $ref: "volunteer-form-data" },
         response: {

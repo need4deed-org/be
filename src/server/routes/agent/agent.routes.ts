@@ -1,11 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  ApiAgentGet,
-  ApiAgentGetList,
-  ApiAgentPatch,
-  SortOrder,
-  UserRole,
-} from "need4deed-sdk";
+import { ApiAgentPatch, SortOrder, UserRole } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import logger from "../../../logger";
@@ -36,6 +30,7 @@ import {
   patchAddress,
   updateAgentLanguages,
 } from "../../utils";
+import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
 import agentMembershipRoutes from "./membership.routes";
@@ -45,10 +40,10 @@ export default async function agentRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  // GETs are open to any logged-in user (PII is masked per role in the
+  // preSerialization hooks below); writes stay COORDINATOR-only (re-gated
+  // per-route).
+  fastify.addHook("onRequest", fastify.authenticate());
 
   fastify.register(agentRegisterRoutes, { prefix: RoutePrefix.REGISTER });
 
@@ -64,7 +59,9 @@ export default async function agentRoutes(
 
   fastify.get<{
     Querystring: QuerystringAgentGetList;
-    Reply: ReplyDataCount<ApiAgentGetList[]>;
+    // Handler sends entities; the DTO (ApiAgentGetList) runs in the
+    // preSerialization hook, so the send is typed as the entity.
+    Reply: ReplyDataCount<Agent[]>;
   }>(
     "/",
     {
@@ -72,6 +69,7 @@ export default async function agentRoutes(
         querystring: agentListQuerySchema,
         response: responseSchema("ApiAgentGetList#", true),
       },
+      preSerialization: makePiiSerialization(dtoAgentGetList),
     },
     async (request, reply) => {
       logger.debug(`GET /agents: request.query:${Object.keys(request.query)}`);
@@ -103,27 +101,28 @@ export default async function agentRoutes(
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentsDistrict = await Promise.all(agents.map(addDistrictToAgent));
-      const data = agentsDistrict.map(dtoAgentGetList);
 
       if (updates.length > 0) {
         await agentRepository.save(updates);
       }
 
+      // DTO (dtoAgentGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agents page:${page || 1} fetched successfully`,
-        data,
+        data: agentsDistrict,
         count,
       });
     },
   );
 
-  fastify.get<{ Params: ParamsId; Reply: ReplyData<ApiAgentGet> }>(
+  fastify.get<{ Params: ParamsId; Reply: ReplyData<Agent> }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
         response: responseSchema("ApiAgentGet#"),
       },
+      preSerialization: makePiiSerialization(dtoAgentGet),
     },
     async (request, reply) => {
       const { id } = request.params;
@@ -145,15 +144,15 @@ export default async function agentRoutes(
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentDistrict = await addDistrictToAgent(agent);
       const agentComments = await addComments2Entity(agentDistrict);
-      const data = dtoAgentGet(agentComments);
 
       if (updates.length > 0) {
         await agentRepository.save(updates);
       }
 
+      // DTO (dtoAgentGet) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
-        data,
+        data: agentComments,
       });
     },
   );
@@ -161,6 +160,7 @@ export default async function agentRoutes(
   fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: null }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAgentPatch#" },
@@ -229,6 +229,7 @@ export default async function agentRoutes(
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: responseSchema(""),

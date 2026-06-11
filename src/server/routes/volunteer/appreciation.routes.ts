@@ -1,7 +1,12 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiAppreciationGet, ApiAppreciationPost } from "need4deed-sdk";
+import {
+  ApiAppreciationGet,
+  ApiAppreciationPost,
+  UserRole,
+} from "need4deed-sdk";
 import { dtoAppreciation } from "../../../services/dto/dto-appreciation";
 import { idParamSchema, responseErrors } from "../../schema";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default function volunteerAppreciationRoutes(
   fastify: FastifyInstance,
@@ -41,6 +46,7 @@ export default function volunteerAppreciationRoutes(
         },
       });
 
+      await maskForCaller(request, appreciations);
       const data = appreciations.map(dtoAppreciation);
 
       return reply.status(200).send({
@@ -53,6 +59,7 @@ export default function volunteerAppreciationRoutes(
   fastify.post<{ Params: { id: number }; Body: ApiAppreciationPost }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAppreciationPost#" },

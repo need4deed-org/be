@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerCommunicationPost } from "need4deed-sdk";
+import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
 import { idParamSchema } from "../../schema";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default function volunteerCommunicationRoutes(
   fastify: FastifyInstance,
@@ -33,6 +34,7 @@ export default function volunteerCommunicationRoutes(
         },
       });
 
+      await maskForCaller(request, communications);
       return reply.status(200).send({
         message: `List of communications for volunteer_id:${volunteerId}`,
         data: communications,
@@ -43,6 +45,7 @@ export default function volunteerCommunicationRoutes(
   fastify.post<{ Params: { id: number }; Body: ApiVolunteerCommunicationPost }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiCommunicationPost#" },

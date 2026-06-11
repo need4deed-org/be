@@ -1,5 +1,9 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { AgentMembershipStatus, ApiAgentMembership } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  ApiAgentMembership,
+  UserRole,
+} from "need4deed-sdk";
 import logger from "../../../logger";
 import { dtoSerializeAgentMembership } from "../../../services";
 import {
@@ -11,13 +15,18 @@ import {
 } from "../../schema";
 import { ParamsId } from "../../types";
 
-// Moderation of agent memberships. Mounted under /agent, so it inherits the
-// COORDINATOR onRequest auth hook (ADMIN bypasses). This is where joins that
-// landed PENDING (no email-domain match) get approved or rejected.
+// Moderation of agent memberships. COORDINATOR/ADMIN only — re-gated here since
+// the parent /agent onRequest hook was relaxed to logged-in for the GET PII
+// work. This is where PENDING joins get approved or rejected.
 export default async function agentMembershipRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  fastify.addHook(
+    "onRequest",
+    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  );
+
   // GET /agent/membership?status=pending — list memberships to moderate.
   fastify.get<{ Querystring: { status?: AgentMembershipStatus } }>(
     "/",
