@@ -3,6 +3,7 @@ import { NotFoundError } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { idParamSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
+import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default async function agentOpportunityRoutes(
   fastify: FastifyInstance,
@@ -15,6 +16,9 @@ export default async function agentOpportunityRoutes(
         params: idParamSchema,
         // TODO: add response schema!
       },
+      // No DTO yet (sends raw entities) — masking still applies to nested
+      // volunteer persons; identity passthrough keeps the shape.
+      preSerialization: makePiiSerialization((o: Opportunity) => o),
     },
     async (request, reply) => {
       const { id } = request.params;

@@ -56,6 +56,11 @@ async function jwtPlugin(
           throw new Error("User not found.");
         }
 
+        // Expose the already-loaded user (carries personId + DB-authoritative
+        // role) for downstream hooks (PII masking, self-auth) — avoids a second
+        // lookup and a JWT claim.
+        request.authUser = user;
+
         if (user.role === UserRole.ADMIN) {
           logger.debug(
             `Admin user ${userId} authenticated, bypassing further checks.`,
