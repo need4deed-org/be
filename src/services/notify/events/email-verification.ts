@@ -121,7 +121,7 @@ export async function sendEmailVerification(
   });
   const url = `${urlEmailVerification}/${token}`;
 
-  logger.debug(`sendEmailVerification: ${user.email}`);
+  logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);
 
   const content = resolveContent(
     await loadManifest(),
