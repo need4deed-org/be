@@ -18,6 +18,7 @@ import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
+import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { AuthOptions } from "./auth";
@@ -42,6 +43,7 @@ declare module "fastify" {
       agentPersonRepository: Repository<AgentPerson>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
+      trustedDomainRepository: Repository<TrustedDomain>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;

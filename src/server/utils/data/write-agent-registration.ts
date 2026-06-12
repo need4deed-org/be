@@ -9,6 +9,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { createAddress } from "./for-routes";
 import { getAgentByAddress } from "./get-agent-by-postcode";
+import { isEmailDomainTrusted } from "./is-trusted-domain";
 
 export interface RegisterAgentResult {
   agentId: number;
@@ -149,7 +150,10 @@ export async function resolveJoinStatus(
     );
   });
 
-  return matched ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
+  // Auto-approve when an existing member shares the domain, or the domain is on
+  // the trusted allowlist (a brand-new org's first representative).
+  const trusted = matched || (await isEmailDomainTrusted(registrantEmail));
+  return trusted ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
 /**
