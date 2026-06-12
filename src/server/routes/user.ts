@@ -28,7 +28,7 @@ import {
   userVerifyEmailSchema,
 } from "../schema/user.schema";
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
-import { getSkipTake, getUserWhere } from "../utils";
+import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -273,8 +273,10 @@ export default async function userRoutes(
           throw new UnauthorizedError();
         }
 
-        // Agents must register from a known agent's email domain (same gate as
-        // POST /opportunity/legacy). Volunteers and users self-register freely.
+        // Agents must register from a known RAC email domain: either an
+        // existing agent member already shares it, or it's on the trusted-domain
+        // allowlist (so a brand-new org's first representative can register).
+        // Volunteers and users self-register freely.
         if (role === UserRole.AGENT) {
           const domain = (email || "").split("@").pop();
           const matchingAgent = await fastify.db.agentRepository.findOne({
@@ -282,7 +284,7 @@ export default async function userRoutes(
               agentPerson: { person: { email: ILike(`%@${domain}`) } },
             },
           });
-          if (!matchingAgent) {
+          if (!matchingAgent && !(await isEmailDomainTrusted(email))) {
             throw new NotFoundError();
           }
         }

@@ -20,6 +20,7 @@ export const RoutePrefix = {
   REFRESH: "/refresh",
   REGISTER: "/register",
   SWAGGER: "/swagger",
+  TRUSTED_DOMAIN: "/trusted-domain",
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",
   VOLUNTEER: "/volunteer",

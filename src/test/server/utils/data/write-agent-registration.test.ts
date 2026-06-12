@@ -16,6 +16,12 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
   createAddress: (...args: unknown[]) => createAddressMock(...args),
 }));
 
+const isEmailDomainTrustedMock = vi.fn();
+vi.mock("../../../../server/utils/data/is-trusted-domain", () => ({
+  isEmailDomainTrusted: (...args: unknown[]) =>
+    isEmailDomainTrustedMock(...args),
+}));
+
 const txnManager: any = { getRepository: vi.fn() };
 const agentPersonRepoFindOne = vi.fn();
 const agentPersonRepoFind = vi.fn();
@@ -55,6 +61,9 @@ beforeEach(() => {
   // Default: the address-dedup lookup (dataSource.getRepository(Agent).find)
   // finds no existing agent, so createAgentForPerson proceeds to create.
   agentPersonRepoFind.mockResolvedValue([]);
+
+  // Default: domain not on the trusted allowlist (member-match decides).
+  isEmailDomainTrustedMock.mockResolvedValue(false);
 
   agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
   agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
@@ -196,6 +205,16 @@ describe("resolveJoinStatus", () => {
     const status = await resolveJoinStatus(33, "");
     expect(status).toBe(AgentMembershipStatus.PENDING);
     expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
+
+  it("returns ACTIVE when no member matches but the domain is trusted", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      { person: { email: "old@other.de", users: [] } },
+    ]);
+    isEmailDomainTrustedMock.mockResolvedValueOnce(true);
+
+    const status = await resolveJoinStatus(33, "newcomer@brandnew.de");
+    expect(status).toBe(AgentMembershipStatus.ACTIVE);
   });
 });
 

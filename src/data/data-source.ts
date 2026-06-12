@@ -39,6 +39,7 @@ import Skill from "./entity/profile/skill.entity";
 import Testimonial from "./entity/testimonial.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
+import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
@@ -94,6 +95,7 @@ export const dataSource = new DataSource({
     Testimonial,
     Timeline,
     Timeslot,
+    TrustedDomain,
     User,
     Volunteer,
   ],
