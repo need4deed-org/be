@@ -84,7 +84,7 @@ export const urlEmailVerification =
 
 // CDN manifest (per-locale subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
-  CDNBaseUrl + "emails/verification.json";
+  CDNBaseUrl + "/emails/verification.json";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
