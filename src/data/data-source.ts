@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-import { isProd, isTest } from "../config";
+import { isProd, isStaging, isTest } from "../config";
 import Comment from "./entity/comment.entity";
 import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
@@ -99,14 +99,15 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
   ],
-  ssl: isProd
-    ? {
-        rejectUnauthorized: true,
-        ca: fs
-          .readFileSync("/app/certificates/eu-central-1-bundle.pem")
-          .toString(),
-      }
-    : false,
+  ssl:
+    isProd || isStaging
+      ? {
+          rejectUnauthorized: true,
+          ca: fs
+            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
+            .toString(),
+        }
+      : false,
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
   migrationsTableName: "be_migrations",
   subscribers: [],
