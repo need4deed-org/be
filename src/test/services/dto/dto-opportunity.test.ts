@@ -147,14 +147,22 @@ describe("dtoOpportunityGetList", () => {
     },
   };
 
-  it("maps the matched volunteers' names, skipping rows with no person", () => {
+  it("maps only opp-matched volunteers' names, skipping other statuses + rows with no person", () => {
     const opportunity = {
       ...baseOpportunity,
       opportunityVolunteer: [
-        { volunteer: { person: { name: "Jane Doe" } } },
-        { volunteer: { person: { name: "John Roe" } } },
-        { volunteer: { person: null } },
-        { volunteer: null },
+        { status: "opp-matched", volunteer: { person: { name: "Jane Doe" } } },
+        { status: "opp-matched", volunteer: { person: { name: "John Roe" } } },
+        // not matched -> excluded
+        {
+          status: "opp-pending",
+          volunteer: { person: { name: "Penny Pend" } },
+        },
+        { status: "opp-active", volunteer: { person: { name: "Active Al" } } },
+        { status: "opp-past", volunteer: { person: { name: "Past Pat" } } },
+        // matched but no person -> filtered out
+        { status: "opp-matched", volunteer: { person: null } },
+        { status: "opp-matched", volunteer: null },
       ],
     };
 
@@ -164,10 +172,12 @@ describe("dtoOpportunityGetList", () => {
     ]);
   });
 
-  it("passes masked names through verbatim", () => {
+  it("passes masked names of matched volunteers through verbatim", () => {
     const opportunity = {
       ...baseOpportunity,
-      opportunityVolunteer: [{ volunteer: { person: { name: "x*** y***" } } }],
+      opportunityVolunteer: [
+        { status: "opp-matched", volunteer: { person: { name: "x*** y***" } } },
+      ],
     };
 
     expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual([
@@ -176,7 +186,12 @@ describe("dtoOpportunityGetList", () => {
   });
 
   it("yields an empty array when no volunteers are matched", () => {
-    const opportunity = { ...baseOpportunity, opportunityVolunteer: [] };
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        { status: "opp-pending", volunteer: { person: { name: "Penny" } } },
+      ],
+    };
     expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual(
       [],
     );
