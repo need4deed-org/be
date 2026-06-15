@@ -680,7 +680,8 @@
         },
         "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
-        "agentTitle": { "type": "string" }
+        "agentTitle": { "type": "string" },
+        "volunteerNames": { "type": "array", "items": { "type": "string" } }
       },
       "required": [
         "id",

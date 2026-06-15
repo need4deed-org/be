@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getOpportunityContact } from "../../../services/dto/dto-opportunity";
+import {
+  dtoOpportunityGetList,
+  getOpportunityContact,
+} from "../../../services/dto/dto-opportunity";
 
 const representativePerson = {
   id: 100,
@@ -120,5 +123,62 @@ describe("getOpportunityContact", () => {
     const result = getOpportunityContact(opportunity as any);
 
     expect(result.id).toBe(100);
+  });
+});
+
+describe("dtoOpportunityGetList", () => {
+  const baseOpportunity = {
+    id: 1,
+    title: "German tutoring",
+    type: "volunteering",
+    status: "opp-active",
+    statusMatch: "opp-vol-matched",
+    numberVolunteers: 2,
+    createdAt: new Date("2026-01-01"),
+    districtId: 5,
+    agent: { title: "Center X" },
+    accompanying: null,
+    deal: {
+      categoryId: 9,
+      dealLanguage: [],
+      dealActivity: [],
+      dealDistrict: [],
+      dealTimeslot: [],
+    },
+  };
+
+  it("maps the matched volunteers' names, skipping rows with no person", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        { volunteer: { person: { name: "Jane Doe" } } },
+        { volunteer: { person: { name: "John Roe" } } },
+        { volunteer: { person: null } },
+        { volunteer: null },
+      ],
+    };
+
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual([
+      "Jane Doe",
+      "John Roe",
+    ]);
+  });
+
+  it("passes masked names through verbatim", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [{ volunteer: { person: { name: "x*** y***" } } }],
+    };
+
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual([
+      "x*** y***",
+    ]);
+  });
+
+  it("yields an empty array when no volunteers are matched", () => {
+    const opportunity = { ...baseOpportunity, opportunityVolunteer: [] };
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual(
+      [],
+    );
   });
 });
