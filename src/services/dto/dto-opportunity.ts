@@ -40,8 +40,9 @@ export function getOpportunityContact(
 
   const person =
     opportunity.contactPerson ??
-    (submitterStillAtAgent ? submitter : opportunity.agent?.representative?.person);
-
+    (submitterStillAtAgent
+      ? submitter
+      : opportunity.agent?.representative?.person);
 
   return {
     id: person?.id,
@@ -80,6 +81,12 @@ export function dtoOpportunityGetList(
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
+    // Names of the volunteers matched to the opportunity. PII masking runs
+    // before this DTO, so masked names pass through. Needs the
+    // opportunityVolunteer.volunteer.person relation loaded.
+    volunteerNames: (opportunity.opportunityVolunteer ?? [])
+      .map((ov) => ov.volunteer?.person?.name)
+      .filter((name): name is string => Boolean(name)),
   } as ApiOpportunityGetList;
 }
 
