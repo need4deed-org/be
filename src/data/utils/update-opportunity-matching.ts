@@ -33,7 +33,7 @@ export async function updateOpportunityMatching(id: number): Promise<void> {
       opportunityRepository.save(Object.assign(opportunity, { statusMatch })),
     );
 
-    if (!opportunity) {
+    if (error) {
       dataSource.logger.log(
         "warn",
         `During saving opportunity (id:${id}) occurred: ${error}`,
