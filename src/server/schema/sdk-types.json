@@ -349,6 +349,9 @@
         "timezone": {
           "type": "string"
         },
+        "agentId": {
+          "type": "integer"
+        },
         "additionalProperties": false
       },
       "required": ["id", "email", "role"]
