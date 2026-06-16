@@ -63,6 +63,7 @@ const registerAgentNewSchema = {
       type: "array",
       items: { $ref: "AgentServiceType#" },
     },
+    phone: { type: "string" },
     addressStreet: { type: "string" },
     addressPostcode: { type: "string" },
     districtId: { type: "integer" },
