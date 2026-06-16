@@ -1,6 +1,8 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  AgentMembershipStatus,
+  AgentRoleType,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -160,7 +162,29 @@ export default async function userRoutes(
           return reply.status(404).send({ message: "User not found." });
         }
 
-        const payload = serializeUserToMeDTO(user);
+        let agentId: number | undefined;
+        if (user.personId) {
+          // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
+          const membership =
+            (await fastify.db.agentPersonRepository.findOne({
+              where: {
+                personId: user.personId,
+                status: AgentMembershipStatus.ACTIVE,
+                role: AgentRoleType.VOLUNTEER_COORDINATOR,
+              },
+              order: { id: "ASC" },
+            })) ??
+            (await fastify.db.agentPersonRepository.findOne({
+              where: {
+                personId: user.personId,
+                status: AgentMembershipStatus.ACTIVE,
+              },
+              order: { id: "ASC" },
+            }));
+          agentId = membership?.agentId;
+        }
+
+        const payload = serializeUserToMeDTO(user, agentId);
         return reply
           .status(200)
           .send({ message: "Logged in User", data: payload });
