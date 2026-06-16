@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentLanguage from "../../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Agent from "../../../../data/entity/opportunity/agent.entity";
+import Person from "../../../../data/entity/person.entity";
 import {
   AgentAddressConflictError,
   classifyRegisterAgentConflict,
@@ -41,6 +42,7 @@ vi.mock("../../../../data/data-source", () => ({
 const agentSave = vi.fn();
 const agentPersonSave = vi.fn();
 const agentLanguageSave = vi.fn();
+const personUpdate = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -53,6 +55,8 @@ beforeEach(() => {
         return { save: agentPersonSave };
       case AgentLanguage:
         return { save: agentLanguageSave };
+      case Person:
+        return { update: personUpdate };
       default:
         throw new Error(`unexpected repo: ${entity?.name}`);
     }
@@ -172,6 +176,20 @@ describe("createAgentForPerson", () => {
       { agentId: 33, languageId: 7 },
       { agentId: 33, languageId: 9 },
     ]);
+  });
+
+  it("updates person.phone inside the transaction when phone is provided", async () => {
+    personUpdate.mockResolvedValue({});
+
+    await createAgentForPerson(11, { title: "Centre HERO", phone: "+49123456789" });
+
+    expect(personUpdate).toHaveBeenCalledWith({ id: 11 }, { phone: "+49123456789" });
+  });
+
+  it("skips person.phone update when phone is not provided", async () => {
+    await createAgentForPerson(11, { title: "Centre HERO" });
+
+    expect(personUpdate).not.toHaveBeenCalled();
   });
 });
 
