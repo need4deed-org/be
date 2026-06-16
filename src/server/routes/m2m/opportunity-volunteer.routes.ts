@@ -30,7 +30,18 @@ export default async function m2mOpportunityVolunteerRoutes(
         fastify.db.opportunityVolunteerRepository;
 
       const opportunityVolunteer = new OpportunityVolunteer(request.body);
-      await opportunityVolunteerRepository.save(opportunityVolunteer);
+      const existing = await opportunityVolunteerRepository.findOne({
+        where: {
+          opportunityId: opportunityVolunteer.opportunityId,
+          volunteerId: opportunityVolunteer.volunteerId,
+        },
+      });
+      if (existing) {
+        opportunityVolunteerRepository.merge(existing, { status: opportunityVolunteer.status });
+        await opportunityVolunteerRepository.save(existing);
+      } else {
+        await opportunityVolunteerRepository.save(opportunityVolunteer);
+      }
 
       return reply.status(201).send({
         message: `Created M2M opportunityId:${opportunityVolunteer.opportunityId}, volunteerId:${opportunityVolunteer.volunteerId}, status:${opportunityVolunteer.status}.`,
