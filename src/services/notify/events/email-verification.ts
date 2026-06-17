@@ -5,6 +5,7 @@ import {
   emailTemplateTtlMs,
   emailVerificationManifestUrl,
   urlEmailVerification,
+  VERIFY_LIFESPAN_MS,
 } from "../../../config/constants";
 import type User from "../../../data/entity/user.entity";
 import { fetchJsonFromUrl } from "../../../data/utils";
@@ -114,11 +115,10 @@ export async function sendEmailVerification(
     throw new Error("User email is required for verification");
   }
 
-  const token = jwt.sign({
-    id: user.id,
-    email: user.email,
-    type: "verify" as TokenType,
-  });
+  const token = jwt.sign(
+    { id: user.id, email: user.email, type: "verify" as TokenType },
+    { expiresIn: `${VERIFY_LIFESPAN_MS}` },
+  );
   const url = `${urlEmailVerification}/${token}`;
 
   logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);

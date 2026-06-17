@@ -1,6 +1,6 @@
 import { Lang } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { urlEmailVerification } from "../../../config/constants";
+import { urlEmailVerification, VERIFY_LIFESPAN_MS } from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   resetVerificationTemplateCache,
@@ -12,7 +12,8 @@ vi.mock("../../../data/utils", () => ({
 }));
 
 const send = vi.fn();
-const deps = { email: { send }, jwt: { sign: () => "tok" } } as any;
+const sign = vi.fn(() => "tok");
+const deps = { email: { send }, jwt: { sign } } as any;
 const user = (over: any = {}) => ({ id: 1, email: "u@x.de", ...over });
 const expectedUrl = `${urlEmailVerification}/tok`;
 
@@ -89,5 +90,16 @@ describe("sendEmailVerification", () => {
     await expect(
       sendEmailVerification(deps, user({ email: undefined })),
     ).rejects.toThrow("User email is required");
+  });
+
+  it("signs the token with VERIFY_LIFESPAN_MS as expiresIn", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
+
+    await sendEmailVerification(deps, user());
+
+    expect(sign).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "verify" }),
+      expect.objectContaining({ expiresIn: `${VERIFY_LIFESPAN_MS}` }),
+    );
   });
 });
