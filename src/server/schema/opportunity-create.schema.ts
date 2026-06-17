@@ -9,7 +9,7 @@ export const opportunityCreateBodySchema = {
   additionalProperties: true,
   properties: {
     agent_id: { type: "integer" },
-    submitted_by_id: { type: "integer" },
+    submitted_by_id: { type: ["integer", "null"] },
     title: { type: "string" },
     opportunity_type: {
       type: "string",
