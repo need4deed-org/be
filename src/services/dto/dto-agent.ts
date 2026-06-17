@@ -44,9 +44,12 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
   };
 }
 
+type AgentDetailsExtended = AgentDetails & { addressStreet?: string | null; addressPostcode?: string | null };
+type ApiAgentGetExtended = Omit<ApiAgentGet, "agentDetails"> & { agentDetails: AgentDetailsExtended };
+
 export function dtoAgentGet(
   agent: Agent & { comments: Comment[] },
-): ApiAgentGet {
+): ApiAgentGetExtended {
   return {
     ...dtoAgentGetList(agent),
     createdAt: agent.createdAt,
@@ -82,10 +85,12 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   };
 }
 
-function dtoAgentDetails(agent: Agent): AgentDetails {
+function dtoAgentDetails(agent: Agent): AgentDetails & { addressStreet?: string | null; addressPostcode?: string | null } {
   return {
     about: agent.info,
     address: serializeAddress(agent.address),
+    addressStreet: agent.address?.street ?? null,
+    addressPostcode: agent.address?.postcode?.value ?? null,
     website: agent.website,
     organizationType: agent.type,
     operator: agent?.organization?.title,

@@ -879,6 +879,8 @@
       "properties": {
         "about": { "type": "string" },
         "address": { "type": "string" },
+        "addressStreet": { "type": ["string", "null"] },
+        "addressPostcode": { "type": ["string", "null"] },
         "website": { "type": "string" },
         "organizationType": { "type": "string" },
         "operator": { "type": "string" },
