@@ -15,6 +15,7 @@ export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./sync-comment-tags";
+export * from "./is-trusted-domain";
 export * from "./update-leads";
 export * from "./write-agent-registration";
 export * from "./write-opportunity-contact-comment";

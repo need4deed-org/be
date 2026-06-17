@@ -7,11 +7,26 @@ import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Person from "../../../data/entity/person.entity";
 import { createAddress } from "./for-routes";
+import { getAgentByAddress } from "./get-agent-by-postcode";
+import { isEmailDomainTrusted } from "./is-trusted-domain";
 
 export interface RegisterAgentResult {
   agentId: number;
   membershipStatus: AgentMembershipStatus;
+}
+
+/**
+ * Raised by createAgentForPerson when the street+postcode already match an
+ * existing agent (via the same getAgentByAddress picker POST /opportunity/legacy
+ * uses). The route maps it to a 409 + agentId so the client can offer JOIN.
+ */
+export class AgentAddressConflictError extends Error {
+  constructor(public readonly agentId: number) {
+    super("An agent at this address already exists.");
+    this.name = "AgentAddressConflictError";
+  }
 }
 
 /**
@@ -26,10 +41,29 @@ export interface RegisterAgentResult {
  * this only writes agent-side records. A unique-title violation bubbles up for
  * the route to convert into a 409 + join suggestion.
  */
+type AgentRegisterInput = ApiAgentRegisterNew & { phone?: string };
+
 export async function createAgentForPerson(
   personId: number,
-  input: ApiAgentRegisterNew,
+  input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
+  // Dedup: if the street+postcode already resolve to an existing agent (same
+  // picker POST /opportunity/legacy uses), don't mint a duplicate — surface it
+  // so the client can offer JOIN instead.
+  if (input.addressStreet && input.addressPostcode) {
+    const agents = await dataSource.getRepository(Agent).find({
+      relations: ["address.postcode", "agentPostcode.postcode"],
+    });
+    const match = getAgentByAddress(
+      agents,
+      input.addressStreet,
+      input.addressPostcode,
+    );
+    if (match) {
+      throw new AgentAddressConflictError(match.id);
+    }
+  }
+
   let result!: RegisterAgentResult;
 
   await dataSource.manager.transaction(async (manager) => {
@@ -72,6 +106,12 @@ export async function createAgentForPerson(
               ({ agentId: agent.id, languageId }) as AgentLanguage,
           ),
         );
+    }
+
+    if (input.phone) {
+      await manager
+        .getRepository(Person)
+        .update({ id: personId }, { phone: input.phone });
     }
 
     result = {
@@ -119,7 +159,10 @@ export async function resolveJoinStatus(
     );
   });
 
-  return matched ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
+  // Auto-approve when an existing member shares the domain, or the domain is on
+  // the trusted allowlist (a brand-new org's first representative).
+  const trusted = matched || (await isEmailDomainTrusted(registrantEmail));
+  return trusted ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
 /**

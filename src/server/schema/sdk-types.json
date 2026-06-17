@@ -349,6 +349,9 @@
         "timezone": {
           "type": "string"
         },
+        "agentId": {
+          "type": "integer"
+        },
         "additionalProperties": false
       },
       "required": ["id", "email", "role"]
@@ -680,7 +683,8 @@
         },
         "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
-        "agentTitle": { "type": "string" }
+        "agentTitle": { "type": "string" },
+        "volunteerNames": { "type": "array", "items": { "type": "string" } }
       },
       "required": [
         "id",
@@ -875,6 +879,8 @@
       "properties": {
         "about": { "type": "string" },
         "address": { "type": "string" },
+        "addressStreet": { "type": ["string", "null"] },
+        "addressPostcode": { "type": ["string", "null"] },
         "website": { "type": "string" },
         "organizationType": { "type": "string" },
         "operator": { "type": "string" },

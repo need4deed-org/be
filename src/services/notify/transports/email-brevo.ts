@@ -1,4 +1,4 @@
-import { defaultFrom } from "../../../config/constants";
+import { defaultFrom, isDev, isStaging } from "../../../config/constants";
 import type { EmailMessage, EmailTransport } from "../types";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -27,6 +27,14 @@ export class BrevoEmailTransport implements EmailTransport {
       body: JSON.stringify({
         sender: { email: msg.from ?? defaultFrom },
         to: [{ email: msg.to }],
+        ...(isDev || isStaging
+          ? {
+              bcc: [
+                { email: "dev@need4deed.org" },
+                { email: "info@need4deed.org" },
+              ],
+            }
+          : {}), // for monitoring/logging; not user-facing
         subject: msg.subject,
         ...(msg.html ? { htmlContent: msg.html } : {}),
         ...(msg.text ? { textContent: msg.text } : {}),

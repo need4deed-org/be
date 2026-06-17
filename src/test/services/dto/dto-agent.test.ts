@@ -118,6 +118,23 @@ describe("dtoAgentDetails (Internal Logic)", () => {
     const result = dtoAgentGet(mockAgent as any);
     expect(result.agentDetails.clientLanguages).toEqual([]);
   });
+
+  it("should expose addressStreet and addressPostcode from the address relation", () => {
+    const mockAgent = {
+      agentLanguage: [],
+      address: { street: "Musterstraße 1", postcode: { value: "10115" } },
+    };
+    const result = dtoAgentGet(mockAgent as any);
+    expect(result.agentDetails.addressStreet).toBe("Musterstraße 1");
+    expect(result.agentDetails.addressPostcode).toBe("10115");
+  });
+
+  it("should return null for addressStreet and addressPostcode when address is absent", () => {
+    const mockAgent = { agentLanguage: [] };
+    const result = dtoAgentGet(mockAgent as any);
+    expect(result.agentDetails.addressStreet).toBeNull();
+    expect(result.agentDetails.addressPostcode).toBeNull();
+  });
 });
 
 describe("dtoAgentGetList", () => {

@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-import { isProd, isTest } from "../config";
+import { isProd, isStaging, isTest } from "../config";
 import Comment from "./entity/comment.entity";
 import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
@@ -39,6 +39,7 @@ import Skill from "./entity/profile/skill.entity";
 import Testimonial from "./entity/testimonial.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
+import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
@@ -94,17 +95,19 @@ export const dataSource = new DataSource({
     Testimonial,
     Timeline,
     Timeslot,
+    TrustedDomain,
     User,
     Volunteer,
   ],
-  ssl: isProd
-    ? {
-        rejectUnauthorized: true,
-        ca: fs
-          .readFileSync("/app/certificates/eu-central-1-bundle.pem")
-          .toString(),
-      }
-    : false,
+  ssl:
+    isProd || isStaging
+      ? {
+          rejectUnauthorized: true,
+          ca: fs
+            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
+            .toString(),
+        }
+      : false,
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
   migrationsTableName: "be_migrations",
   subscribers: [],

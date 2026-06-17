@@ -44,6 +44,7 @@ import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
 import { maskPii } from "../pii/mask";
+import { CallerVisibility } from "../pii/visible-persons";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -597,7 +598,7 @@ export async function fetchVolunteerById(
   id: number,
   isoCode: Lang,
   relations: string[],
-  maskVisiblePersonIds?: ReadonlySet<number> | null,
+  maskContext?: CallerVisibility | null,
 ): Promise<ApiVolunteerGet | null> {
   const volunteerRepository = getRepository(dataSource, Volunteer);
 
@@ -619,9 +620,9 @@ export async function fetchVolunteerById(
   // loaded separately (they aren't part of the volunteer graph), so they must be
   // masked too — otherwise comment authors' Person PII leaks to non-privileged
   // callers.
-  if (maskVisiblePersonIds) {
-    maskPii(volunteer, maskVisiblePersonIds);
-    maskPii(comments, maskVisiblePersonIds);
+  if (maskContext) {
+    maskPii(volunteer, maskContext);
+    maskPii(comments, maskContext);
   }
 
   const data = volunteerSerializer(volunteer, comments, timedEvents);

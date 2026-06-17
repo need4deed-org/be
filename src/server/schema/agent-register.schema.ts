@@ -26,6 +26,7 @@ export const registerSearchQuerySchema = {
   properties: {
     token: { type: "string", minLength: 1 },
     street: { type: "string" },
+    postcode: { type: "string" },
   },
 };
 
@@ -62,6 +63,7 @@ const registerAgentNewSchema = {
       type: "array",
       items: { $ref: "AgentServiceType#" },
     },
+    phone: { type: "string" },
     addressStreet: { type: "string" },
     addressPostcode: { type: "string" },
     districtId: { type: "integer" },
@@ -109,14 +111,15 @@ export const registerAgentResponseSchema = {
   },
 };
 
-// 409 on CREATE when the title is taken — carries the existing agent id so the
-// client can offer to JOIN instead. Overrides the generic 409 in responseErrors.
+// 409 on CREATE when the title is taken (`title`) or the street+postcode
+// already resolve to an existing agent (`address`) — carries that agent's id so
+// the client can offer to JOIN instead. Overrides the generic 409.
 export const registerAgentConflictSchema = {
   type: "object",
   required: ["message", "conflict"],
   properties: {
     message: { type: "string" },
-    conflict: { type: "string", enum: ["title"] },
+    conflict: { type: "string", enum: ["title", "address"] },
     agentId: { type: "integer" },
   },
 };

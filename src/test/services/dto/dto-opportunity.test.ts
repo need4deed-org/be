@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getOpportunityContact } from "../../../services/dto/dto-opportunity";
+import {
+  dtoOpportunityGetList,
+  getOpportunityContact,
+} from "../../../services/dto/dto-opportunity";
 
 const representativePerson = {
   id: 100,
@@ -120,5 +123,77 @@ describe("getOpportunityContact", () => {
     const result = getOpportunityContact(opportunity as any);
 
     expect(result.id).toBe(100);
+  });
+});
+
+describe("dtoOpportunityGetList", () => {
+  const baseOpportunity = {
+    id: 1,
+    title: "German tutoring",
+    type: "volunteering",
+    status: "opp-active",
+    statusMatch: "opp-vol-matched",
+    numberVolunteers: 2,
+    createdAt: new Date("2026-01-01"),
+    districtId: 5,
+    agent: { title: "Center X" },
+    accompanying: null,
+    deal: {
+      categoryId: 9,
+      dealLanguage: [],
+      dealActivity: [],
+      dealDistrict: [],
+      dealTimeslot: [],
+    },
+  };
+
+  it("maps only opp-matched volunteers' names, skipping other statuses + rows with no person", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        { status: "opp-matched", volunteer: { person: { name: "Jane Doe" } } },
+        { status: "opp-matched", volunteer: { person: { name: "John Roe" } } },
+        // not matched -> excluded
+        {
+          status: "opp-pending",
+          volunteer: { person: { name: "Penny Pend" } },
+        },
+        { status: "opp-active", volunteer: { person: { name: "Active Al" } } },
+        { status: "opp-past", volunteer: { person: { name: "Past Pat" } } },
+        // matched but no person -> filtered out
+        { status: "opp-matched", volunteer: { person: null } },
+        { status: "opp-matched", volunteer: null },
+      ],
+    };
+
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual([
+      "Jane Doe",
+      "John Roe",
+    ]);
+  });
+
+  it("passes masked names of matched volunteers through verbatim", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        { status: "opp-matched", volunteer: { person: { name: "x*** y***" } } },
+      ],
+    };
+
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual([
+      "x*** y***",
+    ]);
+  });
+
+  it("yields an empty array when no volunteers are matched", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        { status: "opp-pending", volunteer: { person: { name: "Penny" } } },
+      ],
+    };
+    expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual(
+      [],
+    );
   });
 });

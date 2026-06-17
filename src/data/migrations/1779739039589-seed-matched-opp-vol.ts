@@ -1,5 +1,11 @@
-import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import { MigrationInterface, QueryRunner } from "typeorm";
+
+// OpportunityVolunteerStatusType values as of this migration — hardcoded (not
+// imported from the SDK) so a later contract change can't retroactively alter
+// what this historical seed writes / which statuses it preserves.
+const STATUS_MATCHED = "opp-matched";
+const STATUS_ACTIVE = "opp-active";
+const STATUS_PAST = "opp-past";
 
 // [volunteerId, opportunityId] — extracted from VOLVO-<id> / VOL-<id>
 const MATCHED_PAIRS: [number, number][] = [
@@ -195,13 +201,9 @@ const MATCHED_PAIRS: [number, number][] = [
 ];
 
 // An existing matched/active/past row is authoritative — never downgrade it.
-const SKIP_STATUSES = [
-  OpportunityVolunteerStatusType.MATCHED,
-  OpportunityVolunteerStatusType.ACTIVE,
-  OpportunityVolunteerStatusType.PAST,
-];
+const SKIP_STATUSES = [STATUS_MATCHED, STATUS_ACTIVE, STATUS_PAST];
 
-const MATCHED = OpportunityVolunteerStatusType.MATCHED;
+const MATCHED = STATUS_MATCHED;
 
 export class SeedMatchedOppVol1779739039589 implements MigrationInterface {
   name = "SeedMatchedOppVol1779739039589";
