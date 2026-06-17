@@ -296,6 +296,23 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
 
+      // An AGENT may only create opportunities for an agent they belong to;
+      // COORDINATOR/ADMIN may create for any agent.
+      if (role === UserRole.AGENT) {
+        const personId = request.authUser?.personId;
+        const membership = personId
+          ? await fastify.db.agentPersonRepository.findOneBy({
+              agentId,
+              personId,
+            })
+          : null;
+        if (!membership) {
+          throw new UnauthorizedError(
+            "Agents can only create opportunities for their own agent.",
+          );
+        }
+      }
+
       // The form is legacy-shaped minus the rac_* fields; the legacy parsers
       // accept it. deal.postcode comes from the owning agent's address.
       const legacyBody = body as OpportunityLegacyFormData;
