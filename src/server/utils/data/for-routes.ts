@@ -43,6 +43,8 @@ import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
+import { maskPii } from "../pii/mask";
+import { CallerVisibility } from "../pii/visible-persons";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -142,7 +144,7 @@ export async function addTranslatedFields(
   logger.info("Translating volunteers");
   for (const volunteer of volunteers) {
     try {
-      for (const pl of volunteer.deal.profile.profileLanguage) {
+      for (const pl of volunteer.deal.dealLanguage) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -154,7 +156,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal.profile.profileActivity) {
+      for (const pa of volunteer.deal.dealActivity) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -166,7 +168,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal.profile.profileSkill) {
+      for (const ps of volunteer.deal.dealSkill) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -414,41 +416,42 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     {
       relations: string[];
       idFieldNames: [
-        "accompanying" | "profile" | "location" | "time",
+        "deal",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
       ];
     }
   > = {
-    AccompanyingLanguage: {
-      idFieldNames: [
-        "accompanying",
-        "accompanyingId",
-        "language",
-        "languageId",
-      ],
-      relations: ["profile.profileLanguage"],
+    DealLanguage: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "language", "languageId"],
+      relations: [],
     },
-    ProfileLanguage: {
-      idFieldNames: ["profile", "profileId", "language", "languageId"],
-      relations: ["profile.profileLanguage"],
+    DealActivity: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "activity", "activityId"],
+      relations: [],
     },
-    ProfileActivity: {
-      idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["profile.profileActivity"],
+    DealSkill: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "skill", "skillId"],
+      relations: [],
     },
-    ProfileSkill: {
-      idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["profile.profileSkill"],
+    DealDistrict: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "district", "districtId"],
+      relations: [],
     },
-    LocationDistrict: {
-      idFieldNames: ["location", "locationId", "district", "districtId"],
-      relations: ["location.locationDistrict"],
-    },
-    TimeTimeslot: {
-      idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
-      relations: ["time.timeTimeslot"],
+    DealTimeslot: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "timeslot", "timeslotId"],
+      relations: [],
     },
   };
 
@@ -538,8 +541,12 @@ export async function updateOptionList<
         m2mEntity,
       );
 
+      // When the m2m hangs directly off the root (e.g. DealActivity off Deal),
+      // the host *is* the root; otherwise resolve through the nested relation.
+      const hostIdValue = host === rootEntity ? root.id : root[host].id;
+
       const where = {
-        [hostId]: root[host].id,
+        [hostId]: hostIdValue,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -548,9 +555,20 @@ export async function updateOptionList<
         await m2mRepository.delete(currentList.map(({ id }) => id));
       }
 
-      const newList = list.map((item) => {
+      // De-dupe incoming ids so a repeated selection can't violate a
+      // (host, item) unique constraint (e.g. deal_activity) on re-insert.
+      const seen = new Set<L["id"]>();
+      const uniqueList = list.filter((item) => {
+        if (seen.has(item.id)) {
+          return false;
+        }
+        seen.add(item.id);
+        return true;
+      });
+
+      const newList = uniqueList.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: root[host].id,
+          [hostId]: hostIdValue,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {
@@ -580,6 +598,7 @@ export async function fetchVolunteerById(
   id: number,
   isoCode: Lang,
   relations: string[],
+  maskContext?: CallerVisibility | null,
 ): Promise<ApiVolunteerGet | null> {
   const volunteerRepository = getRepository(dataSource, Volunteer);
 
@@ -596,6 +615,15 @@ export async function fetchVolunteerById(
 
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);
+
+  // Mask PII the caller may not see before the serializer reads it. Comments are
+  // loaded separately (they aren't part of the volunteer graph), so they must be
+  // masked too — otherwise comment authors' Person PII leaks to non-privileged
+  // callers.
+  if (maskContext) {
+    maskPii(volunteer, maskContext);
+    maskPii(comments, maskContext);
+  }
 
   const data = volunteerSerializer(volunteer, comments, timedEvents);
 

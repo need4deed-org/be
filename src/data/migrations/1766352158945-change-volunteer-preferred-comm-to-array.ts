@@ -1,13 +1,22 @@
-import { VolunteerCommunicationType } from "need4deed-sdk";
 import { MigrationInterface, QueryRunner } from "typeorm";
+
+// VolunteerCommunicationType values as of this migration — hardcoded (not
+// imported from the SDK) so a later contract change to that enum can't
+// retroactively alter this historical migration's CHECK constraint / default.
+const COMMUNICATION_TYPES = [
+  "email",
+  "mobilePhone",
+  "whatsapp",
+  "telegram",
+  "sms",
+];
+const DEFAULT_COMMUNICATION_TYPE = "mobilePhone";
 
 export class ChangeVolunteerPreferredCommToArray1766352158945
   implements MigrationInterface
 {
   name = "ChangeVolunteerPreferredCommToArray1766352158945";
-  allowedValues = Object.values(VolunteerCommunicationType)
-    .map((v) => `'${v}'`)
-    .join(",");
+  allowedValues = COMMUNICATION_TYPES.map((v) => `'${v}'`).join(",");
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
@@ -30,7 +39,7 @@ export class ChangeVolunteerPreferredCommToArray1766352158945
     );
     await queryRunner.query(`
       ALTER TABLE "volunteer"
-      ADD "preferred_communication_type" text array NOT NULL DEFAULT ARRAY['${VolunteerCommunicationType.MOBILE_PHONE}']
+      ADD "preferred_communication_type" text array NOT NULL DEFAULT ARRAY['${DEFAULT_COMMUNICATION_TYPE}']
     `);
 
     await queryRunner.query(`
@@ -53,7 +62,7 @@ export class ChangeVolunteerPreferredCommToArray1766352158945
     `);
     await queryRunner.query(`
       ALTER TABLE "volunteer"
-      ADD "preferred_communication_type" "public"."volunteer_preferred_communication_type_enum" NOT NULL DEFAULT '${VolunteerCommunicationType.MOBILE_PHONE}'
+      ADD "preferred_communication_type" "public"."volunteer_preferred_communication_type_enum" NOT NULL DEFAULT '${DEFAULT_COMMUNICATION_TYPE}'
     `);
     await queryRunner.query(`
       DROP FUNCTION IF EXISTS validate_communication_types(text[])

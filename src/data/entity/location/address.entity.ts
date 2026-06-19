@@ -7,7 +7,6 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
-import LocationAddress from "../m2m/location-address";
 import Organization from "../organization.entity";
 import Person from "../person.entity";
 import Postcode from "./postcode.entity";
@@ -46,12 +45,6 @@ export default class Address {
 
   @Column()
   postcodeId: number;
-
-  @OneToMany(
-    () => LocationAddress,
-    (locationAddress) => locationAddress.address,
-  )
-  locationAddress: LocationAddress[];
 
   @OneToMany(() => Person, (person) => person.address)
   person: Person[];

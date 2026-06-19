@@ -5,6 +5,7 @@ describe("serializeUserToMeDTO", () => {
   it("maps all user fields from entity to API shape", () => {
     const user = {
       id: 1,
+      personId: 42,
       email: "test@example.com",
       isActive: true,
       role: "admin",
@@ -21,6 +22,7 @@ describe("serializeUserToMeDTO", () => {
 
     expect(result).toEqual({
       id: 1,
+      personId: 42,
       email: "test@example.com",
       isActive: true,
       role: "admin",
@@ -35,6 +37,7 @@ describe("serializeUserToMeDTO", () => {
   it("falls back to empty strings when person fields are missing", () => {
     const user = {
       id: 2,
+      personId: null,
       email: "no-person@example.com",
       isActive: false,
       role: "coordinator",
@@ -48,6 +51,8 @@ describe("serializeUserToMeDTO", () => {
     expect(result.firstName).toBe("");
     expect(result.fullName).toBe("");
     expect(result.avatarUrl).toBe("");
+    // personId is nullable: a person-less user must not serialize to 0.
+    expect(result.personId).toBeUndefined();
   });
 
   it("falls back to default isoCode 'en' and timezone 'CET' when not set", () => {

@@ -9,12 +9,12 @@ import {
   VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import { FindOptionsWhere } from "typeorm";
-import LocationDistrict from "../../../data/entity/m2m/location-district";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import logger from "../../../logger";
@@ -24,8 +24,17 @@ import {
   volunteerFormParser,
   volunteerListSerializer,
 } from "../../../services";
-import { idParamSchema, responseErrors, responseSchema, volunteerListQuerySchema } from "../../schema";
-import { QuerystringVolunteerGetList, RoutePrefix } from "../../types";
+import {
+  idParamSchema,
+  responseErrors,
+  responseSchema,
+  volunteerListQuerySchema,
+} from "../../schema";
+import {
+  QuerystringVolunteerGetList,
+  RoutePrefix,
+  VolunteerListType,
+} from "../../types";
 import {
   fetchVolunteerById,
   getLanguageCode,
@@ -39,6 +48,10 @@ import {
   updateOptionList,
   writeVolunteerLegacy,
 } from "../../utils";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
@@ -55,19 +68,36 @@ export default async function volunteerRoutes(
     "person.address.postcode",
     "deal",
     "deal.postcode",
-    "deal.profile.profileActivity.activity",
-    "deal.profile.profileSkill.skill",
-    "deal.profile.profileLanguage.language",
-    "deal.time.timeTimeslot.timeslot",
-    "deal.location.locationPostcode.postcode",
-    "deal.location.locationDistrict.district",
-    "deal.location.locationAddress.address.postcode",
+    "deal.dealActivity.activity",
+    "deal.dealSkill.skill",
+    "deal.dealLanguage.language",
+    "deal.dealTimeslot.timeslot",
+    "deal.dealDistrict.district",
   ];
 
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  // Relations the list view actually serializes (volunteerListSerializer):
+  // neither person.address.postcode nor deal.postcode are used, so they are
+  // omitted. The table view renders only languages + locations; the card view
+  // additionally renders activities, skills and availability.
+  const listRelationsCommon = [
+    "person",
+    "deal",
+    "deal.dealLanguage.language",
+    "deal.dealDistrict.district",
+  ];
+  const listRelationsCardExtra = [
+    "deal.dealActivity.activity",
+    "deal.dealSkill.skill",
+    "deal.dealTimeslot.timeslot",
+  ];
+  const getListRelations = (listType: VolunteerListType) =>
+    listType === "table"
+      ? listRelationsCommon
+      : [...listRelationsCommon, ...listRelationsCardExtra];
+
+  // GETs open to any logged-in user (PII masked per role); writes stay
+  // COORDINATOR-only (re-gated per-route).
+  fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
@@ -120,7 +150,12 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(
+          id,
+          isoCode,
+          relations,
+          await resolveCallerMask(request),
+        );
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}).`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
@@ -170,22 +205,42 @@ export default async function volunteerRoutes(
         return query;
       }
 
-      const { page, limit, sortOrder, filter } = filterWorkaround(
+      const { page, limit, sortOrder, filter, listType } = filterWorkaround(
         request.query,
       );
       const [skip, take] = getSkipTake({ page, limit });
 
+      const where = getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>;
+      const order: FindOptionsOrder<Volunteer> = {
+        id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
+      };
+
       const volunteerRepository = fastify.db.volunteerRepository;
-      const [volunteers, count] = await volunteerRepository.findAndCount({
-        where: getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>,
-        relations,
+
+      // Step 1: page the volunteer ids + total count without hydrating any
+      // collection. TypeORM auto-joins only the relations the filter touches,
+      // so the COUNT no longer runs over a 5-way cartesian join.
+      const [idRows, count] = await volunteerRepository.findAndCount({
+        where,
+        select: { id: true },
         skip,
         take,
-        order: {
-          id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
-        },
+        order,
       });
+      const ids = idRows.map((v) => v.id);
 
+      // Step 2: load just this page's entities, fetching collections via the
+      // "query" strategy (one query per relation) to avoid a cartesian blow-up.
+      const volunteers = ids.length
+        ? await volunteerRepository.find({
+            where: { id: In(ids) },
+            relations: getListRelations(listType ?? "card"),
+            relationLoadStrategy: "query",
+            order,
+          })
+        : [];
+
+      await maskForCaller(request, volunteers);
       const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
       reply.status(200).send({
@@ -209,6 +264,7 @@ export default async function volunteerRoutes(
   }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "volunteer-api-id-part#" },
@@ -279,7 +335,7 @@ export default async function volunteerRoutes(
         if (languages) {
           const success = await updateOptionList(
             dealId,
-            ProfileLanguage,
+            DealLanguage,
             languages,
           );
           if (!success) {
@@ -292,7 +348,7 @@ export default async function volunteerRoutes(
         if (availability) {
           const success = await updateOptionList(
             dealId,
-            TimeTimeslot,
+            DealTimeslot,
             await Promise.all(
               availability.map((availabilityObject) => {
                 if (availabilityObject.id) {
@@ -312,7 +368,7 @@ export default async function volunteerRoutes(
         if (activities) {
           const success = await updateOptionList(
             dealId,
-            ProfileActivity,
+            DealActivity,
             activities,
           );
           if (!success) {
@@ -323,7 +379,7 @@ export default async function volunteerRoutes(
         }
 
         if (skills) {
-          const success = await updateOptionList(dealId, ProfileSkill, skills);
+          const success = await updateOptionList(dealId, DealSkill, skills);
           if (!success) {
             return reply.status(400).send({
               message: `Skills for volunteer (deal_id:${dealId}) not updated.`,
@@ -334,7 +390,7 @@ export default async function volunteerRoutes(
         if (locations) {
           const success = await updateOptionList(
             dealId,
-            LocationDistrict,
+            DealDistrict,
             locations,
           );
           if (!success) {
@@ -351,7 +407,12 @@ export default async function volunteerRoutes(
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
       try {
-        const data = await fetchVolunteerById(id, isoCode, relations);
+        const data = await fetchVolunteerById(
+          id,
+          isoCode,
+          relations,
+          await resolveCallerMask(request),
+        );
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}) after patch.`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
@@ -379,6 +440,7 @@ export default async function volunteerRoutes(
   }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         body: { $ref: "volunteer-form-data" },
         response: {

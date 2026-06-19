@@ -10,10 +10,11 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
-  getCategoryToProfileHandler,
+  getCategoryToDealHandler,
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default async function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
@@ -32,10 +33,10 @@ export default async function volunteerOpportunityRoutes(
     },
     async (request, reply) => {
       const relations = [
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
-        "deal.location.locationDistrict.district",
-        "deal.time.timeTimeslot.timeslot",
+        "deal.dealLanguage.language",
+        "deal.dealActivity.activity",
+        "deal.dealDistrict.district",
+        "deal.dealTimeslot.timeslot",
       ];
 
       const { page, limit, ...filters } = request.query;
@@ -57,20 +58,18 @@ export default async function volunteerOpportunityRoutes(
         take,
       });
 
-      const { addCategoryToProfile, updates } = getCategoryToProfileHandler();
+      const { addCategoryToDeal, updates } = getCategoryToDealHandler();
       const opportunitiesCategory = opportunities.map((opportunity) => {
-        Object.assign(
-          opportunity.deal.profile,
-          addCategoryToProfile(opportunity.deal.profile),
-        );
+        addCategoryToDeal(opportunity.deal);
         return opportunity;
       });
 
       if (updates.length > 0) {
-        const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(updates);
+        const dealRepository = fastify.db.dealRepository;
+        await dealRepository.save(updates);
       }
 
+      await maskForCaller(request, opportunitiesCategory);
       const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);
 
       return reply.status(200).send({

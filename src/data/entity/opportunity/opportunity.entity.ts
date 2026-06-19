@@ -18,6 +18,7 @@ import {
 import Deal from "../deal.entity";
 import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
+import Person from "../person.entity";
 import Appreciation from "../volunteer/appreciation.entity";
 import Accompanying from "./accompanying.entity";
 import Agent from "./agent.entity";
@@ -109,6 +110,12 @@ export default class Opportunity {
   @Column({ nullable: true })
   agentId?: number;
 
+  @ManyToOne(() => Person, { nullable: true })
+  @JoinColumn({ name: "submitted_by_person_id" })
+  submittedByPerson?: Person;
+  @Column({ nullable: true })
+  submittedByPersonId?: number;
+
   @ManyToOne(() => District)
   @JoinColumn({ name: "district_id" })
   district?: District;
@@ -123,6 +130,12 @@ export default class Opportunity {
 
   @OneToMany(() => Appreciation, (appreciation) => appreciation.opportunity)
   appreciations: Appreciation[];
+
+  @ManyToOne(() => Person, { nullable: true })
+  @JoinColumn({ name: "contact_person_id" })
+  contactPerson?: Person;
+  @Column({ nullable: true })
+  contactPersonId?: number;
 
   @Column({ nullable: true })
   @IsOptional()
