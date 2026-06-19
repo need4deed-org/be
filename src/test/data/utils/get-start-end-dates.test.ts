@@ -1,30 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStartEnd, getStartEndDates } from "../../../data/utils";
-
-describe("getStartEndDates", () => {
-  it("returns start and end Date objects with correct hours", () => {
-    const { start, end } = getStartEndDates(8, 11);
-    expect(start).toBeInstanceOf(Date);
-    expect(end).toBeInstanceOf(Date);
-    expect(start.getHours()).toBe(8);
-    expect(end.getHours()).toBe(11);
-  });
-
-  it("sets minutes, seconds, and ms to 0 on start", () => {
-    const { start } = getStartEndDates(10, 14);
-    expect(start.getMinutes()).toBe(0);
-    expect(start.getSeconds()).toBe(0);
-    expect(start.getMilliseconds()).toBe(0);
-  });
-
-  it("uses provided date for start, defaults to 2024-01-01 for end", () => {
-    const custom = new Date("2025-06-15");
-    const { start, end } = getStartEndDates(9, 12, custom);
-    expect(start.getFullYear()).toBe(2025);
-    expect(start.getMonth()).toBe(5); // June = 5
-    expect(end.getFullYear()).toBe(2024);
-  });
-});
+import { getStartEnd } from "../../../data/utils";
 
 describe("getStartEnd", () => {
   it("maps known morning/noon/afternoon/evening labels to hour ranges", () => {

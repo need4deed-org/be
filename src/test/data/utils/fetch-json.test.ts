@@ -1,17 +1,36 @@
-import * as fs from "fs/promises";
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join, relative } from "path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 
-vi.mock("fs/promises", () => ({
-  readFile: vi.fn(),
-}));
+// `fs/promises` is an externalized node builtin and is not intercepted by
+// `vi.mock` under the swc transform used here, so the file-path branches are
+// tested against a real temp file rather than a mocked readFile.
 
 describe("fetchJsonFromUrl", () => {
-  it("reads and parses JSON from a file path", async () => {
-    vi.mocked(fs.readFile).mockResolvedValueOnce('{"key":"value"}');
-    const result = await fetchJsonFromUrl("./data/seed.json");
+  let dir: string;
+  let filePath: string;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "fetch-json-"));
+    filePath = join(dir, "data.json");
+    await writeFile(filePath, '{"key":"value"}', "utf-8");
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("reads and parses JSON from a dot-relative file path", async () => {
+    const relPath = `./${relative(process.cwd(), filePath)}`;
+    const result = await fetchJsonFromUrl(relPath);
     expect(result).toEqual({ key: "value" });
-    expect(fs.readFile).toHaveBeenCalledWith("./data/seed.json", "utf-8");
+  });
+
+  it("treats absolute paths as file system paths", async () => {
+    const result = await fetchJsonFromUrl(filePath);
+    expect(result).toEqual({ key: "value" });
   });
 
   it("fetches JSON from a URL", async () => {
@@ -25,11 +44,5 @@ describe("fetchJsonFromUrl", () => {
     expect(mockFetch).toHaveBeenCalledWith("https://example.com/data.json");
 
     vi.unstubAllGlobals();
-  });
-
-  it("treats absolute paths as file system paths", async () => {
-    vi.mocked(fs.readFile).mockResolvedValueOnce('{"absolute":true}');
-    const result = await fetchJsonFromUrl("/etc/config.json");
-    expect(result).toEqual({ absolute: true });
   });
 });
