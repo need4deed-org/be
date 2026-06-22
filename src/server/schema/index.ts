@@ -3,6 +3,7 @@ export * from "./agent-register.schema";
 export * from "./param";
 export * from "./person.schema";
 export * from "./querystring";
+export * from "./opportunity-create.schema";
 export * from "./response-schema";
 export * from "./responseErrors";
 export * from "./trusted-domain.schema";

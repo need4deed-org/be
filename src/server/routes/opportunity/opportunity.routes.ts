@@ -2,10 +2,16 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityPatch,
+  OpportunityFormDataWithAgentSubmitter,
+  OpportunityLegacyFormData,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { BadRequestError, NotFoundError } from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -18,12 +24,17 @@ import Person from "../../../data/entity/person.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
+  accompanyingParserOpportunity,
   dtoOpportunityGet,
   dtoOpportunityGetList,
   parseOpportunity,
+  parseOpportunityLegacy,
 } from "../../../services";
+import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
 import {
   idParamSchema,
+  opportunityCreateBodySchema,
+  opportunityCreateResponseSchema,
   opportunityListQuerySchema,
   responseSchema,
 } from "../../schema";
@@ -39,6 +50,7 @@ import {
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
+  getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
@@ -46,6 +58,7 @@ import {
   getSkipTake,
   patchEntity,
   updateOptionList,
+  writeOpportunityLegacy,
 } from "../../utils";
 import {
   makePiiSerialization,
@@ -239,6 +252,98 @@ export default async function opportunityRoutes(
         message: `Opportunities page:${request.query.page}.`,
         data: opportunitiesCategoryDistrict,
         count,
+      });
+    },
+  );
+
+  // Create an opportunity with its satellites (deal + m2m, accompanying). Unlike
+  // POST /opportunity/legacy, the owning agent and submitter are given in the
+  // body / caller — no address/email guessing.
+  fastify.post<{
+    Body: OpportunityFormDataWithAgentSubmitter;
+    Reply: ReplyData<{ id: number }>;
+  }>(
+    "/",
+    {
+      schema: {
+        body: opportunityCreateBodySchema,
+        response: opportunityCreateResponseSchema,
+      },
+    },
+    async (request, reply) => {
+      // GETs are open to any logged-in user (parent onRequest hook); creating an
+      // opportunity is COORDINATOR/AGENT (ADMIN bypasses).
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT &&
+        role !== UserRole.ADMIN
+      ) {
+        throw new UnauthorizedError();
+      }
+
+      const body = request.body;
+
+      const agentId = body.agent_id;
+      if (!agentId) {
+        throw new BadRequestError("agent_id is required.");
+      }
+      const agent = await fastify.db.agentRepository.findOne({
+        where: { id: agentId },
+        relations: ["address.postcode"],
+      });
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${agentId}) not found.`);
+      }
+
+      // An AGENT may only create opportunities for an agent they belong to;
+      // COORDINATOR/ADMIN may create for any agent.
+      if (role === UserRole.AGENT) {
+        const personId =
+          request.authUser?.personId || request.body.submitted_by_id;
+        const membership = personId
+          ? await fastify.db.agentPersonRepository.findOneBy({
+              agentId,
+              personId,
+            })
+          : null;
+        if (!membership) {
+          throw new UnauthorizedError(
+            "Agents can only create opportunities for their own agent.",
+          );
+        }
+      }
+
+      // The form is legacy-shaped minus the rac_* fields; the legacy parsers
+      // accept it. deal.postcode comes from the owning agent's address.
+      const legacyBody = body as OpportunityLegacyFormData;
+      const opportunity = await parseOpportunityLegacy(legacyBody);
+      opportunity.deal = await dealParserOpportunity(
+        legacyBody,
+        agent.address?.postcode?.value,
+      );
+      opportunity.accompanying =
+        body.opportunity_type === "accompanying"
+          ? await accompanyingParserOpportunity(legacyBody)
+          : undefined;
+
+      opportunity.agentId = agentId;
+      // Submitter: the explicit body value, else the authenticated caller.
+      opportunity.submittedByPersonId =
+        body.submitted_by_id ?? request.authUser?.personId;
+
+      const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
+      Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
+
+      const id = await writeOpportunityLegacy(opportunity);
+
+      fastify.notify.opsAlert(
+        getOpportunityNotificationText(opportunity.title),
+      );
+
+      return reply.status(201).send({
+        message: `Opportunity (${id}) created.`,
+        data: { id },
       });
     },
   );
