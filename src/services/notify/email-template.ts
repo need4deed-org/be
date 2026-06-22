@@ -13,7 +13,7 @@ export interface LocaleContent {
 }
 
 export type Manifest = Partial<Record<Lang, LocaleContent>>;
-export type TemplateVars = Record<string, string>;
+export type TemplateVars = Record<string, string | number>;
 
 const DEFAULT_LOCALE = Lang.EN;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
@@ -34,7 +34,7 @@ export function fillTemplate(
         logger.warn(`email template: unresolved placeholder {{${key}}}`);
         return match;
       }
-      return vars[key];
+      return String(vars[key]);
     });
 
   return {
@@ -94,7 +94,9 @@ export function createManifestLoader(url: string): {
     },
     async load(): Promise<Manifest | null> {
       const now = Date.now();
-      if (cache && now < cache.expires) {return cache.value;}
+      if (cache && now < cache.expires) {
+        return cache.value;
+      }
       try {
         const value = (await withTimeout(
           fetchJsonFromUrl(url),

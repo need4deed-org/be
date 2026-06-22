@@ -1,5 +1,5 @@
 import { Lang } from "need4deed-sdk";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   createManifestLoader,
@@ -163,6 +163,10 @@ describe("createManifestLoader", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("fetches and returns the manifest", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
     const loader = createManifestLoader(url);
@@ -203,6 +207,5 @@ describe("createManifestLoader", () => {
     vi.advanceTimersByTime(11 * 60 * 1000); // past default 10-min TTL
     const result = await loader.load(); // fetch fails → returns stale
     expect(result).toEqual(manifest);
-    vi.useRealTimers();
   });
 });
