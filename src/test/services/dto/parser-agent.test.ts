@@ -47,4 +47,36 @@ describe("parseAgentPatch", () => {
     expect(result.info).toBeUndefined();
     expect(result.searchStatus).toBeUndefined();
   });
+
+  it("falls back to volunteerSearch/serviceType when statusSearch/services are absent", () => {
+    const agent: ApiAgentPatch = {
+      volunteerSearch: "agent-searching" as AgentVolunteerSearchType,
+      serviceType: ["tutoring"] as AgentServiceType[],
+    };
+
+    const result = parseAgentPatch(agent);
+
+    expect(result.searchStatus).toBe("agent-searching");
+    expect(result.services).toEqual(["tutoring"]);
+  });
+
+  it("prefers statusSearch/services over volunteerSearch/serviceType when both are set", () => {
+    const agent: ApiAgentPatch = {
+      statusSearch: "agent-not-needed" as AgentVolunteerSearchType,
+      volunteerSearch: "agent-searching" as AgentVolunteerSearchType,
+      services: ["childcare"] as AgentServiceType[],
+      serviceType: ["tutoring"] as AgentServiceType[],
+    };
+
+    const result = parseAgentPatch(agent);
+
+    expect(result.searchStatus).toBe("agent-not-needed");
+    expect(result.services).toEqual(["childcare"]);
+  });
+
+  it("maps districtId", () => {
+    const agent: ApiAgentPatch = { districtId: 42 };
+
+    expect(parseAgentPatch(agent).districtId).toBe(42);
+  });
 });

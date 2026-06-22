@@ -9,13 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
-import {
-  getAvailability,
-  getLanguages,
-  getOptionItems,
-  getTitles,
-} from "./utils";
-
+import { getAvailability, getLanguages, getOptionItems } from "./utils";
 
 export function volunteerListSerializer(
   volunteer: Volunteer,
@@ -24,25 +18,30 @@ export function volunteerListSerializer(
     const id = volunteer.id;
     const statusEngagement = volunteer.statusEngagement;
     const statusType = volunteer.statusType;
+    const statusMatch = volunteer.statusMatch ?? null;
+    const statusCommunication = volunteer.statusCommunication ?? null;
     const name = volunteer.person.name;
+    const email = volunteer.person.email;
     const avatarUrl = volunteer.person?.avatarUrl || null;
-    const languages = getLanguages(volunteer.deal.profile.profileLanguage);
-    const availability = getAvailability(volunteer.deal.time?.timeTimeslot);
-    const activities = getTitles(
-      volunteer.deal.profile.profileActivity,
-      "activity",
-    );
-    const skills = getTitles(volunteer.deal.profile.profileSkill, "skill");
-    const locations = getTitles(
-      volunteer.deal.location?.locationDistrict,
-      "district",
-    );
+    // Collections may be absent when the list loads a reduced relation set
+    // (listType "table" skips activities/skills/availability) — default to []
+    // so the response shape stays stable.
+    const languages = getLanguages(volunteer.deal.dealLanguage) ?? [];
+    const availability = getAvailability(volunteer.deal.dealTimeslot) ?? [];
+    const activities =
+      getOptionItems(volunteer.deal.dealActivity, "activity") ?? [];
+    const skills = getOptionItems(volunteer.deal.dealSkill, "skill") ?? [];
+    const locations =
+      getOptionItems(volunteer.deal.dealDistrict, "district") ?? [];
 
     return {
       id,
       statusEngagement,
       statusType,
+      statusMatch,
+      statusCommunication,
       name,
+      email,
       avatarUrl,
       languages,
       availability,
@@ -117,18 +116,12 @@ export function volunteerSerializer(
   const opportunitiesMatched = [];
   const createdAt = volunteer.createdAt;
   const updatedAt = volunteer.updatedAt;
-  const activities = getOptionItems(
-    volunteer.deal.profile.profileActivity,
-    "activity",
-  );
-  const skills = getOptionItems(volunteer.deal.profile.profileSkill, "skill");
-  const locations = getOptionItems(
-    volunteer.deal.location.locationDistrict,
-    "district",
-  );
+  const activities = getOptionItems(volunteer.deal.dealActivity, "activity");
+  const skills = getOptionItems(volunteer.deal.dealSkill, "skill");
+  const locations = getOptionItems(volunteer.deal.dealDistrict, "district");
 
-  const languages = getLanguages(volunteer.deal.profile.profileLanguage);
-  const availability = getAvailability(volunteer.deal.time.timeTimeslot);
+  const languages = getLanguages(volunteer.deal.dealLanguage);
+  const availability = getAvailability(volunteer.deal.dealTimeslot);
 
   // TODO: remove cast once need4deed-sdk >= 0.0.82 is published (adds statusVaccinationDate etc.)
   return {

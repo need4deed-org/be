@@ -1,17 +1,22 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
-  ApiOpportunityGetList,
   ApiOpportunityPatch,
+  OpportunityFormDataWithAgentSubmitter,
+  OpportunityLegacyFormData,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { BadRequestError, NotFoundError } from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import Comment from "../../../data/entity/comment.entity";
-import ProfileActivity from "../../../data/entity/m2m/profile-activity";
-import ProfileLanguage from "../../../data/entity/m2m/profile-language";
-import ProfileSkill from "../../../data/entity/m2m/profile-skill";
-import TimeTimeslot from "../../../data/entity/m2m/time-timeslot";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -19,12 +24,17 @@ import Person from "../../../data/entity/person.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
+  accompanyingParserOpportunity,
   dtoOpportunityGet,
   dtoOpportunityGetList,
   parseOpportunity,
+  parseOpportunityLegacy,
 } from "../../../services";
+import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
 import {
   idParamSchema,
+  opportunityCreateBodySchema,
+  opportunityCreateResponseSchema,
   opportunityListQuerySchema,
   responseSchema,
 } from "../../schema";
@@ -33,14 +43,14 @@ import {
   QuerystringOpportunityList,
   ReplyData,
   ReplyDataCount,
-  ReplyMessage,
   RoutePrefix,
 } from "../../types";
 import {
   addComments2Entity,
-  getCategoryToProfileHandler,
+  getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
+  getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
   getOrCreateTimeslot,
@@ -48,7 +58,12 @@ import {
   getSkipTake,
   patchEntity,
   updateOptionList,
+  writeOpportunityLegacy,
 } from "../../utils";
+import {
+  makePiiSerialization,
+  maskForCaller,
+} from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -56,10 +71,9 @@ export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  // GETs open to any logged-in user (PII masked per role); writes stay
+  // COORDINATOR-only (re-gated per-route).
+  fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
@@ -82,13 +96,15 @@ export default async function opportunityRoutes(
       const relations = [
         "accompanying",
         "accompanying.postcode",
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
-        "deal.profile.profileSkill.skill",
-        "deal.location.locationDistrict.district",
-        "deal.time.timeTimeslot.timeslot",
+        "deal.dealLanguage.language",
+        "deal.dealActivity.activity",
+        "deal.dealSkill.skill",
+        "deal.dealDistrict.district",
+        "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
+        "contactPerson",
+        "submittedByPerson.agentPerson",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -142,6 +158,9 @@ export default async function opportunityRoutes(
           )
         : null;
 
+      // dtoOpportunityGet takes a handler-computed arg, so mask inline (rather
+      // than via the makePiiSerialization hook) before serializing.
+      await maskForCaller(request, opportunityComments);
       const data = dtoOpportunityGet(opportunityComments, accompanyingDistrict);
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
@@ -150,7 +169,9 @@ export default async function opportunityRoutes(
 
   fastify.get<{
     Querystring: QuerystringOpportunityList;
-    Reply: ReplyDataCount<ApiOpportunityGetList[]>;
+    // Handler sends entities; the DTO (ApiOpportunityGetList) runs in the
+    // preSerialization hook.
+    Reply: ReplyDataCount<Opportunity[]>;
   }>(
     "/",
     {
@@ -158,9 +179,13 @@ export default async function opportunityRoutes(
         querystring: opportunityListQuerySchema,
         response: responseSchema("ApiOpportunityGetList#", true),
       },
+      preSerialization: makePiiSerialization(dtoOpportunityGetList),
     },
     async (request, reply) => {
-      const [skip, take] = getSkipTake({ page: request.query.page, limit: request.query.limit });
+      const [skip, take] = getSkipTake({
+        page: request.query.page,
+        limit: request.query.limit,
+      });
       const order =
         request.query.sortOrder === SortOrder.NewToOld
           ? { order: { createdAt: "DESC" } as const }
@@ -175,13 +200,13 @@ export default async function opportunityRoutes(
       );
 
       const relations = [
-        "deal.profile.profileActivity.activity",
-        "deal.profile.profileLanguage.language",
-        "deal.profile.profileActivity.activity",
-        "deal.time.timeTimeslot.timeslot",
-        "deal.location.locationDistrict.district",
+        "deal.dealActivity.activity",
+        "deal.dealLanguage.language",
+        "deal.dealTimeslot.timeslot",
+        "deal.dealDistrict.district",
         "agent",
         "accompanying",
+        "opportunityVolunteer.volunteer.person",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -193,8 +218,8 @@ export default async function opportunityRoutes(
         ...(order ? order : {}),
       });
 
-      const { addCategoryToProfile, updates: profileUpdates } =
-        getCategoryToProfileHandler();
+      const { addCategoryToDeal, updates: dealUpdates } =
+        getCategoryToDealHandler();
 
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
@@ -205,32 +230,120 @@ export default async function opportunityRoutes(
             opportunity,
             await addDistrictToOpportunity(opportunity),
           );
-          Object.assign(
-            opportunity.deal.profile,
-            addCategoryToProfile(opportunity.deal.profile),
-          );
+          addCategoryToDeal(opportunity.deal);
           return opportunity;
         }),
       );
 
-      if (profileUpdates.length > 0) {
-        const profileRepository = fastify.db.profileRepository;
-        await profileRepository.save(profileUpdates);
+      if (dealUpdates.length > 0) {
+        const dealRepository = fastify.db.dealRepository;
+        await dealRepository.save(dealUpdates);
       }
 
       if (opportunityUpdates.length > 0) {
         await opportunityRepository.save(opportunityUpdates);
       }
       logger.debug(
-        `Saving category updates: ${profileUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+        `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
-      const data = opportunitiesCategoryDistrict.map(dtoOpportunityGetList);
-
+      // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Opportunities page:${request.query.page}.`,
-        data,
+        data: opportunitiesCategoryDistrict,
         count,
+      });
+    },
+  );
+
+  // Create an opportunity with its satellites (deal + m2m, accompanying). Unlike
+  // POST /opportunity/legacy, the owning agent and submitter are given in the
+  // body / caller — no address/email guessing.
+  fastify.post<{
+    Body: OpportunityFormDataWithAgentSubmitter;
+    Reply: ReplyData<{ id: number }>;
+  }>(
+    "/",
+    {
+      schema: {
+        body: opportunityCreateBodySchema,
+        response: opportunityCreateResponseSchema,
+      },
+    },
+    async (request, reply) => {
+      // GETs are open to any logged-in user (parent onRequest hook); creating an
+      // opportunity is COORDINATOR/AGENT (ADMIN bypasses).
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT &&
+        role !== UserRole.ADMIN
+      ) {
+        throw new UnauthorizedError();
+      }
+
+      const body = request.body;
+
+      const agentId = body.agent_id;
+      if (!agentId) {
+        throw new BadRequestError("agent_id is required.");
+      }
+      const agent = await fastify.db.agentRepository.findOne({
+        where: { id: agentId },
+        relations: ["address.postcode"],
+      });
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${agentId}) not found.`);
+      }
+
+      // An AGENT may only create opportunities for an agent they belong to;
+      // COORDINATOR/ADMIN may create for any agent.
+      if (role === UserRole.AGENT) {
+        const personId =
+          request.authUser?.personId || request.body.submitted_by_id;
+        const membership = personId
+          ? await fastify.db.agentPersonRepository.findOneBy({
+              agentId,
+              personId,
+            })
+          : null;
+        if (!membership) {
+          throw new UnauthorizedError(
+            "Agents can only create opportunities for their own agent.",
+          );
+        }
+      }
+
+      // The form is legacy-shaped minus the rac_* fields; the legacy parsers
+      // accept it. deal.postcode comes from the owning agent's address.
+      const legacyBody = body as OpportunityLegacyFormData;
+      const opportunity = await parseOpportunityLegacy(legacyBody);
+      opportunity.deal = await dealParserOpportunity(
+        legacyBody,
+        agent.address?.postcode?.value,
+      );
+      opportunity.accompanying =
+        body.opportunity_type === "accompanying"
+          ? await accompanyingParserOpportunity(legacyBody)
+          : undefined;
+
+      opportunity.agentId = agentId;
+      // Submitter: the explicit body value, else the authenticated caller.
+      opportunity.submittedByPersonId =
+        body.submitted_by_id ?? request.authUser?.personId;
+
+      const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
+      Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
+
+      const id = await writeOpportunityLegacy(opportunity);
+
+      fastify.notify.opsAlert(
+        getOpportunityNotificationText(opportunity.title),
+      );
+
+      return reply.status(201).send({
+        message: `Opportunity (${id}) created.`,
+        data: { id },
       });
     },
   );
@@ -242,6 +355,7 @@ export default async function opportunityRoutes(
   }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
@@ -348,7 +462,7 @@ export default async function opportunityRoutes(
       if (schedule) {
         const success = await updateOptionList(
           dealId,
-          TimeTimeslot,
+          DealTimeslot,
           await Promise.all(
             schedule.map((scheduleObject) => {
               if (scheduleObject.id) {
@@ -366,11 +480,7 @@ export default async function opportunityRoutes(
       }
 
       if (languages) {
-        const success = await updateOptionList(
-          dealId,
-          ProfileLanguage,
-          languages,
-        );
+        const success = await updateOptionList(dealId, DealLanguage, languages);
         if (!success) {
           throw new BadRequestError(
             `Languages for opportunity (deal_id:${dealId}) not updated.`,
@@ -381,7 +491,7 @@ export default async function opportunityRoutes(
       if (activities) {
         const success = await updateOptionList(
           dealId,
-          ProfileActivity,
+          DealActivity,
           activities,
         );
         if (!success) {
@@ -392,7 +502,7 @@ export default async function opportunityRoutes(
       }
 
       if (skills) {
-        const success = await updateOptionList(dealId, ProfileSkill, skills);
+        const success = await updateOptionList(dealId, DealSkill, skills);
         if (!success) {
           throw new BadRequestError(
             `Skills for opportunity (deal_id:${dealId}) not updated.`,

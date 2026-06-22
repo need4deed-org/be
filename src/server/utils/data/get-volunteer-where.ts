@@ -2,34 +2,43 @@ import { ILike } from "typeorm";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 
+// SECURITY (#666): `search` filters on unmasked DB columns, so a non-privileged
+// caller can infer PII masked in the response by probing which rows match.
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ) {
-  // Build deal.profile sub-filter to avoid overwriting when multiple profile
-  // relations are active (language, activity, skill all share the same deal key).
-  const profileFilter: Record<string, unknown> = {};
+  const dealFilter: Record<string, unknown> = {};
   if (filter?.language) {
-    profileFilter.profileLanguage = { language: { id: normalizeStringArrayInput(filter.language) } };
+    dealFilter.dealLanguage = {
+      language: { id: normalizeStringArrayInput(filter.language) },
+    };
   }
   if (filter?.activity) {
-    profileFilter.profileActivity = { activity: { id: normalizeStringArrayInput(filter.activity) } };
+    dealFilter.dealActivity = {
+      activity: { id: normalizeStringArrayInput(filter.activity) },
+    };
   }
   if (filter?.skill) {
-    profileFilter.profileSkill = { skill: { id: normalizeStringArrayInput(filter.skill) } };
-  }
-
-  const dealFilter: Record<string, unknown> = {};
-  if (Object.keys(profileFilter).length) {
-    dealFilter.profile = profileFilter;
+    dealFilter.dealSkill = {
+      skill: { id: normalizeStringArrayInput(filter.skill) },
+    };
   }
   if (filter?.district) {
-    dealFilter.location = { locationDistrict: { district: { id: normalizeStringArrayInput(filter.district) } } };
+    dealFilter.dealDistrict = {
+      district: { id: normalizeStringArrayInput(filter.district) },
+    };
   }
 
   return {
-    ...(filter?.type ? { statusType: normalizeStringArrayInput(filter.type) } : {}),
-    ...(filter?.engagement ? { statusEngagement: normalizeStringArrayInput(filter.engagement) } : {}),
-    ...(filter?.match ? { statusMatch: normalizeStringArrayInput(filter.match) } : {}),
+    ...(filter?.type
+      ? { statusType: normalizeStringArrayInput(filter.type) }
+      : {}),
+    ...(filter?.engagement
+      ? { statusEngagement: normalizeStringArrayInput(filter.engagement) }
+      : {}),
+    ...(filter?.match
+      ? { statusMatch: normalizeStringArrayInput(filter.match) }
+      : {}),
     ...(filter?.search
       ? {
           person: [

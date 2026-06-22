@@ -4,6 +4,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import {
   dtoAgentGet,
   dtoAgentGetList,
+  dtoAgentOpportunity,
   dtoOpportunityAgent,
 } from "../../../services";
 
@@ -117,6 +118,23 @@ describe("dtoAgentDetails (Internal Logic)", () => {
     const result = dtoAgentGet(mockAgent as any);
     expect(result.agentDetails.clientLanguages).toEqual([]);
   });
+
+  it("should expose addressStreet and addressPostcode from the address relation", () => {
+    const mockAgent = {
+      agentLanguage: [],
+      address: { street: "Musterstraße 1", postcode: { value: "10115" } },
+    };
+    const result = dtoAgentGet(mockAgent as any);
+    expect(result.agentDetails.addressStreet).toBe("Musterstraße 1");
+    expect(result.agentDetails.addressPostcode).toBe("10115");
+  });
+
+  it("should return null for addressStreet and addressPostcode when address is absent", () => {
+    const mockAgent = { agentLanguage: [] };
+    const result = dtoAgentGet(mockAgent as any);
+    expect(result.agentDetails.addressStreet).toBeNull();
+    expect(result.agentDetails.addressPostcode).toBeNull();
+  });
 });
 
 describe("dtoAgentGetList", () => {
@@ -151,6 +169,8 @@ describe("dtoAgentGetList", () => {
       title: "Helping Hands",
       type: "NGO",
       activeVolunteers: 10,
+      numActiveVolunteers: 10,
+      email: "",
       district: {
         id: 201,
         title: { de: "Mitte" },
@@ -177,5 +197,89 @@ describe("dtoAgentGetList", () => {
     // Ensure the mapping from agent.searchStatus to volunteerSearch is correct
     const result = dtoAgentGetList({ ...mockAgentBase } as any);
     expect(result.volunteerSearch).toBe(AgentVolunteerSearchType.SEARCHING);
+  });
+});
+
+describe("dtoAgentOpportunity", () => {
+  const baseOpportunity = {
+    id: 42,
+    title: "German tutoring",
+    status: "opp-active",
+    statusMatch: "opp-vol-matched",
+    numberVolunteers: 3,
+    createdAt: new Date("2026-01-15"),
+  };
+
+  it("maps the opportunity scalars and its linked volunteers", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        {
+          id: 5,
+          volunteerId: 9,
+          status: "opp-matched",
+          volunteer: { person: { name: "Jane Doe", avatarUrl: "a.png" } },
+        },
+      ],
+    };
+
+    expect(dtoAgentOpportunity(opportunity as any)).toEqual({
+      id: 42,
+      title: "German tutoring",
+      statusOpportunity: "opp-active",
+      statusMatch: "opp-vol-matched",
+      numberOfVolunteers: 3,
+      createdAt: new Date("2026-01-15"),
+      volunteers: [
+        {
+          id: 5,
+          volunteerId: 9,
+          status: "opp-matched",
+          name: "Jane Doe",
+          avatarUrl: "a.png",
+        },
+      ],
+    });
+  });
+
+  it("passes through masked person fields verbatim", () => {
+    // The route masks person PII upstream; the DTO must not un-mask or drop it.
+    const opportunity = {
+      ...baseOpportunity,
+      opportunityVolunteer: [
+        {
+          id: 5,
+          volunteerId: 9,
+          status: "opp-matched",
+          volunteer: { person: { name: "x*** y***", avatarUrl: "z***" } },
+        },
+      ],
+    };
+
+    const { volunteers } = dtoAgentOpportunity(opportunity as any);
+    expect(volunteers[0].name).toBe("x*** y***");
+    expect(volunteers[0].avatarUrl).toBe("z***");
+  });
+
+  it("yields an empty volunteers array when none are linked", () => {
+    const result = dtoAgentOpportunity({
+      ...baseOpportunity,
+      opportunityVolunteer: undefined,
+    } as any);
+    expect(result.volunteers).toEqual([]);
+  });
+
+  it("tolerates a linked volunteer with no person loaded", () => {
+    const result = dtoAgentOpportunity({
+      ...baseOpportunity,
+      opportunityVolunteer: [{ id: 5, volunteerId: 9, status: "opp-pending" }],
+    } as any);
+    expect(result.volunteers[0]).toEqual({
+      id: 5,
+      volunteerId: 9,
+      status: "opp-pending",
+      name: undefined,
+      avatarUrl: undefined,
+    });
   });
 });

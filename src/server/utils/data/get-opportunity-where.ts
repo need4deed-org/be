@@ -3,6 +3,8 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { QuerystringOpportunityFiltering } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 
+// SECURITY (#666): filters run on unmasked DB columns, so a non-privileged
+// caller can infer PII masked in the response by probing which rows match.
 export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
 ): FindOptionsWhere<Opportunity> {
@@ -25,11 +27,9 @@ export function getOpportunityWhere(
     ...(filter?.language
       ? {
           deal: {
-            profile: {
-              profileLanguage: {
-                language: {
-                  id: normalizeStringArrayInput(filter.language),
-                },
+            dealLanguage: {
+              language: {
+                id: normalizeStringArrayInput(filter.language),
               },
             },
           },
@@ -38,11 +38,9 @@ export function getOpportunityWhere(
     ...(filter?.district
       ? {
           deal: {
-            location: {
-              locationDistrict: {
-                district: {
-                  id: normalizeStringArrayInput(filter.district),
-                },
+            dealDistrict: {
+              district: {
+                id: normalizeStringArrayInput(filter.district),
               },
             },
           },
@@ -51,11 +49,9 @@ export function getOpportunityWhere(
     ...(filter?.activity
       ? {
           deal: {
-            profile: {
-              profileActivity: {
-                activity: {
-                  id: normalizeStringArrayInput(filter.activity),
-                },
+            dealActivity: {
+              activity: {
+                id: normalizeStringArrayInput(filter.activity),
               },
             },
           },

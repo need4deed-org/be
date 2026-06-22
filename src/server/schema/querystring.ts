@@ -49,6 +49,7 @@ export const agentListQuerySchema = {
       type: "object",
       properties: {
         search: { type: "string" },
+        street: { type: "string" },
         district: { type: "array", items: { type: "string" } },
         type: { type: "array", items: { type: "string" } },
         volunteerSearch: { type: "array", items: { type: "string" } },
@@ -67,21 +68,71 @@ export const volunteerListQuerySchema = {
     ...paginationProps,
     ...langProp,
     ...sortOrderProps,
+    // Selects which relations the list loads: "table" loads only what the
+    // table view renders (languages + locations); "card" (default) loads all
+    // collections. Lets the table view skip activities/skills/availability.
+    listType: { type: "string", enum: ["card", "table"] },
     filter: {
       type: "object",
       properties: {
-        type: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
+        type: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         search: { type: "string" },
-        language: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
-        activity: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
-        skill: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
+        language: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        activity: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        skill: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         availability: { type: "string" },
-        district: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
-        engagement: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
-        match: { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] },
+        district: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        engagement: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
+        match: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
       },
       additionalProperties: false,
     },
+  },
+  additionalProperties: false,
+};
+
+export const userListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    ...sortOrderProps,
+    search: { type: "string" },
+    role: getRef("UserRole#"),
   },
   additionalProperties: false,
 };

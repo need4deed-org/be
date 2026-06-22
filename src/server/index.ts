@@ -3,15 +3,13 @@ import multipart from "@fastify/multipart";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
-import fastifyMailer from "fastify-mailer";
 import qs from "qs";
-import { defaultFrom, pluginTimeout, selfUrl } from "../config/constants";
+import { pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
-import { getMailerConfigForSES, getSesClient } from "../services";
 import cors, { corsOptions } from "./plugins/cors";
-import emailPlugin from "./plugins/email";
 import jwtPlugin from "./plugins/jwt";
+import notifyPlugin from "./plugins/notify";
 import typeormPlugin from "./plugins/typeorm";
 import agentRoutes from "./routes/agent/agent.routes";
 import appreciationRoutes from "./routes/appreciation.routes";
@@ -24,6 +22,7 @@ import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
+import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import workerRoutes from "./routes/worker.routes";
@@ -125,10 +124,6 @@ export async function createServer(): Promise<FastifyInstance> {
     attachFieldsToBody: "keyValues",
   });
 
-  await fastifyInstance.register(
-    fastifyMailer,
-    getMailerConfigForSES(getSesClient()),
-  );
   await fastifyInstance.register(fastifySwagger, {
     openapi: {
       info: {
@@ -151,7 +146,7 @@ export async function createServer(): Promise<FastifyInstance> {
       deepLinking: false,
     },
   });
-  await fastifyInstance.register(emailPlugin, { provider: "ses", defaultFrom });
+  await fastifyInstance.register(notifyPlugin);
   await fastifyInstance.register(healthRoutes, {
     prefix: RoutePrefix.HEALTH_CHECK,
   });
@@ -183,6 +178,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(workerRoutes, {
     prefix: RoutePrefix.WORKER,
+  });
+  await fastifyInstance.register(trustedDomainRoutes, {
+    prefix: RoutePrefix.TRUSTED_DOMAIN,
   });
 
   await fastifyInstance.ready();

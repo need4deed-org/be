@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityVolunteerGet,
   OpportunityVolunteerStatusType,
+  UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
 import { volunteerOpportunityVolunteerDTO } from "../../../services";
@@ -11,6 +12,7 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";
 
@@ -55,6 +57,7 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
+      await maskForCaller(request, opportunities);
       const data = opportunities.map(volunteerOpportunityVolunteerDTO);
 
       return reply.status(200).send({
@@ -71,6 +74,7 @@ export default function volunteerOpportunityVolunteerRoutes(
   }>(
     "/:m2mId",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
@@ -112,6 +116,7 @@ export default function volunteerOpportunityVolunteerRoutes(
   }>(
     "/:m2mId",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
         response: {

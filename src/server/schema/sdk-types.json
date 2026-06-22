@@ -152,7 +152,11 @@
         "entityId": { "type": "number" },
         "entityType": { "type": "string" },
         "authorName": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "taggedPersonIds": {
+          "type": "array",
+          "items": { "type": "integer" }
+        }
       }
     },
     "ApiPerson": {
@@ -234,7 +238,13 @@
     "VolunteerStateMatchType": {
       "$id": "VolunteerStateMatchType",
       "type": "string",
-      "enum": ["matched", "needs-rematching"]
+      "enum": [
+        "vol-no-matches",
+        "vol-pending-match",
+        "vol-matched",
+        "vol-needs-rematch",
+        "vol-past"
+      ]
     },
     "VolunteerStateCGCType": {
       "$id": "VolunteerStateCGCType",
@@ -278,7 +288,7 @@
         },
         "additionalProperties": false
       },
-      "required": ["title", "proficiency"]
+      "required": ["title"]
     },
     "ApiAvailability": {
       "$id": "ApiAvailability",
@@ -311,6 +321,9 @@
         "id": {
           "type": "number"
         },
+        "personId": {
+          "type": "number"
+        },
         "email": {
           "type": "string"
         },
@@ -335,6 +348,9 @@
         },
         "timezone": {
           "type": "string"
+        },
+        "agentId": {
+          "type": "integer"
         },
         "additionalProperties": false
       },
@@ -520,6 +536,7 @@
             "name": { "type": "string" },
             "volunteeringType": { "$ref": "VolunteerStateTypeType#" },
             "engagement": { "$ref": "VolunteerStateEngagementType#" },
+            "communication": { "$ref": "VolunteerStateCommunicationType#" },
             "avatarUrl": { "type": "string" },
             "activities": {
               "type": "array",
@@ -550,6 +567,7 @@
         "name",
         "volunteeringType",
         "engagement",
+        "communication",
         "avatarUrl"
       ]
     },
@@ -626,47 +644,64 @@
         "opp-past"
       ]
     },
+    "OpportunityMatchStatusType": {
+      "$id": "OpportunityMatchStatusType",
+      "type": "string",
+      "enum": [
+        "opp-vol-pending-match",
+        "opp-vol-no-matches",
+        "opp-vol-matched",
+        "opp-vol-needs-rematch",
+        "opp-vol-unmatched",
+        "opp-vol-past"
+      ]
+    },
     "ApiOpportunityGetList": {
       "$id": "ApiOpportunityGetList",
       "type": "object",
       "properties": {
         "id": { "type": "integer" },
-        "volunteerType": { "$ref": "OpportunityType#" },
-        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
         "title": { "type": "string" },
-        "availability": {
+        "category": { "$ref": "OptionById#" },
+        "district": { "$ref": "OptionById#" },
+        "volunteerType": { "$ref": "VolunteerStateTypeType#" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "statusMatch": { "$ref": "OpportunityMatchStatusType#" },
+        "numberOfVolunteers": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "activities": {
           "type": "array",
-          "items": { "$ref": "ApiAvailability#" }
+          "items": { "$ref": "OptionById#" }
         },
         "languages": {
           "type": "array",
           "items": { "$ref": "ApiLanguage#" }
         },
-        "activities": {
+        "availability": {
           "type": "array",
-          "items": { "$ref": "OptionById#" }
+          "items": { "$ref": "ApiAvailability#" }
         },
         "location": { "type": "array", "items": { "$ref": "OptionById#" } },
         "accompanyingDetails": { "$ref": "ApiAccompanying#" },
-        "category": {
-          "type": "object",
-          "properties": { "id": { "type": "integer" } }
-        },
-        "district": {
-          "type": "object",
-          "properties": { "id": { "type": "integer" } }
-        }
+        "agentTitle": { "type": "string" },
+        "volunteerNames": { "type": "array", "items": { "type": "string" } }
       },
       "required": [
         "id",
-        "volunteerType",
-        "statusOpportunity",
         "title",
         "category",
-        "availability",
-        "languages",
+        "district",
+        "volunteerType",
+        "statusOpportunity",
+        "statusMatch",
+        "numberOfVolunteers",
+        "createdAt",
         "activities",
-        "accompanyingDetails"
+        "languages",
+        "availability",
+        "location",
+        "accompanyingDetails",
+        "agentTitle"
       ]
     },
     "ApiOpportunityGet": {
@@ -688,7 +723,10 @@
                 "name": { "type": "string" },
                 "phone": { "type": "string" },
                 "email": { "type": "string" },
-                "waysToContact": { "$ref": "PreferredCommunicationType#" }
+                "waysToContact": {
+                  "type": "array",
+                  "items": { "$ref": "PreferredCommunicationType#" }
+                }
               }
             },
             "agent": {
@@ -704,6 +742,43 @@
             "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
           }
         }
+      ]
+    },
+    "ApiAgentOpportunityVolunteer": {
+      "$id": "ApiAgentOpportunityVolunteer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "volunteerId": { "type": "integer" },
+        "status": { "$ref": "OpportunityVolunteerStatusType#" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      },
+      "required": ["id", "volunteerId", "status"]
+    },
+    "ApiAgentOpportunity": {
+      "$id": "ApiAgentOpportunity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" },
+        "statusOpportunity": { "$ref": "OpportunityStatusType#" },
+        "statusMatch": { "$ref": "OpportunityMatchStatusType#" },
+        "numberOfVolunteers": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "volunteers": {
+          "type": "array",
+          "items": { "$ref": "ApiAgentOpportunityVolunteer#" }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "statusOpportunity",
+        "statusMatch",
+        "numberOfVolunteers",
+        "createdAt",
+        "volunteers"
       ]
     },
     "AgentType": {
@@ -736,10 +811,36 @@
         "other"
       ]
     },
+    "AgentServiceType": {
+      "$id": "AgentServiceType",
+      "type": "string",
+      "enum": [
+        "childcare",
+        "welfare",
+        "consultation",
+        "voluntary-support",
+        "tandem",
+        "sport",
+        "tutoring",
+        "refugee-accommodation",
+        "job-coaching",
+        "youth"
+      ]
+    },
     "AgentTrustType": {
       "$id": "AgentTrustType",
       "type": "string",
       "enum": ["agent-high", "agent-low", "agent-unknown"]
+    },
+    "Lang": {
+      "$id": "Lang",
+      "type": "string",
+      "enum": ["en", "de"]
+    },
+    "UserRole": {
+      "$id": "UserRole",
+      "type": "string",
+      "enum": ["user", "coordinator", "agent", "volunteer", "admin"]
     },
     "AgentVolunteerSearchType": {
       "$id": "AgentVolunteerSearchType",
@@ -778,6 +879,8 @@
       "properties": {
         "about": { "type": "string" },
         "address": { "type": "string" },
+        "addressStreet": { "type": ["string", "null"] },
+        "addressPostcode": { "type": ["string", "null"] },
         "website": { "type": "string" },
         "organizationType": { "type": "string" },
         "operator": { "type": "string" },
@@ -811,6 +914,8 @@
         "district": { "$ref": "Option#" },
         "trustLevel": { "$ref": "AgentTrustType#" },
         "activeVolunteers": { "type": "integer" },
+        "numActiveVolunteers": { "type": "integer" },
+        "email": { "type": "string" },
         "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" }
       }
     },
@@ -821,8 +926,10 @@
         "id",
         "title",
         "type",
-        "district",
+        "trustLevel",
         "activeVolunteers",
+        "numActiveVolunteers",
+        "email",
         "volunteerSearch"
       ]
     },
@@ -830,20 +937,26 @@
       "$id": "AgentProps",
       "type": "object",
       "properties": {
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
+        "title": { "type": "string" },
+        "type": { "$ref": "AgentType#" },
+        "volunteerSearch": { "$ref": "AgentVolunteerSearchType#" },
+        "trustLevel": { "$ref": "AgentTrustType#" },
         "serviceType": {
           "type": "array",
           "items": { "$ref": "AgentService#" }
         },
-        "trustLevel": { "$ref": "AgentTrustType#" },
-        "statusEngagement": { "$ref": "AgentEngagementStatusType#" }
+        "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
+        "about": { "type": "string" },
+        "website": { "type": "string" },
+        "addressStreet": { "type": "string" },
+        "addressPostcode": { "type": "string" },
+        "statusSearch": { "$ref": "AgentVolunteerSearchType#" },
+        "services": {
+          "type": "array",
+          "items": { "$ref": "AgentService#" }
+        },
+        "languages": { "type": "array", "items": { "$ref": "OptionById#" } },
+        "districtId": { "type": "number" }
       }
     },
     "AgentId": {
@@ -869,7 +982,11 @@
             },
             "statusEngagement": { "$ref": "AgentEngagementStatusType#" },
             "agentDetails": { "$ref": "AgentDetails#" },
-            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } }
+            "comments": { "type": "array", "items": { "$ref": "ApiComment#" } },
+            "languages": {
+              "type": "array",
+              "items": { "$ref": "ApiLanguage#" }
+            }
           }
         }
       ]
@@ -885,9 +1002,16 @@
         "id",
         "title",
         "type",
-        "district",
+        "trustLevel",
         "activeVolunteers",
-        "volunteerSearch"
+        "numActiveVolunteers",
+        "email",
+        "volunteerSearch",
+        "createdAt",
+        "statusEngagement",
+        "agentDetails",
+        "comments",
+        "languages"
       ]
     },
     "ApiAccompanying": {

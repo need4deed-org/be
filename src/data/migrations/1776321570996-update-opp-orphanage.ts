@@ -1,6 +1,4 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
-import { NotFoundError } from "../../config";
-import logger from "../../logger";
 
 export class UpdateOppOrphanage1776321570996 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -21,7 +19,7 @@ export class UpdateOppOrphanage1776321570996 implements MigrationInterface {
       );
     }
     if (!agent) {
-      throw new NotFoundError(
+      throw new Error(
         'Agent "Orphanage For Opportunities" not found and could not be created.',
       );
     }
@@ -32,9 +30,6 @@ export class UpdateOppOrphanage1776321570996 implements MigrationInterface {
       WHERE first_name = $1 AND last_name = $2`,
       ["Need4Deed", "Staff"],
     );
-    logger.debug(
-      `UpdateOppOrphanage1776321570996:1:person:${JSON.stringify(person)}`,
-    );
     if (!person) {
       [person] = await queryRunner.query(
         `INSERT INTO person (first_name, last_name)
@@ -43,11 +38,8 @@ export class UpdateOppOrphanage1776321570996 implements MigrationInterface {
         ["Need4Deed", "Staff"],
       );
     }
-    logger.debug(
-      `UpdateOppOrphanage1776321570996:2:person:${JSON.stringify(person)}`,
-    );
     if (!person) {
-      throw new NotFoundError("Person with name Need4Deed Staff not found");
+      throw new Error("Person with name Need4Deed Staff not found");
     }
 
     // 3. Create address for the person if not already set
@@ -64,7 +56,7 @@ export class UpdateOppOrphanage1776321570996 implements MigrationInterface {
         ["12435"],
       );
       if (!postcode) {
-        throw new NotFoundError("Postcode 12435 not found");
+        throw new Error("Postcode 12435 not found");
       }
 
       const [newAddress] = await queryRunner.query(

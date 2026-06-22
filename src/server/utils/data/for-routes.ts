@@ -7,6 +7,7 @@ import {
   Lang,
   Occasionally,
   OccasionalType,
+  OptionById,
   OptionItem,
   SortOrder,
   TranslatedIntoType,
@@ -15,6 +16,7 @@ import {
 import {
   DataSource,
   DeepPartial,
+  EntityManager,
   FindOptionsWhere,
   In,
   QueryFailedError,
@@ -30,6 +32,7 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
@@ -40,6 +43,8 @@ import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import { tryCatch } from "../../../services/utils";
+import { maskPii } from "../pii/mask";
+import { CallerVisibility } from "../pii/visible-persons";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -139,7 +144,7 @@ export async function addTranslatedFields(
   logger.info("Translating volunteers");
   for (const volunteer of volunteers) {
     try {
-      for (const pl of volunteer.deal.profile.profileLanguage) {
+      for (const pl of volunteer.deal.dealLanguage) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -151,7 +156,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal.profile.profileActivity) {
+      for (const pa of volunteer.deal.dealActivity) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -163,7 +168,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal.profile.profileSkill) {
+      for (const ps of volunteer.deal.dealSkill) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -294,8 +299,9 @@ export async function patchEntity<E extends { id: number }>(
   entity: new () => E,
   data: Partial<E>,
   entityId?: number,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean | void> {
-  const repository = getRepository(dataSource, entity);
+  const repository = getRepository(manager, entity);
 
   const id = entityId || data?.id;
   if (!id) {
@@ -317,8 +323,9 @@ export async function patchEntity<E extends { id: number }>(
 export async function patchAddress(
   addressData: Partial<Address>,
   postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const postcodeRepository = getRepository(dataSource, Postcode);
+  const postcodeRepository = getRepository(manager, Postcode);
 
   const address = { ...addressData } as Address;
 
@@ -335,7 +342,72 @@ export async function patchAddress(
     }
   }
 
-  return Boolean(await patchEntity(Address, address));
+  return Boolean(await patchEntity(Address, address, undefined, manager));
+}
+
+/**
+ * Create and persist a new Address from the given data, resolving the postcode
+ * string to a Postcode by value. Returns `null` when no postcode can be
+ * resolved, since an Address cannot exist without one (NOT NULL).
+ */
+export async function createAddress(
+  addressData: Partial<Address>,
+  postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<Address | null> {
+  const addressRepository = getRepository(manager, Address);
+  const postcodeRepository = getRepository(manager, Postcode);
+
+  let postcodeId = postcodeData?.id;
+  if (!postcodeId && postcodeData?.value) {
+    const postcode = await postcodeRepository.findOneBy({
+      value: postcodeData.value,
+    });
+    postcodeId = postcode?.id;
+  }
+
+  if (!postcodeId) {
+    return null;
+  }
+
+  const address = addressRepository.create({ ...addressData, postcodeId });
+  return await addressRepository.save(address);
+}
+
+/**
+ * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
+ * de-selected rows and insert the newly selected ones (rows that are unchanged
+ * are left untouched). Language `id`s come from the SDK as `OptionById`.
+ *
+ * Runs on the given `manager` so the caller can wrap it in a transaction; pass
+ * the transactional EntityManager to make it atomic with surrounding writes.
+ */
+export async function updateAgentLanguages(
+  agentId: number,
+  languages: OptionById[],
+  manager: DataSource | EntityManager = dataSource,
+): Promise<void> {
+  const agentLanguageRepository = getRepository(manager, AgentLanguage);
+
+  const desiredLanguageIds = [
+    ...new Set(languages.map(({ id }) => Number(id))),
+  ];
+  const current = await agentLanguageRepository.find({ where: { agentId } });
+  const currentLanguageIds = current.map(({ languageId }) => languageId);
+
+  const toRemove = current.filter(
+    ({ languageId }) => !desiredLanguageIds.includes(languageId),
+  );
+  const toAdd = desiredLanguageIds
+    .filter((languageId) => !currentLanguageIds.includes(languageId))
+    .map((languageId) => new AgentLanguage({ agentId, languageId }));
+
+  if (toRemove.length > 0) {
+    await agentLanguageRepository.delete(toRemove.map(({ id }) => id));
+  }
+  if (toAdd.length > 0) {
+    await agentLanguageRepository.save(toAdd);
+  }
 }
 
 function getDealRelationsAndIdFieldName(m2mEntityName: string) {
@@ -344,41 +416,42 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     {
       relations: string[];
       idFieldNames: [
-        "accompanying" | "profile" | "location" | "time",
+        "deal",
         string,
         "language" | "activity" | "skill" | "district" | "timeslot",
         string,
       ];
     }
   > = {
-    AccompanyingLanguage: {
-      idFieldNames: [
-        "accompanying",
-        "accompanyingId",
-        "language",
-        "languageId",
-      ],
-      relations: ["profile.profileLanguage"],
+    DealLanguage: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "language", "languageId"],
+      relations: [],
     },
-    ProfileLanguage: {
-      idFieldNames: ["profile", "profileId", "language", "languageId"],
-      relations: ["profile.profileLanguage"],
+    DealActivity: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "activity", "activityId"],
+      relations: [],
     },
-    ProfileActivity: {
-      idFieldNames: ["profile", "profileId", "activity", "activityId"],
-      relations: ["profile.profileActivity"],
+    DealSkill: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "skill", "skillId"],
+      relations: [],
     },
-    ProfileSkill: {
-      idFieldNames: ["profile", "profileId", "skill", "skillId"],
-      relations: ["profile.profileSkill"],
+    DealDistrict: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "district", "districtId"],
+      relations: [],
     },
-    LocationDistrict: {
-      idFieldNames: ["location", "locationId", "district", "districtId"],
-      relations: ["location.locationDistrict"],
-    },
-    TimeTimeslot: {
-      idFieldNames: ["time", "timeId", "timeslot", "timeslotId"],
-      relations: ["time.timeTimeslot"],
+    DealTimeslot: {
+      // m2m hangs directly off the deal (the root), so no nested relation
+      // needs loading to resolve the host id.
+      idFieldNames: ["deal", "dealId", "timeslot", "timeslotId"],
+      relations: [],
     },
   };
 
@@ -468,8 +541,12 @@ export async function updateOptionList<
         m2mEntity,
       );
 
+      // When the m2m hangs directly off the root (e.g. DealActivity off Deal),
+      // the host *is* the root; otherwise resolve through the nested relation.
+      const hostIdValue = host === rootEntity ? root.id : root[host].id;
+
       const where = {
-        [hostId]: root[host].id,
+        [hostId]: hostIdValue,
       } as FindOptionsWhere<M>;
 
       const currentList = await m2mRepository.find({ where });
@@ -478,9 +555,20 @@ export async function updateOptionList<
         await m2mRepository.delete(currentList.map(({ id }) => id));
       }
 
-      const newList = list.map((item) => {
+      // De-dupe incoming ids so a repeated selection can't violate a
+      // (host, item) unique constraint (e.g. deal_activity) on re-insert.
+      const seen = new Set<L["id"]>();
+      const uniqueList = list.filter((item) => {
+        if (seen.has(item.id)) {
+          return false;
+        }
+        seen.add(item.id);
+        return true;
+      });
+
+      const newList = uniqueList.map((item) => {
         const newItem = new m2mEntity({
-          [hostId]: root[host].id,
+          [hostId]: hostIdValue,
           [listItemId]: item.id,
           ...(listName === "language" // TODO: tech debt here
             ? {
@@ -510,6 +598,7 @@ export async function fetchVolunteerById(
   id: number,
   isoCode: Lang,
   relations: string[],
+  maskContext?: CallerVisibility | null,
 ): Promise<ApiVolunteerGet | null> {
   const volunteerRepository = getRepository(dataSource, Volunteer);
 
@@ -526,6 +615,15 @@ export async function fetchVolunteerById(
 
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);
+
+  // Mask PII the caller may not see before the serializer reads it. Comments are
+  // loaded separately (they aren't part of the volunteer graph), so they must be
+  // masked too — otherwise comment authors' Person PII leaks to non-privileged
+  // callers.
+  if (maskContext) {
+    maskPii(volunteer, maskContext);
+    maskPii(comments, maskContext);
+  }
 
   const data = volunteerSerializer(volunteer, comments, timedEvents);
 
