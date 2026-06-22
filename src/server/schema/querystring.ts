@@ -7,6 +7,11 @@ const paginationProps = {
 };
 const langProp = { language: { type: "string" } };
 
+export const langQuerySchema = {
+  type: "object",
+  properties: langProp,
+};
+
 const sortOrderProps = {
   sortOrder: {
     type: "string",
