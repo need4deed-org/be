@@ -23,6 +23,8 @@ services:
       - DB_SCHEMA=public
     ports:
       - ${BE_PORT:-5000}:5000
+    networks:
+      - n4d-net
     volumes:
       - ./:/app
     command: ["yarn", "dev"]
@@ -34,6 +36,8 @@ services:
         condition: service_healthy
     build:
       context: ./data-bootstrap
+    networks:
+      - n4d-net
     environment:
       - DB_HOST=db
       - DB_PORT=5432
@@ -56,18 +60,14 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - be_database:/var/lib/postgresql
+    networks:
+      - n4d-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-  localstack:
-    image: localstack/localstack
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=ses
 
 volumes:
   be_database:

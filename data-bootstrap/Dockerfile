@@ -5,9 +5,9 @@ FROM postgres:17.2
 # Set environment variables for external database connection
 ENV PGHOST=localhost
 ENV PGPORT=5432
-ENV PGDATABASE=mydb
+ENV PGDATABASE=postgres
 ENV PGUSER=postgres
-ENV PGPASSWORD=password
+ENV PGPASSWORD=postgres
 
 # Copy the SQL files
 COPY *.sql /app/
