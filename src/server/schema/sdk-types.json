@@ -217,7 +217,7 @@
           "type": "string"
         },
         "entityId": {
-          "type": "number"
+          "type": "integer"
         },
         "entityType": {
           "type": "string"
@@ -229,13 +229,14 @@
           "type": "string",
           "format": "date-time"
         },
-        "taggedPersonIds": {
+        "taggedPersons": {
           "type": "array",
           "items": {
-            "type": "integer"
+            "$ref": "ApiCommentTaggedPerson#"
           }
         }
-      }
+      },
+      "required": ["id", "content", "authorName", "timestamp", "taggedPersons"]
     },
     "ApiPerson": {
       "$id": "ApiPerson",
@@ -1552,6 +1553,20 @@
           "type": "string"
         }
       }
+    },
+    "ApiCommentTaggedPerson": {
+      "$id": "ApiCommentTaggedPerson",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "readAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "readAt"]
     }
   }
 }
