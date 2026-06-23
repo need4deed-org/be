@@ -973,7 +973,7 @@
           "type": "string"
         },
         "agentId": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "volunteerNames": {
           "type": "array",
