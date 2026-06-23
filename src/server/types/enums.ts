@@ -1,4 +1,5 @@
 export const RoutePrefix = {
+  ACTIVITY_LOG: "/activity-log",
   AGENT: "/agent",
   AUTH: "/auth",
   APPRECIATION: "/appreciation",

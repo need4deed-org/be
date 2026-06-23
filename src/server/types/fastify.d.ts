@@ -10,6 +10,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
@@ -35,6 +36,7 @@ declare module "fastify" {
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
       communicationRepository: Repository<Communication>;
+      activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;
       opportunityRepository: Repository<Opportunity>;
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
