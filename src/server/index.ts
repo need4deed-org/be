@@ -11,12 +11,14 @@ import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
 import typeormPlugin from "./plugins/typeorm";
+import activityLogRoutes from "./routes/activity-log.routes";
 import agentRoutes from "./routes/agent/agent.routes";
 import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
+import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
@@ -166,11 +168,17 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(communicationRoutes, {
     prefix: RoutePrefix.COMMUNICATION,
   });
+  await fastifyInstance.register(activityLogRoutes, {
+    prefix: RoutePrefix.ACTIVITY_LOG,
+  });
   await fastifyInstance.register(appreciationRoutes, {
     prefix: RoutePrefix.APPRECIATION,
   });
   await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
   await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
+  });
+  await fastifyInstance.register(activityLogCollectionRoutes, {
     prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
   });
   await fastifyInstance.register(organizationRoutes, {

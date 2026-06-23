@@ -14,6 +14,7 @@ import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
 import Postcode from "./entity/location/postcode.entity";
+import ActivityLog from "./entity/m2m/activity-log.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
@@ -59,6 +60,7 @@ export const dataSource = new DataSource({
   entities: [
     Accompanying,
     Activity,
+    ActivityLog,
     Address,
     Agent,
     AgentLanguage,
