@@ -1,10 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiActivityLogPatch, UserRole } from "need4deed-sdk";
-import {
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../../config";
+import { NotFoundError } from "../../config";
+import { dtoActivityLogEntry } from "../../services/dto/dto-activity-log";
 import { idParamSchema } from "../schema";
 import { ParamsId } from "../types";
 
@@ -14,10 +11,11 @@ export default async function activityLogRoutes(
 ) {
   fastify.addHook("onRequest", fastify.authenticate());
 
-  // PATCH /activity-log/:id
+  // PATCH /activity-log/:id — COORDINATOR only (ADMIN bypasses)
   fastify.patch<{ Params: ParamsId; Body: ApiActivityLogPatch }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiActivityLogPatch#" },
@@ -34,19 +32,7 @@ export default async function activityLogRoutes(
       },
     },
     async (request, reply) => {
-      const role = request.authUser?.role;
-      if (
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT &&
-        role !== UserRole.ADMIN
-      ) {
-        throw new UnauthorizedError();
-      }
-
       const { id } = request.params;
-      if (id <= 0) {
-        throw new BadRequestError(`Invalid id: ${id}`);
-      }
 
       const log = await fastify.db.activityLogRepository.findOne({
         where: { id },
@@ -62,15 +48,16 @@ export default async function activityLogRoutes(
 
       return reply.status(200).send({
         message: `Activity log entry id:${id} updated`,
-        data: updated,
+        data: dtoActivityLogEntry(updated),
       });
     },
   );
 
-  // DELETE /activity-log/:id
+  // DELETE /activity-log/:id — COORDINATOR only (ADMIN bypasses)
   fastify.delete<{ Params: ParamsId }>(
     "/:id",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -83,19 +70,7 @@ export default async function activityLogRoutes(
       },
     },
     async (request, reply) => {
-      const role = request.authUser?.role;
-      if (
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT &&
-        role !== UserRole.ADMIN
-      ) {
-        throw new UnauthorizedError();
-      }
-
       const { id } = request.params;
-      if (id <= 0) {
-        throw new BadRequestError(`Invalid id: ${id}`);
-      }
 
       const log = await fastify.db.activityLogRepository.findOne({
         where: { id },

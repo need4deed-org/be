@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiActivityLogPost, UserRole } from "need4deed-sdk";
-import {
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from "../../../config";
+import { NotFoundError, UnauthorizedError } from "../../../config";
 import ActivityLog from "../../../data/entity/m2m/activity-log.entity";
+import {
+  dtoActivityLogEntry,
+  dtoActivityLogGet,
+} from "../../../services/dto/dto-activity-log";
 import { idParamSchema } from "../../schema";
 import { ParamsId } from "../../types";
 
@@ -37,9 +37,6 @@ export default async function activityLogCollectionRoutes(
       }
 
       const { id } = request.params;
-      if (id <= 0) {
-        throw new BadRequestError(`Invalid id: ${id}`);
-      }
 
       const ov = await fastify.db.opportunityVolunteerRepository.findOne({
         where: { id },
@@ -53,13 +50,7 @@ export default async function activityLogCollectionRoutes(
         order: { date: "ASC" },
       });
 
-      const totalHours = logs.reduce((sum, l) => sum + Number(l.hours), 0);
-
-      return reply.status(200).send({
-        data: logs,
-        totalHours: Math.round(totalHours * 100) / 100,
-        count: logs.length,
-      });
+      return reply.status(200).send(dtoActivityLogGet(logs));
     },
   );
 
@@ -93,9 +84,6 @@ export default async function activityLogCollectionRoutes(
       }
 
       const { id } = request.params;
-      if (id <= 0) {
-        throw new BadRequestError(`Invalid id: ${id}`);
-      }
 
       const ov = await fastify.db.opportunityVolunteerRepository.findOne({
         where: { id },
@@ -110,7 +98,7 @@ export default async function activityLogCollectionRoutes(
 
       return reply.status(201).send({
         message: `Activity log entry created for OpportunityVolunteer id:${id}`,
-        data: log,
+        data: dtoActivityLogEntry(log),
       });
     },
   );

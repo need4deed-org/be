@@ -23,8 +23,13 @@ export default class ActivityLog {
   @Column({ type: "date" })
   date: Date;
 
-  // Stored as decimal to support fractional hours (e.g. 2.5).
-  @Column({ type: "decimal", precision: 5, scale: 2 })
+  // Stored as decimal; transformer coerces the pg driver's string return to number.
+  @Column({
+    type: "decimal",
+    precision: 5,
+    scale: 2,
+    transformer: { to: (v: number) => v, from: (v: string) => Number(v) },
+  })
   hours: number;
 
   @ManyToOne(() => OpportunityVolunteer, (ov) => ov.activityLogs, {
