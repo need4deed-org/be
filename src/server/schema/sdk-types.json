@@ -972,6 +972,9 @@
         "agentTitle": {
           "type": "string"
         },
+        "agentId": {
+          "type": "integer"
+        },
         "volunteerNames": {
           "type": "array",
           "items": {
@@ -994,7 +997,8 @@
         "availability",
         "location",
         "accompanyingDetails",
-        "agentTitle"
+        "agentTitle",
+        "agentId"
       ]
     },
     "ApiOpportunityGet": {
