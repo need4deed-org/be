@@ -1,3 +1,6 @@
+# database dumps — may contain PII, never commit
+data-bootstrap/*.sql
+
 .idea/
 .vscode/
 node_modules/
