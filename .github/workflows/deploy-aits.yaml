@@ -31,6 +31,6 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.AITS_HOST }}
-          username: root
+          username: ubuntu
           key: ${{ secrets.AITS_SSH_KEY }}
           script: kubectl rollout restart deployment/be -n n4d-dev
