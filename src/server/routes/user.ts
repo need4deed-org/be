@@ -400,4 +400,89 @@ export default async function userRoutes(
       return reply.status(201).send(savedUser);
     },
   );
+
+  // Admin-only user creation — accepts any role including admin/coordinator.
+  // Unlike POST /user/ this endpoint requires an authenticated admin session
+  // and activates the account immediately (no email verification flow).
+  fastify.post<{
+    Body: ApiUserPost;
+    Reply: User | { message: string; errors?: any };
+  }>(
+    "/admin",
+    {
+      schema: {
+        body: createUserBodySchema,
+        response: {
+          201: userResponseSchemaIncludePerson,
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
+      preHandler: async (request) => {
+        const { person: personData, email } = request.body;
+        const personRepository = fastify.db.personRepository;
+
+        if (personData.id) {
+          const resolvedPerson = await personRepository.findOneBy({
+            id: personData.id,
+          });
+          if (!resolvedPerson) {
+            throw new BadRequestError(
+              `Person with ID ${personData.id} not found.`,
+            );
+          }
+          if (!resolvedPerson.email) {
+            resolvedPerson.email = email;
+          }
+          request.resolvedPerson = resolvedPerson;
+          return;
+        }
+
+        const newPerson = new Person(personData);
+        newPerson.email = email;
+        const errors = await validate(newPerson);
+        if (errors.length > 0) {
+          const messages = errors.flatMap((err) =>
+            Object.values(err.constraints || {}),
+          );
+          throw new BadRequestError(
+            `Validation failed for new person data: ${messages.join("; ")}`,
+          );
+        }
+        request.resolvedPerson = newPerson;
+      },
+    },
+    async (request, reply) => {
+      const { email, password: passwordPlain, role, language } = request.body;
+      const userRepository = fastify.db.userRepository;
+
+      if (await userRepository.findOneBy({ email })) {
+        throw new ConflictError("User with this email already exists.");
+      }
+
+      const newUser = new User({
+        email,
+        password: await hashPassword(passwordPlain),
+        role,
+        isActive: true,
+        language: language ?? Lang.EN,
+        timezone: "CET",
+        person: request.resolvedPerson,
+      });
+
+      const errors = await validate(newUser);
+      if (errors.length > 0) {
+        logger.error(
+          `User entity validation errors: ${JSON.stringify(errors)}`,
+        );
+        return reply.status(400).send({
+          message: "Validation failed for newUser data",
+          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+        });
+      }
+
+      const savedUser = await userRepository.save(newUser);
+      return reply.status(201).send(savedUser);
+    },
+  );
 }
