@@ -12,7 +12,7 @@ if [ "$TABLE_EXISTS" = "t" ]; then
 fi
 
 echo "Importing database dump..."
-PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/dev.dump.sql
+PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/scrambled-dump.sql
 echo "Database import completed successfully"
 
 unset PGPASSWORD

@@ -1,5 +1,5 @@
-# database dumps — may contain PII, never commit
-data-bootstrap/*.sql
+# raw database dump — contains real PII, never commit
+data-bootstrap/dev.dump.sql
 
 .idea/
 .vscode/
