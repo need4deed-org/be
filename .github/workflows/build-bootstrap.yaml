@@ -1,0 +1,31 @@
+name: build-bootstrap
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - data-bootstrap/**
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push bootstrap image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./data-bootstrap
+          push: true
+          tags: ghcr.io/need4deed-org/bootstrap:latest
