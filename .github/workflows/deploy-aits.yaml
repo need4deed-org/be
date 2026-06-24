@@ -1,0 +1,36 @@
+name: deploy-aits
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/need4deed-org/be:develop
+
+      - name: Roll out new image on AITS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.AITS_HOST }}
+          username: root
+          key: ${{ secrets.AITS_SSH_KEY }}
+          script: kubectl rollout restart deployment/be -n n4d-dev
