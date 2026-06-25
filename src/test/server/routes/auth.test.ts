@@ -1,7 +1,27 @@
 import { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { accessCookieName, refreshCookieName } from "../../../config/constants";
 import { createServer } from "../../../server";
+
+vi.mock("../../../data/utils", async () => {
+  const actual = await vi.importActual("../../../data/utils");
+  return {
+    ...actual,
+    hashPassword: vi
+      .fn()
+      .mockImplementation((password: string) =>
+        Promise.resolve("hashed-password-" + password),
+      ),
+  };
+});
 
 describe("POST /auth/logout", () => {
   let fastify: FastifyInstance;
@@ -55,6 +75,10 @@ describe("POST /auth/reset-password", () => {
     await fastify.close();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("rejects a token of type 'access'", async () => {
     const nonResetToken = fastify.jwt.sign({
       id: 999,
@@ -105,5 +129,135 @@ describe("POST /auth/reset-password", () => {
     });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it("resets password with a valid reset token", async () => {
+    const resetToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "reset",
+    });
+
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      id: 999,
+    } as any);
+    const updateSpy = vi
+      .spyOn(fastify.db.userRepository, "update")
+      .mockResolvedValue({} as any);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token: resetToken, newPassword: "newpass123456" },
+    });
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      { id: 999 },
+      { password: "hashed-password-newpass123456" },
+    );
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("resets password via cookie when password matches", async () => {
+    const accessToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "access",
+    });
+
+    const checkPassword = vi.fn().mockResolvedValue(true);
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      id: 999,
+      checkPassword,
+    } as any);
+    const updateSpy = vi
+      .spyOn(fastify.db.userRepository, "update")
+      .mockResolvedValue({} as any);
+
+    const currentPass = "currentpass123";
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      cookies: { access: accessToken },
+      payload: { password: currentPass, newPassword: "newpass123456" },
+    });
+
+    expect(checkPassword).toHaveBeenCalledWith(currentPass);
+    expect(updateSpy).toHaveBeenCalledWith(
+      { id: 999 },
+      { password: "hashed-password-newpass123456" },
+    );
+    expect(response.statusCode).toBe(200);
+  });
+});
+
+describe("POST /auth/request-reset", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends reset email when user exists and is active", async () => {
+    const mockUser = { id: 1, email: "test@example.com", isActive: true };
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
+      mockUser as any,
+    );
+
+    const passwordResetSpy = vi.fn().mockResolvedValue(undefined);
+    fastify.notify.passwordReset = passwordResetSpy;
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(passwordResetSpy).toHaveBeenCalledWith(mockUser);
+  });
+
+  it("does not send email when user is inactive", async () => {
+    const mockUser = { id: 1, email: "test@example.com", isActive: false };
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
+      mockUser as any,
+    );
+
+    const passwordResetSpy = vi.fn().mockResolvedValue(undefined);
+    fastify.notify.passwordReset = passwordResetSpy;
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(passwordResetSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not send email when user does not exist", async () => {
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(null);
+
+    const passwordResetSpy = vi.fn().mockResolvedValue(undefined);
+    fastify.notify.passwordReset = passwordResetSpy;
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(passwordResetSpy).not.toHaveBeenCalled();
   });
 });
