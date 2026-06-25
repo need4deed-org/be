@@ -55,6 +55,38 @@ describe("serializeUserToMeDTO", () => {
     expect(result.personId).toBeUndefined();
   });
 
+  it("includes agentId in the result when provided", () => {
+    const user = {
+      id: 4,
+      personId: 10,
+      email: "agent@example.com",
+      isActive: true,
+      role: "agent",
+      language: "en",
+      timezone: "CET",
+      person: { firstName: "Bob", name: "Bob Agent", avatarUrl: "" },
+    };
+
+    const result = serializeUserToMeDTO(user as any, 99);
+    expect(result.agentId).toBe(99);
+  });
+
+  it("omits agentId when not provided", () => {
+    const user = {
+      id: 5,
+      personId: 11,
+      email: "vol@example.com",
+      isActive: true,
+      role: "volunteer",
+      language: "en",
+      timezone: "CET",
+      person: { firstName: "Eve", name: "Eve Vol", avatarUrl: "" },
+    };
+
+    const result = serializeUserToMeDTO(user as any);
+    expect(result.agentId).toBeUndefined();
+  });
+
   it("falls back to default isoCode 'en' and timezone 'CET' when not set", () => {
     const user = {
       id: 3,
