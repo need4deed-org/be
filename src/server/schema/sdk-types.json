@@ -456,9 +456,9 @@
         },
         "agentId": {
           "type": "integer"
-        },
-        "additionalProperties": false
+        }
       },
+      "additionalProperties": false,
       "required": ["id", "email", "role"]
     },
     "DocumentType": {
