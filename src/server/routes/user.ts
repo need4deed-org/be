@@ -163,7 +163,7 @@ export default async function userRoutes(
         }
 
         let agentId: number | undefined;
-        if (user.personId) {
+        if (user.role === UserRole.AGENT && user.personId) {
           // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
           const membership =
             (await fastify.db.agentPersonRepository.findOne({
