@@ -42,3 +42,68 @@ describe("POST /auth/logout", () => {
     }
   });
 });
+
+describe("POST /auth/reset-password", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("rejects a token of type 'access'", async () => {
+    const nonResetToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "access",
+    });
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token: nonResetToken, newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a token of type 'verify'", async () => {
+    const nonResetToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "verify",
+    });
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token: nonResetToken, newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects an invalid token", async () => {
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token: "not-a-valid-jwt", newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("returns 403 when no token and no auth cookie", async () => {
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+});

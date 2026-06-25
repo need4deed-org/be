@@ -7,6 +7,7 @@ import {
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../config/constants";
+import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { responseErrors } from "../schema/responseErrors";
 import {
@@ -277,6 +278,96 @@ async function authRoutes(
       return reply.status(200).send({
         message:
           "If an account with that email exists, a reset link has been sent.",
+      });
+    },
+  );
+
+  fastify.post<{
+    Body: { token?: string; password?: string; newPassword: string };
+    Reply: { message: string };
+  }>(
+    prefixedPath + RoutePrefix.RESET_PASSWORD,
+    {
+      onRequest: [fastify.authenticate({ optional: true })],
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            token: { type: "string" },
+            password: { type: "string" },
+            newPassword: { type: "string", minLength: 8, maxLength: 50 },
+          },
+          required: ["newPassword"],
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+
+    async (request, reply) => {
+      const { token, password, newPassword } = request.body;
+      const TOKEN_ERROR_MESSAGE = "Invalid reset token.";
+
+      if (token) {
+        let payload: { id: number; email: string; type?: string };
+        try {
+          payload = await fastify.jwt.verify(token);
+        } catch {
+          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+        }
+
+        if (payload.type !== "reset") {
+          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+        }
+
+        const user = await fastify.db.userRepository.findOne({
+          where: { id: payload.id },
+        });
+
+        if (!user) {
+          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+        }
+
+        await fastify.db.userRepository.update(
+          { id: user.id },
+          { password: await hashPassword(newPassword) },
+        );
+
+        return reply.status(200).send({
+          message: "Password has been reset.",
+        });
+      }
+
+      const authUser = request.authUser;
+      if (!authUser) {
+        return reply.status(403).send({ message: "Authentication required." });
+      }
+
+      if (!password) {
+        return reply
+          .status(400)
+          .send({ message: "Current password is required." });
+      }
+
+      if (!(await authUser.checkPassword(password))) {
+        return reply
+          .status(400)
+          .send({ message: "Current password is incorrect." });
+      }
+
+      await fastify.db.userRepository.update(
+        { id: authUser.id },
+        { password: await hashPassword(newPassword) },
+      );
+
+      return reply.status(200).send({
+        message: "Password has been changed successfully.",
       });
     },
   );
