@@ -236,6 +236,50 @@ async function authRoutes(
       return reply.status(200).send({ message: "Logout successful." });
     },
   );
+
+  fastify.post<{
+    Body: { email: string };
+    Reply: { message: string };
+  }>(
+    prefixedPath + RoutePrefix.REQUEST_RESET,
+    {
+      schema: {
+        body: {
+          type: "object",
+          properties: { email: { type: "string", format: "email" } },
+          required: ["email"],
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { email } = request.body;
+
+      const user = await fastify.db.userRepository.findOne({
+        where: { email },
+      });
+
+      if (user?.isActive) {
+        fastify.notify.passwordReset(user).catch((err) => {
+          logger.error(
+            `Failed to send password reset for user ${user.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
+      }
+
+      return reply.status(200).send({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+    },
+  );
 }
 
 export default fp(authRoutes, {

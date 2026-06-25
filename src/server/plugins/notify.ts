@@ -8,6 +8,7 @@ import {
   sendCommentTagged,
   sendEmailVerification,
   sendOpsAlert,
+  sendPasswordReset,
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
@@ -15,6 +16,7 @@ import {
 
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
+  passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   commentTagged(input: CommentTaggedInput): Promise<void>;
 }
@@ -50,6 +52,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
       sendEmailVerification({ email, jwt: fastify.jwt }, user),
+    passwordReset: (user: User) =>
+      sendPasswordReset({ email, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     commentTagged: (input: CommentTaggedInput) =>
       sendCommentTagged({ slack }, input),
