@@ -283,21 +283,19 @@ async function authRoutes(
   );
 
   fastify.post<{
-    Body: { token?: string; password?: string; newPassword: string };
+    Body: { token: string; newPassword: string };
     Reply: { message: string };
   }>(
     prefixedPath + RoutePrefix.RESET_PASSWORD,
     {
-      onRequest: [fastify.authenticate({ optional: true })],
       schema: {
         body: {
           type: "object",
           properties: {
             token: { type: "string" },
-            password: { type: "string" },
             newPassword: { type: "string", minLength: 8, maxLength: 50 },
           },
-          required: ["newPassword"],
+          required: ["token", "newPassword"],
         },
         response: {
           200: {
@@ -309,51 +307,68 @@ async function authRoutes(
         },
       },
     },
-
     async (request, reply) => {
-      const { token, password, newPassword } = request.body;
+      const { token, newPassword } = request.body;
       const TOKEN_ERROR_MESSAGE = "Invalid reset token.";
 
-      if (token) {
-        let payload: { id: number; email: string; type?: string };
-        try {
-          payload = await fastify.jwt.verify(token);
-        } catch {
-          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
-        }
-
-        if (payload.type !== "reset") {
-          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
-        }
-
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: payload.id },
-        });
-
-        if (!user) {
-          return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
-        }
-
-        await fastify.db.userRepository.update(
-          { id: user.id },
-          { password: await hashPassword(newPassword) },
-        );
-
-        return reply.status(200).send({
-          message: "Password has been reset.",
-        });
+      let payload: { id: number; email: string; type?: string };
+      try {
+        payload = await fastify.jwt.verify(token);
+      } catch {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 
-      const authUser = request.authUser;
-      if (!authUser) {
-        return reply.status(403).send({ message: "Authentication required." });
+      if (payload.type !== "reset") {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 
-      if (!password) {
-        return reply
-          .status(400)
-          .send({ message: "Current password is required." });
+      const user = await fastify.db.userRepository.findOne({
+        where: { id: payload.id },
+      });
+      if (!user) {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
+
+      await fastify.db.userRepository.update(
+        { id: user.id },
+        { password: await hashPassword(newPassword) },
+      );
+
+      return reply.status(200).send({
+        message: "Password has been reset.",
+      });
+    },
+  );
+
+  fastify.post<{
+    Body: { password: string; newPassword: string };
+    Reply: { message: string };
+  }>(
+    prefixedPath + RoutePrefix.CHANGE_PASSWORD,
+    {
+      onRequest: [fastify.authenticate()],
+      schema: {
+        body: {
+          type: "object",
+          properties: {
+            password: { type: "string" },
+            newPassword: { type: "string", minLength: 8, maxLength: 50 },
+          },
+          required: ["password", "newPassword"],
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { message: { type: "string" } },
+            required: ["message"],
+          },
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { password, newPassword } = request.body;
+      const authUser = request.authUser!;
 
       if (!(await authUser.checkPassword(password))) {
         return reply
@@ -367,7 +382,7 @@ async function authRoutes(
       );
 
       return reply.status(200).send({
-        message: "Password has been changed successfully.",
+        message: "Password has been changed.",
       });
     },
   );

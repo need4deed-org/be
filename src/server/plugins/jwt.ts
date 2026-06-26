@@ -35,9 +35,6 @@ async function jwtPlugin(
         try {
           await request.jwtVerify();
         } catch (_error) {
-          if (opt?.optional) {
-            return;
-          }
           reply.status(401);
           throw new Error("Authorization failed.");
         }

@@ -121,16 +121,6 @@ describe("POST /auth/reset-password", () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it("returns 403 when no token and no auth cookie", async () => {
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/password-reset",
-      payload: { newPassword: "newpass123456" },
-    });
-
-    expect(response.statusCode).toBe(403);
-  });
-
   it("resets password with a valid reset token", async () => {
     const resetToken = fastify.jwt.sign({
       id: 999,
@@ -157,8 +147,58 @@ describe("POST /auth/reset-password", () => {
     );
     expect(response.statusCode).toBe(200);
   });
+});
 
-  it("resets password via cookie when password matches", async () => {
+describe("POST /auth/password-change", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-change",
+      payload: { password: "currentpass123", newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("returns 400 when current password is incorrect", async () => {
+    const accessToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "access",
+    });
+
+    const checkPassword = vi.fn().mockResolvedValue(false);
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      id: 999,
+      checkPassword,
+    } as any);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-change",
+      cookies: { access: accessToken },
+      payload: { password: "wrongpass", newPassword: "newpass123456" },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("changes password when current password matches", async () => {
     const accessToken = fastify.jwt.sign({
       id: 999,
       email: "test@example.com",
@@ -177,7 +217,7 @@ describe("POST /auth/reset-password", () => {
     const currentPass = "currentpass123";
     const response = await fastify.inject({
       method: "POST",
-      url: "/auth/password-reset",
+      url: "/auth/password-change",
       cookies: { access: accessToken },
       payload: { password: currentPass, newPassword: "newpass123456" },
     });

@@ -21,6 +21,7 @@ export const RoutePrefix = {
   REFRESH: "/refresh",
   REQUEST_RESET: "/request-reset",
   RESET_PASSWORD: "/password-reset",
+  CHANGE_PASSWORD: "/password-change",
   REGISTER: "/register",
   SWAGGER: "/swagger",
   TRUSTED_DOMAIN: "/trusted-domain",
