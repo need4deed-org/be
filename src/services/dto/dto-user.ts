@@ -1,10 +1,7 @@
 import { ApiUserGet } from "need4deed-sdk";
 import User from "../../data/entity/user.entity";
 
-export function serializeUserToMeDTO(
-  user: User,
-  agentId?: number,
-): ApiUserGet & { agentId?: number } {
+export function serializeUserToMeDTO(user: User, agentId?: number): ApiUserGet {
   return {
     id: user.id,
     // personId is nullable (person-less users); emit undefined so the
