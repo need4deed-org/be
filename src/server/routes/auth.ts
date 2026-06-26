@@ -11,12 +11,16 @@ import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { responseErrors } from "../schema/responseErrors";
 import {
+  changePasswordSchema,
+  messageResponseSchema,
   refreshAccessResponseSchema,
   refreshAccessSchema,
+  requestResetSchema,
+  resetPasswordSchema,
   userLoginResponseSchema,
   userLoginSchema,
 } from "../schema/user.schema";
-import { RoutePrefix } from "../types";
+import { ReplyMessage, RoutePrefix } from "../types";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -217,11 +221,7 @@ async function authRoutes(
     {
       schema: {
         response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
+          200: messageResponseSchema,
           ...responseErrors,
         },
       },
@@ -240,22 +240,14 @@ async function authRoutes(
 
   fastify.post<{
     Body: { email: string };
-    Reply: { message: string };
+    Reply: ReplyMessage;
   }>(
     prefixedPath + RoutePrefix.REQUEST_RESET,
     {
       schema: {
-        body: {
-          type: "object",
-          properties: { email: { type: "string", format: "email" } },
-          required: ["email"],
-        },
+        body: requestResetSchema,
         response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
+          200: messageResponseSchema,
           ...responseErrors,
         },
       },
@@ -284,25 +276,14 @@ async function authRoutes(
 
   fastify.post<{
     Body: { token: string; newPassword: string };
-    Reply: { message: string };
+    Reply: ReplyMessage;
   }>(
     prefixedPath + RoutePrefix.RESET_PASSWORD,
     {
       schema: {
-        body: {
-          type: "object",
-          properties: {
-            token: { type: "string" },
-            newPassword: { type: "string", minLength: 8, maxLength: 50 },
-          },
-          required: ["token", "newPassword"],
-        },
+        body: resetPasswordSchema,
         response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
+          200: messageResponseSchema,
           ...responseErrors,
         },
       },
@@ -342,26 +323,15 @@ async function authRoutes(
 
   fastify.post<{
     Body: { password: string; newPassword: string };
-    Reply: { message: string };
+    Reply: ReplyMessage;
   }>(
     prefixedPath + RoutePrefix.CHANGE_PASSWORD,
     {
       onRequest: [fastify.authenticate()],
       schema: {
-        body: {
-          type: "object",
-          properties: {
-            password: { type: "string" },
-            newPassword: { type: "string", minLength: 8, maxLength: 50 },
-          },
-          required: ["password", "newPassword"],
-        },
+        body: changePasswordSchema,
         response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
+          200: messageResponseSchema,
           ...responseErrors,
         },
       },
