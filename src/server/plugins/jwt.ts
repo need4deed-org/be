@@ -2,6 +2,11 @@ import fastifyJwt from "@fastify/jwt";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
+import {
+  BadRequestError,
+  UnauthenticatedError,
+  UnauthorizedError,
+} from "../../config";
 import { accessCookieName, cookieOptions } from "../../config/constants";
 import logger from "../../logger";
 import { AuthOptions } from "../types";
@@ -34,9 +39,9 @@ async function jwtPlugin(
       try {
         try {
           await request.jwtVerify();
-        } catch (_error) {
+        } catch {
           reply.status(401);
-          throw new Error("Authorization failed.");
+          throw new UnauthenticatedError("Authorization failed.");
         }
 
         const userId = request.user?.id;
@@ -53,7 +58,7 @@ async function jwtPlugin(
 
         if (!user) {
           reply.status(404);
-          throw new Error("User not found.");
+          throw new BadRequestError("User not found.");
         }
 
         // Expose the already-loaded user (carries personId + DB-authoritative
@@ -77,14 +82,14 @@ async function jwtPlugin(
 
         if (role && role !== user.role) {
           reply.status(403);
-          throw new Error("Permission denied");
+          throw new UnauthorizedError("Permission denied");
         }
 
         if (allowSelf) {
           const requestParamId = (request.params as { id?: string }).id;
           if (String(userId) !== requestParamId) {
             reply.status(403);
-            throw new Error("Permission denied");
+            throw new UnauthorizedError("Permission denied");
           }
         }
       } catch (error) {
