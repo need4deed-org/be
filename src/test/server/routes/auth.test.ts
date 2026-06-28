@@ -11,6 +11,14 @@ import {
 import { accessCookieName, refreshCookieName } from "../../../config/constants";
 import { createServer } from "../../../server";
 
+vi.mock("../../../data", async () => {
+  const actual = await vi.importActual("../../../data");
+  return {
+    ...actual,
+    initDatabase: vi.fn().mockImplementation(() => Promise.resolve()),
+  };
+});
+
 vi.mock("../../../data/utils", async () => {
   const actual = await vi.importActual("../../../data/utils");
   return {
@@ -92,6 +100,10 @@ describe("POST /auth/reset-password", () => {
       payload: { token: nonResetToken, newPassword: "newpass123456" },
     });
 
+    // Since 400 can also be returned for other reasons, check message
+    expect(response.json()).toEqual({
+      message: "Invalid reset token.",
+    });
     expect(response.statusCode).toBe(400);
   });
 
@@ -108,6 +120,10 @@ describe("POST /auth/reset-password", () => {
       payload: { token: nonResetToken, newPassword: "newpass123456" },
     });
 
+    // Since 400 can also be returned for other reasons, check message
+    expect(response.json()).toEqual({
+      message: "Invalid reset token.",
+    });
     expect(response.statusCode).toBe(400);
   });
 
@@ -118,6 +134,10 @@ describe("POST /auth/reset-password", () => {
       payload: { token: "not-a-valid-jwt", newPassword: "newpass123456" },
     });
 
+    // Since 400 can also be returned for other reasons, check message
+    expect(response.json()).toEqual({
+      message: "Invalid reset token.",
+    });
     expect(response.statusCode).toBe(400);
   });
 
@@ -195,6 +215,10 @@ describe("POST /auth/password-change", () => {
       payload: { password: "wrongpass", newPassword: "newpass123456" },
     });
 
+    // Since 400 can also be returned for other reasons, check message
+    expect(response.json()).toEqual({
+      message: "Current password is incorrect.",
+    });
     expect(response.statusCode).toBe(400);
   });
 
