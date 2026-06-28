@@ -9,6 +9,7 @@ import {
 } from "../../config/constants";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
+import { responseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
   changePasswordSchema,
@@ -246,10 +247,7 @@ async function authRoutes(
     {
       schema: {
         body: requestResetSchema,
-        response: {
-          200: messageResponseSchema,
-          ...responseErrors,
-        },
+        response: responseSchema(""),
       },
     },
     async (request, reply) => {
@@ -282,10 +280,7 @@ async function authRoutes(
     {
       schema: {
         body: resetPasswordSchema,
-        response: {
-          200: messageResponseSchema,
-          ...responseErrors,
-        },
+        response: responseSchema(""),
       },
     },
     async (request, reply) => {
@@ -330,10 +325,7 @@ async function authRoutes(
       onRequest: [fastify.authenticate()],
       schema: {
         body: changePasswordSchema,
-        response: {
-          200: messageResponseSchema,
-          ...responseErrors,
-        },
+        response: responseSchema(""),
       },
     },
     async (request, reply) => {
