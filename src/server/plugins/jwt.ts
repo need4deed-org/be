@@ -4,6 +4,7 @@ import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
 import {
   BadRequestError,
+  BaseError,
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../config";
@@ -40,7 +41,6 @@ async function jwtPlugin(
         try {
           await request.jwtVerify();
         } catch {
-          reply.status(401);
           throw new UnauthenticatedError("Authorization failed.");
         }
 
@@ -57,7 +57,6 @@ async function jwtPlugin(
         });
 
         if (!user) {
-          reply.status(404);
           throw new BadRequestError("User not found.");
         }
 
@@ -81,23 +80,26 @@ async function jwtPlugin(
         );
 
         if (role && role !== user.role) {
-          reply.status(403);
           throw new UnauthorizedError("Permission denied");
         }
 
         if (allowSelf) {
           const requestParamId = (request.params as { id?: string }).id;
           if (String(userId) !== requestParamId) {
-            reply.status(403);
             throw new UnauthorizedError("Permission denied");
           }
         }
       } catch (error) {
         logger.warn(`JWT verification failed: ${error.message}`); // Log the warning
-        reply.send({
-          message: `Authentication failed: ${error.message}`,
-          error: error.message,
-        });
+
+        if (error instanceof BaseError) {
+          throw error;
+        } else {
+          reply.send({
+            message: `Authentication failed: ${error.message}`,
+            error: error.message,
+          });
+        }
       }
     };
   });
