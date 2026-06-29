@@ -51,6 +51,9 @@ async function authRoutes(
       },
     },
     async (request, reply) => {
+      reply.clearCookie(accessCookieName, cookieOptions);
+      reply.clearCookie(refreshCookieName, cookieOptions);
+
       const { email, password } = request.body;
 
       if (!email || !password) {
