@@ -82,9 +82,16 @@ export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
   "https://app.need4deed.org/verify-email";
 
+export const urlPasswordReset =
+  process.env.URL_PASSWORD_RESET || "https://app.need4deed.org/reset-password";
+
 // CDN manifest (per-locale subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
+
+// CDN manifest (per-locale subject + html/text) for the password reset email.
+export const emailPasswordResetManifestUrl =
+  CDNBaseUrl + "/emails/password-reset.json";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
@@ -95,6 +102,7 @@ export const emailTemplateFetchTimeoutMs =
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24h in milliseconds
+export const RESET_LIFESPAN_MS = 60 * 60 * 1000; // 60 minutes in milliseconds
 export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 
 export const accessCookieName = "access";

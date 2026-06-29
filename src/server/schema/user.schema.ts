@@ -133,3 +133,33 @@ export const userResponseSchemaIncludePerson = {
     "person",
   ],
 };
+
+export const messageResponseSchema = {
+  type: "object",
+  properties: { message: { type: "string" } },
+  required: ["message"],
+};
+
+export const requestResetSchema = {
+  type: "object",
+  properties: { email: { type: "string", format: "email" } },
+  required: ["email"],
+};
+
+export const resetPasswordSchema = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+    newPassword: { type: "string", minLength: 8, maxLength: 50 },
+  },
+  required: ["token", "newPassword"],
+};
+
+export const changePasswordSchema = {
+  type: "object",
+  properties: {
+    password: { type: "string" },
+    newPassword: { type: "string", minLength: 8, maxLength: 50 },
+  },
+  required: ["password", "newPassword"],
+};

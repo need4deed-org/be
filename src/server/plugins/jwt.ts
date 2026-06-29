@@ -1,7 +1,8 @@
 import fastifyJwt from "@fastify/jwt";
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { FastifyInstance, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
+import { UnauthenticatedError, UnauthorizedError } from "../../config";
 import { accessCookieName, cookieOptions } from "../../config/constants";
 import logger from "../../logger";
 import { AuthOptions } from "../types";
@@ -19,7 +20,7 @@ async function jwtPlugin(
   });
 
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
-    return async function (request: FastifyRequest, reply: FastifyReply) {
+    return async function (request: FastifyRequest) {
       logger.debug(
         `jwtPlugin:authenticate called with request.routeOptions.config: ${JSON.stringify(request.routeOptions.config)}`,
       );
@@ -32,67 +33,50 @@ async function jwtPlugin(
       }
 
       try {
-        try {
-          await request.jwtVerify();
-        } catch (_error) {
-          reply.status(401);
-          throw new Error("Authorization failed.");
-        }
+        await request.jwtVerify();
+      } catch {
+        throw new UnauthenticatedError("Authorization failed.");
+      }
 
-        const userId = request.user?.id;
-        logger.debug(`jwtPlugin:authenticated: ${userId}`);
+      const userId = request.user?.id;
+      logger.debug(`jwtPlugin:authenticated: ${userId}`);
 
-        const userRepository = fastify.db.userRepository;
-        if (!userRepository) {
-          throw new Error("User repository is not initialized.");
-        }
+      const userRepository = fastify.db.userRepository;
+      const user = await userRepository.findOne({
+        where: { id: userId },
+      });
 
-        const user = await userRepository.findOne({
-          where: { id: userId },
-        });
+      if (!user) {
+        throw new UnauthorizedError("User not found.");
+      }
 
-        if (!user) {
-          reply.status(404);
-          throw new Error("User not found.");
-        }
+      // Expose the already-loaded user (carries personId + DB-authoritative
+      // role) for downstream hooks (PII masking, self-auth) — avoids a second
+      // lookup and a JWT claim.
+      request.authUser = user;
 
-        // Expose the already-loaded user (carries personId + DB-authoritative
-        // role) for downstream hooks (PII masking, self-auth) — avoids a second
-        // lookup and a JWT claim.
-        request.authUser = user;
-
-        if (user.role === UserRole.ADMIN) {
-          logger.debug(
-            `Admin user ${userId} authenticated, bypassing further checks.`,
-          );
-          reply.status(200);
-          return;
-        }
-
-        const { role, allowSelf } = opt || {};
-
+      if (user.role === UserRole.ADMIN) {
         logger.debug(
-          `authenticate role:${role}, allowSelf:${allowSelf}, userId:${userId}`,
+          `Admin user ${userId} authenticated, bypassing further checks.`,
         );
+        return;
+      }
 
-        if (role && role !== user.role) {
-          reply.status(403);
-          throw new Error("Permission denied");
-        }
+      const { role, allowSelf } = opt || {};
 
-        if (allowSelf) {
-          const requestParamId = (request.params as { id?: string }).id;
-          if (String(userId) !== requestParamId) {
-            reply.status(403);
-            throw new Error("Permission denied");
-          }
+      logger.debug(
+        `authenticate role:${role}, allowSelf:${allowSelf}, userId:${userId}`,
+      );
+
+      if (role && role !== user.role) {
+        throw new UnauthorizedError("Permission denied");
+      }
+
+      if (allowSelf) {
+        const requestParamId = (request.params as { id?: string }).id;
+        if (String(userId) !== requestParamId) {
+          throw new UnauthorizedError("Permission denied");
         }
-      } catch (error) {
-        logger.warn(`JWT verification failed: ${error.message}`); // Log the warning
-        reply.send({
-          message: `Authentication failed: ${error.message}`,
-          error: error.message,
-        });
       }
     };
   });

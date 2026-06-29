@@ -7,15 +7,21 @@ import {
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../config/constants";
+import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
+import { responseSchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
+  changePasswordSchema,
+  messageResponseSchema,
   refreshAccessResponseSchema,
   refreshAccessSchema,
+  requestResetSchema,
+  resetPasswordSchema,
   userLoginResponseSchema,
   userLoginSchema,
 } from "../schema/user.schema";
-import { RoutePrefix } from "../types";
+import { ReplyMessage, RoutePrefix } from "../types";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -216,11 +222,7 @@ async function authRoutes(
     {
       schema: {
         response: {
-          200: {
-            type: "object",
-            properties: { message: { type: "string" } },
-            required: ["message"],
-          },
+          200: messageResponseSchema,
           ...responseErrors,
         },
       },
@@ -234,6 +236,116 @@ async function authRoutes(
       reply.clearCookie(refreshCookieName, cookieOptions);
 
       return reply.status(200).send({ message: "Logout successful." });
+    },
+  );
+
+  fastify.post<{
+    Body: { email: string };
+    Reply: ReplyMessage;
+  }>(
+    prefixedPath + RoutePrefix.REQUEST_RESET,
+    {
+      schema: {
+        body: requestResetSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { email } = request.body;
+
+      const user = await fastify.db.userRepository.findOne({
+        where: { email },
+      });
+
+      if (user?.isActive) {
+        fastify.notify.passwordReset(user).catch((err) => {
+          logger.error(
+            `Failed to send password reset for user ${user.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
+      }
+
+      return reply.status(200).send({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+    },
+  );
+
+  fastify.post<{
+    Body: { token: string; newPassword: string };
+    Reply: ReplyMessage;
+  }>(
+    prefixedPath + RoutePrefix.RESET_PASSWORD,
+    {
+      schema: {
+        body: resetPasswordSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { token, newPassword } = request.body;
+      const TOKEN_ERROR_MESSAGE = "Invalid reset token.";
+
+      let payload: { id: number; email: string; type?: string };
+      try {
+        payload = await fastify.jwt.verify(token);
+      } catch {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+      }
+
+      if (payload.type !== "reset") {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+      }
+
+      const user = await fastify.db.userRepository.findOne({
+        where: { id: payload.id },
+      });
+      if (!user) {
+        return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
+      }
+
+      await fastify.db.userRepository.update(
+        { id: user.id },
+        { password: await hashPassword(newPassword) },
+      );
+
+      return reply.status(200).send({
+        message: "Password has been reset.",
+      });
+    },
+  );
+
+  fastify.post<{
+    Body: { password: string; newPassword: string };
+    Reply: ReplyMessage;
+  }>(
+    prefixedPath + RoutePrefix.CHANGE_PASSWORD,
+    {
+      onRequest: [fastify.authenticate()],
+      schema: {
+        body: changePasswordSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { password, newPassword } = request.body;
+      const authUser = request.authUser!;
+
+      if (!(await authUser.checkPassword(password))) {
+        return reply
+          .status(400)
+          .send({ message: "Current password is incorrect." });
+      }
+
+      await fastify.db.userRepository.update(
+        { id: authUser.id },
+        { password: await hashPassword(newPassword) },
+      );
+
+      return reply.status(200).send({
+        message: "Password has been changed.",
+      });
     },
   );
 }
