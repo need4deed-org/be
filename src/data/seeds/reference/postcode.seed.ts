@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
-import { seedPLZFile } from "../../config/constants";
-import logger from "../../logger";
-import Postcode from "../entity/location/postcode.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedPLZFile } from "../../../config/constants";
+import logger from "../../../logger";
+import Postcode from "../../entity/location/postcode.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface PLZJSON {
   plz: string;

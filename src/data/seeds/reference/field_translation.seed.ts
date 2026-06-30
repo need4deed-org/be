@@ -6,16 +6,16 @@ import {
   seedLanguageInUseFile,
   seedLeadFromFile,
   seedSkillFile,
-} from "../../config/constants";
-import logger from "../../logger";
-import FieldTranslation from "../entity/field_translation.entity";
-import LeadFrom from "../entity/lead.entity";
-import Activity from "../entity/profile/activity.entity";
-import Category from "../entity/profile/category.entity";
-import Language from "../entity/profile/language.entity";
-import Skill from "../entity/profile/skill.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+} from "../../../config/constants";
+import logger from "../../../logger";
+import FieldTranslation from "../../entity/field_translation.entity";
+import LeadFrom from "../../entity/lead.entity";
+import Activity from "../../entity/profile/activity.entity";
+import Category from "../../entity/profile/category.entity";
+import Language from "../../entity/profile/language.entity";
+import Skill from "../../entity/profile/skill.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 const fieldNameTitle = "title";
 const fieldNameDescription = "description";

@@ -68,6 +68,7 @@
     "test:watch": "yarn test --watch",
     "test:coverage": "yarn test --coverage",
     "test:ui": "yarn test --ui",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "prepare": "husky",
     "what": "./get-json-field-value.sh package.json"
   },
