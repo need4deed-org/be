@@ -6,7 +6,10 @@ import {
 } from "need4deed-sdk";
 import { In, LessThan } from "typeorm";
 import logger from "../../logger";
-import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import {
+  buildLastSentMap,
+  logEmailCommunication,
+} from "../../server/utils/data/log-email-communication";
 import { monthsAgo } from "./german-holidays";
 
 export async function scanRegularUpdate(
@@ -31,20 +34,11 @@ export async function scanRegularUpdate(
     return;
   }
 
-  const sentComms = await fastify.db.communicationRepository.find({
-    where: {
-      opportunityId: In(opps.map((o) => o.id)),
-      communicationType: CommunicationType.OPPORTUNITY_UPDATED,
-    },
-    select: ["opportunityId", "date"],
-  });
-  const lastSentMap = new Map<number, Date>();
-  for (const c of sentComms) {
-    const prev = lastSentMap.get(c.opportunityId!);
-    if (!prev || c.date > prev) {
-      lastSentMap.set(c.opportunityId!, c.date);
-    }
-  }
+  const lastSentMap = await buildLastSentMap(
+    fastify.db.communicationRepository,
+    opps.map((o) => o.id),
+    CommunicationType.OPPORTUNITY_UPDATED,
+  );
 
   for (const opp of opps) {
     try {

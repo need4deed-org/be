@@ -70,6 +70,46 @@ import {
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
+async function sendNewOpportunityEmail(
+  fastify: FastifyInstance,
+  id: number,
+  relations: string[],
+  notifyFn: (opp: Opportunity) => Promise<void>,
+  label: string,
+): Promise<void> {
+  const opp = await fastify.db.opportunityRepository.findOne({
+    where: { id },
+    relations,
+  });
+  if (!opp) {
+    return;
+  }
+  const alreadySent = await fastify.db.communicationRepository.findOne({
+    where: {
+      opportunityId: id,
+      communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
+    },
+  });
+  if (alreadySent) {
+    return;
+  }
+  const comm = await logEmailCommunication(
+    fastify.db.communicationRepository,
+    CommunicationType.OPPORTUNITY_CONFIRMATION,
+    { opportunityId: id },
+  );
+  try {
+    await notifyFn(opp);
+  } catch (sendErr) {
+    await fastify.db.communicationRepository.remove(comm).catch((removeErr) => {
+      logger.error(
+        `${label} dedup rollback failed (opp ${id}, comm ${comm.id}): ${removeErr}`,
+      );
+    });
+    throw sendErr;
+  }
+}
+
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -347,79 +387,35 @@ export default async function opportunityRoutes(
       if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
         (async () => {
           try {
-            const opp = await fastify.db.opportunityRepository.findOne({
-              where: { id },
-              relations: ["contactPerson", "contactPerson.users"],
-            });
-            if (!opp) {
-              return;
-            }
-            const alreadySent =
-              await fastify.db.communicationRepository.findOne({
-                where: {
-                  opportunityId: id,
-                  communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
-                },
-              });
-            if (alreadySent) {
-              return;
-            }
-            const comm = await logEmailCommunication(
-              fastify.db.communicationRepository,
-              CommunicationType.OPPORTUNITY_CONFIRMATION,
-              { opportunityId: id },
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              ["contactPerson", "contactPerson.users"],
+              (opp) => fastify.notify.emailNewRegular(opp),
+              "emailNewRegular",
             );
-            try {
-              await fastify.notify.emailNewRegular(opp);
-            } catch (sendErr) {
-              await fastify.db.communicationRepository.remove(comm);
-              throw sendErr;
-            }
           } catch (err) {
             logger.error(
               `emailNewRegular side-effect failed (opp ${id}): ${err}`,
             );
           }
         })();
-      }
-
-      if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
+      } else if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
         (async () => {
           try {
-            const opp = await fastify.db.opportunityRepository.findOne({
-              where: { id },
-              relations: [
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              [
                 "accompanying",
                 "accompanying.postcode",
                 "contactPerson",
                 "contactPerson.users",
                 "district",
               ],
-            });
-            if (!opp) {
-              return;
-            }
-            const alreadySent =
-              await fastify.db.communicationRepository.findOne({
-                where: {
-                  opportunityId: id,
-                  communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
-                },
-              });
-            if (alreadySent) {
-              return;
-            }
-            const comm = await logEmailCommunication(
-              fastify.db.communicationRepository,
-              CommunicationType.OPPORTUNITY_CONFIRMATION,
-              { opportunityId: id },
+              (opp) => fastify.notify.emailNewAccompanying(opp),
+              "emailNewAccompanying",
             );
-            try {
-              await fastify.notify.emailNewAccompanying(opp);
-            } catch (sendErr) {
-              await fastify.db.communicationRepository.remove(comm);
-              throw sendErr;
-            }
           } catch (err) {
             logger.error(
               `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,

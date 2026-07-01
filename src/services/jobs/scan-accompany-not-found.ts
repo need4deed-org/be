@@ -7,7 +7,10 @@ import {
 } from "need4deed-sdk";
 import { Between, In } from "typeorm";
 import logger from "../../logger";
-import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import {
+  buildLastSentMap,
+  logEmailCommunication,
+} from "../../server/utils/data/log-email-communication";
 import {
   addWorkingDays,
   berlinDayBoundaries,
@@ -47,31 +50,23 @@ export async function scanAccompanyNotFound(
       ),
   );
 
-  if (!candidates.length) {return;}
-
-  // Fix 10: bulk dedup query — one DB round-trip instead of N per-item findOne calls.
-  const sentComms = await fastify.db.communicationRepository.find({
-    where: {
-      opportunityId: In(candidates.map((c) => c.id)),
-      communicationType: CommunicationType.ACCOMPANYING_NOT_FOUND,
-    },
-    select: ["opportunityId", "date"],
-  });
-  // Fix 6: dedup only suppresses if the email was sent AFTER the last opportunity
-  // update — allows re-notification when a match falls through (bumps updatedAt).
-  const lastSentMap = new Map<number, Date>();
-  for (const c of sentComms) {
-    const prev = lastSentMap.get(c.opportunityId!);
-    if (!prev || c.date > prev) {lastSentMap.set(c.opportunityId!, c.date);}
+  if (!candidates.length) {
+    return;
   }
+
+  const lastSentMap = await buildLastSentMap(
+    fastify.db.communicationRepository,
+    candidates.map((c) => c.id),
+    CommunicationType.ACCOMPANYING_NOT_FOUND,
+  );
 
   for (const opp of candidates) {
     try {
       const lastSent = lastSentMap.get(opp.id);
-      if (lastSent && lastSent > opp.updatedAt) {continue;}
+      if (lastSent && lastSent > opp.updatedAt) {
+        continue;
+      }
 
-      // Fix 4: log before send; remove the dedup record on send failure so the
-      // next run can retry rather than being permanently suppressed.
       const comm = await logEmailCommunication(
         fastify.db.communicationRepository,
         CommunicationType.ACCOMPANYING_NOT_FOUND,
