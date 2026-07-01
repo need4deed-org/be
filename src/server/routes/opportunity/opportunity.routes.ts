@@ -5,6 +5,7 @@ import {
   CommunicationType,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
+  OpportunityLegacyType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -325,7 +326,7 @@ export default async function opportunityRoutes(
         agent.address?.postcode?.value,
       );
       opportunity.accompanying =
-        body.opportunity_type === "accompanying"
+        body.opportunity_type === OpportunityLegacyType.ACCOMPANYING
           ? await accompanyingParserOpportunity(legacyBody)
           : undefined;
 
@@ -343,7 +344,7 @@ export default async function opportunityRoutes(
         getOpportunityNotificationText(opportunity.title),
       );
 
-      if (body.opportunity_type === "volunteering") {
+      if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
         const opp = await fastify.db.opportunityRepository.findOne({
           where: { id },
           relations: ["contactPerson", "contactPerson.users"],
@@ -366,7 +367,7 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (body.opportunity_type === "accompanying") {
+      if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
         const opp = await fastify.db.opportunityRepository.findOne({
           where: { id },
           relations: [
