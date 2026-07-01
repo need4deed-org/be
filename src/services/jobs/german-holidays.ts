@@ -61,6 +61,18 @@ export function addWorkingDays(from: Date, days: number): Date {
   return result;
 }
 
+// Returns a Date n calendar months before now, clamping the day to the last
+// day of the target month to avoid setMonth overflow (e.g. Apr 30 - 2 months
+// should be Feb 28, not Mar 2).
+export function monthsAgo(n: number): Date {
+  const now = new Date();
+  const targetMonth = now.getMonth() - n;
+  const y = now.getFullYear() + Math.floor(targetMonth / 12);
+  const m = ((targetMonth % 12) + 12) % 12;
+  const maxDay = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(now.getDate(), maxDay));
+}
+
 export function berlinToday(): Date {
   const s = new Date().toLocaleDateString("sv-SE", {
     timeZone: "Europe/Berlin",

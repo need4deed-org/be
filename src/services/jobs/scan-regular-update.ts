@@ -2,21 +2,21 @@ import { FastifyInstance } from "fastify";
 import {
   CommunicationType,
   OpportunityStatusType,
-  ProfileVolunteeringType,
+  OpportunityType,
 } from "need4deed-sdk";
-import { In, LessThan, MoreThan } from "typeorm";
+import { In, LessThan } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import { monthsAgo } from "./german-holidays";
 
 export async function scanRegularUpdate(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const twoMonthsAgo = new Date();
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+  const twoMonthsAgo = monthsAgo(2);
 
   const opps = await fastify.db.opportunityRepository.find({
     where: {
-      type: ProfileVolunteeringType.REGULAR as never,
+      type: OpportunityType.REGULAR as never,
       status: In([
         OpportunityStatusType.NEW,
         OpportunityStatusType.SEARCHING,
@@ -33,19 +33,23 @@ export async function scanRegularUpdate(
         where: {
           opportunityId: opp.id,
           communicationType: CommunicationType.OPPORTUNITY_UPDATED,
-          date: MoreThan(opp.updatedAt),
         },
       });
       if (alreadySent) {
         continue;
       }
 
-      await fastify.notify.emailRegularUpdate(opp);
-      await logEmailCommunication(
+      const comm = await logEmailCommunication(
         fastify.db.communicationRepository,
         CommunicationType.OPPORTUNITY_UPDATED,
         { opportunityId: opp.id },
       );
+      try {
+        await fastify.notify.emailRegularUpdate(opp);
+      } catch (sendErr) {
+        await fastify.db.communicationRepository.remove(comm);
+        throw sendErr;
+      }
     } catch (err) {
       logger.error(`scanRegularUpdate: opp ${opp.id} failed: ${err}`);
     }

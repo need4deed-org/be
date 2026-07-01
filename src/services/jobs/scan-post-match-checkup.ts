@@ -4,15 +4,15 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { LessThan, MoreThan } from "typeorm";
+import { LessThan } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import { monthsAgo } from "./german-holidays";
 
 export async function scanPostMatchCheckup(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const twoMonthsAgo = new Date();
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+  const twoMonthsAgo = monthsAgo(2);
 
   const ovs = await fastify.db.opportunityVolunteerRepository.find({
     where: {
@@ -30,19 +30,23 @@ export async function scanPostMatchCheckup(
           volunteerId: ov.volunteerId,
           opportunityId: ov.opportunityId,
           communicationType: CommunicationType.POST_FOLLOWUP,
-          date: MoreThan(ov.updatedAt),
         },
       });
       if (alreadySent) {
         continue;
       }
 
-      await fastify.notify.emailPostMatchCheckup(ov);
-      await logEmailCommunication(
+      const comm = await logEmailCommunication(
         fastify.db.communicationRepository,
         CommunicationType.POST_FOLLOWUP,
         { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
       );
+      try {
+        await fastify.notify.emailPostMatchCheckup(ov);
+      } catch (sendErr) {
+        await fastify.db.communicationRepository.remove(comm);
+        throw sendErr;
+      }
     } catch (err) {
       logger.error(`scanPostMatchCheckup: ov ${ov.id} failed: ${err}`);
     }

@@ -4,15 +4,15 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { LessThan, MoreThan } from "typeorm";
+import { LessThan } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import { monthsAgo } from "./german-holidays";
 
 export async function scanStalePending(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const twoMonthsAgo = new Date();
-  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+  const twoMonthsAgo = monthsAgo(2);
 
   const ovs = await fastify.db.opportunityVolunteerRepository.find({
     where: {
@@ -30,19 +30,23 @@ export async function scanStalePending(
           volunteerId: ov.volunteerId,
           opportunityId: ov.opportunityId,
           communicationType: CommunicationType.STATUS_UPDATE,
-          date: MoreThan(ov.updatedAt),
         },
       });
       if (alreadySent) {
         continue;
       }
 
-      await fastify.notify.emailStale(ov);
-      await logEmailCommunication(
+      const comm = await logEmailCommunication(
         fastify.db.communicationRepository,
         CommunicationType.STATUS_UPDATE,
         { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
       );
+      try {
+        await fastify.notify.emailStale(ov);
+      } catch (sendErr) {
+        await fastify.db.communicationRepository.remove(comm);
+        throw sendErr;
+      }
     } catch (err) {
       logger.error(`scanStalePending: ov ${ov.id} failed: ${err}`);
     }
