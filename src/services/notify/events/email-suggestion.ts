@@ -4,7 +4,6 @@ import {
   emailSuggestionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import logger from "../../../logger";
 import { getTitles } from "../../dto/utils";
 import {
   createManifestLoader,
@@ -38,10 +37,9 @@ export async function sendEmailSuggestion(
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailSuggestion: missing email for volunteer ${ov.volunteerId}`,
     );
-    return;
   }
 
   const volunteerName = ov.volunteer.person.name;

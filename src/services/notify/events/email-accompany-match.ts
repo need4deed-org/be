@@ -4,7 +4,6 @@ import {
   emailFromContact,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import logger from "../../../logger";
 import { getLanguages } from "../../dto/utils";
 import {
   createManifestLoader,
@@ -57,18 +56,16 @@ export async function sendEmailAccompanyMatch(
 ): Promise<void> {
   const contactPersonEmail = ov.opportunity?.contactPerson?.email;
   if (!contactPersonEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailAccompanyMatch: missing contact email for opportunity ${ov.opportunityId}`,
     );
-    return;
   }
 
   const volunteer = ov.volunteer;
   if (!volunteer?.person) {
-    logger.warn(
+    throw new Error(
       `sendEmailAccompanyMatch: missing volunteer or person relation for ov ${ov.id}`,
     );
-    return;
   }
 
   const opportunity = ov.opportunity;

@@ -5,7 +5,6 @@ import {
   emailIntroductionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import logger from "../../../logger";
 import { getLanguages, getOptionItems, getTitles } from "../../dto/utils";
 import {
   createManifestLoader,
@@ -88,10 +87,9 @@ export async function sendEmailIntroduction(
   const contactPersonEmail = ov.opportunity?.contactPerson?.email;
 
   if (!volunteerEmail || !contactPersonEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailIntroduction: missing email(s) for ov ${ov.id} (volunteer=${volunteerEmail}, contact=${contactPersonEmail})`,
     );
-    return;
   }
 
   const volunteer = ov.volunteer;
@@ -120,7 +118,9 @@ export async function sendEmailIntroduction(
 
   const agentAddress = (() => {
     const addr = opportunity.agent?.address;
-    if (!addr) {return "";}
+    if (!addr) {
+      return "";
+    }
     return [addr.street, addr.postcode?.value, addr.city]
       .filter(Boolean)
       .join(", ");

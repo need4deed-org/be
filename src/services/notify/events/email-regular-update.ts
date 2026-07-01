@@ -4,7 +4,6 @@ import {
   emailRegularUpdateManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import logger from "../../../logger";
 import {
   createManifestLoader,
   fillTemplate,
@@ -37,10 +36,9 @@ export async function sendEmailRegularUpdate(
 ): Promise<void> {
   const contactPersonEmail = opportunity.contactPerson?.email;
   if (!contactPersonEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailRegularUpdate: missing contact email for opportunity ${opportunity.id}`,
     );
-    return;
   }
 
   const contactpersonName = opportunity.contactPerson!.name;

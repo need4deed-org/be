@@ -38,6 +38,17 @@ export class CommunicationNullableFksAndOpportunityRelation1782903516653
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remove rows that cannot survive the rollback:
+    // (a) rows whose communication_type is one of the 5 new enum values added in up() —
+    //     the USING cast to the old enum would throw 'invalid input value for enum'.
+    // (b) rows where only opportunity_id is set (volunteer_id = NULL, agent_id = NULL) —
+    //     after opportunity_id is dropped, those rows would violate the restored CHECK (sum = 1).
+    await queryRunner.query(
+      `DELETE FROM "communication" WHERE "communication_type" IN ('matched','accompanying-not-found','accompanying-matched','opportunity-updated','opportunity-confirmation')`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "communication" WHERE "volunteer_id" IS NULL AND "agent_id" IS NULL`,
+    );
     await queryRunner.query(
       `ALTER TABLE "communication" DROP CONSTRAINT "FK_73aa11f1d453a65ba3cebda85fb"`,
     );

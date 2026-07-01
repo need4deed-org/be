@@ -108,7 +108,10 @@ export default async function m2mOpportunityVolunteerRoutes(
                 await logEmailCommunication(
                   commRepo,
                   CommunicationType.FIRST_INQUIRY,
-                  { volunteerId: ov.volunteerId },
+                  {
+                    volunteerId: ov.volunteerId,
+                    opportunityId: ov.opportunityId,
+                  },
                 );
               } catch (err) {
                 logger.error(

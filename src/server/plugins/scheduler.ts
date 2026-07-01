@@ -17,27 +17,30 @@ import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 const SCHEDULER_LOCK_ID = 20240701;
 
 async function runWithAdvisoryLock(fn: () => Promise<void>): Promise<void> {
-  // Acquire and release the lock on the same pool connection.
-  // pg_try_advisory_lock is session-level: releasing it from a different
-  // connection is a no-op, so both queries must share a QueryRunner.
+  // Use a transaction-level advisory lock (pg_try_advisory_xact_lock) so the
+  // lock is released automatically at commit/rollback — no explicit unlock
+  // needed. This avoids the session-level pitfall where pg_advisory_unlock
+  // could fail and leave the connection holding the lock in the pool.
   const qr = dataSource.createQueryRunner();
   await qr.connect();
+  await qr.startTransaction();
   try {
     const [row] = await qr.query(
-      "SELECT pg_try_advisory_lock($1) AS acquired",
+      "SELECT pg_try_advisory_xact_lock($1) AS acquired",
       [SCHEDULER_LOCK_ID],
     );
     if (!row?.acquired) {
       logger.debug(
         "scheduler: advisory lock held by another instance — skipping",
       );
+      await qr.rollbackTransaction();
       return;
     }
-    try {
-      await fn();
-    } finally {
-      await qr.query("SELECT pg_advisory_unlock($1)", [SCHEDULER_LOCK_ID]);
-    }
+    await fn();
+    await qr.commitTransaction();
+  } catch (err) {
+    await qr.rollbackTransaction();
+    throw err;
   } finally {
     await qr.release();
   }

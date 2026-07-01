@@ -4,7 +4,6 @@ import {
   emailStaleManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import logger from "../../../logger";
 import {
   createManifestLoader,
   fillTemplate,
@@ -37,10 +36,9 @@ export async function sendEmailStale(
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailStale: missing email for volunteer ${ov.volunteerId}`,
     );
-    return;
   }
 
   const volunteerName = ov.volunteer.person.name;

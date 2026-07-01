@@ -79,16 +79,36 @@ export function berlinDayBoundaries(berlinDate: Date): {
   const y = berlinDate.getFullYear();
   const m = berlinDate.getMonth();
   const d = berlinDate.getDate();
-  // Use noon UTC as a reference point to measure the Berlin offset for this day.
-  // DST transitions happen at 02:00 in Europe, so noon is always unambiguous.
+  // Sample the Berlin UTC offset at noon on the target day.
+  // DST transitions happen at 02:00 in Europe, so noon is always post-transition.
+  // We use formatToParts (not toLocaleString + new Date()) because toLocaleString
+  // + new Date() parsing is implementation-defined and produces wrong offsets on
+  // non-UTC developer machines. formatToParts extracts numeric field values
+  // independently of the process local timezone.
   const noonUTC = new Date(Date.UTC(y, m, d, 12));
-  // toLocaleString renders Berlin wall-clock time as a string; parsing it back
-  // without a timezone treats it as local (= UTC on AWS). The difference gives
-  // the Berlin offset in milliseconds (e.g. +3600000 for UTC+1, +7200000 for UTC+2).
-  const berlinOffsetMs =
-    new Date(
-      noonUTC.toLocaleString("en-US", { timeZone: "Europe/Berlin" }),
-    ).getTime() - noonUTC.getTime();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(noonUTC);
+  const get = (type: string) =>
+    parseInt(parts.find((p) => p.type === type)!.value, 10);
+  // Treating the Berlin wall-clock values as UTC gives us a timestamp we can
+  // subtract from noonUTC to obtain the Berlin UTC offset in milliseconds.
+  const berlinNoonAsUTC = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") === 24 ? 0 : get("hour"),
+    get("minute"),
+    get("second"),
+  );
+  const berlinOffsetMs = berlinNoonAsUTC - noonUTC.getTime();
   return {
     startOfDay: new Date(Date.UTC(y, m, d, 0) - berlinOffsetMs),
     endOfDay: new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - berlinOffsetMs),

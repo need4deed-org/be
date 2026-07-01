@@ -4,7 +4,6 @@ import {
   emailNewAccompanyingManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import logger from "../../../logger";
 import {
   createManifestLoader,
   fillTemplate,
@@ -39,10 +38,9 @@ export async function sendEmailNewAccompanying(
 ): Promise<void> {
   const contactPersonEmail = opportunity.contactPerson?.email;
   if (!contactPersonEmail) {
-    logger.warn(
+    throw new Error(
       `sendEmailNewAccompanying: missing contact email for opportunity ${opportunity.id}`,
     );
-    return;
   }
 
   const accompanying = opportunity.accompanying;
