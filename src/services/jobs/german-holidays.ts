@@ -68,3 +68,29 @@ export function berlinToday(): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
+
+// Returns UTC timestamps for the start and end of the given Berlin calendar day.
+// Necessary because Node.js `new Date(y, m, d)` uses the process-local timezone
+// (UTC on AWS), so it would not correctly represent Berlin midnight.
+export function berlinDayBoundaries(berlinDate: Date): {
+  startOfDay: Date;
+  endOfDay: Date;
+} {
+  const y = berlinDate.getFullYear();
+  const m = berlinDate.getMonth();
+  const d = berlinDate.getDate();
+  // Use noon UTC as a reference point to measure the Berlin offset for this day.
+  // DST transitions happen at 02:00 in Europe, so noon is always unambiguous.
+  const noonUTC = new Date(Date.UTC(y, m, d, 12));
+  // toLocaleString renders Berlin wall-clock time as a string; parsing it back
+  // without a timezone treats it as local (= UTC on AWS). The difference gives
+  // the Berlin offset in milliseconds (e.g. +3600000 for UTC+1, +7200000 for UTC+2).
+  const berlinOffsetMs =
+    new Date(
+      noonUTC.toLocaleString("en-US", { timeZone: "Europe/Berlin" }),
+    ).getTime() - noonUTC.getTime();
+  return {
+    startOfDay: new Date(Date.UTC(y, m, d, 0) - berlinOffsetMs),
+    endOfDay: new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - berlinOffsetMs),
+  };
+}

@@ -28,17 +28,20 @@ export async function scanStalePending(
       const alreadySent = await fastify.db.communicationRepository.findOne({
         where: {
           volunteerId: ov.volunteerId,
+          opportunityId: ov.opportunityId,
           communicationType: CommunicationType.STATUS_UPDATE,
           date: MoreThan(ov.updatedAt),
         },
       });
-      if (alreadySent) {continue;}
+      if (alreadySent) {
+        continue;
+      }
 
       await fastify.notify.emailStale(ov);
       await logEmailCommunication(
         fastify.db.communicationRepository,
         CommunicationType.STATUS_UPDATE,
-        { volunteerId: ov.volunteerId },
+        { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
       );
     } catch (err) {
       logger.error(`scanStalePending: ov ${ov.id} failed: ${err}`);

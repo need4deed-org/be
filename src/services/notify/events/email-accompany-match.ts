@@ -64,6 +64,13 @@ export async function sendEmailAccompanyMatch(
   }
 
   const volunteer = ov.volunteer;
+  if (!volunteer?.person) {
+    logger.warn(
+      `sendEmailAccompanyMatch: missing volunteer or person relation for ov ${ov.id}`,
+    );
+    return;
+  }
+
   const opportunity = ov.opportunity;
   const accompanying = opportunity.accompanying;
 

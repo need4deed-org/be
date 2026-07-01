@@ -4,7 +4,7 @@ import {
   OpportunityStatusType,
   ProfileVolunteeringType,
 } from "need4deed-sdk";
-import { In, LessThan } from "typeorm";
+import { In, LessThan, MoreThan } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
 
@@ -22,7 +22,7 @@ export async function scanRegularUpdate(
         OpportunityStatusType.SEARCHING,
         OpportunityStatusType.ACTIVE,
       ]),
-      createdAt: LessThan(twoMonthsAgo),
+      updatedAt: LessThan(twoMonthsAgo),
     },
     relations: ["contactPerson", "contactPerson.users"],
   });
@@ -33,9 +33,12 @@ export async function scanRegularUpdate(
         where: {
           opportunityId: opp.id,
           communicationType: CommunicationType.OPPORTUNITY_UPDATED,
+          date: MoreThan(opp.updatedAt),
         },
       });
-      if (alreadySent) {continue;}
+      if (alreadySent) {
+        continue;
+      }
 
       await fastify.notify.emailRegularUpdate(opp);
       await logEmailCommunication(

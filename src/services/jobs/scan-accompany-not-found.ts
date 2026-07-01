@@ -1,38 +1,35 @@
 import { FastifyInstance } from "fastify";
 import {
   CommunicationType,
+  OpportunityStatusType,
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
 } from "need4deed-sdk";
+import { Between, In } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
-import { addWorkingDays, berlinToday } from "./german-holidays";
+import {
+  addWorkingDays,
+  berlinDayBoundaries,
+  berlinToday,
+} from "./german-holidays";
 
 export async function scanAccompanyNotFound(
   fastify: FastifyInstance,
 ): Promise<void> {
   const targetDay = addWorkingDays(berlinToday(), 4);
-  const startOfDay = new Date(
-    targetDay.getFullYear(),
-    targetDay.getMonth(),
-    targetDay.getDate(),
-    0,
-    0,
-    0,
-    0,
-  );
-  const endOfDay = new Date(
-    targetDay.getFullYear(),
-    targetDay.getMonth(),
-    targetDay.getDate(),
-    23,
-    59,
-    59,
-    999,
-  );
+  const { startOfDay, endOfDay } = berlinDayBoundaries(targetDay);
 
   const opps = await fastify.db.opportunityRepository.find({
-    where: { type: ProfileVolunteeringType.ACCOMPANYING as never },
+    where: {
+      type: ProfileVolunteeringType.ACCOMPANYING as never,
+      status: In([
+        OpportunityStatusType.NEW,
+        OpportunityStatusType.SEARCHING,
+        OpportunityStatusType.ACTIVE,
+      ]),
+      accompanying: { date: Between(startOfDay, endOfDay) },
+    },
     relations: [
       "accompanying",
       "accompanying.postcode",
@@ -43,15 +40,12 @@ export async function scanAccompanyNotFound(
     ],
   });
 
-  const candidates = opps.filter((opp) => {
-    const date = opp.accompanying?.date;
-    if (!date) {return false;}
-    const d = new Date(date);
-    if (d < startOfDay || d > endOfDay) {return false;}
-    return !opp.opportunityVolunteer?.some(
-      (ov) => ov.status === OpportunityVolunteerStatusType.MATCHED,
-    );
-  });
+  const candidates = opps.filter(
+    (opp) =>
+      !opp.opportunityVolunteer?.some(
+        (ov) => ov.status === OpportunityVolunteerStatusType.MATCHED,
+      ),
+  );
 
   for (const opp of candidates) {
     try {
@@ -61,7 +55,9 @@ export async function scanAccompanyNotFound(
           communicationType: CommunicationType.ACCOMPANYING_NOT_FOUND,
         },
       });
-      if (alreadySent) {continue;}
+      if (alreadySent) {
+        continue;
+      }
 
       await fastify.notify.emailAccompanyNotFound(opp);
       await logEmailCommunication(

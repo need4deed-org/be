@@ -62,7 +62,7 @@ export class CommunicationNullableFksAndOpportunityRelation1782903516653
     await queryRunner.query(
       `ALTER TABLE "communication" DROP COLUMN "opportunity_id"`,
     );
-    await queryRunner.query(`ALTER TABLE "communication" ADD CONSTRAINT "CHK_31faa29cb0aff6ef55be2b2146" CHECK (CHECK (((
+    await queryRunner.query(`ALTER TABLE "communication" ADD CONSTRAINT "CHK_31faa29cb0aff6ef55be2b2146" CHECK (((
 CASE
     WHEN (volunteer_id IS NOT NULL) THEN 1
     ELSE 0
@@ -70,6 +70,6 @@ END +
 CASE
     WHEN (agent_id IS NOT NULL) THEN 1
     ELSE 0
-END) = 1)))`);
+END) = 1))`);
   }
 }
