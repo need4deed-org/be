@@ -844,6 +844,11 @@
   resolved "https://registry.yarnpkg.com/@types/json5/-/json5-0.0.29.tgz#ee28707ae94e11d2b827bcbe5270bcea7f3e71ee"
   integrity sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==
 
+"@types/node-cron@^3.0.11":
+  version "3.0.11"
+  resolved "https://registry.yarnpkg.com/@types/node-cron/-/node-cron-3.0.11.tgz#70b7131f65038ae63cfe841354c8aba363632344"
+  integrity sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==
+
 "@types/node@^24.9.1":
   version "24.10.0"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-24.10.0.tgz#6b79086b0dfc54e775a34ba8114dcc4e0221f31f"
@@ -2937,10 +2942,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-need4deed-sdk@0.0.115:
-  version "0.0.115"
-  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.115.tgz#cb07ffaabbd22353e65b28e9a592a3a78b269593"
-  integrity sha512-VoOpHlSnAUgNIHrUsKPrj1L4299ze+bBFsnCLs3BP5IPL5lLN5uK1vzkT+t9rAgilb8h22HqXWlzxMAPBhoTcA==
+need4deed-sdk@0.0.116:
+  version "0.0.116"
+  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.116.tgz#4b88f6a82129f2fc663825ac3c484731876ea70b"
+  integrity sha512-XL0bI7/qEKvzukxfrCnv0WyueVXyfFbk6FyOPJYw0H86tLUVvkR4iKUOw5f0yAA21vlj6EGx5y39+7VDgsJAcQ==
 
 no-case@^3.0.4:
   version "3.0.4"
@@ -2954,6 +2959,11 @@ node-addon-api@^8.3.0:
   version "8.5.0"
   resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-8.5.0.tgz#c91b2d7682fa457d2e1c388150f0dff9aafb8f3f"
   integrity sha512-/bRZty2mXUIFY/xU5HLvveNHlswNJej+RnxBjOMkidWfwZzgTbPG1E3K5TOxRLOR+5hX7bSofy8yf1hZevMS8A==
+
+node-cron@^4.5.0:
+  version "4.5.0"
+  resolved "https://registry.yarnpkg.com/node-cron/-/node-cron-4.5.0.tgz#284908d302415a32e0774b3a8c8184d423e262a8"
+  integrity sha512-4Trh+kjvbXokyJkwQumvD5YAgeJfgHLR/sKyu71uSmxfCR5QMO1hldpvmFZOICN5pLgNY+J5Y8+ar3XKo5/4tQ==
 
 node-gyp-build@^4.8.4:
   version "4.8.4"

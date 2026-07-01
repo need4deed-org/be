@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityPatch,
+  CommunicationType,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   SortOrder,
@@ -60,6 +61,7 @@ import {
   updateOptionList,
   writeOpportunityLegacy,
 } from "../../utils";
+import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import {
   makePiiSerialization,
   maskForCaller,
@@ -340,6 +342,58 @@ export default async function opportunityRoutes(
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
       );
+
+      if (body.opportunity_type === "volunteering") {
+        const opp = await fastify.db.opportunityRepository.findOne({
+          where: { id },
+          relations: ["contactPerson", "contactPerson.users"],
+        });
+        if (opp) {
+          (async () => {
+            try {
+              await fastify.notify.emailNewRegular(opp);
+              await logEmailCommunication(
+                fastify.db.communicationRepository,
+                CommunicationType.OPPORTUNITY_CONFIRMATION,
+                { opportunityId: id },
+              );
+            } catch (err) {
+              logger.error(
+                `emailNewRegular side-effect failed (opp ${id}): ${err}`,
+              );
+            }
+          })();
+        }
+      }
+
+      if (body.opportunity_type === "accompanying") {
+        const opp = await fastify.db.opportunityRepository.findOne({
+          where: { id },
+          relations: [
+            "accompanying",
+            "accompanying.postcode",
+            "contactPerson",
+            "contactPerson.users",
+            "district",
+          ],
+        });
+        if (opp) {
+          (async () => {
+            try {
+              await fastify.notify.emailNewAccompanying(opp);
+              await logEmailCommunication(
+                fastify.db.communicationRepository,
+                CommunicationType.OPPORTUNITY_CONFIRMATION,
+                { opportunityId: id },
+              );
+            } catch (err) {
+              logger.error(
+                `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,
+              );
+            }
+          })();
+        }
+      }
 
       return reply.status(201).send({
         message: `Opportunity (${id}) created.`,

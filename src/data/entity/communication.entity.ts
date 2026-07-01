@@ -6,19 +6,22 @@ import {
 import {
   Check,
   Column,
+  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
 import Agent from "./opportunity/agent.entity";
+import Opportunity from "./opportunity/opportunity.entity";
 import User from "./user.entity";
 import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
 @Check(`
   (CASE WHEN "volunteer_id" IS NOT NULL THEN 1 ELSE 0 END +
-   CASE WHEN "agent_id" IS NOT NULL THEN 1 ELSE 0 END) = 1
+   CASE WHEN "agent_id" IS NOT NULL THEN 1 ELSE 0 END +
+   CASE WHEN "opportunity_id" IS NOT NULL THEN 1 ELSE 0 END) >= 1
 `)
 export default class Communication {
   constructor(communication?: Partial<Communication>) {
@@ -26,6 +29,7 @@ export default class Communication {
       Object.assign(this, communication);
     }
   }
+
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -38,36 +42,46 @@ export default class Communication {
   @Column({ type: "enum", enum: CommunicationType, nullable: true })
   communicationType?: CommunicationType;
 
-  @Column({ type: "timestamp" })
+  @CreateDateColumn()
   date: Date;
 
   @ManyToOne(() => Volunteer, {
-    nullable: false,
+    nullable: true,
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "volunteer_id" })
-  volunteer: Volunteer;
+  volunteer?: Volunteer;
 
   @Column({ nullable: true })
-  volunteerId: number;
+  volunteerId?: number;
 
   @ManyToOne(() => Agent, {
-    nullable: false,
+    nullable: true,
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "agent_id" })
-  agent: Agent;
+  agent?: Agent;
 
   @Column({ nullable: true })
-  agentId: number;
+  agentId?: number;
+
+  @ManyToOne(() => Opportunity, {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "opportunity_id" })
+  opportunity?: Opportunity;
+
+  @Column({ nullable: true })
+  opportunityId?: number;
 
   @ManyToOne(() => User, {
-    nullable: false,
+    nullable: true,
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "user_id" })
-  user: User;
+  user?: User;
 
   @Column({ nullable: true })
-  userId: number;
+  userId?: number;
 }

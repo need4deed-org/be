@@ -15,6 +15,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
+import Communication from "../communication.entity";
 import Deal from "../deal.entity";
 import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
@@ -130,6 +131,9 @@ export default class Opportunity {
 
   @OneToMany(() => Appreciation, (appreciation) => appreciation.opportunity)
   appreciations: Appreciation[];
+
+  @OneToMany(() => Communication, (communication) => communication.opportunity)
+  communications: Communication[];
 
   @ManyToOne(() => Person, { nullable: true })
   @JoinColumn({ name: "contact_person_id" })
