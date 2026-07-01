@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
+import { IsNull, Not } from "typeorm";
+import { dtoCommunication } from "../../../services/dto/dto-communication";
 import { idParamSchema } from "../../schema";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
@@ -31,13 +33,14 @@ export default function volunteerCommunicationRoutes(
       const communications = await communicationRepository.find({
         where: {
           volunteerId,
+          userId: Not(IsNull()),
         },
       });
 
       await maskForCaller(request, communications);
       return reply.status(200).send({
         message: `List of communications for volunteer_id:${volunteerId}`,
-        data: communications,
+        data: communications.map(dtoCommunication),
       });
     },
   );

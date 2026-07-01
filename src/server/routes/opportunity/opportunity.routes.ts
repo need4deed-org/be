@@ -345,55 +345,87 @@ export default async function opportunityRoutes(
       );
 
       if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
-        const opp = await fastify.db.opportunityRepository.findOne({
-          where: { id },
-          relations: ["contactPerson", "contactPerson.users"],
-        });
-        if (opp) {
-          (async () => {
+        (async () => {
+          try {
+            const opp = await fastify.db.opportunityRepository.findOne({
+              where: { id },
+              relations: ["contactPerson", "contactPerson.users"],
+            });
+            if (!opp) {
+              return;
+            }
+            const alreadySent =
+              await fastify.db.communicationRepository.findOne({
+                where: {
+                  opportunityId: id,
+                  communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
+                },
+              });
+            if (alreadySent) {
+              return;
+            }
+            const comm = await logEmailCommunication(
+              fastify.db.communicationRepository,
+              CommunicationType.OPPORTUNITY_CONFIRMATION,
+              { opportunityId: id },
+            );
             try {
               await fastify.notify.emailNewRegular(opp);
-              await logEmailCommunication(
-                fastify.db.communicationRepository,
-                CommunicationType.OPPORTUNITY_CONFIRMATION,
-                { opportunityId: id },
-              );
-            } catch (err) {
-              logger.error(
-                `emailNewRegular side-effect failed (opp ${id}): ${err}`,
-              );
+            } catch (sendErr) {
+              await fastify.db.communicationRepository.remove(comm);
+              throw sendErr;
             }
-          })();
-        }
+          } catch (err) {
+            logger.error(
+              `emailNewRegular side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
       }
 
       if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
-        const opp = await fastify.db.opportunityRepository.findOne({
-          where: { id },
-          relations: [
-            "accompanying",
-            "accompanying.postcode",
-            "contactPerson",
-            "contactPerson.users",
-            "district",
-          ],
-        });
-        if (opp) {
-          (async () => {
+        (async () => {
+          try {
+            const opp = await fastify.db.opportunityRepository.findOne({
+              where: { id },
+              relations: [
+                "accompanying",
+                "accompanying.postcode",
+                "contactPerson",
+                "contactPerson.users",
+                "district",
+              ],
+            });
+            if (!opp) {
+              return;
+            }
+            const alreadySent =
+              await fastify.db.communicationRepository.findOne({
+                where: {
+                  opportunityId: id,
+                  communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
+                },
+              });
+            if (alreadySent) {
+              return;
+            }
+            const comm = await logEmailCommunication(
+              fastify.db.communicationRepository,
+              CommunicationType.OPPORTUNITY_CONFIRMATION,
+              { opportunityId: id },
+            );
             try {
               await fastify.notify.emailNewAccompanying(opp);
-              await logEmailCommunication(
-                fastify.db.communicationRepository,
-                CommunicationType.OPPORTUNITY_CONFIRMATION,
-                { opportunityId: id },
-              );
-            } catch (err) {
-              logger.error(
-                `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,
-              );
+            } catch (sendErr) {
+              await fastify.db.communicationRepository.remove(comm);
+              throw sendErr;
             }
-          })();
-        }
+          } catch (err) {
+            logger.error(
+              `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
       }
 
       return reply.status(201).send({

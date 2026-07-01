@@ -27,15 +27,29 @@ export async function scanRegularUpdate(
     relations: ["contactPerson", "contactPerson.users"],
   });
 
+  if (!opps.length) {
+    return;
+  }
+
+  const sentComms = await fastify.db.communicationRepository.find({
+    where: {
+      opportunityId: In(opps.map((o) => o.id)),
+      communicationType: CommunicationType.OPPORTUNITY_UPDATED,
+    },
+    select: ["opportunityId", "date"],
+  });
+  const lastSentMap = new Map<number, Date>();
+  for (const c of sentComms) {
+    const prev = lastSentMap.get(c.opportunityId!);
+    if (!prev || c.date > prev) {
+      lastSentMap.set(c.opportunityId!, c.date);
+    }
+  }
+
   for (const opp of opps) {
     try {
-      const alreadySent = await fastify.db.communicationRepository.findOne({
-        where: {
-          opportunityId: opp.id,
-          communicationType: CommunicationType.OPPORTUNITY_UPDATED,
-        },
-      });
-      if (alreadySent) {
+      const lastSent = lastSentMap.get(opp.id);
+      if (lastSent && lastSent > opp.updatedAt) {
         continue;
       }
 

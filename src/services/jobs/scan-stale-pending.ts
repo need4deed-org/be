@@ -4,7 +4,7 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { LessThan } from "typeorm";
+import { In, LessThan } from "typeorm";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
 import { monthsAgo } from "./german-holidays";
@@ -23,16 +23,24 @@ export async function scanStalePending(
     relations: ["volunteer.person", "volunteer.person.users"],
   });
 
+  if (!ovs.length) {
+    return;
+  }
+
+  const sentComms = await fastify.db.communicationRepository.find({
+    where: {
+      volunteerId: In(ovs.map((ov) => ov.volunteerId)),
+      communicationType: CommunicationType.STATUS_UPDATE,
+    },
+    select: ["volunteerId", "opportunityId"],
+  });
+  const alreadySentSet = new Set(
+    sentComms.map((c) => `${c.volunteerId}-${c.opportunityId}`),
+  );
+
   for (const ov of ovs) {
     try {
-      const alreadySent = await fastify.db.communicationRepository.findOne({
-        where: {
-          volunteerId: ov.volunteerId,
-          opportunityId: ov.opportunityId,
-          communicationType: CommunicationType.STATUS_UPDATE,
-        },
-      });
-      if (alreadySent) {
+      if (alreadySentSet.has(`${ov.volunteerId}-${ov.opportunityId}`)) {
         continue;
       }
 

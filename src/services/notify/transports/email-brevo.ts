@@ -44,8 +44,7 @@ export class BrevoEmailTransport implements EmailTransport {
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Brevo email failed (${res.status}): ${body}`);
+      throw new Error(`Brevo email failed (${res.status})`);
     }
   }
 }
