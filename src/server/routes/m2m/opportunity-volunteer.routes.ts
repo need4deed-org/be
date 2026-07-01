@@ -93,8 +93,8 @@ export default async function m2mOpportunityVolunteerRoutes(
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {
           (async () => {
             try {
-              // Fix: findOne inside the IIFE so the handler returns 204 immediately
-              // and a DB hiccup here doesn't produce a 500 after the OV is committed.
+              // findOne inside the IIFE: handler returns 204 immediately;
+              // a DB hiccup here doesn't affect the HTTP response.
               const ov = await opportunityVolunteerRepository.findOne({
                 where: { id },
                 relations: [
@@ -105,8 +105,10 @@ export default async function m2mOpportunityVolunteerRoutes(
                   "opportunity",
                 ],
               });
-              if (!ov) {return;}
-              // Fix: dedup — skip if FIRST_INQUIRY already logged (e.g. PENDING→DECLINED→PENDING).
+              if (!ov) {
+                return;
+              }
+              // Skip if FIRST_INQUIRY already sent (e.g. PENDING→DECLINED→PENDING).
               const alreadySent = await commRepo.findOne({
                 where: {
                   volunteerId: ov.volunteerId,
@@ -114,9 +116,10 @@ export default async function m2mOpportunityVolunteerRoutes(
                   communicationType: CommunicationType.FIRST_INQUIRY,
                 },
               });
-              if (alreadySent) {return;}
-              // Fix: log before send; remove the dedup record on send failure so
-              // the next status toggle can retry.
+              if (alreadySent) {
+                return;
+              }
+              // Log before send; remove the dedup record on failure so the next toggle can retry.
               const comm = await logEmailCommunication(
                 commRepo,
                 CommunicationType.FIRST_INQUIRY,
@@ -128,7 +131,7 @@ export default async function m2mOpportunityVolunteerRoutes(
               try {
                 await fastify.notify.emailSuggestion(ov);
               } catch (sendErr) {
-                await commRepo.remove(comm);
+                await commRepo.remove(comm).catch(logger.error);
                 throw sendErr;
               }
             } catch (err) {
@@ -140,7 +143,8 @@ export default async function m2mOpportunityVolunteerRoutes(
         } else if (nextStatus === OpportunityVolunteerStatusType.MATCHED) {
           (async () => {
             try {
-              // Fix: findOne inside the IIFE — same reasoning as PENDING block above.
+              // findOne inside the IIFE: handler returns 204 immediately;
+              // a DB hiccup here doesn't affect the HTTP response.
               const ov = await opportunityVolunteerRepository.findOne({
                 where: { id },
                 relations: [
@@ -156,13 +160,15 @@ export default async function m2mOpportunityVolunteerRoutes(
                   "opportunity.district",
                 ],
               });
-              if (!ov) {return;}
+              if (!ov) {
+                return;
+              }
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
               const commType = isAccompany
                 ? CommunicationType.ACCOMPANYING_MATCHED
                 : CommunicationType.MATCHED;
-              // Fix: dedup — skip if a match email was already sent for this pair.
+              // Skip if a match email was already sent for this pair.
               const alreadySent = await commRepo.findOne({
                 where: {
                   volunteerId: ov.volunteerId,
@@ -170,9 +176,11 @@ export default async function m2mOpportunityVolunteerRoutes(
                   communicationType: commType,
                 },
               });
-              if (alreadySent) {return;}
+              if (alreadySent) {
+                return;
+              }
               if (isAccompany) {
-                // Fix: log before send + rollback on failure; include volunteerId (was missing).
+                // Log before send; remove the dedup record on failure so the next toggle can retry.
                 const comm = await logEmailCommunication(
                   commRepo,
                   CommunicationType.ACCOMPANYING_MATCHED,
@@ -184,7 +192,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                 try {
                   await fastify.notify.emailAccompanyMatch(ov);
                 } catch (sendErr) {
-                  await commRepo.remove(comm);
+                  await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
                 }
               } else {
@@ -199,7 +207,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                 try {
                   await fastify.notify.emailIntroduction(ov);
                 } catch (sendErr) {
-                  await commRepo.remove(comm);
+                  await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
                 }
               }

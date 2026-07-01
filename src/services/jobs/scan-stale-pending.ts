@@ -51,7 +51,9 @@ export async function scanStalePending(
       try {
         await fastify.notify.emailStale(ov);
       } catch (sendErr) {
-        await fastify.db.communicationRepository.remove(comm);
+        await fastify.db.communicationRepository
+          .remove(comm)
+          .catch(logger.error);
         throw sendErr;
       }
     } catch (err) {

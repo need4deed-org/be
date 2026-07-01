@@ -67,6 +67,11 @@ export async function sendEmailAccompanyMatch(
       `sendEmailAccompanyMatch: missing volunteer or person relation for ov ${ov.id}`,
     );
   }
+  if (!volunteer.deal) {
+    throw new Error(
+      `sendEmailAccompanyMatch: volunteer ${volunteer.id} has no deal relation`,
+    );
+  }
 
   const opportunity = ov.opportunity;
   const accompanying = opportunity.accompanying;

@@ -22,9 +22,9 @@ async function runWithAdvisoryLock(fn: () => Promise<void>): Promise<void> {
   // needed. This avoids the session-level pitfall where pg_advisory_unlock
   // could fail and leave the connection holding the lock in the pool.
   const qr = dataSource.createQueryRunner();
-  await qr.connect();
-  await qr.startTransaction();
   try {
+    await qr.connect();
+    await qr.startTransaction();
     const [row] = await qr.query(
       "SELECT pg_try_advisory_xact_lock($1) AS acquired",
       [SCHEDULER_LOCK_ID],
@@ -39,7 +39,7 @@ async function runWithAdvisoryLock(fn: () => Promise<void>): Promise<void> {
     await fn();
     await qr.commitTransaction();
   } catch (err) {
-    await qr.rollbackTransaction();
+    await qr.rollbackTransaction().catch(logger.error);
     throw err;
   } finally {
     await qr.release();

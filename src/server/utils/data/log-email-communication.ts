@@ -43,16 +43,16 @@ export async function buildLastSentMap(
   opportunityIds: number[],
   communicationType: CommunicationType,
 ): Promise<Map<number, Date>> {
-  const sentComms = await repo.find({
-    where: { opportunityId: In(opportunityIds), communicationType },
-    select: ["opportunityId", "date"],
-  });
-  const map = new Map<number, Date>();
-  for (const c of sentComms) {
-    const prev = map.get(c.opportunityId!);
-    if (!prev || c.date > prev) {
-      map.set(c.opportunityId!, c.date);
-    }
+  if (!opportunityIds.length) {
+    return new Map();
   }
-  return map;
+  const rows = await repo
+    .createQueryBuilder("c")
+    .select("c.opportunityId", "opportunityId")
+    .addSelect("MAX(c.date)", "date")
+    .where("c.opportunityId IN (:...ids)", { ids: opportunityIds })
+    .andWhere("c.communicationType = :type", { type: communicationType })
+    .groupBy("c.opportunityId")
+    .getRawMany<{ opportunityId: number; date: string | Date }>();
+  return new Map(rows.map((r) => [Number(r.opportunityId), new Date(r.date)]));
 }

@@ -75,7 +75,9 @@ export async function scanAccompanyNotFound(
       try {
         await fastify.notify.emailAccompanyNotFound(opp);
       } catch (sendErr) {
-        await fastify.db.communicationRepository.remove(comm);
+        await fastify.db.communicationRepository
+          .remove(comm)
+          .catch(logger.error);
         throw sendErr;
       }
     } catch (err) {

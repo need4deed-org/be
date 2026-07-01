@@ -55,7 +55,9 @@ export async function scanRegularUpdate(
       try {
         await fastify.notify.emailRegularUpdate(opp);
       } catch (sendErr) {
-        await fastify.db.communicationRepository.remove(comm);
+        await fastify.db.communicationRepository
+          .remove(comm)
+          .catch(logger.error);
         throw sendErr;
       }
     } catch (err) {
