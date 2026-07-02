@@ -1,4 +1,5 @@
 import { defaultFrom, isDev, isStaging } from "../../../config/constants";
+import logger from "../../../logger";
 import type { EmailMessage, EmailTransport } from "../types";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -13,6 +14,12 @@ export class BrevoEmailTransport implements EmailTransport {
   constructor(private readonly apiKey: string) {}
 
   async send(msg: EmailMessage): Promise<void> {
+    if (isDev || isStaging) {
+      logger.info(
+        `Brevo email transport (dev/staging) sending to ${msg.to}: ${msg.subject}`,
+      );
+      return;
+    }
     if (!this.apiKey) {
       throw new Error("BREVO_API_KEY is not configured");
     }
