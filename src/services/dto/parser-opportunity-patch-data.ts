@@ -1,4 +1,4 @@
-import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
+import { ApiOpportunityPatch, LangPurpose, OpportunityType } from "need4deed-sdk";
 import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -34,6 +34,7 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
         numberVolunteers: body.numberVolunteers,
         info: body.description,
         infoConfidential: body.description,
+        type: body.volunteerType as unknown as OpportunityType | undefined,
       },
       contact: body?.contact
         ? {
