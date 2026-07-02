@@ -11,17 +11,20 @@ import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
 import typeormPlugin from "./plugins/typeorm";
+import activityLogRoutes from "./routes/activity-log.routes";
 import agentRoutes from "./routes/agent/agent.routes";
 import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
+import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
+import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import workerRoutes from "./routes/worker.routes";
@@ -165,6 +168,9 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(communicationRoutes, {
     prefix: RoutePrefix.COMMUNICATION,
   });
+  await fastifyInstance.register(activityLogRoutes, {
+    prefix: RoutePrefix.ACTIVITY_LOG,
+  });
   await fastifyInstance.register(appreciationRoutes, {
     prefix: RoutePrefix.APPRECIATION,
   });
@@ -172,11 +178,17 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
     prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
   });
+  await fastifyInstance.register(activityLogCollectionRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
+  });
   await fastifyInstance.register(organizationRoutes, {
     prefix: RoutePrefix.ORGANIZATION,
   });
   await fastifyInstance.register(workerRoutes, {
     prefix: RoutePrefix.WORKER,
+  });
+  await fastifyInstance.register(trustedDomainRoutes, {
+    prefix: RoutePrefix.TRUSTED_DOMAIN,
   });
 
   await fastifyInstance.ready();

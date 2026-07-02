@@ -7,4 +7,5 @@ export * from "./getRRULE";
 export * from "./getStartEndDates";
 export * from "./passwd";
 export * from "./remove-data";
+export * from "./update-opportunity-matching";
 export * from "./update-volunteer-matching";

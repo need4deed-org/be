@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import type { EnumValuesMap, ExtendWithEnumValues, DeeplyNestedObject } from "../../../server/utils";
+import { describe, expect, it } from "vitest";
+import type {
+  DeeplyNestedObject,
+  EnumValuesMap,
+  ExtendWithEnumValues,
+} from "../../../server/utils";
 
 describe("server/utils/types", () => {
   it("EnumValuesMap: maps enum values to V and enforces keys/types at compile time", () => {
@@ -10,13 +14,13 @@ describe("server/utils/types", () => {
     expect(ok.a).toBe(1);
 
     // @ts-expect-error - missing key 'b'
-    const missingKey: M = { a: 1 };
+    const _missingKey: M = { a: 1 };
 
     // @ts-expect-error - extra key 'c' not allowed
-    const extraKey: M = { a: 1, b: 2, c: 3 };
+    const _extraKey: M = { a: 1, b: 2, c: 3 };
 
     // @ts-expect-error - wrong value type for 'a'
-    const wrongValue: M = { a: "no", b: 2 };
+    const _wrongValue: M = { a: "no", b: 2 };
   });
 
   it("ExtendWithEnumValues: merges base and enum-derived keys", () => {
@@ -28,10 +32,10 @@ describe("server/utils/types", () => {
     expect(ok.id).toBe(10);
 
     // @ts-expect-error - missing enum key 'y'
-    const missingEnum: R = { id: 1, x: true };
+    const _missingEnum: R = { id: 1, x: true };
 
     // @ts-expect-error - wrong type for enum key 'x'
-    const wrongEnumType: R = { id: 1, x: 1, y: false };
+    const _wrongEnumType: R = { id: 1, x: 1, y: false };
   });
 
   it("DeeplyNestedObject: accepts primitives, nested plain objects and arrays; rejects disallowed types", () => {
@@ -48,9 +52,9 @@ describe("server/utils/types", () => {
     expect((good.obj as any).inner.leaf).toBe("v");
 
     // @ts-expect-error - functions are not allowed
-    const badFn: DeeplyNestedObject = { f: () => {} };
+    const _badFn: DeeplyNestedObject = { f: () => {} };
 
     // @ts-expect-error - Date (class instance) is not permitted by the type
-    const badDate: DeeplyNestedObject = { d: new Date() };
+    const _badDate: DeeplyNestedObject = { d: new Date() };
   });
 });

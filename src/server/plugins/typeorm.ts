@@ -8,6 +8,8 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import ActivityLog from "../../data/entity/m2m/activity-log.entity";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -15,6 +17,7 @@ import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
+import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import Appreciation from "../../data/entity/volunteer/appreciation.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
@@ -39,14 +42,17 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       commentRepository: dataSource.getRepository(Comment),
       documentRepository: dataSource.getRepository(Document),
       communicationRepository: dataSource.getRepository(Communication),
+      activityLogRepository: dataSource.getRepository(ActivityLog),
       appreciationRepository: dataSource.getRepository(Appreciation),
       opportunityVolunteerRepository:
         dataSource.getRepository(OpportunityVolunteer),
       opportunityRepository: dataSource.getRepository(Opportunity),
       dealRepository: dataSource.getRepository(Deal),
       agentRepository: dataSource.getRepository(Agent),
+      agentPersonRepository: dataSource.getRepository(AgentPerson),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
+      trustedDomainRepository: dataSource.getRepository(TrustedDomain),
     });
 
     // TODO: add validation of others

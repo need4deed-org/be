@@ -4,6 +4,7 @@ import {
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
   OpportunityType,
+  OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import District from "../../data/entity/location/district.entity";
@@ -38,9 +39,11 @@ export function getOpportunityContact(
     !!opportunity.agentId &&
     !!submitter.agentPerson?.some((ap) => ap.agentId === opportunity.agentId);
 
-  const person = submitterStillAtAgent
-    ? submitter
-    : opportunity.agent?.representative?.person;
+  const person =
+    opportunity.contactPerson ??
+    (submitterStillAtAgent
+      ? submitter
+      : opportunity.agent?.representative?.person);
 
   return {
     id: person?.id,
@@ -79,6 +82,15 @@ export function dtoOpportunityGetList(
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
+    agentId: opportunity.agentId,
+    // Names of the volunteers MATCHED to the opportunity (status opp-matched
+    // only — not pending/active/past links). PII masking runs before this DTO,
+    // so masked names pass through. Needs the
+    // opportunityVolunteer.volunteer.person relation loaded.
+    volunteerNames: (opportunity.opportunityVolunteer ?? [])
+      .filter((ov) => ov.status === OpportunityVolunteerStatusType.MATCHED)
+      .map((ov) => ov.volunteer?.person?.name)
+      .filter((name): name is string => Boolean(name)),
   } as ApiOpportunityGetList;
 }
 
@@ -132,6 +144,7 @@ export function dtoOpportunityGet(
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
+    agentId: opportunityComments.agentId,
     languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({

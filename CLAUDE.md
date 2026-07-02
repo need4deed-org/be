@@ -1,3 +1,5 @@
+@.claude/shared-rules.md
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -50,6 +52,29 @@ Docker alternative (includes Postgres):
 ```bash
 docker compose up           # starts db + bootstrap + be
 ```
+
+### Flushing the database (fresh rebuild)
+
+To wipe the DB and replay the full migration chain from scratch — e.g. to
+verify migrations are self-contained and replay cleanly:
+
+```bash
+docker compose down -v                  # stop + drop the be_database volume
+RUN_MIGRATIONS=1 docker compose up      # db -> bootstrap (re-seeds) -> be runs all migrations
+```
+
+`down -v` removes the `be_database` volume (the data); the next `up` re-seeds
+via the `bootstrap` service, then `be` runs every migration on startup
+(`RUN_MIGRATIONS=1` forces it on regardless of `.env`). Watch the `be` logs —
+the run must reach `Migrations completed` with no `column ... does not exist`
+errors.
+
+**This is the canonical check that a data/seed migration is self-contained.**
+Migrations must depend only on **raw SQL + hardcoded literals** — never import
+live entities, app helpers, config constants, or **SDK enums** (an enum value
+can change with a contract update, retroactively altering what an old migration
+emits). A migration that reaches for the current entity/enum shape will pass on
+the DB it was written against but break on a fresh replay once that shape drifts.
 
 ---
 
@@ -140,7 +165,8 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
 - `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
-- `AWS_SES_*` — email sending via AWS SES
+- `EMAIL_FROM`, `BREVO_API_KEY` — transactional email via Brevo (verified sender + API key)
+- `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${CDN_BASE_URL}emails/verification.json`); falls back to built-in copy
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 
 ---
@@ -152,6 +178,16 @@ Any changes in entities that are registered in `src/data/data-source.ts` must be
 ```
 yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
 ```
+
+---
+
+## Handling throws in endpoint handlers
+
+Avoid `try {} catch {}` blocks relaying on error handling by fastify.
+
+Just throw specific error based on `src/config/error`
+
+If needed update error handling in `src/server/index.ts`
 
 ---
 

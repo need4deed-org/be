@@ -1,5 +1,8 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
-import { titleOrphanageAgent } from "../../config";
+
+// Hardcoded (not imported from config) so a later change to titleOrphanageAgent
+// can't change which agent title this historical migration inserts.
+const ORPHANAGE_AGENT_TITLE = "Orphanage For Opportunities";
 
 export class UpdateAgentEntity1776699111911 implements MigrationInterface {
   name = "UpdateAgentEntity1776699111911";
@@ -18,7 +21,7 @@ export class UpdateAgentEntity1776699111911 implements MigrationInterface {
     );
 
     const sql = `INSERT INTO agent (title, info)
-            VALUES ('${titleOrphanageAgent}','The dummy agent account for parenting orphaned opportunities.')
+            VALUES ('${ORPHANAGE_AGENT_TITLE}','The dummy agent account for parenting orphaned opportunities.')
             ON CONFLICT (title) DO NOTHING;`;
     await queryRunner.query(sql);
   }

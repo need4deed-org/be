@@ -2,13 +2,13 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import User from "../../data/entity/user.entity";
 import {
+  BrevoEmailTransport,
   CommentTaggedInput,
-  createSesClient,
   EmailTransport,
   sendCommentTagged,
   sendEmailVerification,
   sendOpsAlert,
-  SesEmailTransport,
+  sendPasswordReset,
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
@@ -16,6 +16,7 @@ import {
 
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
+  passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   commentTagged(input: CommentTaggedInput): Promise<void>;
 }
@@ -26,16 +27,8 @@ declare module "fastify" {
   }
 }
 
-type EmailProvider = "ses";
-
 function buildEmailTransport(): EmailTransport {
-  const provider = (process.env.EMAIL_PROVIDER ?? "ses") as EmailProvider;
-  switch (provider) {
-    case "ses":
-      return new SesEmailTransport(createSesClient());
-    default:
-      throw new Error(`Unsupported email provider: ${provider}`);
-  }
+  return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
@@ -59,6 +52,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
       sendEmailVerification({ email, jwt: fastify.jwt }, user),
+    passwordReset: (user: User) =>
+      sendPasswordReset({ email, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     commentTagged: (input: CommentTaggedInput) =>
       sendCommentTagged({ slack }, input),

@@ -2,20 +2,20 @@
 
 set -e
 
-echo "Importing database dump..."
-PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/dev.dump.sql
+# Idempotent: skip if the base schema is already loaded.
+TABLE_EXISTS=$(PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -tAc \
+  "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema='public' AND table_name='language')")
 
-if [ $? -eq 0 ]; then
-    echo "Database import completed successfully"
-  
-else
-    echo "Import failed"
-    exit 1
+if [ "$TABLE_EXISTS" = "t" ]; then
+  echo "Database already bootstrapped, skipping."
+  exit 0
 fi
-# Clean up
-unset PGPASSWORD
 
-echo ""
+echo "Importing database dump..."
+PGPASSWORD="${DB_PASSWORD}" psql -q -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f /app/scrambled-dump.sql
+echo "Database import completed successfully"
+
+unset PGPASSWORD
 echo "Connection details for verification:"
 echo "  psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
 exit 0

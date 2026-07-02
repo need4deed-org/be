@@ -14,7 +14,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
-      - PORT=5000
+      - PORT=8000
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USERNAME=postgres
@@ -22,7 +22,9 @@ services:
       - DB_NAME=postgres
       - DB_SCHEMA=public
     ports:
-      - 5000:5000
+      - ${BE_PORT:-5000}:${PORT:-8000}
+    networks:
+      - n4d-net
     volumes:
       - ./:/app
     command: ["yarn", "dev"]
@@ -34,6 +36,8 @@ services:
         condition: service_healthy
     build:
       context: ./data-bootstrap
+    networks:
+      - n4d-net
     environment:
       - DB_HOST=db
       - DB_PORT=5432
@@ -44,7 +48,7 @@ services:
 
   db:
     container_name: db
-    image: postgres:17.2
+    image: postgres:17.9
     ports:
       - 5432:5432
     environment:
@@ -56,18 +60,14 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - be_database:/var/lib/postgresql
+    networks:
+      - n4d-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-  localstack:
-    image: localstack/localstack
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=ses
 
 volumes:
   be_database:

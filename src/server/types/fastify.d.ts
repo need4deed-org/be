@@ -10,6 +10,8 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import ActivityLog from "../../data/entity/m2m/activity-log.entity";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -17,6 +19,7 @@ import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Language from "../../data/entity/profile/language.entity";
+import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { AuthOptions } from "./auth";
@@ -33,13 +36,16 @@ declare module "fastify" {
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
       communicationRepository: Repository<Communication>;
+      activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;
       opportunityRepository: Repository<Opportunity>;
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
       dealRepository: Repository<Deal>;
       agentRepository: Repository<Agent>;
+      agentPersonRepository: Repository<AgentPerson>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
+      trustedDomainRepository: Repository<TrustedDomain>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
@@ -48,6 +54,8 @@ declare module "fastify" {
     resolvedPerson?: Person; // Optional resolved person for account creation
     personId?: number; // Optional foreign key ID for the Person entity
     agents?: Agent[];
+    registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
+    authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
   }
 }
 
@@ -55,7 +63,7 @@ declare module "@fastify/jwt" {
   // It's crucial to extend the original FastifyJWT interface here
   // so that your custom 'payload' and 'user' types merge correctly
   // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
-  type TokenType = "access" | "refresh" | "verify";
+  type TokenType = "access" | "refresh" | "verify" | "reset";
   interface FastifyJWT {
     // Payload type when signing a token (`reply.jwtSign(payload)`)
     payload: {

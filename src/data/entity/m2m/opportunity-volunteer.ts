@@ -1,18 +1,22 @@
 import { IsEnum } from "class-validator";
 import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import {
+  AfterInsert,
+  AfterRemove,
   AfterUpdate,
   Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
 } from "typeorm";
 import Opportunity from "../opportunity/opportunity.entity";
 import Volunteer from "../volunteer/volunteer.entity";
+import ActivityLog from "./activity-log.entity";
 
 @Entity()
 @Unique(["opportunityId", "volunteerId"])
@@ -61,9 +65,33 @@ export default class OpportunityVolunteer {
   @Column()
   volunteerId: number;
 
+  @OneToMany(() => ActivityLog, (log) => log.opportunityVolunteer)
+  activityLogs: ActivityLog[];
+
+  @AfterInsert()
+  async afterInsertHook() {
+    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
+      "../../utils"
+    );
+    updateVolunteerMatching(this.volunteerId);
+    updateOpportunityMatching(this.opportunityId);
+  }
+
   @AfterUpdate()
   async afterUpdateHook() {
-    const { updateVolunteerMatching } = await import("../../utils");
+    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
+      "../../utils"
+    );
     updateVolunteerMatching(this.volunteerId);
+    updateOpportunityMatching(this.opportunityId);
+  }
+
+  @AfterRemove()
+  async afterRemoveHook() {
+    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
+      "../../utils"
+    );
+    updateVolunteerMatching(this.volunteerId);
+    updateOpportunityMatching(this.opportunityId);
   }
 }

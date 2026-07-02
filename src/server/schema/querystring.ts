@@ -7,6 +7,11 @@ const paginationProps = {
 };
 const langProp = { language: { type: "string" } };
 
+export const langQuerySchema = {
+  type: "object",
+  properties: langProp,
+};
+
 const sortOrderProps = {
   sortOrder: {
     type: "string",
@@ -49,6 +54,7 @@ export const agentListQuerySchema = {
       type: "object",
       properties: {
         search: { type: "string" },
+        street: { type: "string" },
         district: { type: "array", items: { type: "string" } },
         type: { type: "array", items: { type: "string" } },
         volunteerSearch: { type: "array", items: { type: "string" } },
@@ -67,6 +73,10 @@ export const volunteerListQuerySchema = {
     ...paginationProps,
     ...langProp,
     ...sortOrderProps,
+    // Selects which relations the list loads: "table" loads only what the
+    // table view renders (languages + locations); "card" (default) loads all
+    // collections. Lets the table view skip activities/skills/availability.
+    listType: { type: "string", enum: ["card", "table"] },
     filter: {
       type: "object",
       properties: {

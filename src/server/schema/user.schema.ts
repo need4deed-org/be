@@ -1,15 +1,18 @@
 import { existingPersonSchema, newPersonSchema } from "./person.schema";
 
+// Matches the SDK ApiUserPost contract: email, password, role (UserRole),
+// optional language (Lang, defaults to "en"), person. (isActive is
+// server-controlled; timezone uses the entity default.)
 export const createUserBodySchema = {
   type: "object",
-  required: ["email", "person"], // 'person' is now a required nested object
+  required: ["email", "password", "role", "person"],
   properties: {
     email: { type: "string", format: "email" },
-    password: { type: ["string", "null"], minLength: 8, maxLength: 50 },
-    isActive: { type: "boolean", default: false },
-    role: { type: "string", default: "user", enum: ["user", "admin"] }, // Example roles
-    language: { type: "string", default: "en", pattern: "^[a-z]{2}$" }, // e.g., 'en', 'es'
-    timezone: { type: "string", default: "CET" },
+    password: { type: "string", minLength: 8, maxLength: 50 },
+    role: { $ref: "UserRole#" },
+    // Optional: defaults to "en" when omitted (allOf keeps the Lang enum while
+    // allowing a sibling default, which a bare $ref would ignore in draft-07).
+    language: { allOf: [{ $ref: "Lang#" }], default: "en" },
     person: {
       oneOf: [
         // The 'person' property must match one of these schemas
@@ -129,4 +132,34 @@ export const userResponseSchemaIncludePerson = {
     "updatedAt",
     "person",
   ],
+};
+
+export const messageResponseSchema = {
+  type: "object",
+  properties: { message: { type: "string" } },
+  required: ["message"],
+};
+
+export const requestResetSchema = {
+  type: "object",
+  properties: { email: { type: "string", format: "email" } },
+  required: ["email"],
+};
+
+export const resetPasswordSchema = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+    newPassword: { type: "string", minLength: 8, maxLength: 50 },
+  },
+  required: ["token", "newPassword"],
+};
+
+export const changePasswordSchema = {
+  type: "object",
+  properties: {
+    password: { type: "string" },
+    newPassword: { type: "string", minLength: 8, maxLength: 50 },
+  },
+  required: ["password", "newPassword"],
 };

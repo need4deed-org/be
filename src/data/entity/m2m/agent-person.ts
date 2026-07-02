@@ -1,4 +1,4 @@
-import { AgentRoleType } from "need4deed-sdk";
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -31,6 +31,16 @@ export default class AgentPerson {
     default: AgentRoleType.OTHER,
   })
   role: AgentRoleType;
+
+  // Self-registration joins land ACTIVE when the registrant's email domain
+  // matches an existing member of the agent, otherwise PENDING until an
+  // ADMIN/COORDINATOR approves. Pre-existing memberships default to ACTIVE.
+  @Column({
+    type: "enum",
+    enum: AgentMembershipStatus,
+    default: AgentMembershipStatus.ACTIVE,
+  })
+  status: AgentMembershipStatus;
 
   @ManyToOne(() => Agent, (agent) => agent.agentPerson, {
     onDelete: "CASCADE",

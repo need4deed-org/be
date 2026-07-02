@@ -38,6 +38,7 @@ export function opportunityOpportunityVolunteerDTO(
     avatarUrl: opportunityVolunteer.volunteer.person.avatarUrl,
     volunteeringType: opportunityVolunteer.volunteer.statusType,
     engagement: opportunityVolunteer.volunteer.statusEngagement,
+    communication: opportunityVolunteer.volunteer.statusCommunication,
     activities: getOptionItems(
       opportunityVolunteer.volunteer.deal.dealActivity,
       "activity",

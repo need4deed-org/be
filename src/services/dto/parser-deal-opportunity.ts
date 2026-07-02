@@ -33,9 +33,13 @@ import {
 
 export async function dealParserOpportunity(
   formData: OpportunityLegacyFormData,
+  postcodeValue?: string,
 ): Promise<Deal> {
-  // postcode
-  const postcode = await getPostcode(String(formData.rac_plz));
+  // postcode: explicit value (e.g. the owning agent's, for POST /opportunity)
+  // wins, else the form's rac_plz. Skip when neither is present so we don't mint
+  // a bogus "undefined" postcode.
+  const code = postcodeValue ?? formData.rac_plz;
+  const postcode = code ? await getPostcode(String(code)) : null;
 
   // activities
   const dealActivity: DealActivity[] = [];

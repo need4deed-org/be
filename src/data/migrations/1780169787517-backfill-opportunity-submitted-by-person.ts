@@ -1,19 +1,20 @@
-import { ILike, MigrationInterface, QueryRunner } from "typeorm";
-import { getOrCreateSubmitterPerson } from "../../server/utils/data/get-or-create-submitter-person";
-import AgentPerson from "../entity/m2m/agent-person";
-import Person from "../entity/person.entity";
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 // One-shot data migration: walk Opportunity rows that still carry a legacy
 // rac_* Comment blob (text shaped as `email<|>full_name<|>address<|>plz<|>phone`,
 // userId 1, entityType 'opportunity'), parse the blob, and populate
-// Opportunity.submitted_by_person_id via the same getOrCreateSubmitterPerson
-// helper the runtime handler uses (#589). The Comment row is left in place.
+// Opportunity.submitted_by_person_id (#589). The Comment row is left in place.
 //
 // Idempotent: only touches opportunities whose submitted_by_person_id is null.
 // Reversible: down() nulls the column on opportunities that still have a
 // blob comment, preserving FKs set by the runtime handler on post-backfill
 // submissions. Person / AgentPerson rows possibly created by up() are kept
 // (they can't be reliably identified after the fact and are safe to retain).
+//
+// Self-contained: raw SQL only — no entities, app helpers, or SDK enums — so it
+// stays pinned to the schema/contract as it was here and can't break on a fresh
+// replay when those evolve (e.g. the later agent_person.status column, or an SDK
+// enum value change).
 
 interface BlobRow {
   opportunity_id: number;
@@ -21,19 +22,88 @@ interface BlobRow {
   blob: string;
 }
 
+// Mirror of getNameFields (first token -> firstName, last -> lastName, the rest
+// -> middleName). Inlined so the migration doesn't import app code. Caller trims.
+function splitName(raw: string): {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+} {
+  const names = raw.split(" ");
+  const firstName = names.shift() || undefined;
+  const lastName = names.pop() || undefined;
+  const middleName = names.join(" ") || undefined;
+  return { firstName, middleName, lastName };
+}
+
 export class BackfillOpportunitySubmittedByPerson1780169787517
   implements MigrationInterface
 {
   name = "BackfillOpportunitySubmittedByPerson1780169787517";
 
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    const manager = queryRunner.manager;
+  // Find-or-create the submitter Person by email, refreshing name/phone from
+  // this submission (only fields actually provided). Raw SQL — no Person entity.
+  // createdAt/updatedAt/preferredCommunicationType have DB defaults, so omitting
+  // them matches what the entity save did.
+  private async resolveSubmitterPersonId(
+    queryRunner: QueryRunner,
+    email: string,
+    fullName: string,
+    phone: string,
+  ): Promise<{ id: number; preExisting: boolean }> {
+    const [existing] = await queryRunner.query(
+      `SELECT id FROM person WHERE email ILIKE $1 LIMIT 1`,
+      [email],
+    );
 
-    const [alreadySet]: [{ count: string }] = await manager.query(
+    if (existing) {
+      const sets: string[] = [];
+      const params: unknown[] = [];
+      if (fullName) {
+        const { firstName, middleName, lastName } = splitName(fullName);
+        params.push(firstName || email.split("@")[0] || "unknown");
+        sets.push(`first_name = $${params.length}`);
+        // null (not undefined) so absent parts clear stale middle/last names.
+        params.push(middleName ?? null);
+        sets.push(`middle_name = $${params.length}`);
+        params.push(lastName ?? null);
+        sets.push(`last_name = $${params.length}`);
+      }
+      if (phone) {
+        params.push(phone);
+        sets.push(`phone = $${params.length}`);
+      }
+      if (sets.length) {
+        params.push(existing.id);
+        await queryRunner.query(
+          `UPDATE person SET ${sets.join(", ")} WHERE id = $${params.length}`,
+          params,
+        );
+      }
+      return { id: existing.id, preExisting: true };
+    }
+
+    const { firstName, middleName, lastName } = splitName(fullName);
+    const [created] = await queryRunner.query(
+      `INSERT INTO person (first_name, middle_name, last_name, email, phone)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [
+        firstName || email.split("@")[0] || "unknown",
+        middleName ?? null,
+        lastName ?? null,
+        email,
+        phone || null,
+      ],
+    );
+    return { id: created.id, preExisting: false };
+  }
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    const [alreadySet]: [{ count: string }] = await queryRunner.query(
       `SELECT COUNT(*)::text AS count FROM opportunity WHERE submitted_by_person_id IS NOT NULL`,
     );
 
-    const rows: BlobRow[] = await manager.query(`
+    const rows: BlobRow[] = await queryRunner.query(`
       SELECT DISTINCT ON (o.id)
         o.id AS opportunity_id,
         o.agent_id AS agent_id,
@@ -70,47 +140,58 @@ export class BackfillOpportunitySubmittedByPerson1780169787517
         const parts = row.blob.split("<|>");
         const [rac_email, rac_full_name, , , rac_phone] = parts;
 
-        if (!rac_email?.trim()) {
+        const email = (rac_email ?? "").trim();
+        if (!email) {
           counts.skippedNoEmail++;
           console.warn(`[backfill] opp ${oppId}: empty rac_email; skipping`);
           continue;
         }
 
-        const preExistingPerson = await manager.findOne(Person, {
-          where: { email: ILike(rac_email.trim()) },
-        });
-        const preExistingLink = preExistingPerson
-          ? await manager.findOne(AgentPerson, {
-              where: { agentId: row.agent_id, personId: preExistingPerson.id },
-            })
-          : null;
+        const { id: personId, preExisting } =
+          await this.resolveSubmitterPersonId(
+            queryRunner,
+            email,
+            (rac_full_name ?? "").trim(),
+            (rac_phone ?? "").trim(),
+          );
 
-        const person = await getOrCreateSubmitterPerson(
-          { rac_email, rac_full_name, rac_phone },
-          row.agent_id,
-          manager,
-        );
-        // helper only returns null when rac_email is empty, which the
-        // explicit check above already short-circuits, so this is safe.
-        if (!person) {
-          continue;
-        }
+        // Pre-existing (agent, person) link? Stats only.
+        const preExistingLink =
+          preExisting &&
+          (
+            await queryRunner.query(
+              `SELECT 1 FROM agent_person WHERE agent_id = $1 AND person_id = $2 LIMIT 1`,
+              [row.agent_id, personId],
+            )
+          ).length > 0;
 
-        await manager.query(
+        await queryRunner.query(
           `UPDATE opportunity SET submitted_by_person_id = $1 WHERE id = $2 AND submitted_by_person_id IS NULL`,
-          [person.id, oppId],
+          [personId, oppId],
         );
 
-        if (preExistingPerson && preExistingLink) {
+        // Upsert the agent_person link. 'volunteer-coordinator' is the
+        // AgentRoleType value at this migration; hardcoded so a later enum change
+        // can't alter what this historical migration writes.
+        await queryRunner.query(
+          `INSERT INTO agent_person (agent_id, person_id, role)
+           SELECT $1, $2, 'volunteer-coordinator'
+           WHERE NOT EXISTS (
+             SELECT 1 FROM agent_person WHERE agent_id = $1 AND person_id = $2
+           )`,
+          [row.agent_id, personId],
+        );
+
+        if (preExisting && preExistingLink) {
           counts.foundLinked++;
-        } else if (preExistingPerson) {
+        } else if (preExisting) {
           counts.foundNoLink++;
         } else {
           counts.created++;
         }
       }
     } finally {
-      console.log("[backfill] summary:", JSON.stringify(counts));
+      console.warn("[backfill] summary:", JSON.stringify(counts));
     }
   }
 

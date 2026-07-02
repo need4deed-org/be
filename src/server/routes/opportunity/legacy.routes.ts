@@ -7,10 +7,13 @@ import {
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
-import { ILike, In } from "typeorm";
-import { UnauthorizedError } from "../../../config";
+import { In } from "typeorm";
+import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Person from "../../../data/entity/person.entity";
+import { getPostcode, getRepository } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -18,15 +21,72 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
-import { tryCatchFn } from "../../../services/utils";
 import {
-  getAgentByPostcode,
+  getAgentByAddress,
   getDistrictToOpportunityHandler,
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOrCreateSubmitterPerson,
+  writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
+
+function parseContactPerson(formData: OpportunityLegacyFormData): Person {
+  const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
+  return new Person({
+    firstName: parts[0] || formData.rac_full_name || "Unknown",
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : undefined,
+    email: formData.rac_email || undefined,
+    phone: formData.rac_phone || undefined,
+  });
+}
+
+async function findOrCreateAgent(
+  formData: OpportunityLegacyFormData,
+): Promise<Agent> {
+  if (!formData.rac_address || !formData.rac_plz) {
+    logger.warn(
+      "Legacy form missing rac_address or rac_plz — falling back to orphanage agent",
+    );
+    return getOpportunityOrphanageAgent();
+  }
+
+  const agentRepository = getRepository(dataSource, Agent);
+  const agents = await agentRepository.find({
+    relations: ["address.postcode", "agentPostcode.postcode"],
+  });
+
+  const match = getAgentByAddress(
+    agents,
+    formData.rac_address,
+    formData.rac_plz,
+  );
+  if (match) {
+    return match;
+  }
+
+  logger.info(
+    `No agent found for address "${formData.rac_address}" ${formData.rac_plz} — creating new agent`,
+  );
+
+  const postcode = await getPostcode(formData.rac_plz);
+
+  return dataSource.manager.transaction(async (em) => {
+    const address = new Address({
+      street: formData.rac_address,
+      postcodeId: postcode.id,
+    });
+    await em.save(address);
+
+    const agent = new Agent({
+      title: formData.rac_address,
+      addressId: address.id,
+    });
+    await em.save(agent);
+
+    return agent;
+  });
+}
 
 export default async function opportunityLegacyRoutes(
   fastify: FastifyInstance,
@@ -34,26 +94,7 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    {
-      config: { public: true } as FastifyContextConfig,
-      preHandler: async (request) => {
-        const relations = ["agentPerson.person", "agentPostcode.postcode"];
-        const agentRepository = fastify.db.agentRepository;
-        const email = (request.body.rac_email || "").split("@").pop();
-        const agents: Agent[] = await agentRepository.find({
-          where: {
-            agentPerson: { person: { email: ILike(`%@${email}`) } },
-          },
-          relations,
-        });
-        if (agents.length === 0) {
-          throw new UnauthorizedError(
-            "You've got no permission to submit an opportunity.",
-          );
-        }
-        request.agents = agents;
-      },
-    },
+    { config: { public: true } as FastifyContextConfig },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,
@@ -66,39 +107,39 @@ export default async function opportunityLegacyRoutes(
           ? await accompanyingParserOpportunity(request.body)
           : undefined;
 
-      const getAgentByPostcodeTryCatch = tryCatchFn(getAgentByPostcode, (err) =>
-        logger.debug(
-          `Did not find agent by postcode${request.body.rac_plz}: ${err}`,
-        ),
-      );
-      opportunity.agent =
-        getAgentByPostcodeTryCatch(
-          request.agents || [],
-          request.body.rac_plz,
-        ) ?? undefined;
-
-      if (!opportunity.agent && request.agents?.length) {
-        opportunity.agent = request.agents[0];
-      }
-
-      if (!opportunity.agent) {
-        opportunity.agent = await getOpportunityOrphanageAgent();
-      }
+      opportunity.agent = await findOrCreateAgent(request.body);
 
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       if (opportunity.agent?.id) {
-        const submitter = await getOrCreateSubmitterPerson(
+        const person = await getOrCreateSubmitterPerson(
           request.body,
           opportunity.agent.id,
         );
-        if (submitter) {
-          opportunity.submittedByPersonId = submitter.id;
+        if (person) {
+          opportunity.contactPersonId = person.id;
+          opportunity.submittedByPersonId = person.id;
+        } else {
+          // No rac_email on form — create a bare Person for contactPersonId
+          // without deduplication or an agent_person link.
+          const personRepository = getRepository(dataSource, Person);
+          const contactPerson = parseContactPerson(request.body);
+          await personRepository.save(contactPerson);
+          opportunity.contactPersonId = contactPerson.id;
         }
       }
 
       const id = await writeOpportunityLegacy(opportunity);
+
+      // Durable backup of the submitter's contact as a piped <|> comment, in
+      // addition to the Person-based contact set above. Best-effort: never
+      // blocks the submission.
+      await writeOpportunityContactComment(
+        id,
+        opportunity.agent?.id,
+        request.body,
+      );
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),

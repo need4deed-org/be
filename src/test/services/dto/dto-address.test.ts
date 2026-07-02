@@ -13,15 +13,14 @@ describe("serializeAddress", () => {
     expect(serializeAddress(address)).toBe("Friedrichstraße 1, 10117 Berlin");
   });
 
-  it('should use "Berlin" as default when city is missing', () => {
+  it("should omit city when it is missing", () => {
     const address = {
       street: "Friedrichstraße 1",
       postcode: { value: "10117" },
       city: undefined,
     } as Address;
 
-    // Based on: address.city ? address.city : "Berlin"
-    expect(serializeAddress(address)).toBe("Friedrichstraße 1, 10117 Berlin");
+    expect(serializeAddress(address)).toBe("Friedrichstraße 1, 10117");
   });
 
   it("should handle missing postcode gracefully", () => {
@@ -42,16 +41,14 @@ describe("serializeAddress", () => {
     expect(serializeAddress(address)).toBe("20095 Hamburg");
   });
 
-  it('should return "Berlin" if the address object is null or undefined', () => {
-    expect(serializeAddress(null)).toBe("Berlin");
-    expect(serializeAddress(undefined)).toBe("Berlin");
+  it("should return empty string if the address object is null or undefined", () => {
+    expect(serializeAddress(null)).toBe("");
+    expect(serializeAddress(undefined)).toBe("");
   });
 
-  it('should handle an empty address object by defaulting to "Berlin"', () => {
+  it("should return empty string for an empty address object", () => {
     const address = {} as Address;
 
-    // postcodeCity becomes "Berlin", street is undefined
-    // Result: "Berlin"
-    expect(serializeAddress(address)).toBe("Berlin");
+    expect(serializeAddress(address)).toBe("");
   });
 });

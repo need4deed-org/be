@@ -1,3 +1,6 @@
+# raw database dump — contains real PII, never commit
+data-bootstrap/dev.dump.sql
+
 .idea/
 .vscode/
 node_modules/
