@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./src/test/setup.ts"], // Optional: for DB connection logic
     include: ["**/*.{test,spec}.ts"],
+    exclude: ["**/node_modules/**", "src/test/e2e/**"],
     env: {
       JWT_SECRET: "test-secret-only-for-vitest",
       NODE_ENV: "test",
