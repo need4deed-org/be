@@ -15,6 +15,8 @@ services:
       - NODE_ENV=${NODE_ENV}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
       - PORT=8000
+      - NOTIFY_EMAIL_DRY_RUN=true
+      - NOTIFY_SLACK_DRY_RUN=true
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USERNAME=postgres
