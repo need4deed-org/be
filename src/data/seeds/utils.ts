@@ -51,7 +51,7 @@ import {
   PersonJSON,
   TimeJSON,
   VolunteerJSON,
-} from "./dev/types";
+} from "./populate/types";
 
 const noGenderAvatarUrl = "all_genders_avatar.png";
 
