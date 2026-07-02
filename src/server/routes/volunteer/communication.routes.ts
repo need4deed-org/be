@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
+import { dtoCommunication } from "../../../services/dto/dto-communication";
 import { idParamSchema } from "../../schema";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default function volunteerCommunicationRoutes(
   fastify: FastifyInstance,
@@ -10,6 +10,7 @@ export default function volunteerCommunicationRoutes(
   fastify.get<{ Params: { id: string } }>(
     "/",
     {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -27,17 +28,13 @@ export default function volunteerCommunicationRoutes(
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
 
-      const communicationRepository = fastify.db.communicationRepository;
-      const communications = await communicationRepository.find({
-        where: {
-          volunteerId,
-        },
+      const communications = await fastify.db.communicationRepository.find({
+        where: { volunteerId },
       });
 
-      await maskForCaller(request, communications);
       return reply.status(200).send({
         message: `List of communications for volunteer_id:${volunteerId}`,
-        data: communications,
+        data: communications.map(dtoCommunication),
       });
     },
   );
@@ -64,8 +61,7 @@ export default function volunteerCommunicationRoutes(
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
 
-      const communicationRepository = fastify.db.communicationRepository;
-      const communication = await communicationRepository.save({
+      const communication = await fastify.db.communicationRepository.save({
         ...request.body,
         userId: request.user.id,
         volunteerId,
@@ -73,7 +69,7 @@ export default function volunteerCommunicationRoutes(
 
       return reply.status(201).send({
         message: `Communication created for volunteer_id:${volunteerId}`,
-        data: communication,
+        data: dtoCommunication(communication),
       });
     },
   );

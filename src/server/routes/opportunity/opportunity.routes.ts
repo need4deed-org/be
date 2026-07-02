@@ -2,8 +2,10 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityPatch,
+  CommunicationType,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
+  OpportunityLegacyType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -60,12 +62,53 @@ import {
   updateOptionList,
   writeOpportunityLegacy,
 } from "../../utils";
+import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import {
   makePiiSerialization,
   maskForCaller,
 } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
+
+async function sendNewOpportunityEmail(
+  fastify: FastifyInstance,
+  id: number,
+  relations: string[],
+  notifyFn: (opp: Opportunity) => Promise<void>,
+  label: string,
+): Promise<void> {
+  const opp = await fastify.db.opportunityRepository.findOne({
+    where: { id },
+    relations,
+  });
+  if (!opp) {
+    return;
+  }
+  const alreadySent = await fastify.db.communicationRepository.findOne({
+    where: {
+      opportunityId: id,
+      communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
+    },
+  });
+  if (alreadySent) {
+    return;
+  }
+  const comm = await logEmailCommunication(
+    fastify.db.communicationRepository,
+    CommunicationType.OPPORTUNITY_CONFIRMATION,
+    { opportunityId: id },
+  );
+  try {
+    await notifyFn(opp);
+  } catch (sendErr) {
+    await fastify.db.communicationRepository.remove(comm).catch((removeErr) => {
+      logger.error(
+        `${label} dedup rollback failed (opp ${id}, comm ${comm.id}): ${removeErr}`,
+      );
+    });
+    throw sendErr;
+  }
+}
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
@@ -323,7 +366,7 @@ export default async function opportunityRoutes(
         agent.address?.postcode?.value,
       );
       opportunity.accompanying =
-        body.opportunity_type === "accompanying"
+        body.opportunity_type === OpportunityLegacyType.ACCOMPANYING
           ? await accompanyingParserOpportunity(legacyBody)
           : undefined;
 
@@ -340,6 +383,46 @@ export default async function opportunityRoutes(
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
       );
+
+      if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
+        (async () => {
+          try {
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              ["contactPerson", "contactPerson.users"],
+              (opp) => fastify.notify.emailNewRegular(opp),
+              "emailNewRegular",
+            );
+          } catch (err) {
+            logger.error(
+              `emailNewRegular side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
+      } else if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
+        (async () => {
+          try {
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              [
+                "accompanying",
+                "accompanying.postcode",
+                "contactPerson",
+                "contactPerson.users",
+                "district",
+              ],
+              (opp) => fastify.notify.emailNewAccompanying(opp),
+              "emailNewAccompanying",
+            );
+          } catch (err) {
+            logger.error(
+              `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
+      }
 
       return reply.status(201).send({
         message: `Opportunity (${id}) created.`,

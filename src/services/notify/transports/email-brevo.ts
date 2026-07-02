@@ -1,4 +1,5 @@
 import { defaultFrom, isDev, isStaging } from "../../../config/constants";
+import logger from "../../../logger";
 import type { EmailMessage, EmailTransport } from "../types";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -13,6 +14,12 @@ export class BrevoEmailTransport implements EmailTransport {
   constructor(private readonly apiKey: string) {}
 
   async send(msg: EmailMessage): Promise<void> {
+    if (isDev || isStaging) {
+      logger.info(
+        `Brevo email transport (dev/staging) sending to ${msg.to}: ${msg.subject}`,
+      );
+      return;
+    }
     if (!this.apiKey) {
       throw new Error("BREVO_API_KEY is not configured");
     }
@@ -26,7 +33,9 @@ export class BrevoEmailTransport implements EmailTransport {
       },
       body: JSON.stringify({
         sender: { email: msg.from ?? defaultFrom },
-        to: [{ email: msg.to }],
+        to: (Array.isArray(msg.to) ? msg.to : [msg.to]).map((email) => ({
+          email,
+        })),
         ...(isDev || isStaging
           ? {
               bcc: [
@@ -42,8 +51,7 @@ export class BrevoEmailTransport implements EmailTransport {
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Brevo email failed (${res.status}): ${body}`);
+      throw new Error(`Brevo email failed (${res.status})`);
     }
   }
 }

@@ -1,8 +1,8 @@
 import { DataSource } from "typeorm";
-import { seedVolunteersFile } from "../../config";
-import { fetchJsonFromUrl } from "../utils";
+import { seedVolunteersFile } from "../../../config";
+import { fetchJsonFromUrl } from "../../utils";
+import { createDealTimeslots } from "../utils";
 import { VolunteerJSON } from "./types";
-import { createDealTimeslots } from "./utils";
 
 export async function devTime(dataSource: DataSource) {
   const volunteersJson = (await fetchJsonFromUrl(

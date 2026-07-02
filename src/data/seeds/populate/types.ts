@@ -4,7 +4,7 @@ import {
   OpportunityType,
   VolunteerStateType,
 } from "need4deed-sdk";
-import { DealType } from "../types";
+import { DealType } from "../../types";
 
 export interface ProfileJSON {
   info: string;

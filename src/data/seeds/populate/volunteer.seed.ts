@@ -1,12 +1,11 @@
 import { EntityTableName, OpportunityVolunteerStatusType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-import { seedVolunteersFile } from "../../config/constants";
-import logger from "../../logger";
-import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
-import NotionRelation from "../entity/notion-relation.entity";
-import Volunteer from "../entity/volunteer/volunteer.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { VolunteerJSON } from "./types";
+import { seedVolunteersFile } from "../../../config/constants";
+import logger from "../../../logger";
+import OpportunityVolunteer from "../../entity/m2m/opportunity-volunteer";
+import NotionRelation from "../../entity/notion-relation.entity";
+import Volunteer from "../../entity/volunteer/volunteer.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
 import {
   createDeal,
   getCount,
@@ -14,7 +13,8 @@ import {
   getEnumValue,
   getOrCreatePerson,
   getVolunteerState,
-} from "./utils";
+} from "../utils";
+import { VolunteerJSON } from "./types";
 
 export async function seedVolunteers(dataSource: DataSource): Promise<void> {
   if (!dataSource) {

@@ -1,14 +1,13 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-import { seedAgentsFile, titleOrphanageAgent } from "../../config";
-import { tryCatch } from "../../services/utils";
-import Postcode from "../entity/location/postcode.entity";
-import AgentPerson from "../entity/m2m/agent-person";
-import AgentPostcode from "../entity/m2m/agent-postcode";
-import NotionRelation from "../entity/notion-relation.entity";
-import Agent from "../entity/opportunity/agent.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { AgentJSON } from "./types";
+import { seedAgentsFile, titleOrphanageAgent } from "../../../config";
+import { tryCatch } from "../../../services/utils";
+import Postcode from "../../entity/location/postcode.entity";
+import AgentPerson from "../../entity/m2m/agent-person";
+import AgentPostcode from "../../entity/m2m/agent-postcode";
+import NotionRelation from "../../entity/notion-relation.entity";
+import Agent from "../../entity/opportunity/agent.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
 import {
   getAgentEngagement,
   getAgentPersonRole,
@@ -18,7 +17,8 @@ import {
   getAgentType,
   getCount,
   getOrCreatePerson,
-} from "./utils";
+} from "../utils";
+import { AgentJSON } from "./types";
 
 export async function seedAgents(dataSource: DataSource): Promise<void> {
   const agentRepository = getRepository(dataSource, Agent);

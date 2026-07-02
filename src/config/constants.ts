@@ -92,6 +92,27 @@ export const emailVerificationManifestUrl =
 // CDN manifest (per-locale subject + html/text) for the password reset email.
 export const emailPasswordResetManifestUrl =
   CDNBaseUrl + "/emails/password-reset.json";
+
+// CDN manifests for outbound volunteer/opportunity emails.
+export const emailSuggestionManifestUrl =
+  CDNBaseUrl + "/emails/suggestion.json";
+export const emailStaleManifestUrl = CDNBaseUrl + "/emails/stale.json";
+export const emailIntroductionManifestUrl =
+  CDNBaseUrl + "/emails/introduction.json";
+export const emailPostMatchCheckupManifestUrl =
+  CDNBaseUrl + "/emails/checkup.json";
+export const emailAccompanyNotFoundManifestUrl =
+  CDNBaseUrl + "/emails/accompanynotfound.json";
+export const emailAccompanyMatchManifestUrl =
+  CDNBaseUrl + "/emails/accompanymatch.json";
+export const emailRegularUpdateManifestUrl = CDNBaseUrl + "/emails/update.json";
+export const emailNewRegularManifestUrl =
+  CDNBaseUrl + "/emails/confirmation.json";
+export const emailNewAccompanyingManifestUrl =
+  CDNBaseUrl + "/emails/confirmationaccompanying.json";
+
+export const emailFromVolunteer = "volunteer@need4deed.org";
+export const emailFromContact = "contact@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;

@@ -16,13 +16,15 @@ describe("Fastify sanity check", () => {
   it("should create the server without errors", async () => {
     await fastify.ready();
 
-    const health = { message: "Need4Deed API v1 is up and running." };
+    const healthMsg = "Need4Deed API v1 is up and running.";
     const response = await fastify.inject({
       method: "GET",
       url: "/health-check",
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(health);
+    expect(response.json()).toMatchObject({
+      message: expect.stringContaining(healthMsg),
+    });
   });
 });

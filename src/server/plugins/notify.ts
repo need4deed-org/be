@@ -1,11 +1,22 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
+import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import {
   BrevoEmailTransport,
   CommentTaggedInput,
   EmailTransport,
   sendCommentTagged,
+  sendEmailAccompanyMatch,
+  sendEmailAccompanyNotFound,
+  sendEmailIntroduction,
+  sendEmailNewAccompanying,
+  sendEmailNewRegular,
+  sendEmailPostMatchCheckup,
+  sendEmailRegularUpdate,
+  sendEmailStale,
+  sendEmailSuggestion,
   sendEmailVerification,
   sendOpsAlert,
   sendPasswordReset,
@@ -19,6 +30,15 @@ interface NotifyService {
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   commentTagged(input: CommentTaggedInput): Promise<void>;
+  emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
+  emailStale(ov: OpportunityVolunteer): Promise<void>;
+  emailIntroduction(ov: OpportunityVolunteer): Promise<void>;
+  emailPostMatchCheckup(ov: OpportunityVolunteer): Promise<void>;
+  emailAccompanyNotFound(opportunity: Opportunity): Promise<void>;
+  emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
+  emailRegularUpdate(opportunity: Opportunity): Promise<void>;
+  emailNewRegular(opportunity: Opportunity): Promise<void>;
+  emailNewAccompanying(opportunity: Opportunity): Promise<void>;
 }
 
 declare module "fastify" {
@@ -57,6 +77,23 @@ async function notifyPlugin(fastify: FastifyInstance) {
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     commentTagged: (input: CommentTaggedInput) =>
       sendCommentTagged({ slack }, input),
+    emailSuggestion: (ov: OpportunityVolunteer) =>
+      sendEmailSuggestion(email, ov),
+    emailStale: (ov: OpportunityVolunteer) => sendEmailStale(email, ov),
+    emailIntroduction: (ov: OpportunityVolunteer) =>
+      sendEmailIntroduction(email, ov),
+    emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
+      sendEmailPostMatchCheckup(email, ov),
+    emailAccompanyNotFound: (opportunity: Opportunity) =>
+      sendEmailAccompanyNotFound(email, opportunity),
+    emailAccompanyMatch: (ov: OpportunityVolunteer) =>
+      sendEmailAccompanyMatch(email, ov),
+    emailRegularUpdate: (opportunity: Opportunity) =>
+      sendEmailRegularUpdate(email, opportunity),
+    emailNewRegular: (opportunity: Opportunity) =>
+      sendEmailNewRegular(email, opportunity),
+    emailNewAccompanying: (opportunity: Opportunity) =>
+      sendEmailNewAccompanying(email, opportunity),
   });
 }
 

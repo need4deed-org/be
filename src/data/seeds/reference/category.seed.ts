@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
-import { seedCategoryFile } from "../../config/constants";
-import logger from "../../logger";
-import Category from "../entity/profile/category.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedCategoryFile } from "../../../config/constants";
+import logger from "../../../logger";
+import Category from "../../entity/profile/category.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface CategoryJSON {
   id: string;

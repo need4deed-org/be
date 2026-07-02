@@ -3,15 +3,17 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    globals: true, // Allows using 'describe', 'it', 'expect' without importing
+    globals: true,
     environment: "node",
-    setupFiles: ["./src/test/setup.ts"], // Optional: for DB connection logic
-    include: ["**/*.{test,spec}.ts"],
-    exclude: ["**/node_modules/**", "src/test/e2e/**"],
+    globalSetup: ["./src/test/e2e/setup/global.ts"],
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/test/e2e/**/*.test.ts"],
+    pool: "forks",
+    fileParallelism: false,
     env: {
-      JWT_SECRET: "test-secret-only-for-vitest",
+      JWT_SECRET: "test-secret-only-for-e2e-vitest",
       NODE_ENV: "test",
-      PORT: "5001",
+      PORT: "5002",
     },
   },
   plugins: [

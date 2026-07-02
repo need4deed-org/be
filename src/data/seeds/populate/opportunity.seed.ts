@@ -4,21 +4,21 @@ import {
   TranslatedIntoType,
 } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-import { seedOpportunitiesFile } from "../../config/constants";
-import logger from "../../logger";
-import { tryCatch } from "../../services/utils";
-import NotionRelation from "../entity/notion-relation.entity";
-import Accompanying from "../entity/opportunity/accompanying.entity";
-import Opportunity from "../entity/opportunity/opportunity.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { OpportunityJSON } from "./types";
+import { seedOpportunitiesFile } from "../../../config/constants";
+import logger from "../../../logger";
+import { tryCatch } from "../../../services/utils";
+import NotionRelation from "../../entity/notion-relation.entity";
+import Accompanying from "../../entity/opportunity/accompanying.entity";
+import Opportunity from "../../entity/opportunity/opportunity.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
 import {
   createDeal,
   getCount,
   getEnumValue,
   getOrCreateAgent,
   getToTranslate,
-} from "./utils";
+} from "../utils";
+import { OpportunityJSON } from "./types";
 
 export async function seedOpportunities(dataSource: DataSource): Promise<void> {
   if (!dataSource) {

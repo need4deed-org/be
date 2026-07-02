@@ -1,8 +1,8 @@
 import { OccasionalType } from "need4deed-sdk";
 import { DataSource } from "typeorm";
-import Timeslot from "../entity/time/timeslot.entity";
-import { getRepository } from "../utils";
-import { getCount } from "./utils";
+import Timeslot from "../../entity/time/timeslot.entity";
+import { getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 export async function seedTimeslots(dataSource: DataSource): Promise<void> {
   const timeslotRepository = getRepository(dataSource, Timeslot);

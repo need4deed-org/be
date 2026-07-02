@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
-import { seedLanguageFile } from "../../config/constants";
-import logger from "../../logger";
-import Language from "../entity/profile/language.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedLanguageFile } from "../../../config/constants";
+import logger from "../../../logger";
+import Language from "../../entity/profile/language.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface LanguageJSON {
   iso_code: string;
