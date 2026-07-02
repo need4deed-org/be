@@ -2,7 +2,15 @@ import * as path from "path";
 
 const publicFixturesFromHere = ["..", "..", "public", "data"];
 
-const positives = ["1", "YES", "Yes", "yes", "TRUE", "True", "true"];
+export const TRUTHY = new Set([
+  "1",
+  "YES",
+  "Yes",
+  "yes",
+  "TRUE",
+  "True",
+  "true",
+]);
 
 export const CDNBaseUrl =
   process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
@@ -145,12 +153,8 @@ export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
 export const isProd = process.env.NODE_ENV === "production";
 export const isStaging = process.env.NODE_ENV === "staging";
-export const shouldTruncateAll = positives.includes(
-  process.env.TRUNCATE_ALL || "",
-);
-export const shouldRunMigrations = positives.includes(
-  process.env.RUN_MIGRATIONS || "",
-);
+export const shouldTruncateAll = TRUTHY.has(process.env.TRUNCATE_ALL || "");
+export const shouldRunMigrations = TRUTHY.has(process.env.RUN_MIGRATIONS || "");
 export const nidsToken = process.env.NIDS_TOKEN || "";
 
 export const authAccessTokenCookieName = "access";

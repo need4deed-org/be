@@ -1,11 +1,14 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
+import { isProd, TRUTHY } from "../../config/constants";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import {
   BrevoEmailTransport,
   CommentTaggedInput,
+  DryRunEmailTransport,
+  DryRunSlackTransport,
   EmailTransport,
   sendCommentTagged,
   sendEmailAccompanyMatch,
@@ -47,11 +50,34 @@ declare module "fastify" {
   }
 }
 
+/** Resolve dry-run flag for a given transport key (e.g. "EMAIL", "SLACK").
+ *  Priority: per-transport env > global env > default (!isProd). */
+function isDryRun(transportKey: string): boolean {
+  const perTransport = process.env[`NOTIFY_${transportKey}_DRY_RUN`];
+  if (perTransport !== undefined) {
+    return TRUTHY.has(perTransport);
+  }
+
+  const global = process.env.NOTIFY_DRY_RUN;
+  if (global !== undefined) {
+    return TRUTHY.has(global);
+  }
+
+  return !isProd;
+}
+
 function buildEmailTransport(): EmailTransport {
+  if (isDryRun("EMAIL")) {
+    return new DryRunEmailTransport();
+  }
   return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
+  if (isDryRun("SLACK")) {
+    return new DryRunSlackTransport();
+  }
+
   const urls: Partial<Record<SlackChannel, string>> = {};
   if (process.env.SLACK_OPS_WEBHOOK_URL) {
     urls.ops = process.env.SLACK_OPS_WEBHOOK_URL;
