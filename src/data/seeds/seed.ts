@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
 import { check } from "..";
-import { seedAgents } from "./dev/agent.seed";
-import { devTime } from "./dev/dev-parsing";
-import { seedOpportunities } from "./dev/opportunity.seed";
-import { seedVolunteers } from "./dev/volunteer.seed";
+import { seedAgents } from "./populate/agent.seed";
+import { devTime } from "./populate/dev-parsing";
+import { seedOpportunities } from "./populate/opportunity.seed";
+import { seedVolunteers } from "./populate/volunteer.seed";
 import { seedReference } from "./reference";
 import { seedUser } from "./user.seed";
 
