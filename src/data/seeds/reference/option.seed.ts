@@ -1,15 +1,15 @@
 import { EntityTableName } from "need4deed-sdk";
 import { DataSource, In, Repository } from "typeorm";
-import { seedLanguageInUseFile } from "../../config/constants";
-import logger from "../../logger";
-import LeadFrom from "../entity/lead.entity";
-import District from "../entity/location/district.entity";
-import Option from "../entity/option.entity";
-import Activity from "../entity/profile/activity.entity";
-import Language from "../entity/profile/language.entity";
-import Skill from "../entity/profile/skill.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedLanguageInUseFile } from "../../../config/constants";
+import logger from "../../../logger";
+import LeadFrom from "../../entity/lead.entity";
+import District from "../../entity/location/district.entity";
+import Option from "../../entity/option.entity";
+import Activity from "../../entity/profile/activity.entity";
+import Language from "../../entity/profile/language.entity";
+import Skill from "../../entity/profile/skill.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface ContentEnDe {
   en: string;
@@ -74,7 +74,6 @@ async function getOptionsForEntity<E extends OptionEntity>(
     dataSource,
     entity as new () => InstanceType<E>,
   );
-  // const itemType = entity.name.toLowerCase() as TranslationEntityType;
   const itemType = dataSource.getMetadata(entity).tableName as EntityTableName;
   const items = await entityRepository.find();
   if (!items.length) {

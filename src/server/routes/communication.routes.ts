@@ -88,7 +88,10 @@ export default async function communicationRoutes(
         });
       }
 
-      if (communication.userId !== request.user.id) {
+      if (
+        communication.userId !== null &&
+        communication.userId !== request.user.id
+      ) {
         return reply.status(403).send({
           message: `You do not have permission to delete communication with id:${id}.`,
         });

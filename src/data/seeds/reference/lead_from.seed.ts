@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
-import { seedLeadFromFile } from "../../config/constants";
-import logger from "../../logger";
-import LeadFrom from "../entity/lead.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedLeadFromFile } from "../../../config/constants";
+import logger from "../../../logger";
+import LeadFrom from "../../entity/lead.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface LeadJSON {
   id: string;

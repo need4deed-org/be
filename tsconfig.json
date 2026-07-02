@@ -12,7 +12,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "include": ["src/**/*.ts", "vitest.config.ts", "vitest.e2e.config.ts"],
   "exclude": ["node_modules"],
   "ts-node": {
     "files": true

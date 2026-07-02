@@ -1,10 +1,10 @@
 import { DataSource } from "typeorm";
-import { seedActivityFile } from "../../config/constants";
-import logger from "../../logger";
-import Activity from "../entity/profile/activity.entity";
-import Category from "../entity/profile/category.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedActivityFile } from "../../../config/constants";
+import logger from "../../../logger";
+import Activity from "../../entity/profile/activity.entity";
+import Category from "../../entity/profile/category.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface ActivityJSON {
   id: string;

@@ -10,6 +10,8 @@ export function dtoCommunication(
     contactMethod: communication.contactMethod,
     communicationType: communication.communicationType,
     date: communication.date,
+    volunteerId: communication.volunteerId,
+    opportunityId: communication.opportunityId,
     agentId: communication.agentId,
     userId: communication.userId,
   };

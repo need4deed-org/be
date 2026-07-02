@@ -26,7 +26,9 @@ export class BrevoEmailTransport implements EmailTransport {
       },
       body: JSON.stringify({
         sender: { email: msg.from ?? defaultFrom },
-        to: [{ email: msg.to }],
+        to: (Array.isArray(msg.to) ? msg.to : [msg.to]).map((email) => ({
+          email,
+        })),
         ...(isDev || isStaging
           ? {
               bcc: [
@@ -42,8 +44,7 @@ export class BrevoEmailTransport implements EmailTransport {
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Brevo email failed (${res.status}): ${body}`);
+      throw new Error(`Brevo email failed (${res.status})`);
     }
   }
 }

@@ -1,9 +1,9 @@
 import { DataSource } from "typeorm";
-import { seedSkillFile } from "../../config/constants";
-import logger from "../../logger";
-import Skill from "../entity/profile/skill.entity";
-import { fetchJsonFromUrl, getRepository } from "../utils";
-import { getCount } from "./utils";
+import { seedSkillFile } from "../../../config/constants";
+import logger from "../../../logger";
+import Skill from "../../entity/profile/skill.entity";
+import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getCount } from "../utils";
 
 interface SkillJSON {
   id: string;
