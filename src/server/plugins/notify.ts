@@ -26,6 +26,7 @@ import {
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
+  SmtpEmailTransport,
 } from "../../services/notify";
 
 interface NotifyService {
@@ -69,6 +70,15 @@ function isDryRun(transportKey: string): boolean {
 function buildEmailTransport(): EmailTransport {
   if (isDryRun("EMAIL")) {
     return new DryRunEmailTransport();
+  }
+  const smtpHost = process.env.SMTP_HOST;
+  if (smtpHost) {
+    return new SmtpEmailTransport(
+      smtpHost,
+      Number(process.env.SMTP_PORT ?? 587),
+      process.env.SMTP_USER ?? "",
+      process.env.SMTP_PASS ?? "",
+    );
   }
   return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
 }

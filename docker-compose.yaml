@@ -15,8 +15,12 @@ services:
       - NODE_ENV=${NODE_ENV}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
       - PORT=8000
-      - NOTIFY_EMAIL_DRY_RUN=true
-      - NOTIFY_SLACK_DRY_RUN=true
+      - NOTIFY_EMAIL_DRY_RUN=${NOTIFY_EMAIL_DRY_RUN:-true}
+      - NOTIFY_SLACK_DRY_RUN=${NOTIFY_SLACK_DRY_RUN:-true}
+      - SMTP_HOST=${SMTP_HOST:-mail.infomaniak.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USERNAME=postgres
