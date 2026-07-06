@@ -43,7 +43,7 @@ export default class Post {
 
   @ManyToMany(() => Person)
   @JoinTable({
-    name: "post_tagged_person",
+    name: "post_person",
     joinColumn: { name: "post_id" },
     inverseJoinColumn: { name: "person_id" },
   })
@@ -51,7 +51,7 @@ export default class Post {
 
   @ManyToMany(() => Opportunity)
   @JoinTable({
-    name: "post_linked_opportunity",
+    name: "post_opportunity",
     joinColumn: { name: "post_id" },
     inverseJoinColumn: { name: "opportunity_id" },
   })

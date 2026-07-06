@@ -161,8 +161,9 @@ export default async function postRoutes(
         where: { id: userId },
         select: ["personId"],
       });
-      if (!user?.personId)
-        {throw new BadRequestError("No person linked to this user.");}
+      if (!user?.personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
 
       let agentId: number | null = null;
       if (role === UserRole.AGENT) {
@@ -230,20 +231,17 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const id = Number(request.params.id);
-      const { id: userId, role } = request.user;
+      const { role } = request.user;
 
       const post = await fastify.db.postRepository.findOne({
         where: { id },
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
-      if (!post) {throw new NotFoundError(`Post ${id} not found.`);}
+      if (!post) {
+        throw new NotFoundError(`Post ${id} not found.`);
+      }
 
-      const user = await fastify.db.userRepository.findOne({
-        where: { id: userId },
-        select: ["personId"],
-      });
-
-      const isAuthor = user?.personId === post.authorId;
+      const isAuthor = request.authUser?.personId === post.authorId;
       const isPrivileged =
         role === UserRole.ADMIN || role === UserRole.COORDINATOR;
       if (!isAuthor && !isPrivileged) {
@@ -254,7 +252,9 @@ export default async function postRoutes(
 
       const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
 
-      if (text !== null && text !== undefined) {post.text = text;}
+      if (text !== null && text !== undefined) {
+        post.text = text;
+      }
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
         post.taggedPersons = taggedPersonIds.length
           ? await fastify.db.personRepository.findBy({
@@ -291,17 +291,14 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const id = Number(request.params.id);
-      const { id: userId, role } = request.user;
+      const { role } = request.user;
 
       const post = await fastify.db.postRepository.findOne({ where: { id } });
-      if (!post) {throw new NotFoundError(`Post ${id} not found.`);}
+      if (!post) {
+        throw new NotFoundError(`Post ${id} not found.`);
+      }
 
-      const user = await fastify.db.userRepository.findOne({
-        where: { id: userId },
-        select: ["personId"],
-      });
-
-      const isAuthor = user?.personId === post.authorId;
+      const isAuthor = request.authUser?.personId === post.authorId;
       const isPrivileged =
         role === UserRole.ADMIN || role === UserRole.COORDINATOR;
       if (!isAuthor && !isPrivileged) {
