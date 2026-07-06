@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   AgentMembershipStatus,
   AgentRoleType,
+  ApiPostGet,
   ApiPostPatch,
   ApiPostPost,
   UserRole,
@@ -13,17 +14,19 @@ import {
   UnauthorizedError,
 } from "../../config/error/fastify";
 import { dtoPost } from "../../services/dto/dto-post";
-import { idParamSchema, responseSchema } from "../schema";
+import {
+  idParamSchema,
+  paginationQuerySchema,
+  responseSchema,
+} from "../schema";
+import {
+  ParamsId,
+  QuerystringPagination,
+  ReplyData,
+  ReplyDataCount,
+  ReplyMessage,
+} from "../types";
 import { getSkipTake } from "../utils";
-
-const postListQuerySchema = {
-  type: "object",
-  properties: {
-    page: { type: "integer", minimum: 1 },
-    limit: { type: "integer", minimum: 1, maximum: 120 },
-  },
-  additionalProperties: false,
-};
 
 export default async function postRoutes(
   fastify: FastifyInstance,
@@ -32,11 +35,14 @@ export default async function postRoutes(
   //
   // GET /post
   //
-  fastify.get<{ Querystring: { page?: number; limit?: number } }>(
+  fastify.get<{
+    Querystring: QuerystringPagination;
+    Reply: ReplyDataCount<ApiPostGet[]>;
+  }>(
     "/",
     {
       schema: {
-        querystring: postListQuerySchema,
+        querystring: paginationQuerySchema,
         response: responseSchema({
           dataSchemaRef: "ApiPostGet#",
           isArray: true,
@@ -137,7 +143,7 @@ export default async function postRoutes(
   //
   // POST /post
   //
-  fastify.post<{ Body: ApiPostPost }>(
+  fastify.post<{ Body: ApiPostPost; Reply: ReplyData<ApiPostGet> }>(
     "/",
     {
       schema: {
@@ -219,7 +225,11 @@ export default async function postRoutes(
   //
   // PATCH /post/:id
   //
-  fastify.patch<{ Params: { id: string }; Body: ApiPostPatch }>(
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiPostPatch;
+    Reply: ReplyData<ApiPostGet>;
+  }>(
     "/:id",
     {
       schema: {
@@ -230,7 +240,7 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const id = Number(request.params.id);
+      const { id } = request.params;
       const { role } = request.user;
 
       const post = await fastify.db.postRepository.findOne({
@@ -280,7 +290,7 @@ export default async function postRoutes(
   //
   // DELETE /post/:id
   //
-  fastify.delete<{ Params: { id: string } }>(
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
       schema: {
@@ -290,7 +300,7 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const id = Number(request.params.id);
+      const { id } = request.params;
       const { role } = request.user;
 
       const post = await fastify.db.postRepository.findOne({ where: { id } });
