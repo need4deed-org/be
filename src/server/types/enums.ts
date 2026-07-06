@@ -18,6 +18,7 @@ export const RoutePrefix = {
   ORGANIZATION: "/organization",
   OPTION: "/option",
   PERSON: "/person",
+  POST: "/post",
   REFRESH: "/refresh",
   REQUEST_RESET: "/request-reset",
   RESET_PASSWORD: "/password-reset",
