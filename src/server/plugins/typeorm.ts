@@ -16,6 +16,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
+import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
@@ -52,6 +53,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       agentPersonRepository: dataSource.getRepository(AgentPerson),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
+      postRepository: dataSource.getRepository(Post),
       trustedDomainRepository: dataSource.getRepository(TrustedDomain),
     });
 
