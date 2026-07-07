@@ -1335,6 +1335,7 @@
         "trustLevel",
         "activeVolunteers",
         "numActiveVolunteers",
+        "numOpportunities",
         "email",
         "volunteerSearch"
       ]
