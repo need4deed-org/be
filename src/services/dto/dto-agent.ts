@@ -38,14 +38,20 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
     volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
     numActiveVolunteers: agent.activeVolunteers,
+    numOpportunities: agent.opportunity?.length ?? 0,
     email:
       agent.representative?.person?.email || agent.organization?.email || "",
     district: { id: agent.districtId, title: { de: agent?.district?.title } },
   };
 }
 
-type AgentDetailsExtended = AgentDetails & { addressStreet?: string | null; addressPostcode?: string | null };
-type ApiAgentGetExtended = Omit<ApiAgentGet, "agentDetails"> & { agentDetails: AgentDetailsExtended };
+type AgentDetailsExtended = AgentDetails & {
+  addressStreet?: string | null;
+  addressPostcode?: string | null;
+};
+type ApiAgentGetExtended = Omit<ApiAgentGet, "agentDetails"> & {
+  agentDetails: AgentDetailsExtended;
+};
 
 export function dtoAgentGet(
   agent: Agent & { comments: Comment[] },
@@ -85,7 +91,10 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   };
 }
 
-function dtoAgentDetails(agent: Agent): AgentDetails & { addressStreet?: string | null; addressPostcode?: string | null } {
+function dtoAgentDetails(agent: Agent): AgentDetails & {
+  addressStreet?: string | null;
+  addressPostcode?: string | null;
+} {
   return {
     about: agent.info,
     address: serializeAddress(agent.address),
