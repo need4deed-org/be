@@ -18,6 +18,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
+import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
@@ -45,6 +46,7 @@ declare module "fastify" {
       agentPersonRepository: Repository<AgentPerson>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
+      postRepository: Repository<Post>;
       trustedDomainRepository: Repository<TrustedDomain>;
     };
     jwt: JWT;
