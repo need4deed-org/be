@@ -1630,13 +1630,14 @@
           "items": { "type": "integer" }
         }
       },
-      "required": ["text"]
+      "required": ["text"],
+      "additionalProperties": false
     },
     "ApiPostPatch": {
       "$id": "ApiPostPatch",
       "type": "object",
       "properties": {
-        "text": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"], "minLength": 1 },
         "taggedPersonIds": {
           "type": ["array", "null"],
           "items": { "type": "integer" }
@@ -1645,7 +1646,8 @@
           "type": ["array", "null"],
           "items": { "type": "integer" }
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }
