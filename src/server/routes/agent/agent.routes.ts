@@ -72,13 +72,13 @@ export default async function agentRoutes(
       preSerialization: makePiiSerialization(dtoAgentGetList),
     },
     async (request, reply) => {
-      logger.debug(`GET /agents: request.query:${Object.keys(request.query)}`);
+      logger.debug(`GET /agent: request.query:${Object.keys(request.query)}`);
       const { page, limit, sortOrder, filter } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
       const where = getAgentWhere(filter);
 
       logger.debug(
-        `GET /agents: filters:${JSON.stringify(filter)}, skip:${skip}, take:${take}`,
+        `GET /agent: filters:${JSON.stringify(filter)}, skip:${skip}, take:${take}`,
       );
 
       const agentRepository = fastify.db.agentRepository;
