@@ -20,6 +20,7 @@ import {
   ReplyMessage,
 } from "../types";
 import { getSkipTake } from "../utils";
+import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 
 export default async function postRoutes(
   fastify: FastifyInstance,
@@ -105,18 +106,45 @@ export default async function postRoutes(
         linkedOpportunityIds = [],
       } = request.body;
 
-      const taggedPersons = taggedPersonIds.length
-        ? await fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
-        : [];
-      const linkedOpportunities = linkedOpportunityIds.length
-        ? await fastify.db.opportunityRepository.findBy({
-            id: In(linkedOpportunityIds),
-          })
-        : [];
+      const agentPerson = await getAgentPersonRepresentative(personId);
+
+      const [taggedPersons, linkedOpportunities] = await Promise.all([
+        taggedPersonIds.length
+          ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
+          : [],
+        linkedOpportunityIds.length
+          ? fastify.db.opportunityRepository.findBy({
+              id: In(linkedOpportunityIds),
+            })
+          : [],
+      ]);
+
+      const existingPersonIds = new Set(taggedPersons.map((p) => p.id));
+      const missingPersonIds = [...new Set(taggedPersonIds)].filter(
+        (id) => !existingPersonIds.has(id),
+      );
+      if (missingPersonIds.length) {
+        throw new BadRequestError(
+          `Invalid tagged person id(s): ${missingPersonIds.join(", ")}`,
+        );
+      }
+
+      const existingOpportunityIds = new Set(
+        linkedOpportunities.map((o) => o.id),
+      );
+      const missingOpportunityIds = [...new Set(linkedOpportunityIds)].filter(
+        (id) => !existingOpportunityIds.has(id),
+      );
+      if (missingOpportunityIds.length) {
+        throw new BadRequestError(
+          `Invalid linked opportunity id(s): ${missingOpportunityIds.join(", ")}`,
+        );
+      }
 
       const post = fastify.db.postRepository.create({
         text,
         authorId: personId,
+        agentId: agentPerson?.agentId ?? null,
         taggedPersons,
         linkedOpportunities,
       });
@@ -128,9 +156,10 @@ export default async function postRoutes(
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
 
+      if (!full) {throw new NotFoundError("Post not found.");}
       return reply
         .status(201)
-        .send({ message: "Post created.", data: dtoPost(full!) });
+        .send({ message: "Post created.", data: dtoPost(full) });
     },
   );
 
@@ -155,6 +184,14 @@ export default async function postRoutes(
       const { id } = request.params;
       const { role } = request.user;
 
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
       const post = await fastify.db.postRepository.findOne({
         where: { id },
         relations: ["author", "taggedPersons", "linkedOpportunities"],
@@ -178,18 +215,38 @@ export default async function postRoutes(
         post.text = text;
       }
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
-        post.taggedPersons = taggedPersonIds.length
+        const found = taggedPersonIds.length
           ? await fastify.db.personRepository.findBy({
               id: In(taggedPersonIds),
             })
           : [];
+        const existingIds = new Set(found.map((p) => p.id));
+        const missing = [...new Set(taggedPersonIds)].filter(
+          (id) => !existingIds.has(id),
+        );
+        if (missing.length) {
+          throw new BadRequestError(
+            `Invalid tagged person id(s): ${missing.join(", ")}`,
+          );
+        }
+        post.taggedPersons = found;
       }
       if (linkedOpportunityIds !== null && linkedOpportunityIds !== undefined) {
-        post.linkedOpportunities = linkedOpportunityIds.length
+        const found = linkedOpportunityIds.length
           ? await fastify.db.opportunityRepository.findBy({
               id: In(linkedOpportunityIds),
             })
           : [];
+        const existingIds = new Set(found.map((o) => o.id));
+        const missing = [...new Set(linkedOpportunityIds)].filter(
+          (id) => !existingIds.has(id),
+        );
+        if (missing.length) {
+          throw new BadRequestError(
+            `Invalid linked opportunity id(s): ${missing.join(", ")}`,
+          );
+        }
+        post.linkedOpportunities = found;
       }
 
       const updated = await fastify.db.postRepository.save(post);
@@ -214,6 +271,14 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
 
       const post = await fastify.db.postRepository.findOne({ where: { id } });
       if (!post) {
