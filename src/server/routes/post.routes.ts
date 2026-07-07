@@ -1,13 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import {
-  AgentMembershipStatus,
-  AgentRoleType,
-  ApiPostGet,
-  ApiPostPatch,
-  ApiPostPost,
-  UserRole,
-} from "need4deed-sdk";
-import { Brackets, In } from "typeorm";
+import { ApiPostGet, ApiPostPatch, ApiPostPost, UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -52,7 +45,7 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { role, id: userId } = request.user;
+      const { role } = request.user;
       const [skip, take] = getSkipTake(request.query);
 
       const qb = fastify.db.postRepository
@@ -64,67 +57,12 @@ export default async function postRoutes(
         .skip(skip)
         .take(take);
 
-      if (role === UserRole.ADMIN || role === UserRole.COORDINATOR) {
+      if (
+        role === UserRole.ADMIN ||
+        role === UserRole.COORDINATOR ||
+        role === UserRole.AGENT
+      ) {
         // no filter — all posts visible
-      } else if (role === UserRole.AGENT) {
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: userId },
-          select: ["personId"],
-        });
-        const membership = user?.personId
-          ? ((await fastify.db.agentPersonRepository.findOne({
-              where: {
-                personId: user.personId,
-                status: AgentMembershipStatus.ACTIVE,
-                role: AgentRoleType.VOLUNTEER_COORDINATOR,
-              },
-              order: { id: "ASC" },
-            })) ??
-            (await fastify.db.agentPersonRepository.findOne({
-              where: {
-                personId: user.personId,
-                status: AgentMembershipStatus.ACTIVE,
-              },
-              order: { id: "ASC" },
-            })))
-          : null;
-
-        if (!membership) {
-          return reply
-            .status(200)
-            .send({ message: "Posts.", data: [], count: 0 });
-        }
-        qb.where("post.agentId = :agentId", { agentId: membership.agentId });
-      } else if (role === UserRole.VOLUNTEER) {
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: userId },
-          select: ["personId"],
-        });
-        if (!user?.personId) {
-          return reply
-            .status(200)
-            .send({ message: "Posts.", data: [], count: 0 });
-        }
-
-        const memberships = await fastify.db.agentPersonRepository.find({
-          where: {
-            personId: user.personId,
-            status: AgentMembershipStatus.ACTIVE,
-          },
-          select: ["agentId"],
-        });
-        const agentIds = memberships.map((m) => m.agentId);
-
-        qb.where(
-          new Brackets((sub) => {
-            sub.where("taggedPerson.id = :personId", {
-              personId: user.personId,
-            });
-            if (agentIds.length > 0) {
-              sub.orWhere("post.agentId IN (:...agentIds)", { agentIds });
-            }
-          }),
-        );
       } else {
         return reply
           .status(200)
@@ -153,44 +91,19 @@ export default async function postRoutes(
           statusCode: 201,
         }),
       },
-      onRequest: [fastify.authenticate()],
+      onRequest: [fastify.authenticate({ role: UserRole.AGENT })],
     },
     async (request, reply) => {
-      const { id: userId, role } = request.user;
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
       const {
         text,
         taggedPersonIds = [],
         linkedOpportunityIds = [],
       } = request.body;
-
-      const user = await fastify.db.userRepository.findOne({
-        where: { id: userId },
-        select: ["personId"],
-      });
-      if (!user?.personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
-
-      let agentId: number | null = null;
-      if (role === UserRole.AGENT) {
-        const membership =
-          (await fastify.db.agentPersonRepository.findOne({
-            where: {
-              personId: user.personId,
-              status: AgentMembershipStatus.ACTIVE,
-              role: AgentRoleType.VOLUNTEER_COORDINATOR,
-            },
-            order: { id: "ASC" },
-          })) ??
-          (await fastify.db.agentPersonRepository.findOne({
-            where: {
-              personId: user.personId,
-              status: AgentMembershipStatus.ACTIVE,
-            },
-            order: { id: "ASC" },
-          }));
-        agentId = membership?.agentId ?? null;
-      }
 
       const taggedPersons = taggedPersonIds.length
         ? await fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
@@ -203,8 +116,7 @@ export default async function postRoutes(
 
       const post = fastify.db.postRepository.create({
         text,
-        authorId: user.personId,
-        agentId,
+        authorId: personId,
         taggedPersons,
         linkedOpportunities,
       });
