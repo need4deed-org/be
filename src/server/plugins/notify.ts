@@ -5,7 +5,6 @@ import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import {
-  BrevoEmailTransport,
   CommentTaggedInput,
   DryRunEmailTransport,
   DryRunSlackTransport,
@@ -26,6 +25,7 @@ import {
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
+  SmtpEmailTransport,
 } from "../../services/notify";
 
 interface NotifyService {
@@ -67,10 +67,16 @@ function isDryRun(transportKey: string): boolean {
 }
 
 function buildEmailTransport(): EmailTransport {
+  const smtp = new SmtpEmailTransport({
+    host: process.env.SMTP_HOST ?? "mail.infomaniak.com",
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? "",
+    password: process.env.SMTP_PASSWORD ?? "",
+  });
   if (isDryRun("EMAIL")) {
-    return new DryRunEmailTransport();
+    return new DryRunEmailTransport(smtp);
   }
-  return new BrevoEmailTransport(process.env.BREVO_API_KEY ?? "");
+  return smtp;
 }
 
 function buildSlackTransport(): SlackTransport | undefined {

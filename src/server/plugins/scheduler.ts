@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
+import { TRUTHY } from "../../config/constants";
 import { dataSource } from "../../data/data-source";
 import logger from "../../logger";
 import {
@@ -53,6 +54,11 @@ async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
     "0 8-19 * * 1-5",
     async () => {
       try {
+        if (TRUTHY.has(process.env.NOTIFY_CRON_MUTED ?? "")) {
+          logger.info("scheduler: skipping — NOTIFY_CRON_MUTED is set");
+          return;
+        }
+
         if (isGermanPublicHoliday(berlinToday())) {
           logger.info("scheduler: skipping — German public holiday");
           return;
