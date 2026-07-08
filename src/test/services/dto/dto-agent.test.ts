@@ -207,10 +207,19 @@ describe("dtoAgentOpportunity", () => {
   const baseOpportunity = {
     id: 42,
     title: "German tutoring",
+    type: "regular",
     status: "opp-active",
     statusMatch: "opp-vol-matched",
     numberVolunteers: 3,
     createdAt: new Date("2026-01-15"),
+    districtId: 7,
+    district: { id: 7 },
+    deal: {
+      dealLanguage: [],
+      dealActivity: [],
+      dealDistrict: [],
+      dealTimeslot: [],
+    },
   };
 
   it("maps the opportunity scalars and its linked volunteers", () => {
@@ -229,10 +238,16 @@ describe("dtoAgentOpportunity", () => {
     expect(dtoAgentOpportunity(opportunity as any)).toEqual({
       id: 42,
       title: "German tutoring",
+      volunteerType: "regular",
       statusOpportunity: "opp-active",
       statusMatch: "opp-vol-matched",
       numberOfVolunteers: 3,
       createdAt: new Date("2026-01-15"),
+      district: { id: 7 },
+      languages: [],
+      activities: [],
+      location: [],
+      availability: [],
       volunteers: [
         {
           id: 5,
