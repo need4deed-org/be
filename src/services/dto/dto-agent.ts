@@ -37,7 +37,6 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
     trustLevel: agent.trustLevel,
     volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
-    numActiveVolunteers: agent.activeVolunteers,
     numOpportunities: agent.opportunity?.length ?? 0,
     email:
       agent.representative?.person?.email || agent.organization?.email || "",
