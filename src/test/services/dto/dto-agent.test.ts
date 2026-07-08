@@ -1,4 +1,4 @@
-import { AgentVolunteerSearchType } from "need4deed-sdk";
+import { AgentTrustType, AgentVolunteerSearchType } from "need4deed-sdk";
 import { describe, expect, it, vi } from "vitest";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import {
@@ -143,24 +143,26 @@ describe("dtoAgentGetList", () => {
     title: "Helping Hands",
     type: "NGO",
     activeVolunteers: 10,
+    numOpportunities: 0,
     addressId: 101,
     searchStatus: AgentVolunteerSearchType.SEARCHING,
     districtId: 201,
   };
 
-  it("should correctly map a complete agent object", () => {
+  it("maps all scalar fields from a fully-loaded agent", () => {
     const fullAgent = {
       ...mockAgentBase,
+      trustLevel: AgentTrustType.HIGH,
       address: {
         street: "Main St",
         city: "Berlin",
         postcodeId: 501,
         postcode: { value: "10115" },
       },
-      district: {
-        title: "Mitte",
-      },
-    } as Agent & { activeVolunteers: number };
+      district: { title: "Mitte" },
+      representative: { person: { email: "contact@helping-hands.org" } },
+      opportunity: [{} as any, {} as any],
+    } as Agent & { activeVolunteers: number; numOpportunities: number };
 
     const result = dtoAgentGetList(fullAgent);
 
@@ -168,9 +170,10 @@ describe("dtoAgentGetList", () => {
       id: 1,
       title: "Helping Hands",
       type: "NGO",
+      trustLevel: AgentTrustType.HIGH,
       activeVolunteers: 10,
-      numActiveVolunteers: 10,
-      email: "",
+      numOpportunities: 2,
+      email: "contact@helping-hands.org",
       district: {
         id: 201,
         title: { de: "Mitte" },

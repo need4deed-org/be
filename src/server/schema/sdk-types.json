@@ -1338,6 +1338,7 @@
         "trustLevel",
         "activeVolunteers",
         "numActiveVolunteers",
+        "numOpportunities",
         "email",
         "volunteerSearch"
       ]
@@ -1574,6 +1575,83 @@
         }
       },
       "required": ["id", "readAt"]
+    },
+    "ApiPostPerson": {
+      "$id": "ApiPostPerson",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "fullName": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      },
+      "required": ["id", "fullName"]
+    },
+    "ApiPostLinkedOpportunity": {
+      "$id": "ApiPostLinkedOpportunity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "ApiPostGet": {
+      "$id": "ApiPostGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "text": { "type": "string" },
+        "author": { "$ref": "ApiPostPerson#" },
+        "agentId": { "type": ["integer", "null"] },
+        "taggedPersons": {
+          "type": "array",
+          "items": { "$ref": "ApiPostPerson#" }
+        },
+        "linkedOpportunities": {
+          "type": "array",
+          "items": { "$ref": "ApiPostLinkedOpportunity#" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "text",
+        "author",
+        "agentId",
+        "taggedPersons",
+        "linkedOpportunities",
+        "createdAt"
+      ]
+    },
+    "ApiPostPost": {
+      "$id": "ApiPostPost",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "taggedPersonIds": { "type": "array", "items": { "type": "integer" } },
+        "linkedOpportunityIds": {
+          "type": "array",
+          "items": { "type": "integer" }
+        }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "ApiPostPatch": {
+      "$id": "ApiPostPatch",
+      "type": "object",
+      "properties": {
+        "text": { "type": ["string", "null"], "minLength": 1 },
+        "taggedPersonIds": {
+          "type": ["array", "null"],
+          "items": { "type": "integer" }
+        },
+        "linkedOpportunityIds": {
+          "type": ["array", "null"],
+          "items": { "type": "integer" }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

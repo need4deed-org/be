@@ -1,8 +1,6 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
-  AgentMembershipStatus,
-  AgentRoleType,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -31,6 +29,7 @@ import {
 } from "../schema/user.schema";
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
+import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -165,22 +164,7 @@ export default async function userRoutes(
         let agentId: number | undefined;
         if (user.role === UserRole.AGENT && user.personId) {
           // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
-          const membership =
-            (await fastify.db.agentPersonRepository.findOne({
-              where: {
-                personId: user.personId,
-                status: AgentMembershipStatus.ACTIVE,
-                role: AgentRoleType.VOLUNTEER_COORDINATOR,
-              },
-              order: { id: "ASC" },
-            })) ??
-            (await fastify.db.agentPersonRepository.findOne({
-              where: {
-                personId: user.personId,
-                status: AgentMembershipStatus.ACTIVE,
-              },
-              order: { id: "ASC" },
-            }));
+          const membership = await getAgentPersonRepresentative(user.personId);
           agentId = membership?.agentId;
         }
 
