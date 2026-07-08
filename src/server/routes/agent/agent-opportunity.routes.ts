@@ -27,7 +27,14 @@ export default async function agentOpportunityRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const agentRepository = fastify.db.agentRepository;
-      const relations = ["opportunity.opportunityVolunteer.volunteer.person"];
+      const relations = [
+        "opportunity.opportunityVolunteer.volunteer.person",
+        "opportunity.deal.dealLanguage.language",
+        "opportunity.deal.dealActivity.activity",
+        "opportunity.deal.dealDistrict.district",
+        "opportunity.deal.dealTimeslot.timeslot",
+        "opportunity.district",
+      ];
       const agent = await agentRepository.findOne({ where: { id }, relations });
 
       if (!agent) {
