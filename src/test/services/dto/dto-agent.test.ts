@@ -1,4 +1,4 @@
-import { AgentVolunteerSearchType } from "need4deed-sdk";
+import { AgentTrustType, AgentVolunteerSearchType } from "need4deed-sdk";
 import { describe, expect, it, vi } from "vitest";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import {
@@ -152,7 +152,7 @@ describe("dtoAgentGetList", () => {
   it("maps all scalar fields from a fully-loaded agent", () => {
     const fullAgent = {
       ...mockAgentBase,
-      trustLevel: 3,
+      trustLevel: AgentTrustType.HIGH,
       address: {
         street: "Main St",
         city: "Berlin",
@@ -170,9 +170,8 @@ describe("dtoAgentGetList", () => {
       id: 1,
       title: "Helping Hands",
       type: "NGO",
-      trustLevel: 3,
+      trustLevel: AgentTrustType.HIGH,
       activeVolunteers: 10,
-      numActiveVolunteers: 10,
       numOpportunities: 2,
       email: "contact@helping-hands.org",
       district: {
