@@ -860,6 +860,9 @@
             }
           }
         },
+        "opportunity_type": {
+          "$ref": "OpportunityType#"
+        },
         "accompanyingDetails": {
           "$ref": "ApiAccompanyingPatch#"
         }
