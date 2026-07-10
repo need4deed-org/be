@@ -6,6 +6,7 @@ import {
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
+  OpportunityType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -476,6 +477,17 @@ export default async function opportunityRoutes(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
 
+      if (
+        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+        !opportunity.accompanyingId
+      ) {
+        if (!request.body.accompanyingDetails) {
+          throw new BadRequestError(
+            'Accompanying details are required when changing opportunity type to "accompanying".',
+          );
+        }
+      }
+
       if (opportunityObj) {
         const success = await patchEntity(
           Opportunity,
@@ -530,15 +542,37 @@ export default async function opportunityRoutes(
           }
           accompanying.postcodeId = postcode.id;
         }
-        const success = await patchEntity(
-          Accompanying,
-          accompanying,
-          opportunity.accompanyingId,
-        );
-        if (!success) {
-          throw new BadRequestError(
-            "Patching accompanying failed while patching opportunity.",
+
+        if (opportunity.accompanyingId) {
+          const success = await patchEntity(
+            Accompanying,
+            accompanying,
+            opportunity.accompanyingId,
           );
+          if (!success) {
+            throw new BadRequestError(
+              "Patching accompanying failed while patching opportunity.",
+            );
+          }
+          // Only create a new accompanying record if type is being changed to accompanying and no accompanying record exists yet.
+        } else if (
+          request.body.opportunity_type === OpportunityType.ACCOMPANYING
+        ) {
+          const newAccompanying = Object.assign(
+            new Accompanying(),
+            accompanying,
+          );
+          await fastify.db.accompanyingRepository.save(newAccompanying);
+          const linkSuccess = await patchEntity(
+            Opportunity,
+            { accompanyingId: newAccompanying.id } as Partial<Opportunity>,
+            opportunity.id,
+          );
+          if (!linkSuccess) {
+            throw new BadRequestError(
+              "Linking accompanying record to opportunity failed.",
+            );
+          }
         }
       }
 
