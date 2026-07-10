@@ -1320,6 +1320,9 @@
         "numActiveVolunteers": {
           "type": "integer"
         },
+        "numOpportunities": {
+          "type": "integer"
+        },
         "email": {
           "type": "string"
         },
