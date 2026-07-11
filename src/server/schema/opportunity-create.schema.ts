@@ -23,7 +23,7 @@ export const opportunityCreateBodySchema = {
     activities: { type: "array", items: { type: "string" } },
     skills: { type: "array", items: { type: "string" } },
     berlin_locations: { type: "array", items: { type: "string" } },
-    timeslots: { type: "array" },
+    timeslots: { type: ["array", "null"] },
     onetime_date_time: { type: "string" },
     accomp_address: { type: "string" },
     accomp_postcode: { type: "string" },
