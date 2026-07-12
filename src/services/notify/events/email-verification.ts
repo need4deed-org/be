@@ -1,5 +1,5 @@
 import type { JWT, TokenType } from "@fastify/jwt";
-import { Lang } from "need4deed-sdk";
+import { Lang, UserRole } from "need4deed-sdk";
 import {
   emailVerificationManifestUrl,
   urlEmailVerification,
@@ -53,7 +53,9 @@ export async function sendEmailVerification(
     email: user.email,
     type: "verify" as TokenType,
   });
-  const url = `${urlEmailVerification}/${token}`;
+  const roleParam =
+    user.role === UserRole.AGENT ? `?role=${UserRole.AGENT}` : "";
+  const url = `${urlEmailVerification}/${token}${roleParam}`;
 
   logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);
 
