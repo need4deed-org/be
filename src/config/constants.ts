@@ -119,9 +119,12 @@ export const emailNewRegularManifestUrl =
 export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
 
-export const emailFromVolunteer = "volunteer@need4deed.org";
-export const emailFromContact = "contact@need4deed.org";
-export const emailFromAccompanying = "accompanying@need4deed.org";
+export const emailFromVolunteer =
+  process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";
+export const emailFromContact =
+  process.env.EMAIL_FROM_CONTACT || "contact@need4deed.org";
+export const emailFromAccompanying =
+  process.env.EMAIL_FROM_ACCOMPANYING || "accompanying@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
