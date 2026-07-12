@@ -165,7 +165,8 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
 - `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
-- `EMAIL_FROM`, `BREVO_API_KEY` — transactional email via Brevo (verified sender + API key)
+- `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — Infomaniak SMTP account for verification emails (email-verification, password-reset)
+- `EMAIL_FROM_NOTIFY`, `SMTP_NOTIFY_HOST`, `SMTP_NOTIFY_PORT`, `SMTP_NOTIFY_USER`, `SMTP_NOTIFY_PASS` — Infomaniak SMTP account for notification emails (cron scans, status-change triggers); separate account because Infomaniak does not allow multiple senders on one SMTP account
 - `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${CDN_BASE_URL}emails/verification.json`); falls back to built-in copy
 - `CORS_ORIGINS` — comma-separated list of allowed origins
 

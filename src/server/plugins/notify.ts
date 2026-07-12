@@ -66,17 +66,25 @@ function isDryRun(transportKey: string): boolean {
   return !isProd;
 }
 
-function buildEmailTransport(): EmailTransport {
+function buildVerifyEmailTransport(): EmailTransport {
   const smtp = new SmtpEmailTransport({
     host: process.env.SMTP_HOST ?? "mail.infomaniak.com",
     port: Number(process.env.SMTP_PORT ?? 587),
     user: process.env.SMTP_USER ?? "",
     password: process.env.SMTP_PASS ?? "",
   });
-  if (isDryRun("EMAIL")) {
-    return new DryRunEmailTransport(smtp);
-  }
-  return smtp;
+  return isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
+}
+
+function buildNotifyEmailTransport(): EmailTransport {
+  const smtp = new SmtpEmailTransport({
+    host: process.env.SMTP_NOTIFY_HOST ?? "mail.infomaniak.com",
+    port: Number(process.env.SMTP_NOTIFY_PORT ?? 587),
+    user: process.env.SMTP_NOTIFY_USER ?? "",
+    password: process.env.SMTP_NOTIFY_PASS ?? "",
+    from: process.env.EMAIL_FROM_NOTIFY ?? "",
+  });
+  return isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
@@ -98,34 +106,35 @@ function buildSlackTransport(): SlackTransport | undefined {
 }
 
 async function notifyPlugin(fastify: FastifyInstance) {
-  const email = buildEmailTransport();
+  const emailVerify = buildVerifyEmailTransport();
+  const emailNotify = buildNotifyEmailTransport();
   const slack = buildSlackTransport();
 
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
-      sendEmailVerification({ email, jwt: fastify.jwt }, user),
+      sendEmailVerification({ email: emailVerify, jwt: fastify.jwt }, user),
     passwordReset: (user: User) =>
-      sendPasswordReset({ email, jwt: fastify.jwt }, user),
+      sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     commentTagged: (input: CommentTaggedInput) =>
       sendCommentTagged({ slack }, input),
     emailSuggestion: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestion(email, ov),
-    emailStale: (ov: OpportunityVolunteer) => sendEmailStale(email, ov),
+      sendEmailSuggestion(emailNotify, ov),
+    emailStale: (ov: OpportunityVolunteer) => sendEmailStale(emailNotify, ov),
     emailIntroduction: (ov: OpportunityVolunteer) =>
-      sendEmailIntroduction(email, ov),
+      sendEmailIntroduction(emailNotify, ov),
     emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
-      sendEmailPostMatchCheckup(email, ov),
+      sendEmailPostMatchCheckup(emailNotify, ov),
     emailAccompanyNotFound: (opportunity: Opportunity) =>
-      sendEmailAccompanyNotFound(email, opportunity),
+      sendEmailAccompanyNotFound(emailNotify, opportunity),
     emailAccompanyMatch: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatch(email, ov),
+      sendEmailAccompanyMatch(emailNotify, ov),
     emailRegularUpdate: (opportunity: Opportunity) =>
-      sendEmailRegularUpdate(email, opportunity),
+      sendEmailRegularUpdate(emailNotify, opportunity),
     emailNewRegular: (opportunity: Opportunity) =>
-      sendEmailNewRegular(email, opportunity),
+      sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>
-      sendEmailNewAccompanying(email, opportunity),
+      sendEmailNewAccompanying(emailNotify, opportunity),
   });
 }
 
