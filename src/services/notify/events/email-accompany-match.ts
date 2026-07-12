@@ -2,6 +2,7 @@ import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyMatchManifestUrl,
   emailFromContact,
+  emailFromNotify,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getLanguages } from "../../dto/utils";
@@ -121,7 +122,8 @@ export async function sendEmailAccompanyMatch(
 
   await email.send({
     to: contactPersonEmail,
-    from: emailFromContact,
+    cc: emailFromContact,
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),

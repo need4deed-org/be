@@ -1,5 +1,6 @@
 import { Lang } from "need4deed-sdk";
 import {
+  emailFromNotify,
   emailFromVolunteer,
   emailSuggestionManifestUrl,
 } from "../../../config/constants";
@@ -61,7 +62,8 @@ export async function sendEmailSuggestion(
 
   await email.send({
     to: volunteerEmail,
-    from: emailFromVolunteer,
+    cc: emailFromVolunteer,
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),

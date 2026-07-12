@@ -1,6 +1,7 @@
 import { DocumentStatusType, Lang, VolunteerStateCGCType } from "need4deed-sdk";
 import {
   emailFromContact,
+  emailFromNotify,
   emailFromVolunteer,
   emailIntroductionManifestUrl,
 } from "../../../config/constants";
@@ -150,8 +151,9 @@ export async function sendEmailIntroduction(
   });
 
   await email.send({
-    to: [volunteerEmail, contactPersonEmail, emailFromVolunteer],
-    from: emailFromContact,
+    to: [volunteerEmail, contactPersonEmail],
+    cc: [emailFromContact, emailFromVolunteer],
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),
