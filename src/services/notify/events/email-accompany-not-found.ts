@@ -2,7 +2,7 @@ import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyNotFoundManifestUrl,
   emailFromAccompanying,
-  emailFromContact,
+  emailFromNotify,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
@@ -70,7 +70,7 @@ export async function sendEmailAccompanyNotFound(
   await email.send({
     to: contactPersonEmail,
     cc: emailFromAccompanying,
-    from: emailFromContact,
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),

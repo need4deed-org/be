@@ -125,6 +125,8 @@ export const emailFromContact =
   process.env.EMAIL_FROM_CONTACT || "contact@need4deed.org";
 export const emailFromAccompanying =
   process.env.EMAIL_FROM_ACCOMPANYING || "accompanying@need4deed.org";
+export const emailFromNotify =
+  process.env.EMAIL_FROM_NOTIFY || "coordinators@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
