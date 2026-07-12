@@ -121,6 +121,7 @@ export async function sendEmailAccompanyMatch(
 
   await email.send({
     to: contactPersonEmail,
+    cc: emailFromContact,
     from: emailFromContact,
     subject,
     ...(text !== undefined ? { text } : {}),

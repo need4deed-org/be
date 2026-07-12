@@ -150,7 +150,8 @@ export async function sendEmailIntroduction(
   });
 
   await email.send({
-    to: [volunteerEmail, contactPersonEmail, emailFromVolunteer],
+    to: [volunteerEmail, contactPersonEmail],
+    cc: [emailFromContact, emailFromVolunteer],
     from: emailFromContact,
     subject,
     ...(text !== undefined ? { text } : {}),

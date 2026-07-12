@@ -121,6 +121,7 @@ export const emailNewAccompanyingManifestUrl =
 
 export const emailFromVolunteer = "volunteer@need4deed.org";
 export const emailFromContact = "contact@need4deed.org";
+export const emailFromAccompanying = "accompanying@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;

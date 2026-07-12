@@ -48,6 +48,7 @@ export async function sendEmailStale(
 
   await email.send({
     to: volunteerEmail,
+    cc: emailFromVolunteer,
     from: emailFromVolunteer,
     subject,
     ...(text !== undefined ? { text } : {}),

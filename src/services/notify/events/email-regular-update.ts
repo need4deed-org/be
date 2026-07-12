@@ -53,6 +53,7 @@ export async function sendEmailRegularUpdate(
 
   await email.send({
     to: contactPersonEmail,
+    cc: emailFromContact,
     from: emailFromContact,
     subject,
     ...(text !== undefined ? { text } : {}),

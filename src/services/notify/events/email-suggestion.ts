@@ -61,6 +61,7 @@ export async function sendEmailSuggestion(
 
   await email.send({
     to: volunteerEmail,
+    cc: emailFromVolunteer,
     from: emailFromVolunteer,
     subject,
     ...(text !== undefined ? { text } : {}),

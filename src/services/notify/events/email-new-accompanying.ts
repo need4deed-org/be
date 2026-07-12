@@ -1,5 +1,6 @@
 import { Lang } from "need4deed-sdk";
 import {
+  emailFromAccompanying,
   emailFromContact,
   emailNewAccompanyingManifestUrl,
 } from "../../../config/constants";
@@ -82,6 +83,7 @@ export async function sendEmailNewAccompanying(
 
   await email.send({
     to: contactPersonEmail,
+    cc: [emailFromContact, emailFromAccompanying],
     from: emailFromContact,
     subject,
     ...(text !== undefined ? { text } : {}),

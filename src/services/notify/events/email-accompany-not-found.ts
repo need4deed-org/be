@@ -1,6 +1,7 @@
 import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyNotFoundManifestUrl,
+  emailFromAccompanying,
   emailFromContact,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -68,6 +69,7 @@ export async function sendEmailAccompanyNotFound(
 
   await email.send({
     to: contactPersonEmail,
+    cc: emailFromAccompanying,
     from: emailFromContact,
     subject,
     ...(text !== undefined ? { text } : {}),
