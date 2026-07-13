@@ -9,6 +9,7 @@ import {
   isGermanPublicHoliday,
 } from "../../services/jobs/german-holidays";
 import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
+import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
@@ -72,6 +73,7 @@ async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
             scanPostMatchCheckup(fastify),
             scanAccompanyNotFound(fastify),
             scanRegularUpdate(fastify),
+            scanExpiredOnetimers(fastify),
           ]);
 
           for (const r of results) {
