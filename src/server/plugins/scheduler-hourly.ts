@@ -17,7 +17,7 @@ import { runWithAdvisoryLock } from "../utils";
 // across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240701;
 
-async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
+async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
   // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only.
   // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
@@ -60,7 +60,7 @@ async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
   fastify.addHook("onClose", () => task.stop());
 }
 
-export default fp(schedulerPlugin, {
+export default fp(schedulerHourlyPlugin, {
   name: "scheduler",
   dependencies: ["typeorm-plugin", "notify"],
 });
