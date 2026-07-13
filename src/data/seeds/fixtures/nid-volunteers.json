@@ -24,12 +24,21 @@
         "info": "Available Monday and Wednesday mornings for language café.",
         "activities": ["Language café", "Tutoring"],
         "skills": ["Teaching"],
-        "languages": [["German", "native"], ["Arabic", "intermediate"], ["English", "fluent"]]
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "intermediate"],
+          ["English", "fluent"]
+        ]
       },
       "time": {
         "timeslots": [
           { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
-          { "day": "Wednesday", "daytime": ["morning", "afternoon"], "info": "", "start": "" }
+          {
+            "day": "Wednesday",
+            "daytime": ["morning", "afternoon"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Mitte"] }
@@ -60,7 +69,10 @@
         "info": "Available Monday mornings and Friday afternoons.",
         "activities": ["Language café", "Translation"],
         "skills": [],
-        "languages": [["German", "native"], ["Arabic", "beginner"]]
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
       },
       "time": {
         "timeslots": [
@@ -96,12 +108,25 @@
         "info": "Tuesday and Thursday afternoons for homework support.",
         "activities": ["Tutoring"],
         "skills": ["Teaching"],
-        "languages": [["German", "native"], ["Arabic", "beginner"]]
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Tuesday", "daytime": ["afternoon"], "info": "", "start": "" },
-          { "day": "Thursday", "daytime": ["afternoon"], "info": "", "start": "" }
+          {
+            "day": "Tuesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          },
+          {
+            "day": "Thursday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Mitte"] }
@@ -132,7 +157,10 @@
         "info": "Monday and Friday mornings for childcare.",
         "activities": ["Daycare", "Playing"],
         "skills": [],
-        "languages": [["German", "native"], ["Arabic", "beginner"]]
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
       },
       "time": {
         "timeslots": [
@@ -168,12 +196,20 @@
         "info": "Monday mornings and Wednesday mornings for childcare.",
         "activities": ["Daycare", "Language café"],
         "skills": [],
-        "languages": [["German", "native"], ["Turkish", "intermediate"]]
+        "languages": [
+          ["German", "native"],
+          ["Turkish", "intermediate"]
+        ]
       },
       "time": {
         "timeslots": [
           { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
-          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" }
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Neukölln"] }
@@ -204,7 +240,10 @@
         "info": "Saturday mornings for sports.",
         "activities": ["Sports", "Activities-men"],
         "skills": ["Teaching"],
-        "languages": [["German", "native"], ["English", "intermediate"]]
+        "languages": [
+          ["German", "native"],
+          ["English", "intermediate"]
+        ]
       },
       "time": {
         "timeslots": [
@@ -239,11 +278,20 @@
         "info": "Wednesday and Thursday mornings for translation support.",
         "activities": ["Translation", "Fillout German forms"],
         "skills": [],
-        "languages": [["Arabic", "native"], ["German", "fluent"], ["English", "advanced"]]
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "fluent"],
+          ["English", "advanced"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" },
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          },
           { "day": "Thursday", "daytime": ["morning"], "info": "", "start": "" }
         ]
       },
@@ -275,11 +323,19 @@
         "info": "Wednesday mornings for translation.",
         "activities": ["Translation", "Fillout German forms"],
         "skills": [],
-        "languages": [["Arabic", "native"], ["German", "intermediate"]]
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "intermediate"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" }
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Friedrichshain-Kreuzberg"] }
@@ -310,12 +366,25 @@
         "info": "Monday and Wednesday afternoons for form assistance.",
         "activities": ["Fillout German forms"],
         "skills": [],
-        "languages": [["German", "fluent"], ["Turkish", "native"]]
+        "languages": [
+          ["German", "fluent"],
+          ["Turkish", "native"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Monday", "daytime": ["afternoon"], "info": "", "start": "" },
-          { "day": "Wednesday", "daytime": ["afternoon"], "info": "", "start": "" }
+          {
+            "day": "Monday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          },
+          {
+            "day": "Wednesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Friedrichshain-Kreuzberg", "Neukölln"] }
@@ -346,11 +415,19 @@
         "info": "Saturday afternoons for arts and crafts workshops.",
         "activities": ["Arts"],
         "skills": ["Drawing", "Painting"],
-        "languages": [["German", "native"], ["English", "fluent"]]
+        "languages": [
+          ["German", "native"],
+          ["English", "fluent"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Saturday", "daytime": ["afternoon"], "info": "", "start": "" }
+          {
+            "day": "Saturday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
@@ -379,14 +456,25 @@
       "postcode": "10629",
       "profile": {
         "info": "Available Monday and Wednesday mornings for accompanying.",
-        "activities": ["Accompanying to government appointments", "Accompanying"],
+        "activities": [
+          "Accompanying to government appointments",
+          "Accompanying"
+        ],
         "skills": [],
-        "languages": [["Arabic", "native"], ["German", "advanced"]]
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "advanced"]
+        ]
       },
       "time": {
         "timeslots": [
           { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
-          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" }
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
@@ -417,7 +505,10 @@
         "info": "Tuesday and Thursday evenings for job application support.",
         "activities": ["Mentorship"],
         "skills": ["Teaching"],
-        "languages": [["German", "native"], ["English", "advanced"]]
+        "languages": [
+          ["German", "native"],
+          ["English", "advanced"]
+        ]
       },
       "time": {
         "timeslots": [
@@ -453,7 +544,10 @@
         "info": "Saturday mornings for practical tasks like clothing sorting.",
         "activities": ["Clothing Sorting"],
         "skills": [],
-        "languages": [["German", "intermediate"], ["Turkish", "native"]]
+        "languages": [
+          ["German", "intermediate"],
+          ["Turkish", "native"]
+        ]
       },
       "time": {
         "timeslots": [
@@ -488,11 +582,19 @@
         "info": "Wednesday afternoons for children's reading sessions.",
         "activities": ["Reading"],
         "skills": [],
-        "languages": [["German", "native"], ["Arabic", "beginner"]]
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
       },
       "time": {
         "timeslots": [
-          { "day": "Wednesday", "daytime": ["afternoon"], "info": "", "start": "" }
+          {
+            "day": "Wednesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
         ]
       },
       "location": { "districts": ["Pankow"] }
@@ -523,7 +625,10 @@
         "info": "Monday mornings for government appointment accompanying.",
         "activities": ["Accompanying to government appointments"],
         "skills": [],
-        "languages": [["German", "fluent"], ["Persian", "native"]]
+        "languages": [
+          ["German", "fluent"],
+          ["Persian", "native"]
+        ]
       },
       "time": {
         "timeslots": [

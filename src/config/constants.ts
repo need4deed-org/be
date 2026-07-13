@@ -66,19 +66,19 @@ export const seedLeadFromFile = path.join(
 
 export const seedAgentsFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "fixtures"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-agents.json",
 );
 
 export const seedOpportunitiesFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "fixtures"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-opportunities.json",
 );
 
 export const seedVolunteersFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "fixtures"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-volunteers.json",
 );
 
