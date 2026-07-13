@@ -10,7 +10,7 @@ import { runWithAdvisoryLock } from "../utils";
 const SCHEDULER_LOCK_ID = 20240707;
 
 async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
-  // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only.
+  // Daily at the 6AM hour Berlin time, weekdays only.
   // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
     "0 6 * * *",
