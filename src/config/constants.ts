@@ -66,25 +66,21 @@ export const seedLeadFromFile = path.join(
 
 export const seedAgentsFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-agents.json",
 );
 
 export const seedOpportunitiesFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-opportunities.json",
 );
 
 export const seedVolunteersFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-volunteers.json",
 );
-
-// export const seedAgentsFile = CDNBaseUrl + "/dev/agents.json";
-// export const seedVolunteersFile = CDNBaseUrl + "/dev/volunteers.json";
-// export const seedOpportunitiesFile = CDNBaseUrl + "/dev/opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
