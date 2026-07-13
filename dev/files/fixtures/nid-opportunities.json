@@ -1,0 +1,361 @@
+[
+  {
+    "nid": "OPP-001",
+    "status": "active",
+    "title": "German Language Café Facilitation",
+    "timestamp": "2024-02-01T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Help facilitate our weekly German language café for residents. Bring games, conversation topics, or just your enthusiasm.",
+    "infoConfidential": "",
+    "numberVolunteers": "2",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10115",
+      "profile": {
+        "info": "Weekly language café, every Monday and Wednesday morning.",
+        "activities": ["Language café"],
+        "skills": [],
+        "languages": [["Arabic", "intermediate"], ["Turkish", "beginner"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Mitte"] }
+    },
+    "volunteerNids": [["VOL-001", "opp-active"], ["VOL-002", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-002",
+    "status": "active",
+    "title": "Homework Support for School Children",
+    "timestamp": "2024-02-05T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Assist school-age children with homework two afternoons per week. Basic German and patience required.",
+    "infoConfidential": "",
+    "numberVolunteers": "2",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10115",
+      "profile": {
+        "info": "Homework support, Tuesday and Thursday afternoons.",
+        "activities": ["Tutoring"],
+        "skills": ["Teaching"],
+        "languages": [["German", "fluent"], ["Arabic", "beginner"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Tuesday", "daytime": ["afternoon"], "info": "", "start": "" },
+          { "day": "Thursday", "daytime": ["afternoon"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Mitte"] }
+    },
+    "volunteerNids": [["VOL-003", "opp-active"]]
+  },
+  {
+    "nid": "OPP-003",
+    "status": "active",
+    "title": "Daycare Support at Accommodation",
+    "timestamp": "2024-02-10T09:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Support our childcare team on Monday and Friday mornings. Help care for toddlers while parents attend language classes.",
+    "infoConfidential": "",
+    "numberVolunteers": "2",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "12047",
+      "profile": {
+        "info": "Childcare support, Monday and Friday mornings.",
+        "activities": ["Daycare"],
+        "skills": [],
+        "languages": [["German", "intermediate"], ["Arabic", "beginner"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          { "day": "Friday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Neukölln"] }
+    },
+    "volunteerNids": [["VOL-004", "opp-active"], ["VOL-005", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-004",
+    "status": "active",
+    "title": "Youth Sports Activities",
+    "timestamp": "2024-02-12T09:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Lead Saturday morning sports activities for teenagers. Football, basketball, or any sport you enjoy.",
+    "infoConfidential": "",
+    "numberVolunteers": "1",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "12047",
+      "profile": {
+        "info": "Youth sports, Saturday mornings.",
+        "activities": ["Sports"],
+        "skills": ["Teaching"],
+        "languages": [["German", "intermediate"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Saturday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Neukölln"] }
+    },
+    "volunteerNids": [["VOL-006", "opp-active"]]
+  },
+  {
+    "nid": "OPP-005",
+    "status": "active",
+    "title": "Document Translation Support",
+    "timestamp": "2024-02-15T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Help residents understand official letters and documents. Arabic–German translation most needed.",
+    "infoConfidential": "",
+    "numberVolunteers": "2",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10997",
+      "profile": {
+        "info": "Translation support, Wednesday and Thursday mornings.",
+        "activities": ["Translation"],
+        "skills": [],
+        "languages": [["Arabic", "native"], ["German", "fluent"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Wednesday", "daytime": ["morning"], "info": "", "start": "" },
+          { "day": "Thursday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Friedrichshain-Kreuzberg"] }
+    },
+    "volunteerNids": [["VOL-007", "opp-active"], ["VOL-008", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-006",
+    "status": "active",
+    "title": "Assistance with German Forms",
+    "timestamp": "2024-02-18T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Guide residents through filling out German administrative forms (Anmeldung, health insurance, etc.).",
+    "infoConfidential": "",
+    "numberVolunteers": "1",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10997",
+      "profile": {
+        "info": "Form assistance, Monday afternoons.",
+        "activities": ["Fillout German forms"],
+        "skills": [],
+        "languages": [["German", "fluent"], ["Turkish", "intermediate"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["afternoon"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Friedrichshain-Kreuzberg"] }
+    },
+    "volunteerNids": [["VOL-009", "opp-active"]]
+  },
+  {
+    "nid": "OPP-007",
+    "status": "active",
+    "title": "Arts and Crafts Workshop",
+    "timestamp": "2024-03-01T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Run a weekly arts and crafts session for residents of all ages. Materials provided.",
+    "infoConfidential": "",
+    "numberVolunteers": "1",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10627",
+      "profile": {
+        "info": "Arts workshop, Saturday afternoons.",
+        "activities": ["Arts"],
+        "skills": ["Drawing", "Painting"],
+        "languages": [["German", "intermediate"], ["English", "intermediate"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Saturday", "daytime": ["afternoon"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
+    },
+    "volunteerNids": [["VOL-010", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-008",
+    "status": "active",
+    "title": "Medical Appointment Accompaniment",
+    "timestamp": "2024-03-05T09:00:00.000Z",
+    "type": "accompanying",
+    "translationType": "deutsche",
+    "info": "Accompany a resident to a medical appointment and assist with German–Arabic interpretation.",
+    "infoConfidential": "Appointment at Charité outpatient clinic.",
+    "numberVolunteers": "1",
+    "agent": null,
+    "accompanying": {
+      "address": "Charitéplatz 1, 10117 Berlin",
+      "name": "Placeholder Patient",
+      "phone": "+4930450050",
+      "date": "2024-04-10T09:00:00.000Z",
+      "languageToTranslate": "German"
+    },
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10627",
+      "profile": {
+        "info": "One-off medical accompanying appointment.",
+        "activities": ["Accompanying to government appointments"],
+        "skills": [],
+        "languages": [["Arabic", "fluent"], ["German", "intermediate"]]
+      },
+      "time": { "timeslots": [] },
+      "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
+    },
+    "volunteerNids": [["VOL-011", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-009",
+    "status": "active",
+    "title": "Job Application Support",
+    "timestamp": "2024-03-10T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Help residents write CVs and cover letters, and prepare for job interviews. Tuesday and Thursday evenings.",
+    "infoConfidential": "",
+    "numberVolunteers": "1",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10317",
+      "profile": {
+        "info": "Job coaching, Tuesday and Thursday evenings.",
+        "activities": ["Mentorship"],
+        "skills": ["Teaching"],
+        "languages": [["German", "fluent"], ["English", "intermediate"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Tuesday", "daytime": ["evening"], "info": "", "start": "" },
+          { "day": "Thursday", "daytime": ["evening"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Lichtenberg"] }
+    },
+    "volunteerNids": [["VOL-012", "opp-active"]]
+  },
+  {
+    "nid": "OPP-010",
+    "status": "active",
+    "title": "Sorting Donated Clothing",
+    "timestamp": "2024-03-12T09:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Help sort and organise clothing donations every Saturday morning. No special skills needed.",
+    "infoConfidential": "",
+    "numberVolunteers": "2",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10317",
+      "profile": {
+        "info": "Clothing sorting, Saturday mornings.",
+        "activities": ["Clothing Sorting"],
+        "skills": [],
+        "languages": [["German", "beginner"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Saturday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Lichtenberg"] }
+    },
+    "volunteerNids": [["VOL-013", "opp-matched"]]
+  },
+  {
+    "nid": "OPP-011",
+    "status": "pending",
+    "title": "Reading Books for Children",
+    "timestamp": "2024-03-20T10:00:00.000Z",
+    "type": "regular",
+    "translationType": "noTranslation",
+    "info": "Read picture books and short stories to children aged 3–8 every Wednesday afternoon.",
+    "infoConfidential": "",
+    "numberVolunteers": "1",
+    "agent": null,
+    "deal": {
+      "type": "opportunity",
+      "postcode": "10405",
+      "profile": {
+        "info": "Children's reading, Wednesday afternoons.",
+        "activities": ["Reading"],
+        "skills": [],
+        "languages": [["German", "fluent"], ["Arabic", "beginner"]]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Wednesday", "daytime": ["afternoon"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Pankow"] }
+    },
+    "volunteerNids": [["VOL-014", "opp-pending"]]
+  },
+  {
+    "nid": "OPP-012",
+    "status": "pending",
+    "title": "Administrative Appointment Accompaniment",
+    "timestamp": "2024-03-25T09:00:00.000Z",
+    "type": "accompanying",
+    "translationType": "deutsche",
+    "info": "Accompany a resident to a Jobcenter appointment and assist with German–Persian translation.",
+    "infoConfidential": "Jobcenter Spandau appointment.",
+    "numberVolunteers": "1",
+    "agent": null,
+    "accompanying": {
+      "address": "Galenstraße 14, 13587 Berlin",
+      "name": "Placeholder Resident",
+      "phone": "+493033001",
+      "date": "2024-04-20T10:00:00.000Z",
+      "languageToTranslate": "German"
+    },
+    "deal": {
+      "type": "opportunity",
+      "postcode": "13591",
+      "profile": {
+        "info": "One-off Jobcenter accompanying appointment.",
+        "activities": ["Accompanying to government appointments"],
+        "skills": [],
+        "languages": [["German", "fluent"], ["Persian", "native"]]
+      },
+      "time": { "timeslots": [] },
+      "location": { "districts": ["Spandau"] }
+    },
+    "volunteerNids": [["VOL-015", "opp-pending"]]
+  }
+]
