@@ -1,18 +1,9 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
-import { TRUTHY } from "../../config/constants";
 import { dataSource } from "../../data/data-source";
 import logger from "../../logger";
-import {
-  berlinToday,
-  isGermanPublicHoliday,
-} from "../../services/jobs/german-holidays";
-import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
-import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
-import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
-import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
@@ -52,27 +43,13 @@ async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
   // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only.
   // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
-    "0 8-19 * * 1-5",
+    "0 6 * * *",
     async () => {
       try {
-        if (TRUTHY.has(process.env.NOTIFY_CRON_MUTED ?? "")) {
-          logger.info("scheduler: skipping — NOTIFY_CRON_MUTED is set");
-          return;
-        }
-
-        if (isGermanPublicHoliday(berlinToday())) {
-          logger.info("scheduler: skipping — German public holiday");
-          return;
-        }
-
-        logger.info("scheduler: running hourly email scans");
+        logger.info("scheduler: running daily scans");
 
         await runWithAdvisoryLock(async () => {
           const results = await Promise.allSettled([
-            scanStalePending(fastify),
-            scanPostMatchCheckup(fastify),
-            scanAccompanyNotFound(fastify),
-            scanRegularUpdate(fastify),
             scanExpiredOnetimers(fastify),
           ]);
 
