@@ -2,7 +2,6 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
 import { TRUTHY } from "../../config/constants";
-import { dataSource } from "../../data/data-source";
 import logger from "../../logger";
 import {
   berlinToday,
@@ -12,40 +11,11 @@ import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-fo
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
+import { runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240701;
-
-async function runWithAdvisoryLock(fn: () => Promise<void>): Promise<void> {
-  // Use a transaction-level advisory lock (pg_try_advisory_xact_lock) so the
-  // lock is released automatically at commit/rollback — no explicit unlock
-  // needed. This avoids the session-level pitfall where pg_advisory_unlock
-  // could fail and leave the connection holding the lock in the pool.
-  const qr = dataSource.createQueryRunner();
-  try {
-    await qr.connect();
-    await qr.startTransaction();
-    const [row] = await qr.query(
-      "SELECT pg_try_advisory_xact_lock($1) AS acquired",
-      [SCHEDULER_LOCK_ID],
-    );
-    if (!row?.acquired) {
-      logger.debug(
-        "scheduler: advisory lock held by another instance — skipping",
-      );
-      await qr.rollbackTransaction();
-      return;
-    }
-    await fn();
-    await qr.commitTransaction();
-  } catch (err) {
-    await qr.rollbackTransaction().catch(logger.error);
-    throw err;
-  } finally {
-    await qr.release();
-  }
-}
 
 async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
   // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only.
@@ -79,7 +49,7 @@ async function schedulerPlugin(fastify: FastifyInstance): Promise<void> {
               logger.error({ err: r.reason }, "scheduler: scan failed");
             }
           }
-        });
+        }, SCHEDULER_LOCK_ID);
       } catch (err) {
         logger.error({ err }, "scheduler: unhandled error in cron callback");
       }
