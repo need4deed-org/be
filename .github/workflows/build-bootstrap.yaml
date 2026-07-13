@@ -26,6 +26,7 @@ jobs:
       - name: Build and push bootstrap image
         uses: docker/build-push-action@v6
         with:
-          context: ./data-bootstrap
+          context: .
+          file: data-bootstrap/Dockerfile
           push: true
           tags: ghcr.io/need4deed-org/bootstrap:latest
