@@ -40,6 +40,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
 }
 
 export default fp(schedulerDailyPlugin, {
-  name: "scheduler",
+  name: "scheduler-daily",
   dependencies: ["typeorm-plugin", "notify"],
 });

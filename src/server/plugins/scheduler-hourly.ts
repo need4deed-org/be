@@ -61,6 +61,6 @@ async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
 }
 
 export default fp(schedulerHourlyPlugin, {
-  name: "scheduler",
+  name: "scheduler-hourly",
   dependencies: ["typeorm-plugin", "notify"],
 });
