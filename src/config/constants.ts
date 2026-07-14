@@ -2,7 +2,15 @@ import * as path from "path";
 
 const publicFixturesFromHere = ["..", "..", "public", "data"];
 
-const positives = ["1", "YES", "Yes", "yes", "TRUE", "True", "true"];
+export const TRUTHY = new Set([
+  "1",
+  "YES",
+  "Yes",
+  "yes",
+  "TRUE",
+  "True",
+  "true",
+]);
 
 export const CDNBaseUrl =
   process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
@@ -58,33 +66,63 @@ export const seedLeadFromFile = path.join(
 
 export const seedAgentsFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-agents.json",
 );
 
 export const seedOpportunitiesFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-opportunities.json",
 );
 
 export const seedVolunteersFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-volunteers.json",
 );
-
-// export const seedAgentsFile = CDNBaseUrl + "/dev/agents.json";
-// export const seedVolunteersFile = CDNBaseUrl + "/dev/volunteers.json";
-// export const seedOpportunitiesFile = CDNBaseUrl + "/dev/opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
   "https://app.need4deed.org/verify-email";
 
+export const urlPasswordReset =
+  process.env.URL_PASSWORD_RESET || "https://app.need4deed.org/reset-password";
+
 // CDN manifest (per-locale subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
+
+// CDN manifest (per-locale subject + html/text) for the password reset email.
+export const emailPasswordResetManifestUrl =
+  CDNBaseUrl + "/emails/password-reset.json";
+
+// CDN manifests for outbound volunteer/opportunity emails.
+export const emailSuggestionManifestUrl =
+  CDNBaseUrl + "/emails/suggestion.json";
+export const emailStaleManifestUrl = CDNBaseUrl + "/emails/stale.json";
+export const emailIntroductionManifestUrl =
+  CDNBaseUrl + "/emails/introduction.json";
+export const emailPostMatchCheckupManifestUrl =
+  CDNBaseUrl + "/emails/checkup.json";
+export const emailAccompanyNotFoundManifestUrl =
+  CDNBaseUrl + "/emails/accompanynotfound.json";
+export const emailAccompanyMatchManifestUrl =
+  CDNBaseUrl + "/emails/accompanymatch.json";
+export const emailRegularUpdateManifestUrl = CDNBaseUrl + "/emails/update.json";
+export const emailNewRegularManifestUrl =
+  CDNBaseUrl + "/emails/confirmation.json";
+export const emailNewAccompanyingManifestUrl =
+  CDNBaseUrl + "/emails/confirmationaccompanying.json";
+
+export const emailFromVolunteer =
+  process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";
+export const emailFromContact =
+  process.env.EMAIL_FROM_CONTACT || "contact@need4deed.org";
+export const emailFromAccompanying =
+  process.env.EMAIL_FROM_ACCOMPANYING || "accompanying@need4deed.org";
+export const emailFromNotify =
+  process.env.EMAIL_FROM_NOTIFY || "coordinators@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
@@ -95,6 +133,7 @@ export const emailTemplateFetchTimeoutMs =
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24h in milliseconds
+export const RESET_LIFESPAN_MS = 60 * 60 * 1000; // 60 minutes in milliseconds
 export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 
 export const accessCookieName = "access";
@@ -116,12 +155,8 @@ export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
 export const isProd = process.env.NODE_ENV === "production";
 export const isStaging = process.env.NODE_ENV === "staging";
-export const shouldTruncateAll = positives.includes(
-  process.env.TRUNCATE_ALL || "",
-);
-export const shouldRunMigrations = positives.includes(
-  process.env.RUN_MIGRATIONS || "",
-);
+export const shouldTruncateAll = TRUTHY.has(process.env.TRUNCATE_ALL || "");
+export const shouldRunMigrations = TRUTHY.has(process.env.RUN_MIGRATIONS || "");
 export const nidsToken = process.env.NIDS_TOKEN || "";
 
 export const authAccessTokenCookieName = "access";

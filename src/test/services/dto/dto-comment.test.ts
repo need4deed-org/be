@@ -21,11 +21,12 @@ describe("commentSerializer", () => {
       entityType: "volunteer",
       authorName: "Coordinator Jane",
       timestamp: comment.updatedAt,
-      taggedPersonIds: [],
+      taggedPersons: [],
     });
   });
 
-  it("maps commentPerson rows to taggedPersonIds", () => {
+  it("maps commentPerson rows to taggedPersons with readAt", () => {
+    const readAt = new Date("2025-04-01");
     const comment = {
       id: 10,
       text: "Hey <@5> and <@9>",
@@ -33,14 +34,20 @@ describe("commentSerializer", () => {
       entityType: "opportunity",
       updatedAt: new Date(),
       user: { person: { name: "Author" } },
-      commentPerson: [{ personId: 5 }, { personId: 9 }],
+      commentPerson: [
+        { personId: 5, readAt },
+        { personId: 9, readAt: null },
+      ],
     };
 
     const result = commentSerializer(comment as any);
-    expect(result.taggedPersonIds).toEqual([5, 9]);
+    expect(result.taggedPersons).toEqual([
+      { id: 5, readAt },
+      { id: 9, readAt: null },
+    ]);
   });
 
-  it("returns an empty taggedPersonIds when commentPerson is missing", () => {
+  it("returns an empty taggedPersons when commentPerson is missing", () => {
     const comment = {
       id: 11,
       text: "no tags",
@@ -51,7 +58,7 @@ describe("commentSerializer", () => {
     };
 
     const result = commentSerializer(comment as any);
-    expect(result.taggedPersonIds).toEqual([]);
+    expect(result.taggedPersons).toEqual([]);
   });
 
   it("returns undefined authorName when user has no person", () => {

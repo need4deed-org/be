@@ -4,18 +4,16 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
-  AgentRoleType,
   OpportunityLegacyFormData,
   OpportunityStatusType,
 } from "need4deed-sdk";
 import { In } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
-import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
-import Comment from "../../../data/entity/comment.entity";
+import { getPostcode, getRepository } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -23,7 +21,6 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
-import { getPostcode, getRepository } from "../../../data/utils";
 import {
   getAgentByAddress,
   getDistrictToOpportunityHandler,
@@ -48,7 +45,9 @@ async function findOrCreateAgent(
   formData: OpportunityLegacyFormData,
 ): Promise<Agent> {
   if (!formData.rac_address || !formData.rac_plz) {
-    logger.warn("Legacy form missing rac_address or rac_plz — falling back to orphanage agent");
+    logger.warn(
+      "Legacy form missing rac_address or rac_plz — falling back to orphanage agent",
+    );
     return getOpportunityOrphanageAgent();
   }
 
@@ -57,8 +56,12 @@ async function findOrCreateAgent(
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
 
-  const match = getAgentByAddress(agents, formData.rac_address, formData.rac_plz);
-  if (match) return match;
+  const match = getAgentByAddress(
+    agents,
+    formData.rac_address,
+    formData.rac_plz,
+  );
+  if (match) {return match;}
 
   logger.info(
     `No agent found for address "${formData.rac_address}" ${formData.rac_plz} — creating new agent`,
@@ -67,20 +70,17 @@ async function findOrCreateAgent(
   const postcode = await getPostcode(formData.rac_plz);
 
   return dataSource.manager.transaction(async (em) => {
-    const address = new Address({ street: formData.rac_address, postcodeId: postcode.id });
+    const address = new Address({
+      street: formData.rac_address,
+      postcodeId: postcode.id,
+    });
     await em.save(address);
 
-    const person = parseContactPerson(formData);
-    await em.save(person);
-
-    const agent = new Agent({ title: formData.rac_address, addressId: address.id });
+    const agent = new Agent({
+      title: formData.rac_address,
+      addressId: address.id,
+    });
     await em.save(agent);
-
-    await em.save(new AgentPerson({
-      agentId: agent.id,
-      personId: person.id,
-      role: AgentRoleType.VOLUNTEER_COORDINATOR,
-    }));
 
     return agent;
   });
@@ -107,21 +107,24 @@ export default async function opportunityLegacyRoutes(
 
       opportunity.agent = await findOrCreateAgent(request.body);
 
-      const personRepository = getRepository(dataSource, Person);
-      const contactPerson = parseContactPerson(request.body);
-      await personRepository.save(contactPerson);
-      opportunity.contactPersonId = contactPerson.id;
-
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
       if (opportunity.agent?.id) {
-        const submitter = await getOrCreateSubmitterPerson(
+        const person = await getOrCreateSubmitterPerson(
           request.body,
           opportunity.agent.id,
         );
-        if (submitter) {
-          opportunity.submittedByPersonId = submitter.id;
+        if (person) {
+          opportunity.contactPersonId = person.id;
+          opportunity.submittedByPersonId = person.id;
+        } else {
+          // No rac_email on form — create a bare Person for contactPersonId
+          // without deduplication or an agent_person link.
+          const personRepository = getRepository(dataSource, Person);
+          const contactPerson = parseContactPerson(request.body);
+          await personRepository.save(contactPerson);
+          opportunity.contactPersonId = contactPerson.id;
         }
       }
 

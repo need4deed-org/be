@@ -11,7 +11,7 @@ export default async function healthRoutes(
     { schema: { response: responseSchema("") } },
     async (_request, reply) => {
       return reply.status(200).send({
-        message: "Need4Deed API v1 is up and running.",
+        message: `Need4Deed API v1 is up and running.\nHEAD commit: ${process.env.GIT_COMMIT_SHA}`,
       });
     },
   );

@@ -1,37 +1,23 @@
 import { DataSource } from "typeorm";
 import { check } from "..";
-import { seedActivity } from "./activity.seed";
-import { seedAgents } from "./agent.seed";
-import { seedCategory } from "./category.seed";
-import { devTime } from "./dev-parsing";
-import { seedDistrict } from "./district.seed";
-import { seedFieldTranslation } from "./field_translation.seed";
-import { seedLanguage } from "./language.seed";
-import { seedLeadFrom } from "./lead_from.seed";
-import { seedOpportunities } from "./opportunity.seed";
-import { seedOptions } from "./option.seed";
-import { seedPostcode } from "./postcode.seed";
-import { seedSkill } from "./skill.seed";
-import { seedTimeslots } from "./timeslot.seed";
+import { seedAgentUsers } from "./populate/agent-user.seed";
+import { seedAgents } from "./populate/agent.seed";
+import { devTime } from "./populate/dev-parsing";
+import { seedOpportunities } from "./populate/opportunity.seed";
+import { seedVolunteers } from "./populate/volunteer.seed";
+import { seedReference } from "./reference";
 import { seedUser } from "./user.seed";
-import { seedVolunteers } from "./volunteer.seed";
+
+export { seedReference } from "./reference";
 
 export async function seed(dataSource: DataSource) {
-  await seedLanguage(dataSource);
-  await seedCategory(dataSource);
-  await seedActivity(dataSource);
-  await seedSkill(dataSource);
-  await seedLeadFrom(dataSource);
-  await seedFieldTranslation(dataSource);
-  await seedPostcode(dataSource);
-  await seedDistrict(dataSource);
-  await seedOptions(dataSource);
+  await seedReference(dataSource);
   await seedUser(dataSource);
-  await seedTimeslots(dataSource);
   if (check.flag) {
     devTime(dataSource);
   } else {
     await seedAgents(dataSource);
+    await seedAgentUsers(dataSource);
     await seedOpportunities(dataSource);
     await seedVolunteers(dataSource);
   }

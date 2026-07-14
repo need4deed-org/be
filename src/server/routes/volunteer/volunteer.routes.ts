@@ -26,6 +26,7 @@ import {
 } from "../../../services";
 import {
   idParamSchema,
+  langQuerySchema,
   responseErrors,
   responseSchema,
   volunteerListQuerySchema,
@@ -137,6 +138,7 @@ export default async function volunteerRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("volunteer-api-id#"),
       },
     },
@@ -267,6 +269,7 @@ export default async function volunteerRoutes(
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "volunteer-api-id-part#" },
         response: {
           200: {
@@ -442,6 +445,7 @@ export default async function volunteerRoutes(
     {
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
+        querystring: langQuerySchema,
         body: { $ref: "volunteer-form-data" },
         response: {
           201: {

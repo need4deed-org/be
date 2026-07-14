@@ -10,18 +10,23 @@ import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
+import schedulerDailyPlugin from "./plugins/scheduler-daily";
+import schedulerHourlyPlugin from "./plugins/scheduler-hourly";
 import typeormPlugin from "./plugins/typeorm";
+import activityLogRoutes from "./routes/activity-log.routes";
 import agentRoutes from "./routes/agent/agent.routes";
 import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import healthRoutes from "./routes/health";
+import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
+import postRoutes from "./routes/post.routes";
 import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
@@ -147,12 +152,15 @@ export async function createServer(): Promise<FastifyInstance> {
     },
   });
   await fastifyInstance.register(notifyPlugin);
+  await fastifyInstance.register(schedulerHourlyPlugin);
+  await fastifyInstance.register(schedulerDailyPlugin);
   await fastifyInstance.register(healthRoutes, {
     prefix: RoutePrefix.HEALTH_CHECK,
   });
   await fastifyInstance.register(authRoutes, { prefix: RoutePrefix.AUTH });
   await fastifyInstance.register(userRoutes, { prefix: RoutePrefix.USER });
   await fastifyInstance.register(personRoutes, { prefix: RoutePrefix.PERSON });
+  await fastifyInstance.register(postRoutes, { prefix: RoutePrefix.POST });
   await fastifyInstance.register(volunteerRoutes, {
     prefix: RoutePrefix.VOLUNTEER,
   });
@@ -166,11 +174,17 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(communicationRoutes, {
     prefix: RoutePrefix.COMMUNICATION,
   });
+  await fastifyInstance.register(activityLogRoutes, {
+    prefix: RoutePrefix.ACTIVITY_LOG,
+  });
   await fastifyInstance.register(appreciationRoutes, {
     prefix: RoutePrefix.APPRECIATION,
   });
   await fastifyInstance.register(agentRoutes, { prefix: RoutePrefix.AGENT });
   await fastifyInstance.register(m2mOpportunityVolunteerRoutes, {
+    prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
+  });
+  await fastifyInstance.register(activityLogCollectionRoutes, {
     prefix: RoutePrefix.OPPORTUNITY_VOLUNTEER,
   });
   await fastifyInstance.register(organizationRoutes, {

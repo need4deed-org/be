@@ -173,6 +173,9 @@ export default class Volunteer {
   @OneToMany(() => Appreciation, (appreciation) => appreciation.volunteer)
   appreciations: Appreciation[];
 
+  @Column({ default: true })
+  shareContact: boolean;
+
   @Column({ nullable: true })
   @IsOptional()
   @IsString()

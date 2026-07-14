@@ -49,7 +49,7 @@ describe("BrevoEmailTransport", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("throws with status and body on a non-2xx response", async () => {
+  it("throws with status on a non-2xx response (no body to avoid PII in logs)", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 400,
@@ -58,6 +58,6 @@ describe("BrevoEmailTransport", () => {
 
     await expect(
       new BrevoEmailTransport("secret-key").send(msg),
-    ).rejects.toThrow(/Brevo email failed \(400\): .*Invalid sender/);
+    ).rejects.toThrow(/Brevo email failed \(400\)$/);
   });
 });

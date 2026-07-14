@@ -82,6 +82,7 @@ export function dtoOpportunityGetList(
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
     agentTitle: opportunity.agent?.title ?? "",
+    agentId: opportunity.agentId,
     // Names of the volunteers MATCHED to the opportunity (status opp-matched
     // only — not pending/active/past links). PII masking runs before this DTO,
     // so masked names pass through. Needs the
@@ -143,6 +144,7 @@ export function dtoOpportunityGet(
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
+    agentId: opportunityComments.agentId,
     languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({

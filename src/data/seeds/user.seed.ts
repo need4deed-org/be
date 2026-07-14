@@ -48,6 +48,34 @@ export async function seedUser(dataSource: DataSource) {
     person: personCoordinator,
   });
 
+  const personCoordinator2 = new Person({
+    firstName: "Michael",
+    middleName: "Coordinator",
+    lastName: "Doe",
+  });
+
+  const coordinatorUser2 = new User({
+    email: "michael.doe@need4deed.org",
+    password: await hashPassword("no_password"),
+    role: UserRole.COORDINATOR,
+    isActive: true,
+    person: personCoordinator2,
+  });
+
+  const personCoordinator3 = new Person({
+    firstName: "Julia",
+    middleName: "Coordinator",
+    lastName: "Doe",
+  });
+
+  const coordinatorUser3 = new User({
+    email: "julia.doe@need4deed.org",
+    password: await hashPassword("no_password"),
+    role: UserRole.COORDINATOR,
+    isActive: true,
+    person: personCoordinator3,
+  });
+
   const postcode12345 = await postcodeRepository.findOne({
     where: { value: "12345" },
   });
@@ -81,7 +109,13 @@ export async function seedUser(dataSource: DataSource) {
   });
 
   try {
-    await userRepository.save([userAdmin, coordinatorUser, userUser]);
+    await userRepository.save([
+      userAdmin,
+      coordinatorUser,
+      coordinatorUser2,
+      coordinatorUser3,
+      userUser,
+    ]);
   } catch (_error) {
     logger.info("Skipping seeding users as they already seeded.");
   }

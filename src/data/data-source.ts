@@ -14,6 +14,7 @@ import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
 import Postcode from "./entity/location/postcode.entity";
+import ActivityLog from "./entity/m2m/activity-log.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
@@ -32,6 +33,7 @@ import Opportunity from "./entity/opportunity/opportunity.entity";
 import Option from "./entity/option.entity";
 import Organization from "./entity/organization.entity";
 import Person from "./entity/person.entity";
+import Post from "./entity/post.entity";
 import Activity from "./entity/profile/activity.entity";
 import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
@@ -59,6 +61,7 @@ export const dataSource = new DataSource({
   entities: [
     Accompanying,
     Activity,
+    ActivityLog,
     Address,
     Agent,
     AgentLanguage,
@@ -89,6 +92,7 @@ export const dataSource = new DataSource({
     OpportunityVolunteer,
     Organization,
     Person,
+    Post,
     Postcode,
     Option,
     Skill,

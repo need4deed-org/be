@@ -1,4 +1,5 @@
 export const RoutePrefix = {
+  ACTIVITY_LOG: "/activity-log",
   AGENT: "/agent",
   AUTH: "/auth",
   APPRECIATION: "/appreciation",
@@ -17,7 +18,11 @@ export const RoutePrefix = {
   ORGANIZATION: "/organization",
   OPTION: "/option",
   PERSON: "/person",
+  POST: "/post",
   REFRESH: "/refresh",
+  REQUEST_RESET: "/request-reset",
+  RESET_PASSWORD: "/password-reset",
+  CHANGE_PASSWORD: "/password-change",
   REGISTER: "/register",
   SWAGGER: "/swagger",
   TRUSTED_DOMAIN: "/trusted-domain",

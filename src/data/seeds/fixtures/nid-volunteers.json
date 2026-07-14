@@ -1,0 +1,641 @@
+[
+  {
+    "nid": "VOL-001",
+    "timestamp": "2023-09-01T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "I am a language teacher interested in supporting language exchange programs.",
+    "infoExperience": "Taught German as a foreign language for 3 years.",
+    "person": {
+      "firstName": "Felix",
+      "middleName": "",
+      "lastName": "Neumann",
+      "email": "felix.neumann@example.com",
+      "phone": "+4930201001",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10115",
+      "profile": {
+        "info": "Available Monday and Wednesday mornings for language café.",
+        "activities": ["Language café", "Tutoring"],
+        "skills": ["Teaching"],
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "intermediate"],
+          ["English", "fluent"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          {
+            "day": "Wednesday",
+            "daytime": ["morning", "afternoon"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Mitte"] }
+    }
+  },
+  {
+    "nid": "VOL-002",
+    "timestamp": "2024-01-10T10:00:00.000Z",
+    "status": "New",
+    "statusEngagement": "New",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "I moved to Berlin six months ago and want to give back to the community.",
+    "infoExperience": "No formal experience, but enthusiastic learner.",
+    "person": {
+      "firstName": "Sophie",
+      "middleName": "",
+      "lastName": "Braun",
+      "email": "sophie.braun@example.com",
+      "phone": "+4930201002",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10119",
+      "profile": {
+        "info": "Available Monday mornings and Friday afternoons.",
+        "activities": ["Language café", "Translation"],
+        "skills": [],
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          { "day": "Friday", "daytime": ["afternoon"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Mitte", "Pankow"] }
+    }
+  },
+  {
+    "nid": "VOL-003",
+    "timestamp": "2023-11-05T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Retired school teacher, happy to help with homework and tutoring.",
+    "infoExperience": "30 years as a primary school teacher in Berlin.",
+    "person": {
+      "firstName": "Klaus",
+      "middleName": "",
+      "lastName": "Fischer",
+      "email": "klaus.fischer@example.com",
+      "phone": "+4930201003",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10115",
+      "profile": {
+        "info": "Tuesday and Thursday afternoons for homework support.",
+        "activities": ["Tutoring"],
+        "skills": ["Teaching"],
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Tuesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          },
+          {
+            "day": "Thursday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Mitte"] }
+    }
+  },
+  {
+    "nid": "VOL-004",
+    "timestamp": "2023-10-15T10:00:00.000Z",
+    "status": "Active accompany",
+    "statusEngagement": "Active",
+    "accompanying": true,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Parent of two young children, experienced in childcare settings.",
+    "infoExperience": "2 years volunteering at a Kita in Neukölln.",
+    "person": {
+      "firstName": "Laura",
+      "middleName": "",
+      "lastName": "Wagner",
+      "email": "laura.wagner@example.com",
+      "phone": "+4930201004",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "12047",
+      "profile": {
+        "info": "Monday and Friday mornings for childcare.",
+        "activities": ["Daycare", "Playing"],
+        "skills": [],
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          { "day": "Friday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Neukölln"] }
+    }
+  },
+  {
+    "nid": "VOL-005",
+    "timestamp": "2024-01-20T10:00:00.000Z",
+    "status": "Matched",
+    "statusEngagement": "Available",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Student studying early childhood education.",
+    "infoExperience": "Internship at a Berlin Kita, six months.",
+    "person": {
+      "firstName": "Emma",
+      "middleName": "",
+      "lastName": "Koch",
+      "email": "emma.koch@example.com",
+      "phone": "+4930201005",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "12047",
+      "profile": {
+        "info": "Monday mornings and Wednesday mornings for childcare.",
+        "activities": ["Daycare", "Language café"],
+        "skills": [],
+        "languages": [
+          ["German", "native"],
+          ["Turkish", "intermediate"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Neukölln"] }
+    }
+  },
+  {
+    "nid": "VOL-006",
+    "timestamp": "2023-12-01T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Football coach and fitness instructor looking to volunteer on weekends.",
+    "infoExperience": "Coaching youth football for 5 years in Neukölln.",
+    "person": {
+      "firstName": "Marco",
+      "middleName": "",
+      "lastName": "Richter",
+      "email": "marco.richter@example.com",
+      "phone": "+4930201006",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "12053",
+      "profile": {
+        "info": "Saturday mornings for sports.",
+        "activities": ["Sports", "Activities-men"],
+        "skills": ["Teaching"],
+        "languages": [
+          ["German", "native"],
+          ["English", "intermediate"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Saturday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Neukölln"] }
+    }
+  },
+  {
+    "nid": "VOL-007",
+    "timestamp": "2023-09-20T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Professional translator (Arabic–German) supporting refugees in legal and medical contexts.",
+    "infoExperience": "4 years as a freelance translator and interpreter.",
+    "person": {
+      "firstName": "Nour",
+      "middleName": "",
+      "lastName": "Hassan",
+      "email": "nour.hassan@example.com",
+      "phone": "+4930201007",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10997",
+      "profile": {
+        "info": "Wednesday and Thursday mornings for translation support.",
+        "activities": ["Translation", "Fillout German forms"],
+        "skills": [],
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "fluent"],
+          ["English", "advanced"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          },
+          { "day": "Thursday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Friedrichshain-Kreuzberg"] }
+    }
+  },
+  {
+    "nid": "VOL-008",
+    "timestamp": "2024-01-25T10:00:00.000Z",
+    "status": "New",
+    "statusEngagement": "Available",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Arabic speaker with good German, eager to help with translation.",
+    "infoExperience": "Helped friends and family with official German correspondence.",
+    "person": {
+      "firstName": "Yusuf",
+      "middleName": "",
+      "lastName": "Al-Rashid",
+      "email": "yusuf.alrashid@example.com",
+      "phone": "+4930201008",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10997",
+      "profile": {
+        "info": "Wednesday mornings for translation.",
+        "activities": ["Translation", "Fillout German forms"],
+        "skills": [],
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "intermediate"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Friedrichshain-Kreuzberg"] }
+    }
+  },
+  {
+    "nid": "VOL-009",
+    "timestamp": "2023-10-10T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Administrative professional helping newcomers navigate German bureaucracy.",
+    "infoExperience": "1 year at a refugee advice centre in Kreuzberg.",
+    "person": {
+      "firstName": "Dilnoza",
+      "middleName": "",
+      "lastName": "Yıldız",
+      "email": "dilnoza.yildiz@example.com",
+      "phone": "+4930201009",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10999",
+      "profile": {
+        "info": "Monday and Wednesday afternoons for form assistance.",
+        "activities": ["Fillout German forms"],
+        "skills": [],
+        "languages": [
+          ["German", "fluent"],
+          ["Turkish", "native"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Monday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          },
+          {
+            "day": "Wednesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Friedrichshain-Kreuzberg", "Neukölln"] }
+    }
+  },
+  {
+    "nid": "VOL-010",
+    "timestamp": "2024-02-01T10:00:00.000Z",
+    "status": "Matched",
+    "statusEngagement": "Available",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Graphic designer and art teacher looking to run creative workshops.",
+    "infoExperience": "Ran monthly art workshops at a community centre for 2 years.",
+    "person": {
+      "firstName": "Petra",
+      "middleName": "",
+      "lastName": "Zimmermann",
+      "email": "petra.zimmermann@example.com",
+      "phone": "+4930201010",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10627",
+      "profile": {
+        "info": "Saturday afternoons for arts and crafts workshops.",
+        "activities": ["Arts"],
+        "skills": ["Drawing", "Painting"],
+        "languages": [
+          ["German", "native"],
+          ["English", "fluent"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Saturday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
+    }
+  },
+  {
+    "nid": "VOL-011",
+    "timestamp": "2023-11-15T10:00:00.000Z",
+    "status": "Active accompany",
+    "statusEngagement": "Active",
+    "accompanying": true,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "Medical student with Arabic background, available to accompany patients to appointments.",
+    "infoExperience": "Informal interpreting at a Berlin hospital for 6 months.",
+    "person": {
+      "firstName": "Karim",
+      "middleName": "",
+      "lastName": "Mansour",
+      "email": "karim.mansour@example.com",
+      "phone": "+4930201011",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10629",
+      "profile": {
+        "info": "Available Monday and Wednesday mornings for accompanying.",
+        "activities": [
+          "Accompanying to government appointments",
+          "Accompanying"
+        ],
+        "skills": [],
+        "languages": [
+          ["Arabic", "native"],
+          ["German", "advanced"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" },
+          {
+            "day": "Wednesday",
+            "daytime": ["morning"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Charlottenburg-Wilmersdorf"] }
+    }
+  },
+  {
+    "nid": "VOL-012",
+    "timestamp": "2023-12-10T10:00:00.000Z",
+    "status": "Active regular",
+    "statusEngagement": "Active",
+    "accompanying": false,
+    "statusCGC": "Yes",
+    "statusVaccination": "Yes",
+    "infoAbout": "HR professional offering career coaching and CV writing support.",
+    "infoExperience": "3 years as a career counsellor, experience coaching refugees.",
+    "person": {
+      "firstName": "Jana",
+      "middleName": "",
+      "lastName": "Schneider",
+      "email": "jana.schneider@example.com",
+      "phone": "+4930201012",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10317",
+      "profile": {
+        "info": "Tuesday and Thursday evenings for job application support.",
+        "activities": ["Mentorship"],
+        "skills": ["Teaching"],
+        "languages": [
+          ["German", "native"],
+          ["English", "advanced"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Tuesday", "daytime": ["evening"], "info": "", "start": "" },
+          { "day": "Thursday", "daytime": ["evening"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Lichtenberg"] }
+    }
+  },
+  {
+    "nid": "VOL-013",
+    "timestamp": "2024-02-05T10:00:00.000Z",
+    "status": "Matched",
+    "statusEngagement": "Available",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Looking for a practical weekend volunteering opportunity.",
+    "infoExperience": "No formal experience.",
+    "person": {
+      "firstName": "Ozan",
+      "middleName": "",
+      "lastName": "Demir",
+      "email": "ozan.demir@example.com",
+      "phone": "+4930201013",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10319",
+      "profile": {
+        "info": "Saturday mornings for practical tasks like clothing sorting.",
+        "activities": ["Clothing Sorting"],
+        "skills": [],
+        "languages": [
+          ["German", "intermediate"],
+          ["Turkish", "native"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Saturday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Lichtenberg", "Neukölln"] }
+    }
+  },
+  {
+    "nid": "VOL-014",
+    "timestamp": "2024-03-01T10:00:00.000Z",
+    "status": "New",
+    "statusEngagement": "New",
+    "accompanying": false,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Primary school librarian who loves reading to children.",
+    "infoExperience": "Reading groups at a local library, 1 year.",
+    "person": {
+      "firstName": "Sabine",
+      "middleName": "",
+      "lastName": "Krause",
+      "email": "sabine.krause@example.com",
+      "phone": "+4930201014",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "10405",
+      "profile": {
+        "info": "Wednesday afternoons for children's reading sessions.",
+        "activities": ["Reading"],
+        "skills": [],
+        "languages": [
+          ["German", "native"],
+          ["Arabic", "beginner"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          {
+            "day": "Wednesday",
+            "daytime": ["afternoon"],
+            "info": "",
+            "start": ""
+          }
+        ]
+      },
+      "location": { "districts": ["Pankow"] }
+    }
+  },
+  {
+    "nid": "VOL-015",
+    "timestamp": "2024-03-10T10:00:00.000Z",
+    "status": "New",
+    "statusEngagement": "New",
+    "accompanying": true,
+    "statusCGC": "",
+    "statusVaccination": "",
+    "infoAbout": "Iranian-German bilingual available to accompany residents to official appointments.",
+    "infoExperience": "Helped family members navigate German administration.",
+    "person": {
+      "firstName": "Shirin",
+      "middleName": "",
+      "lastName": "Golestan",
+      "email": "shirin.golestan@example.com",
+      "phone": "+4930201015",
+      "address": null
+    },
+    "deal": {
+      "type": "volunteer",
+      "postcode": "13591",
+      "profile": {
+        "info": "Monday mornings for government appointment accompanying.",
+        "activities": ["Accompanying to government appointments"],
+        "skills": [],
+        "languages": [
+          ["German", "fluent"],
+          ["Persian", "native"]
+        ]
+      },
+      "time": {
+        "timeslots": [
+          { "day": "Monday", "daytime": ["morning"], "info": "", "start": "" }
+        ]
+      },
+      "location": { "districts": ["Spandau"] }
+    }
+  }
+]

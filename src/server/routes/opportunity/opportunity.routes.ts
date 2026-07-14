@@ -2,8 +2,10 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityGet,
   ApiOpportunityPatch,
+  CommunicationType,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
+  OpportunityLegacyType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -60,12 +62,53 @@ import {
   updateOptionList,
   writeOpportunityLegacy,
 } from "../../utils";
+import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import {
   makePiiSerialization,
   maskForCaller,
 } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
+
+async function sendNewOpportunityEmail(
+  fastify: FastifyInstance,
+  id: number,
+  relations: string[],
+  notifyFn: (opp: Opportunity) => Promise<void>,
+  label: string,
+): Promise<void> {
+  const opp = await fastify.db.opportunityRepository.findOne({
+    where: { id },
+    relations,
+  });
+  if (!opp) {
+    return;
+  }
+  const alreadySent = await fastify.db.communicationRepository.findOne({
+    where: {
+      opportunityId: id,
+      communicationType: CommunicationType.OPPORTUNITY_CONFIRMATION,
+    },
+  });
+  if (alreadySent) {
+    return;
+  }
+  const comm = await logEmailCommunication(
+    fastify.db.communicationRepository,
+    CommunicationType.OPPORTUNITY_CONFIRMATION,
+    { opportunityId: id },
+  );
+  try {
+    await notifyFn(opp);
+  } catch (sendErr) {
+    await fastify.db.communicationRepository.remove(comm).catch((removeErr) => {
+      logger.error(
+        `${label} dedup rollback failed (opp ${id}, comm ${comm.id}): ${removeErr}`,
+      );
+    });
+    throw sendErr;
+  }
+}
 
 export default async function opportunityRoutes(
   fastify: FastifyInstance,
@@ -296,6 +339,16 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
 
+      // This route derives the deal's postcode solely from the agent's
+      // address (the form has no rac_plz fallback, unlike the legacy route).
+      // deal.postcode_id is NOT NULL, so a missing postcode here would
+      // otherwise reach the DB as an unhandled constraint violation.
+      if (!agent.address?.postcode?.value) {
+        throw new BadRequestError(
+          `Agent (id:${agentId}) has no postcode on its address; set one before creating an opportunity for it.`,
+        );
+      }
+
       // An AGENT may only create opportunities for an agent they belong to;
       // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
@@ -323,7 +376,7 @@ export default async function opportunityRoutes(
         agent.address?.postcode?.value,
       );
       opportunity.accompanying =
-        body.opportunity_type === "accompanying"
+        body.opportunity_type === OpportunityLegacyType.ACCOMPANYING
           ? await accompanyingParserOpportunity(legacyBody)
           : undefined;
 
@@ -340,6 +393,57 @@ export default async function opportunityRoutes(
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
       );
+
+      if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
+        (async () => {
+          try {
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              [
+                "submittedByPerson",
+                "submittedByPerson.users",
+                "contactPerson",
+                "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
+              ],
+              (opp) => fastify.notify.emailNewRegular(opp),
+              "emailNewRegular",
+            );
+          } catch (err) {
+            logger.error(
+              `emailNewRegular side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
+      } else if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
+        (async () => {
+          try {
+            await sendNewOpportunityEmail(
+              fastify,
+              id,
+              [
+                "accompanying",
+                "accompanying.postcode",
+                "submittedByPerson",
+                "submittedByPerson.users",
+                "contactPerson",
+                "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
+                "district",
+              ],
+              (opp) => fastify.notify.emailNewAccompanying(opp),
+              "emailNewAccompanying",
+            );
+          } catch (err) {
+            logger.error(
+              `emailNewAccompanying side-effect failed (opp ${id}): ${err}`,
+            );
+          }
+        })();
+      }
 
       return reply.status(201).send({
         message: `Opportunity (${id}) created.`,

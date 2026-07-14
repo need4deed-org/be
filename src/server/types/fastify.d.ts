@@ -10,6 +10,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
+import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../data/entity/opportunity/agent.entity";
@@ -17,6 +18,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
+import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
@@ -35,6 +37,7 @@ declare module "fastify" {
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
       communicationRepository: Repository<Communication>;
+      activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;
       opportunityRepository: Repository<Opportunity>;
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
@@ -43,6 +46,7 @@ declare module "fastify" {
       agentPersonRepository: Repository<AgentPerson>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
+      postRepository: Repository<Post>;
       trustedDomainRepository: Repository<TrustedDomain>;
     };
     jwt: JWT;
@@ -61,7 +65,7 @@ declare module "@fastify/jwt" {
   // It's crucial to extend the original FastifyJWT interface here
   // so that your custom 'payload' and 'user' types merge correctly
   // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
-  type TokenType = "access" | "refresh" | "verify";
+  type TokenType = "access" | "refresh" | "verify" | "reset";
   interface FastifyJWT {
     // Payload type when signing a token (`reply.jwtSign(payload)`)
     payload: {

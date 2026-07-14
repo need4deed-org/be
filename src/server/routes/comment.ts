@@ -397,6 +397,75 @@ export default async function commentRoutes(
     },
   );
 
+  //
+  // PATCH /comment/:id/read
+  //
+  fastify.patch(
+    "/:id/read",
+    {
+      schema: {
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              data: { $ref: "ApiComment#" },
+            },
+            required: ["message", "data"],
+          },
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const id = Number((request.params as { id: string }).id);
+      if (isNaN(id) || id <= 0) {
+        return reply
+          .status(400)
+          .send({ message: "Invalid comment ID provided." });
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        return reply
+          .status(403)
+          .send({ message: "No person linked to this user." });
+      }
+
+      const cpRepository =
+        fastify.db.commentRepository.manager.getRepository(CommentPerson);
+      const cp = await cpRepository.findOne({
+        where: { commentId: id, personId },
+      });
+      if (!cp) {
+        return reply
+          .status(404)
+          .send({
+            message: `No tag found for comment id:${id} on your person.`,
+          });
+      }
+
+      cp.readAt = new Date();
+      await cpRepository.save(cp);
+
+      const comment = await fastify.db.commentRepository.findOne({
+        where: { id },
+        relations: ["user", "user.person", "language", "commentPerson"],
+      });
+      if (!comment) {
+        return reply
+          .status(404)
+          .send({ message: `Comment id:${id} not found.` });
+      }
+
+      return reply.status(200).send({
+        message: `Comment id:${id} marked as read`,
+        data: commentSerializer(comment),
+      });
+    },
+  );
+
   fastify.delete(
     "/:id",
     {

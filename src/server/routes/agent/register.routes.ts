@@ -91,7 +91,7 @@ export default async function agentRegisterRoutes(
       const street = (request.query.street ?? "").trim();
       const postcode = (request.query.postcode ?? "").trim();
       const domain = request.registrant?.email.split("@").pop()?.toLowerCase();
-      if (street.length < 3 || !postcode || !domain) {
+      if (street.length < 3 || !domain) {
         return reply.status(200).send({ message: "No query", data: [] });
       }
 
