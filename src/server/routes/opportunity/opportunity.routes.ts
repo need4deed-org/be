@@ -390,7 +390,14 @@ export default async function opportunityRoutes(
             await sendNewOpportunityEmail(
               fastify,
               id,
-              ["contactPerson", "contactPerson.users"],
+              [
+                "submittedByPerson",
+                "submittedByPerson.users",
+                "contactPerson",
+                "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
+              ],
               (opp) => fastify.notify.emailNewRegular(opp),
               "emailNewRegular",
             );
@@ -409,8 +416,12 @@ export default async function opportunityRoutes(
               [
                 "accompanying",
                 "accompanying.postcode",
+                "submittedByPerson",
+                "submittedByPerson.users",
                 "contactPerson",
                 "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
                 "district",
               ],
               (opp) => fastify.notify.emailNewAccompanying(opp),

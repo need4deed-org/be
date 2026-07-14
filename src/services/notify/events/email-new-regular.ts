@@ -4,6 +4,7 @@ import {
   emailNewRegularManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import {
   createManifestLoader,
   fillTemplate,
@@ -34,17 +35,18 @@ export async function sendEmailNewRegular(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPersonEmail = opportunity.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(opportunity);
+  const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
       `sendEmailNewRegular: missing contact email for opportunity ${opportunity.id}`,
     );
   }
 
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = opportunity.title;
 
-  const locale = resolveLocale(opportunity.contactPerson?.users?.[0]?.language);
+  const locale = resolveLocale(contactPerson.users?.[0]?.language);
   const content = resolveContent(await loader.load(), locale, BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,

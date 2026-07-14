@@ -1,5 +1,6 @@
 export * from "./fetch-json";
 export * from "./get-district";
+export * from "./get-opportunity-representative-person";
 export * from "./get-postcode";
 export * from "./get-repository";
 export * from "./getLoggingForDataSource";
