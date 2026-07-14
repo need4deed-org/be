@@ -6,6 +6,7 @@ import {
   emailIntroductionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { getLanguages, getOptionItems, getTitles } from "../../dto/utils";
 import {
   createManifestLoader,
@@ -85,7 +86,8 @@ export async function sendEmailIntroduction(
   ov: OpportunityVolunteer,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
-  const contactPersonEmail = ov.opportunity?.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
+  const contactPersonEmail = contactPerson?.email;
 
   if (!volunteerEmail || !contactPersonEmail) {
     throw new Error(
@@ -98,7 +100,7 @@ export async function sendEmailIntroduction(
   const locale = resolveLocale(volunteer.person?.users?.[0]?.language);
 
   const volunteerName = volunteer.person.name;
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = opportunity.title;
 
   const volunteerLanguage = getLanguages(volunteer.deal?.dealLanguage ?? [])
@@ -145,7 +147,7 @@ export async function sendEmailIntroduction(
     volunteerEmail,
     volunteerPhone: volunteer.person.phone ?? "",
     contactpersonEmail: contactPersonEmail,
-    contactpersonPhone: opportunity.contactPerson!.phone ?? "",
+    contactpersonPhone: contactPerson.phone ?? "",
     agentAddress,
     statmentOnCertificates,
   });
