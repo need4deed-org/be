@@ -6,12 +6,12 @@ import {
 } from "need4deed-sdk";
 import { Brackets } from "typeorm";
 import logger from "../../logger";
-import { berlinToday } from "./german-holidays";
+import { addWorkingDays, berlinToday } from "./german-holidays";
 
 export async function scanExpiredOnetimers(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const dayBeforeToday = berlinToday().setDate(berlinToday().getDate() - 1);
+  const dayBeforeToday = addWorkingDays(berlinToday(), -1);
 
   const expiredOpportunities = await fastify.db.opportunityRepository
     .createQueryBuilder("opportunity")

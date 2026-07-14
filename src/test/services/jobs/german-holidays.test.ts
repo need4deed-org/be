@@ -83,6 +83,12 @@ describe("addWorkingDays", () => {
     expect(result).toEqual(d(2026, 1, 5));
   });
 
+  it("skips weekends when subtracting days", () => {
+    // Monday 2026-01-05 - 1 working day = Friday 2026-01-02
+    const result = addWorkingDays(d(2026, 1, 5), -1);
+    expect(result).toEqual(d(2026, 1, 2));
+  });
+
   it("skips Saturday and Sunday when spanning a weekend", () => {
     // Thursday 2026-01-08 + 2 working days = Monday 2026-01-12
     const result = addWorkingDays(d(2026, 1, 8), 2);
