@@ -10,7 +10,8 @@ import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
-import schedulerPlugin from "./plugins/scheduler";
+import schedulerDailyPlugin from "./plugins/scheduler-daily";
+import schedulerHourlyPlugin from "./plugins/scheduler-hourly";
 import typeormPlugin from "./plugins/typeorm";
 import activityLogRoutes from "./routes/activity-log.routes";
 import agentRoutes from "./routes/agent/agent.routes";
@@ -151,7 +152,8 @@ export async function createServer(): Promise<FastifyInstance> {
     },
   });
   await fastifyInstance.register(notifyPlugin);
-  await fastifyInstance.register(schedulerPlugin);
+  await fastifyInstance.register(schedulerHourlyPlugin);
+  await fastifyInstance.register(schedulerDailyPlugin);
   await fastifyInstance.register(healthRoutes, {
     prefix: RoutePrefix.HEALTH_CHECK,
   });
