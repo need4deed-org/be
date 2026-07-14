@@ -17,10 +17,14 @@ export async function seedAgentUsers(dataSource: DataSource): Promise<void> {
   for (const agentJson of agentsJson ?? []) {
     for (const personJson of agentJson.person ?? []) {
       const email = personJson.email;
-      if (!email) {continue;}
+      if (!email) {
+        continue;
+      }
 
       const existing = await userRepository.findOne({ where: { email } });
-      if (existing) {continue;}
+      if (existing) {
+        continue;
+      }
 
       const person = await personRepository.findOne({ where: { email } });
       if (!person) {
@@ -33,7 +37,7 @@ export async function seedAgentUsers(dataSource: DataSource): Promise<void> {
       const user = new User({
         email,
         password: pwHash,
-        role: UserRole.USER,
+        role: UserRole.AGENT,
         isActive: true,
         person,
       });
