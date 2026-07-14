@@ -50,9 +50,11 @@ export function isGermanPublicHoliday(date: Date): boolean {
 
 export function addWorkingDays(from: Date, days: number): Date {
   let result = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const direction = days < 0 ? -1 : 1;
+  const remaining = Math.abs(days);
   let added = 0;
-  while (added < days) {
-    result = addDays(result, 1);
+  while (added < remaining) {
+    result = addDays(result, direction);
     const dow = result.getDay();
     if (dow !== 0 && dow !== 6 && !isGermanPublicHoliday(result)) {
       added++;
