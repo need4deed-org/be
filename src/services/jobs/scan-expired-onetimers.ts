@@ -45,18 +45,36 @@ export async function scanExpiredOnetimers(
   }
 
   for (const opportunity of expiredOpportunities) {
-    opportunity.status = OpportunityStatusType.INACTIVE;
-    await fastify.db.opportunityRepository.save(opportunity);
+    try {
+      opportunity.status = OpportunityStatusType.INACTIVE;
+      await fastify.db.opportunityRepository.save(opportunity);
 
-    for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-      if (
-        opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
-      ) {
-        opportunityVolunteer.status = OpportunityVolunteerStatusType.PAST;
-        await fastify.db.opportunityVolunteerRepository.save(
-          opportunityVolunteer,
-        );
+      for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
+        if (
+          opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
+        ) {
+          try {
+            opportunityVolunteer.status = OpportunityVolunteerStatusType.PAST;
+            await fastify.db.opportunityVolunteerRepository.save(
+              opportunityVolunteer,
+            );
+          } catch (err) {
+            logger.error(
+              {
+                err,
+                opportunityId: opportunity.id,
+                opportunityVolunteerId: opportunityVolunteer.id,
+              },
+              "scanExpiredOnetimers: failed to mark opportunity volunteer as PAST",
+            );
+          }
+        }
       }
+    } catch (err) {
+      logger.error(
+        { err, opportunityId: opportunity.id },
+        "scanExpiredOnetimers: failed to mark opportunity as INACTIVE",
+      );
     }
   }
 
