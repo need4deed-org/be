@@ -1,5 +1,6 @@
 import { Lang } from "need4deed-sdk";
 import {
+  emailFromNotify,
   emailFromVolunteer,
   emailPostMatchCheckupManifestUrl,
 } from "../../../config/constants";
@@ -48,7 +49,8 @@ export async function sendEmailPostMatchCheckup(
 
   await email.send({
     to: volunteerEmail,
-    from: emailFromVolunteer,
+    cc: emailFromVolunteer,
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),

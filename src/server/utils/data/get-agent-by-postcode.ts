@@ -5,8 +5,8 @@ function normalizeStreet(s: string): string {
     .trim()
     .toLowerCase()
     .replace(/\s*stra(?:ße|sse)\b/g, "str") // straße / strasse → str
-    .replace(/\s*str\./g, "str")             // str.  → str
-    .replace(/\s+str\b/g, "str");            // " str" → str
+    .replace(/\s*str\./g, "str") // str.  → str
+    .replace(/\s+str\b/g, "str"); // " str" → str
 }
 
 const HOUSE_NUMBER_RE = /\s+(\d+[\w-]*(?:\s+[a-z]+)?)$/;
@@ -22,7 +22,7 @@ function extractHouseNumber(s: string): string | undefined {
 }
 
 function agentHasPlz(a: Agent, plz: string): boolean {
-  if (a.address?.postcode?.value === plz) return true;
+  if (a.address?.postcode?.value === plz) {return true;}
   return !!a.agentPostcode?.some((ap) => ap.postcode?.value === plz);
 }
 
@@ -34,34 +34,34 @@ function streetNameWordRegex(streetName: string): RegExp {
 export function getAgentByAddress(
   agents: Agent[],
   street: string,
-  plz: string,
+  plz?: string,
 ): Agent | undefined {
   const normStreet = normalizeStreet(street);
 
   // 1. Strict: agents created via new code have address.street set
   const strict = agents.find(
     (a) =>
-      a.address?.postcode?.value === plz &&
+      (!plz || a.address?.postcode?.value === plz) &&
       normalizeStreet(a.address?.street ?? "") === normStreet,
   );
-  if (strict) return strict;
+  if (strict) {return strict;}
 
   // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
-  //    whole word in agent title + PLZ from either address.postcode or agentPostcode.
+  //    whole word in agent title. PLZ narrows the match when provided.
   //    Number consistency: if the agent title contains a number it must match the
   //    form's number — prevents "Heerstr 10" matching form input "Heerstr 110".
   //    Agents with no number in title (e.g. "Refugium Hausvaterweg") match on
   //    street name alone.
   const streetName = extractStreetName(street);
-  if (!streetName) return undefined;
+  if (!streetName) {return undefined;}
   const streetRegex = streetNameWordRegex(streetName);
   const houseNumber = extractHouseNumber(street);
 
   const fuzzyMatches = agents.filter((a) => {
-    if (!agentHasPlz(a, plz)) return false;
-    if (!streetRegex.test(normalizeStreet(a.title ?? ""))) return false;
+    if (plz && !agentHasPlz(a, plz)) {return false;}
+    if (!streetRegex.test(normalizeStreet(a.title ?? ""))) {return false;}
     const titleNumber = extractHouseNumber(a.title ?? "");
-    if (titleNumber && houseNumber && titleNumber !== houseNumber) return false;
+    if (titleNumber && houseNumber && titleNumber !== houseNumber) {return false;}
     return true;
   });
 

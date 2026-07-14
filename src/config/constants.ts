@@ -66,25 +66,21 @@ export const seedLeadFromFile = path.join(
 
 export const seedAgentsFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-agents.json",
 );
 
 export const seedOpportunitiesFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-opportunities.json",
 );
 
 export const seedVolunteersFile = path.join(
   __dirname,
-  ...["..", "..", "dev", "files", "notion"],
+  ...["..", "data", "seeds", "fixtures"],
   "nid-volunteers.json",
 );
-
-// export const seedAgentsFile = CDNBaseUrl + "/dev/agents.json";
-// export const seedVolunteersFile = CDNBaseUrl + "/dev/volunteers.json";
-// export const seedOpportunitiesFile = CDNBaseUrl + "/dev/opportunities.json";
 
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
@@ -119,8 +115,14 @@ export const emailNewRegularManifestUrl =
 export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
 
-export const emailFromVolunteer = "volunteer@need4deed.org";
-export const emailFromContact = "contact@need4deed.org";
+export const emailFromVolunteer =
+  process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";
+export const emailFromContact =
+  process.env.EMAIL_FROM_CONTACT || "contact@need4deed.org";
+export const emailFromAccompanying =
+  process.env.EMAIL_FROM_ACCOMPANYING || "accompanying@need4deed.org";
+export const emailFromNotify =
+  process.env.EMAIL_FROM_NOTIFY || "coordinators@need4deed.org";
 // How long a fetched email manifest is cached in-memory (default 10 min).
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;

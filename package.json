@@ -43,7 +43,7 @@
     "class-validator": "^0.14.2",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.0.1",
-    "need4deed-sdk": "0.0.120",
+    "need4deed-sdk": "0.0.125",
     "node-cron": "^4.5.0",
     "nodemailer": "^9.0.3",
     "pg": "^8.14.1",
@@ -55,6 +55,7 @@
   },
   "scripts": {
     "start": "ts-node src/index.ts",
+    "seed": "ts-node src/data/seeds/run.ts",
     "dev": "nodemon",
     "typeorm": "typeorm-ts-node-commonjs -d src/data/data-source.ts",
     "migration:generate": "yarn typeorm migration:generate",

@@ -13,6 +13,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
+import { getAvailability, getLanguages } from "./utils";
 
 // Serializes an agent<->person membership for the moderation endpoints.
 // Expects the `agent` and `person` relations to be loaded.
@@ -123,10 +124,20 @@ export function dtoAgentOpportunity(
   return {
     id: opportunity.id,
     title: opportunity.title,
+    volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
     numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
+    district: { id: opportunity.district?.id ?? opportunity.districtId },
+    languages: getLanguages(opportunity.deal?.dealLanguage ?? []),
+    activities: (opportunity.deal?.dealActivity ?? [])
+      .filter(Boolean)
+      .map((da) => ({ id: da.activity.id })),
+    location: (opportunity.deal?.dealDistrict ?? [])
+      .filter(Boolean)
+      .map((dd) => ({ id: dd.district.id })),
+    availability: getAvailability(opportunity.deal?.dealTimeslot ?? []) ?? [],
     volunteers: (opportunity.opportunityVolunteer ?? [])
       .filter(Boolean)
       .map((ov) => ({

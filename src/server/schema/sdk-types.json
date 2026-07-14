@@ -781,6 +781,9 @@
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
+        "title": {
+          "type": "string"
+        },
         "statusOpportunity": {
           "$ref": "OpportunityStatusType#"
         },

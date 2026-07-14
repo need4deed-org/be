@@ -2,8 +2,10 @@ import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyMatchManifestUrl,
   emailFromContact,
+  emailFromNotify,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { getLanguages } from "../../dto/utils";
 import {
   createManifestLoader,
@@ -54,7 +56,8 @@ export async function sendEmailAccompanyMatch(
   email: EmailTransport,
   ov: OpportunityVolunteer,
 ): Promise<void> {
-  const contactPersonEmail = ov.opportunity?.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
+  const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
       `sendEmailAccompanyMatch: missing contact email for opportunity ${ov.opportunityId}`,
@@ -79,7 +82,7 @@ export async function sendEmailAccompanyMatch(
   const volunteerName = volunteer.person.name;
   const volunteerEmail = volunteer.person.email ?? "";
   const volunteerPhone = volunteer.person.phone ?? "";
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
 
   const volunteerLanguage = getLanguages(volunteer.deal?.dealLanguage ?? [])
     .map((l) => l.title)
@@ -97,7 +100,7 @@ export async function sendEmailAccompanyMatch(
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
 
-  const locale = resolveLocale(opportunity.contactPerson?.users?.[0]?.language);
+  const locale = resolveLocale(contactPerson.users?.[0]?.language);
   const contactSharing = resolveContactSharing(
     volunteer.shareContact ?? true,
     volunteerName,
@@ -121,7 +124,8 @@ export async function sendEmailAccompanyMatch(
 
   await email.send({
     to: contactPersonEmail,
-    from: emailFromContact,
+    cc: emailFromContact,
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),

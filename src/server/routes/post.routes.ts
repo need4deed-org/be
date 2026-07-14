@@ -21,6 +21,7 @@ import {
 } from "../types";
 import { getSkipTake } from "../utils";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
 export default async function postRoutes(
   fastify: FastifyInstance,
@@ -119,27 +120,12 @@ export default async function postRoutes(
           : [],
       ]);
 
-      const existingPersonIds = new Set(taggedPersons.map((p) => p.id));
-      const missingPersonIds = [...new Set(taggedPersonIds)].filter(
-        (id) => !existingPersonIds.has(id),
+      validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
+      validateRelationIds(
+        linkedOpportunityIds,
+        linkedOpportunities,
+        "linked opportunity",
       );
-      if (missingPersonIds.length) {
-        throw new BadRequestError(
-          `Invalid tagged person id(s): ${missingPersonIds.join(", ")}`,
-        );
-      }
-
-      const existingOpportunityIds = new Set(
-        linkedOpportunities.map((o) => o.id),
-      );
-      const missingOpportunityIds = [...new Set(linkedOpportunityIds)].filter(
-        (id) => !existingOpportunityIds.has(id),
-      );
-      if (missingOpportunityIds.length) {
-        throw new BadRequestError(
-          `Invalid linked opportunity id(s): ${missingOpportunityIds.join(", ")}`,
-        );
-      }
 
       const post = fastify.db.postRepository.create({
         text,
@@ -156,7 +142,9 @@ export default async function postRoutes(
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
 
-      if (!full) {throw new NotFoundError("Post not found.");}
+      if (!full) {
+        throw new NotFoundError("Post not found.");
+      }
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -220,15 +208,7 @@ export default async function postRoutes(
               id: In(taggedPersonIds),
             })
           : [];
-        const existingIds = new Set(found.map((p) => p.id));
-        const missing = [...new Set(taggedPersonIds)].filter(
-          (id) => !existingIds.has(id),
-        );
-        if (missing.length) {
-          throw new BadRequestError(
-            `Invalid tagged person id(s): ${missing.join(", ")}`,
-          );
-        }
+        validateRelationIds(taggedPersonIds, found, "tagged person");
         post.taggedPersons = found;
       }
       if (linkedOpportunityIds !== null && linkedOpportunityIds !== undefined) {
@@ -237,15 +217,7 @@ export default async function postRoutes(
               id: In(linkedOpportunityIds),
             })
           : [];
-        const existingIds = new Set(found.map((o) => o.id));
-        const missing = [...new Set(linkedOpportunityIds)].filter(
-          (id) => !existingIds.has(id),
-        );
-        if (missing.length) {
-          throw new BadRequestError(
-            `Invalid linked opportunity id(s): ${missing.join(", ")}`,
-          );
-        }
+        validateRelationIds(linkedOpportunityIds, found, "linked opportunity");
         post.linkedOpportunities = found;
       }
 

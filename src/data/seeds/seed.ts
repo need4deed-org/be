@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { check } from "..";
+import { seedAgentUsers } from "./populate/agent-user.seed";
 import { seedAgents } from "./populate/agent.seed";
 import { devTime } from "./populate/dev-parsing";
 import { seedOpportunities } from "./populate/opportunity.seed";
@@ -16,6 +17,7 @@ export async function seed(dataSource: DataSource) {
     devTime(dataSource);
   } else {
     await seedAgents(dataSource);
+    await seedAgentUsers(dataSource);
     await seedOpportunities(dataSource);
     await seedVolunteers(dataSource);
   }
