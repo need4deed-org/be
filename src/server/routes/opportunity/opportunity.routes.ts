@@ -339,6 +339,16 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
 
+      // This route derives the deal's postcode solely from the agent's
+      // address (the form has no rac_plz fallback, unlike the legacy route).
+      // deal.postcode_id is NOT NULL, so a missing postcode here would
+      // otherwise reach the DB as an unhandled constraint violation.
+      if (!agent.address?.postcode?.value) {
+        throw new BadRequestError(
+          `Agent (id:${agentId}) has no postcode on its address; set one before creating an opportunity for it.`,
+        );
+      }
+
       // An AGENT may only create opportunities for an agent they belong to;
       // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
