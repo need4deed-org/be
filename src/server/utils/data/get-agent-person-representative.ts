@@ -5,22 +5,21 @@ import { getRepository } from "../../../data/utils";
 
 export async function getAgentPersonRepresentative(
   personId: number,
+  agentId?: number,
 ): Promise<AgentPerson | null> {
   const agentPersonRepository = getRepository(dataSource, AgentPerson);
+  const baseWhere = {
+    personId,
+    status: AgentMembershipStatus.ACTIVE,
+    ...(agentId ? { agentId } : {}),
+  };
   const representative =
     (await agentPersonRepository.findOne({
-      where: {
-        personId,
-        status: AgentMembershipStatus.ACTIVE,
-        role: AgentRoleType.VOLUNTEER_COORDINATOR,
-      },
+      where: { ...baseWhere, role: AgentRoleType.VOLUNTEER_COORDINATOR },
       order: { id: "ASC" },
     })) ??
     (await agentPersonRepository.findOne({
-      where: {
-        personId,
-        status: AgentMembershipStatus.ACTIVE,
-      },
+      where: baseWhere,
       order: { id: "ASC" },
     }));
 
