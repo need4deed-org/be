@@ -756,19 +756,39 @@ export class GenesisBaseSchema1763036250000 implements MigrationInterface {
       ["volunteer", "PK_76924da1998b3e07025e04c4d3c", "id"],
     ];
 
+    // A PK-add can't rely on `EXCEPTION WHEN duplicate_object` for idempotency:
+    // Postgres checks "table already has a PK" before it checks "constraint
+    // name already exists", so it raises invalid_table_definition (uncaught
+    // here) rather than duplicate_object whenever the table already has any
+    // primary key, even one with this exact name. Guard explicitly instead.
     for (const [tbl, name, cols] of pks) {
-      await queryRunner.query(
-        `DO $$ BEGIN ALTER TABLE ONLY public.${tbl} ADD CONSTRAINT "${name}" PRIMARY KEY (${cols}); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-      );
+      await queryRunner.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conrelid = 'public.${tbl}'::regclass AND contype = 'p'
+          ) THEN
+            ALTER TABLE ONLY public.${tbl} ADD CONSTRAINT "${name}" PRIMARY KEY (${cols});
+          END IF;
+        END $$`);
     }
 
     // Composite PKs
-    await queryRunner.query(
-      `DO $$ BEGIN ALTER TABLE ONLY public.post_person ADD CONSTRAINT "PK_2752a498efcea4ce067c3ced8b6" PRIMARY KEY (post_id, person_id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    );
-    await queryRunner.query(
-      `DO $$ BEGIN ALTER TABLE ONLY public.post_opportunity ADD CONSTRAINT "PK_83c02a05c6699152a7619ca8de2" PRIMARY KEY (post_id, opportunity_id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    );
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conrelid = 'public.post_person'::regclass AND contype = 'p'
+        ) THEN
+          ALTER TABLE ONLY public.post_person ADD CONSTRAINT "PK_2752a498efcea4ce067c3ced8b6" PRIMARY KEY (post_id, person_id);
+        END IF;
+      END $$`);
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conrelid = 'public.post_opportunity'::regclass AND contype = 'p'
+        ) THEN
+          ALTER TABLE ONLY public.post_opportunity ADD CONSTRAINT "PK_83c02a05c6699152a7619ca8de2" PRIMARY KEY (post_id, opportunity_id);
+        END IF;
+      END $$`);
 
     // ─── UNIQUE CONSTRAINTS ───────────────────────────────────────────────────
 
