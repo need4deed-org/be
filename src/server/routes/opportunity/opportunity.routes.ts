@@ -453,6 +453,7 @@ export default async function opportunityRoutes(
       const opportunity = await opportunityRepository.findOne({
         where: { id },
       });
+
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
@@ -481,10 +482,25 @@ export default async function opportunityRoutes(
         request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
         !opportunity.accompanyingId
       ) {
-        if (!request.body.accompanyingDetails) {
+        const details = request.body.accompanyingDetails;
+        if (!details) {
           throw new BadRequestError(
             'Accompanying details are required when changing opportunity type to "accompanying".',
           );
+        }
+        const requiredFields = [
+          "appointmentAddress",
+          "appointmentDate",
+          "appointmentTime",
+          "refugeeName",
+          "appointmentPostcode",
+          "appointmentLanguage",
+        ] as const;
+        const missing = requiredFields.filter(
+          (f) => !details[f as keyof typeof details],
+        );
+        if (missing.length > 0) {
+          throw new BadRequestError(`Missing required accompanying fields`);
         }
       }
 
@@ -562,16 +578,17 @@ export default async function opportunityRoutes(
             new Accompanying(),
             accompanying,
           );
-          await fastify.db.accompanyingRepository.save(newAccompanying);
-          const linkSuccess = await patchEntity(
-            Opportunity,
-            { accompanyingId: newAccompanying.id } as Partial<Opportunity>,
-            opportunity.id,
-          );
-          if (!linkSuccess) {
-            throw new BadRequestError(
-              "Linking accompanying record to opportunity failed.",
+          try {
+            await fastify.db.accompanyingRepository.manager.transaction(
+              async (manager) => {
+                await manager.save(Accompanying, newAccompanying);
+                await manager.update(Opportunity, opportunity.id, {
+                  accompanyingId: newAccompanying.id,
+                });
+              },
             );
+          } catch {
+            throw new BadRequestError("Saving new accompanying failed");
           }
         }
       }
