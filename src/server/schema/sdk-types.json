@@ -286,6 +286,26 @@
       "$id": "ApiPersonPatch",
       "$ref": "ApiPerson#"
     },
+    "ApiRepresentativePatch": {
+      "$id": "ApiRepresentativePatch",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "ApiPerson#"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "$ref": "AgentRoleType#"
+            },
+            "agentId": {
+              "type": "integer"
+            }
+          }
+        }
+      ]
+    },
     "VolunteerStateType": {
       "$id": "VolunteerStateType",
       "type": "string",
