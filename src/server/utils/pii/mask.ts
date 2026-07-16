@@ -2,6 +2,7 @@ import { EntityTableName, UserRole } from "need4deed-sdk";
 import Comment from "../../../data/entity/comment.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import { CallerVisibility } from "./visible-persons";
@@ -80,9 +81,10 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
  * (the walker still descends them to reach nested PII). A WeakSet guards the
  * entity graph's cycles.
  *
- * Masked: a Person not in `personIds` (and its own Address); a standalone
- * Address (e.g. agent.address); an Opportunity's accompanying when the
- * opportunity isn't visible; a Comment that isn't visible (see isCommentVisible).
+ * Masked: a Person not in `personIds` (and its own Address); an Agent not in
+ * `agentIds` (and its own Address); a standalone Address reached some other
+ * way; an Opportunity's accompanying when the opportunity isn't visible; a
+ * Comment that isn't visible (see isCommentVisible).
  */
 export function maskPii<T>(data: T, ctx: CallerVisibility): T {
   walk(data, ctx, new WeakSet<object>());
@@ -125,8 +127,16 @@ function walk(
       }
       seen.add(node.address);
     }
+  } else if (node instanceof Agent) {
+    const isVisible = ctx.agentIds.has(node.id);
+    // Claim the agent's own Address so the standalone-Address rule below
+    // can't re-mask it when the caller has visibility into this agent.
+    if (isVisible && node.address && typeof node.address === "object") {
+      seen.add(node.address);
+    }
   } else if (node instanceof Address) {
-    // Reached not via a Person (e.g. agent.address) -> standalone PII, mask it.
+    // Reached not via a visible Person/Agent (e.g. another agent's address)
+    // -> standalone PII, mask it.
     maskFields(node as unknown as Record<string, unknown>, ADDRESS_PII_FIELDS);
   } else if (node instanceof Opportunity) {
     // Accompanying (refugee contact) follows its opportunity's visibility.

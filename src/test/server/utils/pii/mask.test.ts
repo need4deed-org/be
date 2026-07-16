@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import Comment from "../../../../data/entity/comment.entity";
 import Address from "../../../../data/entity/location/address.entity";
 import Accompanying from "../../../../data/entity/opportunity/accompanying.entity";
+import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../../data/entity/person.entity";
 import { maskPii, maskString } from "../../../../server/utils/pii/mask";
@@ -89,7 +90,7 @@ describe("maskPii", () => {
     expect(visible.address.street).toBe("Side 2");
   });
 
-  it("masks a standalone Address (not under a Person) and leaves non-PII fields", () => {
+  it("masks a standalone Address (not under a Person/Agent) and leaves non-PII fields", () => {
     const agentLike = {
       id: 5,
       title: "Center",
@@ -98,6 +99,27 @@ describe("maskPii", () => {
     maskPii(agentLike, ctx({ personIds: [1] }));
     expect(agentLike.address.street).toMatch(MASKED);
     expect(agentLike.title).toBe("Center");
+  });
+
+  it("masks an Agent's address when the caller has no visibility into that agent", () => {
+    const agent = Object.assign(new Agent(), {
+      id: 5,
+      title: "Center",
+      address: makeAddress("Haupt 3"),
+    });
+    maskPii(agent, ctx({ agentIds: [1] }));
+    expect(agent.address.street).toMatch(MASKED);
+    expect(agent.title).toBe("Center");
+  });
+
+  it("leaves an Agent's own address unmasked when the caller has visibility into that agent", () => {
+    const agent = Object.assign(new Agent(), {
+      id: 5,
+      title: "Center",
+      address: makeAddress("Haupt 3"),
+    });
+    maskPii(agent, ctx({ agentIds: [5] }));
+    expect(agent.address.street).toBe("Haupt 3");
   });
 
   it("leaves reference-like objects untouched and recurses to nested PII", () => {
