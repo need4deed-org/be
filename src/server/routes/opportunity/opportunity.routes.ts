@@ -593,6 +593,10 @@ export default async function opportunityRoutes(
         }
       }
 
+      if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
+        await updateOptionList(dealId, DealTimeslot, []);
+      }
+
       if (schedule) {
         const success = await updateOptionList(
           dealId,
