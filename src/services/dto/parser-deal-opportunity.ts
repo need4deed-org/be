@@ -2,34 +2,21 @@ import {
   ApiLanguage,
   EntityTableName,
   LangPurpose,
-  OccasionalType,
   OpportunityLegacyFormData,
 } from "need4deed-sdk";
-import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealSkill from "../../data/entity/m2m/deal-skill";
-import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import Activity from "../../data/entity/profile/activity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Skill from "../../data/entity/profile/skill.entity";
-import Timeslot from "../../data/entity/time/timeslot.entity";
 import { DealType } from "../../data/types";
-import {
-  getPostcode,
-  getRepository,
-  getRRULE,
-  getStartEnd,
-} from "../../data/utils";
-import logger from "../../logger";
-import {
-  getLanguageTitle,
-  getProfileEntityByTitle,
-  getTimeslot,
-} from "../../server/utils";
+import { getPostcode } from "../../data/utils";
+import { getLanguageTitle, getProfileEntityByTitle } from "../../server/utils";
+import { buildDealTimeslots } from "./build-deal-timeslots";
 
 export async function dealParserOpportunity(
   formData: OpportunityLegacyFormData,
@@ -98,49 +85,10 @@ export async function dealParserOpportunity(
   }
 
   // time
-  const dealTimeslot: DealTimeslot[] = [];
-  const opportunityTimes = formData.timeslots || [];
-  for (const opportunityTime of opportunityTimes) {
-    const [day, daytime] = opportunityTime;
-    let timeframe: { start?: Date; end?: Date } = { start: null, end: null };
-    let rrule: string = null;
-    let occasional: OccasionalType = null;
-    if (day) {
-      timeframe = getStartEnd(daytime as string);
-      const mapDay = [
-        "",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-      ] as const;
-      rrule = getRRULE(mapDay[Number(day)]);
-    } else {
-      occasional = daytime.toLowerCase() as OccasionalType;
-    }
-    const timeslot = await getTimeslot({ rrule, ...timeframe, occasional });
-    const dealTimeslotEntry = new DealTimeslot({ timeslot });
-    dealTimeslot.push(dealTimeslotEntry);
-  }
-
-  if (formData.onetime_date_time) {
-    const timeslotRepository = getRepository(dataSource, Timeslot);
-    const start = new Date(formData.onetime_date_time);
-    const info = `One-time event on ${formData.onetime_date_time}`;
-    const timeslot = await getTimeslot({
-      start,
-      info,
-    });
-
-    await timeslotRepository.save(timeslot); // TODO: check if id is undefined before saving
-    logger.debug(`Created one-time timeslot: ${JSON.stringify(timeslot)}`);
-
-    const dealTimeslotEntry = new DealTimeslot({ timeslot });
-    dealTimeslot.push(dealTimeslotEntry);
-  }
+  const dealTimeslot = await buildDealTimeslots(
+    formData.timeslots,
+    formData.onetime_date_time,
+  );
 
   // districts
   const dealDistrict: DealDistrict[] = [];
