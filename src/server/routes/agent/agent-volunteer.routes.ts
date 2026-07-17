@@ -18,7 +18,7 @@ export default function agentVolunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        response: responseSchema("ApiVolunteerOpportunityGet#", true, false),
+        response: responseSchema("ApiOpportunityVolunteerGet#", true, false),
       },
       preSerialization: makePiiSerialization(
         opportunityOpportunityVolunteerDTO,
