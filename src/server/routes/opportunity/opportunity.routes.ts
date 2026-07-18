@@ -32,7 +32,7 @@ import {
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
-import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
 import {
   idParamSchema,
   opportunityCreateBodySchema,
@@ -367,12 +367,18 @@ export default async function opportunityRoutes(
         }
       }
 
-      // The form is legacy-shaped minus the rac_* fields; the legacy parsers
-      // accept it. deal.postcode comes from the owning agent's address.
-      const legacyBody = body as OpportunityLegacyFormData;
+      // title/opportunity_type/volunteers_number/accomp_* are shared with the
+      // legacy shape, so parseOpportunityLegacy/accompanyingParserOpportunity
+      // (which never touch activities/skills/languages) can still take the
+      // body via this cast — the two SDK types otherwise no longer overlap
+      // enough for a direct cast (activities/skills/languages/districts are
+      // ids here, titles/ISO-codes there), hence the `unknown` hop. The deal
+      // (activities/skills/languages) is resolved separately below, by id —
+      // see dealParserOpportunityCreate.
+      const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
-      opportunity.deal = await dealParserOpportunity(
-        legacyBody,
+      opportunity.deal = await dealParserOpportunityCreate(
+        body,
         agent.address?.postcode?.value,
       );
       opportunity.accompanying =
