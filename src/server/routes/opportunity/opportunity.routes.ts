@@ -32,7 +32,7 @@ import {
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
-import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
 import {
   idParamSchema,
   opportunityCreateBodySchema,
@@ -367,12 +367,14 @@ export default async function opportunityRoutes(
         }
       }
 
-      // The form is legacy-shaped minus the rac_* fields; the legacy parsers
-      // accept it. deal.postcode comes from the owning agent's address.
-      const legacyBody = body as OpportunityLegacyFormData;
+      // Only parseOpportunityLegacy/accompanyingParserOpportunity read the
+      // legacy-shaped fields (title, accomp_*, etc.), which this form still
+      // carries; the deal itself is resolved by numeric option id below
+      // (dealParserOpportunityCreate), not through the legacy title lookup.
+      const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
-      opportunity.deal = await dealParserOpportunity(
-        legacyBody,
+      opportunity.deal = await dealParserOpportunityCreate(
+        body,
         agent.address?.postcode?.value,
       );
       opportunity.accompanying =
