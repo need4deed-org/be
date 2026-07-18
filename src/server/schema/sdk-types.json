@@ -813,6 +813,9 @@
         "description": {
           "type": "string"
         },
+        "volunteerType": {
+          "$ref": "VolunteerStateTypeType#"
+        },
         "languagesMain": {
           "type": "array",
           "items": {
