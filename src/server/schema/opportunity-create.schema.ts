@@ -1,9 +1,11 @@
 import { responseErrors } from "./responseErrors";
 
 // Body for POST /opportunity (SDK OpportunityFormDataWithAgentSubmitter): the
-// legacy opportunity form minus the rac_* fields, plus agent_id + the optional
-// submitted_by_id. The form is loosely typed (voidable), so additional
-// properties are allowed; agent_id presence is enforced in the handler.
+// dashboard's typed create-opportunity form. Unlike /opportunity/legacy,
+// activities/skills/languages/districts are numeric option ids (from
+// GET /option/*), not title/ISO-code strings. The form is loosely typed
+// (voidable), so additional properties are allowed; agent_id presence is
+// enforced in the handler.
 export const opportunityCreateBodySchema = {
   type: "object",
   additionalProperties: true,
@@ -19,10 +21,10 @@ export const opportunityCreateBodySchema = {
     vo_information: { type: "string" },
     category: { type: "string" },
     category_id: { type: ["integer", "string"] },
-    languages: { type: "array", items: { type: "string" } },
-    activities: { type: "array", items: { type: "string" } },
-    skills: { type: "array", items: { type: "string" } },
-    berlin_locations: { type: "array", items: { type: "string" } },
+    languageIds: { type: "array", items: { type: "integer" } },
+    activityIds: { type: "array", items: { type: "integer" } },
+    skillIds: { type: "array", items: { type: "integer" } },
+    districtIds: { type: "array", items: { type: "integer" } },
     timeslots: { type: ["array", "null"] },
     onetime_date_time: { type: "string" },
     accomp_address: { type: "string" },
