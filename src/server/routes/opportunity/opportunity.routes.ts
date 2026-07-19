@@ -368,10 +368,19 @@ export default async function opportunityRoutes(
         legacyBody,
         agent.address?.postcode?.value,
       );
-      opportunity.accompanying =
-        body.opportunity_type === OpportunityLegacyType.ACCOMPANYING
-          ? await accompanyingParserOpportunity(legacyBody)
-          : undefined;
+
+      opportunity.accompanying = undefined;
+
+      if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
+        opportunity.accompanying =
+          await accompanyingParserOpportunity(legacyBody);
+      } else if (opportunity.type === OpportunityType.EVENTS) {
+        opportunity.accompanying = new Accompanying({
+          date: new Date(legacyBody.onetime_date_time),
+          address: "",
+          name: "",
+        });
+      }
 
       opportunity.agentId = agentId;
       // Submitter: the explicit body value, else the authenticated caller.
