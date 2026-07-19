@@ -58,6 +58,7 @@ export const dataSource = new DataSource({
   schema: process.env.DB_SCHEMA || "public",
   synchronize: false,
   migrationsRun: false,
+  migrationsTransactionMode: "each",
   entities: [
     Accompanying,
     Activity,
