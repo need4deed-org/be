@@ -34,6 +34,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
   opportunityCreateBodySchema,
@@ -56,6 +57,7 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
+  getOrCreateEventTimeslot,
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
@@ -504,6 +506,19 @@ export default async function opportunityRoutes(
         }
       }
 
+      const effectiveType = request.body.opportunity_type ?? opportunity.type;
+
+      if (
+        effectiveType === OpportunityType.EVENTS &&
+        opportunity.type !== OpportunityType.EVENTS
+      ) {
+        if (!request.body.event?.date || !request.body.event?.time) {
+          throw new BadRequestError(
+            'Event date and time are required when changing opportunity type to "events".',
+          );
+        }
+      }
+
       if (opportunityObj) {
         const success = await patchEntity(
           Opportunity,
@@ -591,6 +606,49 @@ export default async function opportunityRoutes(
             throw new BadRequestError("Saving new accompanying failed");
           }
         }
+      }
+
+      // If the opportunity is being changed to an event or already an event, create or update the accompanying record with the event date and time, and create or update the timeslot for the event.
+      if (
+        effectiveType === OpportunityType.EVENTS &&
+        request.body.event?.date &&
+        request.body.event?.time
+      ) {
+        const eventDate = getDateObj(
+          request.body.event.date,
+          request.body.event.time,
+        );
+
+        if (opportunity.accompanyingId) {
+          await patchEntity(
+            Accompanying,
+            { date: eventDate },
+            opportunity.accompanyingId,
+          );
+        } else {
+          const newAccompanying = new Accompanying({
+            date: eventDate,
+            address: "",
+            name: "",
+          });
+          try {
+            await fastify.db.accompanyingRepository.manager.transaction(
+              async (manager) => {
+                await manager.save(Accompanying, newAccompanying);
+                await manager.update(Opportunity, opportunity.id, {
+                  accompanyingId: newAccompanying.id,
+                });
+              },
+            );
+          } catch {
+            throw new BadRequestError(
+              "Saving new accompanying for event failed",
+            );
+          }
+        }
+
+        const timeslot = await getOrCreateEventTimeslot(eventDate);
+        await updateOptionList(dealId, DealTimeslot, [{ id: timeslot.id }]);
       }
 
       if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
