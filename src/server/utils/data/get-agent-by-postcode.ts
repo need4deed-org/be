@@ -22,7 +22,9 @@ function extractHouseNumber(s: string): string | undefined {
 }
 
 function agentHasPlz(a: Agent, plz: string): boolean {
-  if (a.address?.postcode?.value === plz) {return true;}
+  if (a.address?.postcode?.value === plz) {
+    return true;
+  }
   return !!a.agentPostcode?.some((ap) => ap.postcode?.value === plz);
 }
 
@@ -44,7 +46,9 @@ export function getAgentByAddress(
       (!plz || a.address?.postcode?.value === plz) &&
       normalizeStreet(a.address?.street ?? "") === normStreet,
   );
-  if (strict) {return strict;}
+  if (strict) {
+    return strict;
+  }
 
   // 2. Fuzzy fallback for legacy agents: street name (no number) found as a
   //    whole word in agent title. PLZ narrows the match when provided.
@@ -53,15 +57,23 @@ export function getAgentByAddress(
   //    Agents with no number in title (e.g. "Refugium Hausvaterweg") match on
   //    street name alone.
   const streetName = extractStreetName(street);
-  if (!streetName) {return undefined;}
+  if (!streetName) {
+    return undefined;
+  }
   const streetRegex = streetNameWordRegex(streetName);
   const houseNumber = extractHouseNumber(street);
 
   const fuzzyMatches = agents.filter((a) => {
-    if (plz && !agentHasPlz(a, plz)) {return false;}
-    if (!streetRegex.test(normalizeStreet(a.title ?? ""))) {return false;}
+    if (plz && !agentHasPlz(a, plz)) {
+      return false;
+    }
+    if (!streetRegex.test(normalizeStreet(a.title ?? ""))) {
+      return false;
+    }
     const titleNumber = extractHouseNumber(a.title ?? "");
-    if (titleNumber && houseNumber && titleNumber !== houseNumber) {return false;}
+    if (titleNumber && houseNumber && titleNumber !== houseNumber) {
+      return false;
+    }
     return true;
   });
 

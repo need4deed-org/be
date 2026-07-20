@@ -506,6 +506,26 @@ export async function getOrCreateTimeslot(
   return timeslot;
 }
 
+export async function getOrCreateEventTimeslot(date: Date): Promise<Timeslot> {
+  const normalizedDate = new Date(date);
+  normalizedDate.setSeconds(0, 0);
+  const repository = getRepository(dataSource, Timeslot);
+  let timeslot = await repository.findOneBy({
+    start: normalizedDate,
+    end: null,
+    rrule: null,
+    occasional: null,
+  });
+  if (!timeslot) {
+    timeslot = new Timeslot({
+      start: normalizedDate,
+      info: `One-time event on ${normalizedDate.toISOString()}`,
+    });
+    await repository.save(timeslot);
+  }
+  return timeslot;
+}
+
 export async function updateOptionList<
   M extends { id: number },
   L extends { id: number | string },
