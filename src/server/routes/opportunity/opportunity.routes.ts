@@ -115,7 +115,8 @@ export default async function opportunityRoutes(
   _options: FastifyPluginOptions,
 ) {
   // GETs open to any logged-in user (PII masked per role); writes stay
-  // COORDINATOR-only (re-gated per-route).
+  // COORDINATOR-only (re-gated per-route), except PATCH /:id which also lets
+  // an AGENT update the `statusOpportunity` of their own agent's opportunity.
   fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(opportunityLegacyRoutes, {
@@ -459,7 +460,6 @@ export default async function opportunityRoutes(
   }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
@@ -467,6 +467,18 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
+      // COORDINATOR/ADMIN may edit the full patch surface; an AGENT may only
+      // flip the status of an opportunity belonging to an agent they're a
+      // member of (checked below, once the opportunity's agentId is known).
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT &&
+        role !== UserRole.ADMIN
+      ) {
+        throw new UnauthorizedError();
+      }
+
       const id = request.params.id;
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -475,6 +487,31 @@ export default async function opportunityRoutes(
       });
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
+
+      if (role === UserRole.AGENT) {
+        const personId = request.authUser?.personId;
+        const membership = personId
+          ? await fastify.db.agentPersonRepository.findOneBy({
+              agentId: opportunity.agentId,
+              personId,
+            })
+          : null;
+        if (!membership) {
+          throw new UnauthorizedError(
+            "Agents can only update opportunities belonging to their own agent.",
+          );
+        }
+
+        const body = request.body as Record<string, unknown>;
+        const disallowedKeys = Object.keys(body).filter(
+          (key) => key !== "statusOpportunity" && body[key] !== undefined,
+        );
+        if (disallowedKeys.length > 0) {
+          throw new UnauthorizedError(
+            "Agents can only update an opportunity's status.",
+          );
+        }
       }
 
       const dealId = opportunity.dealId;
