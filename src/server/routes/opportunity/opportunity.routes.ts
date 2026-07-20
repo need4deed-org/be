@@ -631,7 +631,15 @@ export default async function opportunityRoutes(
         if (opportunity.accompanyingId) {
           await patchEntity(
             Accompanying,
-            { date: eventDate },
+            {
+              date: eventDate,
+              address: "",
+              name: "",
+              phone: null,
+              email: null,
+              languageToTranslate: null,
+              postcodeId: null,
+            },
             opportunity.accompanyingId,
           );
         } else {
@@ -658,6 +666,21 @@ export default async function opportunityRoutes(
 
         const timeslot = await getOrCreateEventTimeslot(eventDate);
         await updateOptionList(dealId, DealTimeslot, [{ id: timeslot.id }]);
+      }
+
+      if (
+        effectiveType === OpportunityType.REGULAR &&
+        opportunity.type !== OpportunityType.REGULAR &&
+        opportunity.accompanyingId
+      ) {
+        await fastify.db.accompanyingRepository.manager.transaction(
+          async (manager) => {
+            await manager.update(Opportunity, opportunity.id, {
+              accompanyingId: null,
+            });
+            await manager.delete(Accompanying, opportunity.accompanyingId);
+          },
+        );
       }
 
       if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
