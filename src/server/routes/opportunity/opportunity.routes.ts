@@ -6,7 +6,6 @@ import {
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
-  OpportunityType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -34,7 +33,6 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
-import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
   opportunityCreateBodySchema,
@@ -57,7 +55,6 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
-  getOrCreateEventTimeslot,
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
@@ -380,19 +377,10 @@ export default async function opportunityRoutes(
         body,
         agent.address?.postcode?.value,
       );
-
-      opportunity.accompanying = undefined;
-
-      if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
-        opportunity.accompanying =
-          await accompanyingParserOpportunity(legacyBody);
-      } else if (opportunity.type === OpportunityType.EVENTS) {
-        opportunity.accompanying = new Accompanying({
-          date: new Date(legacyBody.onetime_date_time),
-          address: "",
-          name: "",
-        });
-      }
+      opportunity.accompanying =
+        body.opportunity_type === OpportunityLegacyType.ACCOMPANYING
+          ? await accompanyingParserOpportunity(legacyBody)
+          : undefined;
 
       opportunity.agentId = agentId;
       // Submitter: the explicit body value, else the authenticated caller.
@@ -487,7 +475,6 @@ export default async function opportunityRoutes(
       const opportunity = await opportunityRepository.findOne({
         where: { id },
       });
-
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
@@ -511,45 +498,6 @@ export default async function opportunityRoutes(
       logger.debug(
         `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
       );
-
-      if (
-        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
-        !opportunity.accompanyingId
-      ) {
-        const details = request.body.accompanyingDetails;
-        if (!details) {
-          throw new BadRequestError(
-            'Accompanying details are required when changing opportunity type to "accompanying".',
-          );
-        }
-        const requiredFields = [
-          "appointmentAddress",
-          "appointmentDate",
-          "appointmentTime",
-          "refugeeName",
-          "appointmentPostcode",
-          "appointmentLanguage",
-        ] as const;
-        const missing = requiredFields.filter(
-          (f) => !details[f as keyof typeof details],
-        );
-        if (missing.length > 0) {
-          throw new BadRequestError(`Missing required accompanying fields`);
-        }
-      }
-
-      const effectiveType = request.body.opportunity_type ?? opportunity.type;
-
-      if (
-        effectiveType === OpportunityType.EVENTS &&
-        opportunity.type !== OpportunityType.EVENTS
-      ) {
-        if (!request.body.event?.date || !request.body.event?.time) {
-          throw new BadRequestError(
-            'Event date and time are required when changing opportunity type to "events".',
-          );
-        }
-      }
 
       if (opportunityObj) {
         const success = await patchEntity(
@@ -605,109 +553,16 @@ export default async function opportunityRoutes(
           }
           accompanying.postcodeId = postcode.id;
         }
-
-        if (opportunity.accompanyingId) {
-          const success = await patchEntity(
-            Accompanying,
-            accompanying,
-            opportunity.accompanyingId,
-          );
-          if (!success) {
-            throw new BadRequestError(
-              "Patching accompanying failed while patching opportunity.",
-            );
-          }
-          // Only create a new accompanying record if type is being changed to accompanying and no accompanying record exists yet.
-        } else if (
-          request.body.opportunity_type === OpportunityType.ACCOMPANYING
-        ) {
-          const newAccompanying = Object.assign(
-            new Accompanying(),
-            accompanying,
-          );
-          try {
-            await fastify.db.accompanyingRepository.manager.transaction(
-              async (manager) => {
-                await manager.save(Accompanying, newAccompanying);
-                await manager.update(Opportunity, opportunity.id, {
-                  accompanyingId: newAccompanying.id,
-                });
-              },
-            );
-          } catch {
-            throw new BadRequestError("Saving new accompanying failed");
-          }
-        }
-      }
-
-      // If the opportunity is being changed to an event or already an event, create or update the accompanying record with the event date and time, and create or update the timeslot for the event.
-      if (
-        effectiveType === OpportunityType.EVENTS &&
-        request.body.event?.date &&
-        request.body.event?.time
-      ) {
-        const eventDate = getDateObj(
-          request.body.event.date,
-          request.body.event.time,
+        const success = await patchEntity(
+          Accompanying,
+          accompanying,
+          opportunity.accompanyingId,
         );
-
-        if (opportunity.accompanyingId) {
-          await patchEntity(
-            Accompanying,
-            {
-              date: eventDate,
-              address: "",
-              name: "",
-              phone: null,
-              email: null,
-              languageToTranslate: null,
-              postcodeId: null,
-            },
-            opportunity.accompanyingId,
+        if (!success) {
+          throw new BadRequestError(
+            "Patching accompanying failed while patching opportunity.",
           );
-        } else {
-          const newAccompanying = new Accompanying({
-            date: eventDate,
-            address: "",
-            name: "",
-          });
-          try {
-            await fastify.db.accompanyingRepository.manager.transaction(
-              async (manager) => {
-                await manager.save(Accompanying, newAccompanying);
-                await manager.update(Opportunity, opportunity.id, {
-                  accompanyingId: newAccompanying.id,
-                });
-              },
-            );
-          } catch {
-            throw new BadRequestError(
-              "Saving new accompanying for event failed",
-            );
-          }
         }
-
-        const timeslot = await getOrCreateEventTimeslot(eventDate);
-        await updateOptionList(dealId, DealTimeslot, [{ id: timeslot.id }]);
-      }
-
-      if (
-        effectiveType === OpportunityType.REGULAR &&
-        opportunity.type !== OpportunityType.REGULAR &&
-        opportunity.accompanyingId
-      ) {
-        await fastify.db.accompanyingRepository.manager.transaction(
-          async (manager) => {
-            await manager.update(Opportunity, opportunity.id, {
-              accompanyingId: null,
-            });
-            await manager.delete(Accompanying, opportunity.accompanyingId);
-          },
-        );
-      }
-
-      if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
-        await updateOptionList(dealId, DealTimeslot, []);
       }
 
       if (schedule) {

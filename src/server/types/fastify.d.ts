@@ -13,7 +13,6 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
-import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
@@ -45,7 +44,6 @@ declare module "fastify" {
       dealRepository: Repository<Deal>;
       agentRepository: Repository<Agent>;
       agentPersonRepository: Repository<AgentPerson>;
-      accompanyingRepository: Repository<Accompanying>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
       postRepository: Repository<Post>;

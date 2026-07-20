@@ -11,7 +11,6 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
-import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
@@ -52,7 +51,6 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       dealRepository: dataSource.getRepository(Deal),
       agentRepository: dataSource.getRepository(Agent),
       agentPersonRepository: dataSource.getRepository(AgentPerson),
-      accompanyingRepository: dataSource.getRepository(Accompanying),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
       postRepository: dataSource.getRepository(Post),

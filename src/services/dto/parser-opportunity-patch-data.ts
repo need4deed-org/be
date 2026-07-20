@@ -35,7 +35,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
         numberVolunteers: body.numberVolunteers,
         info: body.description,
         infoConfidential: body.description,
-        type: body.opportunity_type,
       },
       contact: body?.contact
         ? {
