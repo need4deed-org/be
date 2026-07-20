@@ -2956,10 +2956,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-need4deed-sdk@0.0.123:
-  version "0.0.123"
-  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.123.tgz#4b82c166b9d9b193f1cde555728a481b7cabd2ee"
-  integrity sha512-FRoGGGddB8f13XQxjdezbpFYzYvQ5mLwCCFSbIlwkbKlRSsNjaoUtzIUAgzcx0refD6/HSW5iDkbsjgZnW4vCw==
+need4deed-sdk@0.0.128:
+  version "0.0.128"
+  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.128.tgz#b1c0443cb0d6d13b39cf60bb9862fee5a563f4a2"
+  integrity sha512-AczNANHKYaWIp+BweDZFCrlv3hHN1lLZDrFzDhfJD39SicLygCqd1NPMtVyIRH4trh6zZSj+2E1D4gKlIdKDUw==
 
 no-case@^3.0.4:
   version "3.0.4"
