@@ -1,7 +1,11 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiPersonGet, ApiPersonPatch, UserRole } from "need4deed-sdk";
-import { NotFoundError } from "../../config";
+import { ApiPersonGet, ApiRepresentativePatch, UserRole } from "need4deed-sdk";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../config";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
 import logger from "../../logger";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
@@ -11,6 +15,7 @@ import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { ParamsId, ReplyData } from "../types";
 import { updatePerson } from "../utils";
+import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 
 export default async function personRoutes(
   fastify: FastifyInstance,
@@ -108,18 +113,25 @@ export default async function personRoutes(
   fastify.patch<{
     Params: ParamsId;
     Reply: ReplyData<ApiPersonGet>;
-    Body: ApiPersonPatch;
+    Body: ApiRepresentativePatch;
   }>(
     "/:id",
     {
+      onRequest: [fastify.authenticate()],
       schema: {
         params: idParamSchema,
-        body: { $ref: "ApiPersonPatch#" },
+        body: { $ref: "ApiRepresentativePatch#" },
         response: responseSchema("ApiPersonGet#"),
       },
     },
     async (request, reply) => {
       const personId = request.params.id;
+      const authUser = request.authUser!;
+
+      if (authUser.role !== UserRole.ADMIN && authUser.personId !== personId) {
+        throw new UnauthorizedError("Insufficient permissions.");
+      }
+
       const person = await fastify.db.personRepository.findOne({
         where: { id: personId },
         relations: ["address.postcode"],
@@ -129,16 +141,49 @@ export default async function personRoutes(
         throw new NotFoundError(`Person with id ${personId} not found.`);
       }
 
-      const updatedPersonObj = deepMerge(
-        {
-          id: person.id,
-          addressId: person.addressId,
-          address: { postcodeId: person.address.postcodeId },
-        },
-        dtoParsePerson(request.body),
+      // role/agentId aren't person fields — a role-only patch has nothing
+      // for updatePerson to change, and TypeORM throws on an empty SET
+      // clause, so skip it entirely rather than no-op saving.
+      const hasPersonFieldUpdates = Object.keys(request.body).some(
+        (key) => key !== "role" && key !== "agentId",
       );
 
-      const updatedPerson = await updatePerson(updatedPersonObj);
+      const updatedPerson = hasPersonFieldUpdates
+        ? await updatePerson(
+            deepMerge(
+              {
+                id: person.id,
+                addressId: person.addressId,
+                address: { postcodeId: person.address.postcodeId },
+              },
+              dtoParsePerson(request.body),
+            ),
+          )
+        : person;
+
+      // role lives on AgentPerson, not person — agentId disambiguates which
+      // membership to update for a person belonging to more than one agent.
+      if (request.body.role !== undefined) {
+        if (!request.body.agentId) {
+          throw new BadRequestError(
+            "agentId is required to update a representative's role.",
+          );
+        }
+
+        const membership = await getAgentPersonRepresentative(
+          personId,
+          request.body.agentId,
+        );
+
+        if (!membership) {
+          throw new NotFoundError(
+            `No active agent membership found for person ${personId} at agent ${request.body.agentId}.`,
+          );
+        }
+
+        membership.role = request.body.role;
+        await fastify.db.agentPersonRepository.save(membership);
+      }
 
       const data = dtoSerializePerson(updatedPerson);
 

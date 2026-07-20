@@ -286,6 +286,26 @@
       "$id": "ApiPersonPatch",
       "$ref": "ApiPerson#"
     },
+    "ApiRepresentativePatch": {
+      "$id": "ApiRepresentativePatch",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "ApiPerson#"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "role": {
+              "$ref": "AgentRoleType#"
+            },
+            "agentId": {
+              "type": "integer"
+            }
+          }
+        }
+      ]
+    },
     "VolunteerStateType": {
       "$id": "VolunteerStateType",
       "type": "string",
@@ -781,6 +801,9 @@
       "$id": "ApiVolunteerOpportunityPatch",
       "type": "object",
       "properties": {
+        "title": {
+          "type": "string"
+        },
         "statusOpportunity": {
           "$ref": "OpportunityStatusType#"
         },
@@ -1327,6 +1350,9 @@
           "type": "integer"
         },
         "numActiveVolunteers": {
+          "type": "integer"
+        },
+        "numOpportunities": {
           "type": "integer"
         },
         "email": {

@@ -37,10 +37,13 @@ services:
       db:
         condition: service_healthy
     build:
-      context: ./data-bootstrap
+      context: .
+      dockerfile: data-bootstrap/Dockerfile
     networks:
       - n4d-net
     environment:
+      - NODE_ENV=development
+      - RUN_MIGRATIONS=true
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres

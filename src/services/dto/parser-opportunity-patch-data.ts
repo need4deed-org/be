@@ -30,6 +30,7 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
   return {
     ...getEmptyPropsNull({
       opportunity: {
+        title: body.title,
         status: body.statusOpportunity,
         numberVolunteers: body.numberVolunteers,
         info: body.description,

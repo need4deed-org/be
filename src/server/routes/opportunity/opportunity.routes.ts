@@ -33,7 +33,7 @@ import {
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
-import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -342,6 +342,16 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
 
+      // This route derives the deal's postcode solely from the agent's
+      // address (the form has no rac_plz fallback, unlike the legacy route).
+      // deal.postcode_id is NOT NULL, so a missing postcode here would
+      // otherwise reach the DB as an unhandled constraint violation.
+      if (!agent.address?.postcode?.value) {
+        throw new BadRequestError(
+          `Agent (id:${agentId}) has no postcode on its address; set one before creating an opportunity for it.`,
+        );
+      }
+
       // An AGENT may only create opportunities for an agent they belong to;
       // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
@@ -360,12 +370,14 @@ export default async function opportunityRoutes(
         }
       }
 
-      // The form is legacy-shaped minus the rac_* fields; the legacy parsers
-      // accept it. deal.postcode comes from the owning agent's address.
-      const legacyBody = body as OpportunityLegacyFormData;
+      // Only parseOpportunityLegacy/accompanyingParserOpportunity read the
+      // legacy-shaped fields (title, accomp_*, etc.), which this form still
+      // carries; the deal itself is resolved by numeric option id below
+      // (dealParserOpportunityCreate), not through the legacy title lookup.
+      const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
-      opportunity.deal = await dealParserOpportunity(
-        legacyBody,
+      opportunity.deal = await dealParserOpportunityCreate(
+        body,
         agent.address?.postcode?.value,
       );
 
@@ -402,7 +414,14 @@ export default async function opportunityRoutes(
             await sendNewOpportunityEmail(
               fastify,
               id,
-              ["contactPerson", "contactPerson.users"],
+              [
+                "submittedByPerson",
+                "submittedByPerson.users",
+                "contactPerson",
+                "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
+              ],
               (opp) => fastify.notify.emailNewRegular(opp),
               "emailNewRegular",
             );
@@ -421,8 +440,12 @@ export default async function opportunityRoutes(
               [
                 "accompanying",
                 "accompanying.postcode",
+                "submittedByPerson",
+                "submittedByPerson.users",
                 "contactPerson",
                 "contactPerson.users",
+                "agent.agentPerson.person",
+                "agent.agentPerson.person.users",
                 "district",
               ],
               (opp) => fastify.notify.emailNewAccompanying(opp),

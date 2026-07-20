@@ -1,0 +1,164 @@
+[
+  {
+    "nid": "RAC-001",
+    "title": "Musterhaus Berlin gGmbH",
+    "about": "A refugee accommodation center in Mitte offering German language support and tutoring.",
+    "website": "https://musterhaus-berlin.example.com",
+    "type": "GU2",
+    "trustLevel": "High",
+    "statusSearch": "Searching",
+    "statusEngagement": "Active",
+    "services": ["refugee-accommodation", "tutoring"],
+    "postcodes": ["10115", "10117"],
+    "person": [
+      {
+        "firstName": "Maria",
+        "middleName": "",
+        "lastName": "Müller",
+        "email": "maria.mueller@example.com",
+        "phone": "+4930111001",
+        "address": null,
+        "role": "volunteer-coordinator"
+      }
+    ],
+    "opportunityNids": ["OPP-001", "OPP-002"]
+  },
+  {
+    "nid": "RAC-002",
+    "title": "Unterkunft Testweg e.V.",
+    "about": "Family-focused accommodation center in Neukölln with childcare and youth programs.",
+    "website": "https://testweg-neukoelln.example.com",
+    "type": "GU1",
+    "trustLevel": "Low",
+    "statusSearch": "Filled",
+    "statusEngagement": "Active",
+    "services": ["childcare", "youth"],
+    "postcodes": ["12047", "12053"],
+    "person": [
+      {
+        "firstName": "Hans",
+        "middleName": "",
+        "lastName": "Weber",
+        "email": "hans.weber@example.com",
+        "phone": "+4930111002",
+        "address": null,
+        "role": "social-worker"
+      }
+    ],
+    "opportunityNids": ["OPP-003", "OPP-004"]
+  },
+  {
+    "nid": "RAC-003",
+    "title": "Beispiel-Wohnheim Kreuzberg gGmbH",
+    "about": "Translation and language support center in Friedrichshain-Kreuzberg.",
+    "website": "https://wohnheim-kreuzberg.example.com",
+    "type": "AE",
+    "trustLevel": "High",
+    "statusSearch": "Searching",
+    "statusEngagement": "Active",
+    "services": ["tutoring", "consultation"],
+    "postcodes": ["10997", "10999"],
+    "person": [
+      {
+        "firstName": "Anna",
+        "middleName": "",
+        "lastName": "Schmidt",
+        "email": "anna.schmidt@example.com",
+        "phone": "+4930111003",
+        "address": null,
+        "role": "volunteer-coordinator"
+      }
+    ],
+    "opportunityNids": ["OPP-005", "OPP-006"]
+  },
+  {
+    "nid": "RAC-004",
+    "title": "Probeheim Charlottenburg e.V.",
+    "about": "Arts, wellness and sport programs for residents in Charlottenburg-Wilmersdorf.",
+    "website": "https://probeheim-charlottenburg.example.com",
+    "type": "GU3",
+    "trustLevel": "agent-unknown",
+    "statusSearch": "agent-volunteers-found",
+    "statusEngagement": "Unresponsive",
+    "services": ["welfare", "sport"],
+    "postcodes": ["10627", "10629"],
+    "person": [
+      {
+        "firstName": "Thomas",
+        "middleName": "",
+        "lastName": "Becker",
+        "email": "thomas.becker@example.com",
+        "phone": "+4930111004",
+        "address": null,
+        "role": "manager"
+      }
+    ],
+    "opportunityNids": ["OPP-007", "OPP-008"]
+  },
+  {
+    "nid": "RAC-005",
+    "title": "Demo-Unterkunft Lichtenberg",
+    "about": "Employment and integration support center in Lichtenberg.",
+    "website": "https://demo-lichtenberg.example.com",
+    "type": "GU2+",
+    "trustLevel": "High",
+    "statusSearch": "Searching",
+    "statusEngagement": "Active",
+    "services": ["refugee-accommodation", "job-coaching"],
+    "postcodes": ["10317", "10319"],
+    "person": [
+      {
+        "firstName": "Lisa",
+        "middleName": "",
+        "lastName": "Hoffmann",
+        "email": "lisa.hoffmann@example.com",
+        "phone": "+4930111005",
+        "address": null,
+        "role": "project-coordinator"
+      }
+    ],
+    "opportunityNids": ["OPP-009", "OPP-010"]
+  },
+  {
+    "nid": "RAC-006",
+    "title": "Musterhaus Pankow",
+    "about": "Small family accommodation center in Pankow.",
+    "website": "",
+    "type": "GU1",
+    "trustLevel": "Low",
+    "statusSearch": "agent-not-needed",
+    "statusEngagement": "agent-inactive",
+    "services": ["childcare"],
+    "postcodes": ["10405"],
+    "person": [],
+    "opportunityNids": ["OPP-011"]
+  },
+  {
+    "nid": "RAC-007",
+    "title": "Testheim Spandau",
+    "about": "New accommodation center in Spandau looking for accompanying volunteers.",
+    "website": "",
+    "type": "NU",
+    "trustLevel": "agent-unknown",
+    "statusSearch": "Searching",
+    "statusEngagement": "agent-new",
+    "services": ["voluntary-support"],
+    "postcodes": ["13591"],
+    "person": [],
+    "opportunityNids": ["OPP-012"]
+  },
+  {
+    "nid": "RAC-008",
+    "title": "Beispiel Steglitz gGmbH",
+    "about": "Welfare and consultation center in Steglitz-Zehlendorf, recently onboarded.",
+    "website": "https://beispiel-steglitz.example.com",
+    "type": "ASOG",
+    "trustLevel": "High",
+    "statusSearch": "Searching",
+    "statusEngagement": "Active",
+    "services": ["welfare", "consultation"],
+    "postcodes": ["12169"],
+    "person": [],
+    "opportunityNids": []
+  }
+]

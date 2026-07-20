@@ -28,6 +28,7 @@ export class SmtpEmailTransport implements EmailTransport {
     await this.transporter.sendMail({
       from: msg.from ?? this.from,
       to: msg.to,
+      ...(msg.cc !== undefined ? { cc: msg.cc } : {}),
       subject: msg.subject,
       text: msg.text,
       html: msg.html,

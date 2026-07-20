@@ -1,4 +1,4 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, UserRole } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { urlEmailVerification } from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
@@ -89,5 +89,30 @@ describe("sendEmailVerification", () => {
     await expect(
       sendEmailVerification(deps, user({ email: undefined })),
     ).rejects.toThrow("User email is required");
+  });
+
+  it("appends ?role=agent to the URL for AGENT users", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
+
+    await sendEmailVerification(
+      deps,
+      user({ role: UserRole.AGENT, language: Lang.EN }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain(`${expectedUrl}?role=agent`);
+  });
+
+  it("does not append a role param for non-agent users", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
+
+    await sendEmailVerification(
+      deps,
+      user({ role: UserRole.USER, language: Lang.EN }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain(expectedUrl);
+    expect(msg.text).not.toContain("?role=");
   });
 });

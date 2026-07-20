@@ -1,9 +1,12 @@
 import { Lang } from "need4deed-sdk";
 import {
+  emailFromAccompanying,
   emailFromContact,
+  emailFromNotify,
   emailNewAccompanyingManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import {
   createManifestLoader,
   fillTemplate,
@@ -36,7 +39,8 @@ export async function sendEmailNewAccompanying(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPersonEmail = opportunity.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(opportunity);
+  const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
       `sendEmailNewAccompanying: missing contact email for opportunity ${opportunity.id}`,
@@ -44,7 +48,7 @@ export async function sendEmailNewAccompanying(
   }
 
   const accompanying = opportunity.accompanying;
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
   const appointmentDate = accompanying?.date
     ? new Date(accompanying.date).toLocaleDateString("de-DE", {
         timeZone: "Europe/Berlin",
@@ -64,7 +68,7 @@ export async function sendEmailNewAccompanying(
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
 
-  const locale = resolveLocale(opportunity.contactPerson?.users?.[0]?.language);
+  const locale = resolveLocale(contactPerson.users?.[0]?.language);
   const content = resolveContent(await loader.load(), locale, BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
@@ -82,7 +86,8 @@ export async function sendEmailNewAccompanying(
 
   await email.send({
     to: contactPersonEmail,
-    from: emailFromContact,
+    cc: [emailFromContact, emailFromAccompanying],
+    from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
     ...(html !== undefined ? { html } : {}),
