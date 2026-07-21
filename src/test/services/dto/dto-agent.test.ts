@@ -32,6 +32,22 @@ describe("dtoAgentGet", () => {
         person: { firstName: "John" },
         role: "Manager",
       },
+      agentPerson: [
+        {
+          id: 501,
+          agentId: 1,
+          role: "Manager",
+          status: "active",
+          person: { firstName: "John" },
+        },
+        {
+          id: 502,
+          agentId: 1,
+          role: "Social Worker",
+          status: "pending",
+          person: { firstName: "Jane" },
+        },
+      ],
       services: ["Consulting", "Legal"],
       trustLevel: 5,
       engagementStatus: "Active",
@@ -56,6 +72,27 @@ describe("dtoAgentGet", () => {
       role: "Manager",
     });
 
+    // contacts should list every AgentPerson membership, not just the
+    // collapsed representative
+    expect(result.contacts).toEqual([
+      {
+        id: 501,
+        agentId: 1,
+        agentTitle: "Agent Alpha",
+        person: { name: "John" },
+        role: "Manager",
+        status: "active",
+      },
+      {
+        id: 502,
+        agentId: 1,
+        agentTitle: "Agent Alpha",
+        person: { name: "Jane" },
+        role: "Social Worker",
+        status: "pending",
+      },
+    ]);
+
     // Checking nested agentDetails (via the internal helper)
     expect(result.agentDetails.services).toBe("Consulting, Legal");
     expect(result.agentDetails.clientLanguages[0].title).toBe("English");
@@ -72,6 +109,7 @@ describe("dtoAgentGet", () => {
     expect(result.operator).toBeUndefined();
     expect(result.comments).toBeUndefined();
     expect(result.representative.role).toBeUndefined();
+    expect(result.contacts).toEqual([]);
   });
 });
 

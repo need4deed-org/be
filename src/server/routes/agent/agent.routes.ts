@@ -34,6 +34,7 @@ import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
 import agentVolunteerRoutes from "./agent-volunteer.routes";
+import agentContactRoutes from "./contact.routes";
 import agentMembershipRoutes from "./membership.routes";
 import agentRegisterRoutes from "./register.routes";
 
@@ -60,6 +61,10 @@ export default async function agentRoutes(
 
   fastify.register(agentVolunteerRoutes, {
     prefix: `/:id${RoutePrefix.VOLUNTEER_LINKED}`,
+  });
+
+  fastify.register(agentContactRoutes, {
+    prefix: `/:id${RoutePrefix.CONTACT}`,
   });
 
   fastify.get<{

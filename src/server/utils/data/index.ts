@@ -2,6 +2,7 @@ export * from "./add-category-to-deal";
 export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./add-district-to-opp";
+export * from "./create-agent-contact";
 export * from "./for-routes";
 export * from "./get-agent-by-postcode";
 export * from "./get-agent-where";

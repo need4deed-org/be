@@ -1458,6 +1458,10 @@
             "representative": {
               "$ref": "AgentRepresentative#"
             },
+            "contacts": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true }
+            },
             "serviceType": {
               "type": "array",
               "items": {
