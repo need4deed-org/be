@@ -389,6 +389,9 @@
         },
         "id": {
           "type": "integer"
+        },
+        "isoCode": {
+          "type": "string"
         }
       },
       "required": ["title", "id"],
