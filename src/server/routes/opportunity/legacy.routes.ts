@@ -6,10 +6,12 @@ import {
 import {
   OpportunityLegacyFormData,
   OpportunityStatusType,
+  OpportunityType,
 } from "need4deed-sdk";
 import { In } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
+import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
@@ -61,7 +63,9 @@ async function findOrCreateAgent(
     formData.rac_address,
     formData.rac_plz,
   );
-  if (match) {return match;}
+  if (match) {
+    return match;
+  }
 
   logger.info(
     `No agent found for address "${formData.rac_address}" ${formData.rac_plz} — creating new agent`,
@@ -100,10 +104,19 @@ export default async function opportunityLegacyRoutes(
       );
 
       opportunity.deal = await dealParserOpportunity(request.body);
-      opportunity.accompanying =
-        request.body.opportunity_type === "accompanying"
-          ? await accompanyingParserOpportunity(request.body)
-          : undefined;
+      opportunity.accompanying = undefined;
+
+      if (request.body.opportunity_type === "accompanying") {
+        opportunity.accompanying = await accompanyingParserOpportunity(
+          request.body,
+        );
+      } else if (opportunity.type === OpportunityType.EVENTS) {
+        opportunity.accompanying = new Accompanying({
+          date: new Date(request.body.onetime_date_time),
+          address: "",
+          name: "",
+        });
+      }
 
       opportunity.agent = await findOrCreateAgent(request.body);
 
