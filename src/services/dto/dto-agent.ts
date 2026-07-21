@@ -65,6 +65,9 @@ export function dtoAgentGet(
       ...dtoSerializePerson(agent?.representative?.person),
       role: agent?.representative?.role,
     },
+    contacts: (agent.agentPerson ?? []).map((ap) =>
+      dtoSerializeAgentMembership({ ...ap, agent }),
+    ),
     serviceType: agent.services,
     trustLevel: agent.trustLevel,
     statusEngagement: agent.engagementStatus,
