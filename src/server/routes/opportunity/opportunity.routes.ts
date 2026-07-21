@@ -34,6 +34,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
+import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -533,6 +534,11 @@ export default async function opportunityRoutes(
       if (!dealId) {
         throw new Error(`Opportunity id:${id} is lacking a deal.`);
       }
+
+      await assertValidMainCommunicationLanguages(
+        request.body.languagesMain,
+        fastify.db.languageRepository,
+      );
 
       const {
         opportunity: opportunityObj,
