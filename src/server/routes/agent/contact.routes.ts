@@ -34,6 +34,18 @@ export default function agentContactRoutes(
     async (request, reply) => {
       const agentId = Number(request.params.id);
 
+      // Mirrors the role allowlist on PATCH /opportunity/:id: only these
+      // three roles may reach the membership check below, regardless of
+      // whether a stray AgentPerson row exists for some other role.
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT &&
+        role !== UserRole.ADMIN
+      ) {
+        throw new UnauthorizedError();
+      }
+
       const agent = await fastify.db.agentRepository.findOneBy({
         id: agentId,
       });
@@ -41,7 +53,6 @@ export default function agentContactRoutes(
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
 
-      const role = request.authUser?.role;
       const isCoordinatorOrAdmin =
         role === UserRole.COORDINATOR || role === UserRole.ADMIN;
 
