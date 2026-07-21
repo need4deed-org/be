@@ -18,6 +18,7 @@ export * from "./get-volunteer-where";
 export * from "./is-trusted-domain";
 export * from "./run-w-advisory-lock";
 export * from "./sync-comment-tags";
+export * from "./update-agent-contact";
 export * from "./update-leads";
 export * from "./write-agent-registration";
 export * from "./write-opportunity-contact-comment";

@@ -42,9 +42,11 @@ export async function createAgentContact(
     const person = await personRepository.save(
       new Person({
         firstName: input.firstName,
+        middleName: input.middleName || undefined,
         lastName: input.lastName,
         email: input.email || undefined,
         phone: input.phone || undefined,
+        landline: input.landline || undefined,
         addressId,
       }),
     );
