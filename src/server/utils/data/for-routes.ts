@@ -257,6 +257,22 @@ export async function getOptions(
         },
       });
 
+      // isoCode is the stable identifier for a LANGUAGE option — unlike
+      // `title`, which is translated into whichever `language` was
+      // requested. Consumers (e.g. restricting a picker to German/English)
+      // need to match on this rather than a locale-dependent title.
+      if (itemType === EntityTableName.LANGUAGE) {
+        const languages = await languageRepository.findBy({
+          id: In(items.map(({ entityId }) => entityId)),
+        });
+        const isoCodeById = new Map(languages.map((l) => [l.id, l.isoCode]));
+        return items.map(({ translation, entityId }) => ({
+          title: translation,
+          id: entityId,
+          isoCode: isoCodeById.get(entityId),
+        }));
+      }
+
       return items.map(({ translation, entityId }) => ({
         title: translation,
         id: entityId,
