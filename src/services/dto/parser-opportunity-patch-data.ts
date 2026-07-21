@@ -23,6 +23,15 @@ export async function assertValidMainCommunicationLanguages(
   }
   const ids = [...new Set(languagesMain.map(({ id }) => Number(id)))];
   const languages = await languageRepository.findBy({ id: In(ids) });
+  // Any id that didn't resolve to a real row (stale/bogus reference) must be
+  // rejected outright, not silently dropped — otherwise a request like
+  // [germanId, 999999] would validate as "German only" despite containing
+  // an unresolvable language.
+  if (languages.length !== ids.length) {
+    throw new BadRequestError(
+      "Main communication language must be German, German and English, or none.",
+    );
+  }
   const isoCodes = new Set(languages.map((l) => l.isoCode));
 
   const isGermanOnly = isoCodes.size === 1 && isoCodes.has("de");

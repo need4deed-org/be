@@ -3,9 +3,14 @@ import {
   LangPurpose,
   TranslatedIntoType,
 } from "need4deed-sdk";
-import { describe, expect, it } from "vitest";
+import { Repository } from "typeorm";
+import { describe, expect, it, vi } from "vitest";
 import { BadRequestError } from "../../../config";
-import { parseOpportunity } from "../../../services/dto/parser-opportunity-patch-data";
+import Language from "../../../data/entity/profile/language.entity";
+import {
+  assertValidMainCommunicationLanguages,
+  parseOpportunity,
+} from "../../../services/dto/parser-opportunity-patch-data";
 
 describe("parseOpportunity", () => {
   it("throws BadRequestError when body is falsy", () => {
@@ -131,5 +136,86 @@ describe("parseOpportunity", () => {
     });
 
     expect(result.agent).toBeNull();
+  });
+});
+
+describe("assertValidMainCommunicationLanguages", () => {
+  const findBy = vi.fn();
+  const languageRepository = { findBy } as unknown as Repository<Language>;
+
+  function mockLanguages(rows: { id: number; isoCode: string }[]) {
+    findBy.mockResolvedValueOnce(rows);
+  }
+
+  it("resolves without querying when languagesMain is undefined", async () => {
+    await expect(
+      assertValidMainCommunicationLanguages(undefined, languageRepository),
+    ).resolves.toBeUndefined();
+    expect(findBy).not.toHaveBeenCalled();
+  });
+
+  it("resolves without querying when languagesMain is empty", async () => {
+    await expect(
+      assertValidMainCommunicationLanguages([], languageRepository),
+    ).resolves.toBeUndefined();
+    expect(findBy).not.toHaveBeenCalled();
+  });
+
+  it("resolves when the selection is German only", async () => {
+    mockLanguages([{ id: 1, isoCode: "de" }]);
+    await expect(
+      assertValidMainCommunicationLanguages([{ id: 1 }], languageRepository),
+    ).resolves.toBeUndefined();
+  });
+
+  it("resolves when the selection is German and English", async () => {
+    mockLanguages([
+      { id: 1, isoCode: "de" },
+      { id: 2, isoCode: "en" },
+    ]);
+    await expect(
+      assertValidMainCommunicationLanguages(
+        [{ id: 1 }, { id: 2 }],
+        languageRepository,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects English alone", async () => {
+    mockLanguages([{ id: 2, isoCode: "en" }]);
+    await expect(
+      assertValidMainCommunicationLanguages([{ id: 2 }], languageRepository),
+    ).rejects.toThrow(BadRequestError);
+  });
+
+  it("rejects a language other than German/English", async () => {
+    mockLanguages([{ id: 3, isoCode: "fr" }]);
+    await expect(
+      assertValidMainCommunicationLanguages([{ id: 3 }], languageRepository),
+    ).rejects.toThrow(BadRequestError);
+  });
+
+  it("rejects when one of the ids doesn't resolve to any language row", async () => {
+    // Only 1 of the 2 requested ids came back — the other is stale/bogus and
+    // must not be silently dropped from the check.
+    mockLanguages([{ id: 1, isoCode: "de" }]);
+    await expect(
+      assertValidMainCommunicationLanguages(
+        [{ id: 1 }, { id: 999999 }],
+        languageRepository,
+      ),
+    ).rejects.toThrow(BadRequestError);
+  });
+
+  it("dedupes repeated/string-vs-number ids before checking resolution", async () => {
+    // If ids weren't deduped first, findBy returning a single row for a
+    // 3-times-repeated id would look like 2 unresolved ids and wrongly reject.
+    mockLanguages([{ id: 1, isoCode: "de" }]);
+    await expect(
+      assertValidMainCommunicationLanguages(
+        [{ id: 1 }, { id: 1 }, { id: "1" }],
+        languageRepository,
+      ),
+    ).resolves.toBeUndefined();
   });
 });
