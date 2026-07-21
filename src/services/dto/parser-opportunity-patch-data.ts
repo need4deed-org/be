@@ -11,9 +11,10 @@ import { getDateObj } from "../utils";
 
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
 
-// The org's main communication language is German; volunteers may additionally
-// read English, so the only valid "main communication" sets are: none, German
-// alone, or German+English together — never English alone or any other language.
+// The main-communication dropdown only ever offers German/English, so the
+// only valid submissions are: none, German alone, English alone, or both
+// together — anything else means an id outside that set (or a stale/bogus
+// reference) slipped through.
 export async function assertValidMainCommunicationLanguages(
   languagesMain: { id: number | string }[] | undefined,
   languageRepository: Repository<Language>,
@@ -29,18 +30,17 @@ export async function assertValidMainCommunicationLanguages(
   // an unresolvable language.
   if (languages.length !== ids.length) {
     throw new BadRequestError(
-      "Main communication language must be German, German and English, or none.",
+      "Main communication language must be German, English, or both.",
     );
   }
   const isoCodes = new Set(languages.map((l) => l.isoCode));
+  const isOnlyGermanOrEnglish = [...isoCodes].every(
+    (code) => code === "de" || code === "en",
+  );
 
-  const isGermanOnly = isoCodes.size === 1 && isoCodes.has("de");
-  const isGermanAndEnglish =
-    isoCodes.size === 2 && isoCodes.has("de") && isoCodes.has("en");
-
-  if (!isGermanOnly && !isGermanAndEnglish) {
+  if (!isOnlyGermanOrEnglish) {
     throw new BadRequestError(
-      "Main communication language must be German, German and English, or none.",
+      "Main communication language must be German, English, or both.",
     );
   }
 }
