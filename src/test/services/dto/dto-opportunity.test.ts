@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dtoOpportunityGet,
   dtoOpportunityGetList,
   getOpportunityContact,
 } from "../../../services/dto/dto-opportunity";
@@ -195,5 +196,134 @@ describe("dtoOpportunityGetList", () => {
     expect(dtoOpportunityGetList(opportunity as any).volunteerNames).toEqual(
       [],
     );
+  });
+});
+
+describe("dtoOpportunityGet", () => {
+  const eventDate = new Date("2026-06-15T09:30:00Z");
+
+  const baseDetail = {
+    id: 1,
+    title: "Event opportunity",
+    type: "events",
+    status: "opp-active",
+    statusMatch: "opp-vol-matched",
+    numberVolunteers: 2,
+    createdAt: new Date("2026-01-01"),
+    districtId: 5,
+    agentId: 42,
+    agent: {
+      title: "Center X",
+      id: 42,
+      type: "agent",
+      name: "Some Agent",
+      address: "123 Main St",
+      district: { id: 1 },
+      representative: {
+        person: { id: 100, name: "Rep", phone: "", email: "" },
+      },
+    },
+    accompanying: null,
+    deal: {
+      categoryId: 9,
+      dealLanguage: [],
+      dealActivity: [],
+      dealSkill: [],
+      dealDistrict: [],
+      dealTimeslot: [],
+    },
+    comments: [],
+    info: "",
+    infoConfidential: "",
+    opportunityVolunteer: [],
+  };
+
+  it("populates event from a one-time event timeslot", () => {
+    const opportunity = {
+      ...baseDetail,
+      deal: {
+        ...baseDetail.deal,
+        dealTimeslot: [
+          {
+            timeslot: {
+              id: 10,
+              start: eventDate,
+              end: null,
+              rrule: null,
+              occasional: null,
+            },
+          },
+        ],
+      },
+    };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.event).toEqual({
+      date: "2026-06-15",
+      time: "09:30",
+    });
+  });
+
+  it("returns undefined event when there are no dealTimeslots", () => {
+    const opportunity = {
+      ...baseDetail,
+      deal: {
+        ...baseDetail.deal,
+        dealTimeslot: [],
+      },
+    };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.event).toBeUndefined();
+  });
+
+  it("returns undefined event when timeslots are recurring (have rrule)", () => {
+    const opportunity = {
+      ...baseDetail,
+      deal: {
+        ...baseDetail.deal,
+        dealTimeslot: [
+          {
+            timeslot: {
+              id: 11,
+              start: new Date("2026-01-01T08:00:00Z"),
+              end: new Date("2026-01-01T11:00:00Z"),
+              rrule: "FREQ=WEEKLY;BYDAY=MO",
+              occasional: null,
+            },
+          },
+        ],
+      },
+    };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.event).toBeUndefined();
+  });
+
+  it("returns undefined event when timeslots are occasional", () => {
+    const opportunity = {
+      ...baseDetail,
+      deal: {
+        ...baseDetail.deal,
+        dealTimeslot: [
+          {
+            timeslot: {
+              id: 12,
+              start: null,
+              end: null,
+              rrule: null,
+              occasional: "weekends",
+            },
+          },
+        ],
+      },
+    };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.event).toBeUndefined();
   });
 });

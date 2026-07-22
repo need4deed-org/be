@@ -1118,6 +1118,18 @@
               "items": {
                 "$ref": "ApiComment#"
               }
+            },
+            "event": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "string"
+                }
+              },
+              "required": ["date", "time"]
             }
           }
         }

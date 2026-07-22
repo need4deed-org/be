@@ -2,6 +2,7 @@ import { ApiOpportunityAccompanyingDetails, OptionById } from "need4deed-sdk";
 import District from "../../data/entity/location/district.entity";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
+import { formatDate, formatTime } from "../utils";
 
 export function dtoOpportunityAccompanying(
   accompanying: Accompanying,
@@ -11,8 +12,8 @@ export function dtoOpportunityAccompanying(
   return accompanying
     ? {
         appointmentAddress: accompanying.address,
-        appointmentDate: accompanying.date.toISOString().split("T")[0],
-        appointmentTime: `${String(accompanying.date.getUTCHours()).padStart(2, "0")}:${String(accompanying.date.getUTCMinutes()).padStart(2, "0")}`,
+        appointmentDate: formatDate(accompanying.date),
+        appointmentTime: formatTime(accompanying.date),
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
         appointmentLanguage: accompanying.languageToTranslate,
