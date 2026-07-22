@@ -19,13 +19,10 @@ import { createAgentContact, updateAgentContact } from "../../utils";
 
 // Mirrors the role allowlist on PATCH /opportunity/:id: only these three
 // roles may reach the membership check, regardless of whether a stray
-// AgentPerson row exists for some other role. Coordinator/admin may act on
-// any agent; an AGENT must be an active member of this specific agent.
-async function assertCanManageContacts(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-  agentId: number,
-): Promise<void> {
+// AgentPerson row exists for some other role. Cheap (no DB), so it runs
+// before the agent-existence check — an unauthenticated/wrong-role caller
+// shouldn't get a DB round trip just to be told "no".
+function assertHasContactManagementRole(request: FastifyRequest): void {
   const role = request.authUser?.role;
   if (
     role !== UserRole.COORDINATOR &&
@@ -34,7 +31,19 @@ async function assertCanManageContacts(
   ) {
     throw new UnauthorizedError();
   }
+}
 
+// Coordinator/admin may act on any agent; an AGENT must be an active member
+// of this specific agent. Run this *after* the 404 check for the agent
+// itself, so a non-member probing a nonexistent agent id still gets 404
+// (matching the rest of the API) rather than a 403 that leaks nothing about
+// existence but changes already-established error-code semantics.
+async function assertCanManageContacts(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  agentId: number,
+): Promise<void> {
+  const role = request.authUser?.role;
   if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
     return;
   }
@@ -75,7 +84,7 @@ export default function agentContactRoutes(
     async (request, reply) => {
       const agentId = Number(request.params.id);
 
-      await assertCanManageContacts(fastify, request, agentId);
+      assertHasContactManagementRole(request);
 
       const agent = await fastify.db.agentRepository.findOneBy({
         id: agentId,
@@ -83,6 +92,8 @@ export default function agentContactRoutes(
       if (!agent) {
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
+
+      await assertCanManageContacts(fastify, request, agentId);
 
       const agentPerson = await createAgentContact(agentId, request.body);
       agentPerson.agent = agent;
@@ -110,7 +121,7 @@ export default function agentContactRoutes(
       const agentId = Number(request.params.id);
       const membershipId = Number(request.params.membershipId);
 
-      await assertCanManageContacts(fastify, request, agentId);
+      assertHasContactManagementRole(request);
 
       const agent = await fastify.db.agentRepository.findOneBy({
         id: agentId,
@@ -118,6 +129,8 @@ export default function agentContactRoutes(
       if (!agent) {
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
+
+      await assertCanManageContacts(fastify, request, agentId);
 
       const membership = await fastify.db.agentPersonRepository.findOne({
         where: { id: membershipId, agentId },
