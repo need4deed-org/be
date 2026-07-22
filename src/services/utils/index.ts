@@ -150,3 +150,11 @@ export function getDateObj(date: string, time: string): Date {
 
   return dateObj;
 }
+
+export const formatDate = (date: Date): string => {
+  return date.toISOString().split("T")[0];
+};
+
+export const formatTime = (date: Date): string => {
+  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+};

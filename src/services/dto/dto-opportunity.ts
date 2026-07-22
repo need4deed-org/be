@@ -10,7 +10,7 @@ import Comment from "../../data/entity/comment.entity";
 import District from "../../data/entity/location/district.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
-import { tryCatchFn } from "../utils";
+import { formatDate, formatTime, tryCatchFn } from "../utils";
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";
 import { commentSerializer } from "./dto-comment";
@@ -131,6 +131,17 @@ export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
   accompanyingDistrict?: District | null,
 ): ApiOpportunityGet {
+  let eventStart: Date | undefined = undefined;
+  if (opportunityComments.type === OpportunityType.EVENTS) {
+    eventStart = (opportunityComments.deal?.dealTimeslot ?? []).find(
+      (dt) =>
+        dt.timeslot?.start &&
+        !dt.timeslot?.end &&
+        !dt.timeslot?.rrule &&
+        !dt.timeslot?.occasional,
+    )?.timeslot?.start;
+  }
+
   return {
     id: opportunityComments.id,
     title: opportunityComments.title,
@@ -175,6 +186,12 @@ export function dtoOpportunityGet(
       opportunityComments.deal.dealLanguage,
       accompanyingDistrict,
     ),
+    event: eventStart
+      ? {
+          date: formatDate(eventStart),
+          time: formatTime(eventStart),
+        }
+      : undefined,
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
   } as ApiOpportunityGet;
