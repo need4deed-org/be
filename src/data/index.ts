@@ -41,7 +41,7 @@ const ALREADY_EXISTS_CODES = new Set(["42710", "42P07", "42P16"]);
 // treat that as proof the schema is already there and just backfill genesis's
 // own tracking row instead of re-attempting its DDL — this is the same fix
 // applied manually to the pre/production incidents this covers.
-async function bootstrapFreshDb(): Promise<void> {
+export async function bootstrapFreshDb(): Promise<void> {
   const qr = dataSource.createQueryRunner();
   try {
     await qr.query(`
