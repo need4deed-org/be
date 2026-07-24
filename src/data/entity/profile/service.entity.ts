@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
+import { OptionTitle } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import AgentService from "../m2m/agent-service";
 
@@ -22,5 +23,8 @@ export default class Service {
   @OneToMany(() => AgentService, (agentService) => agentService.service)
   agentService: AgentService[];
 
-  translation: string;
+  // Populated by getOptionTitleTranslations before serialization — see
+  // AgentType.translations for why this differs from Skill/Language's
+  // single resolved `translation: string`.
+  translations?: OptionTitle;
 }

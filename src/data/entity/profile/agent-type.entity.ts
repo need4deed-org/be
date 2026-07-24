@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsString, Length } from "class-validator";
+import { OptionTitle } from "need4deed-sdk";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import Agent from "../opportunity/agent.entity";
 
@@ -22,5 +23,8 @@ export default class AgentType {
   @OneToMany(() => Agent, (agent) => agent.agentType)
   agent: Agent[];
 
-  translation: string;
+  // Populated by getOptionTitleTranslations before serialization — unlike
+  // Skill/Language's single resolved `translation: string`, this needs both
+  // en and de at once to match the OptionById.title shape in a single response.
+  translations?: OptionTitle;
 }

@@ -31,6 +31,7 @@ import {
   RoutePrefix,
 } from "../../types";
 import {
+  addAgentTypeServiceTranslations,
   addComments2Entity,
   createAddress,
   getAgentWhere,
@@ -138,7 +139,7 @@ export default async function agentRoutes(
       logger.debug(`GET /agent: request.query:${Object.keys(request.query)}`);
       const { page, limit, sortOrder, filter } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
-      const where = getAgentWhere(filter);
+      const where = await getAgentWhere(filter);
 
       logger.debug(
         `GET /agent: filters:${JSON.stringify(filter)}, skip:${skip}, take:${take}`,
@@ -165,6 +166,7 @@ export default async function agentRoutes(
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentsDistrict = await Promise.all(agents.map(addDistrictToAgent));
+      await addAgentTypeServiceTranslations(agentsDistrict);
 
       if (updates.length > 0) {
         await agentRepository.save(updates);
@@ -210,6 +212,7 @@ export default async function agentRoutes(
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentDistrict = await addDistrictToAgent(agent);
       const agentComments = await addComments2Entity(agentDistrict);
+      await addAgentTypeServiceTranslations([agentComments]);
 
       if (updates.length > 0) {
         await agentRepository.save(updates);

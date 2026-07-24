@@ -128,6 +128,30 @@ describe("dtoAgentGet", () => {
     expect(result.representative.role).toBeUndefined();
     expect(result.contacts).toEqual([]);
   });
+
+  // Regression test: service.title is the DB key ("sport", "welfare"), not a
+  // translation — it must never be passed through as `de` once
+  // addAgentTypeServiceTranslations has resolved real translations.
+  it("prefers each service's translations over the raw title once resolved", () => {
+    const mockAgent = {
+      agentService: [
+        {
+          serviceId: 7,
+          service: {
+            title: "sport",
+            translations: { en: "sport", de: "Sport" },
+          },
+        },
+      ],
+      agentLanguage: [],
+    };
+
+    const result = dtoAgentGet(mockAgent as any);
+
+    expect(result.services).toEqual([
+      { id: 7, title: { en: "sport", de: "Sport" } },
+    ]);
+  });
 });
 
 describe("dtoOpportunityAgent", () => {
@@ -265,6 +289,30 @@ describe("dtoAgentGetList", () => {
     // Ensure the mapping from agent.searchStatus to volunteerSearch is correct
     const result = dtoAgentGetList({ ...mockAgentBase } as any);
     expect(result.volunteerSearch).toBe(AgentVolunteerSearchType.SEARCHING);
+  });
+
+  // Regression test: the raw agentType.title is the DB key ("welfare",
+  // "GU2"), not a translation — it must never be passed through as `de`
+  // once addAgentTypeServiceTranslations has resolved real translations.
+  it("prefers agentType.translations over the raw title once resolved", () => {
+    const result = dtoAgentGetList({
+      ...mockAgentBase,
+      agentType: {
+        title: "NGO",
+        translations: {
+          en: "Multiple social support",
+          de: "Mehrere Soziale Leistungen",
+        },
+      },
+    } as any);
+
+    expect(result.type).toEqual({
+      id: 3,
+      title: {
+        en: "Multiple social support",
+        de: "Mehrere Soziale Leistungen",
+      },
+    });
   });
 });
 
