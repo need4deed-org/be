@@ -21,16 +21,6 @@ export enum DealType {
   OPPORTUNITY = "opportunity",
 }
 
-export enum AgentOperatorType {
-  ORGANIZATION = "organization",
-  PERSON = "person",
-}
-
-export enum AgentType {
-  RAC = "RAC",
-  NGO = "NGO",
-}
-
 export enum ConfigType {
   SCHEMA = "schema",
   REFERENCE_DATA = "reference_data",

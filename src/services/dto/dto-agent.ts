@@ -5,6 +5,7 @@ import {
   ApiAgentMembership,
   ApiAgentOpportunity,
   ApiOpportunityAgent,
+  OptionById,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
@@ -14,6 +15,13 @@ import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
 import { getAvailability, getLanguages } from "./utils";
+
+// Translated reference data (AgentType/Service) isn't resolved per-language
+// here yet — like `district` below, this passes through the loaded title as
+// `de` until field_translation-based resolution is wired in.
+function dtoOptionTitle(id: number | undefined, title?: string): OptionById {
+  return { id, title: { de: title } };
+}
 
 // Serializes an agent<->person membership for the moderation endpoints.
 // Expects the `agent` and `person` relations to be loaded.
@@ -34,7 +42,7 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
   return {
     id: agent.id,
     title: agent.title,
-    type: agent.type!,
+    type: dtoOptionTitle(agent.agentTypeId, agent.agentType?.title),
     trustLevel: agent.trustLevel,
     volunteerSearch: agent.searchStatus,
     activeVolunteers: agent.activeVolunteers,
@@ -68,7 +76,9 @@ export function dtoAgentGet(
     contacts: (agent.agentPerson ?? []).map((ap) =>
       dtoSerializeAgentMembership({ ...ap, agent }),
     ),
-    serviceType: agent.services,
+    services: (agent.agentService ?? []).map((as) =>
+      dtoOptionTitle(as.serviceId, as.service?.title),
+    ),
     trustLevel: agent.trustLevel,
     statusEngagement: agent.engagementStatus,
     agentDetails: dtoAgentDetails(agent),
@@ -84,7 +94,7 @@ export function dtoAgentGet(
 export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
   return {
     id: agent.id,
-    type: agent.type,
+    type: dtoOptionTitle(agent.agentTypeId, agent.agentType?.title),
     name: agent.title,
     address: serializeAddress(agent.representative?.person?.address),
     district: {
@@ -104,9 +114,11 @@ function dtoAgentDetails(agent: Agent): AgentDetails & {
     addressStreet: agent.address?.street ?? null,
     addressPostcode: agent.address?.postcode?.value ?? null,
     website: agent.website,
-    organizationType: agent.type,
+    organizationType: dtoOptionTitle(agent.agentTypeId, agent.agentType?.title),
     operator: agent?.organization?.title,
-    services: agent.services?.join(", "),
+    services: (agent.agentService ?? []).map((as) =>
+      dtoOptionTitle(as.serviceId, as.service?.title),
+    ),
     clientLanguages:
       agent.agentLanguage?.map((al) => ({
         id: al.languageId,

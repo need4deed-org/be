@@ -151,6 +151,7 @@ export default async function opportunityRoutes(
         "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
+        "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
       ];

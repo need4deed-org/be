@@ -11,11 +11,56 @@ import logger from "../../../logger";
 import FieldTranslation from "../../entity/field_translation.entity";
 import LeadFrom from "../../entity/lead.entity";
 import Activity from "../../entity/profile/activity.entity";
+import AgentType from "../../entity/profile/agent-type.entity";
 import Category from "../../entity/profile/category.entity";
 import Language from "../../entity/profile/language.entity";
+import Service from "../../entity/profile/service.entity";
 import Skill from "../../entity/profile/skill.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
 import { getCount } from "../utils";
+
+// Same values as the AddAgentTypeAndService migration's field_translation
+// seed — duplicated (not imported/shared) because that migration must stay
+// self-contained. This is the dev/test bootstrap's fallback path: on a fresh
+// DB, migrations run before `language` is seeded, so the migration's own
+// insert seeds 0 rows there; this backfills once `language` definitely
+// exists. On any already-migrated environment (where `language` predates
+// this migration), the migration's insert already did the job and
+// seedFieldTranslation's count!==0 guard skips this entirely.
+const AGENT_TYPE_TRANSLATIONS: Record<string, ContentEnDe> = {
+  AE: { en: "AE", de: "AE" },
+  GU1: { en: "GU1", de: "GU1" },
+  GU2: { en: "GU2", de: "GU2" },
+  "GU2+": { en: "GU2+", de: "GU2+" },
+  GU3: { en: "GU3", de: "GU3" },
+  NU: { en: "NU", de: "NU" },
+  ASOG: { en: "ASOG", de: "ASOG" },
+  "counseling-center": { en: "Counseling-center", de: "Beratungsstelle" },
+  tandem: { en: "Tandem", de: "Tandem" },
+  "multiple-social-support": {
+    en: "Multiple-social-support",
+    de: "Allgemeine Sozialberatung",
+  },
+};
+
+const SERVICE_TRANSLATIONS: Record<string, ContentEnDe> = {
+  childcare: { en: "Childcare", de: "Kinderbetreuung" },
+  welfare: { en: "Welfare", de: "Wohlfahrt" },
+  consultation: { en: "Consultation", de: "Beratung" },
+  "voluntary-support": {
+    en: "Voluntary-support",
+    de: "Ehrenamtliche Unterstützung",
+  },
+  tandem: { en: "Tandem", de: "Tandem" },
+  sport: { en: "Sport", de: "Sport" },
+  tutoring: { en: "Tutoring", de: "Nachhilfe" },
+  "refugee-accommodation": {
+    en: "Refugee Accommodation",
+    de: "Unterkunft für Geflüchtete",
+  },
+  "job-coaching": { en: "Job-coaching", de: "Job-Coaching" },
+  youth: { en: "Youth", de: "Jugend" },
+};
 
 const fieldNameTitle = "title";
 const fieldNameDescription = "description";
@@ -312,6 +357,114 @@ async function seedSkills(
   }
 }
 
+async function seedAgentTypes(
+  fieldTranslationRepository: Repository<FieldTranslation>,
+  agentTypeRepository: Repository<AgentType>,
+  langEN: Language,
+  langDE: Language,
+) {
+  const agentTypes = await agentTypeRepository.find();
+
+  const existingAgentTypeTranslations = await fieldTranslationRepository.find({
+    where: { entityType: EntityTableName.AGENT_TYPE },
+    relations: ["language"],
+  });
+
+  const existingAgentTypeTranslationsSet = new Set(
+    existingAgentTypeTranslations.map(
+      (translation) =>
+        `${translation.language.isoCode}_${translation.entityId}`,
+    ),
+  );
+
+  const translationsForInsert: FieldTranslation[] = [];
+  for (const agentType of agentTypes) {
+    const translation = AGENT_TYPE_TRANSLATIONS[agentType.title];
+    if (!translation) {
+      continue;
+    }
+
+    if (!existingAgentTypeTranslationsSet.has(`${isoCodeEN}_${agentType.id}`)) {
+      const translationEN = new FieldTranslation();
+      translationEN.translation = translation.en;
+      translationEN.entityType = EntityTableName.AGENT_TYPE;
+      translationEN.entityId = agentType.id;
+      translationEN.languageId = langEN.id;
+      translationsForInsert.push(translationEN);
+    }
+
+    if (!existingAgentTypeTranslationsSet.has(`${isoCodeDE}_${agentType.id}`)) {
+      const translationDE = new FieldTranslation();
+      translationDE.translation = translation.de;
+      translationDE.entityType = EntityTableName.AGENT_TYPE;
+      translationDE.entityId = agentType.id;
+      translationDE.languageId = langDE.id;
+      translationsForInsert.push(translationDE);
+    }
+  }
+
+  try {
+    await fieldTranslationRepository.insert(translationsForInsert);
+  } catch (error) {
+    throw new Error(
+      `Error inserting agent type translations: ${error.message}`,
+    );
+  }
+}
+
+async function seedServices(
+  fieldTranslationRepository: Repository<FieldTranslation>,
+  serviceRepository: Repository<Service>,
+  langEN: Language,
+  langDE: Language,
+) {
+  const services = await serviceRepository.find();
+
+  const existingServiceTranslations = await fieldTranslationRepository.find({
+    where: { entityType: EntityTableName.SERVICE },
+    relations: ["language"],
+  });
+
+  const existingServiceTranslationsSet = new Set(
+    existingServiceTranslations.map(
+      (translation) =>
+        `${translation.language.isoCode}_${translation.entityId}`,
+    ),
+  );
+
+  const translationsForInsert: FieldTranslation[] = [];
+  for (const service of services) {
+    const translation = SERVICE_TRANSLATIONS[service.title];
+    if (!translation) {
+      continue;
+    }
+
+    if (!existingServiceTranslationsSet.has(`${isoCodeEN}_${service.id}`)) {
+      const translationEN = new FieldTranslation();
+      translationEN.translation = translation.en;
+      translationEN.entityType = EntityTableName.SERVICE;
+      translationEN.entityId = service.id;
+      translationEN.languageId = langEN.id;
+      translationsForInsert.push(translationEN);
+    }
+
+    if (!existingServiceTranslationsSet.has(`${isoCodeDE}_${service.id}`)) {
+      const translationDE = new FieldTranslation();
+      translationDE.translation = translation.de;
+      translationDE.entityType = EntityTableName.SERVICE;
+      translationDE.entityId = service.id;
+      translationDE.languageId = langDE.id;
+      translationsForInsert.push(translationDE);
+    }
+  }
+
+  try {
+    await fieldTranslationRepository.insert(translationsForInsert);
+  } catch (error) {
+    throw new Error(`Error inserting service translations: ${error.message}`);
+  }
+}
+
 async function seedLeeds(
   fieldTranslationRepository: Repository<FieldTranslation>,
   leadFromRepository: Repository<LeadFrom>,
@@ -436,6 +589,22 @@ export async function seedFieldTranslation(
   await seedLeeds(
     fieldTranslationRepository,
     leadFromRepository,
+    langEN,
+    langDE,
+  );
+
+  const agentTypeRepository = getRepository(dataSource, AgentType);
+  await seedAgentTypes(
+    fieldTranslationRepository,
+    agentTypeRepository,
+    langEN,
+    langDE,
+  );
+
+  const serviceRepository = getRepository(dataSource, Service);
+  await seedServices(
+    fieldTranslationRepository,
+    serviceRepository,
     langEN,
     langDE,
   );

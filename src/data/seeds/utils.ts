@@ -4,7 +4,7 @@ import {
   AgentRoleType,
   AgentServiceType,
   AgentTrustType,
-  AgentType,
+  AgentTypeKey,
   AgentVolunteerSearchType,
   DocumentStatusType,
   EntityTableName,
@@ -460,7 +460,6 @@ export async function getOrCreateAgent(
 
   const newAgent = new Agent({
     title: agentData.title,
-    type: undefined,
     organizationId: organization.id,
   });
   await agentRepository.save(newAgent);
@@ -710,14 +709,14 @@ export function getAgentTrustLevel(level: string): AgentTrustType {
   return AgentTrustType.UNKNOWN;
 }
 
-export function getAgentType(type: string): AgentType {
-  if (getEnumValue(AgentType, type)) {
-    return type as AgentType;
+export function getAgentType(type: string): AgentTypeKey {
+  if (getEnumValue(AgentTypeKey, type)) {
+    return type as AgentTypeKey;
   }
 
   switch (type) {
     case "Multiple social support":
-      return AgentType.MULTIPLE_SOCIAL_SUPPORT;
+      return AgentTypeKey.MULTIPLE_SOCIAL_SUPPORT;
   }
 
   return null;
