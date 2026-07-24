@@ -1,6 +1,15 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiAgentPatch, SortOrder, UserRole } from "need4deed-sdk";
-import { BadRequestError, NotFoundError } from "../../../config";
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
+import {
+  AgentMembershipStatus,
+  ApiAgentPatch,
+  SortOrder,
+  UserRole,
+} from "need4deed-sdk";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import logger from "../../../logger";
 import {
@@ -38,13 +47,56 @@ import agentContactRoutes from "./contact.routes";
 import agentMembershipRoutes from "./membership.routes";
 import agentRegisterRoutes from "./register.routes";
 
+// Mirrors the role allowlist in contact.routes.ts: only these three roles may
+// reach the membership check. Cheap (no DB), so it runs before the
+// agent-existence check.
+function assertHasOrgEditRole(request: FastifyRequest): void {
+  const role = request.authUser?.role;
+  if (
+    role !== UserRole.COORDINATOR &&
+    role !== UserRole.AGENT &&
+    role !== UserRole.ADMIN
+  ) {
+    throw new UnauthorizedError();
+  }
+}
+
+// Coordinator/admin may edit any agent; an AGENT must be an active member of
+// this specific agent. Run this *after* the 404 check for the agent itself,
+// so a non-member probing a nonexistent agent id still gets 404 rather than
+// a 403 that changes already-established error-code semantics.
+async function assertCanEditOrg(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  agentId: number,
+): Promise<void> {
+  const role = request.authUser?.role;
+  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
+    return;
+  }
+
+  const personId = request.authUser?.personId;
+  const membership = personId
+    ? await fastify.db.agentPersonRepository.findOneBy({
+        agentId,
+        personId,
+        status: AgentMembershipStatus.ACTIVE,
+      })
+    : null;
+  if (!membership) {
+    throw new UnauthorizedError(
+      "Only active members of this agent can edit its organization details.",
+    );
+  }
+}
+
 export default async function agentRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
   // GETs are open to any logged-in user (PII is masked per role in the
-  // preSerialization hooks below); writes stay COORDINATOR-only (re-gated
-  // per-route).
+  // preSerialization hooks below); writes are re-gated per-route: DELETE
+  // stays COORDINATOR-only, PATCH also allows an active AgentPerson member.
   fastify.addHook("onRequest", fastify.authenticate());
 
   fastify.register(agentRegisterRoutes, { prefix: RoutePrefix.REGISTER });
@@ -170,7 +222,6 @@ export default async function agentRoutes(
   fastify.patch<{ Params: ParamsId; Body: ApiAgentPatch; Reply: null }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiAgentPatch#" },
@@ -180,12 +231,17 @@ export default async function agentRoutes(
     async (request, reply) => {
       const { id } = request.params;
       logger.debug(`PATCH /agent/${id}, fields:${Object.keys(request.body)}`);
+
+      assertHasOrgEditRole(request);
+
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
 
       if (!agent) {
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
+
+      await assertCanEditOrg(fastify, request, id);
 
       const { addressStreet, addressPostcode, languages } = request.body;
 
