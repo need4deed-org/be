@@ -30,10 +30,9 @@ import { getCount } from "../utils";
 const AGENT_TYPE_TRANSLATIONS: Record<string, ContentEnDe> = {
   AE: { en: "Reception facility", de: "Aufnahmeeinrichtung" },
   GU1: { en: "shared accommodation 1", de: "Gemeinschaftsunterkunft 1" },
+  // GU2+ is not a category of its own — merged into GU2 (see the
+  // AddAgentTypeAndService migration's backfill).
   GU2: { en: "shared accommodation 2", de: "Gemeinschaftsunterkunft 2" },
-  // GU2+ has no row of its own in the source data — reuses GU2's
-  // translations with "+" appended, per product direction.
-  "GU2+": { en: "shared accommodation 2+", de: "Gemeinschaftsunterkunft 2+" },
   GU3: { en: "shared accommodation 3", de: "Gemeinschaftsunterkunft 3" },
   NU: { en: "Emergency shelter", de: "Notunterkunft" },
   ASOG: { en: "accommodation with no social support", de: "ASOG" },

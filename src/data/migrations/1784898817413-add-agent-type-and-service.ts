@@ -10,7 +10,7 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 // table is that new categories no longer require an SDK release.
 const sqlSeedAgentType = `
 INSERT INTO "agent_type" ("title") VALUES
-  ('AE'), ('GU1'), ('GU2'), ('GU2+'), ('GU3'), ('NU'), ('ASOG'),
+  ('AE'), ('GU1'), ('GU2'), ('GU3'), ('NU'), ('ASOG'),
   ('S/U'), ('jobcenter'), ('arzt'),
   ('counseling-center'), ('tandem'), ('multiple-social-support')
 ON CONFLICT ("title") DO NOTHING;
@@ -24,11 +24,17 @@ INSERT INTO "service" ("title") VALUES
 ON CONFLICT ("title") DO NOTHING;
 `;
 
+// GU2+ has no row of its own (merged into GU2, see below) — map it explicitly
+// so any agent previously classified GU2+ backfills onto GU2 instead of
+// being left with a null agent_type_id.
 const sqlBackfillAgentTypeId = `
 UPDATE "agent"
 SET "agent_type_id" = "agent_type"."id"
 FROM "agent_type"
-WHERE "agent_type"."title" = "agent"."type"::text;
+WHERE "agent_type"."title" = CASE
+  WHEN "agent"."type"::text = 'GU2+' THEN 'GU2'
+  ELSE "agent"."type"::text
+END;
 `;
 
 const sqlBackfillAgentService = `
@@ -41,9 +47,8 @@ ON CONFLICT ("agent_id", "service_id") DO NOTHING;
 `;
 
 // en/de labels below are the authoritative copy provided directly by the
-// product owner (not inferred from fe's prior placeholder labels). GU2+ has
-// no row of its own in that source data; per direction, it reuses GU2's
-// translations with "+" appended.
+// product owner (not inferred from fe's prior placeholder labels). GU2+ is
+// not a category of its own — it's merged into GU2 (see the backfill above).
 const sqlSeedAgentTypeTranslations = `
 INSERT INTO "field_translation" (field_name, language_id, entity_type, entity_id, translation)
 SELECT
@@ -56,7 +61,6 @@ FROM (VALUES
   ('AE', 'Reception facility', 'Aufnahmeeinrichtung'),
   ('GU1', 'shared accommodation 1', 'Gemeinschaftsunterkunft 1'),
   ('GU2', 'shared accommodation 2', 'Gemeinschaftsunterkunft 2'),
-  ('GU2+', 'shared accommodation 2+', 'Gemeinschaftsunterkunft 2+'),
   ('GU3', 'shared accommodation 3', 'Gemeinschaftsunterkunft 3'),
   ('NU', 'Emergency shelter', 'Notunterkunft'),
   ('ASOG', 'accommodation with no social support', 'ASOG'),

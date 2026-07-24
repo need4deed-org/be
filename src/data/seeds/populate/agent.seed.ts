@@ -1,4 +1,4 @@
-import { EntityTableName } from "need4deed-sdk";
+import { AgentTypeKey, EntityTableName } from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedAgentsFile, titleOrphanageAgent } from "../../../config";
 import { tryCatch } from "../../../services/utils";
@@ -45,8 +45,12 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
 
   for (const agentJson of agentsJson ?? []) {
     const agentTypeKey = getAgentType(agentJson.type);
-    const agentType = agentTypeKey
-      ? await agentTypeRepository.findOneBy({ title: agentTypeKey })
+    // GU2+ is not a category of its own — merged into GU2 (see the
+    // AddAgentTypeAndService migration's backfill for the same mapping).
+    const agentTypeTitle =
+      agentTypeKey === AgentTypeKey.GU2_PLUS ? AgentTypeKey.GU2 : agentTypeKey;
+    const agentType = agentTypeTitle
+      ? await agentTypeRepository.findOneBy({ title: agentTypeTitle })
       : null;
 
     const agentObj = new Agent({
