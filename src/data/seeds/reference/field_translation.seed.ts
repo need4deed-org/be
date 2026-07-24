@@ -28,38 +28,42 @@ import { getCount } from "../utils";
 // this migration), the migration's insert already did the job and
 // seedFieldTranslation's count!==0 guard skips this entirely.
 const AGENT_TYPE_TRANSLATIONS: Record<string, ContentEnDe> = {
-  AE: { en: "AE", de: "AE" },
-  GU1: { en: "GU1", de: "GU1" },
-  GU2: { en: "GU2", de: "GU2" },
-  "GU2+": { en: "GU2+", de: "GU2+" },
-  GU3: { en: "GU3", de: "GU3" },
-  NU: { en: "NU", de: "NU" },
-  ASOG: { en: "ASOG", de: "ASOG" },
-  "counseling-center": { en: "Counseling-center", de: "Beratungsstelle" },
+  AE: { en: "Reception facility", de: "Aufnahmeeinrichtung" },
+  GU1: { en: "shared accommodation 1", de: "Gemeinschaftsunterkunft 1" },
+  GU2: { en: "shared accommodation 2", de: "Gemeinschaftsunterkunft 2" },
+  // GU2+ has no row of its own in the source data — reuses GU2's
+  // translations with "+" appended, per product direction.
+  "GU2+": { en: "shared accommodation 2+", de: "Gemeinschaftsunterkunft 2+" },
+  GU3: { en: "shared accommodation 3", de: "Gemeinschaftsunterkunft 3" },
+  NU: { en: "Emergency shelter", de: "Notunterkunft" },
+  ASOG: { en: "accommodation with no social support", de: "ASOG" },
+  "S/U": { en: "School", de: "Schule/Uni" },
+  jobcenter: { en: "Jobcenter", de: "Jobcenter" },
+  arzt: { en: "Doctor", de: "Arzt" },
+  "counseling-center": { en: "consultation center", de: "Beratungsstelle" },
   tandem: { en: "Tandem", de: "Tandem" },
   "multiple-social-support": {
-    en: "Multiple-social-support",
-    de: "Allgemeine Sozialberatung",
+    en: "multiple social support",
+    de: "Mehrere Soziale Leistungen",
   },
 };
 
 const SERVICE_TRANSLATIONS: Record<string, ContentEnDe> = {
-  childcare: { en: "Childcare", de: "Kinderbetreuung" },
-  welfare: { en: "Welfare", de: "Wohlfahrt" },
-  consultation: { en: "Consultation", de: "Beratung" },
-  "voluntary-support": {
-    en: "Voluntary-support",
-    de: "Ehrenamtliche Unterstützung",
-  },
-  tandem: { en: "Tandem", de: "Tandem" },
-  sport: { en: "Sport", de: "Sport" },
-  tutoring: { en: "Tutoring", de: "Nachhilfe" },
+  childcare: { en: "childcare", de: "Kinderbetreuung" },
+  welfare: { en: "welfare", de: "Sozialhilfe" },
+  health: { en: "Health", de: "Gesundheit" },
+  consultation: { en: "consultation", de: "Beratung" },
+  "voluntary-support": { en: "voluntary-support", de: "Freiwilligenhilfe" },
+  tandem: { en: "tandem", de: "Tandem" },
+  sport: { en: "sport", de: "Sport" },
+  tutoring: { en: "tutoring", de: "Nachhilfe" },
   "refugee-accommodation": {
-    en: "Refugee Accommodation",
-    de: "Unterkunft für Geflüchtete",
+    en: "refugee-accommodation",
+    de: "Flüchtlingsunterkunft",
   },
-  "job-coaching": { en: "Job-coaching", de: "Job-Coaching" },
-  youth: { en: "Youth", de: "Jugend" },
+  "job-coaching": { en: "job-coaching", de: "Jobcoaching" },
+  youth: { en: "youth", de: "Jugendarbeit" },
+  education: { en: "Education", de: "Bildung" },
 };
 
 const fieldNameTitle = "title";

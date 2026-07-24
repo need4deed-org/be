@@ -1,22 +1,26 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-// Canonical seed values, snapshotted as literals from need4deed-sdk's
-// AgentTypeKey/AgentServiceType enums at the time this migration was
-// written. Deliberately NOT imported from the SDK — an enum value can change
+// Canonical seed values. The original 10 agent_type / 10 service titles are
+// literals snapshotted from need4deed-sdk's AgentTypeKey/AgentServiceType
+// enums (deliberately NOT imported from the SDK — an enum value can change
 // with a later contract update, which would retroactively alter what this
-// migration emits on a fresh replay.
+// migration emits on a fresh replay). S/U, jobcenter, arzt, health and
+// education are additional categories with no SDK enum equivalent, added
+// directly as reference rows — the point of moving off a fixed enum onto a
+// table is that new categories no longer require an SDK release.
 const sqlSeedAgentType = `
 INSERT INTO "agent_type" ("title") VALUES
   ('AE'), ('GU1'), ('GU2'), ('GU2+'), ('GU3'), ('NU'), ('ASOG'),
+  ('S/U'), ('jobcenter'), ('arzt'),
   ('counseling-center'), ('tandem'), ('multiple-social-support')
 ON CONFLICT ("title") DO NOTHING;
 `;
 
 const sqlSeedService = `
 INSERT INTO "service" ("title") VALUES
-  ('childcare'), ('welfare'), ('consultation'), ('voluntary-support'),
+  ('childcare'), ('welfare'), ('health'), ('consultation'), ('voluntary-support'),
   ('tandem'), ('sport'), ('tutoring'), ('refugee-accommodation'),
-  ('job-coaching'), ('youth')
+  ('job-coaching'), ('youth'), ('education')
 ON CONFLICT ("title") DO NOTHING;
 `;
 
@@ -36,9 +40,10 @@ INNER JOIN "service" ON "service"."title" = "agent_service_title"
 ON CONFLICT ("agent_id", "service_id") DO NOTHING;
 `;
 
-// en/de labels below match what's already shipped in the fe dashboard
-// (AGENT_TYPE_LABELS/AGENT_SERVICE_LABELS + the filters.type/filters.services
-// i18n keys) rather than inventing new copy.
+// en/de labels below are the authoritative copy provided directly by the
+// product owner (not inferred from fe's prior placeholder labels). GU2+ has
+// no row of its own in that source data; per direction, it reuses GU2's
+// translations with "+" appended.
 const sqlSeedAgentTypeTranslations = `
 INSERT INTO "field_translation" (field_name, language_id, entity_type, entity_id, translation)
 SELECT
@@ -48,16 +53,19 @@ SELECT
   agent_type.id,
   CASE lang.iso_code WHEN 'en' THEN v.en_title ELSE v.de_title END
 FROM (VALUES
-  ('AE', 'AE', 'AE'),
-  ('GU1', 'GU1', 'GU1'),
-  ('GU2', 'GU2', 'GU2'),
-  ('GU2+', 'GU2+', 'GU2+'),
-  ('GU3', 'GU3', 'GU3'),
-  ('NU', 'NU', 'NU'),
-  ('ASOG', 'ASOG', 'ASOG'),
-  ('counseling-center', 'Counseling-center', 'Beratungsstelle'),
+  ('AE', 'Reception facility', 'Aufnahmeeinrichtung'),
+  ('GU1', 'shared accommodation 1', 'Gemeinschaftsunterkunft 1'),
+  ('GU2', 'shared accommodation 2', 'Gemeinschaftsunterkunft 2'),
+  ('GU2+', 'shared accommodation 2+', 'Gemeinschaftsunterkunft 2+'),
+  ('GU3', 'shared accommodation 3', 'Gemeinschaftsunterkunft 3'),
+  ('NU', 'Emergency shelter', 'Notunterkunft'),
+  ('ASOG', 'accommodation with no social support', 'ASOG'),
+  ('S/U', 'School', 'Schule/Uni'),
+  ('jobcenter', 'Jobcenter', 'Jobcenter'),
+  ('arzt', 'Doctor', 'Arzt'),
+  ('counseling-center', 'consultation center', 'Beratungsstelle'),
   ('tandem', 'Tandem', 'Tandem'),
-  ('multiple-social-support', 'Multiple-social-support', 'Allgemeine Sozialberatung')
+  ('multiple-social-support', 'multiple social support', 'Mehrere Soziale Leistungen')
 ) AS v(key, en_title, de_title)
 INNER JOIN "agent_type" ON "agent_type"."title" = v.key
 CROSS JOIN "language" lang
@@ -75,16 +83,18 @@ SELECT
   service.id,
   CASE lang.iso_code WHEN 'en' THEN v.en_title ELSE v.de_title END
 FROM (VALUES
-  ('childcare', 'Childcare', 'Kinderbetreuung'),
-  ('welfare', 'Welfare', 'Wohlfahrt'),
-  ('consultation', 'Consultation', 'Beratung'),
-  ('voluntary-support', 'Voluntary-support', 'Ehrenamtliche Unterstützung'),
-  ('tandem', 'Tandem', 'Tandem'),
-  ('sport', 'Sport', 'Sport'),
-  ('tutoring', 'Tutoring', 'Nachhilfe'),
-  ('refugee-accommodation', 'Refugee Accommodation', 'Unterkunft für Geflüchtete'),
-  ('job-coaching', 'Job-coaching', 'Job-Coaching'),
-  ('youth', 'Youth', 'Jugend')
+  ('childcare', 'childcare', 'Kinderbetreuung'),
+  ('welfare', 'welfare', 'Sozialhilfe'),
+  ('health', 'Health', 'Gesundheit'),
+  ('consultation', 'consultation', 'Beratung'),
+  ('voluntary-support', 'voluntary-support', 'Freiwilligenhilfe'),
+  ('tandem', 'tandem', 'Tandem'),
+  ('sport', 'sport', 'Sport'),
+  ('tutoring', 'tutoring', 'Nachhilfe'),
+  ('refugee-accommodation', 'refugee-accommodation', 'Flüchtlingsunterkunft'),
+  ('job-coaching', 'job-coaching', 'Jobcoaching'),
+  ('youth', 'youth', 'Jugendarbeit'),
+  ('education', 'Education', 'Bildung')
 ) AS v(key, en_title, de_title)
 INNER JOIN "service" ON "service"."title" = v.key
 CROSS JOIN "language" lang
