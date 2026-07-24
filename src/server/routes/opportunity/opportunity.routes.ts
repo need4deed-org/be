@@ -51,6 +51,7 @@ import {
   RoutePrefix,
 } from "../../types";
 import {
+  addAgentTypeServiceTranslations,
   addComments2Entity,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
@@ -151,6 +152,7 @@ export default async function opportunityRoutes(
         "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
         "agent.district",
+        "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
       ];
@@ -182,6 +184,7 @@ export default async function opportunityRoutes(
         opportunityComments.agent,
         await addDistrictToAgent(opportunityComments.agent),
       );
+      await addAgentTypeServiceTranslations([opportunityComments.agent]);
 
       if (districtUpdates.length) {
         const agentRepository = fastify.db.agentRepository;

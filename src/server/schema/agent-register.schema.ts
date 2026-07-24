@@ -56,12 +56,12 @@ const registerAgentNewSchema = {
   additionalProperties: false,
   properties: {
     title: { type: "string", minLength: 1 },
-    type: { $ref: "AgentType#" },
+    typeId: { type: "integer" },
     info: { type: "string" },
     website: { type: "string" },
-    services: {
+    serviceIds: {
       type: "array",
-      items: { $ref: "AgentServiceType#" },
+      items: { type: "integer" },
     },
     phone: { type: "string" },
     addressStreet: { type: "string" },

@@ -18,6 +18,7 @@ import ActivityLog from "./entity/m2m/activity-log.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
 import AgentPerson from "./entity/m2m/agent-person";
 import AgentPostcode from "./entity/m2m/agent-postcode";
+import AgentService from "./entity/m2m/agent-service";
 import CommentPerson from "./entity/m2m/comment-person";
 import DealActivity from "./entity/m2m/deal-activity";
 import DealDistrict from "./entity/m2m/deal-district";
@@ -35,8 +36,10 @@ import Organization from "./entity/organization.entity";
 import Person from "./entity/person.entity";
 import Post from "./entity/post.entity";
 import Activity from "./entity/profile/activity.entity";
+import AgentType from "./entity/profile/agent-type.entity";
 import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
+import Service from "./entity/profile/service.entity";
 import Skill from "./entity/profile/skill.entity";
 import Testimonial from "./entity/testimonial.entity";
 import Timeslot from "./entity/time/timeslot.entity";
@@ -68,6 +71,8 @@ export const dataSource = new DataSource({
     AgentLanguage,
     AgentPerson,
     AgentPostcode,
+    AgentService,
+    AgentType,
     Appreciation,
     Category,
     Comment,
@@ -96,6 +101,7 @@ export const dataSource = new DataSource({
     Post,
     Postcode,
     Option,
+    Service,
     Skill,
     Testimonial,
     Timeline,
