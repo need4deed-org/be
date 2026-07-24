@@ -48,13 +48,17 @@ describe("dtoAgentGet", () => {
           person: { firstName: "Jane" },
         },
       ],
-      services: ["Consulting", "Legal"],
+      agentService: [
+        { serviceId: 10, service: { title: "Consulting" } },
+        { serviceId: 11, service: { title: "Legal" } },
+      ],
       trustLevel: 5,
       engagementStatus: "Active",
       info: "Bio text",
       address: { street: "Baker St" },
       website: "https://agent.com",
-      type: "NGO",
+      agentTypeId: 3,
+      agentType: { title: "NGO" },
       agentLanguage: [{ languageId: "en", language: { title: "English" } }],
       comments: [{ id: 101, content: "Great service" }],
     };
@@ -94,13 +98,26 @@ describe("dtoAgentGet", () => {
     ]);
 
     // Checking nested agentDetails (via the internal helper)
-    expect(result.agentDetails.services).toBe("Consulting, Legal");
+    expect(result.agentDetails.organizationType).toEqual({
+      id: 3,
+      title: { de: "NGO" },
+    });
+    expect(result.agentDetails.services).toEqual([
+      { id: 10, title: { de: "Consulting" } },
+      { id: 11, title: { de: "Legal" } },
+    ]);
     expect(result.agentDetails.clientLanguages[0].title).toBe("English");
+
+    // Checking the top-level (non-nested) type/services mirror the same data
+    expect(result.type).toEqual({ id: 3, title: { de: "NGO" } });
+    expect(result.services).toEqual([
+      { id: 10, title: { de: "Consulting" } },
+      { id: 11, title: { de: "Legal" } },
+    ]);
   });
 
   it("should handle missing optional nested properties gracefully", () => {
     const minimalAgent = {
-      services: [],
       comments: undefined,
     };
 
@@ -117,7 +134,8 @@ describe("dtoOpportunityAgent", () => {
   it("should map agent to opportunity format with localized district", () => {
     const mockAgent = {
       id: 7,
-      type: "Provider",
+      agentTypeId: 9,
+      agentType: { title: "Provider" },
       title: "Clinic X",
       districtId: "dist_1",
       district: { title: "Mitte" },
@@ -128,7 +146,7 @@ describe("dtoOpportunityAgent", () => {
 
     expect(result).toEqual({
       id: 7,
-      type: "Provider",
+      type: { id: 9, title: { de: "Provider" } },
       name: "Clinic X",
       address: "serialized_address",
       district: {
@@ -140,15 +158,23 @@ describe("dtoOpportunityAgent", () => {
 });
 
 describe("dtoAgentDetails (Internal Logic)", () => {
-  it("should join services into a comma-separated string", () => {
+  it("should map services to an array of translated options", () => {
     const mockAgent = {
-      services: ["A", "B", "C"],
+      agentService: [
+        { serviceId: 1, service: { title: "A" } },
+        { serviceId: 2, service: { title: "B" } },
+        { serviceId: 3, service: { title: "C" } },
+      ],
       agentLanguage: [],
     };
 
     // Since it's a private helper, we test it through dtoAgentGet
     const result = dtoAgentGet(mockAgent as any);
-    expect(result.agentDetails.services).toBe("A, B, C");
+    expect(result.agentDetails.services).toEqual([
+      { id: 1, title: { de: "A" } },
+      { id: 2, title: { de: "B" } },
+      { id: 3, title: { de: "C" } },
+    ]);
   });
 
   it("should return an empty array if agentLanguage is missing", () => {
@@ -179,7 +205,8 @@ describe("dtoAgentGetList", () => {
   const mockAgentBase = {
     id: 1,
     title: "Helping Hands",
-    type: "NGO",
+    agentTypeId: 3,
+    agentType: { title: "NGO" },
     activeVolunteers: 10,
     numOpportunities: 0,
     addressId: 101,
@@ -207,7 +234,7 @@ describe("dtoAgentGetList", () => {
     expect(result).toEqual({
       id: 1,
       title: "Helping Hands",
-      type: "NGO",
+      type: { id: 3, title: { de: "NGO" } },
       trustLevel: AgentTrustType.HIGH,
       activeVolunteers: 10,
       numOpportunities: 2,

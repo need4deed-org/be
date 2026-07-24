@@ -5,8 +5,11 @@ import { tryCatch } from "../../../services/utils";
 import Postcode from "../../entity/location/postcode.entity";
 import AgentPerson from "../../entity/m2m/agent-person";
 import AgentPostcode from "../../entity/m2m/agent-postcode";
+import AgentService from "../../entity/m2m/agent-service";
 import NotionRelation from "../../entity/notion-relation.entity";
 import Agent from "../../entity/opportunity/agent.entity";
+import AgentType from "../../entity/profile/agent-type.entity";
+import Service from "../../entity/profile/service.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
 import {
   getAgentEngagement,
@@ -22,6 +25,9 @@ import { AgentJSON } from "./types";
 
 export async function seedAgents(dataSource: DataSource): Promise<void> {
   const agentRepository = getRepository(dataSource, Agent);
+  const agentTypeRepository = getRepository(dataSource, AgentType);
+  const serviceRepository = getRepository(dataSource, Service);
+  const agentServiceRepository = getRepository(dataSource, AgentService);
 
   const count = await getCount(agentRepository);
   if (count !== 0) {
@@ -38,15 +44,19 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
   } as AgentJSON);
 
   for (const agentJson of agentsJson ?? []) {
+    const agentTypeKey = getAgentType(agentJson.type);
+    const agentType = agentTypeKey
+      ? await agentTypeRepository.findOneBy({ title: agentTypeKey })
+      : null;
+
     const agentObj = new Agent({
       title: agentJson.title || agentJson.website || "unknown",
       info: agentJson.about,
       website: agentJson.website,
-      type: getAgentType(agentJson.type),
+      agentTypeId: agentType?.id,
       trustLevel: getAgentTrustLevel(agentJson.trustLevel),
       searchStatus: getAgentSearchStatus(agentJson.statusSearch),
       engagementStatus: getAgentEngagement(agentJson.statusEngagement),
-      services: agentJson.services?.map(getAgentService),
     });
     const [agent, error] = await tryCatch(agentRepository.save(agentObj));
 
@@ -56,6 +66,27 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
         `While creating an agent ${agentJson.nid} occurred: ${error}`,
       );
       continue;
+    }
+
+    const serviceKeys = (agentJson.services ?? []).map(getAgentService);
+    for (const serviceKey of serviceKeys) {
+      const service = await serviceRepository.findOneBy({
+        title: serviceKey,
+      });
+      if (!service) {
+        continue;
+      }
+      const [, error] = await tryCatch(
+        agentServiceRepository.save(
+          new AgentService({ agentId: agent.id, serviceId: service.id }),
+        ),
+      );
+      if (error) {
+        dataSource.logger.log(
+          "warn",
+          `Storing agent-service m2m (agentId:${agent.id}, serviceId:${service.id}) occurred: ${error}`,
+        );
+      }
     }
 
     const agentPostcodeRepository = getRepository(dataSource, AgentPostcode);

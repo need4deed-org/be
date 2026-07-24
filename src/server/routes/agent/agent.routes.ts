@@ -38,6 +38,7 @@ import {
   getSkipTake,
   patchAddress,
   updateAgentLanguages,
+  updateAgentServices,
 } from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
@@ -147,6 +148,7 @@ export default async function agentRoutes(
       const relations = [
         "address.postcode",
         "district",
+        "agentType",
         "opportunity.opportunityVolunteer",
         "agentPerson.person",
         "organization",
@@ -193,6 +195,8 @@ export default async function agentRoutes(
       const relations = [
         "address.postcode",
         "district",
+        "agentType",
+        "agentService.service",
         "opportunity.opportunityVolunteer",
         "organization.address.postcode",
         "agentPerson.person.address.postcode",
@@ -243,7 +247,8 @@ export default async function agentRoutes(
 
       await assertCanEditOrg(fastify, request, id);
 
-      const { addressStreet, addressPostcode, languages } = request.body;
+      const { addressStreet, addressPostcode, languages, serviceIds } =
+        request.body;
 
       // Persist address, scalar fields and languages atomically so a partial
       // failure can't leave the agent half-updated.
@@ -285,6 +290,10 @@ export default async function agentRoutes(
 
         if (languages) {
           await updateAgentLanguages(id, languages, manager);
+        }
+
+        if (serviceIds) {
+          await updateAgentServices(id, serviceIds, manager);
         }
       });
 

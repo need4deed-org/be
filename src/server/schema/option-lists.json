@@ -29,6 +29,14 @@
         "district": {
           "type": "array",
           "items": { "$ref": "OptionItem#" }
+        },
+        "agent_type": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
+        },
+        "service": {
+          "type": "array",
+          "items": { "$ref": "OptionItem#" }
         }
       },
       "additionalProperties": false
