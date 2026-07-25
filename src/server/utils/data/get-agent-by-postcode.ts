@@ -30,7 +30,11 @@ function agentHasPlz(a: Agent, plz: string): boolean {
 
 function streetNameWordRegex(streetName: string): RegExp {
   const escaped = streetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`);
+  // Boundary is "not a letter" rather than literal whitespace, so titles that
+  // glue the street name to the rest with punctuation (e.g. "Demo-Unterkunft")
+  // still match — while a real substring like "ringstr" inside "ostringstr"
+  // still correctly fails (the preceding character there is a letter).
+  return new RegExp(`(?:^|[^\\p{L}])${escaped}(?:[^\\p{L}]|$)`, "u");
 }
 
 export function getAgentByAddress(
