@@ -104,6 +104,18 @@ export function getAgentsByStreetPrefix(
   });
 }
 
+// Combines the two search picker sources into a single ordered, deduped list:
+// the decisive exact/legacy-fuzzy match (if any) always first, since callers
+// (e.g. the frontend picker) treat the first entry as the best guess, followed
+// by the remaining prefix matches.
+export function mergeAgentMatches(
+  exactMatch: Agent | undefined,
+  prefixMatches: Agent[],
+): Agent[] {
+  const rest = prefixMatches.filter((a) => a.id !== exactMatch?.id);
+  return exactMatch ? [exactMatch, ...rest] : rest;
+}
+
 export function getAgentByPostcode(
   agents: Agent[],
   plz: string,
