@@ -80,6 +80,42 @@ export function getAgentByAddress(
   return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
 }
 
+// Prefix search for the self-registration picker: agents whose address.street
+// starts with the (normalized) typed value. Deliberately separate from
+// getAgentByAddress — that function's strict/fuzzy paths back the CREATE-path
+// conflict check and the legacy find-or-create flow, both of which need a
+// single decisive match rather than a broadening candidate list.
+export function getAgentsByStreetPrefix(
+  agents: Agent[],
+  street: string,
+  plz?: string,
+): Agent[] {
+  const normStreet = normalizeStreet(street);
+  if (!normStreet) {
+    return [];
+  }
+
+  return agents.filter((a) => {
+    if (plz && a.address?.postcode?.value !== plz) {
+      return false;
+    }
+    const agentStreet = a.address?.street;
+    return !!agentStreet && normalizeStreet(agentStreet).startsWith(normStreet);
+  });
+}
+
+// Combines the two search picker sources into a single ordered, deduped list:
+// the decisive exact/legacy-fuzzy match (if any) always first, since callers
+// (e.g. the frontend picker) treat the first entry as the best guess, followed
+// by the remaining prefix matches.
+export function mergeAgentMatches(
+  exactMatch: Agent | undefined,
+  prefixMatches: Agent[],
+): Agent[] {
+  const rest = prefixMatches.filter((a) => a.id !== exactMatch?.id);
+  return exactMatch ? [exactMatch, ...rest] : rest;
+}
+
 export function getAgentByPostcode(
   agents: Agent[],
   plz: string,

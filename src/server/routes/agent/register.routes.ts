@@ -26,7 +26,9 @@ import {
   classifyRegisterAgentConflict,
   createAgentForPerson,
   getAgentByAddress,
+  getAgentsByStreetPrefix,
   joinAgent,
+  mergeAgentMatches,
   resolveJoinStatus,
 } from "../../utils";
 
@@ -114,10 +116,20 @@ export default async function agentRegisterRoutes(
         })
         .getMany();
 
-      // Reuse the POST /opportunity/legacy picker (strict street+PLZ, then fuzzy
-      // street-name) — returns the single best match (or none).
-      const match = getAgentByAddress(candidates, street, postcode);
-      const data = match ? [{ id: match.id, title: match.title }] : [];
+      // Two complementary sources, merged with the decisive match first: the
+      // strict/legacy-fuzzy single-best match shared with POST
+      // /opportunity/legacy, plus a street prefix search so partial input
+      // (3+ chars) can surface candidates before the full street is typed.
+      const exactMatch = getAgentByAddress(candidates, street, postcode);
+      const prefixMatches = getAgentsByStreetPrefix(
+        candidates,
+        street,
+        postcode,
+      );
+      const data = mergeAgentMatches(exactMatch, prefixMatches).map((a) => ({
+        id: a.id,
+        title: a.title,
+      }));
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });

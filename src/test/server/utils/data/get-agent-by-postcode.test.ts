@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   getAgentByAddress,
   getAgentByPostcode,
+  getAgentsByStreetPrefix,
+  mergeAgentMatches,
 } from "../../../../server/utils";
 
 describe("getAgentByPostcode", () => {
@@ -179,5 +181,97 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     expect(getAgentByAddress(agents, "Hausvaterweg 21 A", plz)).toEqual(
       legacyAgent,
     );
+  });
+});
+
+describe("getAgentsByStreetPrefix", () => {
+  const mueller = {
+    id: 1,
+    address: { postcode: { value: "13353" }, street: "Müllerstraße 48" },
+  } as any;
+  const haupt = {
+    id: 2,
+    address: { postcode: { value: "55555" }, street: "Hauptstr. 10" },
+  } as any;
+  const legacyNoAddress = {
+    id: 3,
+    title: "Refugium Hausvaterweg",
+    address: null,
+    agentPostcode: [{ postcode: { value: "13353" } }],
+  } as any;
+
+  it("matches on a partial (3+ char) prefix of the street", () => {
+    expect(getAgentsByStreetPrefix([mueller, haupt], "Mül")).toEqual([mueller]);
+  });
+
+  it("is case/spelling-insensitive like the strict match (straße/strasse/str.)", () => {
+    expect(getAgentsByStreetPrefix([mueller], "müller str")).toEqual([mueller]);
+    expect(getAgentsByStreetPrefix([mueller], "MÜLLERSTR")).toEqual([mueller]);
+  });
+
+  it("returns all agents matching the prefix, not just one", () => {
+    const muellerTwo = {
+      id: 4,
+      address: { postcode: { value: "13353" }, street: "Müllerstraße 12" },
+    } as any;
+    expect(
+      getAgentsByStreetPrefix([mueller, muellerTwo, haupt], "Müllerstr"),
+    ).toEqual([mueller, muellerTwo]);
+  });
+
+  it("narrows by postcode when provided", () => {
+    const muellerElsewhere = {
+      id: 5,
+      address: { postcode: { value: "99999" }, street: "Müllerstraße 3" },
+    } as any;
+    expect(
+      getAgentsByStreetPrefix([mueller, muellerElsewhere], "Müller", "13353"),
+    ).toEqual([mueller]);
+  });
+
+  it("does not match a different street with a similar prefix", () => {
+    expect(getAgentsByStreetPrefix([haupt], "Müller")).toEqual([]);
+  });
+
+  it("ignores legacy agents with no address.street", () => {
+    expect(getAgentsByStreetPrefix([legacyNoAddress], "Hausvaterweg")).toEqual(
+      [],
+    );
+  });
+
+  it("returns an empty array when the typed value normalizes to empty", () => {
+    expect(getAgentsByStreetPrefix([mueller], "   ")).toEqual([]);
+  });
+});
+
+describe("mergeAgentMatches", () => {
+  const exact = { id: 1, title: "Exact Match Agent" } as any;
+  const prefixOnly = { id: 2, title: "Prefix Only Agent" } as any;
+  const anotherPrefixOnly = { id: 3, title: "Another Prefix Agent" } as any;
+
+  it("puts the exact match first even when prefix matches precede it in the source list", () => {
+    expect(
+      mergeAgentMatches(exact, [prefixOnly, anotherPrefixOnly, exact]),
+    ).toEqual([exact, prefixOnly, anotherPrefixOnly]);
+  });
+
+  it("does not duplicate the exact match when it also appears in prefix matches", () => {
+    const merged = mergeAgentMatches(exact, [exact, prefixOnly]);
+    expect(merged).toEqual([exact, prefixOnly]);
+    expect(merged.filter((a) => a.id === exact.id)).toHaveLength(1);
+  });
+
+  it("returns just the exact match when there are no prefix matches", () => {
+    expect(mergeAgentMatches(exact, [])).toEqual([exact]);
+  });
+
+  it("returns the prefix matches unchanged when there is no exact match", () => {
+    expect(
+      mergeAgentMatches(undefined, [prefixOnly, anotherPrefixOnly]),
+    ).toEqual([prefixOnly, anotherPrefixOnly]);
+  });
+
+  it("returns an empty array when neither is present", () => {
+    expect(mergeAgentMatches(undefined, [])).toEqual([]);
   });
 });
