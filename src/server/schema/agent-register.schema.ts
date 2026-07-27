@@ -26,7 +26,6 @@ export const registerSearchQuerySchema = {
   properties: {
     token: { type: "string", minLength: 1 },
     street: { type: "string" },
-    postcode: { type: "string" },
   },
 };
 

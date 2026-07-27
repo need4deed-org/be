@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAgentByAddress,
   getAgentByPostcode,
-  getAgentsByStreetPrefix,
-  mergeAgentMatches,
+  searchAgentCandidates,
 } from "../../../../server/utils";
 
 describe("getAgentByPostcode", () => {
@@ -184,94 +183,74 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
   });
 });
 
-describe("getAgentsByStreetPrefix", () => {
+describe("searchAgentCandidates", () => {
   const mueller = {
     id: 1,
-    address: { postcode: { value: "13353" }, street: "Müllerstraße 48" },
+    address: { street: "Müllerstraße 48" },
+    title: "Müller Wohnheim",
   } as any;
   const haupt = {
     id: 2,
-    address: { postcode: { value: "55555" }, street: "Hauptstr. 10" },
+    address: { street: "Hauptstr. 10" },
+    title: "Haupt Wohnheim",
   } as any;
-  const legacyNoAddress = {
+  const legacyDemo = {
     id: 3,
-    title: "Refugium Hausvaterweg",
+    title: "Demo-Unterkunft Lichtenberg",
     address: null,
-    agentPostcode: [{ postcode: { value: "13353" } }],
   } as any;
 
-  it("matches on a partial (3+ char) prefix of the street", () => {
-    expect(getAgentsByStreetPrefix([mueller, haupt], "Mül")).toEqual([mueller]);
+  it("matches agents with a real address on a partial (3+ char) street prefix", () => {
+    expect(searchAgentCandidates([mueller, haupt], "Mül")).toEqual([mueller]);
   });
 
-  it("is case/spelling-insensitive like the strict match (straße/strasse/str.)", () => {
-    expect(getAgentsByStreetPrefix([mueller], "müller str")).toEqual([mueller]);
-    expect(getAgentsByStreetPrefix([mueller], "MÜLLERSTR")).toEqual([mueller]);
+  it("is case/spelling-insensitive on the street prefix (straße/strasse/str.)", () => {
+    expect(searchAgentCandidates([mueller], "müller str")).toEqual([mueller]);
+    expect(searchAgentCandidates([mueller], "MÜLLERSTR")).toEqual([mueller]);
   });
 
-  it("returns all agents matching the prefix, not just one", () => {
+  it("returns every agent matching the street prefix, not just one", () => {
     const muellerTwo = {
       id: 4,
-      address: { postcode: { value: "13353" }, street: "Müllerstraße 12" },
+      address: { street: "Müllerstraße 12" },
+      title: "Müller Wohnheim 2",
     } as any;
     expect(
-      getAgentsByStreetPrefix([mueller, muellerTwo, haupt], "Müllerstr"),
+      searchAgentCandidates([mueller, muellerTwo, haupt], "Müllerstr"),
     ).toEqual([mueller, muellerTwo]);
   });
 
-  it("narrows by postcode when provided", () => {
-    const muellerElsewhere = {
-      id: 5,
-      address: { postcode: { value: "99999" }, street: "Müllerstraße 3" },
-    } as any;
-    expect(
-      getAgentsByStreetPrefix([mueller, muellerElsewhere], "Müller", "13353"),
-    ).toEqual([mueller]);
-  });
-
   it("does not match a different street with a similar prefix", () => {
-    expect(getAgentsByStreetPrefix([haupt], "Müller")).toEqual([]);
+    expect(searchAgentCandidates([haupt], "Müller")).toEqual([]);
   });
 
-  it("ignores legacy agents with no address.street", () => {
-    expect(getAgentsByStreetPrefix([legacyNoAddress], "Hausvaterweg")).toEqual(
-      [],
-    );
+  it("matches legacy agents (no address) on a title substring, not just a prefix", () => {
+    expect(searchAgentCandidates([legacyDemo], "Demo")).toEqual([legacyDemo]);
+    expect(searchAgentCandidates([legacyDemo], "Lichtenberg")).toEqual([
+      legacyDemo,
+    ]);
+  });
+
+  it("is case-insensitive on the title substring match", () => {
+    expect(searchAgentCandidates([legacyDemo], "lichtenberg")).toEqual([
+      legacyDemo,
+    ]);
+  });
+
+  it("does not match an agent's title when it has a real address (address always wins)", () => {
+    const mismatched = {
+      id: 5,
+      address: { street: "Elsewhere 1" },
+      title: "Demo Mismatch",
+    } as any;
+    expect(searchAgentCandidates([mismatched], "Demo")).toEqual([]);
+  });
+
+  it("does not match a legacy agent whose title lacks the search term", () => {
+    expect(searchAgentCandidates([legacyDemo], "Kreuzberg")).toEqual([]);
   });
 
   it("returns an empty array when the typed value normalizes to empty", () => {
-    expect(getAgentsByStreetPrefix([mueller], "   ")).toEqual([]);
-  });
-});
-
-describe("mergeAgentMatches", () => {
-  const exact = { id: 1, title: "Exact Match Agent" } as any;
-  const prefixOnly = { id: 2, title: "Prefix Only Agent" } as any;
-  const anotherPrefixOnly = { id: 3, title: "Another Prefix Agent" } as any;
-
-  it("puts the exact match first even when prefix matches precede it in the source list", () => {
-    expect(
-      mergeAgentMatches(exact, [prefixOnly, anotherPrefixOnly, exact]),
-    ).toEqual([exact, prefixOnly, anotherPrefixOnly]);
-  });
-
-  it("does not duplicate the exact match when it also appears in prefix matches", () => {
-    const merged = mergeAgentMatches(exact, [exact, prefixOnly]);
-    expect(merged).toEqual([exact, prefixOnly]);
-    expect(merged.filter((a) => a.id === exact.id)).toHaveLength(1);
-  });
-
-  it("returns just the exact match when there are no prefix matches", () => {
-    expect(mergeAgentMatches(exact, [])).toEqual([exact]);
-  });
-
-  it("returns the prefix matches unchanged when there is no exact match", () => {
-    expect(
-      mergeAgentMatches(undefined, [prefixOnly, anotherPrefixOnly]),
-    ).toEqual([prefixOnly, anotherPrefixOnly]);
-  });
-
-  it("returns an empty array when neither is present", () => {
-    expect(mergeAgentMatches(undefined, [])).toEqual([]);
+    expect(searchAgentCandidates([mueller, legacyDemo], "   ")).toEqual([]);
   });
 });
