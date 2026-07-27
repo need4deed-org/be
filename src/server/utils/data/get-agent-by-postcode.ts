@@ -80,15 +80,18 @@ export function getAgentByAddress(
   return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
 }
 
-// Prefix search for the self-registration picker: agents whose address.street
-// starts with the (normalized) typed value. Deliberately separate from
-// getAgentByAddress — that function's strict/fuzzy paths back the CREATE-path
-// conflict check and the legacy find-or-create flow, both of which need a
-// single decisive match rather than a broadening candidate list.
-export function getAgentsByStreetPrefix(
+// Candidate search for the self-registration picker: returns every matching
+// agent (not a single best guess) so the registrant can pick from a list.
+// Deliberately separate from getAgentByAddress — that function's strict/fuzzy
+// paths back the CREATE-path conflict check and the legacy find-or-create
+// flow, both of which need a single decisive answer, no postcode narrowing
+// here, and no house-number/word-boundary disambiguation: once a real
+// address.street exists, a plain prefix match is enough; once it doesn't
+// (legacy agents), a plain substring match against the title is enough, since
+// ambiguity is resolved by the human picking from the list, not by the code.
+export function searchAgentCandidates(
   agents: Agent[],
   street: string,
-  plz?: string,
 ): Agent[] {
   const normStreet = normalizeStreet(street);
   if (!normStreet) {
@@ -96,24 +99,11 @@ export function getAgentsByStreetPrefix(
   }
 
   return agents.filter((a) => {
-    if (plz && a.address?.postcode?.value !== plz) {
-      return false;
+    if (a.address) {
+      return normalizeStreet(a.address.street ?? "").startsWith(normStreet);
     }
-    const agentStreet = a.address?.street;
-    return !!agentStreet && normalizeStreet(agentStreet).startsWith(normStreet);
+    return normalizeStreet(a.title ?? "").includes(normStreet);
   });
-}
-
-// Combines the two search picker sources into a single ordered, deduped list:
-// the decisive exact/legacy-fuzzy match (if any) always first, since callers
-// (e.g. the frontend picker) treat the first entry as the best guess, followed
-// by the remaining prefix matches.
-export function mergeAgentMatches(
-  exactMatch: Agent | undefined,
-  prefixMatches: Agent[],
-): Agent[] {
-  const rest = prefixMatches.filter((a) => a.id !== exactMatch?.id);
-  return exactMatch ? [exactMatch, ...rest] : rest;
 }
 
 export function getAgentByPostcode(
