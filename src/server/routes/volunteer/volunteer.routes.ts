@@ -22,6 +22,7 @@ import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   leadFromParser,
@@ -526,6 +527,16 @@ export default async function volunteerRoutes(
 
       const { dealId } = volunteer;
 
+      // OpportunityVolunteer rows cascade at the DB level, which bypasses
+      // TypeORM's @AfterRemove hook (it never loads/removes those entities
+      // via the entity manager) — so each linked opportunity's statusMatch
+      // must be recomputed explicitly, or it's left stale indefinitely.
+      const linkedOpportunityIds = (
+        await fastify.db.opportunityVolunteerRepository.find({
+          where: { volunteerId: id },
+        })
+      ).map((ov) => ov.opportunityId);
+
       await dataSource.manager.transaction(async (manager) => {
         await manager.delete(Comment, {
           entityType: EntityTableName.VOLUNTEER,
@@ -536,6 +547,10 @@ export default async function volunteerRoutes(
           await manager.delete(Deal, { id: dealId });
         }
       });
+
+      await Promise.all(
+        linkedOpportunityIds.map((oId) => updateOpportunityMatching(oId)),
+      );
 
       return reply.status(200).send({
         message: `Volunteer (id:${id}) deleted.`,

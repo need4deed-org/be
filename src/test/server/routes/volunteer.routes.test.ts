@@ -1,9 +1,18 @@
 import { FastifyInstance } from "fastify";
-import { EntityTableName, UserRole } from "need4deed-sdk";
+import {
+  EntityTableName,
+  OpportunityMatchStatusType,
+  OpportunityStatusType,
+  OpportunityType,
+  OpportunityVolunteerStatusType,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
@@ -31,6 +40,9 @@ describe("DELETE /volunteer/:id", () => {
   let volunteerPerson: Person;
   let volunteer: Volunteer;
   let comment: Comment;
+  let opportunityDeal: Deal;
+  let opportunity: Opportunity;
+  let opportunityVolunteer: OpportunityVolunteer;
   let agentPerson: Person;
   let coordinatorPerson: Person;
   let agentCookie: string;
@@ -56,6 +68,33 @@ describe("DELETE /volunteer/:id", () => {
     );
     volunteer = await fastify.db.volunteerRepository.save(
       new Volunteer({ dealId: deal.id, personId: volunteerPerson.id }),
+    );
+
+    opportunityDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (vol delete) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        dealId: opportunityDeal.id,
+      }),
+    );
+    opportunityVolunteer = await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status: OpportunityVolunteerStatusType.MATCHED,
+      }),
+    );
+    // Set deterministically rather than relying on OpportunityVolunteer's
+    // fire-and-forget @AfterInsert hook (updateOpportunityMatching isn't
+    // awaited there), so the "before" state for the recompute assertion
+    // below isn't a race.
+    await fastify.db.opportunityRepository.update(
+      { id: opportunity.id },
+      { statusMatch: OpportunityMatchStatusType.MATCHED },
     );
 
     agentPerson = await fastify.db.personRepository.save(
@@ -115,13 +154,18 @@ describe("DELETE /volunteer/:id", () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
-    // volunteer/deal/comment are deleted by the DELETE /volunteer/:id call
-    // itself in the tests below; these are best-effort in case a test fails
-    // before reaching that point.
+    // volunteer/deal/comment/opportunityVolunteer are deleted by the
+    // DELETE /volunteer/:id call itself in the tests below; these are
+    // best-effort in case a test fails before reaching that point.
+    await fastify.db.opportunityVolunteerRepository.delete({
+      id: opportunityVolunteer.id,
+    });
     await fastify.db.commentRepository.delete({ id: comment.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
     await fastify.close();
   });
 
@@ -143,7 +187,7 @@ describe("DELETE /volunteer/:id", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("lets a coordinator delete a volunteer, cascading its deal and comments", async () => {
+  it("lets a coordinator delete a volunteer, cascading its deal, comments, and match link", async () => {
     const res = await fastify.inject({
       method: "DELETE",
       url: `/volunteer/${volunteer.id}`,
@@ -160,10 +204,28 @@ describe("DELETE /volunteer/:id", () => {
     expect(
       await fastify.db.commentRepository.findOneBy({ id: comment.id }),
     ).toBeNull();
+    expect(
+      await fastify.db.opportunityVolunteerRepository.findOneBy({
+        id: opportunityVolunteer.id,
+      }),
+    ).toBeNull();
 
     // The underlying Person is untouched by a volunteer delete.
     expect(
       await fastify.db.personRepository.findOneBy({ id: volunteerPerson.id }),
     ).not.toBeNull();
+
+    // The linked opportunity's match status is recomputed now that the
+    // match link is gone — confirming the deleted OpportunityVolunteer's
+    // cascade (which bypasses its own @AfterRemove hook) doesn't leave the
+    // opportunity stuck at MATCHED.
+    const survivingOpportunity =
+      await fastify.db.opportunityRepository.findOneBy({
+        id: opportunity.id,
+      });
+    expect(survivingOpportunity).not.toBeNull();
+    expect(survivingOpportunity?.statusMatch).toBe(
+      OpportunityMatchStatusType.NEEDS_REMATCH,
+    );
   });
 });

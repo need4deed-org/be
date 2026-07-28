@@ -5,6 +5,7 @@ import {
   OpportunityType,
   OpportunityVolunteerStatusType,
   UserRole,
+  VolunteerStateMatchType,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
@@ -319,6 +320,14 @@ describe("DELETE /opportunity/:id", () => {
         status: OpportunityVolunteerStatusType.MATCHED,
       }),
     );
+    // Set deterministically rather than relying on OpportunityVolunteer's
+    // fire-and-forget @AfterInsert hook (updateVolunteerMatching isn't
+    // awaited there), so the "before" state for the recompute assertion
+    // below isn't a race.
+    await fastify.db.volunteerRepository.update(
+      { id: volunteer.id },
+      { statusMatch: VolunteerStateMatchType.MATCHED },
+    );
 
     const language = await fastify.db.languageRepository.findOneOrFail({
       where: {},
@@ -452,9 +461,16 @@ describe("DELETE /opportunity/:id", () => {
       }),
     ).toBeNull();
 
-    // The linked volunteer itself is untouched by an opportunity delete.
-    expect(
-      await fastify.db.volunteerRepository.findOneBy({ id: volunteer.id }),
-    ).not.toBeNull();
+    // The linked volunteer itself is untouched by an opportunity delete, but
+    // its match status is recomputed now that the match link is gone —
+    // confirming the deleted OpportunityVolunteer's cascade (which bypasses
+    // its own @AfterRemove hook) doesn't leave the volunteer stuck at MATCHED.
+    const survivingVolunteer = await fastify.db.volunteerRepository.findOneBy({
+      id: volunteer.id,
+    });
+    expect(survivingVolunteer).not.toBeNull();
+    expect(survivingVolunteer?.statusMatch).toBe(
+      VolunteerStateMatchType.NEEDS_REMATCH,
+    );
   });
 });
