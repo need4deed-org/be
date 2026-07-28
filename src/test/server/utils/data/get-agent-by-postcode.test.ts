@@ -159,6 +159,16 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     ).toEqual(heerstr110);
   });
 
+  it("matches when the street name is immediately followed by punctuation in the title (e.g. hyphen)", () => {
+    const agent = {
+      id: 8,
+      title: "Demo-Unterkunft Lichtenberg",
+      address: null,
+      agentPostcode: [{ postcode: { value: "10317" } }],
+    } as any;
+    expect(getAgentByAddress([agent], "Demo", "10317")).toEqual(agent);
+  });
+
   it("does not false-match when street name is a substring of a different street in title", () => {
     const agent = {
       id: 4,
