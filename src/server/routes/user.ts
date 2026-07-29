@@ -11,7 +11,7 @@ import { FindOptionsWhere, ILike } from "typeorm";
 import {
   BadRequestError,
   ConflictError,
-  NotFoundError,
+  InvalidOrganizationEmailError,
   UnauthorizedError,
 } from "../../config";
 import Person from "../../data/entity/person.entity";
@@ -293,7 +293,7 @@ export default async function userRoutes(
             },
           });
           if (!matchingAgent && !(await isEmailDomainTrusted(email))) {
-            throw new NotFoundError();
+            throw new InvalidOrganizationEmailError();
           }
         }
 

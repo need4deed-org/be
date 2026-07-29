@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAgentByAddress,
   getAgentByPostcode,
+  searchAgentCandidates,
 } from "../../../../server/utils";
 
 describe("getAgentByPostcode", () => {
@@ -158,6 +159,16 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     ).toEqual(heerstr110);
   });
 
+  it("matches when the street name is immediately followed by punctuation in the title (e.g. hyphen)", () => {
+    const agent = {
+      id: 8,
+      title: "Demo-Unterkunft Lichtenberg",
+      address: null,
+      agentPostcode: [{ postcode: { value: "10317" } }],
+    } as any;
+    expect(getAgentByAddress([agent], "Demo", "10317")).toEqual(agent);
+  });
+
   it("does not false-match when street name is a substring of a different street in title", () => {
     const agent = {
       id: 4,
@@ -179,5 +190,77 @@ describe("getAgentByAddress — fuzzy fallback for legacy agents", () => {
     expect(getAgentByAddress(agents, "Hausvaterweg 21 A", plz)).toEqual(
       legacyAgent,
     );
+  });
+});
+
+describe("searchAgentCandidates", () => {
+  const mueller = {
+    id: 1,
+    address: { street: "Müllerstraße 48" },
+    title: "Müller Wohnheim",
+  } as any;
+  const haupt = {
+    id: 2,
+    address: { street: "Hauptstr. 10" },
+    title: "Haupt Wohnheim",
+  } as any;
+  const legacyDemo = {
+    id: 3,
+    title: "Demo-Unterkunft Lichtenberg",
+    address: null,
+  } as any;
+
+  it("matches agents with a real address on a partial (3+ char) street prefix", () => {
+    expect(searchAgentCandidates([mueller, haupt], "Mül")).toEqual([mueller]);
+  });
+
+  it("is case/spelling-insensitive on the street prefix (straße/strasse/str.)", () => {
+    expect(searchAgentCandidates([mueller], "müller str")).toEqual([mueller]);
+    expect(searchAgentCandidates([mueller], "MÜLLERSTR")).toEqual([mueller]);
+  });
+
+  it("returns every agent matching the street prefix, not just one", () => {
+    const muellerTwo = {
+      id: 4,
+      address: { street: "Müllerstraße 12" },
+      title: "Müller Wohnheim 2",
+    } as any;
+    expect(
+      searchAgentCandidates([mueller, muellerTwo, haupt], "Müllerstr"),
+    ).toEqual([mueller, muellerTwo]);
+  });
+
+  it("does not match a different street with a similar prefix", () => {
+    expect(searchAgentCandidates([haupt], "Müller")).toEqual([]);
+  });
+
+  it("matches legacy agents (no address) on a title substring, not just a prefix", () => {
+    expect(searchAgentCandidates([legacyDemo], "Demo")).toEqual([legacyDemo]);
+    expect(searchAgentCandidates([legacyDemo], "Lichtenberg")).toEqual([
+      legacyDemo,
+    ]);
+  });
+
+  it("is case-insensitive on the title substring match", () => {
+    expect(searchAgentCandidates([legacyDemo], "lichtenberg")).toEqual([
+      legacyDemo,
+    ]);
+  });
+
+  it("does not match an agent's title when it has a real address (address always wins)", () => {
+    const mismatched = {
+      id: 5,
+      address: { street: "Elsewhere 1" },
+      title: "Demo Mismatch",
+    } as any;
+    expect(searchAgentCandidates([mismatched], "Demo")).toEqual([]);
+  });
+
+  it("does not match a legacy agent whose title lacks the search term", () => {
+    expect(searchAgentCandidates([legacyDemo], "Kreuzberg")).toEqual([]);
+  });
+
+  it("returns an empty array when the typed value normalizes to empty", () => {
+    expect(searchAgentCandidates([mueller, legacyDemo], "   ")).toEqual([]);
   });
 });

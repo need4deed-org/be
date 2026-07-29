@@ -1,10 +1,8 @@
-import { IsArray, IsEnum, IsOptional, IsString } from "class-validator";
+import { IsOptional, IsString } from "class-validator";
 import {
   AgentEngagementStatusType,
   AgentRoleType,
-  AgentServiceType,
   AgentTrustType,
-  AgentType,
   AgentVolunteerSearchType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
@@ -23,7 +21,9 @@ import District from "../location/district.entity";
 import AgentLanguage from "../m2m/agent-language";
 import AgentPerson from "../m2m/agent-person";
 import AgentPostcode from "../m2m/agent-postcode";
+import AgentService from "../m2m/agent-service";
 import Organization from "../organization.entity";
+import AgentType from "../profile/agent-type.entity";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
@@ -48,14 +48,12 @@ export default class Agent {
   @IsString()
   website?: string;
 
-  @Column({
-    type: "enum",
-    enum: AgentType,
-    nullable: true,
-  })
-  @IsOptional()
-  @IsEnum(AgentType)
-  type?: AgentType;
+  @ManyToOne(() => AgentType, (agentType) => agentType.agent)
+  @JoinColumn({ name: "agent_type_id" })
+  agentType: AgentType;
+
+  @Column({ nullable: true })
+  agentTypeId?: number;
 
   @Column({
     type: "enum",
@@ -77,20 +75,6 @@ export default class Agent {
     default: AgentEngagementStatusType.NEW,
   })
   engagementStatus: AgentEngagementStatusType;
-
-  @Column({
-    type: "text",
-    array: true,
-    transformer: {
-      to: (value: AgentServiceType[]) => value,
-      from: (value: unknown) => value as AgentServiceType[],
-    },
-    nullable: true,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(AgentServiceType, { each: true })
-  services: AgentServiceType[];
 
   @CreateDateColumn()
   createdAt: Date;
@@ -130,6 +114,9 @@ export default class Agent {
 
   @OneToMany(() => AgentLanguage, (agentLanguage) => agentLanguage.agent)
   agentLanguage: AgentLanguage[];
+
+  @OneToMany(() => AgentService, (agentService) => agentService.agent)
+  agentService: AgentService[];
 
   get representative(): AgentPerson {
     let representative = this.agentPerson?.find(

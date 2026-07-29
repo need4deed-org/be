@@ -33,6 +33,7 @@ import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
+import AgentService from "../../../data/entity/m2m/agent-service";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
@@ -246,6 +247,8 @@ export async function getOptions(
         EntityTableName.SKILL,
         EntityTableName.LEAD,
         EntityTableName.CATEGORY,
+        EntityTableName.AGENT_TYPE,
+        EntityTableName.SERVICE,
       ].includes(itemType)
     ) {
       const items = await fieldTranslationRepository.find({
@@ -301,6 +304,8 @@ export async function getOptions(
       [EntityTableName.ACTIVITY]: await getList(EntityTableName.ACTIVITY),
       [EntityTableName.SKILL]: await getList(EntityTableName.SKILL),
       [EntityTableName.LEAD]: await getList(EntityTableName.LEAD),
+      [EntityTableName.AGENT_TYPE]: await getList(EntityTableName.AGENT_TYPE),
+      [EntityTableName.SERVICE]: await getList(EntityTableName.SERVICE),
     };
   }
 
@@ -423,6 +428,40 @@ export async function updateAgentLanguages(
   }
   if (toAdd.length > 0) {
     await agentLanguageRepository.save(toAdd);
+  }
+}
+
+/**
+ * Sync the agent's `agentService` join rows to match `serviceIds`: remove the
+ * de-selected rows and insert the newly selected ones (rows that are unchanged
+ * are left untouched). Mirrors updateAgentLanguages above.
+ *
+ * Runs on the given `manager` so the caller can wrap it in a transaction; pass
+ * the transactional EntityManager to make it atomic with surrounding writes.
+ */
+export async function updateAgentServices(
+  agentId: number,
+  serviceIds: number[],
+  manager: DataSource | EntityManager = dataSource,
+): Promise<void> {
+  const agentServiceRepository = getRepository(manager, AgentService);
+
+  const desiredServiceIds = [...new Set(serviceIds.map(Number))];
+  const current = await agentServiceRepository.find({ where: { agentId } });
+  const currentServiceIds = current.map(({ serviceId }) => serviceId);
+
+  const toRemove = current.filter(
+    ({ serviceId }) => !desiredServiceIds.includes(serviceId),
+  );
+  const toAdd = desiredServiceIds
+    .filter((serviceId) => !currentServiceIds.includes(serviceId))
+    .map((serviceId) => new AgentService({ agentId, serviceId }));
+
+  if (toRemove.length > 0) {
+    await agentServiceRepository.delete(toRemove.map(({ id }) => id));
+  }
+  if (toAdd.length > 0) {
+    await agentServiceRepository.save(toAdd);
   }
 }
 

@@ -1199,19 +1199,8 @@
     },
     "AgentType": {
       "$id": "AgentType",
-      "type": "string",
-      "enum": [
-        "AE",
-        "GU1",
-        "GU2",
-        "GU2+",
-        "GU3",
-        "NU",
-        "ASOG",
-        "counseling-center",
-        "tandem",
-        "multiple-social-support"
-      ]
+      "$ref": "OptionProps#",
+      "required": ["id"]
     },
     "AgentRoleType": {
       "$id": "AgentRoleType",
@@ -1225,22 +1214,6 @@
         "project-staff",
         "childcare-worker",
         "other"
-      ]
-    },
-    "AgentServiceType": {
-      "$id": "AgentServiceType",
-      "type": "string",
-      "enum": [
-        "childcare",
-        "welfare",
-        "consultation",
-        "voluntary-support",
-        "tandem",
-        "sport",
-        "tutoring",
-        "refugee-accommodation",
-        "job-coaching",
-        "youth"
       ]
     },
     "AgentTrustType": {
@@ -1273,21 +1246,10 @@
         "agent-inactive"
       ]
     },
-    "AgentService": {
-      "$id": "AgentService",
-      "type": "string",
-      "enum": [
-        "childcare",
-        "welfare",
-        "consultation",
-        "voluntary-support",
-        "tandem",
-        "sport",
-        "tutoring",
-        "refugee-accommodation",
-        "job-coaching",
-        "youth"
-      ]
+    "Service": {
+      "$id": "Service",
+      "$ref": "OptionProps#",
+      "required": ["id"]
     },
     "AgentDetails": {
       "$id": "AgentDetails",
@@ -1309,13 +1271,16 @@
           "type": "string"
         },
         "organizationType": {
-          "type": "string"
+          "$ref": "AgentType#"
         },
         "operator": {
           "type": "string"
         },
         "services": {
-          "type": "string"
+          "type": "array",
+          "items": {
+            "$ref": "Service#"
+          }
         },
         "clientLanguages": {
           "type": "array",
@@ -1400,20 +1365,14 @@
         "title": {
           "type": "string"
         },
-        "type": {
-          "$ref": "AgentType#"
+        "typeId": {
+          "type": "integer"
         },
         "volunteerSearch": {
           "$ref": "AgentVolunteerSearchType#"
         },
         "trustLevel": {
           "$ref": "AgentTrustType#"
-        },
-        "serviceType": {
-          "type": "array",
-          "items": {
-            "$ref": "AgentService#"
-          }
         },
         "statusEngagement": {
           "$ref": "AgentEngagementStatusType#"
@@ -1433,10 +1392,10 @@
         "statusSearch": {
           "$ref": "AgentVolunteerSearchType#"
         },
-        "services": {
+        "serviceIds": {
           "type": "array",
           "items": {
-            "$ref": "AgentService#"
+            "type": "integer"
           }
         },
         "languages": {
@@ -1477,10 +1436,10 @@
               "type": "array",
               "items": { "type": "object", "additionalProperties": true }
             },
-            "serviceType": {
+            "services": {
               "type": "array",
               "items": {
-                "$ref": "AgentService#"
+                "$ref": "Service#"
               }
             },
             "statusEngagement": {
