@@ -25,9 +25,9 @@ import {
   AgentAddressConflictError,
   classifyRegisterAgentConflict,
   createAgentForPerson,
-  getAgentByAddress,
   joinAgent,
   resolveJoinStatus,
+  searchAgentCandidates,
 } from "../../utils";
 
 // Authorizes the registration routes via the email-verification JWT carried in
@@ -75,7 +75,7 @@ export default async function agentRegisterRoutes(
   // self-registration picker, so a registrant can JOIN their org instead of
   // creating a duplicate. Token-gated (not the COORDINATOR-only GET /agent).
   fastify.get<{
-    Querystring: { token: string; street?: string; postcode?: string };
+    Querystring: { token: string; street?: string };
   }>(
     "/search",
     {
@@ -89,35 +89,23 @@ export default async function agentRegisterRoutes(
     },
     async (request, reply) => {
       const street = (request.query.street ?? "").trim();
-      const postcode = (request.query.postcode ?? "").trim();
-      const domain = request.registrant?.email.split("@").pop()?.toLowerCase();
-      if (street.length < 3 || !domain) {
+      if (street.length < 3) {
         return reply.status(200).send({ message: "No query", data: [] });
       }
 
-      // Candidates: only agents the registrant is tied to by email domain — an
-      // existing member shares their domain (Person.email, falling back to the
-      // linked User.email). Keeps the picker to orgs they can join (mirrors
-      // resolveJoinStatus, so a picked agent auto-approves to ACTIVE) and
-      // narrows enumeration. Load the relations getAgentByAddress reads.
+      // No membership/domain scoping here — matching is purely on
+      // agent.address.street (or agent.title when there's no address).
+      // Whether a picked agent auto-approves (ACTIVE) or needs review
+      // (PENDING) is decided later, at JOIN time, by resolveJoinStatus.
       const candidates = await fastify.db.agentRepository
         .createQueryBuilder("agent")
         .leftJoinAndSelect("agent.address", "address")
-        .leftJoinAndSelect("address.postcode", "postcode")
-        .leftJoinAndSelect("agent.agentPostcode", "agentPostcode")
-        .leftJoinAndSelect("agentPostcode.postcode", "agentPostcodePostcode")
-        .innerJoin("agent.agentPerson", "ap")
-        .innerJoin("ap.person", "person")
-        .leftJoin("person.users", "usr")
-        .where("(person.email ILIKE :suffix OR usr.email ILIKE :suffix)", {
-          suffix: `%@${domain}`,
-        })
         .getMany();
 
-      // Reuse the POST /opportunity/legacy picker (strict street+PLZ, then fuzzy
-      // street-name) — returns the single best match (or none).
-      const match = getAgentByAddress(candidates, street, postcode);
-      const data = match ? [{ id: match.id, title: match.title }] : [];
+      const data = searchAgentCandidates(candidates, street).map((a) => ({
+        id: a.id,
+        title: a.title,
+      }));
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });

@@ -30,7 +30,11 @@ function agentHasPlz(a: Agent, plz: string): boolean {
 
 function streetNameWordRegex(streetName: string): RegExp {
   const escaped = streetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`);
+  // Boundary is "not a letter" rather than literal whitespace, so titles that
+  // glue the street name to the rest with punctuation (e.g. "Demo-Unterkunft")
+  // still match — while a real substring like "ringstr" inside "ostringstr"
+  // still correctly fails (the preceding character there is a letter).
+  return new RegExp(`(?:^|[^\\p{L}])${escaped}(?:[^\\p{L}]|$)`, "u");
 }
 
 export function getAgentByAddress(
@@ -78,6 +82,32 @@ export function getAgentByAddress(
   });
 
   return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined;
+}
+
+// Candidate search for the self-registration picker: returns every matching
+// agent (not a single best guess) so the registrant can pick from a list.
+// Deliberately separate from getAgentByAddress — that function's strict/fuzzy
+// paths back the CREATE-path conflict check and the legacy find-or-create
+// flow, both of which need a single decisive answer, no postcode narrowing
+// here, and no house-number/word-boundary disambiguation: once a real
+// address.street exists, a plain prefix match is enough; once it doesn't
+// (legacy agents), a plain substring match against the title is enough, since
+// ambiguity is resolved by the human picking from the list, not by the code.
+export function searchAgentCandidates(
+  agents: Agent[],
+  street: string,
+): Agent[] {
+  const normStreet = normalizeStreet(street);
+  if (!normStreet) {
+    return [];
+  }
+
+  return agents.filter((a) => {
+    if (a.address) {
+      return normalizeStreet(a.address.street ?? "").startsWith(normStreet);
+    }
+    return normalizeStreet(a.title ?? "").includes(normStreet);
+  });
 }
 
 export function getAgentByPostcode(

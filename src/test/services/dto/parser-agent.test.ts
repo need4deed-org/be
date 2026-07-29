@@ -1,8 +1,6 @@
 import {
   AgentEngagementStatusType,
-  AgentServiceType,
   AgentTrustType,
-  AgentType,
   AgentVolunteerSearchType,
   ApiAgentPatch,
 } from "need4deed-sdk";
@@ -15,11 +13,13 @@ describe("parseAgentPatch", () => {
       title: "Global Relief NGO",
       about: "A non-profit focused on disaster recovery.",
       website: "https://example.org",
-      type: "AE" as AgentType,
+      typeId: 1,
       trustLevel: "unknown" as AgentTrustType,
       statusSearch: "agent-not-needed" as AgentVolunteerSearchType,
       statusEngagement: "agent-new" as AgentEngagementStatusType,
-      services: ["childcare", "refugee-accommodation"] as AgentServiceType[],
+      // serviceIds is a m2m relation synced separately (updateAgentServices),
+      // not part of the Partial<Agent> this returns — asserted below.
+      serviceIds: [1, 2],
     };
 
     const result = parseAgentPatch(mockApiAgent);
@@ -28,12 +28,12 @@ describe("parseAgentPatch", () => {
       title: "Global Relief NGO",
       info: "A non-profit focused on disaster recovery.",
       website: "https://example.org",
-      type: "AE",
+      agentTypeId: 1,
       trustLevel: "unknown",
       searchStatus: "agent-not-needed",
       engagementStatus: "agent-new",
-      services: ["childcare", "refugee-accommodation"],
     });
+    expect(result).not.toHaveProperty("serviceIds");
   });
 
   it("should handle undefined or missing optional fields", () => {
@@ -48,30 +48,25 @@ describe("parseAgentPatch", () => {
     expect(result.searchStatus).toBeUndefined();
   });
 
-  it("falls back to volunteerSearch/serviceType when statusSearch/services are absent", () => {
+  it("falls back to volunteerSearch when statusSearch is absent", () => {
     const agent: ApiAgentPatch = {
       volunteerSearch: "agent-searching" as AgentVolunteerSearchType,
-      serviceType: ["tutoring"] as AgentServiceType[],
     };
 
     const result = parseAgentPatch(agent);
 
     expect(result.searchStatus).toBe("agent-searching");
-    expect(result.services).toEqual(["tutoring"]);
   });
 
-  it("prefers statusSearch/services over volunteerSearch/serviceType when both are set", () => {
+  it("prefers statusSearch over volunteerSearch when both are set", () => {
     const agent: ApiAgentPatch = {
       statusSearch: "agent-not-needed" as AgentVolunteerSearchType,
       volunteerSearch: "agent-searching" as AgentVolunteerSearchType,
-      services: ["childcare"] as AgentServiceType[],
-      serviceType: ["tutoring"] as AgentServiceType[],
     };
 
     const result = parseAgentPatch(agent);
 
     expect(result.searchStatus).toBe("agent-not-needed");
-    expect(result.services).toEqual(["childcare"]);
   });
 
   it("maps districtId", () => {

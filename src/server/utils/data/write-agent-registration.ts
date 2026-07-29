@@ -6,6 +6,7 @@ import {
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { createAddress } from "./for-routes";
@@ -79,14 +80,23 @@ export async function createAgentForPerson(
     const agent = await manager.getRepository(Agent).save(
       new Agent({
         title: input.title,
-        type: input.type ?? undefined,
+        agentTypeId: input.typeId ?? undefined,
         info: input.info ?? undefined,
         website: input.website ?? undefined,
-        services: input.services ?? undefined,
         districtId: input.districtId ?? undefined,
         addressId: address?.id,
       }),
     );
+
+    if (input.serviceIds?.length) {
+      await manager
+        .getRepository(AgentService)
+        .save(
+          input.serviceIds.map(
+            (serviceId) => ({ agentId: agent.id, serviceId }) as AgentService,
+          ),
+        );
+    }
 
     await manager.getRepository(AgentPerson).save(
       new AgentPerson({

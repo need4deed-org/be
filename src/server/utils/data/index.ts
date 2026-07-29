@@ -1,3 +1,4 @@
+export * from "./add-agent-type-service-translations";
 export * from "./add-category-to-deal";
 export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
