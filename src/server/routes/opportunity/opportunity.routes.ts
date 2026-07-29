@@ -3,6 +3,7 @@ import {
   ApiOpportunityGet,
   ApiOpportunityPatch,
   CommunicationType,
+  EntityTableName,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
@@ -15,7 +16,9 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../../config";
+import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
+import Deal from "../../../data/entity/deal.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
@@ -24,6 +27,7 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import { updateVolunteerMatching } from "../../../data/utils";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
@@ -48,6 +52,7 @@ import {
   QuerystringOpportunityList,
   ReplyData,
   ReplyDataCount,
+  ReplyMessage,
   RoutePrefix,
 } from "../../types";
 import {
@@ -808,6 +813,66 @@ export default async function opportunityRoutes(
       }
 
       return reply.status(204).send();
+    },
+  );
+
+  // COORDINATOR-only, hard delete. OpportunityVolunteer (+ its ActivityLog),
+  // Communication, and Appreciation rows all cascade via FK. Comment rows are
+  // polymorphic (entityType/entityId, no real FK) so they're cleaned up
+  // explicitly here; Deal and Accompanying are exclusively owned by one
+  // opportunity each (minted fresh at creation), so they're deleted alongside
+  // rather than left as permanent orphans.
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const opportunityRepository = fastify.db.opportunityRepository;
+      const opportunity = await opportunityRepository.findOneBy({ id });
+
+      if (!opportunity) {
+        throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
+
+      const { dealId, accompanyingId } = opportunity;
+
+      // OpportunityVolunteer rows cascade at the DB level, which bypasses
+      // TypeORM's @AfterRemove hook (it never loads/removes those entities
+      // via the entity manager) — so each linked volunteer's statusMatch
+      // must be recomputed explicitly, or it's left stale indefinitely.
+      const linkedVolunteerIds = (
+        await fastify.db.opportunityVolunteerRepository.find({
+          where: { opportunityId: id },
+        })
+      ).map((ov) => ov.volunteerId);
+
+      await dataSource.manager.transaction(async (manager) => {
+        await manager.delete(Comment, {
+          entityType: EntityTableName.OPPORTUNITY,
+          entityId: id,
+        });
+        await manager.delete(Opportunity, { id });
+        if (dealId) {
+          await manager.delete(Deal, { id: dealId });
+        }
+        if (accompanyingId) {
+          await manager.delete(Accompanying, { id: accompanyingId });
+        }
+      });
+
+      await Promise.all(
+        linkedVolunteerIds.map((vId) => updateVolunteerMatching(vId)),
+      );
+
+      return reply.status(200).send({
+        message: `Opportunity (id:${id}) deleted.`,
+      });
     },
   );
 }

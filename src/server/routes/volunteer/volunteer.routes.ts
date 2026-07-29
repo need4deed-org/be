@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
+  EntityTableName,
   Id,
   Lang,
   SortOrder,
@@ -10,6 +11,10 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
+import { NotFoundError } from "../../../config";
+import { dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
+import Deal from "../../../data/entity/deal.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -17,6 +22,7 @@ import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   leadFromParser,
@@ -32,7 +38,9 @@ import {
   volunteerListQuerySchema,
 } from "../../schema";
 import {
+  ParamsId,
   QuerystringVolunteerGetList,
+  ReplyMessage,
   RoutePrefix,
   VolunteerListType,
 } from "../../types";
@@ -490,6 +498,63 @@ export default async function volunteerRoutes(
         logger.error(`Error writing volunteer: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
+    },
+  );
+
+  // COORDINATOR-only, hard delete. OpportunityVolunteer, Document,
+  // Communication, and Appreciation rows all cascade via FK. Comment rows are
+  // polymorphic (entityType/entityId, no real FK) so they're cleaned up
+  // explicitly here; Deal is exclusively owned by one volunteer (minted fresh
+  // at creation), so it's deleted alongside rather than left as a permanent
+  // orphan.
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const volunteerRepository = fastify.db.volunteerRepository;
+      const volunteer = await volunteerRepository.findOneBy({ id });
+
+      if (!volunteer) {
+        throw new NotFoundError(`Volunteer (id:${id}) not found.`);
+      }
+
+      const { dealId } = volunteer;
+
+      // OpportunityVolunteer rows cascade at the DB level, which bypasses
+      // TypeORM's @AfterRemove hook (it never loads/removes those entities
+      // via the entity manager) — so each linked opportunity's statusMatch
+      // must be recomputed explicitly, or it's left stale indefinitely.
+      const linkedOpportunityIds = (
+        await fastify.db.opportunityVolunteerRepository.find({
+          where: { volunteerId: id },
+        })
+      ).map((ov) => ov.opportunityId);
+
+      await dataSource.manager.transaction(async (manager) => {
+        await manager.delete(Comment, {
+          entityType: EntityTableName.VOLUNTEER,
+          entityId: id,
+        });
+        await manager.delete(Volunteer, { id });
+        if (dealId) {
+          await manager.delete(Deal, { id: dealId });
+        }
+      });
+
+      await Promise.all(
+        linkedOpportunityIds.map((oId) => updateOpportunityMatching(oId)),
+      );
+
+      return reply.status(200).send({
+        message: `Volunteer (id:${id}) deleted.`,
+      });
     },
   );
 }
