@@ -4,7 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import qs from "qs";
-import { pluginTimeout, selfUrl } from "../config/constants";
+import { isProd, pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
@@ -123,6 +123,15 @@ export async function createServer(): Promise<FastifyInstance> {
   if (!secret) {
     throw new Error("JWT_SECRET is not defined in environment variables.");
   }
+
+  if (isProd && secret.length < 32) {
+    throw new Error("JWT_SECRET must be at least 32 characters in production.");
+  }
+
+  if (isProd && (process.env.SIGN_COOKIES || "false") !== "true") {
+    throw new Error("SIGN_COOKIES must be set to 'true' in production.");
+  }
+
   await fastifyInstance.register(jwtPlugin, { secret });
   await fastifyInstance.register(cors, corsOptions);
   await fastifyInstance.register(multipart, {
