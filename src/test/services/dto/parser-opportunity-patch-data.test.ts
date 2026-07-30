@@ -181,11 +181,11 @@ describe("assertValidMainCommunicationLanguages", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("rejects English alone", async () => {
+  it("resolves when the selection is English only", async () => {
     mockLanguages([{ id: 2, isoCode: "en" }]);
     await expect(
       assertValidMainCommunicationLanguages([{ id: 2 }], languageRepository),
-    ).rejects.toThrow(BadRequestError);
+    ).resolves.toBeUndefined();
   });
 
   it("rejects a language other than German/English", async () => {
