@@ -332,15 +332,6 @@ describe("DELETE /opportunity/:id", () => {
     const language = await fastify.db.languageRepository.findOneOrFail({
       where: {},
     });
-    comment = await fastify.db.commentRepository.save(
-      new Comment({
-        text: "Test comment",
-        entityType: EntityTableName.OPPORTUNITY,
-        entityId: opportunity.id,
-        languageId: language.id,
-        userId: 0, // overwritten below once the coordinator user exists
-      }),
-    );
 
     agentPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Agent" }),
@@ -359,9 +350,14 @@ describe("DELETE /opportunity/:id", () => {
         personId: coordinatorPerson.id,
       }),
     );
-    await fastify.db.commentRepository.update(
-      { id: comment.id },
-      { userId: coordinatorUser.id },
+    comment = await fastify.db.commentRepository.save(
+      new Comment({
+        text: "Test comment",
+        entityType: EntityTableName.OPPORTUNITY,
+        entityId: opportunity.id,
+        languageId: language.id,
+        userId: coordinatorUser.id,
+      }),
     );
     await fastify.db.userRepository.save(
       new User({
