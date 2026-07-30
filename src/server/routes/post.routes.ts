@@ -93,9 +93,16 @@ export default async function postRoutes(
           statusCode: 201,
         }),
       },
-      onRequest: [fastify.authenticate({ role: UserRole.AGENT })],
+      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
+      const { role } = request.user;
+      if (role !== UserRole.AGENT && role !== UserRole.COORDINATOR) {
+        throw new UnauthorizedError(
+          "Only agents and coordinators can create posts.",
+        );
+      }
+
       const personId = request.authUser?.personId;
       if (!personId) {
         throw new BadRequestError("No person linked to this user.");
