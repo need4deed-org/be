@@ -10,6 +10,7 @@ import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
+import rateLimitPlugin from "./plugins/rate-limit";
 import schedulerDailyPlugin from "./plugins/scheduler-daily";
 import schedulerHourlyPlugin from "./plugins/scheduler-hourly";
 import typeormPlugin from "./plugins/typeorm";
@@ -95,6 +96,12 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.setErrorHandler((error, request, reply) => {
     request.log.error(error);
 
+    if (error.statusCode === 429) {
+      return reply.status(429).send({
+        message: "Too many requests. Please try again later.",
+      });
+    }
+
     // If it's one of our custom errors, use its status code
     if (error instanceof BaseError) {
       return reply.status(error.statusCode).send({
@@ -128,6 +135,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(multipart, {
     attachFieldsToBody: "keyValues",
   });
+  await fastifyInstance.register(rateLimitPlugin);
 
   await fastifyInstance.register(fastifySwagger, {
     openapi: {

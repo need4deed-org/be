@@ -42,6 +42,7 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.LOGIN,
     {
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: userLoginSchema,
         response: {
@@ -248,6 +249,7 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.REQUEST_RESET,
     {
+      config: { rateLimit: { max: 3, timeWindow: "5 minutes" } },
       schema: {
         body: requestResetSchema,
         response: responseSchema(""),
@@ -281,6 +283,7 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.RESET_PASSWORD,
     {
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
       schema: {
         body: resetPasswordSchema,
         response: responseSchema(""),
