@@ -41,7 +41,9 @@ describe("DELETE /opportunity-volunteer/:id", () => {
   let opportunityDeal: Deal;
   let opportunity: Opportunity;
   let opportunityVolunteer: OpportunityVolunteer;
+  let agentPerson: Person;
   let coordinatorPerson: Person;
+  let agentCookie: string;
   let coordinatorCookie: string;
 
   beforeAll(async () => {
@@ -93,11 +95,23 @@ describe("DELETE /opportunity-volunteer/:id", () => {
       { statusMatch: OpportunityMatchStatusType.MATCHED },
     );
 
+    agentPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Agent" }),
+    );
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Coordinator" }),
     );
 
     const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `agent-m2m-unmatch-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentPerson.id,
+      }),
+    );
     await fastify.db.userRepository.save(
       new User({
         email: `coordinator-m2m-unmatch-${suffix}@test.need4deed.org`,
@@ -117,13 +131,16 @@ describe("DELETE /opportunity-volunteer/:id", () => {
       return getCookie(res.cookies, accessCookieName);
     };
 
+    agentCookie = await login(`agent-m2m-unmatch-${suffix}@test.need4deed.org`);
     coordinatorCookie = await login(
       `coordinator-m2m-unmatch-${suffix}@test.need4deed.org`,
     );
   });
 
   afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: agentPerson.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     // The match link is deleted by the DELETE call itself in the test below;
     // this is best-effort in case a test fails before reaching that point.
@@ -136,6 +153,15 @@ describe("DELETE /opportunity-volunteer/:id", () => {
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
     await fastify.close();
+  });
+
+  it("403s when a non-coordinator tries to remove the link", async () => {
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   it("404s for a nonexistent m2m relation", async () => {
