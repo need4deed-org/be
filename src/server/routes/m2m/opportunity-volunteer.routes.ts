@@ -7,6 +7,10 @@ import {
 } from "need4deed-sdk";
 import { ConflictError, NotFoundError } from "../../../config";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import {
+  updateOpportunityMatching,
+  updateVolunteerMatching,
+} from "../../../data/utils";
 import logger from "../../../logger";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
@@ -284,6 +288,8 @@ export default async function m2mOpportunityVolunteerRoutes(
       }
 
       await opportunityVolunteerRepository.delete({ id });
+      await updateVolunteerMatching(m2mInstance.volunteerId);
+      await updateOpportunityMatching(m2mInstance.opportunityId);
 
       return reply.status(204).send();
     },
