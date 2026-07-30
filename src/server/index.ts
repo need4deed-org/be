@@ -4,7 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import qs from "qs";
-import { pluginTimeout, selfUrl } from "../config/constants";
+import { isProd, pluginTimeout, selfUrl } from "../config/constants";
 import { BaseError } from "../config/error/base";
 import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
@@ -129,28 +129,30 @@ export async function createServer(): Promise<FastifyInstance> {
     attachFieldsToBody: "keyValues",
   });
 
-  await fastifyInstance.register(fastifySwagger, {
-    openapi: {
-      info: {
-        title: "N4D Fastify API Documentation",
-        description: "will come later",
-        version: "0.0.1",
-      },
-      servers: [
-        {
-          url: selfUrl,
-          description: "Local development server",
+  if (!isProd) {
+    await fastifyInstance.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: "N4D Fastify API Documentation",
+          description: "will come later",
+          version: "0.0.1",
         },
-      ],
-    },
-  });
-  await fastifyInstance.register(fastifySwaggerUi, {
-    routePrefix: RoutePrefix.SWAGGER,
-    uiConfig: {
-      docExpansion: "full",
-      deepLinking: false,
-    },
-  });
+        servers: [
+          {
+            url: selfUrl,
+            description: "Local development server",
+          },
+        ],
+      },
+    });
+    await fastifyInstance.register(fastifySwaggerUi, {
+      routePrefix: RoutePrefix.SWAGGER,
+      uiConfig: {
+        docExpansion: "full",
+        deepLinking: false,
+      },
+    });
+  }
   await fastifyInstance.register(notifyPlugin);
   await fastifyInstance.register(schedulerHourlyPlugin);
   await fastifyInstance.register(schedulerDailyPlugin);
