@@ -25,6 +25,7 @@ import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import { updateVolunteerMatching } from "../../../data/utils";
@@ -34,6 +35,7 @@ import {
   accompanyingParserOpportunity,
   dtoOpportunityGet,
   dtoOpportunityGetList,
+  parseAccompDatetime,
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
@@ -64,12 +66,12 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
-  getOrCreateEventTimeslot,
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
   patchEntity,
   updateOptionList,
+  upsertOnetimer,
   writeOpportunityLegacy,
 } from "../../utils";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
@@ -150,6 +152,7 @@ export default async function opportunityRoutes(
       const relations = [
         "accompanying",
         "accompanying.postcode",
+        "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
         "deal.dealSkill.skill",
@@ -262,6 +265,7 @@ export default async function opportunityRoutes(
         "deal.dealDistrict.district",
         "agent",
         "accompanying",
+        "onetimer",
         "opportunityVolunteer.volunteer.person",
       ];
 
@@ -392,15 +396,17 @@ export default async function opportunityRoutes(
       );
 
       opportunity.accompanying = undefined;
+      opportunity.onetimer = undefined;
 
       if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
         opportunity.accompanying =
           await accompanyingParserOpportunity(legacyBody);
+        opportunity.onetimer = new Onetimer({
+          date: parseAccompDatetime(legacyBody.accomp_datetime),
+        });
       } else if (opportunity.type === OpportunityType.EVENTS) {
-        opportunity.accompanying = new Accompanying({
+        opportunity.onetimer = new Onetimer({
           date: new Date(legacyBody.onetime_date_time),
-          address: "",
-          name: "",
         });
       }
 
@@ -450,6 +456,7 @@ export default async function opportunityRoutes(
               [
                 "accompanying",
                 "accompanying.postcode",
+                "onetimer",
                 "submittedByPerson",
                 "submittedByPerson.users",
                 "contactPerson",
@@ -553,6 +560,7 @@ export default async function opportunityRoutes(
         contact,
         agent,
         accompanying,
+        onetimerDate,
         languages,
         schedule,
         skills,
@@ -691,7 +699,22 @@ export default async function opportunityRoutes(
         }
       }
 
-      // If the opportunity is being changed to an event or already an event, create or update the accompanying record with the event date and time, and create or update the timeslot for the event.
+      // Appointment start date/time for ACCOMPANYING, shared with EVENTS via
+      // the same `onetimer` (see be#746) — owned 1:1 by the opportunity.
+      if (onetimerDate) {
+        const onetimer = await upsertOnetimer(
+          opportunity.onetimerId,
+          onetimerDate,
+        );
+        if (!opportunity.onetimerId) {
+          await patchEntity(
+            Opportunity,
+            { onetimerId: onetimer.id } as Partial<Opportunity>,
+            opportunity.id,
+          );
+        }
+      }
+
       if (
         effectiveType === OpportunityType.EVENTS &&
         request.body.event?.date &&
@@ -701,58 +724,36 @@ export default async function opportunityRoutes(
           request.body.event.date,
           request.body.event.time,
         );
-
-        if (opportunity.accompanyingId) {
+        const onetimer = await upsertOnetimer(
+          opportunity.onetimerId,
+          eventDate,
+        );
+        if (!opportunity.onetimerId) {
           await patchEntity(
-            Accompanying,
-            {
-              date: eventDate,
-              address: "",
-              name: "",
-              phone: null,
-              email: null,
-              languageToTranslate: null,
-              postcodeId: null,
-            },
-            opportunity.accompanyingId,
+            Opportunity,
+            { onetimerId: onetimer.id } as Partial<Opportunity>,
+            opportunity.id,
           );
-        } else {
-          const newAccompanying = new Accompanying({
-            date: eventDate,
-            address: "",
-            name: "",
-          });
-          try {
-            await fastify.db.accompanyingRepository.manager.transaction(
-              async (manager) => {
-                await manager.save(Accompanying, newAccompanying);
-                await manager.update(Opportunity, opportunity.id, {
-                  accompanyingId: newAccompanying.id,
-                });
-              },
-            );
-          } catch {
-            throw new BadRequestError(
-              "Saving new accompanying for event failed",
-            );
-          }
         }
-
-        const timeslot = await getOrCreateEventTimeslot(eventDate);
-        await updateOptionList(dealId, DealTimeslot, [{ id: timeslot.id }]);
       }
 
       if (
         effectiveType === OpportunityType.REGULAR &&
         opportunity.type !== OpportunityType.REGULAR &&
-        opportunity.accompanyingId
+        (opportunity.accompanyingId || opportunity.onetimerId)
       ) {
         await fastify.db.accompanyingRepository.manager.transaction(
           async (manager) => {
             await manager.update(Opportunity, opportunity.id, {
               accompanyingId: null,
+              onetimerId: null,
             });
-            await manager.delete(Accompanying, opportunity.accompanyingId);
+            if (opportunity.accompanyingId) {
+              await manager.delete(Accompanying, opportunity.accompanyingId);
+            }
+            if (opportunity.onetimerId) {
+              await manager.delete(Onetimer, opportunity.onetimerId);
+            }
           },
         );
       }
@@ -840,7 +841,7 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
 
-      const { dealId, accompanyingId } = opportunity;
+      const { dealId, accompanyingId, onetimerId } = opportunity;
 
       // OpportunityVolunteer rows cascade at the DB level, which bypasses
       // TypeORM's @AfterRemove hook (it never loads/removes those entities
@@ -863,6 +864,9 @@ export default async function opportunityRoutes(
         }
         if (accompanyingId) {
           await manager.delete(Accompanying, { id: accompanyingId });
+        }
+        if (onetimerId) {
+          await manager.delete(Onetimer, { id: onetimerId });
         }
       });
 

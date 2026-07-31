@@ -30,6 +30,7 @@ import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
+import Onetimer from "./entity/opportunity/onetimer.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
 import Option from "./entity/option.entity";
 import Organization from "./entity/organization.entity";
@@ -94,6 +95,7 @@ export const dataSource = new DataSource({
     Language,
     LeadFrom,
     NotionRelation,
+    Onetimer,
     Opportunity,
     OpportunityVolunteer,
     Organization,

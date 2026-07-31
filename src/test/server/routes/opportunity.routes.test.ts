@@ -15,6 +15,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -264,6 +265,7 @@ describe("DELETE /opportunity/:id", () => {
   let opportunity: Opportunity;
   let deal: Deal;
   let accompanying: Accompanying;
+  let onetimer: Onetimer;
   let opportunityVolunteer: OpportunityVolunteer;
   let comment: Comment;
   let agentPerson: Person;
@@ -290,8 +292,10 @@ describe("DELETE /opportunity/:id", () => {
       new Accompanying({
         address: "Test Address",
         name: "Test Refugee",
-        date: new Date(),
       }),
+    );
+    onetimer = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: new Date() }),
     );
     opportunity = await fastify.db.opportunityRepository.save(
       new Opportunity({
@@ -301,6 +305,7 @@ describe("DELETE /opportunity/:id", () => {
         agentId: agent.id,
         dealId: deal.id,
         accompanyingId: accompanying.id,
+        onetimerId: onetimer.id,
       }),
     );
 
@@ -407,6 +412,7 @@ describe("DELETE /opportunity/:id", () => {
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.accompanyingRepository.delete({ id: accompanying.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimer.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
     await fastify.close();
   });
@@ -429,7 +435,7 @@ describe("DELETE /opportunity/:id", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("lets a coordinator delete an opportunity, cascading its deal, accompanying, comments, and match link", async () => {
+  it("lets a coordinator delete an opportunity, cascading its deal, accompanying, onetimer, comments, and match link", async () => {
     const res = await fastify.inject({
       method: "DELETE",
       url: `/opportunity/${opportunity.id}`,
@@ -447,6 +453,9 @@ describe("DELETE /opportunity/:id", () => {
       await fastify.db.accompanyingRepository.findOneBy({
         id: accompanying.id,
       }),
+    ).toBeNull();
+    expect(
+      await fastify.db.onetimerRepository.findOneBy({ id: onetimer.id }),
     ).toBeNull();
     expect(
       await fastify.db.commentRepository.findOneBy({ id: comment.id }),

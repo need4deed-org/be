@@ -238,23 +238,10 @@ describe("dtoOpportunityGet", () => {
     opportunityVolunteer: [],
   };
 
-  it("populates event from a one-time event timeslot", () => {
+  it("populates event from the opportunity's onetimer", () => {
     const opportunity = {
       ...baseDetail,
-      deal: {
-        ...baseDetail.deal,
-        dealTimeslot: [
-          {
-            timeslot: {
-              id: 10,
-              start: eventDate,
-              end: null,
-              rrule: null,
-              occasional: null,
-            },
-          },
-        ],
-      },
+      onetimer: { id: 10, date: eventDate },
     };
 
     const result = dtoOpportunityGet(opportunity as any);
@@ -265,13 +252,10 @@ describe("dtoOpportunityGet", () => {
     });
   });
 
-  it("returns undefined event when there are no dealTimeslots", () => {
+  it("returns undefined event when the opportunity has no onetimer", () => {
     const opportunity = {
       ...baseDetail,
-      deal: {
-        ...baseDetail.deal,
-        dealTimeslot: [],
-      },
+      onetimer: undefined,
     };
 
     const result = dtoOpportunityGet(opportunity as any);
@@ -279,47 +263,11 @@ describe("dtoOpportunityGet", () => {
     expect(result.event).toBeUndefined();
   });
 
-  it("returns undefined event when timeslots are recurring (have rrule)", () => {
+  it("returns undefined event for non-EVENTS types even when a onetimer is present", () => {
     const opportunity = {
       ...baseDetail,
-      deal: {
-        ...baseDetail.deal,
-        dealTimeslot: [
-          {
-            timeslot: {
-              id: 11,
-              start: new Date("2026-01-01T08:00:00Z"),
-              end: new Date("2026-01-01T11:00:00Z"),
-              rrule: "FREQ=WEEKLY;BYDAY=MO",
-              occasional: null,
-            },
-          },
-        ],
-      },
-    };
-
-    const result = dtoOpportunityGet(opportunity as any);
-
-    expect(result.event).toBeUndefined();
-  });
-
-  it("returns undefined event when timeslots are occasional", () => {
-    const opportunity = {
-      ...baseDetail,
-      deal: {
-        ...baseDetail.deal,
-        dealTimeslot: [
-          {
-            timeslot: {
-              id: 12,
-              start: null,
-              end: null,
-              rrule: null,
-              occasional: "weekends",
-            },
-          },
-        ],
-      },
+      type: "accompanying",
+      onetimer: { id: 13, date: eventDate },
     };
 
     const result = dtoOpportunityGet(opportunity as any);

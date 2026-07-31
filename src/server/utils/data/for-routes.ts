@@ -34,6 +34,7 @@ import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentService from "../../../data/entity/m2m/agent-service";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
@@ -561,24 +562,22 @@ export async function getOrCreateTimeslot(
   return timeslot;
 }
 
-export async function getOrCreateEventTimeslot(date: Date): Promise<Timeslot> {
-  const normalizedDate = new Date(date);
-  normalizedDate.setSeconds(0, 0);
-  const repository = getRepository(dataSource, Timeslot);
-  let timeslot = await repository.findOneBy({
-    start: normalizedDate,
-    end: null,
-    rrule: null,
-    occasional: null,
-  });
-  if (!timeslot) {
-    timeslot = new Timeslot({
-      start: normalizedDate,
-      info: `One-time event on ${normalizedDate.toISOString()}`,
-    });
-    await repository.save(timeslot);
+// The single-occurrence start date/time for ACCOMPANYING/EVENTS
+// opportunities (see be#746). Unlike `getOrCreateTimeslot`, a `Onetimer` is
+// owned 1:1 by its opportunity rather than deduplicated by value, so this
+// updates the opportunity's existing row in place or creates a new one.
+export async function upsertOnetimer(
+  existingOnetimerId: number | undefined,
+  date: Date,
+): Promise<Onetimer> {
+  const repository = getRepository(dataSource, Onetimer);
+  if (existingOnetimerId) {
+    await repository.update(existingOnetimerId, { date });
+    return repository.findOneByOrFail({ id: existingOnetimerId });
   }
-  return timeslot;
+  const onetimer = new Onetimer({ date });
+  await repository.save(onetimer);
+  return onetimer;
 }
 
 export async function updateOptionList<
