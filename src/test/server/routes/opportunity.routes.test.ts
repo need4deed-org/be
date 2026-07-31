@@ -606,3 +606,160 @@ describe("PATCH /opportunity/:id onetimer resolution", () => {
     expect(orphan).toBeNull();
   });
 });
+
+// be#746: server-side sort by start date, replacing the old client-side
+// per-page sort — this is what actually fixes opportunities falling through
+// the cracks across pages. Verifies both the ordering and that opportunities
+// with no onetimer (e.g. REGULAR type) always sort last, regardless of
+// direction (Postgres defaults DESC to NULLS FIRST, which would be wrong
+// here).
+describe("GET /opportunity sortBy=start-date", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let dealSoon: Deal;
+  let dealLater: Deal;
+  let dealNoDate: Deal;
+  let onetimerSoon: Onetimer;
+  let onetimerLater: Onetimer;
+  let oppSoon: Opportunity;
+  let oppLater: Opportunity;
+  let oppNoDate: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (sort-start-date) ${suffix}` }),
+    );
+
+    const inDays = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return d;
+    };
+    onetimerSoon = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: inDays(5) }),
+    );
+    onetimerLater = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: inDays(20) }),
+    );
+
+    dealSoon = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    dealLater = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    dealNoDate = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+
+    oppSoon = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Sort Soon ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealSoon.id,
+        onetimerId: onetimerSoon.id,
+      }),
+    );
+    oppLater = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Sort Later ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealLater.id,
+        onetimerId: onetimerLater.id,
+      }),
+    );
+    // No onetimer at all — must sort last in both directions.
+    oppNoDate = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Sort No Date ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealNoDate.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "SortCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    const coordinatorUser = await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-sort-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorUser.email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: oppSoon.id });
+    await fastify.db.opportunityRepository.delete({ id: oppLater.id });
+    await fastify.db.opportunityRepository.delete({ id: oppNoDate.id });
+    await fastify.db.dealRepository.delete({ id: dealSoon.id });
+    await fastify.db.dealRepository.delete({ id: dealLater.id });
+    await fastify.db.dealRepository.delete({ id: dealNoDate.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimerSoon.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimerLater.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  // Relative order of our known ids within the response, ignoring whatever
+  // other opportunities exist in the shared dev DB.
+  function relativeOrder(data: { id: number }[], ids: number[]): number[] {
+    return data.map((o) => o.id).filter((id) => ids.includes(id));
+  }
+
+  it("orders soonest-first (old-new) with no-date opportunities last", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(
+      relativeOrder(data, [oppSoon.id, oppLater.id, oppNoDate.id]),
+    ).toEqual([oppSoon.id, oppLater.id, oppNoDate.id]);
+  });
+
+  it("orders latest-first (new-old) with no-date opportunities still last", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?sortBy=start-date&sortOrder=new-old&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(
+      relativeOrder(data, [oppSoon.id, oppLater.id, oppNoDate.id]),
+    ).toEqual([oppLater.id, oppSoon.id, oppNoDate.id]);
+  });
+});

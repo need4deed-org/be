@@ -7,6 +7,7 @@ import {
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
+  OpportunitySortField,
   OpportunityType,
   SortOrder,
   UserRole,
@@ -270,13 +271,40 @@ export default async function opportunityRoutes(
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
-      const [opportunities, count] = await opportunityRepository.findAndCount({
-        where,
-        relations,
-        skip,
-        take,
-        ...(order ? order : {}),
-      });
+
+      // Sorting by start date (be#746) needs NULLS LAST regardless of
+      // direction — opportunities with no onetimer (REGULAR type, or an
+      // ACCOMPANYING/EVENTS one with no date set yet) always sort last, so
+      // they don't crowd out real dates at the top of a "soonest first"
+      // list. `find()`'s plain `order` option can't express that (Postgres
+      // defaults DESC to NULLS FIRST), so this path uses the query builder.
+      // The extra `leftJoin`+`addSelect` for ordering is harmless alongside
+      // the `relations`-driven join of the same to-one relation — it can't
+      // multiply rows, and keeps `relations` as the single source of truth
+      // for what gets loaded. The `addSelect` is required, not cosmetic:
+      // paginating (skip/take) alongside the other one-to-many joins forces
+      // TypeORM to wrap the query in a DISTINCT subquery, and any column
+      // referenced in ORDER BY must be part of that subquery's projection.
+      const [opportunities, count] =
+        request.query.sortBy === OpportunitySortField.START_DATE
+          ? await opportunityRepository
+              .createQueryBuilder("opportunity")
+              .setFindOptions({ where, relations, skip, take })
+              .leftJoin("opportunity.onetimer", "onetimerSort")
+              .addSelect("onetimerSort.date")
+              .orderBy(
+                "onetimerSort.date",
+                request.query.sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
+                "NULLS LAST",
+              )
+              .getManyAndCount()
+          : await opportunityRepository.findAndCount({
+              where,
+              relations,
+              skip,
+              take,
+              ...(order ? order : {}),
+            });
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();
