@@ -124,12 +124,8 @@ export async function createServer(): Promise<FastifyInstance> {
     throw new Error("JWT_SECRET is not defined in environment variables.");
   }
 
-  if (isProd && secret.length < 32) {
-    throw new Error("JWT_SECRET must be at least 32 characters in production.");
-  }
-
-  if (isProd && (process.env.SIGN_COOKIES || "false") !== "true") {
-    throw new Error("SIGN_COOKIES must be set to 'true' in production.");
+  if (isProd && secret.length < 64) {
+    throw new Error("JWT_SECRET must be at least 64 characters in production.");
   }
 
   await fastifyInstance.register(jwtPlugin, { secret });
