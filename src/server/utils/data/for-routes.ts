@@ -566,14 +566,17 @@ export async function getOrCreateTimeslot(
 // opportunities (see be#746). Unlike `getOrCreateTimeslot`, a `Onetimer` is
 // owned 1:1 by its opportunity rather than deduplicated by value, so this
 // updates the opportunity's existing row in place or creates a new one.
+// Accepts an optional manager so the caller can wrap this + the opportunity's
+// onetimerId link-update in a single transaction.
 export async function upsertOnetimer(
   existingOnetimerId: number | undefined,
   date: Date,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<Onetimer> {
-  const repository = getRepository(dataSource, Onetimer);
+  const repository = getRepository(manager, Onetimer);
   if (existingOnetimerId) {
     await repository.update(existingOnetimerId, { date });
-    return repository.findOneByOrFail({ id: existingOnetimerId });
+    return { id: existingOnetimerId, date } as Onetimer;
   }
   const onetimer = new Onetimer({ date });
   await repository.save(onetimer);

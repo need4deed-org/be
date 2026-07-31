@@ -11,7 +11,7 @@ export class RetireAccompanyingDate1785481623751 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TEMP TABLE "tmp_events_accompanying" AS
+      CREATE TEMP TABLE "tmp_events_accompanying" ON COMMIT DROP AS
       SELECT o."id" AS "opportunity_id", o."accompanying_id"
       FROM "opportunity" o
       WHERE o."type" = 'events' AND o."accompanying_id" IS NOT NULL

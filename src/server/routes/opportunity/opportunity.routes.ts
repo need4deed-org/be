@@ -699,42 +699,38 @@ export default async function opportunityRoutes(
         }
       }
 
-      // Appointment start date/time for ACCOMPANYING, shared with EVENTS via
-      // the same `onetimer` (see be#746) — owned 1:1 by the opportunity.
-      if (onetimerDate) {
-        const onetimer = await upsertOnetimer(
-          opportunity.onetimerId,
-          onetimerDate,
-        );
-        if (!opportunity.onetimerId) {
-          await patchEntity(
-            Opportunity,
-            { onetimerId: onetimer.id } as Partial<Opportunity>,
-            opportunity.id,
-          );
-        }
-      }
+      // Single-occurrence start date/time, shared by ACCOMPANYING and EVENTS
+      // via `onetimer` (see be#746) — owned 1:1 by the opportunity. Resolved
+      // from whichever source matches the *resulting* type, so a payload that
+      // (incorrectly) carries both `accompanyingDetails` and `event` — or
+      // either alongside an unrelated type change — can't write a onetimer
+      // that doesn't belong to this opportunity's new type.
+      const resolvedOnetimerDate =
+        effectiveType === OpportunityType.EVENTS
+          ? request.body.event?.date && request.body.event?.time
+            ? getDateObj(request.body.event.date, request.body.event.time)
+            : undefined
+          : effectiveType === OpportunityType.ACCOMPANYING
+            ? onetimerDate
+            : undefined;
 
-      if (
-        effectiveType === OpportunityType.EVENTS &&
-        request.body.event?.date &&
-        request.body.event?.time
-      ) {
-        const eventDate = getDateObj(
-          request.body.event.date,
-          request.body.event.time,
-        );
-        const onetimer = await upsertOnetimer(
-          opportunity.onetimerId,
-          eventDate,
-        );
-        if (!opportunity.onetimerId) {
-          await patchEntity(
-            Opportunity,
-            { onetimerId: onetimer.id } as Partial<Opportunity>,
-            opportunity.id,
+      if (resolvedOnetimerDate) {
+        await dataSource.manager.transaction(async (manager) => {
+          const onetimer = await upsertOnetimer(
+            opportunity.onetimerId,
+            resolvedOnetimerDate,
+            manager,
           );
-        }
+          if (!opportunity.onetimerId) {
+            await patchEntity(
+              Opportunity,
+              { onetimerId: onetimer.id } as Partial<Opportunity>,
+              opportunity.id,
+              manager,
+            );
+            opportunity.onetimerId = onetimer.id;
+          }
+        });
       }
 
       if (

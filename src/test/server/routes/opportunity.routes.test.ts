@@ -479,3 +479,130 @@ describe("DELETE /opportunity/:id", () => {
     );
   });
 });
+
+// Regression test for be#816: the onetimer-writing logic in the PATCH
+// handler used to be two independent blocks, each reading the pre-request
+// `opportunity.onetimerId`. A payload carrying both `accompanyingDetails`
+// and `event` in the same request (the JSON schema doesn't forbid it) made
+// the second block miss the onetimer the first had just created and linked,
+// creating a second, orphaned `Onetimer` row. The fix resolves a single date
+// tied to the *resulting* type before writing onetimer at all.
+describe("PATCH /opportunity/:id onetimer resolution", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let deal: Deal;
+  let opportunity: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (onetimer-resolve) ${suffix}` }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (onetimer-resolve) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    const coordinatorUser = await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-onetimer-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: coordinatorUser.email,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    const updated = await fastify.db.opportunityRepository.findOneBy({
+      id: opportunity.id,
+    });
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    if (updated?.onetimerId) {
+      await fastify.db.onetimerRepository.delete({ id: updated.onetimerId });
+    }
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  it("writes exactly one onetimer using the event date when both accompanyingDetails and event are sent", async () => {
+    // Distinct, test-specific dates so we can positively assert neither an
+    // orphaned row (from the accompanyingDetails date) nor a stray one from
+    // other concurrently-running tests interferes with the check.
+    const eventDate = "2026-08-01";
+    const accompanyingDate = "2026-09-11";
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunity_type: "events",
+        event: { date: eventDate, time: "14:00" },
+        accompanyingDetails: {
+          appointmentDate: accompanyingDate,
+          appointmentTime: "09:00",
+        },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: opportunity.id,
+    });
+    expect(updated.onetimerId).toBeTruthy();
+
+    const onetimer = await fastify.db.onetimerRepository.findOneByOrFail({
+      id: updated.onetimerId,
+    });
+    // The event date wins (matches the resulting EVENTS type), not the
+    // accompanyingDetails date.
+    expect(new Date(onetimer.date).toISOString().slice(0, 10)).toBe(eventDate);
+
+    // No orphaned second row was created from the accompanyingDetails date —
+    // if the two write paths still raced, this row would exist and be
+    // unreferenced by any opportunity.
+    const orphan = await fastify.db.onetimerRepository
+      .createQueryBuilder("onetimer")
+      .where("CAST(onetimer.date AS date) = CAST(:date AS date)", {
+        date: accompanyingDate,
+      })
+      .getOne();
+    expect(orphan).toBeNull();
+  });
+});

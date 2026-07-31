@@ -290,10 +290,14 @@ export default async function opportunityLegacyRoutes(
             email ? `Email: ${email}` : null,
           ].filter(Boolean);
 
-          // Treat the epoch sentinel date as "no date set"
-          const EPOCH = "1970-01-01T00:00:00.000Z";
+          // Treat the epoch sentinel date as "no date set". Compare by
+          // timestamp (not string equality) since onetimerDate is a real
+          // Date instance here, not an ISO string.
+          const EPOCH_MS = 0;
           const accomp_datetime =
-            !onetimerDate || onetimerDate === EPOCH ? null : onetimerDate;
+            !onetimerDate || new Date(onetimerDate).getTime() === EPOCH_MS
+              ? null
+              : onetimerDate;
 
           return {
             accomp_information:
