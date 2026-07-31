@@ -5,6 +5,10 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
+import {
+  updateOpportunityMatching,
+  updateVolunteerMatching,
+} from "../../../data/utils";
 import { volunteerOpportunityVolunteerDTO } from "../../../services";
 import {
   idmM2mIdParamSchema,
@@ -149,6 +153,8 @@ export default function volunteerOpportunityVolunteerRoutes(
       }
 
       await opportunityVolunteerRepository.delete({ id: m2mId });
+      await updateVolunteerMatching(opportunity.volunteerId);
+      await updateOpportunityMatching(opportunity.opportunityId);
 
       return reply.status(200).send({
         message: msg200(opportunity.opportunityId, volunteerId, "deleted"),
