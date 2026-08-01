@@ -1,6 +1,9 @@
 import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { accompanyingParserOpportunity } from "../../../services/dto/parser-accompanying-legacy";
+import {
+  accompanyingParserOpportunity,
+  parseAccompDatetime,
+} from "../../../services/dto/parser-accompanying-legacy";
 
 const { mockPostcode, getPostcodeMock } = vi.hoisted(() => {
   const mockPostcode = { id: 1, value: "10115" };
@@ -31,8 +34,13 @@ describe("accompanyingParserOpportunity", () => {
     expect(result.name).toBe("Jane Doe");
     expect(result.phone).toBe("030123456");
     expect(result.languageToTranslate).toBe(TranslatedIntoType.DEUTSCHE);
-    expect(result.date).toBeInstanceOf(Date);
-    expect(isNaN(result.date.getTime())).toBe(false);
+  });
+
+  it("parseAccompDatetime parses accomp_datetime into a valid Date", () => {
+    const date = parseAccompDatetime(baseBody.accomp_datetime);
+
+    expect(date).toBeInstanceOf(Date);
+    expect(isNaN(date.getTime())).toBe(false);
   });
 
   it("resolves and assigns postcode entity when accomp_postcode is provided", async () => {

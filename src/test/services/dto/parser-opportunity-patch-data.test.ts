@@ -42,7 +42,7 @@ describe("parseOpportunity", () => {
     });
   });
 
-  it("composes accompanying.date from appointmentDate + appointmentTime", () => {
+  it("composes onetimerDate from appointmentDate + appointmentTime", () => {
     const result = parseOpportunity({
       accompanyingDetails: {
         appointmentDate: "2026-06-01",
@@ -50,7 +50,17 @@ describe("parseOpportunity", () => {
       },
     });
 
-    expect(result.accompanying?.date).toBeInstanceOf(Date);
+    expect(result.onetimerDate).toBeInstanceOf(Date);
+  });
+
+  it("leaves onetimerDate undefined when no appointmentDate is sent", () => {
+    const result = parseOpportunity({
+      accompanyingDetails: {
+        appointmentAddress: "Musterstraße 1",
+      },
+    });
+
+    expect(result.onetimerDate).toBeUndefined();
   });
 
   it("does not set accompanying.postcode (resolved in route handler instead)", () => {

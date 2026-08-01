@@ -23,6 +23,7 @@ import DealTimeslot from "../../entity/m2m/deal-timeslot";
 import OpportunityVolunteer from "../../entity/m2m/opportunity-volunteer";
 import Accompanying from "../../entity/opportunity/accompanying.entity";
 import Agent from "../../entity/opportunity/agent.entity";
+import Onetimer from "../../entity/opportunity/onetimer.entity";
 import Opportunity from "../../entity/opportunity/opportunity.entity";
 import Organization from "../../entity/organization.entity";
 import Person from "../../entity/person.entity";
@@ -341,6 +342,7 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
   // --- opportunities ---
   const opportunityRepo = getRepository(dataSource, Opportunity);
   const accompanyingRepo = getRepository(dataSource, Accompanying);
+  const onetimerRepo = getRepository(dataSource, Onetimer);
 
   const oppDeal1 = await makeDeal(
     dataSource,
@@ -391,9 +393,11 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     new Accompanying({
       address: "Musterstraße 1, Berlin",
       name: "Test Appointment",
-      date: accompanyingTimeslot.start,
       postcodeId: pc12043.id,
     }),
+  );
+  const onetimer = await onetimerRepo.save(
+    new Onetimer({ date: accompanyingTimeslot.start }),
   );
   const oppDeal3 = await makeDeal(
     dataSource,
@@ -408,6 +412,7 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
       agentId: agent2.id,
       deal: oppDeal3,
       accompanyingId: accompanying.id,
+      onetimerId: onetimer.id,
       numberVolunteers: 1,
     }),
   );

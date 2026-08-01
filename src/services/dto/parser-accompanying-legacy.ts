@@ -4,7 +4,7 @@ import { getPostcode } from "../../data/utils";
 
 // Parses a datetime string as Europe/Berlin time when no timezone is specified.
 // Uses the Intl API so DST transitions (CET⇔CEST) are handled automatically.
-function parseAccompDatetime(value: string | undefined): Date {
+export function parseAccompDatetime(value: string | undefined): Date {
   if (!value) {
     return new Date(NaN);
   }
@@ -47,7 +47,6 @@ export async function accompanyingParserOpportunity(
     address: body.accomp_address,
     name: body.accomp_name,
     phone: body.accomp_phone,
-    date: parseAccompDatetime(body.accomp_datetime),
     languageToTranslate: body.accomp_translation as TranslatedIntoType,
   });
 
