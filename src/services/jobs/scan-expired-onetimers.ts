@@ -4,7 +4,6 @@ import {
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
-import { Brackets } from "typeorm";
 import logger from "../../logger";
 import { addWorkingDays, berlinToday } from "./german-holidays";
 
@@ -15,10 +14,7 @@ export async function scanExpiredOnetimers(
 
   const expiredOpportunities = await fastify.db.opportunityRepository
     .createQueryBuilder("opportunity")
-    .leftJoinAndSelect("opportunity.accompanying", "accompanying")
-    .leftJoinAndSelect("opportunity.deal", "deal")
-    .leftJoinAndSelect("deal.dealTimeslot", "dealTimeslot")
-    .leftJoinAndSelect("dealTimeslot.timeslot", "timeslot")
+    .leftJoinAndSelect("opportunity.onetimer", "onetimer")
     .leftJoinAndSelect(
       "opportunity.opportunityVolunteer",
       "opportunityVolunteer",
@@ -29,15 +25,9 @@ export async function scanExpiredOnetimers(
     .andWhere("opportunity.status != :inactive", {
       inactive: OpportunityStatusType.INACTIVE,
     })
-    .andWhere(
-      new Brackets((qb) => {
-        qb.where("accompanying.date < :yesterday", {
-          yesterday: dayBeforeToday,
-        }).orWhere("timeslot.start < :yesterday", {
-          yesterday: dayBeforeToday,
-        });
-      }),
-    )
+    .andWhere("onetimer.date < :yesterday", {
+      yesterday: dayBeforeToday,
+    })
     .getMany();
 
   if (!expiredOpportunities.length) {

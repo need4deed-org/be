@@ -23,6 +23,7 @@ import Person from "../person.entity";
 import Appreciation from "../volunteer/appreciation.entity";
 import Accompanying from "./accompanying.entity";
 import Agent from "./agent.entity";
+import Onetimer from "./onetimer.entity";
 
 @Entity()
 export default class Opportunity {
@@ -98,6 +99,16 @@ export default class Opportunity {
   accompanying?: Accompanying;
   @Column({ nullable: true })
   accompanyingId?: number;
+
+  // Single-occurrence start date/time, shared by ACCOMPANYING (appointment)
+  // and EVENTS (event start) types — see be#746.
+  @ManyToOne(() => Onetimer, (onetimer) => onetimer.opportunity, {
+    nullable: true,
+  })
+  @JoinColumn({ name: "onetimer_id" })
+  onetimer?: Onetimer;
+  @Column({ nullable: true })
+  onetimerId?: number;
 
   @ManyToOne(() => Deal)
   @JoinColumn({ name: "deal_id" })

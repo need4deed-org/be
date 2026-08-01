@@ -46,8 +46,8 @@ export async function sendEmailAccompanyNotFound(
 
   const contactpersonName = opportunity.contactPerson!.name;
   const accompanying = opportunity.accompanying;
-  const appointmentDate = accompanying?.date
-    ? new Date(accompanying.date).toLocaleDateString("de-DE", {
+  const appointmentDate = opportunity.onetimer?.date
+    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
         timeZone: "Europe/Berlin",
         year: "numeric",
         month: "2-digit",

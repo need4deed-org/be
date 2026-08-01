@@ -1,4 +1,4 @@
-import { SortOrder } from "need4deed-sdk";
+import { OpportunitySortField, SortOrder } from "need4deed-sdk";
 import { getRef } from "../utils";
 
 const paginationProps = {
@@ -25,11 +25,22 @@ const sortOrderProps = {
   },
 };
 
+// Opportunity-list-only: which field `sortOrder` applies to. Not part of
+// `sortOrderProps` since sorting by start date is meaningless for
+// agent/volunteer/user lists that also reuse that shared prop set.
+const sortByProps = {
+  sortBy: {
+    type: "string",
+    enum: Object.values(OpportunitySortField),
+  },
+};
+
 export const opportunityListQuerySchema = {
   type: "object",
   properties: {
     ...paginationProps,
     ...sortOrderProps,
+    ...sortByProps,
     ...langProp,
     filter: {
       type: "object",

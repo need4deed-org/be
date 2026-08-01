@@ -11,14 +11,15 @@ import {
 import { In } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
-import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import { getPostcode, getRepository } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
+  parseAccompDatetime,
   parseFormData,
   parseOpportunityLegacy,
 } from "../../../services";
@@ -105,16 +106,18 @@ export default async function opportunityLegacyRoutes(
 
       opportunity.deal = await dealParserOpportunity(request.body);
       opportunity.accompanying = undefined;
+      opportunity.onetimer = undefined;
 
       if (request.body.opportunity_type === "accompanying") {
         opportunity.accompanying = await accompanyingParserOpportunity(
           request.body,
         );
+        opportunity.onetimer = new Onetimer({
+          date: parseAccompDatetime(request.body.accomp_datetime),
+        });
       } else if (opportunity.type === OpportunityType.EVENTS) {
-        opportunity.accompanying = new Accompanying({
+        opportunity.onetimer = new Onetimer({
           date: new Date(request.body.onetime_date_time),
-          address: "",
-          name: "",
         });
       }
 
@@ -267,7 +270,7 @@ export default async function opportunityLegacyRoutes(
           };
         }
 
-        function parseAccompanying(accompanying) {
+        function parseAccompanying(accompanying, onetimerDate) {
           if (!accompanying) {
             return {
               accomp_information: null,
@@ -276,7 +279,7 @@ export default async function opportunityLegacyRoutes(
             };
           }
 
-          const { address, name, phone, email, date, languageToTranslate } =
+          const { address, name, phone, email, languageToTranslate } =
             accompanying;
 
           // Build accomp_information from available contact fields
@@ -287,9 +290,14 @@ export default async function opportunityLegacyRoutes(
             email ? `Email: ${email}` : null,
           ].filter(Boolean);
 
-          // Treat the epoch sentinel date as "no date set"
-          const EPOCH = "1970-01-01T00:00:00.000Z";
-          const accomp_datetime = !date || date === EPOCH ? null : date;
+          // Treat the epoch sentinel date as "no date set". Compare by
+          // timestamp (not string equality) since onetimerDate is a real
+          // Date instance here, not an ISO string.
+          const EPOCH_MS = 0;
+          const accomp_datetime =
+            !onetimerDate || new Date(onetimerDate).getTime() === EPOCH_MS
+              ? null
+              : onetimerDate;
 
           return {
             accomp_information:
@@ -320,7 +328,7 @@ export default async function opportunityLegacyRoutes(
 
           const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
-            parseAccompanying(raw.accompanying);
+            parseAccompanying(raw.accompanying, raw.onetimer?.date);
 
           return {
             id: raw.id,
@@ -366,6 +374,7 @@ export default async function opportunityLegacyRoutes(
           "deal.dealTimeslot.timeslot",
           "deal.dealDistrict.district",
           "accompanying",
+          "onetimer",
         ],
       });
       return reply

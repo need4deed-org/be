@@ -9,6 +9,7 @@ import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
 import NotionRelation from "../../entity/notion-relation.entity";
 import Accompanying from "../../entity/opportunity/accompanying.entity";
+import Onetimer from "../../entity/opportunity/onetimer.entity";
 import Opportunity from "../../entity/opportunity/opportunity.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
 import {
@@ -69,11 +70,19 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
                 address: opportunity.accompanying.address || "Berlin",
                 name: opportunity.accompanying.name || "unknown",
                 phone: opportunity.accompanying.phone,
-                date: new Date(opportunity.accompanying.date),
                 languageToTranslate: getToTranslate(
                   opportunity.accompanying.languageToTranslate,
                 ),
               }),
+            )
+          : Promise.reject(),
+      );
+
+      const onetimerRepository = getRepository(dataSource, Onetimer);
+      const [onetimer] = await tryCatch(
+        opportunity.accompanying?.date
+          ? onetimerRepository.save(
+              new Onetimer({ date: new Date(opportunity.accompanying.date) }),
             )
           : Promise.reject(),
       );
@@ -92,6 +101,7 @@ export async function seedOpportunities(dataSource: DataSource): Promise<void> {
         createdAt: new Date(opportunity.timestamp),
         updatedAt: new Date(opportunity.timestamp),
         ...(accompanying?.id ? { accompanyingId: accompanying.id } : {}),
+        ...(onetimer?.id ? { onetimerId: onetimer.id } : {}),
         ...(notionRelation?.hostId
           ? { agentId: notionRelation?.hostId }
           : { agent: await getOrCreateAgent(opportunity.agent, dataSource) }),
