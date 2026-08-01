@@ -1,4 +1,4 @@
-import { IsDate, IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString } from "class-validator";
 import { TranslatedIntoType } from "need4deed-sdk";
 import {
   Column,
@@ -39,10 +39,6 @@ export default class Accompanying {
   @IsString()
   @IsOptional()
   email?: string;
-
-  @Column({ type: "timestamptz" })
-  @IsDate()
-  date: Date;
 
   @Column({ type: "enum", enum: TranslatedIntoType, nullable: true })
   @IsOptional()

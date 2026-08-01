@@ -15,6 +15,7 @@ import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
@@ -46,6 +47,7 @@ declare module "fastify" {
       agentRepository: Repository<Agent>;
       agentPersonRepository: Repository<AgentPerson>;
       accompanyingRepository: Repository<Accompanying>;
+      onetimerRepository: Repository<Onetimer>;
       organizationRepository: Repository<Organization>;
       postcodeRepository: Repository<Postcode>;
       postRepository: Repository<Post>;

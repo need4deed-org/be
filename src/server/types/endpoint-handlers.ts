@@ -1,4 +1,4 @@
-import { Lang, SortOrder, UserRole } from "need4deed-sdk";
+import { Lang, OpportunitySortField, SortOrder, UserRole } from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -55,7 +55,12 @@ export type QuerystringVolunteerOpportunityGetList =
   QuerystringPaginationLanguage & QuerystringOpportunityFiltering;
 
 export type QuerystringOpportunityList = QuerystringPaginationLanguage &
-  QuerystringOpportunityFiltering;
+  QuerystringOpportunityFiltering & {
+    // Which field `sortOrder` applies to. Scoped to the opportunity list
+    // only (not the shared QuerystringPaginationOrdering) — sorting by
+    // start date only makes sense here, not for agent/volunteer/user lists.
+    sortBy?: OpportunitySortField;
+  };
 
 export interface QuerystringAgentFiltering {
   filter?: {

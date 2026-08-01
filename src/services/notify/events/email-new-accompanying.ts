@@ -49,8 +49,8 @@ export async function sendEmailNewAccompanying(
 
   const accompanying = opportunity.accompanying;
   const contactpersonName = contactPerson.name;
-  const appointmentDate = accompanying?.date
-    ? new Date(accompanying.date).toLocaleDateString("de-DE", {
+  const appointmentDate = opportunity.onetimer?.date
+    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
         timeZone: "Europe/Berlin",
         year: "numeric",
         month: "2-digit",

@@ -31,11 +31,12 @@ export async function scanAccompanyNotFound(
         OpportunityStatusType.SEARCHING,
         OpportunityStatusType.ACTIVE,
       ]),
-      accompanying: { date: Between(startOfDay, endOfDay) },
+      onetimer: { date: Between(startOfDay, endOfDay) },
     },
     relations: [
       "accompanying",
       "accompanying.postcode",
+      "onetimer",
       "contactPerson",
       "contactPerson.users",
       "district",

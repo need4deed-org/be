@@ -195,6 +195,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                   "opportunity.agent.agentPerson.person",
                   "opportunity.agent.agentPerson.person.users",
                   "opportunity.accompanying.postcode",
+                  "opportunity.onetimer",
                   "opportunity.district",
                 ],
               });
