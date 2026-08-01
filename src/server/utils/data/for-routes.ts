@@ -568,15 +568,18 @@ export async function getOrCreateTimeslot(
 // updates the opportunity's existing row in place or creates a new one.
 // Accepts an optional manager so the caller can wrap this + the opportunity's
 // onetimerId link-update in a single transaction.
+// Returns only `id`/`date` on the update path (the caller only ever needs
+// the id) rather than a full `Onetimer` — avoids faking the rest of the
+// entity's shape just to satisfy the return type.
 export async function upsertOnetimer(
   existingOnetimerId: number | undefined,
   date: Date,
   manager: DataSource | EntityManager = dataSource,
-): Promise<Onetimer> {
+): Promise<Pick<Onetimer, "id" | "date">> {
   const repository = getRepository(manager, Onetimer);
   if (existingOnetimerId) {
     await repository.update(existingOnetimerId, { date });
-    return { id: existingOnetimerId, date } as Onetimer;
+    return { id: existingOnetimerId, date };
   }
   const onetimer = new Onetimer({ date });
   await repository.save(onetimer);
