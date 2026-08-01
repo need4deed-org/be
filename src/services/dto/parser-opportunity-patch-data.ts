@@ -91,17 +91,17 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
       accompanying: accompanyingDetails
         ? ({
             address: accompanyingDetails.appointmentAddress,
-            date: accompanyingDetails.appointmentDate
-              ? getDateObj(
-                  accompanyingDetails.appointmentDate,
-                  accompanyingDetails.appointmentTime || "00:00",
-                )
-              : undefined,
             phone: accompanyingDetails.refugeeNumber,
             name: accompanyingDetails.refugeeName,
             languageToTranslate: accompanyingDetails.appointmentLanguage,
           } as Partial<Accompanying>)
         : {},
+      onetimerDate: accompanyingDetails?.appointmentDate
+        ? getDateObj(
+            accompanyingDetails.appointmentDate,
+            accompanyingDetails.appointmentTime || "00:00",
+          )
+        : undefined,
       languages: dedupeLanguages([
         ...(body?.languagesMain || []).map((l) => ({
           id: l.id,

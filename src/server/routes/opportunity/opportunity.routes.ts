@@ -7,6 +7,7 @@ import {
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
+  OpportunitySortField,
   OpportunityType,
   SortOrder,
   UserRole,
@@ -25,6 +26,7 @@ import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import { updateVolunteerMatching } from "../../../data/utils";
@@ -34,6 +36,7 @@ import {
   accompanyingParserOpportunity,
   dtoOpportunityGet,
   dtoOpportunityGetList,
+  parseAccompDatetime,
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
@@ -64,12 +67,12 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOpportunityWhere,
-  getOrCreateEventTimeslot,
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
   patchEntity,
   updateOptionList,
+  upsertOnetimer,
   writeOpportunityLegacy,
 } from "../../utils";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
@@ -150,6 +153,7 @@ export default async function opportunityRoutes(
       const relations = [
         "accompanying",
         "accompanying.postcode",
+        "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
         "deal.dealSkill.skill",
@@ -262,17 +266,49 @@ export default async function opportunityRoutes(
         "deal.dealDistrict.district",
         "agent",
         "accompanying",
+        "onetimer",
         "opportunityVolunteer.volunteer.person",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
-      const [opportunities, count] = await opportunityRepository.findAndCount({
-        where,
-        relations,
-        skip,
-        take,
-        ...(order ? order : {}),
-      });
+
+      // Sorting by start date (be#746) needs NULLS LAST regardless of
+      // direction — opportunities with no onetimer (REGULAR type, or an
+      // ACCOMPANYING/EVENTS one with no date set yet) always sort last, so
+      // they don't crowd out real dates at the top of a "soonest first"
+      // list. `find()`'s plain `order` option can't express that (Postgres
+      // defaults DESC to NULLS FIRST), so this path uses the query builder,
+      // with its own `leftJoinAndSelect` on `onetimer` (excluded from the
+      // `relations` passed to `setFindOptions` to avoid joining it twice)
+      // so the same alias both hydrates the entity and drives ORDER BY.
+      // Pagination (skip/take) alongside the other one-to-many joins forces
+      // TypeORM to wrap the query in a DISTINCT subquery, and any column
+      // referenced in ORDER BY must be part of that subquery's projection —
+      // `leftJoinAndSelect` (unlike plain `leftJoin`) satisfies that.
+      const [opportunities, count] =
+        request.query.sortBy === OpportunitySortField.START_DATE
+          ? await opportunityRepository
+              .createQueryBuilder("opportunity")
+              .setFindOptions({
+                where,
+                relations: relations.filter((r) => r !== "onetimer"),
+                skip,
+                take,
+              })
+              .leftJoinAndSelect("opportunity.onetimer", "onetimerSort")
+              .orderBy(
+                "onetimerSort.date",
+                request.query.sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
+                "NULLS LAST",
+              )
+              .getManyAndCount()
+          : await opportunityRepository.findAndCount({
+              where,
+              relations,
+              skip,
+              take,
+              ...(order ? order : {}),
+            });
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();
@@ -392,15 +428,17 @@ export default async function opportunityRoutes(
       );
 
       opportunity.accompanying = undefined;
+      opportunity.onetimer = undefined;
 
       if (body.opportunity_type === OpportunityLegacyType.ACCOMPANYING) {
         opportunity.accompanying =
           await accompanyingParserOpportunity(legacyBody);
+        opportunity.onetimer = new Onetimer({
+          date: parseAccompDatetime(legacyBody.accomp_datetime),
+        });
       } else if (opportunity.type === OpportunityType.EVENTS) {
-        opportunity.accompanying = new Accompanying({
+        opportunity.onetimer = new Onetimer({
           date: new Date(legacyBody.onetime_date_time),
-          address: "",
-          name: "",
         });
       }
 
@@ -450,6 +488,7 @@ export default async function opportunityRoutes(
               [
                 "accompanying",
                 "accompanying.postcode",
+                "onetimer",
                 "submittedByPerson",
                 "submittedByPerson.users",
                 "contactPerson",
@@ -553,6 +592,7 @@ export default async function opportunityRoutes(
         contact,
         agent,
         accompanying,
+        onetimerDate,
         languages,
         schedule,
         skills,
@@ -691,68 +731,57 @@ export default async function opportunityRoutes(
         }
       }
 
-      // If the opportunity is being changed to an event or already an event, create or update the accompanying record with the event date and time, and create or update the timeslot for the event.
-      if (
-        effectiveType === OpportunityType.EVENTS &&
-        request.body.event?.date &&
-        request.body.event?.time
-      ) {
-        const eventDate = getDateObj(
-          request.body.event.date,
-          request.body.event.time,
-        );
+      // Single-occurrence start date/time, shared by ACCOMPANYING and EVENTS
+      // via `onetimer` (see be#746) — owned 1:1 by the opportunity. Resolved
+      // from whichever source matches the *resulting* type, so a payload that
+      // (incorrectly) carries both `accompanyingDetails` and `event` — or
+      // either alongside an unrelated type change — can't write a onetimer
+      // that doesn't belong to this opportunity's new type.
+      const resolvedOnetimerDate =
+        effectiveType === OpportunityType.EVENTS
+          ? request.body.event?.date && request.body.event?.time
+            ? getDateObj(request.body.event.date, request.body.event.time)
+            : undefined
+          : effectiveType === OpportunityType.ACCOMPANYING
+            ? onetimerDate
+            : undefined;
 
-        if (opportunity.accompanyingId) {
-          await patchEntity(
-            Accompanying,
-            {
-              date: eventDate,
-              address: "",
-              name: "",
-              phone: null,
-              email: null,
-              languageToTranslate: null,
-              postcodeId: null,
-            },
-            opportunity.accompanyingId,
+      if (resolvedOnetimerDate) {
+        await dataSource.manager.transaction(async (manager) => {
+          const onetimer = await upsertOnetimer(
+            opportunity.onetimerId,
+            resolvedOnetimerDate,
+            manager,
           );
-        } else {
-          const newAccompanying = new Accompanying({
-            date: eventDate,
-            address: "",
-            name: "",
-          });
-          try {
-            await fastify.db.accompanyingRepository.manager.transaction(
-              async (manager) => {
-                await manager.save(Accompanying, newAccompanying);
-                await manager.update(Opportunity, opportunity.id, {
-                  accompanyingId: newAccompanying.id,
-                });
-              },
+          if (!opportunity.onetimerId) {
+            await patchEntity(
+              Opportunity,
+              { onetimerId: onetimer.id } as Partial<Opportunity>,
+              opportunity.id,
+              manager,
             );
-          } catch {
-            throw new BadRequestError(
-              "Saving new accompanying for event failed",
-            );
+            opportunity.onetimerId = onetimer.id;
           }
-        }
-
-        const timeslot = await getOrCreateEventTimeslot(eventDate);
-        await updateOptionList(dealId, DealTimeslot, [{ id: timeslot.id }]);
+        });
       }
 
       if (
         effectiveType === OpportunityType.REGULAR &&
         opportunity.type !== OpportunityType.REGULAR &&
-        opportunity.accompanyingId
+        (opportunity.accompanyingId || opportunity.onetimerId)
       ) {
         await fastify.db.accompanyingRepository.manager.transaction(
           async (manager) => {
             await manager.update(Opportunity, opportunity.id, {
               accompanyingId: null,
+              onetimerId: null,
             });
-            await manager.delete(Accompanying, opportunity.accompanyingId);
+            if (opportunity.accompanyingId) {
+              await manager.delete(Accompanying, opportunity.accompanyingId);
+            }
+            if (opportunity.onetimerId) {
+              await manager.delete(Onetimer, opportunity.onetimerId);
+            }
           },
         );
       }
@@ -840,7 +869,7 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
 
-      const { dealId, accompanyingId } = opportunity;
+      const { dealId, accompanyingId, onetimerId } = opportunity;
 
       // OpportunityVolunteer rows cascade at the DB level, which bypasses
       // TypeORM's @AfterRemove hook (it never loads/removes those entities
@@ -863,6 +892,9 @@ export default async function opportunityRoutes(
         }
         if (accompanyingId) {
           await manager.delete(Accompanying, { id: accompanyingId });
+        }
+        if (onetimerId) {
+          await manager.delete(Onetimer, { id: onetimerId });
         }
       });
 

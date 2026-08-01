@@ -139,7 +139,7 @@ export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 export const accessCookieName = "access";
 export const refreshCookieName = "refresh";
 export const cookieOptions = {
-  signed: (process.env.SIGN_COOKIES || "false") === "true",
+  signed: TRUTHY.has(process.env.SIGN_COOKIES || ""),
   httpOnly: true,
   secure: (process.env.NODE_ENV || "development") === "production",
   sameSite: ((process.env.NODE_ENV || "development") === "production"

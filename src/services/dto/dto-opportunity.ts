@@ -80,7 +80,10 @@ export function dtoOpportunityGetList(
       id: ld.district.id,
     })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
-    accompanyingDetails: dtoOpportunityAccompanying(opportunity.accompanying!),
+    accompanyingDetails: dtoOpportunityAccompanying(
+      opportunity.accompanying!,
+      opportunity.onetimer?.date,
+    ),
     agentTitle: opportunity.agent?.title ?? "",
     agentId: opportunity.agentId,
     // Names of the volunteers MATCHED to the opportunity (status opp-matched
@@ -121,6 +124,7 @@ export function dtoVolunteerOpportunityGetList(
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunity.accompanying!,
+      opportunity.onetimer?.date,
       opportunity.deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
@@ -131,16 +135,10 @@ export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
   accompanyingDistrict?: District | null,
 ): ApiOpportunityGet {
-  let eventStart: Date | undefined = undefined;
-  if (opportunityComments.type === OpportunityType.EVENTS) {
-    eventStart = (opportunityComments.deal?.dealTimeslot ?? []).find(
-      (dt) =>
-        dt.timeslot?.start &&
-        !dt.timeslot?.end &&
-        !dt.timeslot?.rrule &&
-        !dt.timeslot?.occasional,
-    )?.timeslot?.start;
-  }
+  const eventStart =
+    opportunityComments.type === OpportunityType.EVENTS
+      ? opportunityComments.onetimer?.date
+      : undefined;
 
   return {
     id: opportunityComments.id,
@@ -183,6 +181,7 @@ export function dtoOpportunityGet(
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
       opportunityComments.accompanying!,
+      opportunityComments.onetimer?.date,
       opportunityComments.deal.dealLanguage,
       accompanyingDistrict,
     ),

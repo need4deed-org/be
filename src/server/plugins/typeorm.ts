@@ -13,6 +13,7 @@ import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
@@ -53,6 +54,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       agentRepository: dataSource.getRepository(Agent),
       agentPersonRepository: dataSource.getRepository(AgentPerson),
       accompanyingRepository: dataSource.getRepository(Accompanying),
+      onetimerRepository: dataSource.getRepository(Onetimer),
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
       postRepository: dataSource.getRepository(Post),
