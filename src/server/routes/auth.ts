@@ -137,6 +137,7 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
       schema: {
         body: refreshAccessSchema,
         response: {
@@ -328,6 +329,7 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.CHANGE_PASSWORD,
     {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
       onRequest: [fastify.authenticate()],
       schema: {
         body: changePasswordSchema,
