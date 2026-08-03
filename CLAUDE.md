@@ -162,6 +162,7 @@ Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts`
 Copy `.env.example` to `.env` and fill in real values. Key variables:
 
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SCHEMA` — Postgres connection
+- `DB_SSL_CA_PATH` — optional; path to the CA certificate used to verify the Postgres server in `production`/`staging` (defaults to the baked-in AWS RDS bundle; TLS verification is always strict)
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
 - `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
