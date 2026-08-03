@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -21,7 +22,7 @@ describe("getSslForDataSource", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it.each(["development", "test", "debug", undefined])(
+  it.each(["development", "test", "debug", "", undefined])(
     "returns false for %s even when a CA path is set",
     (env) => {
       expect(getSslForDataSource(env, caPath)).toBe(false);
@@ -38,7 +39,7 @@ describe("getSslForDataSource", () => {
     },
   );
 
-  it("throws an actionable error when the CA path is unreadable", () => {
+  it("names the path and DB_SSL_CA_PATH when the CA is unreadable", () => {
     const missing = join(dir, "missing.pem");
     expect(() => getSslForDataSource("production", missing)).toThrowError(
       /DB_SSL_CA_PATH/,
@@ -48,11 +49,33 @@ describe("getSslForDataSource", () => {
     );
   });
 
-  it("falls back to the baked-in bundle path when no path is given", () => {
-    expect(() => getSslForDataSource("production", undefined)).toThrowError(
-      /\/app\/certificates\/eu-central-1-bundle\.pem/,
+  it("rejects a CA file that contains no PEM certificate", async () => {
+    const empty = join(dir, "empty.pem");
+    await writeFile(empty, "", "utf-8");
+    expect(() => getSslForDataSource("production", empty)).toThrowError(
+      /contains no PEM certificate/,
     );
   });
+
+  const DEFAULT_CA_PATH = "/app/certificates/eu-central-1-bundle.pem";
+
+  it.skipIf(existsSync(DEFAULT_CA_PATH))(
+    "falls back to the baked-in bundle path when no path is given",
+    () => {
+      expect(() => getSslForDataSource("production", undefined)).toThrowError(
+        /\/app\/certificates\/eu-central-1-bundle\.pem/,
+      );
+    },
+  );
+
+  it.skipIf(existsSync(DEFAULT_CA_PATH))(
+    "treats an empty-string path like an unset one",
+    () => {
+      expect(() => getSslForDataSource("production", "")).toThrowError(
+        /\/app\/certificates\/eu-central-1-bundle\.pem/,
+      );
+    },
+  );
 
   it("never disables certificate verification", () => {
     const ssl = getSslForDataSource("staging", caPath);
