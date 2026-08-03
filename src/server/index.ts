@@ -10,6 +10,7 @@ import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
 import notifyPlugin from "./plugins/notify";
+import rateLimitPlugin from "./plugins/rate-limit";
 import schedulerDailyPlugin from "./plugins/scheduler-daily";
 import schedulerHourlyPlugin from "./plugins/scheduler-hourly";
 import typeormPlugin from "./plugins/typeorm";
@@ -42,11 +43,40 @@ import volunteerApiSchema from "./schema/volunteer-api.json";
 import volunteerFormDataSchema from "./schema/volunteer-form.json";
 import { RoutePrefix } from "./types";
 
+const decodeTrustProxyEnv = (
+  value: string | undefined,
+): boolean | string | number | string[] => {
+  if (value === undefined || value === null || value.trim() === "") {
+    return false;
+  }
+
+  const normalized = value.trim();
+
+  if (/^\d+$/.test(normalized)) {
+    return parseInt(normalized, 10);
+  }
+
+  if (normalized.toLowerCase() === "true") {
+    return true;
+  }
+
+  if (normalized.toLowerCase() === "false") {
+    return false;
+  }
+
+  if (normalized.includes(",")) {
+    return normalized.split(",").map((item) => item.trim());
+  }
+
+  return normalized;
+};
+
 export async function createServer(): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     pluginTimeout,
     querystringParser: (str) => qs.parse(str),
     loggerInstance: logger,
+    trustProxy: decodeTrustProxyEnv(process.env.TRUST_PROXY),
     ajv: {
       customOptions: {
         strict: false,
@@ -95,6 +125,11 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.setErrorHandler((error, request, reply) => {
     request.log.error(error);
 
+    if (error.statusCode === 429) {
+      reply.status(429).send(error);
+      return;
+    }
+
     // If it's one of our custom errors, use its status code
     if (error instanceof BaseError) {
       return reply.status(error.statusCode).send({
@@ -133,6 +168,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(multipart, {
     attachFieldsToBody: "keyValues",
   });
+  await fastifyInstance.register(rateLimitPlugin);
 
   await fastifyInstance.register(fastifySwagger, {
     openapi: {
