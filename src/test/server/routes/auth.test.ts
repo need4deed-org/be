@@ -325,3 +325,128 @@ describe("POST /auth/request-reset", () => {
     expect(passwordResetSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("Rate limiting", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("POST /auth/login limits to 10 requests per minute", async () => {
+    for (let i = 0; i < 10; i++) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "test@example.com", password: "whatever" },
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: "test@example.com", password: "whatever" },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/refresh limits to 20 requests per minute", async () => {
+    for (let i = 0; i < 20; i++) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: { refresh: "some-token" },
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      payload: { refresh: "some-token" },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/request-reset limits to 3 requests per 5 minutes", async () => {
+    for (let i = 0; i < 3; i++) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/request-reset",
+        payload: { email: "test@example.com" },
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/password-reset limits to 10 requests per minute", async () => {
+    for (let i = 0; i < 10; i++) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/password-reset",
+        payload: { token: "invalid", newPassword: "newpass123456" },
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token: "invalid", newPassword: "newpass123456" },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/password-change limits to 20 requests per minute", async () => {
+    const accessToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      type: "access",
+    });
+
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      id: 999,
+      role: "volunteer",
+    } as any);
+
+    for (let i = 0; i < 20; i++) {
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/password-change",
+        cookies: { access: accessToken },
+        payload: { password: "old", newPassword: "new" },
+      });
+      expect(response.statusCode).not.toBe(429);
+    }
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-change",
+      cookies: { access: accessToken },
+      payload: { password: "old", newPassword: "new" },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+});
