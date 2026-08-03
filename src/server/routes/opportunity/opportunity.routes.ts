@@ -599,9 +599,6 @@ export default async function opportunityRoutes(
         activities,
       } = parseOpportunity(request.body);
       const agentLinkId = request.body.agent?.id;
-      logger.debug(
-        `PATCH /opportunity/{id} ${JSON.stringify(parseOpportunity(request.body))}`,
-      );
 
       if (
         request.body.opportunity_type === OpportunityType.ACCOMPANYING &&

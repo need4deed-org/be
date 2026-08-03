@@ -61,8 +61,6 @@ async function authRoutes(
       }
 
       try {
-        logger.debug(`Attempting to authenticate: ${email}`);
-
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
           throw new Error("User repository is not initialized.");
