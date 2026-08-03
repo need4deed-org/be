@@ -123,6 +123,11 @@ export async function createServer(): Promise<FastifyInstance> {
   if (!secret) {
     throw new Error("JWT_SECRET is not defined in environment variables.");
   }
+
+  if (isProd && secret.length < 64) {
+    throw new Error("JWT_SECRET must be at least 64 characters in production.");
+  }
+
   await fastifyInstance.register(jwtPlugin, { secret });
   await fastifyInstance.register(cors, corsOptions);
   await fastifyInstance.register(multipart, {
