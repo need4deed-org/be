@@ -232,7 +232,7 @@ export default async function userRoutes(
         });
 
         if (!user) {
-          logger.warn(`User with email ${email} not found.`);
+          logger.warn("User not found for login attempt.");
           return reply.status(400).send({ message: "Invalid token." });
         }
 
