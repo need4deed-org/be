@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentRoleType,
   EntityTableName,
   OpportunityStatusType,
   OpportunityType,
@@ -48,6 +49,8 @@ describe("PATCH /opportunity/:id agent status update", () => {
   let otherDeal: Deal;
   let agentPerson: Person;
   let coordinatorPerson: Person;
+  let agentContactPerson: Person;
+  let unrelatedPerson: Person;
   let agentCookie: string;
   let coordinatorCookie: string;
 
@@ -99,6 +102,12 @@ describe("PATCH /opportunity/:id agent status update", () => {
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Coordinator" }),
     );
+    agentContactPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "AgentContact" }),
+    );
+    unrelatedPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Unrelated" }),
+    );
 
     const pwHash = await hashPassword(PASSWORD);
     await fastify.db.userRepository.save(
@@ -121,6 +130,13 @@ describe("PATCH /opportunity/:id agent status update", () => {
     );
     await fastify.db.agentPersonRepository.save(
       new AgentPerson({ agentId: ownAgent.id, personId: agentPerson.id }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: ownAgent.id,
+        personId: agentContactPerson.id,
+        role: AgentRoleType.OTHER,
+      }),
     );
 
     const login = async (email: string): Promise<string> => {
@@ -145,6 +161,10 @@ describe("PATCH /opportunity/:id agent status update", () => {
       agentId: ownAgent.id,
       personId: agentPerson.id,
     });
+    await fastify.db.agentPersonRepository.delete({
+      agentId: ownAgent.id,
+      personId: agentContactPerson.id,
+    });
     await fastify.db.dealRepository.delete({ id: ownDeal.id });
     await fastify.db.dealRepository.delete({ id: otherDeal.id });
     await fastify.db.agentRepository.delete({ id: ownAgent.id });
@@ -153,6 +173,8 @@ describe("PATCH /opportunity/:id agent status update", () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: agentContactPerson.id });
+    await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
     await fastify.close();
   });
 
@@ -254,6 +276,58 @@ describe("PATCH /opportunity/:id agent status update", () => {
       { id: ownOpportunity.id },
       { agentId: ownAgent.id },
     );
+  });
+
+  it("403s when an agent tries to relink an opportunity's contact via contact.id", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        statusOpportunity: OpportunityStatusType.ACTIVE,
+        contact: { id: agentContactPerson.id },
+      },
+    });
+    expect(res.statusCode).toBe(403);
+
+    const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(unchanged.contactPersonId).toBeFalsy();
+  });
+
+  it("lets a coordinator relink an opportunity's contact to a registered contact of its agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { contact: { id: agentContactPerson.id } },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(updated.contactPersonId).toBe(agentContactPerson.id);
+  });
+
+  it("404s when relinking an opportunity's contact to a person who isn't a registered contact of its agent", async () => {
+    const before = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { contact: { id: unrelatedPerson.id } },
+    });
+    expect(res.statusCode).toBe(404);
+
+    const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(unchanged.contactPersonId).toBe(before.contactPersonId);
   });
 });
 

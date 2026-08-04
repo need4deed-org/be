@@ -28,7 +28,6 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import Person from "../../../data/entity/person.entity";
 import { updateVolunteerMatching } from "../../../data/utils";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 import logger from "../../../logger";
@@ -589,7 +588,6 @@ export default async function opportunityRoutes(
 
       const {
         opportunity: opportunityObj,
-        contact,
         agent,
         accompanying,
         onetimerDate,
@@ -599,6 +597,7 @@ export default async function opportunityRoutes(
         activities,
       } = parseOpportunity(request.body);
       const agentLinkId = request.body.agent?.id;
+      const contactLinkId = request.body.contact?.id;
 
       if (
         request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
@@ -650,15 +649,6 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (contact) {
-        const success = await patchEntity(Person, contact);
-        if (!success) {
-          throw new Error(
-            "Patching contact failed while patching opportunity.",
-          );
-        }
-      }
-
       if (agentLinkId !== undefined) {
         const linkedAgent = await fastify.db.agentRepository.findOne({
           where: { id: agentLinkId },
@@ -678,6 +668,32 @@ export default async function opportunityRoutes(
         const success = await patchEntity(Agent, agent, opportunity.agentId);
         if (!success) {
           throw new Error("Patching agent failed while patching opportunity.");
+        }
+      }
+
+      if (contactLinkId !== undefined) {
+        // Evaluated after the agent relink above so a payload that relinks
+        // both `agent.id` and `contact.id` in one request validates the
+        // contact against the opportunity's *new* agent, not the old one.
+        const effectiveAgentId = agentLinkId ?? opportunity.agentId;
+        const isAgentContact = await fastify.db.agentPersonRepository.findOneBy(
+          {
+            agentId: effectiveAgentId,
+            personId: contactLinkId,
+          },
+        );
+        if (!isAgentContact) {
+          throw new NotFoundError(
+            `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
+          );
+        }
+        const success = await patchEntity(
+          Opportunity,
+          { contactPersonId: contactLinkId } as Partial<Opportunity>,
+          opportunity.id,
+        );
+        if (!success) {
+          throw new BadRequestError("Relinking opportunity contact failed.");
         }
       }
 
