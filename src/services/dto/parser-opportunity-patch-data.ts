@@ -1,6 +1,5 @@
 import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
 import { In, Repository } from "typeorm";
-import { getNameFields } from "..";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
@@ -73,15 +72,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
         infoConfidential: body.description,
         type: body.opportunity_type,
       },
-      contact: body?.contact
-        ? {
-            id: body?.contact?.id,
-            ...getNameFields(body.contact.name),
-            phone: body?.contact?.phone,
-            email: body?.contact?.email,
-            preferredCommunicationType: body?.contact?.waysToContact,
-          }
-        : {},
       agent:
         agentBody && agentBody.id === undefined
           ? ({
