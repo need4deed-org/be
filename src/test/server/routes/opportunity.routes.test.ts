@@ -325,6 +325,29 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(updated.contactPersonId).toBe(agentContactPerson.id);
   });
 
+  it("clears the opportunity's contact when relinking agent.id without also sending contact.id", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { agent: { id: otherAgent.id } },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(updated.agentId).toBe(otherAgent.id);
+    expect(updated.contactPersonId).toBeFalsy();
+
+    // Restore for the following tests, which assume ownOpportunity is on
+    // ownAgent again.
+    await fastify.db.opportunityRepository.update(
+      { id: ownOpportunity.id },
+      { agentId: ownAgent.id },
+    );
+  });
+
   it("404s when relinking an opportunity's contact to a person who is a registered contact of a different agent", async () => {
     const before = await fastify.db.opportunityRepository.findOneByOrFail({
       id: ownOpportunity.id,

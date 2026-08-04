@@ -656,9 +656,16 @@ export default async function opportunityRoutes(
         if (!linkedAgent) {
           throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
         }
+        // The opportunity's existing contact (if any) belongs to the *old*
+        // agent and has no guaranteed relationship to the new one — clear it
+        // rather than leave a stale cross-agent reference. If the request
+        // also carries `contact.id`, the contactLinkId branch below sets the
+        // real (validated-against-the-new-agent) value right after this.
+        const contactReset: Partial<Opportunity> =
+          contactLinkId === undefined ? { contactPersonId: null } : {};
         const success = await patchEntity(
           Opportunity,
-          { agentId: agentLinkId } as Partial<Opportunity>,
+          { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
           opportunity.id,
         );
         if (!success) {
