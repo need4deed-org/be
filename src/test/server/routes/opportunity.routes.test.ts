@@ -138,6 +138,16 @@ describe("PATCH /opportunity/:id agent status update", () => {
         role: AgentRoleType.OTHER,
       }),
     );
+    // Registered as a contact of otherAgent, not ownAgent — used to confirm
+    // the membership check rejects a contact that belongs to a different
+    // agent, not just a person with no agent contact at all.
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: otherAgent.id,
+        personId: unrelatedPerson.id,
+        role: AgentRoleType.OTHER,
+      }),
+    );
 
     const login = async (email: string): Promise<string> => {
       const res = await fastify.inject({
@@ -164,6 +174,10 @@ describe("PATCH /opportunity/:id agent status update", () => {
     await fastify.db.agentPersonRepository.delete({
       agentId: ownAgent.id,
       personId: agentContactPerson.id,
+    });
+    await fastify.db.agentPersonRepository.delete({
+      agentId: otherAgent.id,
+      personId: unrelatedPerson.id,
     });
     await fastify.db.dealRepository.delete({ id: ownDeal.id });
     await fastify.db.dealRepository.delete({ id: otherDeal.id });
@@ -311,7 +325,7 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(updated.contactPersonId).toBe(agentContactPerson.id);
   });
 
-  it("404s when relinking an opportunity's contact to a person who isn't a registered contact of its agent", async () => {
+  it("404s when relinking an opportunity's contact to a person who is a registered contact of a different agent", async () => {
     const before = await fastify.db.opportunityRepository.findOneByOrFail({
       id: ownOpportunity.id,
     });
@@ -328,6 +342,35 @@ describe("PATCH /opportunity/:id agent status update", () => {
       id: ownOpportunity.id,
     });
     expect(unchanged.contactPersonId).toBe(before.contactPersonId);
+  });
+
+  // unrelatedPerson is only a registered contact of otherAgent (confirmed
+  // rejected against ownAgent by the previous test) — relinking agent.id and
+  // contact.id together in one request must validate the contact against
+  // the *new* agent, not the opportunity's current one.
+  it("lets a coordinator relink both agent and contact in one request, validating the contact against the new agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        agent: { id: otherAgent.id },
+        contact: { id: unrelatedPerson.id },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(updated.agentId).toBe(otherAgent.id);
+    expect(updated.contactPersonId).toBe(unrelatedPerson.id);
+
+    // Restore for any later test in this file that assumes ownAgent.
+    await fastify.db.opportunityRepository.update(
+      { id: ownOpportunity.id },
+      { agentId: ownAgent.id, contactPersonId: agentContactPerson.id },
+    );
   });
 });
 

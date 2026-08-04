@@ -676,13 +676,12 @@ export default async function opportunityRoutes(
         // both `agent.id` and `contact.id` in one request validates the
         // contact against the opportunity's *new* agent, not the old one.
         const effectiveAgentId = agentLinkId ?? opportunity.agentId;
-        const isAgentContact = await fastify.db.agentPersonRepository.findOneBy(
-          {
+        const agentContactMembership =
+          await fastify.db.agentPersonRepository.findOneBy({
             agentId: effectiveAgentId,
             personId: contactLinkId,
-          },
-        );
-        if (!isAgentContact) {
+          });
+        if (!agentContactMembership) {
           throw new NotFoundError(
             `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
           );
