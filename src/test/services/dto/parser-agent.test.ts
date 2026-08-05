@@ -69,9 +69,9 @@ describe("parseAgentPatch", () => {
     expect(result.searchStatus).toBe("agent-not-needed");
   });
 
-  it("maps districtId", () => {
+  it("never maps districtId — district is derived from postcode server-side, not client-settable (be#827)", () => {
     const agent: ApiAgentPatch = { districtId: 42 };
 
-    expect(parseAgentPatch(agent).districtId).toBe(42);
+    expect(parseAgentPatch(agent)).not.toHaveProperty("districtId");
   });
 });
