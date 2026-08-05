@@ -2,7 +2,11 @@ import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
+import District from "../../../data/entity/location/district.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -285,5 +289,143 @@ describe("PATCH /agent/:id organization details", () => {
       payload: { title: `Updated by admin ${agent.id}` },
     });
     expect(res.statusCode).toBe(204);
+  });
+
+  // District must always be derived from postcode, never independently
+  // settable — a client-supplied districtId that disagrees with the actual
+  // postcode is silently overridden rather than persisted (be#827).
+  describe("district derivation from postcode", () => {
+    let postcodeA: Postcode;
+    let postcodeB: Postcode;
+    let districtA: District;
+    let districtB: District;
+    let mappingA: DistrictPostcode;
+    let mappingB: DistrictPostcode;
+
+    beforeAll(async () => {
+      const districtRepository = dataSource.getRepository(District);
+      const postcodeRepository = dataSource.getRepository(Postcode);
+      const districtPostcodeRepository =
+        dataSource.getRepository(DistrictPostcode);
+
+      const districtSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      const numericSuffix = String(Date.now() % 10000).padStart(4, "0");
+
+      postcodeA = await postcodeRepository.save(
+        new Postcode({ value: `1${numericSuffix}` }),
+      );
+      postcodeB = await postcodeRepository.save(
+        new Postcode({ value: `9${numericSuffix}` }),
+      );
+      districtA = await districtRepository.save(
+        new District({ title: `Test District A ${districtSuffix}` }),
+      );
+      districtB = await districtRepository.save(
+        new District({ title: `Test District B ${districtSuffix}` }),
+      );
+      mappingA = await districtPostcodeRepository.save(
+        new DistrictPostcode({
+          postcodeId: postcodeA.id,
+          districtId: districtA.id,
+        }),
+      );
+      mappingB = await districtPostcodeRepository.save(
+        new DistrictPostcode({
+          postcodeId: postcodeB.id,
+          districtId: districtB.id,
+        }),
+      );
+    });
+
+    afterAll(async () => {
+      const districtRepository = dataSource.getRepository(District);
+      const postcodeRepository = dataSource.getRepository(Postcode);
+      const districtPostcodeRepository =
+        dataSource.getRepository(DistrictPostcode);
+
+      await districtPostcodeRepository.delete({ id: mappingA.id });
+      await districtPostcodeRepository.delete({ id: mappingB.id });
+      await districtRepository.delete({ id: districtA.id });
+      await districtRepository.delete({ id: districtB.id });
+      await postcodeRepository.delete({ id: postcodeA.id });
+      await postcodeRepository.delete({ id: postcodeB.id });
+    });
+
+    it("derives district from postcode when creating an address via PATCH", async () => {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          addressStreet: "Teststraße 1",
+          addressPostcode: postcodeA.value,
+        },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const updated = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      expect(updated.districtId).toBe(districtA.id);
+    });
+
+    it("recomputes district when the postcode changes on a subsequent PATCH", async () => {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { addressPostcode: postcodeB.value },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const updated = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      expect(updated.districtId).toBe(districtB.id);
+    });
+
+    it("ignores a client-supplied districtId that disagrees with the resolved postcode", async () => {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          addressPostcode: postcodeA.value,
+          districtId: districtB.id,
+        },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const updated = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      // Derived from postcodeA (districtA), not the client-supplied districtB.
+      expect(updated.districtId).toBe(districtA.id);
+    });
+
+    it("ignores a client-supplied districtId even when the request doesn't touch the address at all", async () => {
+      const before = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          districtId: districtB.id,
+          title: `District-noop ${agent.id}`,
+        },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const updated = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      // Still derived from the agent's existing address (postcodeA / districtA
+      // from the previous test), unchanged by the districtId in this payload.
+      expect(updated.districtId).toBe(before.districtId);
+      expect(updated.districtId).not.toBe(districtB.id);
+    });
   });
 });
