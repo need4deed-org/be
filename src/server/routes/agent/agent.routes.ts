@@ -10,7 +10,9 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../../config";
+import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import { getRepository } from "../../../data/utils";
 import logger from "../../../logger";
 import {
   dtoAgentGet,
@@ -38,6 +40,7 @@ import {
   getDistrictToAgentHandler,
   getSkipTake,
   patchAddress,
+  syncAgentDistrictFromPostcode,
   updateAgentLanguages,
   updateAgentServices,
 } from "../../utils";
@@ -289,6 +292,22 @@ export default async function agentRoutes(
         }
 
         Object.assign(agent, parseAgentPatch(request.body));
+
+        // District is derived from postcode, never independently settable
+        // (be#827) — recompute it here, after any address/postcode update
+        // above, so it can't drift out of sync. Runs on every patch, not
+        // only ones that touch the address, so a stale district left over
+        // from before this fix also gets corrected the next time this
+        // agent is edited at all.
+        if (agent.addressId) {
+          const addressRepository = getRepository(manager, Address);
+          const address = await addressRepository.findOne({
+            where: { id: agent.addressId },
+            relations: ["postcode"],
+          });
+          await syncAgentDistrictFromPostcode(agent, address?.postcode);
+        }
+
         await manager.getRepository(Agent).save(agent);
 
         if (languages) {

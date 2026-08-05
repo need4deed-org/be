@@ -21,9 +21,14 @@ export async function getDistrictFromPostcode(
       dataSource,
       DistrictPostcode,
     );
+    // A postcode can map to more than one district (DistrictPostcode is a
+    // genuine m2m). Order deterministically so the same postcode always
+    // resolves to the same district rather than whatever row Postgres
+    // happens to return first (be#827).
     const districtPostcode = await districtPostcodeRepository.findOne({
       where: { postcodeId: postcodeId },
       relations: ["district"],
+      order: { id: "ASC" },
     });
     if (districtPostcode) {
       return districtPostcode.district;
