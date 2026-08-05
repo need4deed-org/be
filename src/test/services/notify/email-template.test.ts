@@ -106,9 +106,9 @@ describe("resolveLocale", () => {
     expect(resolveLocale("en")).toBe(Lang.EN);
   });
 
-  it("falls back to EN for unknown languages", () => {
-    expect(resolveLocale("fr")).toBe(Lang.EN);
-    expect(resolveLocale(undefined)).toBe(Lang.EN);
+  it("falls back to DE for unknown languages", () => {
+    expect(resolveLocale("fr")).toBe(Lang.DE);
+    expect(resolveLocale(undefined)).toBe(Lang.DE);
   });
 });
 
@@ -130,12 +130,12 @@ describe("resolveContent", () => {
     );
   });
 
-  it("falls back to EN manifest when requested locale is missing", () => {
+  it("falls back to DE manifest (the default locale) when requested locale is missing", () => {
     const manifest = {
-      [Lang.EN]: { subject: "Manifest EN", html: "<p>en</p>" },
+      [Lang.DE]: { subject: "Manifest DE", html: "<p>de</p>" },
     };
-    expect(resolveContent(manifest, Lang.DE, builtin).subject).toBe(
-      "Manifest EN",
+    expect(resolveContent(manifest, Lang.EN, builtin).subject).toBe(
+      "Manifest DE",
     );
   });
 

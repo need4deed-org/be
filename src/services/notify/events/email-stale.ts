@@ -1,29 +1,17 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailFromNotify,
   emailFromVolunteer,
   emailStaleManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { STALE_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
   resolveLocale,
-  type LocaleContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject: "Are you still interested in volunteering? — Need4Deed",
-    text: `Dear {{ volunteerName }},\n\nWe wanted to check in. Two months ago we sent you a volunteering opportunity, but we have not heard back yet.\n\nIf you are still interested in volunteering, please reply to this email.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject: "Bist du noch interessiert? — Need4Deed",
-    text: `Hallo {{ volunteerName }},\n\nwir wollten kurz nachfragen. Vor zwei Monaten haben wir dir eine ehrenamtliche Möglichkeit vorgeschlagen, aber bisher haben wir keine Rückmeldung erhalten.\n\nFalls du weiterhin Interesse hast, antworte bitte auf diese E-Mail.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailStaleManifestUrl);
 

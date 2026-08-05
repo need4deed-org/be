@@ -18,7 +18,10 @@ export interface LocaleContent {
 export type Manifest = Partial<Record<Lang, LocaleContent>> | LocaleContent;
 export type TemplateVars = Record<string, string | number>;
 
-const DEFAULT_LOCALE = Lang.EN;
+// Berlin-based NGO — when a recipient's locale can't be determined (e.g. a
+// volunteer with no User row to read a language preference from), German is
+// the more appropriate default than English.
+const DEFAULT_LOCALE = Lang.DE;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 
 /**

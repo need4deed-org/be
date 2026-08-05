@@ -47,12 +47,12 @@ describe("sendEmailVerification", () => {
     expect(msg.html).not.toContain("{{verificationUrl}}");
   });
 
-  it("falls back to the default locale (en) for an unsupported language", async () => {
+  it("falls back to the default locale (de) for an unsupported language", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
 
     await sendEmailVerification(deps, user({ language: "fr" }));
 
-    expect(send.mock.calls[0][0].subject).toBe("Verify your account");
+    expect(send.mock.calls[0][0].subject).toBe("Konto bestätigen");
   });
 
   it("caches the manifest within TTL (single fetch across two sends)", async () => {
