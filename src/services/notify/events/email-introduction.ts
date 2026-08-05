@@ -8,27 +8,14 @@ import {
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { getLanguages, getOptionItems, getTitles } from "../../dto/utils";
+import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
   resolveLocale,
-  type LocaleContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject:
-      "Introduction — {{ volunteerName }} & {{ volunteeringopportunityName }}",
-    text: `Dear {{ contactpersonName }}, dear {{ volunteerName }},\n\nWe are delighted to introduce you to each other for the volunteering opportunity "{{ volunteeringopportunityName }}".\n\n{{ volunteerName }} speaks {{ volunteerLanguage }} and has the following skills: {{ volunteerSkills }}.\nAvailability: {{ volSchedule }}\n\n{{ statmentOnCertificates }}\n\nVolunteer contact:\n{{ volunteerName }}\n{{ volunteerEmail }}\n{{ volunteerPhone }}\n\nCenter contact:\n{{ contactpersonName }}\n{{ contactpersonEmail }}\n{{ contactpersonPhone }}\n{{ agentAddress }}\n\nPlease feel free to get in touch with each other directly to arrange the details. If you have any questions, do not hesitate to contact us.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject:
-      "Vorstellung — {{ volunteerName }} & {{ volunteeringopportunityName }}",
-    text: `Hallo {{ contactpersonName }}, hallo {{ volunteerName }},\n\nwir freuen uns, euch für das Gesuch „{{ volunteeringopportunityName }}" miteinander bekannt zu machen.\n\n{{ volunteerName }} spricht {{ volunteerLanguage }} und hat folgende Fähigkeiten: {{ volunteerSkills }}.\nVerfügbarkeit: {{ volSchedule }}\n\n{{ statmentOnCertificates }}\n\nKontaktdaten Ehrenamt:\n{{ volunteerName }}\n{{ volunteerEmail }}\n{{ volunteerPhone }}\n\nKontaktdaten Unterkunft:\n{{ contactpersonName }}\n{{ contactpersonEmail }}\n{{ contactpersonPhone }}\n{{ agentAddress }}\n\nIhr könnt gerne direkt miteinander in Kontakt treten, um die Details zu klären. Bei Fragen stehen wir gerne zur Verfügung.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailIntroductionManifestUrl);
 

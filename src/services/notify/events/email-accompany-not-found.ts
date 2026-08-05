@@ -1,31 +1,17 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyNotFoundManifestUrl,
   emailFromAccompanying,
   emailFromNotify,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
   resolveLocale,
-  type LocaleContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject:
-      "Accompanying to an appointment on {{ appointmentDate }} in {{ appointmentDistrict }} for {{ clientName }}",
-    text: `Dear {{ contactpersonName }},\n\nUnfortunately, we were unable to find a volunteer for this appointment. We have now called off our search.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject:
-      "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-    text: `Hallo {{ contactpersonName }},\n\nleider hat sich niemand für die Sprachmittlung gemeldet. Wir haben nun unsere Suche eingestellt.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailAccompanyNotFoundManifestUrl);
 

@@ -7,27 +7,14 @@ import {
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { getLanguages } from "../../dto/utils";
+import { ACCOMPANY_MATCH_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
   resolveLocale,
-  type LocaleContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject:
-      "Accompanying to an appointment on {{ appointmentDate }} in {{ appointmentDistrict }} for {{ clientName }}",
-    text: `Dear {{ contactpersonName }},\n\n{{ volunteerName }} would be glad to provide interpreting support for this appointment. {{ volunteerName }} speaks {{ volunteerLanguage }}.\n\n{{ volunteerName }} has already received {{ clientName }}'s contact details and will get in touch with them shortly.\n\n{{ contactSharing }}\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject:
-      "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-    text: `Hallo {{ contactpersonName }},\n\n{{ volunteerName }} übernimmt gerne die Sprachmittlung für diesen Termin. {{ volunteerName }} spricht {{ volunteerLanguage }}.\n\n{{ volunteerName }} hat schon die Kontaktdaten von {{ clientName }} bekommen und meldet sich zeitnah bei der Person.\n\n{{ contactSharing }}\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailAccompanyMatchManifestUrl);
 
