@@ -851,21 +851,6 @@
           "properties": {
             "id": {
               "type": "integer"
-            },
-            "name": {
-              "type": "string"
-            },
-            "phone": {
-              "type": "string"
-            },
-            "email": {
-              "type": "string"
-            },
-            "waysToContact": {
-              "type": "array",
-              "items": {
-                "$ref": "PreferredCommunicationType#"
-              }
             }
           }
         },
