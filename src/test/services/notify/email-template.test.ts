@@ -149,6 +149,19 @@ describe("resolveContent", () => {
       "Builtin EN",
     );
   });
+
+  it("uses a flat (non-locale-keyed) manifest as-is regardless of locale", () => {
+    const manifest = { subject: "Flat subject", text: "flat body" };
+    expect(resolveContent(manifest, Lang.EN, builtin)).toEqual(manifest);
+    expect(resolveContent(manifest, Lang.DE, builtin)).toEqual(manifest);
+  });
+
+  it("falls back to builtin when a flat manifest is invalid (no body)", () => {
+    const manifest = { subject: "no body" };
+    expect(resolveContent(manifest, Lang.DE, builtin).subject).toBe(
+      "Builtin DE",
+    );
+  });
 });
 
 // ─── createManifestLoader ────────────────────────────────────────────────────
