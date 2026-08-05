@@ -12,7 +12,10 @@ export interface LocaleContent {
   text?: string;
 }
 
-export type Manifest = Partial<Record<Lang, LocaleContent>>;
+// A manifest is either per-locale content keyed by "en"/"de", or a single flat
+// LocaleContent used as-is regardless of locale (for content that isn't split
+// by language, e.g. a template that already mixes both languages in one body).
+export type Manifest = Partial<Record<Lang, LocaleContent>> | LocaleContent;
 export type TemplateVars = Record<string, string | number>;
 
 const DEFAULT_LOCALE = Lang.EN;
@@ -56,11 +59,22 @@ function isValid(content: LocaleContent | undefined): content is LocaleContent {
   return Boolean(content?.subject && (content.html || content.text));
 }
 
+// A flat manifest has a top-level "subject" — the per-locale shape never does,
+// since its top-level keys are always locale codes ("en"/"de").
+function isFlatContent(manifest: Manifest): manifest is LocaleContent {
+  return typeof (manifest as LocaleContent).subject === "string";
+}
+
 export function resolveContent(
   manifest: Manifest | null,
   locale: Lang,
   builtin: Record<Lang, LocaleContent>,
 ): LocaleContent {
+  if (manifest && isFlatContent(manifest)) {
+    return isValid(manifest)
+      ? manifest
+      : (builtin[locale] ?? builtin[DEFAULT_LOCALE]);
+  }
   const candidates = [manifest?.[locale], manifest?.[DEFAULT_LOCALE]];
   return candidates.find(isValid) ?? builtin[locale] ?? builtin[DEFAULT_LOCALE];
 }
