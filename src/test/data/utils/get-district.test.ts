@@ -112,6 +112,17 @@ describe("getDistrictFromPostcode", () => {
 });
 
 describe("getDistrictByTitle", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
   it("returns null for a title with no matching district", async () => {
     const result = await getDistrictByTitle(
       `Nonexistent District ${Date.now()}`,
