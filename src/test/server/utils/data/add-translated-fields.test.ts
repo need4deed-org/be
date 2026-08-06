@@ -1,29 +1,35 @@
 import { FastifyInstance } from "fastify";
-import { EntityTableName, Lang } from "need4deed-sdk";
+import { Lang } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import Deal from "../../../../data/entity/deal.entity";
-import FieldTranslation from "../../../../data/entity/field_translation.entity";
 import Postcode from "../../../../data/entity/location/postcode.entity";
 import DealLanguage from "../../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../../data/entity/m2m/deal-skill";
-import Language from "../../../../data/entity/profile/language.entity";
-import Skill from "../../../../data/entity/profile/skill.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../../data/types/enums";
 import { createServer } from "../../../../server";
 import { addTranslatedFields } from "../../../../server/utils/data/for-routes";
 
+// Deliberately reuses existing, already-seeded reference rows (language,
+// skill, field_translation) rather than inserting new ones — those tables
+// are reference data, not something a test should be writing into, even
+// temporarily. Only the transactional rows (postcode/deal/volunteer/
+// dealLanguage/dealSkill) linking to them are created and cleaned up here.
 describe("addTranslatedFields", () => {
   let fastify: FastifyInstance;
   let postcode: Postcode;
   let deal: Deal;
   let volunteer: Volunteer;
-  let sourceLanguage: Language;
-  let skill: Skill;
   let dealLanguage: DealLanguage;
   let dealSkill: DealSkill;
-  let translations: FieldTranslation[];
+
+  // German itself (id 1540) — has a real German field_translation ("Deutsch").
+  const languageWithGermanTranslation = 1540;
+  // "Ghotuo" (id 1) — a real, seeded language with no English translation.
+  const languageWithNoEnglishTranslation = 1;
+  // "Woodworking" (id 1) — has a real German field_translation ("Holzverarbeitung").
+  const skillWithGermanTranslation = 1;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -34,18 +40,8 @@ describe("addTranslatedFields", () => {
     const postcodeRepository = dataSource.getRepository(Postcode);
     const dealRepository = dataSource.getRepository(Deal);
     const volunteerRepository = dataSource.getRepository(Volunteer);
-    const languageRepository = dataSource.getRepository(Language);
-    const skillRepository = dataSource.getRepository(Skill);
     const dealLanguageRepository = dataSource.getRepository(DealLanguage);
     const dealSkillRepository = dataSource.getRepository(DealSkill);
-    const fieldTranslationRepository =
-      dataSource.getRepository(FieldTranslation);
-
-    // The real, already-seeded German locale row — addTranslatedFields()
-    // resolves its `isoCode` argument to this exact row internally.
-    const germanLanguage = await languageRepository.findOneByOrFail({
-      isoCode: "de",
-    });
 
     postcode = await postcodeRepository.save(
       new Postcode({ value: `1${suffix.slice(-4)}` }),
@@ -57,54 +53,28 @@ describe("addTranslatedFields", () => {
       new Volunteer({ dealId: deal.id }),
     );
 
-    sourceLanguage = await languageRepository.save(
-      new Language({ isoCode: "xx", title: `Test Language ${suffix}` }),
-    );
-    skill = await skillRepository.save(
-      new Skill({ title: `Test Skill ${suffix}` }),
-    );
-
     dealLanguage = await dealLanguageRepository.save(
-      new DealLanguage({ dealId: deal.id, languageId: sourceLanguage.id }),
+      new DealLanguage({
+        dealId: deal.id,
+        languageId: languageWithGermanTranslation,
+      }),
     );
     dealSkill = await dealSkillRepository.save(
-      new DealSkill({ dealId: deal.id, skillId: skill.id }),
+      new DealSkill({ dealId: deal.id, skillId: skillWithGermanTranslation }),
     );
-
-    translations = await fieldTranslationRepository.save([
-      fieldTranslationRepository.create({
-        language: germanLanguage,
-        entityType: EntityTableName.LANGUAGE,
-        entityId: sourceLanguage.id,
-        translation: `Deutsche Übersetzung ${suffix}`,
-      }),
-      fieldTranslationRepository.create({
-        language: germanLanguage,
-        entityType: EntityTableName.SKILL,
-        entityId: skill.id,
-        translation: `Deutsche Fähigkeit ${suffix}`,
-      }),
-    ]);
   });
 
   afterAll(async () => {
-    const fieldTranslationRepository =
-      dataSource.getRepository(FieldTranslation);
     const dealLanguageRepository = dataSource.getRepository(DealLanguage);
     const dealSkillRepository = dataSource.getRepository(DealSkill);
     const volunteerRepository = dataSource.getRepository(Volunteer);
     const dealRepository = dataSource.getRepository(Deal);
-    const languageRepository = dataSource.getRepository(Language);
-    const skillRepository = dataSource.getRepository(Skill);
     const postcodeRepository = dataSource.getRepository(Postcode);
 
-    await fieldTranslationRepository.delete(translations.map((t) => t.id));
     await dealLanguageRepository.delete({ id: dealLanguage.id });
     await dealSkillRepository.delete({ id: dealSkill.id });
     await volunteerRepository.delete({ id: volunteer.id });
     await dealRepository.delete({ id: deal.id });
-    await languageRepository.delete({ id: sourceLanguage.id });
-    await skillRepository.delete({ id: skill.id });
     await postcodeRepository.delete({ id: postcode.id });
     await fastify.close();
   });
@@ -120,30 +90,33 @@ describe("addTranslatedFields", () => {
     return v;
   }
 
-  it("populates .translation on dealLanguage/dealSkill entities from field_translation", async () => {
+  it("populates .translation on dealLanguage/dealSkill entities from the real field_translation data", async () => {
     const v = await loadVolunteerWithRelations();
 
     await addTranslatedFields([v], Lang.DE);
 
-    expect(v.deal.dealLanguage[0].language.translation).toBe(
-      `Deutsche Übersetzung ${suffix}`,
-    );
-    expect(v.deal.dealSkill[0].skill.translation).toBe(
-      `Deutsche Fähigkeit ${suffix}`,
-    );
+    expect(v.deal.dealLanguage[0].language.translation).toBe("Deutsch");
+    expect(v.deal.dealSkill[0].skill.translation).toBe("Holzverarbeitung");
   });
 
-  it("leaves .translation unset when no field_translation row exists for the requested language", async () => {
+  it("leaves .translation unset when no field_translation row exists for the requested language, falling back to the original field value downstream", async () => {
+    const dealLanguageRepository = dataSource.getRepository(DealLanguage);
+    await dealLanguageRepository.update(
+      { id: dealLanguage.id },
+      { languageId: languageWithNoEnglishTranslation },
+    );
     const v = await loadVolunteerWithRelations();
 
-    // "en" is a real, seeded locale, but no field_translation row was
-    // created above for that language — the entity's own .translation
-    // (never populated for a fresh fetch) should stay untouched, letting the
-    // caller (getOptionItems/getLanguages) fall back to the raw .title.
     await addTranslatedFields([v], Lang.EN);
 
+    // getOptionItems/getLanguages then fall back to language.title itself.
     expect(v.deal.dealLanguage[0].language.translation).toBeUndefined();
-    expect(v.deal.dealSkill[0].skill.translation).toBeUndefined();
+    expect(v.deal.dealLanguage[0].language.title).toBe("Ghotuo");
+
+    await dealLanguageRepository.update(
+      { id: dealLanguage.id },
+      { languageId: languageWithGermanTranslation },
+    );
   });
 
   it("does not throw when dealActivity isn't loaded (be#849 hardening)", async () => {
