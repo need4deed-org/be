@@ -146,7 +146,11 @@ export async function addTranslatedFields(
   logger.info("Translating volunteers");
   for (const volunteer of volunteers) {
     try {
-      for (const pl of volunteer.deal.dealLanguage) {
+      // `?? []` guards below: this is also called from the notify path
+      // (be#849) with only a subset of deal relations loaded — e.g. no
+      // dealActivity — so it must not assume every caller eager-loaded all
+      // three, only whichever ones it actually needs translated.
+      for (const pl of volunteer.deal?.dealLanguage ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -158,7 +162,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal.dealActivity) {
+      for (const pa of volunteer.deal?.dealActivity ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -170,7 +174,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal.dealSkill) {
+      for (const ps of volunteer.deal?.dealSkill ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -691,7 +695,7 @@ export async function fetchVolunteerById(
     return null;
   }
 
-  addTranslatedFields([volunteer], isoCode);
+  await addTranslatedFields([volunteer], isoCode);
 
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);
