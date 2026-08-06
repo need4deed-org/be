@@ -25,24 +25,15 @@ export type TemplateVars = Record<string, string | number | null | undefined>;
 // volunteer with no User row to read a language preference from), German is
 // the more appropriate default than English.
 const DEFAULT_LOCALE = Lang.DE;
-// Captures an optional trailing "!" — {{ key! }} opts a placeholder into
-// "required": a product owner can mark specific fields as load-bearing
-// directly in the CDN manifest, without a code change. See fillTemplate().
-const PLACEHOLDER_RE = /\{\{\s*(\w+)(!)?\s*\}\}/g;
+const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 
 /**
- * Replace all {{ key }} / {{ key! }} placeholders in the template content
- * with values from vars. Handles optional whitespace around keys.
- *
- * - A key genuinely absent from vars (not just nullish) is always left
- *   unresolved (the `{{ ... }}` stays in the output) and warned about — a
- *   template referencing a variable the caller never computes is always a
- *   code bug, `!` or not.
- * - A key present in vars but null/undefined:
- *   - without `!`: substituted with "" — most fields are legitimately
- *     optional, and a blank is better than the literal word "undefined".
- *   - with `!`: treated the same as unresolved (left in place, warned about)
- *     — this is the opt-in for fields that must never be blank.
+ * Replace all {{ key }} placeholders in the template content with values
+ * from vars. Handles optional whitespace around keys. Every placeholder must
+ * resolve to a real value — a key genuinely absent from vars, or present but
+ * null/undefined, is left unresolved (the `{{ ... }}` stays in the output)
+ * and warned about, so a template/caller mismatch always surfaces rather
+ * than silently rendering blank.
  *
  * Never substring-matches rendered text for "undefined"/etc. — a user could
  * legitimately type that into free-text content (a title, a comment), and
@@ -53,23 +44,12 @@ export function fillTemplate(
   vars: TemplateVars,
 ): { subject: string; html?: string; text?: string } {
   const fill = (s: string): string =>
-    s.replace(PLACEHOLDER_RE, (match, key: string, required?: string) => {
-      if (!(key in vars)) {
+    s.replace(PLACEHOLDER_RE, (match, key: string) => {
+      const value = vars[key];
+      if (!(key in vars) || value === undefined || value === null) {
         logger.warn(`email template: unresolved placeholder {{${key}}}`);
         return match;
       }
-
-      const value = vars[key];
-      if (value === undefined || value === null) {
-        if (required) {
-          logger.warn(
-            `email template: required placeholder {{${key}!}} resolved to ${value === null ? "null" : "undefined"}`,
-          );
-          return match;
-        }
-        return "";
-      }
-
       return String(value);
     });
 

@@ -1,12 +1,11 @@
 import type { EmailMessage } from "./types";
 
-// Mirrors fillTemplate()'s placeholder syntax ({{ key }} / {{ key! }}) so a
-// leftover unresolved placeholder is caught regardless of whether it was
-// marked required. Deliberately does not scan for any other substring (e.g.
-// the word "undefined") — that's fillTemplate's job at the source, where it
-// can tell an actual nullish variable apart from a user having legitimately
-// typed that word into free-text content.
-const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+!?\s*\}\}/;
+// Mirrors fillTemplate()'s placeholder syntax so a leftover unresolved
+// placeholder is caught. Deliberately does not scan for any other substring
+// (e.g. the word "undefined") — that's fillTemplate's job at the source,
+// where it can tell an actual nullish variable apart from a user having
+// legitimately typed that word into free-text content.
+const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+\s*\}\}/;
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim();

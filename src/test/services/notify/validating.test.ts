@@ -34,7 +34,7 @@ describe("ValidatingEmailTransport", () => {
       to: "person@example.com",
       cc: "cc@example.com",
       from: "notify@need4deed.org",
-      subject: "Date: {{ date! }}",
+      subject: "Date: {{ date }}",
       text: "some body",
     };
 
@@ -46,9 +46,9 @@ describe("ValidatingEmailTransport", () => {
     const report = vi.mocked(errorTransport.send).mock.calls[0][0];
     expect(report.to).toBe("dev@need4deed.org");
     expect(report.from).toBe("notify@need4deed.org");
-    expect(report.subject).toBe("[Suspended invalid email] Date: {{ date! }}");
+    expect(report.subject).toBe("[Suspended invalid email] Date: {{ date }}");
     expect(report.text).toContain(
-      'subject has an unresolved placeholder: "Date: {{ date! }}"',
+      'subject has an unresolved placeholder: "Date: {{ date }}"',
     );
     expect(report.text).toContain("To: person@example.com");
     expect(report.text).toContain("Cc: cc@example.com");

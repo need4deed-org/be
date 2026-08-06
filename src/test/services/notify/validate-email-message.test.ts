@@ -53,16 +53,6 @@ describe("validateEmailMessage", () => {
     ]);
   });
 
-  it("flags an unresolved required (!) placeholder in the subject", () => {
-    const problems = validateEmailMessage({
-      ...validMessage,
-      subject: "Date: {{ date! }}",
-    });
-    expect(problems).toEqual([
-      'subject has an unresolved placeholder: "Date: {{ date! }}"',
-    ]);
-  });
-
   it("flags when neither text nor html is set", () => {
     expect(
       validateEmailMessage({ to: validMessage.to, subject: "Subject" }),
