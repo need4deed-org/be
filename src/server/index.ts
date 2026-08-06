@@ -170,28 +170,30 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(rateLimitPlugin);
 
-  await fastifyInstance.register(fastifySwagger, {
-    openapi: {
-      info: {
-        title: "N4D Fastify API Documentation",
-        description: "will come later",
-        version: "0.0.1",
-      },
-      servers: [
-        {
-          url: selfUrl,
-          description: "Local development server",
+  if (!isProd) {
+    await fastifyInstance.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: "N4D Fastify API Documentation",
+          description: "will come later",
+          version: "0.0.1",
         },
-      ],
-    },
-  });
-  await fastifyInstance.register(fastifySwaggerUi, {
-    routePrefix: RoutePrefix.SWAGGER,
-    uiConfig: {
-      docExpansion: "full",
-      deepLinking: false,
-    },
-  });
+        servers: [
+          {
+            url: selfUrl,
+            description: "Local development server",
+          },
+        ],
+      },
+    });
+    await fastifyInstance.register(fastifySwaggerUi, {
+      routePrefix: RoutePrefix.SWAGGER,
+      uiConfig: {
+        docExpansion: "full",
+        deepLinking: false,
+      },
+    });
+  }
   await fastifyInstance.register(notifyPlugin);
   await fastifyInstance.register(schedulerHourlyPlugin);
   await fastifyInstance.register(schedulerDailyPlugin);
