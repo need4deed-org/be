@@ -8,8 +8,7 @@ import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -44,8 +43,7 @@ export async function sendEmailAccompanyNotFound(
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
   const clientName = accompanying?.name ?? "";
 
-  const locale = resolveLocale(opportunity.contactPerson?.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     appointmentDate,

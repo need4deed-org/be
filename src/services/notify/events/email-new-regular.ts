@@ -9,8 +9,7 @@ import { NEW_REGULAR_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -35,8 +34,7 @@ export async function sendEmailNewRegular(
   const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = opportunity.title;
 
-  const locale = resolveLocale(contactPerson.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     volunteeringopportunityName,

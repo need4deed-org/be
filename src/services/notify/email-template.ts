@@ -82,6 +82,21 @@ export function resolveContent(
   return candidates.find(isValid) ?? builtin[locale] ?? builtin[DEFAULT_LOCALE];
 }
 
+/**
+ * Like resolveContent(), but for templates that were never split by
+ * recipient locale in the first place — the manifest (or its fallback) is a
+ * single flat LocaleContent used as-is, regardless of who's receiving it.
+ * No locale to resolve, so there's nothing to guess wrong.
+ */
+export function resolveFlatContent(
+  manifest: Manifest | null,
+  builtin: LocaleContent,
+): LocaleContent {
+  return manifest && isFlatContent(manifest) && isValid(manifest)
+    ? manifest
+    : builtin;
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeout = new Promise<never>((_resolve, reject) => {

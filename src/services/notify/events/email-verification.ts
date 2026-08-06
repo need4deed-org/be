@@ -10,8 +10,7 @@ import { VERIFICATION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailMessage, EmailTransport } from "../types";
 
@@ -46,11 +45,7 @@ export async function sendEmailVerification(
 
   logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);
 
-  const content = resolveContent(
-    await loader.load(),
-    resolveLocale(user.language),
-    BUILTIN,
-  );
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, html, text } = fillTemplate(content, {
     verificationUrl: url,
   });

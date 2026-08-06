@@ -5,6 +5,7 @@ import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
+  resolveFlatContent,
   resolveLocale,
   type LocaleContent,
 } from "../../../services/notify/email-template";
@@ -161,6 +162,31 @@ describe("resolveContent", () => {
     expect(resolveContent(manifest, Lang.DE, builtin).subject).toBe(
       "Builtin DE",
     );
+  });
+});
+
+// ─── resolveFlatContent ──────────────────────────────────────────────────────
+
+describe("resolveFlatContent", () => {
+  const flatBuiltin: LocaleContent = { subject: "Builtin", text: "fallback" };
+
+  it("uses the flat manifest as-is when valid", () => {
+    const manifest = { subject: "Flat subject", text: "flat body" };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(manifest);
+  });
+
+  it("falls back to builtin when manifest is null", () => {
+    expect(resolveFlatContent(null, flatBuiltin)).toEqual(flatBuiltin);
+  });
+
+  it("falls back to builtin when the flat manifest is invalid (no body)", () => {
+    const manifest = { subject: "no body" };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
+  });
+
+  it("falls back to builtin when the manifest is unexpectedly locale-keyed", () => {
+    const manifest = { [Lang.EN]: { subject: "en", text: "en body" } };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
   });
 });
 
