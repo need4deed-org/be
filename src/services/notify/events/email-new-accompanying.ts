@@ -1,3 +1,4 @@
+import { TranslatedIntoType } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -15,6 +16,18 @@ import {
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
+
+// Matches fe's own labels for these values (public/locales/de/translations.json)
+// — German-only since this template is (be#838).
+const TRANSLATION_LABELS: Record<TranslatedIntoType, string> = {
+  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
+  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
+  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
+};
+
+function translationLabel(value: TranslatedIntoType | undefined): string {
+  return value ? (TRANSLATION_LABELS[value] ?? "") : "";
+}
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -55,8 +68,15 @@ export async function sendEmailNewAccompanying(
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  const accompaniedpersonLanguage = accompanying?.languageToTranslate ?? "";
-  const appointmentaLanguage = opportunity.translationType ?? "";
+  // Both slots come from the same submission field (be#846) — there's no
+  // second, independently-set value anywhere in the codebase today
+  // (opportunity.translationType has no other reader or writer besides this
+  // one email). Mapped to the same human-readable label rather than left as
+  // the raw enum value ("deutsche").
+  const accompaniedpersonLanguage = translationLabel(
+    accompanying?.languageToTranslate,
+  );
+  const appointmentaLanguage = accompaniedpersonLanguage;
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
