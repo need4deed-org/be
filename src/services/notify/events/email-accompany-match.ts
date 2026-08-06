@@ -1,4 +1,3 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyMatchManifestUrl,
   emailFromContact,
@@ -11,8 +10,7 @@ import { ACCOMPANY_MATCH_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -22,21 +20,18 @@ export function resetAccompanyMatchTemplateCache(): void {
   loader.resetCache();
 }
 
+// German-only — accompanymatch.json is no longer split by recipient locale
+// (see be#838); its recipients (RAC contact persons) are always German-speaking.
 function resolveContactSharing(
   shareContact: boolean,
   volunteerName: string,
   volunteerEmail: string,
   volunteerPhone: string,
-  lang: Lang,
 ): string {
   if (shareContact) {
-    return lang === Lang.DE
-      ? `${volunteerName}s Kontaktdaten findest Du unten: ${volunteerEmail} ${volunteerPhone} Sollte es zur Terminabsage kommen, lass uns bitte wissen. Falls es zu einer kurzfristigen Absage kommt, kontaktiere ${volunteerName} gerne direkt. Gib bitte die Kontaktdaten des Sprachmittlers auf keinen Fall an die zu begleitende Person weiter.`
-      : `You can find ${volunteerName}'s contact details below: ${volunteerEmail} ${volunteerPhone} Please let us know if the appointment is cancelled. If it is cancelled at short notice, feel free to contact ${volunteerName} directly. Please do not, under any circumstances, pass the interpreter's contact details on to the person being accompanied.`;
+    return `${volunteerName}s Kontaktdaten findest Du unten: ${volunteerEmail} ${volunteerPhone} Sollte es zur Terminabsage kommen, lass uns bitte wissen. Falls es zu einer kurzfristigen Absage kommt, kontaktiere ${volunteerName} gerne direkt. Gib bitte die Kontaktdaten des Sprachmittlers auf keinen Fall an die zu begleitende Person weiter.`;
   }
-  return lang === Lang.DE
-    ? `Nach der Absprache mit ${volunteerName} dürfen wir Dir leider die Kontaktdaten nicht weitergeben. Sollte es zur Terminabsage kommen, lass uns bitte wissen. Für Fragen stehe ich Dir gerne zur Verfügung.`
-    : `As agreed with ${volunteerName}, we are unfortunately unable to share their contact details with you. Please let us know if the appointment is cancelled. I am happy to help if you have any questions.`;
+  return `Nach der Absprache mit ${volunteerName} dürfen wir Dir leider die Kontaktdaten nicht weitergeben. Sollte es zur Terminabsage kommen, lass uns bitte wissen. Für Fragen stehe ich Dir gerne zur Verfügung.`;
 }
 
 export async function sendEmailAccompanyMatch(
@@ -87,16 +82,14 @@ export async function sendEmailAccompanyMatch(
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
 
-  const locale = resolveLocale(contactPerson.users?.[0]?.language);
   const contactSharing = resolveContactSharing(
     volunteer.shareContact ?? true,
     volunteerName,
     volunteerEmail,
     volunteerPhone,
-    locale,
   );
 
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     volunteerName,

@@ -1,4 +1,4 @@
-import { DocumentStatusType, Lang, VolunteerStateCGCType } from "need4deed-sdk";
+import { DocumentStatusType, VolunteerStateCGCType } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -12,8 +12,7 @@ import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -23,11 +22,12 @@ export function resetIntroductionTemplateCache(): void {
   loader.resetCache();
 }
 
+// German-only, matching introduction.json's certificateStatements block —
+// this template is no longer split by recipient locale (see be#838).
 function resolveStatmentOnCertificates(
   statusCGC: DocumentStatusType,
   statusCgcProcess: VolunteerStateCGCType | null | undefined,
   statusVaccination: DocumentStatusType,
-  lang: Lang,
 ): string {
   const cgcNo = statusCGC === DocumentStatusType.NO;
   const cgcYes = statusCGC === DocumentStatusType.YES;
@@ -36,34 +36,22 @@ function resolveStatmentOnCertificates(
   const vaccinationYes = statusVaccination === DocumentStatusType.YES;
 
   if (cgcNo && missing && vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor."
-      : "We will apply for the certificate of good conduct (das erweiterte Führungszeugnis) for them. Proof of measles vaccination has been provided.";
+    return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
   }
   if (cgcNo && missing && !vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis beantragen wir sofort."
-      : "We will apply for the certificate of good conduct (das erweiterte Führungszeugnis) for them.";
+    return "Das erweiterte Führungszeugnis beantragen wir sofort.";
   }
   if (cgcNo && uploaded && vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor."
-      : "We have applied for the certificate of good conduct (das erweiterte Führungszeugnis) for them. Proof of measles vaccination has been provided.";
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor.";
   }
   if (cgcNo && uploaded && !vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis haben wir bereits beantragt."
-      : "We have applied for the certificate of good conduct (das erweiterte Führungszeugnis) for them.";
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
   }
   if (cgcYes && vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis sowie der Masernschutznachweis liegen vor."
-      : "They have already gotten their certificate of good conduct (das erweiterte Führungszeugnis). Proof of measles vaccination has been provided.";
+    return "Das erweiterte Führungszeugnis sowie der Masernschutznachweis liegen vor.";
   }
   if (cgcYes && !vaccinationYes) {
-    return lang === Lang.DE
-      ? "Das erweiterte Führungszeugnis liegt vor."
-      : "They have already gotten their certificate of good conduct (das erweiterte Führungszeugnis).";
+    return "Das erweiterte Führungszeugnis liegt vor.";
   }
   return "";
 }
@@ -84,7 +72,6 @@ export async function sendEmailIntroduction(
 
   const volunteer = ov.volunteer;
   const opportunity = ov.opportunity;
-  const locale = resolveLocale(volunteer.person?.users?.[0]?.language);
 
   const volunteerName = volunteer.person.name;
   const contactpersonName = contactPerson.name;
@@ -120,10 +107,9 @@ export async function sendEmailIntroduction(
     volunteer.statusCGC,
     volunteer.statusCgcProcess,
     volunteer.statusVaccination,
-    locale,
   );
 
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     volunteerName,

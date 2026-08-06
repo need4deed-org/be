@@ -89,7 +89,7 @@ export const urlEmailVerification =
 export const urlPasswordReset =
   process.env.URL_PASSWORD_RESET || "https://app.need4deed.org/reset-password";
 
-// CDN manifest (per-locale subject + html/text) for the verification email.
+// CDN manifest (flat, bilingual subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
 

@@ -9,8 +9,7 @@ import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -39,8 +38,7 @@ export async function sendEmailSuggestion(
       .map((t) => String(t))
       .join(", ") || "";
 
-  const locale = resolveLocale(ov.volunteer.person?.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     volunteerName,
     opportunityName,
