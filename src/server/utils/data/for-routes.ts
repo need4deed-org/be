@@ -27,6 +27,7 @@ import { BadRequestError, NotFoundError } from "../../../config";
 import { defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
+import Deal from "../../../data/entity/deal.entity";
 import Document from "../../../data/entity/document.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -125,8 +126,11 @@ export async function getInstanceByTranslation<
   return null;
 }
 
+// Volunteer and Opportunity both structurally satisfy this shape, so either
+// can be passed directly — a Volunteer's own deal, or an Opportunity's
+// posting-side deal, use the same field_translation lookup (be#856).
 export async function addTranslatedFields(
-  volunteers: Volunteer[],
+  entities: { id: number; deal?: Deal }[],
   isoCode: Lang,
 ) {
   let language: Language;
@@ -143,14 +147,14 @@ export async function addTranslatedFields(
     logger.warn(`Error loading language: ${error}`);
     throw new Error(error.message);
   }
-  logger.info("Translating volunteers");
-  for (const volunteer of volunteers) {
+  logger.info("Translating deal fields");
+  for (const entity of entities) {
     try {
-      // `?? []` guards below: this is also called from the notify path
-      // (be#849) with only a subset of deal relations loaded — e.g. no
+      // `?? []` guards below: this is also called from notify paths (be#849,
+      // be#856) with only a subset of deal relations loaded — e.g. no
       // dealActivity — so it must not assume every caller eager-loaded all
       // three, only whichever ones it actually needs translated.
-      for (const pl of volunteer.deal?.dealLanguage ?? []) {
+      for (const pl of entity.deal?.dealLanguage ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -162,7 +166,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pl.language.translation;
       }
-      for (const pa of volunteer.deal?.dealActivity ?? []) {
+      for (const pa of entity.deal?.dealActivity ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -174,7 +178,7 @@ export async function addTranslatedFields(
           ? translation?.translation
           : pa.activity.translation;
       }
-      for (const ps of volunteer.deal?.dealSkill ?? []) {
+      for (const ps of entity.deal?.dealSkill ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
@@ -188,7 +192,7 @@ export async function addTranslatedFields(
       }
     } catch (error) {
       logger.warn(
-        `Error occurred while adding translations to a volunteer id:${volunteer.id} ${error}`,
+        `Error occurred while adding translations to entity id:${entity.id} ${error}`,
       );
     }
   }
