@@ -5,6 +5,7 @@ import {
   createManifestLoader,
   fillTemplate,
   resolveContent,
+  resolveFlatContent,
   resolveLocale,
   type LocaleContent,
 } from "../../../services/notify/email-template";
@@ -106,9 +107,9 @@ describe("resolveLocale", () => {
     expect(resolveLocale("en")).toBe(Lang.EN);
   });
 
-  it("falls back to EN for unknown languages", () => {
-    expect(resolveLocale("fr")).toBe(Lang.EN);
-    expect(resolveLocale(undefined)).toBe(Lang.EN);
+  it("falls back to DE for unknown languages", () => {
+    expect(resolveLocale("fr")).toBe(Lang.DE);
+    expect(resolveLocale(undefined)).toBe(Lang.DE);
   });
 });
 
@@ -130,12 +131,12 @@ describe("resolveContent", () => {
     );
   });
 
-  it("falls back to EN manifest when requested locale is missing", () => {
+  it("falls back to DE manifest (the default locale) when requested locale is missing", () => {
     const manifest = {
-      [Lang.EN]: { subject: "Manifest EN", html: "<p>en</p>" },
+      [Lang.DE]: { subject: "Manifest DE", html: "<p>de</p>" },
     };
-    expect(resolveContent(manifest, Lang.DE, builtin).subject).toBe(
-      "Manifest EN",
+    expect(resolveContent(manifest, Lang.EN, builtin).subject).toBe(
+      "Manifest DE",
     );
   });
 
@@ -148,6 +149,44 @@ describe("resolveContent", () => {
     expect(resolveContent(manifest, Lang.EN, builtin).subject).toBe(
       "Builtin EN",
     );
+  });
+
+  it("uses a flat (non-locale-keyed) manifest as-is regardless of locale", () => {
+    const manifest = { subject: "Flat subject", text: "flat body" };
+    expect(resolveContent(manifest, Lang.EN, builtin)).toEqual(manifest);
+    expect(resolveContent(manifest, Lang.DE, builtin)).toEqual(manifest);
+  });
+
+  it("falls back to builtin when a flat manifest is invalid (no body)", () => {
+    const manifest = { subject: "no body" };
+    expect(resolveContent(manifest, Lang.DE, builtin).subject).toBe(
+      "Builtin DE",
+    );
+  });
+});
+
+// ─── resolveFlatContent ──────────────────────────────────────────────────────
+
+describe("resolveFlatContent", () => {
+  const flatBuiltin: LocaleContent = { subject: "Builtin", text: "fallback" };
+
+  it("uses the flat manifest as-is when valid", () => {
+    const manifest = { subject: "Flat subject", text: "flat body" };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(manifest);
+  });
+
+  it("falls back to builtin when manifest is null", () => {
+    expect(resolveFlatContent(null, flatBuiltin)).toEqual(flatBuiltin);
+  });
+
+  it("falls back to builtin when the flat manifest is invalid (no body)", () => {
+    const manifest = { subject: "no body" };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
+  });
+
+  it("falls back to builtin when the manifest is unexpectedly locale-keyed", () => {
+    const manifest = { [Lang.EN]: { subject: "en", text: "en body" } };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
   });
 });
 

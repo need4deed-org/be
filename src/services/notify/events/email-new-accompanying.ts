@@ -1,4 +1,4 @@
-import { Lang } from "need4deed-sdk";
+import { TranslatedIntoType } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -7,29 +7,27 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
-  type LocaleContent,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject:
-      "Accompanying appointment on {{ appointmentDate }} in {{ appointmentDistrict }} for {{ clientName }}",
-    text: `Dear {{ contactpersonName }},\n\nThank you for your request.\n\nHere are the details you provided. Please check that everything is correct:\n {{ appointmentTitle }}\n {{ appointmentDistrict }}\n {{ appointmentAddress }}\n {{ accompaniedpersonLanguage }}\n{{ appointmentaLanguage }}\n{{ accompaniedpersonName }}\n{{ accompaniedpersonPhone }}\n{{ appointmentComment }}\n\nWe will review the information promptly and get back to you within two days if anything is missing.\n\nIf all the details are correct and the accompaniment is straightforward (e.g. not a hospital treatment, a brief description is provided, and a direct phone number of the contact person is available), we will forward your request to our volunteers. We will get back to you once we have found someone for the appointment.\nIf we are unable to find a volunteer for the appointment, we will let you know no later than four working days beforehand.\n\nMore information about our guidelines can be found at https://need4deed.org/rac-guidelines\n\nBest regards,\nThe Team`,
-  },
-  [Lang.DE]: {
-    subject:
-      "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-    text: `Hallo {{ contactpersonName }},\n\nvielen Dank für die Anfrage.\n\nHier sind die angegebenen Details. Bitte prüfe kurz, ob alles stimmt:\n {{ appointmentTitle }}\n {{ appointmentDistrict }}\n {{ appointmentAddress }}\n {{ accompaniedpersonLanguage }}\n{{ appointmentaLanguage }}\n{{ accompaniedpersonName }}\n{{ accompaniedpersonPhone }}\n{{ appointmentComment }}\n\nWir überprüfen die Informationen umgehend und melden uns innerhalb von zwei Tagen, falls etwas fehlt.\n\nFalls alle Angaben korrekt sind und die Begleitung klar ist (z. B. keine Krankenhausbehandlung, kurze Beschreibung und verfügbare Direktnummer der begleitenden Person), leiten wir deine Anfrage an die Freiwilligen weiter. Wir melden uns, sobald wir jemanden für den Termin gefunden haben.\nFalls wir keine Freiwilligen für den Termin vermitteln können, melden wir uns spätestens vier Werktage vorher.\n\nMehr Informationen über die Leitlinien findest Du unter https://need4deed.org/rac-guidelines\n\nViele Grüße\nDas Team`,
-  },
+const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
+
+// Matches fe's own labels for these values (public/locales/de/translations.json)
+// — German-only since this template is (be#838).
+const TRANSLATION_LABELS: Record<TranslatedIntoType, string> = {
+  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
+  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
+  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
 };
 
-const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
+function translationLabel(value: TranslatedIntoType | undefined): string {
+  return value ? (TRANSLATION_LABELS[value] ?? "") : "";
+}
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -57,23 +55,43 @@ export async function sendEmailNewAccompanying(
         day: "2-digit",
       })
     : "";
+  const appointmentTime = opportunity.onetimer?.date
+    ? new Date(opportunity.onetimer.date).toLocaleTimeString("de-DE", {
+        timeZone: "Europe/Berlin",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
+  const appointmentPlz = accompanying?.postcode?.value ?? "";
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  const accompaniedpersonLanguage = accompanying?.languageToTranslate ?? "";
-  const appointmentaLanguage = opportunity.translationType ?? "";
+  // accompaniedpersonLanguage: the translation requirement for the
+  // accompanied person (be#846). appointmentaLanguage: the deal's own
+  // requested languages — a distinct concept, German-translated via
+  // field_translation by the caller before this function runs (be#856).
+  const accompaniedpersonLanguage = translationLabel(
+    accompanying?.languageToTranslate,
+  );
+  const appointmentaLanguage = (opportunity.deal?.dealLanguage ?? [])
+    .map(
+      (dealLanguage) =>
+        dealLanguage.language.translation ?? dealLanguage.language.title,
+    )
+    .join(", ");
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
 
-  const locale = resolveLocale(contactPerson.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     appointmentDate,
+    appointmentTime,
     appointmentDistrict,
+    appointmentPlz,
     clientName,
     appointmentTitle,
     appointmentAddress,

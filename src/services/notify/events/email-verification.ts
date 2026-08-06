@@ -1,17 +1,16 @@
 import type { JWT, TokenType } from "@fastify/jwt";
-import { Lang, UserRole } from "need4deed-sdk";
+import { UserRole } from "need4deed-sdk";
 import {
   emailVerificationManifestUrl,
   urlEmailVerification,
 } from "../../../config/constants";
 import type User from "../../../data/entity/user.entity";
 import logger from "../../../logger";
+import { VERIFICATION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
-  type LocaleContent,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailMessage, EmailTransport } from "../types";
 
@@ -19,19 +18,6 @@ export interface EmailVerificationDeps {
   email: EmailTransport;
   jwt: JWT;
 }
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject: "Account Created",
-    text: `Your account has been created successfully. Please verify your email:\n{{verificationUrl}}`,
-    html: `<p>Your account has been created successfully. Please verify your email:</p><p><a href="{{verificationUrl}}">{{verificationUrl}}</a></p>`,
-  },
-  [Lang.DE]: {
-    subject: "Konto erstellt",
-    text: `Dein Konto wurde erfolgreich erstellt. Bitte bestätige deine E-Mail:\n{{verificationUrl}}`,
-    html: `<p>Dein Konto wurde erfolgreich erstellt. Bitte bestätige deine E-Mail:</p><p><a href="{{verificationUrl}}">{{verificationUrl}}</a></p>`,
-  },
-};
 
 const loader = createManifestLoader(emailVerificationManifestUrl);
 
@@ -59,11 +45,7 @@ export async function sendEmailVerification(
 
   logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);
 
-  const content = resolveContent(
-    await loader.load(),
-    resolveLocale(user.language),
-    BUILTIN,
-  );
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, html, text } = fillTemplate(content, {
     verificationUrl: url,
   });

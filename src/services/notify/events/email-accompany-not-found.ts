@@ -1,31 +1,16 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailAccompanyNotFoundManifestUrl,
   emailFromAccompanying,
   emailFromNotify,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
-  type LocaleContent,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject:
-      "Accompanying to an appointment on {{ appointmentDate }} in {{ appointmentDistrict }} for {{ clientName }}",
-    text: `Dear {{ contactpersonName }},\n\nUnfortunately, we were unable to find a volunteer for this appointment. We have now called off our search.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject:
-      "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-    text: `Hallo {{ contactpersonName }},\n\nleider hat sich niemand für die Sprachmittlung gemeldet. Wir haben nun unsere Suche eingestellt.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailAccompanyNotFoundManifestUrl);
 
@@ -58,8 +43,7 @@ export async function sendEmailAccompanyNotFound(
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
   const clientName = accompanying?.name ?? "";
 
-  const locale = resolveLocale(opportunity.contactPerson?.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     appointmentDate,

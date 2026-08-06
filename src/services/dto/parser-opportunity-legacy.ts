@@ -33,7 +33,15 @@ export async function parseOpportunityLegacy(
     ...(body.accomp_translation
       ? { translationType: body.accomp_translation as TranslatedIntoType }
       : {}),
-    infoConfidential: body.accomp_information,
+    // Mirror the patch path (parser-opportunity-patch-data.ts), which writes
+    // the description into both info and infoConfidential together — the
+    // ACCOMPANYING display reads infoConfidential (be#859), so creation must
+    // keep them in sync too, not just leave infoConfidential to whatever
+    // (currently always null) accomp_information carries.
+    infoConfidential:
+      type === OpportunityType.ACCOMPANYING
+        ? body.vo_information
+        : body.accomp_information,
     districtId: district?.id,
   });
 }

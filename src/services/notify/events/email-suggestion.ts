@@ -1,4 +1,3 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailFromNotify,
   emailFromVolunteer,
@@ -6,25 +5,13 @@ import {
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getTitles } from "../../dto/utils";
+import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
-  type LocaleContent,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject: "Volunteering opportunity match — Need4Deed",
-    text: `Dear {{ volunteerName }},\n\nWe have found a volunteering opportunity that matches your profile.\n\nOpportunity: {{ opportunityName }}\nPostcode: {{ plz }}\nSchedule: {{ schedule }}\n\nIf you are interested, please reply to this email.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject: "Möglicher Einsatz — Need4Deed",
-    text: `Hallo {{ volunteerName }},\n\nwir haben eine ehrenamtliche Möglichkeit gefunden, die zu deinem Profil passt.\n\nGesuch: {{ opportunityName }}\nPostleitzahl: {{ plz }}\nZeiten: {{ schedule }}\n\nFalls du Interesse hast, antworte bitte auf diese E-Mail.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailSuggestionManifestUrl);
 
@@ -51,8 +38,7 @@ export async function sendEmailSuggestion(
       .map((t) => String(t))
       .join(", ") || "";
 
-  const locale = resolveLocale(ov.volunteer.person?.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     volunteerName,
     opportunityName,

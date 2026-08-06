@@ -1,4 +1,3 @@
-import { Lang } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -6,25 +5,13 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import { NEW_REGULAR_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
-  resolveContent,
-  resolveLocale,
-  type LocaleContent,
+  resolveFlatContent,
 } from "../email-template";
 import type { EmailTransport } from "../types";
-
-const BUILTIN: Record<Lang, LocaleContent> = {
-  [Lang.EN]: {
-    subject: "Your request to Need4Deed",
-    text: `Dear {{ contactpersonName }},\n\nThank you for sending us your volunteering opportunity "{{ volunteeringopportunityName }}".\n\nWe will start looking for volunteers as soon as possible.\n\nWe will let you know when we find someone and introduce the volunteer to you.\n\nBest regards,\nNeed4Deed`,
-  },
-  [Lang.DE]: {
-    subject: "Deine Anfrage bei Need4Deed",
-    text: `Hallo {{ contactpersonName }},\n\nvielen Dank für deine Anfrage zu "{{ volunteeringopportunityName }}".\n\nWir fangen bald mit der Suche an.\n\nWenn wir jemanden gefunden haben, melden wir uns bei dir und stellen dir die Person vor.\n\nViele Grüße\nNeed4Deed`,
-  },
-};
 
 const loader = createManifestLoader(emailNewRegularManifestUrl);
 
@@ -47,8 +34,7 @@ export async function sendEmailNewRegular(
   const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = opportunity.title;
 
-  const locale = resolveLocale(contactPerson.users?.[0]?.language);
-  const content = resolveContent(await loader.load(), locale, BUILTIN);
+  const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     volunteeringopportunityName,

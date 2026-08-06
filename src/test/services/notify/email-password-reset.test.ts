@@ -47,12 +47,12 @@ describe("sendPasswordReset", () => {
     expect(msg.html).not.toContain("{{resetUrl}}");
   });
 
-  it("falls back to the default locale (en) for an unsupported language", async () => {
+  it("falls back to the default locale (de) for an unsupported language", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
 
     await sendPasswordReset(deps, user({ language: "fr" }));
 
-    expect(send.mock.calls[0][0].subject).toBe("Password Reset");
+    expect(send.mock.calls[0][0].subject).toBe("Passwort zurücksetzen");
   });
 
   it("caches the manifest within TTL (single fetch across two sends)", async () => {

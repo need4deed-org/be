@@ -343,6 +343,15 @@ describe("PATCH /agent/:id organization details", () => {
       const districtPostcodeRepository =
         dataSource.getRepository(DistrictPostcode);
 
+      // The tests below leave agent.districtId/addressId pointing at the
+      // fixtures created here — clear both first. Otherwise deleting the
+      // districts violates the agent -> district FK directly, and deleting
+      // the postcodes cascades into the address row still referenced by
+      // agent.addressId (also a no-cascade FK).
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { districtId: null, addressId: null },
+      );
       await districtPostcodeRepository.delete({ id: mappingA.id });
       await districtPostcodeRepository.delete({ id: mappingB.id });
       await districtRepository.delete({ id: districtA.id });
