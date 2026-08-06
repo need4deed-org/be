@@ -5,6 +5,7 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import Activity from "../../../data/entity/profile/activity.entity";
@@ -150,5 +151,159 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
     expect(saved.deal.dealLanguage.map((dl) => dl.language.id)).toEqual([
       language.id,
     ]);
+  });
+});
+
+// Regression test for be#844: Opportunity.onetimer had no explicit save in
+// writeOpportunityLegacy (unlike Opportunity.accompanying), so a freshly
+// built (no-id) Onetimer was silently dropped and onetimerId stayed null on
+// creation, for both ACCOMPANYING and EVENTS-type opportunities.
+describe("POST /opportunity persists onetimer on creation (be#844)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+  let addressId: number;
+  let postcodeValue: string;
+  const createdOpportunityIds: number[] = [];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const addressRepository = getRepository(dataSource, Address);
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    postcodeValue = postcode.value;
+    const address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    addressId = address.id;
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent (onetimer-create) ${suffix}`,
+        addressId: address.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-onetimer-create-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-onetimer-create-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    for (const id of createdOpportunityIds) {
+      const opportunity = await fastify.db.opportunityRepository.findOne({
+        where: { id },
+      });
+      await fastify.db.opportunityRepository.delete({ id });
+      if (opportunity?.onetimerId) {
+        await fastify.db.onetimerRepository.delete({
+          id: opportunity.onetimerId,
+        });
+      }
+    }
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: addressId });
+    await fastify.close();
+  });
+
+  it("creates and links a onetimer for an ACCOMPANYING-type opportunity", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Onetimer Accompanying ${suffix}`,
+        opportunity_type: OpportunityLegacyType.ACCOMPANYING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+        accomp_address: "Teststraße 1",
+        accomp_postcode: postcodeValue,
+        accomp_datetime: "2026-08-28T13:55:00",
+        accomp_name: "John Doe",
+        accomp_phone: "420-024",
+        accomp_translation: "deutsche",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const createdId = res.json().data.id;
+    createdOpportunityIds.push(createdId);
+
+    const saved = await fastify.db.opportunityRepository.findOneOrFail({
+      where: { id: createdId },
+    });
+    expect(saved.onetimerId).toBeTruthy();
+
+    const onetimer = await getRepository(dataSource, Onetimer).findOneByOrFail({
+      id: saved.onetimerId,
+    });
+    expect(new Date(onetimer.date).toISOString().slice(0, 10)).toBe(
+      "2026-08-28",
+    );
+  });
+
+  it("creates and links a onetimer for an EVENTS-type opportunity", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Onetimer Events ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+        onetime_date_time: "2026-09-15T18:00:00",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const createdId = res.json().data.id;
+    createdOpportunityIds.push(createdId);
+
+    const saved = await fastify.db.opportunityRepository.findOneOrFail({
+      where: { id: createdId },
+    });
+    expect(saved.onetimerId).toBeTruthy();
+
+    const onetimer = await getRepository(dataSource, Onetimer).findOneByOrFail({
+      id: saved.onetimerId,
+    });
+    expect(new Date(onetimer.date).toISOString().slice(0, 10)).toBe(
+      "2026-09-15",
+    );
   });
 });
