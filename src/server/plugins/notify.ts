@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
-import { isProd, TRUTHY } from "../../config/constants";
+import { errorEmailRecipient, isProd, TRUTHY } from "../../config/constants";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
@@ -26,6 +26,7 @@ import {
   SlackTransport,
   SlackWebhookTransport,
   SmtpEmailTransport,
+  ValidatingEmailTransport,
 } from "../../services/notify";
 
 interface NotifyService {
@@ -73,7 +74,11 @@ function buildVerifyEmailTransport(): EmailTransport {
     user: process.env.SMTP_USER ?? "",
     password: process.env.SMTP_PASS ?? "",
   });
-  return isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
+  const deliverable = isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
+  // Error reports bypass dry-run (always the raw `smtp`, never `deliverable`)
+  // — an invalid-content alert must actually reach someone regardless of
+  // environment, it's not end-user-facing content.
+  return new ValidatingEmailTransport(deliverable, smtp, errorEmailRecipient);
 }
 
 function buildNotifyEmailTransport(): EmailTransport {
@@ -84,7 +89,8 @@ function buildNotifyEmailTransport(): EmailTransport {
     password: process.env.SMTP_NOTIFY_PASS ?? "",
     from: process.env.EMAIL_FROM_NOTIFY ?? "",
   });
-  return isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
+  const deliverable = isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
+  return new ValidatingEmailTransport(deliverable, smtp, errorEmailRecipient);
 }
 
 function buildSlackTransport(): SlackTransport | undefined {

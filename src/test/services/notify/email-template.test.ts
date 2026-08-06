@@ -94,6 +94,52 @@ describe("fillTemplate", () => {
     const result = fillTemplate({ subject: "Hi {{name}}" }, { name: "" });
     expect(result.subject).toBe("Hi ");
   });
+
+  it("substitutes a nullish value (no ! marker) with an empty string, not the word 'undefined'", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{date}}", text: "Time: {{time}}" },
+      { date: undefined, time: null },
+    );
+    expect(result.subject).toBe("Date: ");
+    expect(result.text).toBe("Time: ");
+  });
+
+  it("treats a required (!) placeholder resolving to undefined as unresolved", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{date!}}" },
+      { date: undefined },
+    );
+    expect(result.subject).toBe("Date: {{date!}}");
+  });
+
+  it("treats a required (!) placeholder resolving to null as unresolved", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{ date! }}" },
+      { date: null },
+    );
+    expect(result.subject).toBe("Date: {{ date! }}");
+  });
+
+  it("fills a required (!) placeholder normally when the value is present", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{ date! }}" },
+      { date: "2026-08-28" },
+    );
+    expect(result.subject).toBe("Date: 2026-08-28");
+  });
+
+  it("still treats a genuinely missing key as unresolved regardless of the ! marker", () => {
+    const result = fillTemplate({ subject: "Date: {{ date! }}" }, {});
+    expect(result.subject).toBe("Date: {{ date! }}");
+  });
+
+  it("never flags literal user content that happens to contain the word 'undefined'", () => {
+    const result = fillTemplate(
+      { subject: "{{ title }}" },
+      { title: "My undefined project" },
+    );
+    expect(result.subject).toBe("My undefined project");
+  });
 });
 
 // ─── resolveLocale ───────────────────────────────────────────────────────────

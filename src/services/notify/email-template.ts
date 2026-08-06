@@ -16,31 +16,61 @@ export interface LocaleContent {
 // LocaleContent used as-is regardless of locale (for content that isn't split
 // by language, e.g. a template that already mixes both languages in one body).
 export type Manifest = Partial<Record<Lang, LocaleContent>> | LocaleContent;
-export type TemplateVars = Record<string, string | number>;
+// null/undefined are legal values here (not just string | number) precisely
+// because that's the failure mode fillTemplate() guards against — a caller
+// computing a var that unexpectedly comes back nullish.
+export type TemplateVars = Record<string, string | number | null | undefined>;
 
 // Berlin-based NGO — when a recipient's locale can't be determined (e.g. a
 // volunteer with no User row to read a language preference from), German is
 // the more appropriate default than English.
 const DEFAULT_LOCALE = Lang.DE;
-const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
+// Captures an optional trailing "!" — {{ key! }} opts a placeholder into
+// "required": a product owner can mark specific fields as load-bearing
+// directly in the CDN manifest, without a code change. See fillTemplate().
+const PLACEHOLDER_RE = /\{\{\s*(\w+)(!)?\s*\}\}/g;
 
 /**
- * Replace all {{ key }} placeholders in the template content with values from
- * vars. Handles optional whitespace around keys. Each placeholder that has no
- * matching key in vars is left unchanged and a warning is logged so template
- * mismatches surface early.
+ * Replace all {{ key }} / {{ key! }} placeholders in the template content
+ * with values from vars. Handles optional whitespace around keys.
+ *
+ * - A key genuinely absent from vars (not just nullish) is always left
+ *   unresolved (the `{{ ... }}` stays in the output) and warned about — a
+ *   template referencing a variable the caller never computes is always a
+ *   code bug, `!` or not.
+ * - A key present in vars but null/undefined:
+ *   - without `!`: substituted with "" — most fields are legitimately
+ *     optional, and a blank is better than the literal word "undefined".
+ *   - with `!`: treated the same as unresolved (left in place, warned about)
+ *     — this is the opt-in for fields that must never be blank.
+ *
+ * Never substring-matches rendered text for "undefined"/etc. — a user could
+ * legitimately type that into free-text content (a title, a comment), and
+ * that must never be flagged as invalid.
  */
 export function fillTemplate(
   content: LocaleContent,
   vars: TemplateVars,
 ): { subject: string; html?: string; text?: string } {
   const fill = (s: string): string =>
-    s.replace(PLACEHOLDER_RE, (match, key: string) => {
+    s.replace(PLACEHOLDER_RE, (match, key: string, required?: string) => {
       if (!(key in vars)) {
         logger.warn(`email template: unresolved placeholder {{${key}}}`);
         return match;
       }
-      return String(vars[key]);
+
+      const value = vars[key];
+      if (value === undefined || value === null) {
+        if (required) {
+          logger.warn(
+            `email template: required placeholder {{${key}!}} resolved to ${value === null ? "null" : "undefined"}`,
+          );
+          return match;
+        }
+        return "";
+      }
+
+      return String(value);
     });
 
   return {

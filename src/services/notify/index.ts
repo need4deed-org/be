@@ -4,6 +4,8 @@ export * from "./transports/email-brevo";
 export * from "./transports/email-smtp";
 export * from "./transports/slack-webhook";
 export * from "./transports/dry-run";
+export * from "./transports/validating";
+export * from "./validate-email-message";
 export * from "./events/email-verification";
 export * from "./events/ops-alert";
 export * from "./events/comment-tagged";
