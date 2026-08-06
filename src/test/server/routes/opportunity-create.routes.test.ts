@@ -3,7 +3,9 @@ import { OpportunityLegacyType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -220,7 +222,20 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
       const opportunity = await fastify.db.opportunityRepository.findOne({
         where: { id },
       });
+      // Deletion order matters: opportunity first (it holds the FKs), then
+      // its deal/accompanying/onetimer — deal_timeslot cascades with the
+      // deal, so no separate cleanup is needed for it.
       await fastify.db.opportunityRepository.delete({ id });
+      if (opportunity?.dealId) {
+        await getRepository(dataSource, Deal).delete({
+          id: opportunity.dealId,
+        });
+      }
+      if (opportunity?.accompanyingId) {
+        await getRepository(dataSource, Accompanying).delete({
+          id: opportunity.accompanyingId,
+        });
+      }
       if (opportunity?.onetimerId) {
         await fastify.db.onetimerRepository.delete({
           id: opportunity.onetimerId,
@@ -274,6 +289,13 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
   });
 
   it("creates and links a onetimer for an EVENTS-type opportunity", async () => {
+    // Unique per test run (not a fixed literal): buildDealTimeslots() also
+    // finds-or-creates a Timeslot row for this date, which we don't clean up
+    // below (matching existing convention elsewhere in this suite) — a fixed
+    // literal would keep matching the same row and mask the leftover Deal/
+    // DealTimeslot rows this regression guards against (be#844 review).
+    const eventDateTime = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000);
+
     const res = await fastify.inject({
       method: "POST",
       url: "/opportunity/",
@@ -286,7 +308,7 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
         category_id: "",
         language: "en",
         agent_id: agent.id,
-        onetime_date_time: "2026-09-15T18:00:00",
+        onetime_date_time: eventDateTime.toISOString(),
       },
     });
 
@@ -303,7 +325,7 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
       id: saved.onetimerId,
     });
     expect(new Date(onetimer.date).toISOString().slice(0, 10)).toBe(
-      "2026-09-15",
+      eventDateTime.toISOString().slice(0, 10),
     );
   });
 });
