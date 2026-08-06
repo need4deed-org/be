@@ -6,6 +6,7 @@ import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 
 export async function writeOpportunityLegacy(
@@ -27,6 +28,8 @@ export async function writeOpportunityLegacy(
       transactionalEntityManager.getRepository(DealDistrict);
     const accompanyingRepository =
       transactionalEntityManager.getRepository(Accompanying);
+    const onetimerRepository =
+      transactionalEntityManager.getRepository(Onetimer);
 
     await dealRepository.save(opportunity.deal);
 
@@ -59,6 +62,10 @@ export async function writeOpportunityLegacy(
 
     if (opportunity.accompanying) {
       await accompanyingRepository.save(opportunity.accompanying);
+    }
+
+    if (opportunity.onetimer) {
+      await onetimerRepository.save(opportunity.onetimer);
     }
 
     await opportunityRepository.save(opportunity);

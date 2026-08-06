@@ -1,3 +1,4 @@
+import { TranslatedIntoType } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -15,6 +16,18 @@ import {
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
+
+// Matches fe's own labels for these values (public/locales/de/translations.json)
+// — German-only since this template is (be#838).
+const TRANSLATION_LABELS: Record<TranslatedIntoType, string> = {
+  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
+  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
+  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
+};
+
+function translationLabel(value: TranslatedIntoType | undefined): string {
+  return value ? (TRANSLATION_LABELS[value] ?? "") : "";
+}
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -55,8 +68,19 @@ export async function sendEmailNewAccompanying(
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  const accompaniedpersonLanguage = accompanying?.languageToTranslate ?? "";
-  const appointmentaLanguage = opportunity.translationType ?? "";
+  // accompaniedpersonLanguage: the translation requirement for the
+  // accompanied person (be#846). appointmentaLanguage: the deal's own
+  // requested languages — a distinct concept, German-translated via
+  // field_translation by the caller before this function runs (be#856).
+  const accompaniedpersonLanguage = translationLabel(
+    accompanying?.languageToTranslate,
+  );
+  const appointmentaLanguage = (opportunity.deal?.dealLanguage ?? [])
+    .map(
+      (dealLanguage) =>
+        dealLanguage.language.translation ?? dealLanguage.language.title,
+    )
+    .join(", ");
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";

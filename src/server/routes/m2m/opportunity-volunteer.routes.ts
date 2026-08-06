@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   CommunicationType,
+  Lang,
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
   UserRole,
@@ -14,6 +15,7 @@ import {
 import logger from "../../../logger";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
+import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
 // Sends the FIRST_INQUIRY "suggest" email for an OV that is (now) PENDING.
@@ -202,6 +204,11 @@ export default async function m2mOpportunityVolunteerRoutes(
               if (!ov) {
                 return;
               }
+              // emailIntroduction/emailAccompanyMatch render the
+              // volunteer's language/skill titles — without this, they'd
+              // always be the raw (English) title rather than the German
+              // translation (be#849).
+              await addTranslatedFields([ov.volunteer], Lang.DE);
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
               const commType = isAccompany

@@ -1,7 +1,6 @@
-import * as fs from "fs";
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-import { isProd, isStaging, isTest } from "../config";
+import { isTest } from "../config";
 import Comment from "./entity/comment.entity";
 import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
@@ -50,7 +49,7 @@ import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
-import { getLoggingForDataSource } from "./utils";
+import { getLoggingForDataSource, getSslForDataSource } from "./utils";
 
 export const dataSource = new DataSource({
   type: "postgres",
@@ -112,15 +111,7 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
   ],
-  ssl:
-    isProd || isStaging
-      ? {
-          rejectUnauthorized: true,
-          ca: fs
-            .readFileSync("/app/certificates/eu-central-1-bundle.pem")
-            .toString(),
-        }
-      : false,
+  ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
   migrationsTableName: "be_migrations",
   subscribers: [],

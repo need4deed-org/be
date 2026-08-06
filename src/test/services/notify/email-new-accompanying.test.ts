@@ -1,3 +1,4 @@
+import { TranslatedIntoType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import { sendEmailNewAccompanying } from "../../../services/notify/events/email-new-accompanying";
@@ -21,7 +22,6 @@ function buildOpportunity(over: Record<string, unknown> = {}) {
     id: 1,
     title: "Hospital visit",
     info: "some info",
-    translationType: "Arabic",
     contactPerson: {
       name: "Jane Doe",
       email: "jane@example.com",
@@ -32,7 +32,7 @@ function buildOpportunity(over: Record<string, unknown> = {}) {
       name: "Client Name",
       address: "Main street 1",
       phone: "123456",
-      languageToTranslate: "Arabic",
+      languageToTranslate: TranslatedIntoType.ENGLISH_OK,
       postcode: { value: "10115" },
     },
     onetimer: { date: new Date("2026-03-05T13:30:00.000Z") },
@@ -59,5 +59,69 @@ describe("sendEmailNewAccompanying", () => {
     const msg = send.mock.calls[0][0];
     expect(msg.text).not.toContain("{{ appointmentTime }}");
     expect(msg.text).not.toContain("{{ appointmentPlz }}");
+  });
+
+  // be#846: accompaniedpersonLanguage/appointmentaLanguage were raw enum
+  // values duplicated from the same source (opportunity.translationType has
+  // no other reader or writer anywhere in the codebase) — mapped to a
+  // human-readable label instead, from the one genuine source.
+  it("maps languageToTranslate to a human-readable label, not the raw enum value", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        accompanying: {
+          name: "Client Name",
+          languageToTranslate: TranslatedIntoType.DEUTSCHE,
+          postcode: { value: "10115" },
+        },
+      }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain("Nur Deutsch");
+    expect(msg.text).not.toContain("deutsche");
+  });
+
+  // be#856: appointmentaLanguage previously aliased accompaniedpersonLanguage
+  // (the be#846 fix collapsed two distinct concepts into one to kill the
+  // duplicated-raw-enum bug). It must instead reflect the deal's own
+  // requested languages, independent of the translation-requirement label.
+  it("derives appointmentaLanguage from the deal's own dealLanguage entries, translated (be#856)", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        deal: {
+          dealLanguage: [
+            { language: { title: "German", translation: "Deutsch" } },
+            { language: { title: "English", translation: undefined } },
+          ],
+        },
+      }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain(
+      "Sprachen: Deutsch oder Englisch, Deutsch, English",
+    );
+  });
+
+  it("renders an empty appointmentaLanguage when the deal has no languages", async () => {
+    await sendEmailNewAccompanying(email, buildOpportunity({ deal: {} }));
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain("Sprachen: Deutsch oder Englisch, \n");
+  });
+
+  it("renders an empty label when languageToTranslate is unset", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        accompanying: { name: "Client Name", postcode: { value: "10115" } },
+      }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).not.toContain("undefined");
+    expect(msg.text).toContain("Sprachen: , ");
   });
 });

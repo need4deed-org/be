@@ -157,7 +157,6 @@ export const defaultFrom = process.env.EMAIL_FROM || "";
 export const isDev = process.env.NODE_ENV === "development";
 export const isTest = process.env.NODE_ENV === "test";
 export const isProd = process.env.NODE_ENV === "production";
-export const isStaging = process.env.NODE_ENV === "staging";
 export const shouldTruncateAll = TRUTHY.has(process.env.TRUNCATE_ALL || "");
 export const shouldRunMigrations = TRUTHY.has(process.env.RUN_MIGRATIONS || "");
 export const nidsToken = process.env.NIDS_TOKEN || "";

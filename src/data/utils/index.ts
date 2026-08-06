@@ -3,6 +3,7 @@ export * from "./get-district";
 export * from "./get-opportunity-representative-person";
 export * from "./get-postcode";
 export * from "./get-repository";
+export * from "./get-ssl-for-data-source";
 export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
 export * from "./getStartEndDates";
