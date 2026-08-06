@@ -82,11 +82,34 @@ describe("sendEmailNewAccompanying", () => {
     expect(msg.text).not.toContain("deutsche");
   });
 
-  it("renders the same label for both language slots (single source of truth)", async () => {
-    await sendEmailNewAccompanying(email, buildOpportunity());
+  // be#856: appointmentaLanguage previously aliased accompaniedpersonLanguage
+  // (the be#846 fix collapsed two distinct concepts into one to kill the
+  // duplicated-raw-enum bug). It must instead reflect the deal's own
+  // requested languages, independent of the translation-requirement label.
+  it("derives appointmentaLanguage from the deal's own dealLanguage entries, translated (be#856)", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        deal: {
+          dealLanguage: [
+            { language: { title: "German", translation: "Deutsch" } },
+            { language: { title: "English", translation: undefined } },
+          ],
+        },
+      }),
+    );
 
     const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Deutsch oder Englisch, Deutsch oder Englisch");
+    expect(msg.text).toContain(
+      "Sprachen: Deutsch oder Englisch, Deutsch, English",
+    );
+  });
+
+  it("renders an empty appointmentaLanguage when the deal has no languages", async () => {
+    await sendEmailNewAccompanying(email, buildOpportunity({ deal: {} }));
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain("Sprachen: Deutsch oder Englisch, \n");
   });
 
   it("renders an empty label when languageToTranslate is unset", async () => {

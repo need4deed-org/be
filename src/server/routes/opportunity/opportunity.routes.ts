@@ -4,6 +4,7 @@ import {
   ApiOpportunityPatch,
   CommunicationType,
   EntityTableName,
+  Lang,
   OpportunityFormDataWithAgentSubmitter,
   OpportunityLegacyFormData,
   OpportunityLegacyType,
@@ -74,6 +75,7 @@ import {
   upsertOnetimer,
   writeOpportunityLegacy,
 } from "../../utils";
+import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import {
   makePiiSerialization,
@@ -488,6 +490,7 @@ export default async function opportunityRoutes(
                 "accompanying",
                 "accompanying.postcode",
                 "onetimer",
+                "deal.dealLanguage.language",
                 "submittedByPerson",
                 "submittedByPerson.users",
                 "contactPerson",
@@ -496,7 +499,14 @@ export default async function opportunityRoutes(
                 "agent.agentPerson.person.users",
                 "district",
               ],
-              (opp) => fastify.notify.emailNewAccompanying(opp),
+              async (opp) => {
+                // The email's appointment-language field is the deal's own
+                // requested languages, German-translated via field_translation
+                // (be#856) — not the accompanying.languageToTranslate label
+                // used elsewhere in the same email.
+                await addTranslatedFields([opp], Lang.DE);
+                await fastify.notify.emailNewAccompanying(opp);
+              },
               "emailNewAccompanying",
             );
           } catch (err) {

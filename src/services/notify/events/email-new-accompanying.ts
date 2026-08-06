@@ -68,15 +68,19 @@ export async function sendEmailNewAccompanying(
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  // Both slots come from the same submission field (be#846) — there's no
-  // second, independently-set value anywhere in the codebase today
-  // (opportunity.translationType has no other reader or writer besides this
-  // one email). Mapped to the same human-readable label rather than left as
-  // the raw enum value ("deutsche").
+  // accompaniedpersonLanguage: the translation requirement for the
+  // accompanied person (be#846). appointmentaLanguage: the deal's own
+  // requested languages — a distinct concept, German-translated via
+  // field_translation by the caller before this function runs (be#856).
   const accompaniedpersonLanguage = translationLabel(
     accompanying?.languageToTranslate,
   );
-  const appointmentaLanguage = accompaniedpersonLanguage;
+  const appointmentaLanguage = (opportunity.deal?.dealLanguage ?? [])
+    .map(
+      (dealLanguage) =>
+        dealLanguage.language.translation ?? dealLanguage.language.title,
+    )
+    .join(", ");
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
