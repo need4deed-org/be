@@ -194,7 +194,7 @@ If needed update error handling in `src/server/index.ts`
 
 ## API contract
 
-The runtime contract is at https://app.need4deed.org/swagger/json
+The runtime contract is at https://dev.need4deed.org/swagger/json
 
 The transpile time contract is at SDK (`yarn upgrade need4deed-sdk --latest`)
 
