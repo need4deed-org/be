@@ -383,7 +383,7 @@ export default async function opportunityRoutes(
       }
       const agent = await fastify.db.agentRepository.findOne({
         where: { id: agentId },
-        relations: ["address.postcode"],
+        relations: ["address.postcode", "agentPerson"],
       });
       if (!agent) {
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
@@ -447,6 +447,19 @@ export default async function opportunityRoutes(
       // Submitter: the explicit body value, else the authenticated caller.
       opportunity.submittedByPersonId =
         body.submitted_by_id ?? request.authUser?.personId;
+      // Snapshot the contact at creation time (be#833): if this is left null,
+      // getOpportunityContact falls back at *read* time to agent.representative,
+      // which drifts every time the agent's contact list changes — so an
+      // unrelated request years later can silently reattribute this
+      // opportunity to whoever was just added. Freeze it now to whoever is
+      // actually the submitter's agent membership, or the agent's current
+      // representative if the submitter isn't one (e.g. a coordinator
+      // creating on the agent's behalf).
+      opportunity.contactPersonId = agent.agentPerson?.some(
+        (ap) => ap.personId === opportunity.submittedByPersonId,
+      )
+        ? opportunity.submittedByPersonId
+        : agent.representative?.personId;
 
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
