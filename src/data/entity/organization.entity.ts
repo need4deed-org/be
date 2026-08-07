@@ -59,17 +59,22 @@ export default class Organization {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "address_id" })
-  address: Address;
+  address?: Address;
 
-  @Column()
-  addressId: number;
+  // Nullable (be#843): a bulk-imported organization (e.g. seeded from a known
+  // domain list) may not have a known address yet — that's a legitimate
+  // "not yet known" state, not an error condition.
+  @Column({ nullable: true })
+  addressId?: number;
 
   @ManyToOne(() => Person, (person) => person.organization, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "person_id" })
-  person: Person;
+  person?: Person;
 
-  @Column()
-  personId: number;
+  // Nullable (be#843): same reasoning as addressId — a bulk-imported
+  // organization may not have an assigned primary contact yet.
+  @Column({ nullable: true })
+  personId?: number;
 }

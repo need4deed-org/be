@@ -15,6 +15,7 @@ export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
     info: agent.about,
     website: agent.website,
     agentTypeId: agent.typeId,
+    organizationId: agent.organizationId,
     trustLevel: agent.trustLevel,
     // GET emits volunteerSearch while PATCH uses statusSearch; accept either
     // so round-tripped fields aren't silently dropped.

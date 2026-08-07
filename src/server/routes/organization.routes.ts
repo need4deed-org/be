@@ -1,16 +1,38 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiOrganizationPatch, UserRole } from "need4deed-sdk";
+import {
+  ApiOrganizationGetList,
+  ApiOrganizationPatch,
+  UserRole,
+} from "need4deed-sdk";
 import { NotFoundError } from "../../config";
+import { dtoOrganizationGetList } from "../../services";
 import { idParamSchema, responseSchema } from "../schema";
-import { ParamsId, ReplyMessage } from "../types";
+import { ParamsId, ReplyData } from "../types";
 
 export default async function organizationRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
+  // GET is open to any logged-in user — it's just a dropdown of organization
+  // names (e.g. for the agent "operator" picker, be#843), no PII. Writes stay
+  // COORDINATOR-only, gated per-route below.
+  fastify.addHook("onRequest", fastify.authenticate());
+
+  fastify.get<{ Reply: ReplyData<ApiOrganizationGetList[]> }>(
+    "/",
+    {
+      schema: { response: responseSchema("ApiOrganizationGetList#", true) },
+    },
+    async (_request, reply) => {
+      const organizations = await fastify.db.organizationRepository.find({
+        order: { title: "ASC" },
+      });
+
+      return reply.status(200).send({
+        message: "Organizations found.",
+        data: organizations.map(dtoOrganizationGetList),
+      });
+    },
   );
 
   fastify.patch<{
@@ -20,7 +42,11 @@ export default async function organizationRoutes(
   }>(
     "/:id",
     {
-      schema: { params: idParamSchema, response: responseSchema({ statusCode: 204 }) },
+      preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
     },
     async (request, reply) => {
       const { id } = request.params;

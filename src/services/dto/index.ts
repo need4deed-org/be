@@ -5,6 +5,7 @@ export * from "./dto-comment";
 export * from "./dto-communication";
 export * from "./dto-opportunity";
 export * from "./dto-opportunity-volunteer";
+export * from "./dto-organization";
 export * from "./dto-person";
 export * from "./dto-volunteer";
 export * from "./parser-accompanying-legacy";

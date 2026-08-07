@@ -3,11 +3,13 @@ import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -289,6 +291,51 @@ describe("PATCH /agent/:id organization details", () => {
       payload: { title: `Updated by admin ${agent.id}` },
     });
     expect(res.statusCode).toBe(204);
+  });
+
+  // Regression test for be#843: the operator (Träger, e.g. IB/DRK/Albatros)
+  // field on an agent's profile is Agent.organizationId, which was missing
+  // end-to-end from the PATCH contract and so silently failed to save.
+  it("saves organizationId — the operator (Träger) field (be#843)", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const addressRepository = dataSource.getRepository(Address);
+    const organizationRepository = dataSource.getRepository(Organization);
+
+    const address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    const organization = await organizationRepository.save(
+      new Organization({
+        title: `Test Operator ${suffix}`,
+        addressId: address.id,
+        personId: memberPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/agent/${agent.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { organizationId: organization.id },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.agentRepository.findOneByOrFail({
+      id: agent.id,
+    });
+    expect(updated.organizationId).toBe(organization.id);
+
+    // organizationId is a no-cascade FK on Agent — clear it before deleting
+    // the Organization row, or the delete violates the constraint.
+    await fastify.db.agentRepository.update(
+      { id: agent.id },
+      { organizationId: null },
+    );
+    await organizationRepository.delete({ id: organization.id });
+    await addressRepository.delete({ id: address.id });
   });
 
   // District must always be derived from postcode, never independently
