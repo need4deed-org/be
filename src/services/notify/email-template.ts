@@ -16,7 +16,10 @@ export interface LocaleContent {
 // LocaleContent used as-is regardless of locale (for content that isn't split
 // by language, e.g. a template that already mixes both languages in one body).
 export type Manifest = Partial<Record<Lang, LocaleContent>> | LocaleContent;
-export type TemplateVars = Record<string, string | number>;
+// null/undefined are legal values here (not just string | number) precisely
+// because that's the failure mode fillTemplate() guards against — a caller
+// computing a var that unexpectedly comes back nullish.
+export type TemplateVars = Record<string, string | number | null | undefined>;
 
 // Berlin-based NGO — when a recipient's locale can't be determined (e.g. a
 // volunteer with no User row to read a language preference from), German is
@@ -25,10 +28,16 @@ const DEFAULT_LOCALE = Lang.DE;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 
 /**
- * Replace all {{ key }} placeholders in the template content with values from
- * vars. Handles optional whitespace around keys. Each placeholder that has no
- * matching key in vars is left unchanged and a warning is logged so template
- * mismatches surface early.
+ * Replace all {{ key }} placeholders in the template content with values
+ * from vars. Handles optional whitespace around keys. Every placeholder must
+ * resolve to a real value — a key genuinely absent from vars, or present but
+ * null/undefined, is left unresolved (the `{{ ... }}` stays in the output)
+ * and warned about, so a template/caller mismatch always surfaces rather
+ * than silently rendering blank.
+ *
+ * Never substring-matches rendered text for "undefined"/etc. — a user could
+ * legitimately type that into free-text content (a title, a comment), and
+ * that must never be flagged as invalid.
  */
 export function fillTemplate(
   content: LocaleContent,
@@ -36,11 +45,12 @@ export function fillTemplate(
 ): { subject: string; html?: string; text?: string } {
   const fill = (s: string): string =>
     s.replace(PLACEHOLDER_RE, (match, key: string) => {
-      if (!(key in vars)) {
+      const value = vars[key];
+      if (!(key in vars) || value === undefined || value === null) {
         logger.warn(`email template: unresolved placeholder {{${key}}}`);
         return match;
       }
-      return String(vars[key]);
+      return String(value);
     });
 
   return {

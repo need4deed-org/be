@@ -94,6 +94,38 @@ describe("fillTemplate", () => {
     const result = fillTemplate({ subject: "Hi {{name}}" }, { name: "" });
     expect(result.subject).toBe("Hi ");
   });
+
+  it("treats a nullish (undefined) value as unresolved, not the word 'undefined'", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{date}}" },
+      { date: undefined },
+    );
+    expect(result.subject).toBe("Date: {{date}}");
+  });
+
+  it("treats a nullish (null) value as unresolved", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{ date }}" },
+      { date: null },
+    );
+    expect(result.subject).toBe("Date: {{ date }}");
+  });
+
+  it("fills a placeholder normally when the value is present", () => {
+    const result = fillTemplate(
+      { subject: "Date: {{ date }}" },
+      { date: "2026-08-28" },
+    );
+    expect(result.subject).toBe("Date: 2026-08-28");
+  });
+
+  it("never flags literal user content that happens to contain the word 'undefined'", () => {
+    const result = fillTemplate(
+      { subject: "{{ title }}" },
+      { title: "My undefined project" },
+    );
+    expect(result.subject).toBe("My undefined project");
+  });
 });
 
 // ─── resolveLocale ───────────────────────────────────────────────────────────
