@@ -66,7 +66,7 @@ export class AddOnetimerEntity1785481503175 implements MigrationInterface {
       SELECT "tmp_id", "date" FROM "tmp_onetimer_backfill" ORDER BY "tmp_id"
     `);
     await queryRunner.query(`
-      SELECT setval('onetimer_id_seq', (SELECT COALESCE(MAX("id"), 0) FROM "onetimer"))
+      SELECT setval('onetimer_id_seq', (SELECT COALESCE(MAX("id"), 0) + 1 FROM "onetimer"), false)
     `);
 
     await queryRunner.query(`
