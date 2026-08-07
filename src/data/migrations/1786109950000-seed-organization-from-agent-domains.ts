@@ -341,6 +341,15 @@ export class SeedOrganizationFromAgentDomains1786109950000
     const placeholders = ORGANIZATION_DOMAINS.map((_, i) => `$${i + 1}`).join(
       ", ",
     );
+    // An agent may have since been assigned one of these as its operator
+    // (be#843/be#865) — Agent.organizationId has no ON DELETE cascade, so
+    // the DELETE below would otherwise abort on the FK violation. Clear the
+    // reference first; that's a lossy but non-fatal fallback, same as
+    // reverting any seed data after it's been adopted downstream.
+    await queryRunner.query(
+      `UPDATE "agent" SET "organization_id" = NULL WHERE "organization_id" IN (SELECT "id" FROM "organization" WHERE "title" IN (${placeholders}))`,
+      ORGANIZATION_DOMAINS,
+    );
     await queryRunner.query(
       `DELETE FROM "organization" WHERE "title" IN (${placeholders})`,
       ORGANIZATION_DOMAINS,

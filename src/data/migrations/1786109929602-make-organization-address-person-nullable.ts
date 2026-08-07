@@ -54,6 +54,14 @@ export class MakeOrganizationAddressPersonNullable1786109929602
     await queryRunner.query(
       `CREATE TYPE "public"."agent_engagement_status_enum_old" AS ENUM('agent-active', 'agent-inactive', 'agent-new', 'agent-unresponsive')`,
     );
+    // agent-incontact/agent-tried-to-contact don't exist on the old 4-value
+    // enum — casting a row still set to either would abort this migration.
+    // Reassign them to the old enum's first value before the cast; this is a
+    // lossy but non-fatal fallback (same tradeoff as reverting any enum
+    // widening after real rows start using the new values).
+    await queryRunner.query(
+      `UPDATE "agent" SET "engagement_status" = 'agent-active' WHERE "engagement_status" IN ('agent-incontact', 'agent-tried-to-contact')`,
+    );
     await queryRunner.query(
       `ALTER TABLE "agent" ALTER COLUMN "engagement_status" DROP DEFAULT`,
     );
