@@ -1,10 +1,11 @@
 import { FastifyInstance } from "fastify";
-import { OpportunityLegacyType, UserRole } from "need4deed-sdk";
+import { AgentRoleType, OpportunityLegacyType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
@@ -327,5 +328,154 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
     expect(new Date(onetimer.date).toISOString().slice(0, 10)).toBe(
       eventDateTime.toISOString().slice(0, 10),
     );
+  });
+});
+
+// Regression test for be#833: adding a new contact to an agent must not
+// retroactively change which contact an already-existing opportunity shows.
+// POST /opportunity now snapshots contact_person_id at creation time instead
+// of leaving it null (which used to make getOpportunityContact re-derive it,
+// live, from the agent's *current* representative on every read).
+describe("POST /opportunity freezes contact_person_id at creation (be#833)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+  let addressId: number;
+  let existingContact: Person;
+  const createdOpportunityIds: number[] = [];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const addressRepository = getRepository(dataSource, Address);
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    addressId = address.id;
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (contact-freeze) ${suffix}`, addressId }),
+    );
+
+    existingContact = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Alice",
+        lastName: "Existing",
+        email: `alice-contact-freeze-${suffix}@test.need4deed.org`,
+      }),
+    );
+    await getRepository(dataSource, AgentPerson).save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: existingContact.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-contact-freeze-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-contact-freeze-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    for (const id of createdOpportunityIds) {
+      const opportunity = await fastify.db.opportunityRepository.findOne({
+        where: { id },
+      });
+      await fastify.db.opportunityRepository.delete({ id });
+      if (opportunity?.dealId) {
+        await getRepository(dataSource, Deal).delete({
+          id: opportunity.dealId,
+        });
+      }
+    }
+    await getRepository(dataSource, AgentPerson).delete({ agentId: agent.id });
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: existingContact.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: addressId });
+    await fastify.close();
+  });
+
+  it("sets contact_person_id to the agent's representative at creation, and it stays put after a new contact is added", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Opportunity (contact-freeze) ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const createdId = res.json().data.id;
+    createdOpportunityIds.push(createdId);
+
+    const opportunityRepository = getRepository(dataSource, Opportunity);
+    const savedBefore = await opportunityRepository.findOneOrFail({
+      where: { id: createdId },
+    });
+    // The coordinator who created this isn't an agent member, so contact
+    // resolves to the agent's sole (volunteer-coordinator) contact.
+    expect(savedBefore.contactPersonId).toBe(existingContact.id);
+
+    // Now add a brand new contact to the agent, with the same role — this is
+    // exactly the action the bug report describes as retroactively hijacking
+    // the contact shown on already-existing requests.
+    const newContact = await fastify.db.personRepository.save(
+      new Person({ firstName: "Bob", lastName: "NewContact" }),
+    );
+    await getRepository(dataSource, AgentPerson).save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: newContact.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      }),
+    );
+
+    const savedAfter = await opportunityRepository.findOneOrFail({
+      where: { id: createdId },
+    });
+    expect(savedAfter.contactPersonId).toBe(existingContact.id);
+
+    await getRepository(dataSource, AgentPerson).delete({
+      agentId: agent.id,
+      personId: newContact.id,
+    });
+    await fastify.db.personRepository.delete({ id: newContact.id });
   });
 });
