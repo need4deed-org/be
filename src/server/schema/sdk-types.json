@@ -347,16 +347,15 @@
     "VolunteerStateAppreciationType": {
       "$id": "VolunteerStateAppreciationType",
       "type": "string",
-       "enum": [
-    "t-shirt",
-    "benefit-card",
-    "tote-bag",
-    "need4deed-certificate",
-    "cap",
-    "notebook",
-    "city-certificate"
-  ]
-
+      "enum": [
+        "t-shirt",
+        "benefit-card",
+        "tote-bag",
+        "need4deed-certificate",
+        "cap",
+        "notebook",
+        "city-certificate"
+      ]
     },
     "VolunteerStateTypeType": {
       "$id": "VolunteerStateTypeType",
@@ -1400,6 +1399,9 @@
         },
         "districtId": {
           "type": "number"
+        },
+        "organizationId": {
+          "type": "number"
         }
       }
     },
@@ -1568,6 +1570,20 @@
           "type": "string"
         }
       }
+    },
+    "ApiOrganizationGetList": {
+      "$id": "ApiOrganizationGetList",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "title"],
+      "additionalProperties": false
     },
     "ApiCommentTaggedPerson": {
       "$id": "ApiCommentTaggedPerson",

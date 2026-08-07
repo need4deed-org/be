@@ -14,6 +14,7 @@ describe("parseAgentPatch", () => {
       about: "A non-profit focused on disaster recovery.",
       website: "https://example.org",
       typeId: 1,
+      organizationId: 7,
       trustLevel: "unknown" as AgentTrustType,
       statusSearch: "agent-not-needed" as AgentVolunteerSearchType,
       statusEngagement: "agent-new" as AgentEngagementStatusType,
@@ -29,6 +30,7 @@ describe("parseAgentPatch", () => {
       info: "A non-profit focused on disaster recovery.",
       website: "https://example.org",
       agentTypeId: 1,
+      organizationId: 7,
       trustLevel: "unknown",
       searchStatus: "agent-not-needed",
       engagementStatus: "agent-new",
@@ -73,5 +75,11 @@ describe("parseAgentPatch", () => {
     const agent: ApiAgentPatch = { districtId: 42 };
 
     expect(parseAgentPatch(agent)).not.toHaveProperty("districtId");
+  });
+
+  it("maps organizationId — the operator (Träger) field on an agent's profile (be#843)", () => {
+    const agent: ApiAgentPatch = { organizationId: 9 };
+
+    expect(parseAgentPatch(agent).organizationId).toBe(9);
   });
 });
