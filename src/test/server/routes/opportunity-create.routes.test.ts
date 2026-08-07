@@ -342,6 +342,8 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
 
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
+  let memberPerson: Person;
+  let memberCookie: string;
   let agent: Agent;
   let addressId: number;
   let existingContact: Person;
@@ -402,6 +404,42 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
       },
     });
     coordinatorCookie = getCookie(res.cookies, accessCookieName);
+
+    // A genuine member of the agent, distinct from its volunteer-coordinator
+    // representative — used to prove the "submitter is an agent member"
+    // branch stores the submitter, not the representative.
+    memberPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Carol",
+        lastName: "Member",
+        email: `carol-contact-freeze-${suffix}@test.need4deed.org`,
+      }),
+    );
+    await getRepository(dataSource, AgentPerson).save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: memberPerson.id,
+        role: AgentRoleType.SOCIAL_WORKER,
+      }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `member-contact-freeze-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: memberPerson.id,
+      }),
+    );
+    const memberRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `member-contact-freeze-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    memberCookie = getCookie(memberRes.cookies, accessCookieName);
   });
 
   afterAll(async () => {
@@ -419,6 +457,8 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     await getRepository(dataSource, AgentPerson).delete({ agentId: agent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.userRepository.delete({ personId: memberPerson.id });
+    await fastify.db.personRepository.delete({ id: memberPerson.id });
     await fastify.db.personRepository.delete({ id: existingContact.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await getRepository(dataSource, Address).delete({ id: addressId });
@@ -477,5 +517,36 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
       personId: newContact.id,
     });
     await fastify.db.personRepository.delete({ id: newContact.id });
+  });
+
+  it("sets contact_person_id to the submitter when they are a genuine agent member, not the representative", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: memberCookie },
+      payload: {
+        title: `Test Opportunity (contact-freeze member) ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const createdId = res.json().data.id;
+    createdOpportunityIds.push(createdId);
+
+    const opportunityRepository = getRepository(dataSource, Opportunity);
+    const saved = await opportunityRepository.findOneOrFail({
+      where: { id: createdId },
+    });
+    // The creator (memberPerson) is an agent member in their own right, so
+    // contact resolves to them directly, not to the volunteer-coordinator
+    // representative (existingContact).
+    expect(saved.contactPersonId).toBe(memberPerson.id);
+    expect(saved.contactPersonId).not.toBe(existingContact.id);
   });
 });
