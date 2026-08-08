@@ -693,7 +693,10 @@ export default async function opportunityRoutes(
           // An opportunity moving to a status that implies searching means
           // its agent is searching too (be#862) — cascaded here, atomically,
           // rather than as a second independent PATCH from the frontend.
+          // agentId is nullable (e.g. orphaned legacy rows) — skip the
+          // cascade rather than failing the whole status patch over it.
           if (
+            effectiveAgentId &&
             opportunityObj.status &&
             impliesAgentSearching(opportunityObj.status)
           ) {

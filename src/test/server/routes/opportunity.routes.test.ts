@@ -409,6 +409,8 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
   let newAgent: Agent;
   let opportunity: Opportunity;
   let deal: Deal;
+  let orphanOpportunity: Opportunity;
+  let orphanDeal: Deal;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
 
@@ -437,6 +439,21 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
         status: OpportunityStatusType.INACTIVE,
         agentId: agent.id,
         dealId: deal.id,
+      }),
+    );
+    // Mirrors a legacy/orphaned row with no owning agent (agent_id is
+    // nullable at the DB level) — the search-status cascade must not turn a
+    // previously-succeeding status PATCH into a 400 just because there's no
+    // agent to cascade to (be#868 review).
+    orphanDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    orphanOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (search-cascade-orphan) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.INACTIVE,
+        dealId: orphanDeal.id,
       }),
     );
 
@@ -468,6 +485,10 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
   afterAll(async () => {
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.opportunityRepository.delete({
+      id: orphanOpportunity.id,
+    });
+    await fastify.db.dealRepository.delete({ id: orphanDeal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.db.agentRepository.delete({ id: newAgent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
@@ -552,6 +573,24 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
       { id: opportunity.id },
       { agentId: agent.id },
     );
+  });
+
+  // Regression test for be#868 review: agent_id is nullable at the DB level
+  // (legacy/orphaned rows) — the cascade must not turn what would otherwise
+  // be a successful status patch into a 400 just because there's no agent.
+  it("still applies the status patch when the opportunity has no agent to cascade to", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${orphanOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { statusOpportunity: OpportunityStatusType.ACTIVE },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: orphanOpportunity.id,
+    });
+    expect(updated.status).toBe(OpportunityStatusType.ACTIVE);
   });
 });
 
