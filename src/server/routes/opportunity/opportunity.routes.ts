@@ -70,7 +70,9 @@ import {
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
+  impliesAgentSearching,
   patchEntity,
+  setAgentSearching,
   updateOptionList,
   upsertOnetimer,
   writeOpportunityLegacy,
@@ -661,17 +663,11 @@ export default async function opportunityRoutes(
         }
       }
 
-      if (opportunityObj) {
-        const success = await patchEntity(
-          Opportunity,
-          opportunityObj,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new Error("Patching opportunity failed.");
-        }
-      }
-
+      // Resolved and validated up front (rather than inside the
+      // agentLinkId!==undefined block below) so the status-cascade transaction
+      // below can target whichever agent will actually own this opportunity
+      // once the request is applied — not the one it's being relinked away
+      // from (be#862 review).
       if (agentLinkId !== undefined) {
         const linkedAgent = await fastify.db.agentRepository.findOne({
           where: { id: agentLinkId },
@@ -679,33 +675,14 @@ export default async function opportunityRoutes(
         if (!linkedAgent) {
           throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
         }
-        // The opportunity's existing contact (if any) belongs to the *old*
-        // agent and has no guaranteed relationship to the new one — clear it
-        // rather than leave a stale cross-agent reference. If the request
-        // also carries `contact.id`, the contactLinkId branch below sets the
-        // real (validated-against-the-new-agent) value right after this.
-        const contactReset: Partial<Opportunity> =
-          contactLinkId === undefined ? { contactPersonId: null } : {};
-        const success = await patchEntity(
-          Opportunity,
-          { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new BadRequestError("Relinking opportunity agent failed.");
-        }
-      } else if (agent) {
-        const success = await patchEntity(Agent, agent, opportunity.agentId);
-        if (!success) {
-          throw new Error("Patching agent failed while patching opportunity.");
-        }
       }
+      const effectiveAgentId = agentLinkId ?? opportunity.agentId;
 
+      // Also validated up front, same reasoning as agentLinkId above:
+      // effectiveAgentId already resolves to the *new* agent when this
+      // request also relinks `agent.id`, so a payload that relinks both in
+      // one go validates the contact against the new agent, not the old one.
       if (contactLinkId !== undefined) {
-        // Evaluated after the agent relink above so a payload that relinks
-        // both `agent.id` and `contact.id` in one request validates the
-        // contact against the opportunity's *new* agent, not the old one.
-        const effectiveAgentId = agentLinkId ?? opportunity.agentId;
         const agentContactMembership =
           await fastify.db.agentPersonRepository.findOneBy({
             agentId: effectiveAgentId,
@@ -716,15 +693,86 @@ export default async function opportunityRoutes(
             `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
           );
         }
-        const success = await patchEntity(
-          Opportunity,
-          { contactPersonId: contactLinkId } as Partial<Opportunity>,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new BadRequestError("Relinking opportunity contact failed.");
-        }
       }
+
+      // The opportunity patch, the be#862 search-status cascade, the agent
+      // relink, and the contact relink all share one transaction — each used
+      // to be a separate statement issued independently, so a failure partway
+      // through could leave some of these applied and others lost (be#868
+      // review).
+      await dataSource.manager.transaction(async (manager) => {
+        if (opportunityObj) {
+          const success = await patchEntity(
+            Opportunity,
+            opportunityObj,
+            opportunity.id,
+            manager,
+          );
+          if (!success) {
+            throw new Error("Patching opportunity failed.");
+          }
+
+          // An opportunity moving to a status that implies searching means
+          // its agent is searching too (be#862) — cascaded here, atomically,
+          // rather than as a second independent PATCH from the frontend.
+          // agentId is nullable (e.g. orphaned legacy rows) — skip the
+          // cascade rather than failing the whole status patch over it.
+          if (
+            effectiveAgentId &&
+            opportunityObj.status &&
+            impliesAgentSearching(opportunityObj.status)
+          ) {
+            await setAgentSearching(effectiveAgentId, manager);
+          }
+        }
+
+        if (agentLinkId !== undefined) {
+          // The opportunity's existing contact (if any) belongs to the *old*
+          // agent and has no guaranteed relationship to the new one — clear
+          // it rather than leave a stale cross-agent reference. If the
+          // request also carries `contact.id`, the contactLinkId branch
+          // below sets the real (validated-against-the-new-agent) value
+          // right after this.
+          const contactReset: Partial<Opportunity> =
+            contactLinkId === undefined ? { contactPersonId: null } : {};
+          const success = await patchEntity(
+            Opportunity,
+            { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
+            opportunity.id,
+            manager,
+          );
+          if (!success) {
+            throw new BadRequestError("Relinking opportunity agent failed.");
+          }
+        } else if (agent) {
+          const success = await patchEntity(
+            Agent,
+            agent,
+            opportunity.agentId,
+            manager,
+          );
+          if (!success) {
+            throw new Error(
+              "Patching agent failed while patching opportunity.",
+            );
+          }
+        }
+
+        if (contactLinkId !== undefined) {
+          // Evaluated after the agent relink above so a payload that resets
+          // contactPersonId to null (contactReset, above) doesn't clobber the
+          // real value being set here.
+          const success = await patchEntity(
+            Opportunity,
+            { contactPersonId: contactLinkId } as Partial<Opportunity>,
+            opportunity.id,
+            manager,
+          );
+          if (!success) {
+            throw new BadRequestError("Relinking opportunity contact failed.");
+          }
+        }
+      });
 
       if (accompanying) {
         const appointmentPostcodeValue =

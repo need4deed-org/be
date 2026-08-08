@@ -1,3 +1,4 @@
+import { OpportunityStatusType } from "need4deed-sdk";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
@@ -8,6 +9,7 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { impliesAgentSearching, setAgentSearching } from "./for-routes";
 
 export async function writeOpportunityLegacy(
   opportunity: Opportunity,
@@ -69,6 +71,19 @@ export async function writeOpportunityLegacy(
     }
 
     await opportunityRepository.save(opportunity);
+
+    // opportunity.status is normally left undefined at this point (the
+    // create form has no field to set it, so it's the entity's DB-level
+    // default) — fall back to that same default explicitly rather than
+    // assuming "creation always implies searching", so this stays correct if
+    // that default, or a future caller passing an explicit status, changes
+    // (be#862 / be#868 review).
+    if (
+      opportunity.agentId &&
+      impliesAgentSearching(opportunity.status ?? OpportunityStatusType.NEW)
+    ) {
+      await setAgentSearching(opportunity.agentId, transactionalEntityManager);
+    }
   });
 
   return opportunity.id;
