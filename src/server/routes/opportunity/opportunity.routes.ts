@@ -678,11 +678,27 @@ export default async function opportunityRoutes(
       }
       const effectiveAgentId = agentLinkId ?? opportunity.agentId;
 
-      // The opportunity patch, the be#862 search-status cascade, and the
-      // agent relink all share one transaction — previously the relink was a
-      // separate statement issued after the cascade transaction committed, so
-      // a relink failure (e.g. a mid-flight delete of the target agent) could
-      // leave the status/cascade applied but the relink itself lost (be#868
+      // Also validated up front, same reasoning as agentLinkId above:
+      // effectiveAgentId already resolves to the *new* agent when this
+      // request also relinks `agent.id`, so a payload that relinks both in
+      // one go validates the contact against the new agent, not the old one.
+      if (contactLinkId !== undefined) {
+        const agentContactMembership =
+          await fastify.db.agentPersonRepository.findOneBy({
+            agentId: effectiveAgentId,
+            personId: contactLinkId,
+          });
+        if (!agentContactMembership) {
+          throw new NotFoundError(
+            `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
+          );
+        }
+      }
+
+      // The opportunity patch, the be#862 search-status cascade, the agent
+      // relink, and the contact relink all share one transaction — each used
+      // to be a separate statement issued independently, so a failure partway
+      // through could leave some of these applied and others lost (be#868
       // review).
       await dataSource.manager.transaction(async (manager) => {
         if (opportunityObj) {
@@ -741,31 +757,22 @@ export default async function opportunityRoutes(
             );
           }
         }
-      });
 
-      if (contactLinkId !== undefined) {
-        // effectiveAgentId already resolves to the *new* agent when this
-        // request also relinks `agent.id`, so a payload that relinks both in
-        // one go validates the contact against the new agent, not the old one.
-        const agentContactMembership =
-          await fastify.db.agentPersonRepository.findOneBy({
-            agentId: effectiveAgentId,
-            personId: contactLinkId,
-          });
-        if (!agentContactMembership) {
-          throw new NotFoundError(
-            `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
+        if (contactLinkId !== undefined) {
+          // Evaluated after the agent relink above so a payload that resets
+          // contactPersonId to null (contactReset, above) doesn't clobber the
+          // real value being set here.
+          const success = await patchEntity(
+            Opportunity,
+            { contactPersonId: contactLinkId } as Partial<Opportunity>,
+            opportunity.id,
+            manager,
           );
+          if (!success) {
+            throw new BadRequestError("Relinking opportunity contact failed.");
+          }
         }
-        const success = await patchEntity(
-          Opportunity,
-          { contactPersonId: contactLinkId } as Partial<Opportunity>,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new BadRequestError("Relinking opportunity contact failed.");
-        }
-      }
+      });
 
       if (accompanying) {
         const appointmentPostcodeValue =
