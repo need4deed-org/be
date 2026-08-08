@@ -663,6 +663,21 @@ export default async function opportunityRoutes(
         }
       }
 
+      // Resolved and validated up front (rather than inside the
+      // agentLinkId!==undefined block below) so the status-cascade transaction
+      // below can target whichever agent will actually own this opportunity
+      // once the request is applied — not the one it's being relinked away
+      // from (be#862 review).
+      if (agentLinkId !== undefined) {
+        const linkedAgent = await fastify.db.agentRepository.findOne({
+          where: { id: agentLinkId },
+        });
+        if (!linkedAgent) {
+          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
+        }
+      }
+      const effectiveAgentId = agentLinkId ?? opportunity.agentId;
+
       if (opportunityObj) {
         await dataSource.manager.transaction(async (manager) => {
           const success = await patchEntity(
@@ -682,18 +697,12 @@ export default async function opportunityRoutes(
             opportunityObj.status &&
             impliesAgentSearching(opportunityObj.status)
           ) {
-            await setAgentSearching(opportunity.agentId, manager);
+            await setAgentSearching(effectiveAgentId, manager);
           }
         });
       }
 
       if (agentLinkId !== undefined) {
-        const linkedAgent = await fastify.db.agentRepository.findOne({
-          where: { id: agentLinkId },
-        });
-        if (!linkedAgent) {
-          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
-        }
         // The opportunity's existing contact (if any) belongs to the *old*
         // agent and has no guaranteed relationship to the new one — clear it
         // rather than leave a stale cross-agent reference. If the request
@@ -717,10 +726,9 @@ export default async function opportunityRoutes(
       }
 
       if (contactLinkId !== undefined) {
-        // Evaluated after the agent relink above so a payload that relinks
-        // both `agent.id` and `contact.id` in one request validates the
-        // contact against the opportunity's *new* agent, not the old one.
-        const effectiveAgentId = agentLinkId ?? opportunity.agentId;
+        // effectiveAgentId already resolves to the *new* agent when this
+        // request also relinks `agent.id`, so a payload that relinks both in
+        // one go validates the contact against the new agent, not the old one.
         const agentContactMembership =
           await fastify.db.agentPersonRepository.findOneBy({
             agentId: effectiveAgentId,

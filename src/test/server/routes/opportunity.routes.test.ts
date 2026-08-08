@@ -406,6 +406,7 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
   let fastify: FastifyInstance;
 
   let agent: Agent;
+  let newAgent: Agent;
   let opportunity: Opportunity;
   let deal: Deal;
   let coordinatorPerson: Person;
@@ -422,6 +423,9 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (search-cascade) ${suffix}` }),
+    );
+    newAgent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (search-cascade-relink) ${suffix}` }),
     );
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
@@ -465,6 +469,7 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.db.agentRepository.delete({ id: newAgent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.close();
@@ -498,6 +503,55 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
       id: agent.id,
     });
     expect(updatedAgent.searchStatus).toBe(AgentVolunteerSearchType.SEARCHING);
+  });
+
+  // Regression test for the stale-agent bug caught in be#868 review: a
+  // request that relinks `agent.id` and sets a searching statusOpportunity in
+  // the same PATCH must cascade to the *new* agent, not the one the
+  // opportunity is being relinked away from.
+  it("cascades the newly-linked agent to SEARCHING, not the one it's being relinked away from", async () => {
+    // Reset both agents to a known, non-searching baseline first — the
+    // previous test already left `agent` at SEARCHING.
+    await fastify.db.agentRepository.update(
+      { id: agent.id },
+      { searchStatus: AgentVolunteerSearchType.NOT_NEEDED },
+    );
+    await fastify.db.agentRepository.update(
+      { id: newAgent.id },
+      { searchStatus: AgentVolunteerSearchType.NOT_NEEDED },
+    );
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        agent: { id: newAgent.id },
+        statusOpportunity: OpportunityStatusType.ACTIVE,
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updatedOldAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agent.id,
+    });
+    expect(updatedOldAgent.searchStatus).toBe(
+      AgentVolunteerSearchType.NOT_NEEDED,
+    );
+
+    const updatedNewAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: newAgent.id,
+    });
+    expect(updatedNewAgent.searchStatus).toBe(
+      AgentVolunteerSearchType.SEARCHING,
+    );
+
+    // Restore for isolation, though no later test in this describe depends
+    // on the opportunity's agent.
+    await fastify.db.opportunityRepository.update(
+      { id: opportunity.id },
+      { agentId: agent.id },
+    );
   });
 });
 
