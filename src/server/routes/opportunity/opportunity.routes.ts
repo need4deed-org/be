@@ -678,8 +678,14 @@ export default async function opportunityRoutes(
       }
       const effectiveAgentId = agentLinkId ?? opportunity.agentId;
 
-      if (opportunityObj) {
-        await dataSource.manager.transaction(async (manager) => {
+      // The opportunity patch, the be#862 search-status cascade, and the
+      // agent relink all share one transaction — previously the relink was a
+      // separate statement issued after the cascade transaction committed, so
+      // a relink failure (e.g. a mid-flight delete of the target agent) could
+      // leave the status/cascade applied but the relink itself lost (be#868
+      // review).
+      await dataSource.manager.transaction(async (manager) => {
+        if (opportunityObj) {
           const success = await patchEntity(
             Opportunity,
             opportunityObj,
@@ -702,31 +708,40 @@ export default async function opportunityRoutes(
           ) {
             await setAgentSearching(effectiveAgentId, manager);
           }
-        });
-      }
+        }
 
-      if (agentLinkId !== undefined) {
-        // The opportunity's existing contact (if any) belongs to the *old*
-        // agent and has no guaranteed relationship to the new one — clear it
-        // rather than leave a stale cross-agent reference. If the request
-        // also carries `contact.id`, the contactLinkId branch below sets the
-        // real (validated-against-the-new-agent) value right after this.
-        const contactReset: Partial<Opportunity> =
-          contactLinkId === undefined ? { contactPersonId: null } : {};
-        const success = await patchEntity(
-          Opportunity,
-          { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new BadRequestError("Relinking opportunity agent failed.");
+        if (agentLinkId !== undefined) {
+          // The opportunity's existing contact (if any) belongs to the *old*
+          // agent and has no guaranteed relationship to the new one — clear
+          // it rather than leave a stale cross-agent reference. If the
+          // request also carries `contact.id`, the contactLinkId branch
+          // below sets the real (validated-against-the-new-agent) value
+          // right after this.
+          const contactReset: Partial<Opportunity> =
+            contactLinkId === undefined ? { contactPersonId: null } : {};
+          const success = await patchEntity(
+            Opportunity,
+            { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
+            opportunity.id,
+            manager,
+          );
+          if (!success) {
+            throw new BadRequestError("Relinking opportunity agent failed.");
+          }
+        } else if (agent) {
+          const success = await patchEntity(
+            Agent,
+            agent,
+            opportunity.agentId,
+            manager,
+          );
+          if (!success) {
+            throw new Error(
+              "Patching agent failed while patching opportunity.",
+            );
+          }
         }
-      } else if (agent) {
-        const success = await patchEntity(Agent, agent, opportunity.agentId);
-        if (!success) {
-          throw new Error("Patching agent failed while patching opportunity.");
-        }
-      }
+      });
 
       if (contactLinkId !== undefined) {
         // effectiveAgentId already resolves to the *new* agent when this
