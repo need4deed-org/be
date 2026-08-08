@@ -1,4 +1,5 @@
 import {
+  AgentVolunteerSearchType,
   ApiAvailability,
   ApiDocumentGet,
   ApiOptionLists,
@@ -7,6 +8,7 @@ import {
   Lang,
   Occasionally,
   OccasionalType,
+  OpportunityStatusType,
   OptionById,
   OptionItem,
   SortOrder,
@@ -35,6 +37,7 @@ import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentService from "../../../data/entity/m2m/agent-service";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Option from "../../../data/entity/option.entity";
 import Person from "../../../data/entity/person.entity";
@@ -348,6 +351,31 @@ export async function patchEntity<E extends { id: number }>(
         );
       }
     });
+}
+
+// An opportunity looking for volunteers implies its agent is looking for
+// volunteers too (be#862). Kept as a set (rather than e.g. "!== INACTIVE/PAST")
+// so a future status added to the SDK doesn't silently start cascading.
+const AGENT_SEARCH_CASCADE_STATUSES = new Set<OpportunityStatusType>([
+  OpportunityStatusType.NEW,
+  OpportunityStatusType.ACTIVE,
+  OpportunityStatusType.SEARCHING,
+]);
+
+export function impliesAgentSearching(status: OpportunityStatusType): boolean {
+  return AGENT_SEARCH_CASCADE_STATUSES.has(status);
+}
+
+export async function setAgentSearching(
+  agentId: number,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<void> {
+  await patchEntity(
+    Agent,
+    { searchStatus: AgentVolunteerSearchType.SEARCHING } as Partial<Agent>,
+    agentId,
+    manager,
+  );
 }
 
 export async function patchAddress(

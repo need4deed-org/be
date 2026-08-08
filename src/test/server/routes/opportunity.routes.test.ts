@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
   AgentRoleType,
+  AgentVolunteerSearchType,
   EntityTableName,
   OpportunityStatusType,
   OpportunityType,
@@ -394,6 +395,109 @@ describe("PATCH /opportunity/:id agent status update", () => {
       { id: ownOpportunity.id },
       { agentId: ownAgent.id, contactPersonId: agentContactPerson.id },
     );
+  });
+});
+
+// Regression test for be#862: this cascade used to be a second, independent
+// PATCH /agent/:id fired by the frontend after the opportunity PATCH
+// succeeded — non-atomic, and easy to forget for other callers. It now
+// happens server-side, in the same transaction as the opportunity patch.
+describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () => {
+  let fastify: FastifyInstance;
+
+  let agent: Agent;
+  let opportunity: Opportunity;
+  let deal: Deal;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (search-cascade) ${suffix}` }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (search-cascade) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.INACTIVE,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-search-cascade-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-search-cascade-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.close();
+  });
+
+  it("leaves the agent's volunteerSearch untouched when the opportunity moves to a non-searching status", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { statusOpportunity: OpportunityStatusType.PAST },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updatedAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agent.id,
+    });
+    expect(updatedAgent.searchStatus).toBe(AgentVolunteerSearchType.NOT_NEEDED);
+  });
+
+  it("flips the agent's volunteerSearch to SEARCHING when the opportunity's status becomes ACTIVE", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { statusOpportunity: OpportunityStatusType.ACTIVE },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updatedAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agent.id,
+    });
+    expect(updatedAgent.searchStatus).toBe(AgentVolunteerSearchType.SEARCHING);
   });
 });
 

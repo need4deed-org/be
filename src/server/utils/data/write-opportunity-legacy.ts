@@ -8,6 +8,7 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { setAgentSearching } from "./for-routes";
 
 export async function writeOpportunityLegacy(
   opportunity: Opportunity,
@@ -69,6 +70,11 @@ export async function writeOpportunityLegacy(
     }
 
     await opportunityRepository.save(opportunity);
+
+    // A newly-created opportunity always starts in a status that implies
+    // searching (be#862) — the create form has no field to set it otherwise,
+    // so the owning agent's volunteerSearch flips to SEARCHING unconditionally.
+    await setAgentSearching(opportunity.agentId, transactionalEntityManager);
   });
 
   return opportunity.id;

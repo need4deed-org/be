@@ -70,7 +70,9 @@ import {
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
+  impliesAgentSearching,
   patchEntity,
+  setAgentSearching,
   updateOptionList,
   upsertOnetimer,
   writeOpportunityLegacy,
@@ -662,14 +664,27 @@ export default async function opportunityRoutes(
       }
 
       if (opportunityObj) {
-        const success = await patchEntity(
-          Opportunity,
-          opportunityObj,
-          opportunity.id,
-        );
-        if (!success) {
-          throw new Error("Patching opportunity failed.");
-        }
+        await dataSource.manager.transaction(async (manager) => {
+          const success = await patchEntity(
+            Opportunity,
+            opportunityObj,
+            opportunity.id,
+            manager,
+          );
+          if (!success) {
+            throw new Error("Patching opportunity failed.");
+          }
+
+          // An opportunity moving to a status that implies searching means
+          // its agent is searching too (be#862) — cascaded here, atomically,
+          // rather than as a second independent PATCH from the frontend.
+          if (
+            opportunityObj.status &&
+            impliesAgentSearching(opportunityObj.status)
+          ) {
+            await setAgentSearching(opportunity.agentId, manager);
+          }
+        });
       }
 
       if (agentLinkId !== undefined) {

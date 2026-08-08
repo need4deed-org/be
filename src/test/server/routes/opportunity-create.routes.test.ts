@@ -1,5 +1,10 @@
 import { FastifyInstance } from "fastify";
-import { AgentRoleType, OpportunityLegacyType, UserRole } from "need4deed-sdk";
+import {
+  AgentRoleType,
+  AgentVolunteerSearchType,
+  OpportunityLegacyType,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -548,5 +553,105 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     // representative (existingContact).
     expect(saved.contactPersonId).toBe(memberPerson.id);
     expect(saved.contactPersonId).not.toBe(existingContact.id);
+  });
+});
+
+// Regression test for be#862: a newly-created opportunity always starts in a
+// status that implies searching, so the owning agent's volunteerSearch must
+// flip to SEARCHING atomically alongside the opportunity write, rather than
+// via a second, independent PATCH /agent/:id from the frontend.
+describe("POST /opportunity cascades a new agent to SEARCHING (be#862)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+  let addressId: number;
+  let createdOpportunityId: number;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const addressRepository = getRepository(dataSource, Address);
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    addressId = address.id;
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent (search-cascade-create) ${suffix}`,
+        addressId: address.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-search-cascade-create-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-search-cascade-create-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    if (createdOpportunityId) {
+      await fastify.db.opportunityRepository.delete({
+        id: createdOpportunityId,
+      });
+    }
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: addressId });
+    await fastify.close();
+  });
+
+  it("flips the owning agent's volunteerSearch to SEARCHING", async () => {
+    expect(agent.searchStatus).toBe(AgentVolunteerSearchType.NOT_NEEDED);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Opportunity (search-cascade-create) ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdOpportunityId = res.json().data.id;
+
+    const updatedAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agent.id,
+    });
+    expect(updatedAgent.searchStatus).toBe(AgentVolunteerSearchType.SEARCHING);
   });
 });
