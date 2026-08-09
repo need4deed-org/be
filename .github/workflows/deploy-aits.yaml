@@ -34,4 +34,11 @@ jobs:
           host: ${{ secrets.AITS_HOST }}
           username: ubuntu
           key: ${{ secrets.AITS_SSH_KEY }}
-          script: kubectl rollout restart deployment/be -n n4d-dev
+          # rollout restart alone only proves the request was accepted, not that
+          # the new pod actually came up (be#868: a stuck/unschedulable pod left
+          # this reporting green for ~24h while AITS kept serving the old image).
+          # rollout status fails (and fails this step) if it doesn't roll out
+          # within the timeout.
+          script: |
+            kubectl rollout restart deployment/be -n n4d-dev
+            kubectl rollout status deployment/be -n n4d-dev --timeout=120s
