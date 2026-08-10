@@ -4,6 +4,8 @@ import { BadRequestError } from "../../../config/error";
 import { BaseError } from "../../../config/error/base";
 import {
   deepMerge,
+  formatDate,
+  formatTime,
   getDateObj,
   getErrorStatusCode,
   isObject,
@@ -306,6 +308,41 @@ describe("getDateObj()", () => {
     expect(() => getDateObj("2026-01-01", null as any)).toThrow(
       BadRequestError,
     );
+  });
+});
+
+describe("formatDate() / formatTime() (be#873)", () => {
+  it("format an ordinary daytime UTC instant as its Europe/Berlin date/time (CEST, UTC+2)", () => {
+    // 2026-08-15T12:30:00Z is 14:30 Berlin (CEST) on the same calendar day.
+    const date = new Date("2026-08-15T12:30:00Z");
+    expect(formatDate(date)).toBe("2026-08-15");
+    expect(formatTime(date)).toBe("14:30");
+  });
+
+  it("rolls the date forward to the Berlin calendar day for a late-UTC/early-Berlin instant (CEST, UTC+2)", () => {
+    // 2026-08-14T23:00:00Z is 01:00 Berlin on 2026-08-15 — a day later than
+    // the raw UTC date. This is exactly the scenario that displayed a day
+    // early before this fix (naive `toISOString().split("T")[0]` read back
+    // "2026-08-14").
+    const date = new Date("2026-08-14T23:00:00Z");
+    expect(formatDate(date)).toBe("2026-08-15");
+    expect(formatTime(date)).toBe("01:00");
+  });
+
+  it("uses the Europe/Berlin winter offset (CET, UTC+1)", () => {
+    // 2026-01-14T23:30:00Z is 00:30 Berlin on 2026-01-15 (CET, UTC+1).
+    const date = new Date("2026-01-14T23:30:00Z");
+    expect(formatDate(date)).toBe("2026-01-15");
+    expect(formatTime(date)).toBe("00:30");
+  });
+
+  it("round-trips with parseAccompDatetime's forward Berlin-to-UTC conversion", () => {
+    // parseAccompDatetime("2026-08-15T01:00:00") treats "01:00" as intended
+    // Berlin local time and stores the correct UTC instant; formatDate/Time
+    // reading that instant back must recover the original Berlin date/time.
+    const stored = new Date("2026-08-14T23:00:00.000Z");
+    expect(formatDate(stored)).toBe("2026-08-15");
+    expect(formatTime(stored)).toBe("01:00");
   });
 });
 

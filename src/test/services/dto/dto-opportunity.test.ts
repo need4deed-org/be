@@ -238,7 +238,7 @@ describe("dtoOpportunityGet", () => {
     opportunityVolunteer: [],
   };
 
-  it("populates event from the opportunity's onetimer", () => {
+  it("populates event from the opportunity's onetimer, converted to Europe/Berlin (be#873)", () => {
     const opportunity = {
       ...baseDetail,
       onetimer: { id: 10, date: eventDate },
@@ -246,9 +246,10 @@ describe("dtoOpportunityGet", () => {
 
     const result = dtoOpportunityGet(opportunity as any);
 
+    // eventDate is 2026-06-15T09:30:00Z — 11:30 in Europe/Berlin (CEST, UTC+2 in June).
     expect(result.event).toEqual({
       date: "2026-06-15",
-      time: "09:30",
+      time: "11:30",
     });
   });
 

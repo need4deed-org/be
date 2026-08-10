@@ -36,8 +36,9 @@ describe("dtoOpportunityAccompanying", () => {
     expect(result.refugeeName).toBe("Jane Doe");
     expect(result.refugeeNumber).toBe("030123456");
     expect(result.appointmentLanguage).toBe(TranslatedIntoType.DEUTSCHE);
-    expect(result.appointmentDate).toBe(TEST_DATE.toISOString().split("T")[0]);
-    expect(result.appointmentTime).toBe("10:30");
+    // TEST_DATE is 2026-06-01T10:30:00Z — 12:30 in Europe/Berlin (CEST, UTC+2 in June).
+    expect(result.appointmentDate).toBe("2026-06-01");
+    expect(result.appointmentTime).toBe("12:30");
     expect(result.refugeeLanguage).toEqual([]);
   });
 

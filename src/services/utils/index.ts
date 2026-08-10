@@ -151,10 +151,31 @@ export function getDateObj(date: string, time: string): Date {
   return dateObj;
 }
 
+// Appointment/event instants are stored as an exact UTC timestamp, but must
+// display as the Europe/Berlin calendar date/time the user actually picked —
+// reading raw UTC components would show a day earlier for anything scheduled
+// between roughly 00:00-02:00 Berlin time, since that instant falls on the
+// previous UTC calendar day (see be#873). This mirrors, in reverse, the
+// Berlin-aware conversion parseAccompDatetime does on write.
+function getBerlinDateParts(date: Date): Record<string, string> {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map((p) => [p.type, p.value]));
+}
+
 export const formatDate = (date: Date): string => {
-  return date.toISOString().split("T")[0];
+  const { year, month, day } = getBerlinDateParts(date);
+  return `${year}-${month}-${day}`;
 };
 
 export const formatTime = (date: Date): string => {
-  return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+  const { hour, minute } = getBerlinDateParts(date);
+  return `${hour}:${minute}`;
 };
