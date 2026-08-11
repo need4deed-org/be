@@ -40,5 +40,6 @@ jobs:
           # rollout status fails (and fails this step) if it doesn't roll out
           # within the timeout.
           script: |
+            set -e
             kubectl rollout restart deployment/be -n n4d-dev
             kubectl rollout status deployment/be -n n4d-dev --timeout=120s
