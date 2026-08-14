@@ -141,6 +141,8 @@ export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 
 export const accessCookieName = "access";
 export const refreshCookieName = "refresh";
+// Header for direct (non-login) API key auth — see src/server/plugins/jwt.ts.
+export const apiKeyHeaderName = "x-api-key";
 export const cookieOptions = {
   signed: TRUTHY.has(process.env.SIGN_COOKIES || ""),
   httpOnly: true,

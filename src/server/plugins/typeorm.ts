@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { initDatabase } from "../../data";
 import { dataSource } from "../../data/data-source";
+import ApiKey from "../../data/entity/api-key.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Deal from "../../data/entity/deal.entity";
@@ -36,6 +37,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
+      apiKeyRepository: dataSource.getRepository(ApiKey),
       userRepository: dataSource.getRepository(User),
       personRepository: dataSource.getRepository(Person),
       volunteerRepository: dataSource.getRepository(Volunteer),
