@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
+import logger from "../../logger";
 import { dataSource } from "../data-source";
 import ApiKey from "../entity/api-key.entity";
 import { getRepository } from "../utils";
@@ -48,7 +49,7 @@ async function main() {
   await dataSource.initialize();
   try {
     const { alreadyRevoked } = await revokeApiKey(dataSource, opts);
-    console.log(
+    logger.info(
       alreadyRevoked
         ? `API key "${opts.label}" is already revoked.`
         : `API key "${opts.label}" revoked.`,

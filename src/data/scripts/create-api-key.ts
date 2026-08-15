@@ -2,6 +2,7 @@ import "reflect-metadata";
 import * as crypto from "crypto";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { DataSource } from "typeorm";
+import logger from "../../logger";
 import { dataSource } from "../data-source";
 import ApiKey from "../entity/api-key.entity";
 import AgentPerson from "../entity/m2m/agent-person";
@@ -138,10 +139,10 @@ async function main() {
   await dataSource.initialize();
   try {
     const { rawKey, agentTitle } = await createApiKey(dataSource, opts);
-    console.log(
-      `API key "${opts.label}" created (role: ${opts.role}${agentTitle ? `, agent: "${agentTitle}"` : ""}). Store it now — it will not be shown again:`,
+    logger.info(
+      `API key "${opts.label}" created (role: ${opts.role}${agentTitle ? `, agent: "${agentTitle}"` : ""}).`,
     );
-    console.log(rawKey);
+    logger.info(`Store this key now — it will not be shown again: ${rawKey}`);
   } finally {
     await dataSource.destroy();
   }
