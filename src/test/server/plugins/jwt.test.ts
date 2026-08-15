@@ -125,6 +125,33 @@ describe("X-API-Key authentication", () => {
     expect(response.json().message).toBe("Account is not active.");
   });
 
+  it("an admin-role key bypasses the route's role check, same as an admin cookie session would", async () => {
+    const rawKey = "n4d_admin-role-key";
+    const keyHash = await hashPassword(rawKey);
+
+    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([
+      new ApiKey({
+        id: 4,
+        keyHash,
+        revokedAt: null,
+        userId: 1,
+        user: { id: 1, role: UserRole.ADMIN, isActive: true } as any,
+      }),
+    ]);
+    vi.spyOn(fastify.db.apiKeyRepository, "update").mockResolvedValue(
+      {} as any,
+    );
+    vi.spyOn(fastify.db.trustedDomainRepository, "find").mockResolvedValue([]);
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/trusted-domain",
+      headers: { "x-api-key": rawKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it("still enforces the route's role check for a key whose user lacks it", async () => {
     const rawKey = "n4d_volunteer-role-key";
     const keyHash = await hashPassword(rawKey);

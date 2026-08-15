@@ -10,8 +10,11 @@ import {
 import User from "./user.entity";
 
 // Direct (non-login) API access for bot/automation consumers. Each key is
-// tied to a dedicated service User (role fixed at coordinator, no Person
-// attached) so the existing role-based authenticate() checks apply unchanged.
+// tied to a dedicated service User minted with one of admin/coordinator/agent
+// as its role, so the existing role-based authenticate() checks apply
+// unchanged. An agent-role service user also gets a Person + AgentPerson
+// membership (see create-api-key.ts) since agent-scoped write routes check
+// membership, not just role.
 // No self-service endpoints yet — minted/revoked via CLI (see
 // src/data/scripts/create-api-key.ts, revoke-api-key.ts).
 @Entity()
