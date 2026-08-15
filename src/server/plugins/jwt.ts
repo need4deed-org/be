@@ -10,7 +10,7 @@ import {
   cookieOptions,
 } from "../../config/constants";
 import User from "../../data/entity/user.entity";
-import { verifyPassword } from "../../data/utils";
+import { sha256Hex } from "../../data/utils";
 import logger from "../../logger";
 import { AuthOptions } from "../types";
 
@@ -26,27 +26,27 @@ async function jwtPlugin(
     },
   });
 
-  // Direct (non-login) API access: looks up the raw key against active
-  // (non-revoked) ApiKey rows and returns the linked service user. The key
-  // set is expected to stay small (bot accounts only), so a bcrypt.compare
-  // per row is cheap — bcrypt can't be looked up by an indexed hash match.
+  // Direct (non-login) API access: an O(1) indexed lookup of the raw key's
+  // SHA-256 digest against active (non-revoked) ApiKey rows, returning the
+  // linked service user. This must stay a cheap single-row lookup (not a
+  // linear bcrypt.compare scan) since, unlike the JWT-cookie path, it runs
+  // on every request from an unauthenticated caller that merely sends the
+  // header — an expensive per-row check here would be a free CPU-exhaustion
+  // lever for anyone spraying garbage keys at any protected route.
   async function findUserByApiKey(rawKey: string): Promise<User | null> {
-    const activeKeys = await fastify.db.apiKeyRepository.find({
-      where: { revokedAt: IsNull() },
+    const apiKey = await fastify.db.apiKeyRepository.findOne({
+      where: { keyHash: sha256Hex(rawKey), revokedAt: IsNull() },
       relations: { user: true },
     });
 
-    for (const apiKey of activeKeys) {
-      if (await verifyPassword(rawKey, apiKey.keyHash)) {
-        fastify.db.apiKeyRepository
-          .update(apiKey.id, { lastUsedAt: new Date() })
-          .catch((err) =>
-            logger.error(err, "Failed to update api key lastUsedAt"),
-          );
-        return apiKey.user;
-      }
+    if (!apiKey) {
+      return null;
     }
-    return null;
+
+    fastify.db.apiKeyRepository
+      .update(apiKey.id, { lastUsedAt: new Date() })
+      .catch((err) => logger.error(err, "Failed to update api key lastUsedAt"));
+    return apiKey.user;
   }
 
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
@@ -74,6 +74,12 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthenticatedError("Invalid API key.");
         }
+        // isActive is checked here but deliberately not for the JWT-cookie
+        // path below: this is a new gate introduced for API keys, not a
+        // fix applied unevenly. Changing existing cookie-session behavior
+        // (an already-issued 15-min token for a since-deactivated user
+        // currently still authenticates until it expires) is out of scope
+        // for this change.
         if (!user.isActive) {
           throw new UnauthenticatedError("Account is not active.");
         }

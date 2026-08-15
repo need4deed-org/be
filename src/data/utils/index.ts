@@ -7,6 +7,7 @@ export * from "./get-ssl-for-data-source";
 export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
 export * from "./getStartEndDates";
+export * from "./hash-token";
 export * from "./passwd";
 export * from "./remove-data";
 export * from "./update-opportunity-matching";

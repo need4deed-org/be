@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddApiKey1786691450063 implements MigrationInterface {
-  name = "AddApiKey1786691450063";
+export class AddApiKey1786800615564 implements MigrationInterface {
+  name = "AddApiKey1786800615564";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -11,6 +11,9 @@ export class AddApiKey1786691450063 implements MigrationInterface {
       `CREATE UNIQUE INDEX "IDX_14747b6de7344b8b456573605c" ON "api_key" ("label") `,
     );
     await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_3c9751d2a6011ba13e27838105" ON "api_key" ("key_hash") `,
+    );
+    await queryRunner.query(
       `ALTER TABLE "api_key" ADD CONSTRAINT "FK_6a0830f03e537b239a53269b27d" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
   }
@@ -18,6 +21,9 @@ export class AddApiKey1786691450063 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TABLE "api_key" DROP CONSTRAINT "FK_6a0830f03e537b239a53269b27d"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_3c9751d2a6011ba13e27838105"`,
     );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_14747b6de7344b8b456573605c"`,

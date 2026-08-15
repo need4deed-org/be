@@ -1,55 +1,84 @@
 import "reflect-metadata";
 import * as crypto from "crypto";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
+import { DataSource } from "typeorm";
 import { dataSource } from "../data-source";
 import ApiKey from "../entity/api-key.entity";
 import AgentPerson from "../entity/m2m/agent-person";
 import Agent from "../entity/opportunity/agent.entity";
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
-import { getRepository, hashPassword } from "../utils";
+import { hashPassword, sha256Hex } from "../utils";
 
 // Mints a direct (non-login) API key for bot/automation access. No
 // self-service endpoint yet — see be#875.
 // Usage: yarn create-api-key --label <bot-label> --role <admin|coordinator|agent> [--agent-id <id>]
 
 const ALLOWED_ROLES = [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.AGENT];
+const USAGE =
+  "Usage: yarn create-api-key --label <bot-label> --role <admin|coordinator|agent> [--agent-id <id>]";
 
-function parseArgs(): { label: string; role: UserRole; agentId?: number } {
-  const args = process.argv.slice(2);
+export interface CreateApiKeyOptions {
+  label: string;
+  role: UserRole;
+  agentId?: number;
+}
+
+export interface CreateApiKeyResult {
+  rawKey: string;
+  userId: number;
+  agentTitle?: string;
+}
+
+export function parseArgs(argv: string[]): CreateApiKeyOptions {
   const get = (flag: string) => {
-    const index = args.indexOf(flag);
-    return index !== -1 ? args[index + 1] : undefined;
+    const index = argv.indexOf(flag);
+    return index !== -1 ? argv[index + 1] : undefined;
   };
 
   const label = get("--label");
-  const role = get("--role") as UserRole | undefined;
+  const role = get("--role")?.toLowerCase() as UserRole | undefined;
   const agentIdRaw = get("--agent-id");
 
   if (!label || !role || !ALLOWED_ROLES.includes(role)) {
-    throw new Error(
-      "Usage: yarn create-api-key --label <bot-label> --role <admin|coordinator|agent> [--agent-id <id>]",
-    );
+    throw new Error(USAGE);
   }
 
-  if (role === UserRole.AGENT && !agentIdRaw) {
+  if (role !== UserRole.AGENT) {
+    return { label, role };
+  }
+
+  if (!agentIdRaw) {
     throw new Error(
       "--agent-id is required for --role agent (agent-scoped write routes require an AgentPerson membership).",
     );
   }
 
-  return { label, role, agentId: agentIdRaw ? Number(agentIdRaw) : undefined };
+  const agentId = Number(agentIdRaw);
+  if (!Number.isInteger(agentId) || agentId <= 0) {
+    throw new Error(
+      `--agent-id must be a positive integer, got "${agentIdRaw}".`,
+    );
+  }
+
+  return { label, role, agentId };
 }
 
-async function main() {
-  const { label, role, agentId } = parseArgs();
+// All writes run in one transaction: a service User (+ Person/AgentPerson
+// for an agent-role key) with no corresponding ApiKey row would be an
+// unrevocable, untraceable credential-less account if a crash landed
+// between the individual saves.
+export async function createApiKey(
+  ds: DataSource,
+  { label, role, agentId }: CreateApiKeyOptions,
+): Promise<CreateApiKeyResult> {
+  const rawKey = `n4d_${crypto.randomBytes(32).toString("hex")}`;
 
-  await dataSource.initialize();
-  try {
-    const userRepository = getRepository(dataSource, User);
-    const apiKeyRepository = getRepository(dataSource, ApiKey);
-    const agentRepository = getRepository(dataSource, Agent);
-    const agentPersonRepository = getRepository(dataSource, AgentPerson);
+  const { userId, agentTitle } = await ds.transaction(async (manager) => {
+    const apiKeyRepository = manager.getRepository(ApiKey);
+    const agentRepository = manager.getRepository(Agent);
+    const userRepository = manager.getRepository(User);
+    const agentPersonRepository = manager.getRepository(AgentPerson);
 
     const existing = await apiKeyRepository.findOne({ where: { label } });
     if (existing) {
@@ -93,17 +122,24 @@ async function main() {
       );
     }
 
-    const rawKey = `n4d_${crypto.randomBytes(32).toString("hex")}`;
     await apiKeyRepository.save(
-      new ApiKey({
-        label,
-        keyHash: await hashPassword(rawKey),
-        userId: user.id,
-      }),
+      new ApiKey({ label, keyHash: sha256Hex(rawKey), userId: user.id }),
     );
 
+    return { userId: user.id, agentTitle: agent?.title };
+  });
+
+  return { rawKey, userId, agentTitle };
+}
+
+async function main() {
+  const opts = parseArgs(process.argv.slice(2));
+
+  await dataSource.initialize();
+  try {
+    const { rawKey, agentTitle } = await createApiKey(dataSource, opts);
     console.log(
-      `API key "${label}" created (role: ${role}${agent ? `, agent: "${agent.title}"` : ""}). Store it now — it will not be shown again:`,
+      `API key "${opts.label}" created (role: ${opts.role}${agentTitle ? `, agent: "${agentTitle}"` : ""}). Store it now — it will not be shown again:`,
     );
     console.log(rawKey);
   } finally {
@@ -111,7 +147,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}

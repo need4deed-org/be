@@ -34,6 +34,12 @@ export default class ApiKey {
   @IsString()
   label: string;
 
+  // SHA-256 hex digest of the raw key (see data/utils/hash-token.ts), not
+  // bcrypt: the raw key is a high-entropy random token, not a human
+  // password, so a fast deterministic hash is safe here and lets
+  // authenticate() resolve a key via an indexed exact match instead of a
+  // linear bcrypt.compare scan over every active key.
+  @Index({ unique: true })
   @Column()
   @IsNotEmpty()
   @IsString()

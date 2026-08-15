@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 import ApiKey from "../../../data/entity/api-key.entity";
-import { hashPassword } from "../../../data/utils";
+import { sha256Hex } from "../../../data/utils";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
 
@@ -41,17 +41,19 @@ describe("X-API-Key authentication", () => {
 
   it("authenticates a coordinator-scoped route with a valid key and records lastUsedAt", async () => {
     const rawKey = "n4d_test-raw-key";
-    const keyHash = await hashPassword(rawKey);
+    const keyHash = sha256Hex(rawKey);
 
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([
-      new ApiKey({
-        id: 1,
-        keyHash,
-        revokedAt: null,
-        userId: 42,
-        user: coordinatorUser as any,
-      }),
-    ]);
+    const findOneSpy = vi
+      .spyOn(fastify.db.apiKeyRepository, "findOne")
+      .mockResolvedValue(
+        new ApiKey({
+          id: 1,
+          keyHash,
+          revokedAt: null,
+          userId: 42,
+          user: coordinatorUser as any,
+        }),
+      );
     const updateSpy = vi
       .spyOn(fastify.db.apiKeyRepository, "update")
       .mockResolvedValue({} as any);
@@ -64,11 +66,16 @@ describe("X-API-Key authentication", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    // The lookup must be a single indexed findOne by hash, not a scan over
+    // every active key — this is what makes an invalid-key request cheap.
+    expect(findOneSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ keyHash }) }),
+    );
     expect(updateSpy).toHaveBeenCalledWith(1, { lastUsedAt: expect.any(Date) });
   });
 
   it("rejects an unknown key with 401 and does not fall back to cookie auth", async () => {
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([]);
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(null);
 
     const response = await fastify.inject({
       method: "GET",
@@ -83,10 +90,10 @@ describe("X-API-Key authentication", () => {
   });
 
   it("rejects a revoked key (excluded by the repository's revokedAt filter)", async () => {
-    // authenticate() only ever sees non-revoked rows (find() is called with
-    // where: { revokedAt: IsNull() }), so a revoked key looks identical to
-    // an unknown one from the mock's perspective.
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([]);
+    // authenticate() only ever matches non-revoked rows (findOne() is
+    // called with where: { keyHash, revokedAt: IsNull() }), so a revoked
+    // key looks identical to an unknown one from the mock's perspective.
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(null);
 
     const response = await fastify.inject({
       method: "GET",
@@ -100,9 +107,9 @@ describe("X-API-Key authentication", () => {
 
   it("rejects a valid key whose service user has been deactivated", async () => {
     const rawKey = "n4d_inactive-user-key";
-    const keyHash = await hashPassword(rawKey);
+    const keyHash = sha256Hex(rawKey);
 
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(
       new ApiKey({
         id: 2,
         keyHash,
@@ -110,7 +117,7 @@ describe("X-API-Key authentication", () => {
         userId: 42,
         user: { ...coordinatorUser, isActive: false } as any,
       }),
-    ]);
+    );
     vi.spyOn(fastify.db.apiKeyRepository, "update").mockResolvedValue(
       {} as any,
     );
@@ -127,9 +134,9 @@ describe("X-API-Key authentication", () => {
 
   it("an admin-role key bypasses the route's role check, same as an admin cookie session would", async () => {
     const rawKey = "n4d_admin-role-key";
-    const keyHash = await hashPassword(rawKey);
+    const keyHash = sha256Hex(rawKey);
 
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(
       new ApiKey({
         id: 4,
         keyHash,
@@ -137,7 +144,7 @@ describe("X-API-Key authentication", () => {
         userId: 1,
         user: { id: 1, role: UserRole.ADMIN, isActive: true } as any,
       }),
-    ]);
+    );
     vi.spyOn(fastify.db.apiKeyRepository, "update").mockResolvedValue(
       {} as any,
     );
@@ -154,9 +161,9 @@ describe("X-API-Key authentication", () => {
 
   it("still enforces the route's role check for a key whose user lacks it", async () => {
     const rawKey = "n4d_volunteer-role-key";
-    const keyHash = await hashPassword(rawKey);
+    const keyHash = sha256Hex(rawKey);
 
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(
       new ApiKey({
         id: 3,
         keyHash,
@@ -164,7 +171,7 @@ describe("X-API-Key authentication", () => {
         userId: 7,
         user: { id: 7, role: UserRole.VOLUNTEER, isActive: true } as any,
       }),
-    ]);
+    );
     vi.spyOn(fastify.db.apiKeyRepository, "update").mockResolvedValue(
       {} as any,
     );
@@ -180,7 +187,7 @@ describe("X-API-Key authentication", () => {
 
   it("never logs the raw API key value", async () => {
     const rawKey = "n4d_should-never-appear-in-logs";
-    vi.spyOn(fastify.db.apiKeyRepository, "find").mockResolvedValue([]);
+    vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(null);
     const debugSpy = vi.spyOn(logger, "debug");
     const errorSpy = vi.spyOn(logger, "error");
 
@@ -200,7 +207,7 @@ describe("X-API-Key authentication", () => {
       coordinatorUser as any,
     );
     vi.spyOn(fastify.db.trustedDomainRepository, "find").mockResolvedValue([]);
-    const apiKeyFindSpy = vi.spyOn(fastify.db.apiKeyRepository, "find");
+    const apiKeyFindOneSpy = vi.spyOn(fastify.db.apiKeyRepository, "findOne");
 
     const accessToken = fastify.jwt.sign({
       id: 42,
@@ -214,6 +221,6 @@ describe("X-API-Key authentication", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(apiKeyFindSpy).not.toHaveBeenCalled();
+    expect(apiKeyFindOneSpy).not.toHaveBeenCalled();
   });
 });
