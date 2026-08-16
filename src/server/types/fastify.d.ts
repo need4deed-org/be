@@ -3,6 +3,7 @@ import "fastify";
 import { onRequestHookHandler } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { Repository } from "typeorm";
+import ApiKey from "../../data/entity/api-key.entity";
 import Appreciation from "../../data/entity/appreciation.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
@@ -30,6 +31,7 @@ import { AuthOptions } from "./auth";
 declare module "fastify" {
   interface FastifyInstance {
     db: {
+      apiKeyRepository: Repository<ApiKey>;
       userRepository: Repository<User>;
       personRepository: Repository<Person>;
       volunteerRepository: Repository<Volunteer>;

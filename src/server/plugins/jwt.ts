@@ -2,8 +2,15 @@ import fastifyJwt from "@fastify/jwt";
 import { FastifyInstance, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { UserRole } from "need4deed-sdk";
+import { IsNull } from "typeorm";
 import { UnauthenticatedError, UnauthorizedError } from "../../config";
-import { accessCookieName, cookieOptions } from "../../config/constants";
+import {
+  accessCookieName,
+  apiKeyHeaderName,
+  cookieOptions,
+} from "../../config/constants";
+import User from "../../data/entity/user.entity";
+import { sha256Hex } from "../../data/utils";
 import logger from "../../logger";
 import { AuthOptions } from "../types";
 
@@ -19,6 +26,29 @@ async function jwtPlugin(
     },
   });
 
+  // Direct (non-login) API access: an O(1) indexed lookup of the raw key's
+  // SHA-256 digest against active (non-revoked) ApiKey rows, returning the
+  // linked service user. This must stay a cheap single-row lookup (not a
+  // linear bcrypt.compare scan) since, unlike the JWT-cookie path, it runs
+  // on every request from an unauthenticated caller that merely sends the
+  // header — an expensive per-row check here would be a free CPU-exhaustion
+  // lever for anyone spraying garbage keys at any protected route.
+  async function findUserByApiKey(rawKey: string): Promise<User | null> {
+    const apiKey = await fastify.db.apiKeyRepository.findOne({
+      where: { keyHash: sha256Hex(rawKey), revokedAt: IsNull() },
+      relations: { user: true },
+    });
+
+    if (!apiKey) {
+      return null;
+    }
+
+    fastify.db.apiKeyRepository
+      .update(apiKey.id, { lastUsedAt: new Date() })
+      .catch((err) => logger.error(err, "Failed to update api key lastUsedAt"));
+    return apiKey.user;
+  }
+
   fastify.decorate("authenticate", function (opt?: AuthOptions) {
     return async function (request: FastifyRequest) {
       logger.debug(
@@ -32,22 +62,45 @@ async function jwtPlugin(
         return;
       }
 
-      try {
-        await request.jwtVerify();
-      } catch {
-        throw new UnauthenticatedError("Authorization failed.");
-      }
+      const apiKeyHeader = request.headers[apiKeyHeaderName];
+      const rawApiKey = Array.isArray(apiKeyHeader)
+        ? apiKeyHeader[0]
+        : apiKeyHeader;
 
-      const userId = request.user?.id;
-      logger.debug(`jwtPlugin:authenticated: ${userId}`);
+      let user: User | null;
 
-      const userRepository = fastify.db.userRepository;
-      const user = await userRepository.findOne({
-        where: { id: userId },
-      });
+      if (rawApiKey) {
+        user = await findUserByApiKey(rawApiKey);
+        if (!user) {
+          throw new UnauthenticatedError("Invalid API key.");
+        }
+        // isActive is checked here but deliberately not for the JWT-cookie
+        // path below: this is a new gate introduced for API keys, not a
+        // fix applied unevenly. Changing existing cookie-session behavior
+        // (an already-issued 15-min token for a since-deactivated user
+        // currently still authenticates until it expires) is out of scope
+        // for this change.
+        if (!user.isActive) {
+          throw new UnauthenticatedError("Account is not active.");
+        }
+        logger.debug(`jwtPlugin:authenticated via api key: ${user.id}`);
+      } else {
+        try {
+          await request.jwtVerify();
+        } catch {
+          throw new UnauthenticatedError("Authorization failed.");
+        }
 
-      if (!user) {
-        throw new UnauthorizedError("User not found.");
+        const userId = request.user?.id;
+        logger.debug(`jwtPlugin:authenticated: ${userId}`);
+
+        user = await fastify.db.userRepository.findOne({
+          where: { id: userId },
+        });
+
+        if (!user) {
+          throw new UnauthorizedError("User not found.");
+        }
       }
 
       // Expose the already-loaded user (carries personId + DB-authoritative
@@ -57,7 +110,7 @@ async function jwtPlugin(
 
       if (user.role === UserRole.ADMIN) {
         logger.debug(
-          `Admin user ${userId} authenticated, bypassing further checks.`,
+          `Admin user ${user.id} authenticated, bypassing further checks.`,
         );
         return;
       }
@@ -65,7 +118,7 @@ async function jwtPlugin(
       const { role, allowSelf } = opt || {};
 
       logger.debug(
-        `authenticate role:${role}, allowSelf:${allowSelf}, userId:${userId}`,
+        `authenticate role:${role}, allowSelf:${allowSelf}, userId:${user.id}`,
       );
 
       if (role && role !== user.role) {
@@ -74,7 +127,7 @@ async function jwtPlugin(
 
       if (allowSelf) {
         const requestParamId = (request.params as { id?: string }).id;
-        if (String(userId) !== requestParamId) {
+        if (String(user.id) !== requestParamId) {
           throw new UnauthorizedError("Permission denied");
         }
       }

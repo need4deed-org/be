@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { isTest } from "../config";
+import ApiKey from "./entity/api-key.entity";
 import Comment from "./entity/comment.entity";
 import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
@@ -73,6 +74,7 @@ export const dataSource = new DataSource({
     AgentPostcode,
     AgentService,
     AgentType,
+    ApiKey,
     Appreciation,
     Category,
     Comment,
