@@ -202,4 +202,19 @@ describe("POST /event-registration", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  it("returns 400 for an unreasonably large numberOfPeople", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event-registration/",
+      payload: {
+        opportunityId: futureEventOpportunityId,
+        fullName: "Ali K.",
+        email: "ali@example.com",
+        numberOfPeople: 3_000_000_000,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });

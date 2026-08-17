@@ -10,7 +10,7 @@ export const opportunityEventRegistrationBodySchema = {
     fullName: { type: "string", minLength: 1 },
     email: { type: "string", minLength: 1, format: "email" },
     phone: { type: ["string", "null"] },
-    numberOfPeople: { type: "integer", minimum: 1 },
+    numberOfPeople: { type: "integer", minimum: 1, maximum: 1000 },
     languagePreference: { type: ["string", "null"] },
     message: { type: ["string", "null"], maxLength: 500 },
   },
