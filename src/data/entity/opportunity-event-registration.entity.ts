@@ -1,4 +1,13 @@
-import { IsInt, IsOptional, IsString, MaxLength } from "class-validator";
+import {
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+  MaxLength,
+  Min,
+} from "class-validator";
 import {
   Column,
   CreateDateColumn,
@@ -30,20 +39,23 @@ export default class OpportunityEventRegistration {
   opportunityId: number;
 
   @Column()
+  @IsNotEmpty()
   @IsString()
   fullName: string;
 
   @Column()
-  @IsString()
+  @IsNotEmpty()
+  @IsEmail()
   email: string;
 
   @Column({ nullable: true })
   @IsOptional()
-  @IsString()
+  @Length(7, 20)
   phone?: string;
 
   @Column({ default: 1 })
   @IsInt()
+  @Min(1)
   numberOfPeople: number;
 
   @Column({ nullable: true })
