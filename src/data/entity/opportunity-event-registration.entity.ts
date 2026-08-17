@@ -10,10 +10,12 @@ import {
 import Opportunity from "./opportunity/opportunity.entity";
 
 @Entity()
-export default class EventRegistration {
-  constructor(eventRegistration?: Partial<EventRegistration>) {
-    if (eventRegistration) {
-      Object.assign(this, eventRegistration);
+export default class OpportunityEventRegistration {
+  constructor(
+    opportunityEventRegistration?: Partial<OpportunityEventRegistration>,
+  ) {
+    if (opportunityEventRegistration) {
+      Object.assign(this, opportunityEventRegistration);
     }
   }
 

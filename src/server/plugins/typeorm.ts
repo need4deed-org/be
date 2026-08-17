@@ -7,12 +7,12 @@ import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
-import EventRegistration from "../../data/entity/event-registration.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import OpportunityEventRegistration from "../../data/entity/opportunity-event-registration.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../data/entity/opportunity/onetimer.entity";
@@ -47,7 +47,9 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       optionRepository: dataSource.getRepository(Option),
       commentRepository: dataSource.getRepository(Comment),
       documentRepository: dataSource.getRepository(Document),
-      eventRegistrationRepository: dataSource.getRepository(EventRegistration),
+      opportunityEventRegistrationRepository: dataSource.getRepository(
+        OpportunityEventRegistration,
+      ),
       communicationRepository: dataSource.getRepository(Communication),
       activityLogRepository: dataSource.getRepository(ActivityLog),
       appreciationRepository: dataSource.getRepository(Appreciation),
