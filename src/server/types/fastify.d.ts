@@ -9,6 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
+import EventRegistration from "../../data/entity/event-registration.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
@@ -40,6 +41,7 @@ declare module "fastify" {
       optionRepository: Repository<Option>;
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
+      eventRegistrationRepository: Repository<EventRegistration>;
       communicationRepository: Repository<Communication>;
       activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;

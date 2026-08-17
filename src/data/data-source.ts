@@ -7,6 +7,7 @@ import Communication from "./entity/communication.entity";
 import Config from "./entity/config.entity";
 import Deal from "./entity/deal.entity";
 import Document from "./entity/document.entity";
+import EventRegistration from "./entity/event-registration.entity";
 import EventTranslation from "./entity/event/event_translation.entity";
 import EventN4D from "./entity/event/event.entity";
 import FieldTranslation from "./entity/field_translation.entity";
@@ -91,6 +92,7 @@ export const dataSource = new DataSource({
     DistrictPostcode,
     Document,
     EventN4D,
+    EventRegistration,
     EventTranslation,
     FieldTranslation,
     Language,
