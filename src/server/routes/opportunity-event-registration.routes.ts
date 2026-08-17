@@ -1,3 +1,4 @@
+import { validate } from "class-validator";
 import {
   FastifyContextConfig,
   FastifyInstance,
@@ -5,6 +6,7 @@ import {
 } from "fastify";
 import {
   ApiOpportunityEventRegistrationPost,
+  OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../config";
@@ -14,6 +16,14 @@ import {
   opportunityEventRegistrationResponseSchema,
 } from "../schema";
 import { ReplyMessage } from "../types/endpoint-handlers";
+
+// Statuses under which an opportunity is still publicly open — same set the
+// public opportunity listing filters to (opportunity/legacy.routes.ts).
+const OPEN_OPPORTUNITY_STATUSES: OpportunityStatusType[] = [
+  OpportunityStatusType.NEW,
+  OpportunityStatusType.ACTIVE,
+  OpportunityStatusType.SEARCHING,
+];
 
 export default async function opportunityEventRegistrationRoutes(
   fastify: FastifyInstance,
@@ -47,9 +57,23 @@ export default async function opportunityEventRegistrationRoutes(
       if (new Date(opportunity.onetimer.date).getTime() < Date.now()) {
         throw new BadRequestError("Event date has already passed.");
       }
+      if (!OPEN_OPPORTUNITY_STATUSES.includes(opportunity.status)) {
+        throw new BadRequestError("Opportunity is no longer open.");
+      }
+
+      const newRegistration = new OpportunityEventRegistration({
+        opportunityId,
+        ...registration,
+      });
+      const errors = await validate(newRegistration);
+      if (errors.length > 0) {
+        throw new BadRequestError(
+          errors.flatMap((e) => Object.values(e.constraints || {})).join(", "),
+        );
+      }
 
       await fastify.db.opportunityEventRegistrationRepository.save(
-        new OpportunityEventRegistration({ opportunityId, ...registration }),
+        newRegistration,
       );
 
       return reply

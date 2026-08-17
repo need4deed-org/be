@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { OpportunityType } from "need4deed-sdk";
+import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import OpportunityEventRegistration from "../../../data/entity/opportunity-event-registration.entity";
@@ -19,6 +19,7 @@ describe("POST /event-registration", () => {
   let pastEventOpportunityId: number;
   let accompanyingOpportunityId: number;
   let noOnetimerOpportunityId: number;
+  let inactiveEventOpportunityId: number;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -29,6 +30,7 @@ describe("POST /event-registration", () => {
     async function makeOpportunity(
       type: OpportunityType,
       date: Date | null,
+      status?: OpportunityStatusType,
     ): Promise<number> {
       let onetimerId: number | undefined;
       if (date) {
@@ -41,6 +43,7 @@ describe("POST /event-registration", () => {
           title: `Test event-registration opportunity ${suffix}`,
           type,
           onetimerId,
+          ...(status ? { status } : {}),
         } as Partial<Opportunity>),
       );
       opportunityIds.push(opportunity.id);
@@ -62,6 +65,11 @@ describe("POST /event-registration", () => {
     noOnetimerOpportunityId = await makeOpportunity(
       OpportunityType.REGULAR,
       null,
+    );
+    inactiveEventOpportunityId = await makeOpportunity(
+      OpportunityType.EVENTS,
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      OpportunityStatusType.INACTIVE,
     );
   });
 
@@ -158,6 +166,36 @@ describe("POST /event-registration", () => {
         opportunityId: pastEventOpportunityId,
         fullName: "Ali K.",
         email: "ali@example.com",
+        numberOfPeople: 1,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 when the opportunity is no longer open (e.g. inactive)", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event-registration/",
+      payload: {
+        opportunityId: inactiveEventOpportunityId,
+        fullName: "Ali K.",
+        email: "ali@example.com",
+        numberOfPeople: 1,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 400 for a malformed email", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event-registration/",
+      payload: {
+        opportunityId: futureEventOpportunityId,
+        fullName: "Ali K.",
+        email: "not-an-email",
         numberOfPeople: 1,
       },
     });
