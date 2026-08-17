@@ -28,6 +28,7 @@ import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import NotionRelation from "./entity/notion-relation.entity";
+import OpportunityEventRegistration from "./entity/opportunity-event-registration.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Onetimer from "./entity/opportunity/onetimer.entity";
@@ -98,6 +99,7 @@ export const dataSource = new DataSource({
     NotionRelation,
     Onetimer,
     Opportunity,
+    OpportunityEventRegistration,
     OpportunityVolunteer,
     Organization,
     Person,
