@@ -5,6 +5,7 @@ export * from "./param";
 export * from "./person.schema";
 export * from "./querystring";
 export * from "./opportunity-create.schema";
+export * from "./opportunity-event-registration.schema";
 export * from "./response-schema";
 export * from "./responseErrors";
 export * from "./trusted-domain.schema";
