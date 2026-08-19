@@ -276,6 +276,46 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(unchanged.agentId).toBe(ownAgent.id);
   });
 
+  // agentBody.id === undefined is parser-opportunity-patch-data.ts's
+  // self-edit-agent path (sets Agent.title from agentBody.name) — not a
+  // relink, so it must not be blocked by the agent.agentId !== opportunity's
+  // agentId check above (be#871 review).
+  it("lets an agent edit their own agent's name via agent.name with no id", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { agent: { name: "Renamed via self-edit" } },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updatedAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: ownAgent.id,
+    });
+    expect(updatedAgent.title).toBe("Renamed via self-edit");
+
+    // Restore for any later test in this file that asserts on ownAgent.title.
+    await fastify.db.agentRepository.update(
+      { id: ownAgent.id },
+      { title: ownAgent.title },
+    );
+  });
+
+  it("lets an agent patch agent.id pointing at their own (unchanged) agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { agent: { id: ownAgent.id } },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(unchanged.agentId).toBe(ownAgent.id);
+  });
+
   it("lets a coordinator relink an opportunity to another agent via agent.id", async () => {
     const res = await fastify.inject({
       method: "PATCH",

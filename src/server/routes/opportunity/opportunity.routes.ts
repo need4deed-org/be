@@ -593,8 +593,17 @@ export default async function opportunityRoutes(
           );
         }
 
+        // Only block an actual reassignment to a *different* agent — an
+        // agent editing their own agent's name/address/district with no `id`
+        // (or the same id) is a legitimate self-edit, not a relink (see
+        // parser-opportunity-patch-data.ts's agentBody.id === undefined
+        // branch, and be#871 review).
         const body = request.body as Record<string, unknown>;
-        if (body.agent !== undefined) {
+        const agentBody = body.agent as { id?: number } | undefined;
+        if (
+          agentBody?.id !== undefined &&
+          agentBody.id !== opportunity.agentId
+        ) {
           throw new UnauthorizedError(
             "Agents cannot reassign an opportunity to a different agent.",
           );
