@@ -218,17 +218,23 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("403s when an agent tries to patch fields beyond status", async () => {
+  it("lets an agent patch fields beyond status on their own opportunity (be#870)", async () => {
     const res = await fastify.inject({
       method: "PATCH",
       url: `/opportunity/${ownOpportunity.id}`,
       cookies: { [accessCookieName]: agentCookie },
       payload: {
         statusOpportunity: OpportunityStatusType.ACTIVE,
-        title: "Sneaky rename",
+        title: "Agent renamed",
       },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(updated.status).toBe(OpportunityStatusType.ACTIVE);
+    expect(updated.title).toBe("Agent renamed");
   });
 
   it("still lets a coordinator patch the full surface, including status", async () => {
@@ -250,10 +256,8 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(updated.title).toBe("Coordinator renamed");
   });
 
-  // An agent including `agent.id` alongside statusOpportunity would otherwise
-  // silently reach the relink branch — this confirms the existing
-  // disallowedKeys check (which only permits `statusOpportunity`) already
-  // blocks a non-coordinator from moving an opportunity to another agent.
+  // Agents may now edit their own opportunity's fields generally (be#870),
+  // but reassigning it to a *different* agent stays coordinator-only.
   it("403s when an agent tries to relink an opportunity to another agent via agent.id", async () => {
     const res = await fastify.inject({
       method: "PATCH",
@@ -265,6 +269,46 @@ describe("PATCH /opportunity/:id agent status update", () => {
       },
     });
     expect(res.statusCode).toBe(403);
+
+    const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(unchanged.agentId).toBe(ownAgent.id);
+  });
+
+  // agentBody.id === undefined is parser-opportunity-patch-data.ts's
+  // self-edit-agent path (sets Agent.title from agentBody.name) — not a
+  // relink, so it must not be blocked by the agent.agentId !== opportunity's
+  // agentId check above (be#871 review).
+  it("lets an agent edit their own agent's name via agent.name with no id", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { agent: { name: "Renamed via self-edit" } },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updatedAgent = await fastify.db.agentRepository.findOneByOrFail({
+      id: ownAgent.id,
+    });
+    expect(updatedAgent.title).toBe("Renamed via self-edit");
+
+    // Restore for any later test in this file that asserts on ownAgent.title.
+    await fastify.db.agentRepository.update(
+      { id: ownAgent.id },
+      { title: ownAgent.title },
+    );
+  });
+
+  it("lets an agent patch agent.id pointing at their own (unchanged) agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { agent: { id: ownAgent.id } },
+    });
+    expect(res.statusCode).toBe(204);
 
     const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
       id: ownOpportunity.id,
@@ -293,7 +337,7 @@ describe("PATCH /opportunity/:id agent status update", () => {
     );
   });
 
-  it("403s when an agent tries to relink an opportunity's contact via contact.id", async () => {
+  it("lets an agent relink their opportunity's contact to a registered contact of their own agent (be#870)", async () => {
     const res = await fastify.inject({
       method: "PATCH",
       url: `/opportunity/${ownOpportunity.id}`,
@@ -303,7 +347,31 @@ describe("PATCH /opportunity/:id agent status update", () => {
         contact: { id: agentContactPerson.id },
       },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(updated.contactPersonId).toBe(agentContactPerson.id);
+
+    // Reset so later tests in this file see no contact set.
+    await fastify.db.opportunityRepository.update(
+      { id: ownOpportunity.id },
+      { contactPersonId: null },
+    );
+  });
+
+  // unrelatedPerson is only a registered contact of otherAgent — an agent
+  // relinking their own opportunity's contact must still be validated
+  // against their own agent's registered contacts, same as a coordinator.
+  it("404s when an agent tries to relink their opportunity's contact to a person who isn't a registered contact of their agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { contact: { id: unrelatedPerson.id } },
+    });
+    expect(res.statusCode).toBe(404);
 
     const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
       id: ownOpportunity.id,

@@ -558,9 +558,12 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      // COORDINATOR/ADMIN may edit the full patch surface; an AGENT may only
-      // flip the status of an opportunity belonging to an agent they're a
-      // member of (checked below, once the opportunity's agentId is known).
+      // COORDINATOR/ADMIN may edit the full patch surface, including
+      // reassigning the opportunity to a different agent. An AGENT may edit
+      // any field of an opportunity belonging to an agent they're a member of
+      // (checked below, once the opportunity's agentId is known), except
+      // reassigning it to a *different* agent — that stays coordinator-only,
+      // matching the fe "Transfer" action (be#870).
       const role = request.authUser?.role;
       if (
         role !== UserRole.COORDINATOR &&
@@ -595,13 +598,19 @@ export default async function opportunityRoutes(
           );
         }
 
+        // Only block an actual reassignment to a *different* agent — an
+        // agent editing their own agent's name/address/district with no `id`
+        // (or the same id) is a legitimate self-edit, not a relink (see
+        // parser-opportunity-patch-data.ts's agentBody.id === undefined
+        // branch, and be#871 review).
         const body = request.body as Record<string, unknown>;
-        const disallowedKeys = Object.keys(body).filter(
-          (key) => key !== "statusOpportunity" && body[key] !== undefined,
-        );
-        if (disallowedKeys.length > 0) {
+        const agentBody = body.agent as { id?: number } | undefined;
+        if (
+          agentBody?.id !== undefined &&
+          agentBody.id !== opportunity.agentId
+        ) {
           throw new UnauthorizedError(
-            "Agents can only update an opportunity's status.",
+            "Agents cannot reassign an opportunity to a different agent.",
           );
         }
       }
