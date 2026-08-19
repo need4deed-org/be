@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { initDatabase } from "../../data";
 import { dataSource } from "../../data/data-source";
+import ApiKey from "../../data/entity/api-key.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Deal from "../../data/entity/deal.entity";
@@ -11,6 +12,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import OpportunityEventRegistration from "../../data/entity/opportunity-event-registration.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../data/entity/opportunity/onetimer.entity";
@@ -36,6 +38,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
+      apiKeyRepository: dataSource.getRepository(ApiKey),
       userRepository: dataSource.getRepository(User),
       personRepository: dataSource.getRepository(Person),
       volunteerRepository: dataSource.getRepository(Volunteer),
@@ -44,6 +47,9 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       optionRepository: dataSource.getRepository(Option),
       commentRepository: dataSource.getRepository(Comment),
       documentRepository: dataSource.getRepository(Document),
+      opportunityEventRegistrationRepository: dataSource.getRepository(
+        OpportunityEventRegistration,
+      ),
       communicationRepository: dataSource.getRepository(Communication),
       activityLogRepository: dataSource.getRepository(ActivityLog),
       appreciationRepository: dataSource.getRepository(Appreciation),

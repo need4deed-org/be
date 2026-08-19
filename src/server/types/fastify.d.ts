@@ -3,6 +3,7 @@ import "fastify";
 import { onRequestHookHandler } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { Repository } from "typeorm";
+import ApiKey from "../../data/entity/api-key.entity";
 import Appreciation from "../../data/entity/appreciation.entity";
 import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
@@ -13,6 +14,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import OpportunityEventRegistration from "../../data/entity/opportunity-event-registration.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../data/entity/opportunity/onetimer.entity";
@@ -30,6 +32,7 @@ import { AuthOptions } from "./auth";
 declare module "fastify" {
   interface FastifyInstance {
     db: {
+      apiKeyRepository: Repository<ApiKey>;
       userRepository: Repository<User>;
       personRepository: Repository<Person>;
       volunteerRepository: Repository<Volunteer>;
@@ -38,6 +41,7 @@ declare module "fastify" {
       optionRepository: Repository<Option>;
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
+      opportunityEventRegistrationRepository: Repository<OpportunityEventRegistration>;
       communicationRepository: Repository<Communication>;
       activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;
