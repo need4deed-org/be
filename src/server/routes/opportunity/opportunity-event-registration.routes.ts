@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { NotFoundError, UnauthorizedError } from "../../../config";
+import OpportunityEventRegistration from "../../../data/entity/opportunity-event-registration.entity";
 import { dtoOpportunityEventRegistration } from "../../../services";
 import {
   idParamSchema,
@@ -35,7 +36,7 @@ async function assertCanViewRegistrations(
 
   const personId = request.authUser?.personId;
   const membership =
-    personId && agentId
+    personId !== undefined && agentId !== undefined
       ? await fastify.db.agentPersonRepository.findOneBy({
           agentId,
           personId,
@@ -49,10 +50,42 @@ async function assertCanViewRegistrations(
   }
 }
 
+// Shared by both handlers below so the role gate, 404, and ownership check
+// can't drift apart between the JSON list and the CSV export.
+async function getAuthorizedRegistrations(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  opportunityId: number,
+): Promise<OpportunityEventRegistration[]> {
+  assertHasRegistrationsRole(request);
+
+  const opportunity = await fastify.db.opportunityRepository.findOne({
+    where: { id: opportunityId },
+  });
+  if (!opportunity) {
+    throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
+  }
+  await assertCanViewRegistrations(fastify, request, opportunity.agentId);
+
+  return fastify.db.opportunityEventRegistrationRepository.find({
+    where: { opportunityId },
+    order: { createdAt: "DESC" },
+  });
+}
+
+function csvCell(value: string): string {
+  // Neutralize formula injection (OWASP CSV injection): fullName/message
+  // come from the public, unauthenticated POST /event-registration form, and
+  // a leading =, +, -, or @ is interpreted as a live formula by Excel/Sheets
+  // once a coordinator/agent opens this export.
+  const guarded = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return /["\r\n,]/.test(guarded)
+    ? `"${guarded.replace(/"/g, '""')}"`
+    : guarded;
+}
+
 function toCsv(rows: string[][]): string {
-  const escape = (value: string) =>
-    /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-  return rows.map((row) => row.map(escape).join(",")).join("\n");
+  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
 }
 
 export default function opportunityEventRegistrationRoutes(
@@ -68,22 +101,12 @@ export default function opportunityEventRegistrationRoutes(
       },
     },
     async (request, reply) => {
-      assertHasRegistrationsRole(request);
       const opportunityId = request.params.id;
-
-      const opportunity = await fastify.db.opportunityRepository.findOne({
-        where: { id: opportunityId },
-      });
-      if (!opportunity) {
-        throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
-      }
-      await assertCanViewRegistrations(fastify, request, opportunity.agentId);
-
-      const registrations =
-        await fastify.db.opportunityEventRegistrationRepository.find({
-          where: { opportunityId },
-          order: { createdAt: "DESC" },
-        });
+      const registrations = await getAuthorizedRegistrations(
+        fastify,
+        request,
+        opportunityId,
+      );
 
       const totalPeople = registrations.reduce(
         (sum, r) => sum + r.numberOfPeople,
@@ -103,22 +126,12 @@ export default function opportunityEventRegistrationRoutes(
     "/export",
     { schema: { params: idParamSchema } },
     async (request, reply) => {
-      assertHasRegistrationsRole(request);
       const opportunityId = request.params.id;
-
-      const opportunity = await fastify.db.opportunityRepository.findOne({
-        where: { id: opportunityId },
-      });
-      if (!opportunity) {
-        throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
-      }
-      await assertCanViewRegistrations(fastify, request, opportunity.agentId);
-
-      const registrations =
-        await fastify.db.opportunityEventRegistrationRepository.find({
-          where: { opportunityId },
-          order: { createdAt: "DESC" },
-        });
+      const registrations = await getAuthorizedRegistrations(
+        fastify,
+        request,
+        opportunityId,
+      );
 
       const rows = [
         [
@@ -130,15 +143,17 @@ export default function opportunityEventRegistrationRoutes(
           "Message",
           "Registered at",
         ],
-        ...registrations.map((r) => [
-          r.fullName,
-          r.email,
-          r.phone ?? "",
-          String(r.numberOfPeople),
-          r.languagePreference ?? "",
-          r.message ?? "",
-          r.createdAt.toISOString(),
-        ]),
+        ...registrations
+          .map(dtoOpportunityEventRegistration)
+          .map((r) => [
+            r.fullName,
+            r.email,
+            r.phone ?? "",
+            String(r.numberOfPeople),
+            r.languagePreference ?? "",
+            r.message ?? "",
+            r.createdAt.toISOString(),
+          ]),
       ];
 
       reply.header("Content-Type", "text/csv");

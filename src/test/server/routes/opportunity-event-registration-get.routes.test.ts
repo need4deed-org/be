@@ -246,4 +246,33 @@ describe("GET /opportunity/:id/registrations", () => {
     expect(lines).toHaveLength(3);
     expect(lines[1]).toContain("Bilal T.");
   });
+
+  it("neutralizes CSV formula injection in exported fields", async () => {
+    const injected = await getRepository(
+      dataSource,
+      OpportunityEventRegistration,
+    ).save(
+      new OpportunityEventRegistration({
+        opportunityId: ownOpportunity.id,
+        fullName: '=HYPERLINK("http://evil","x")',
+        email: "injected@example.com",
+        numberOfPeople: 1,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${ownOpportunity.id}/registrations/export`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain(
+      '"\'=HYPERLINK(""http://evil"",""x"")",injected@example.com',
+    );
+
+    await getRepository(dataSource, OpportunityEventRegistration).delete({
+      id: injected.id,
+    });
+  });
 });
