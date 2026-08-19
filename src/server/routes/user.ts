@@ -1,6 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  ApiAgentMembershipSummary,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -29,6 +30,7 @@ import {
 } from "../schema/user.schema";
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
+import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 
 export default async function userRoutes(
@@ -61,7 +63,7 @@ export default async function userRoutes(
         order: { id: direction },
       });
 
-      const data = users.map(serializeUserToMeDTO);
+      const data = users.map((user) => serializeUserToMeDTO(user));
 
       return reply.status(200).send({
         message: `List of users page:${page || 1}`,
@@ -162,13 +164,22 @@ export default async function userRoutes(
         }
 
         let agentId: number | undefined;
+        let agentMemberships: ApiAgentMembershipSummary[] | undefined;
         if (user.role === UserRole.AGENT && user.personId) {
           // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
           const membership = await getAgentPersonRepresentative(user.personId);
           agentId = membership?.agentId;
+
+          // All active memberships, not just the "representative" one — a
+          // person can belong to more than one agent (be#809).
+          const memberships = await getActiveAgentMemberships(user.personId);
+          agentMemberships = memberships.map((m) => ({
+            agentId: m.agentId,
+            agentTitle: m.agent?.title ?? "",
+          }));
         }
 
-        const payload = serializeUserToMeDTO(user, agentId);
+        const payload = serializeUserToMeDTO(user, agentId, agentMemberships);
         return reply
           .status(200)
           .send({ message: "Logged in User", data: payload });

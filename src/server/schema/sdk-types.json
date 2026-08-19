@@ -487,6 +487,22 @@
         },
         "agentId": {
           "type": "integer"
+        },
+        "agentMemberships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "agentId": {
+                "type": "number"
+              },
+              "agentTitle": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["agentId", "agentTitle"]
+          }
         }
       },
       "additionalProperties": false,
