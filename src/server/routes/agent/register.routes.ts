@@ -100,9 +100,18 @@ export default async function agentRegisterRoutes(
       const candidates = await fastify.db.agentRepository
         .createQueryBuilder("agent")
         .leftJoinAndSelect("agent.address", "address")
+        .leftJoinAndSelect("agent.agentPerson", "agentPerson")
         .getMany();
 
-      const data = searchAgentCandidates(candidates, street).map((a) => ({
+      // A coordinator-created agent (fe#911) has no AgentPerson yet — it isn't
+      // claimable through self-registration's JOIN (which auto-approves on an
+      // email-domain match with zero coordinator review); exclude it here so
+      // it can only be linked through a future, explicitly-reviewed flow.
+      const claimable = candidates.filter(
+        (a) => (a.agentPerson?.length ?? 0) > 0,
+      );
+
+      const data = searchAgentCandidates(claimable, street).map((a) => ({
         id: a.id,
         title: a.title,
       }));

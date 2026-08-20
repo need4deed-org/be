@@ -49,7 +49,7 @@ export const registerSearchResponseSchema = {
   },
 };
 
-const registerAgentNewSchema = {
+export const registerAgentNewSchema = {
   type: "object",
   required: ["title"],
   additionalProperties: false,
@@ -120,5 +120,25 @@ export const registerAgentConflictSchema = {
     message: { type: "string" },
     conflict: { type: "string", enum: ["title", "address"] },
     agentId: { type: "integer" },
+  },
+};
+
+// POST /agent (coordinator/admin-only, fe#911) — same create fields as
+// registration's CREATE branch (registerAgentNewSchema), but the body isn't
+// wrapped in { agent: ... } since this endpoint only ever creates, never joins.
+export const createAgentBodySchema = registerAgentNewSchema;
+
+export const createAgentResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "object",
+      required: ["agentId"],
+      properties: {
+        agentId: { type: "integer" },
+      },
+    },
   },
 };

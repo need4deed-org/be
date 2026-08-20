@@ -3,6 +3,7 @@ import {
   AgentRoleType,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
+import { EntityManager } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -30,6 +31,77 @@ export class AgentAddressConflictError extends Error {
   }
 }
 
+// Dedup: if the street+postcode already resolve to an existing agent (same
+// picker POST /opportunity/legacy uses), don't mint a duplicate — surface it
+// so the caller can offer JOIN (self-registration) or just point at the
+// existing agent (coordinator create) instead.
+async function assertNoAddressConflict(
+  addressStreet?: string,
+  addressPostcode?: string,
+): Promise<void> {
+  if (!addressStreet || !addressPostcode) {
+    return;
+  }
+  const agents = await dataSource.getRepository(Agent).find({
+    relations: ["address.postcode", "agentPostcode.postcode"],
+  });
+  const match = getAgentByAddress(agents, addressStreet, addressPostcode);
+  if (match) {
+    throw new AgentAddressConflictError(match.id);
+  }
+}
+
+// The Agent + Address + AgentService + AgentLanguage rows shared by both the
+// self-registration CREATE path and the coordinator-created (personless)
+// path — everything except the AgentPerson membership itself, which only the
+// former needs.
+async function createBareAgent(
+  input: ApiAgentRegisterNew,
+  manager: EntityManager,
+): Promise<Agent> {
+  const address =
+    input.addressStreet && input.addressPostcode
+      ? await createAddress(
+          { street: input.addressStreet },
+          { value: input.addressPostcode },
+          manager,
+        )
+      : null;
+
+  const agent = await manager.getRepository(Agent).save(
+    new Agent({
+      title: input.title,
+      agentTypeId: input.typeId ?? undefined,
+      info: input.info ?? undefined,
+      website: input.website ?? undefined,
+      districtId: input.districtId ?? undefined,
+      addressId: address?.id,
+    }),
+  );
+
+  if (input.serviceIds?.length) {
+    await manager
+      .getRepository(AgentService)
+      .save(
+        input.serviceIds.map(
+          (serviceId) => ({ agentId: agent.id, serviceId }) as AgentService,
+        ),
+      );
+  }
+
+  if (input.languages?.length) {
+    await manager
+      .getRepository(AgentLanguage)
+      .save(
+        input.languages.map(
+          (languageId) => ({ agentId: agent.id, languageId }) as AgentLanguage,
+        ),
+      );
+  }
+
+  return agent;
+}
+
 /**
  * CREATE path: a verified user creates a brand-new agent and becomes its first
  * VOLUNTEER_COORDINATOR. The creator owns the record, so the membership is
@@ -48,55 +120,12 @@ export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
-  // Dedup: if the street+postcode already resolve to an existing agent (same
-  // picker POST /opportunity/legacy uses), don't mint a duplicate — surface it
-  // so the client can offer JOIN instead.
-  if (input.addressStreet && input.addressPostcode) {
-    const agents = await dataSource.getRepository(Agent).find({
-      relations: ["address.postcode", "agentPostcode.postcode"],
-    });
-    const match = getAgentByAddress(
-      agents,
-      input.addressStreet,
-      input.addressPostcode,
-    );
-    if (match) {
-      throw new AgentAddressConflictError(match.id);
-    }
-  }
+  await assertNoAddressConflict(input.addressStreet, input.addressPostcode);
 
   let result!: RegisterAgentResult;
 
   await dataSource.manager.transaction(async (manager) => {
-    const address =
-      input.addressStreet && input.addressPostcode
-        ? await createAddress(
-            { street: input.addressStreet },
-            { value: input.addressPostcode },
-            manager,
-          )
-        : null;
-
-    const agent = await manager.getRepository(Agent).save(
-      new Agent({
-        title: input.title,
-        agentTypeId: input.typeId ?? undefined,
-        info: input.info ?? undefined,
-        website: input.website ?? undefined,
-        districtId: input.districtId ?? undefined,
-        addressId: address?.id,
-      }),
-    );
-
-    if (input.serviceIds?.length) {
-      await manager
-        .getRepository(AgentService)
-        .save(
-          input.serviceIds.map(
-            (serviceId) => ({ agentId: agent.id, serviceId }) as AgentService,
-          ),
-        );
-    }
+    const agent = await createBareAgent(input, manager);
 
     await manager.getRepository(AgentPerson).save(
       new AgentPerson({
@@ -106,17 +135,6 @@ export async function createAgentForPerson(
         status: AgentMembershipStatus.ACTIVE,
       }),
     );
-
-    if (input.languages?.length) {
-      await manager
-        .getRepository(AgentLanguage)
-        .save(
-          input.languages.map(
-            (languageId) =>
-              ({ agentId: agent.id, languageId }) as AgentLanguage,
-          ),
-        );
-    }
 
     if (input.phone) {
       await manager
@@ -131,6 +149,28 @@ export async function createAgentForPerson(
   });
 
   return result;
+}
+
+/**
+ * COORDINATOR/ADMIN create path (fe#911, be side): an Agent with no linked
+ * Person/User at all — for adding an NGO the coordinator already has details
+ * for, before it has self-registered. Shares createBareAgent with
+ * createAgentForPerson; the only difference is there's no AgentPerson
+ * membership (and thus no phone-on-Person write) to add.
+ */
+export async function createAgent(
+  input: ApiAgentRegisterNew,
+): Promise<{ agentId: number }> {
+  await assertNoAddressConflict(input.addressStreet, input.addressPostcode);
+
+  let agentId!: number;
+
+  await dataSource.manager.transaction(async (manager) => {
+    const agent = await createBareAgent(input, manager);
+    agentId = agent.id;
+  });
+
+  return { agentId };
 }
 
 /**

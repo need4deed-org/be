@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
   AgentMembershipStatus,
   ApiAgentPatch,
+  ApiAgentRegisterNew,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -21,7 +22,11 @@ import {
 } from "../../../services";
 import {
   agentListQuerySchema,
+  createAgentBodySchema,
+  createAgentResponseSchema,
   idParamSchema,
+  registerAgentConflictSchema,
+  responseErrors,
   responseSchema,
 } from "../../schema";
 import {
@@ -44,6 +49,11 @@ import {
   updateAgentLanguages,
   updateAgentServices,
 } from "../../utils";
+import {
+  AgentAddressConflictError,
+  classifyRegisterAgentConflict,
+  createAgent,
+} from "../../utils/data/write-agent-registration";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
@@ -175,12 +185,75 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
+      // A coordinator-created agent (fe#911) has no AgentPerson at all until a
+      // real registration claims it — keep it out of the list for anyone but
+      // coordinator/admin. `count` intentionally still reflects the unfiltered
+      // total (this page's data is filtered, not the query itself).
+      const role = request.authUser?.role;
+      const isPrivileged =
+        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      const visibleAgents = isPrivileged
+        ? agentsDistrict
+        : agentsDistrict.filter(
+            (agent) => (agent.agentPerson?.length ?? 0) > 0,
+          );
+
       // DTO (dtoAgentGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agents page:${page || 1} fetched successfully`,
-        data: agentsDistrict,
+        data: visibleAgents,
         count,
       });
+    },
+  );
+
+  // POST / — coordinator/admin creates a bare Agent with no linked Person/User
+  // (fe#911), for an NGO the coordinator already has details for before it has
+  // self-registered. Distinct from POST /agent/register, which always links
+  // the authenticated caller's own person.
+  fastify.post<{ Body: ApiAgentRegisterNew }>(
+    "/",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        body: createAgentBodySchema,
+        response: {
+          201: createAgentResponseSchema,
+          ...responseErrors,
+          409: registerAgentConflictSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const result = await createAgent(request.body);
+        return reply.status(201).send({
+          message: "Agent created successfully.",
+          data: result,
+        });
+      } catch (err) {
+        if (err instanceof AgentAddressConflictError) {
+          return reply.status(409).send({
+            message: "An agent at this address already exists.",
+            conflict: "address",
+            agentId: err.agentId,
+          });
+        }
+        if (classifyRegisterAgentConflict(err) === "title") {
+          const existing = await fastify.db.agentRepository.findOne({
+            where: { title: request.body.title },
+          });
+          return reply.status(409).send({
+            message: "An agent with this title already exists.",
+            conflict: "title",
+            ...(existing ? { agentId: existing.id } : {}),
+          });
+        }
+        logger.error(
+          `POST /agent: create failed: ${err instanceof Error ? err.message : err}`,
+        );
+        return reply.status(500).send({ message: "Failed to create agent." });
+      }
     },
   );
 

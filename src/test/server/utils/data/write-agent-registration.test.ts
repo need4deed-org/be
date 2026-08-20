@@ -2,11 +2,13 @@ import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentLanguage from "../../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
+import AgentService from "../../../../data/entity/m2m/agent-service";
 import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Person from "../../../../data/entity/person.entity";
 import {
   AgentAddressConflictError,
   classifyRegisterAgentConflict,
+  createAgent,
   createAgentForPerson,
   joinAgent,
   resolveJoinStatus,
@@ -42,6 +44,7 @@ vi.mock("../../../../data/data-source", () => ({
 const agentSave = vi.fn();
 const agentPersonSave = vi.fn();
 const agentLanguageSave = vi.fn();
+const agentServiceSave = vi.fn();
 const personUpdate = vi.fn();
 
 beforeEach(() => {
@@ -55,6 +58,8 @@ beforeEach(() => {
         return { save: agentPersonSave };
       case AgentLanguage:
         return { save: agentLanguageSave };
+      case AgentService:
+        return { save: agentServiceSave };
       case Person:
         return { update: personUpdate };
       default:
@@ -72,6 +77,7 @@ beforeEach(() => {
   agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
   agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
   agentLanguageSave.mockImplementation(async (rows: any[]) => rows);
+  agentServiceSave.mockImplementation(async (rows: any[]) => rows);
 });
 
 describe("createAgentForPerson", () => {
@@ -181,15 +187,88 @@ describe("createAgentForPerson", () => {
   it("updates person.phone inside the transaction when phone is provided", async () => {
     personUpdate.mockResolvedValue({});
 
-    await createAgentForPerson(11, { title: "Centre HERO", phone: "+49123456789" });
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      phone: "+49123456789",
+    });
 
-    expect(personUpdate).toHaveBeenCalledWith({ id: 11 }, { phone: "+49123456789" });
+    expect(personUpdate).toHaveBeenCalledWith(
+      { id: 11 },
+      { phone: "+49123456789" },
+    );
   });
 
   it("skips person.phone update when phone is not provided", async () => {
     await createAgentForPerson(11, { title: "Centre HERO" });
 
     expect(personUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// fe#911: coordinator/admin creates a bare Agent with no linked Person — same
+// Agent/Address/Service/Language writes as createAgentForPerson, minus the
+// AgentPerson membership (and the phone-on-Person write, which has no person
+// to target here).
+describe("createAgent", () => {
+  it("persists the Agent alone — no AgentPerson, no phone write", async () => {
+    const result = await createAgent({ title: "Bare Agent HERO" });
+
+    expect(agentSave).toHaveBeenCalledTimes(1);
+    expect(agentSave.mock.calls[0][0]).toMatchObject({
+      title: "Bare Agent HERO",
+      addressId: undefined,
+    });
+    expect(agentPersonSave).not.toHaveBeenCalled();
+    expect(personUpdate).not.toHaveBeenCalled();
+    expect(result).toEqual({ agentId: 33 });
+  });
+
+  it("creates Address and propagates addressId when street+postcode given", async () => {
+    createAddressMock.mockResolvedValueOnce({ id: 99 });
+
+    await createAgent({
+      title: "Bare Agent HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+    });
+
+    expect(agentSave.mock.calls[0][0].addressId).toBe(99);
+  });
+
+  it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      {
+        id: 77,
+        address: {
+          street: "Bitterfelder Str 11",
+          postcode: { value: "12681" },
+        },
+      },
+    ]);
+
+    const err = await createAgent({
+      title: "Bare Agent HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(AgentAddressConflictError);
+    expect(err.agentId).toBe(77);
+    expect(agentSave).not.toHaveBeenCalled();
+  });
+
+  it("inserts AgentLanguage and AgentService rows when given", async () => {
+    await createAgent({
+      title: "Bare Agent HERO",
+      languages: [5, 7],
+      serviceIds: [1, 2],
+    });
+
+    expect(agentLanguageSave).toHaveBeenCalledTimes(1);
+    expect(agentLanguageSave.mock.calls[0][0]).toEqual([
+      { agentId: 33, languageId: 5 },
+      { agentId: 33, languageId: 7 },
+    ]);
   });
 });
 
