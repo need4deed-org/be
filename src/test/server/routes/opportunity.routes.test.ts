@@ -25,6 +25,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { formatDate, formatTime } from "../../../services/utils";
 
 const PASSWORD = "test_password";
 
@@ -1166,5 +1167,30 @@ describe("GET /opportunity sortBy=start-date", () => {
     expect(
       relativeOrder(data, [oppSoon.id, oppLater.id, oppNoDate.id]),
     ).toEqual([oppLater.id, oppSoon.id, oppNoDate.id]);
+  });
+
+  it("exposes appointmentDate/appointmentTime derived from onetimer, null when absent", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    const byId = (id: number) => data.find((o: { id: number }) => o.id === id);
+
+    expect(byId(oppSoon.id)).toMatchObject({
+      appointmentDate: formatDate(onetimerSoon.date),
+      appointmentTime: formatTime(onetimerSoon.date),
+    });
+    expect(byId(oppLater.id)).toMatchObject({
+      appointmentDate: formatDate(onetimerLater.date),
+      appointmentTime: formatTime(onetimerLater.date),
+    });
+    expect(byId(oppNoDate.id)).toMatchObject({
+      appointmentDate: null,
+      appointmentTime: null,
+    });
   });
 });

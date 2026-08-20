@@ -86,6 +86,12 @@ export function dtoOpportunityGetList(
     ),
     agentTitle: opportunity.agent?.title ?? "",
     agentId: opportunity.agentId,
+    appointmentDate: opportunity.onetimer
+      ? formatDate(opportunity.onetimer.date)
+      : null,
+    appointmentTime: opportunity.onetimer
+      ? formatTime(opportunity.onetimer.date)
+      : null,
     // Names of the volunteers MATCHED to the opportunity (status opp-matched
     // only — not pending/active/past links). PII masking runs before this DTO,
     // so masked names pass through. Needs the
