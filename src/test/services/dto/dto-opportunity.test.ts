@@ -197,6 +197,25 @@ describe("dtoOpportunityGetList", () => {
       [],
     );
   });
+
+  it("derives appointmentDate/appointmentTime from the opportunity's onetimer", () => {
+    const opportunity = {
+      ...baseOpportunity,
+      onetimer: { id: 10, date: new Date("2026-06-15T09:30:00Z") },
+    };
+
+    const result = dtoOpportunityGetList(opportunity as any);
+    expect(result.appointmentDate).toBe("2026-06-15");
+    expect(result.appointmentTime).toBe("09:30");
+  });
+
+  it("returns null appointmentDate/appointmentTime when there is no onetimer", () => {
+    const opportunity = { ...baseOpportunity, onetimer: undefined };
+
+    const result = dtoOpportunityGetList(opportunity as any);
+    expect(result.appointmentDate).toBeNull();
+    expect(result.appointmentTime).toBeNull();
+  });
 });
 
 describe("dtoOpportunityGet", () => {
@@ -273,5 +292,27 @@ describe("dtoOpportunityGet", () => {
     const result = dtoOpportunityGet(opportunity as any);
 
     expect(result.event).toBeUndefined();
+  });
+
+  it("populates appointmentDate/appointmentTime from onetimer regardless of type", () => {
+    const opportunity = {
+      ...baseDetail,
+      type: "accompanying",
+      onetimer: { id: 13, date: eventDate },
+    };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.appointmentDate).toBe("2026-06-15");
+    expect(result.appointmentTime).toBe("09:30");
+  });
+
+  it("returns null appointmentDate/appointmentTime when there is no onetimer", () => {
+    const opportunity = { ...baseDetail, onetimer: undefined };
+
+    const result = dtoOpportunityGet(opportunity as any);
+
+    expect(result.appointmentDate).toBeNull();
+    expect(result.appointmentTime).toBeNull();
   });
 });
