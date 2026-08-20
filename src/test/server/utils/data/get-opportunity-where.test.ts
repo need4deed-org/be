@@ -10,6 +10,7 @@ import {
 } from "typeorm";
 import { describe, expect, it } from "vitest";
 import { getOpportunityWhere } from "../../../../server/utils/data/get-opportunity-where";
+import { berlinDayBoundaries } from "../../../../services/jobs/german-holidays";
 
 describe("getOpportunityWhere", () => {
   it("returns an empty object when neither filter nor appointment params are given", () => {
@@ -50,46 +51,52 @@ describe("getOpportunityWhere", () => {
       ).toEqual({});
     });
 
-    it("defers to an explicit filter.type instead of overriding it", () => {
+    it("leaves an explicit filter.type that doesn't include accompanying untouched", () => {
       const where = getOpportunityWhere({ type: ["events"] } as never, {
         excludeAccompanying: true,
       });
       expect(where).toEqual({ type: In(["events"]) });
     });
+
+    it("strips accompanying out of an explicit filter.type that includes it, instead of ignoring the flag", () => {
+      const where = getOpportunityWhere(
+        { type: ["accompanying", "events"] } as never,
+        { excludeAccompanying: true },
+      );
+      expect(where).toEqual({ type: In(["events"]) });
+    });
   });
 
   describe("appointment date range", () => {
-    it("uses MoreThanOrEqual when only appointmentDateFrom is given", () => {
+    it("uses MoreThanOrEqual anchored to Berlin midnight when only appointmentDateFrom is given", () => {
       const where = getOpportunityWhere(undefined, {
         appointmentDateFrom: "2026-06-01",
       });
+      const { startOfDay } = berlinDayBoundaries(new Date(2026, 5, 1));
       expect(where).toEqual({
-        onetimer: { date: MoreThanOrEqual(new Date("2026-06-01")) },
+        onetimer: { date: MoreThanOrEqual(startOfDay) },
       });
     });
 
-    it("uses LessThanOrEqual with an inclusive end-of-day bound when only appointmentDateTo is given", () => {
+    it("uses LessThanOrEqual anchored to the end of the Berlin day when only appointmentDateTo is given", () => {
       const where = getOpportunityWhere(undefined, {
         appointmentDateTo: "2026-06-30",
       });
-      const expectedEnd = new Date("2026-06-30");
-      expectedEnd.setUTCHours(23, 59, 59, 999);
+      const { endOfDay } = berlinDayBoundaries(new Date(2026, 5, 30));
       expect(where).toEqual({
-        onetimer: { date: LessThanOrEqual(expectedEnd) },
+        onetimer: { date: LessThanOrEqual(endOfDay) },
       });
     });
 
-    it("uses Between with an inclusive end-of-day upper bound when both are given", () => {
+    it("uses Between with Berlin day boundaries when both are given", () => {
       const where = getOpportunityWhere(undefined, {
         appointmentDateFrom: "2026-06-01",
         appointmentDateTo: "2026-06-30",
       });
-      const expectedEnd = new Date("2026-06-30");
-      expectedEnd.setUTCHours(23, 59, 59, 999);
+      const { startOfDay } = berlinDayBoundaries(new Date(2026, 5, 1));
+      const { endOfDay } = berlinDayBoundaries(new Date(2026, 5, 30));
       expect(where).toEqual({
-        onetimer: {
-          date: Between(new Date("2026-06-01"), expectedEnd),
-        },
+        onetimer: { date: Between(startOfDay, endOfDay) },
       });
     });
 
@@ -98,6 +105,12 @@ describe("getOpportunityWhere", () => {
         getOpportunityWhere(undefined, {
           appointmentDateFrom: "not-a-date",
         }),
+      ).toThrow(/Invalid date/);
+    });
+
+    it("throws BadRequestError on an empty string instead of silently skipping validation", () => {
+      expect(() =>
+        getOpportunityWhere(undefined, { appointmentDateFrom: "" }),
       ).toThrow(/Invalid date/);
     });
   });
@@ -121,8 +134,9 @@ describe("getOpportunityWhere", () => {
         hasAppointmentDate: true,
         appointmentDateFrom: "2026-06-01",
       });
+      const { startOfDay } = berlinDayBoundaries(new Date(2026, 5, 1));
       expect(where).toEqual({
-        onetimer: { date: MoreThanOrEqual(new Date("2026-06-01")) },
+        onetimer: { date: MoreThanOrEqual(startOfDay) },
       });
     });
   });

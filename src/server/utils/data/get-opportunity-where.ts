@@ -10,30 +10,33 @@ import {
 } from "typeorm";
 import { BadRequestError } from "../../../config/error";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { QuerystringOpportunityFiltering } from "../../types";
+import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
+import {
+  QuerystringOpportunityFiltering,
+  QuerystringOpportunityList,
+} from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 
-export interface OpportunityAppointmentFilter {
-  appointmentDateFrom?: string;
-  appointmentDateTo?: string;
-  hasAppointmentDate?: boolean;
-  excludeAccompanying?: boolean;
-}
+export type OpportunityAppointmentFilter = Pick<
+  QuerystringOpportunityList,
+  | "appointmentDateFrom"
+  | "appointmentDateTo"
+  | "hasAppointmentDate"
+  | "excludeAccompanying"
+>;
 
+// appointmentDateFrom/To are Berlin calendar days ("2026-06-30"), not UTC
+// ones — this is a Berlin-based product and Opportunity.onetimer.date is
+// filtered the same way elsewhere (berlinDayBoundaries, used by
+// scanAccompanyNotFound). Parsing with `new Date(value)` would instead
+// anchor the range to UTC midnight, shifting it by Berlin's UTC offset.
 function parseAppointmentDate(value: string): Date {
-  const date = new Date(value);
-  if (isNaN(date.getTime())) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
     throw new BadRequestError(`Invalid date: "${value}"`);
   }
-  return date;
-}
-
-// A `...To` bound is a calendar day, e.g. "2026-06-30" — inclusive of every
-// appointment that day, not just the one at its midnight instant.
-function endOfDay(date: Date): Date {
-  const end = new Date(date);
-  end.setUTCHours(23, 59, 59, 999);
-  return end;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
 }
 
 function getAppointmentDateWhere(
@@ -42,13 +45,16 @@ function getAppointmentDateWhere(
   const { appointmentDateFrom, appointmentDateTo, hasAppointmentDate } =
     appointment ?? {};
 
-  if (appointmentDateFrom || appointmentDateTo) {
-    const from = appointmentDateFrom
-      ? parseAppointmentDate(appointmentDateFrom)
-      : undefined;
-    const to = appointmentDateTo
-      ? endOfDay(parseAppointmentDate(appointmentDateTo))
-      : undefined;
+  if (appointmentDateFrom !== undefined || appointmentDateTo !== undefined) {
+    const from =
+      appointmentDateFrom !== undefined
+        ? berlinDayBoundaries(parseAppointmentDate(appointmentDateFrom))
+            .startOfDay
+        : undefined;
+    const to =
+      appointmentDateTo !== undefined
+        ? berlinDayBoundaries(parseAppointmentDate(appointmentDateTo)).endOfDay
+        : undefined;
 
     return {
       onetimer: {
@@ -71,6 +77,30 @@ function getAppointmentDateWhere(
   return {};
 }
 
+function getTypeWhere(
+  filter: QuerystringOpportunityFiltering["filter"],
+  excludeAccompanying?: boolean,
+): FindOptionsWhere<Opportunity> {
+  if (filter?.type) {
+    const types = Array.isArray(filter.type) ? filter.type : [filter.type];
+    // Combine rather than defer: an explicit type list that happens to
+    // include "accompanying" still gets it stripped when excludeAccompanying
+    // is also set, so the flag's name isn't silently contradicted.
+    const filtered = excludeAccompanying
+      ? types.filter((type) => type !== OpportunityType.ACCOMPANYING)
+      : types;
+    return {
+      type: normalizeStringArrayInput(filtered),
+    } as FindOptionsWhere<Opportunity>;
+  }
+
+  return excludeAccompanying
+    ? ({
+        type: Not(OpportunityType.ACCOMPANYING),
+      } as FindOptionsWhere<Opportunity>)
+    : {};
+}
+
 // SECURITY (#666): filters run on unmasked DB columns, so a non-privileged
 // caller can infer PII masked in the response by probing which rows match.
 export function getOpportunityWhere(
@@ -78,13 +108,7 @@ export function getOpportunityWhere(
   appointment?: OpportunityAppointmentFilter,
 ): FindOptionsWhere<Opportunity> {
   return {
-    ...(filter?.type
-      ? {
-          type: normalizeStringArrayInput(filter.type),
-        }
-      : appointment?.excludeAccompanying
-        ? { type: Not(OpportunityType.ACCOMPANYING) }
-        : {}),
+    ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
     ...(filter?.status
       ? {
