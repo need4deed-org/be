@@ -4,7 +4,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
-import { BaseError, UnauthorizedError } from "../../../config";
+import { BaseError, NotFoundError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -144,29 +144,39 @@ export async function createAgentForPerson(
 
   let result!: RegisterAgentResult;
 
-  await dataSource.manager.transaction(async (manager) => {
-    const agent = await createBareAgent(input, manager);
+  try {
+    await dataSource.manager.transaction(async (manager) => {
+      const agent = await createBareAgent(input, manager);
 
-    await manager.getRepository(AgentPerson).save(
-      new AgentPerson({
+      await manager.getRepository(AgentPerson).save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+          status: AgentMembershipStatus.ACTIVE,
+        }),
+      );
+
+      if (input.phone) {
+        await manager
+          .getRepository(Person)
+          .update({ id: personId }, { phone: input.phone });
+      }
+
+      result = {
         agentId: agent.id,
-        personId,
-        role: AgentRoleType.VOLUNTEER_COORDINATOR,
-        status: AgentMembershipStatus.ACTIVE,
-      }),
-    );
-
-    if (input.phone) {
-      await manager
-        .getRepository(Person)
-        .update({ id: personId }, { phone: input.phone });
+        membershipStatus: AgentMembershipStatus.ACTIVE,
+      };
+    });
+  } catch (err) {
+    if (classifyRegisterAgentConflict(err) === "title") {
+      const existing = await dataSource
+        .getRepository(Agent)
+        .findOne({ where: { title: input.title } });
+      throw new AgentTitleConflictError(existing?.id);
     }
-
-    result = {
-      agentId: agent.id,
-      membershipStatus: AgentMembershipStatus.ACTIVE,
-    };
-  });
+    throw err;
+  }
 
   return result;
 }
@@ -268,7 +278,10 @@ export async function joinAgent(
   // legacy agents (created via POST /opportunity/legacy with no rac_email)
   // can also have zero AgentPerson rows and must remain joinable.
   const agent = await agentRepo.findOne({ where: { id: agentId } });
-  if (!agent || agent.unclaimed) {
+  if (!agent) {
+    throw new NotFoundError(`Agent (id:${agentId}) not found.`);
+  }
+  if (agent.unclaimed) {
     throw new UnauthorizedError(
       "This agent has not been claimed yet and cannot be joined directly.",
     );

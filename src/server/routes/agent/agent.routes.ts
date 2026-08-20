@@ -40,6 +40,7 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  assertAgentVisible,
   createAddress,
   getAgentWhere,
   getDistrictToAgentHandler,
@@ -255,16 +256,7 @@ export default async function agentRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 
-      // Mirrors the GET /agent list filter: a coordinator-created agent
-      // (fe#911) stays invisible to non-coordinator/admin callers until a
-      // real registration claims it. 404 rather than 403 so its existence
-      // isn't leaked to a caller guessing ids.
-      const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-      if (agent.unclaimed && !isPrivileged) {
-        throw new NotFoundError(`Agent (id:${id}) not found.`);
-      }
+      assertAgentVisible(agent, request.authUser?.role);
 
       const { addDistrictToAgent, updates } = getDistrictToAgentHandler();
       const agentDistrict = await addDistrictToAgent(agent);

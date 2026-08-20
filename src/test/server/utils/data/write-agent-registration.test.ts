@@ -1,5 +1,6 @@
 import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NotFoundError } from "../../../../config";
 import AgentLanguage from "../../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import AgentService from "../../../../data/entity/m2m/agent-service";
@@ -216,6 +217,21 @@ describe("createAgentForPerson", () => {
 
     expect(personUpdate).not.toHaveBeenCalled();
   });
+
+  it("throws AgentTitleConflictError with the existing agent's id on a unique-title violation", async () => {
+    agentSave.mockRejectedValueOnce({
+      code: "23505",
+      detail: "Key (title)=(Centre HERO) already exists.",
+    });
+    agentRepoFindOne.mockResolvedValueOnce({ id: 55 });
+
+    const err = await createAgentForPerson(11, { title: "Centre HERO" }).catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(AgentTitleConflictError);
+    expect(err.agentId).toBe(55);
+  });
 });
 
 // fe#911: coordinator/admin creates a bare Agent with no linked Person — same
@@ -343,14 +359,14 @@ describe("resolveJoinStatus", () => {
 });
 
 describe("joinAgent", () => {
-  it("rejects joining an agent that doesn't exist", async () => {
+  it("404s (not 403) when the agent doesn't exist at all", async () => {
     agentRepoFindOne.mockResolvedValueOnce(null);
 
-    await expect(
-      joinAgent(11, 33, AgentMembershipStatus.PENDING),
-    ).rejects.toThrow(
-      "This agent has not been claimed yet and cannot be joined directly.",
+    const err = await joinAgent(11, 33, AgentMembershipStatus.PENDING).catch(
+      (e) => e,
     );
+
+    expect(err).toBeInstanceOf(NotFoundError);
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
   });
 
