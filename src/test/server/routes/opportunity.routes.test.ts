@@ -1013,6 +1013,117 @@ describe("PATCH /opportunity/:id onetimer resolution", () => {
   });
 });
 
+// be#890: dtoOpportunityGet backs this route and must set every field
+// ApiOpportunityGet's response schema now requires (inherited from the
+// widened ApiOpportunityGetList) — a missing required field makes
+// fast-json-stringify throw, not silently strip, so this exercises that path.
+describe("GET /opportunity/:id", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let deal: Deal;
+  let onetimer: Onetimer;
+  let opportunity: Opportunity;
+  let opportunityNoDate: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (get-by-id) ${suffix}` }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    onetimer = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: new Date("2026-06-15T09:30:00Z") }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (get-by-id) ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: deal.id,
+        onetimerId: onetimer.id,
+      }),
+    );
+    opportunityNoDate = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity No Date (get-by-id) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "GetByIdCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    const coordinatorUser = await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-get-by-id-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorUser.email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunityNoDate.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  it("returns appointmentDate/appointmentTime derived from onetimer", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    expect(data.appointmentDate).toBe("2026-06-15");
+    expect(data.appointmentTime).toBe("09:30");
+  });
+
+  it("returns null appointmentDate/appointmentTime when there is no onetimer", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunityNoDate.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    expect(data.appointmentDate).toBeNull();
+    expect(data.appointmentTime).toBeNull();
+  });
+});
+
 // be#746: server-side sort by start date, replacing the old client-side
 // per-page sort — this is what actually fixes opportunities falling through
 // the cracks across pages. Verifies both the ordering and that opportunities
