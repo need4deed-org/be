@@ -316,8 +316,26 @@ describe("resolveJoinStatus", () => {
 });
 
 describe("joinAgent", () => {
-  it("creates a new membership link with the given status when none exists", async () => {
+  // fe#911: a coordinator-created agent has zero AgentPerson rows until a
+  // real registration claims it. Excluding it from the /search picker isn't
+  // enough on its own — this is the endpoint that actually grants access, and
+  // it takes agentId directly from the client — so it must refuse to link
+  // anyone to an agent nobody has ever joined yet.
+  it("rejects joining an agent with no existing memberships at all", async () => {
     agentPersonRepoFindOne.mockResolvedValueOnce(null);
+
+    await expect(
+      joinAgent(11, 33, AgentMembershipStatus.PENDING),
+    ).rejects.toThrow(
+      "This agent has not been claimed yet and cannot be joined directly.",
+    );
+    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+  });
+
+  it("creates a new membership link with the given status when the agent already has a member", async () => {
+    agentPersonRepoFindOne
+      .mockResolvedValueOnce({ id: 1, role: AgentRoleType.SOCIAL_WORKER })
+      .mockResolvedValueOnce(null);
 
     const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
 
@@ -335,10 +353,12 @@ describe("joinAgent", () => {
   });
 
   it("is idempotent: returns the existing membership status without saving again", async () => {
-    agentPersonRepoFindOne.mockResolvedValueOnce({
-      id: 7,
-      status: AgentMembershipStatus.ACTIVE,
-    });
+    agentPersonRepoFindOne
+      .mockResolvedValueOnce({ id: 1, role: AgentRoleType.SOCIAL_WORKER })
+      .mockResolvedValueOnce({
+        id: 7,
+        status: AgentMembershipStatus.ACTIVE,
+      });
 
     const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
 

@@ -4,6 +4,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
+import { UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -226,6 +227,19 @@ export async function joinAgent(
   status: AgentMembershipStatus,
 ): Promise<RegisterAgentResult> {
   const repo = dataSource.getRepository(AgentPerson);
+
+  // A coordinator-created agent (fe#911) has zero AgentPerson rows until a
+  // real registration claims it — that claim must go through a future,
+  // explicitly-reviewed flow, not this auto-approve-on-domain-match JOIN.
+  // Excluding it from the /search picker isn't enough on its own: this route
+  // takes agentId directly from the client, so anyone who already has (or
+  // guesses) the id could otherwise join straight past that picker.
+  const anyMembership = await repo.findOne({ where: { agentId } });
+  if (!anyMembership) {
+    throw new UnauthorizedError(
+      "This agent has not been claimed yet and cannot be joined directly.",
+    );
+  }
 
   const existing = await repo.findOne({
     where: { agentId, personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },

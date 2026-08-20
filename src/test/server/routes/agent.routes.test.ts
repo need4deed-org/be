@@ -580,7 +580,10 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
 
     const asAgent = await fastify.inject({
       method: "GET",
-      url: "/agent?limit=1000",
+      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
+      // (DESC by id) puts the just-created agent reliably on page 1 no matter
+      // how many other agents already exist in the DB.
+      url: "/agent?limit=120&sortOrder=new-old",
       cookies: { access: agentCookie },
     });
     expect(
@@ -589,7 +592,10 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
 
     const asCoordinator = await fastify.inject({
       method: "GET",
-      url: "/agent?limit=1000",
+      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
+      // (DESC by id) puts the just-created agent reliably on page 1 no matter
+      // how many other agents already exist in the DB.
+      url: "/agent?limit=120&sortOrder=new-old",
       cookies: { access: coordinatorCookie },
     });
     expect(

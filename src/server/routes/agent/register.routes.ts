@@ -170,6 +170,12 @@ export default async function agentRegisterRoutes(
 
         return reply.status(201).send({ message, data: result });
       } catch (err) {
+        // Not this route's to translate — let Fastify's error handler map it
+        // to 403 (e.g. joinAgent rejecting a coordinator-created/unclaimed
+        // agent, fe#911).
+        if (err instanceof UnauthorizedError) {
+          throw err;
+        }
         if (err instanceof AgentAddressConflictError) {
           return reply.status(409).send({
             message: "An agent at this address already exists.",
