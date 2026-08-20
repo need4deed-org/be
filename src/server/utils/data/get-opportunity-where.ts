@@ -24,36 +24,36 @@ export function getOpportunityWhere(
           title: ILike(`%${filter.search}%`),
         }
       : {}),
-    ...(filter?.language
+    // language, district, activity and skill all constrain the same `deal` relation, so they must share a
+    // single `deal` key.
+    // if we use two spreads with the same key, the second replaces the first, and the earlier
+    // constraint is silently dropped.
+    ...(filter?.language ||
+    filter?.district ||
+    filter?.activity ||
+    filter?.skill
       ? {
           deal: {
-            dealLanguage: {
-              language: {
-                id: normalizeStringArrayInput(filter.language),
+            ...(filter?.language && {
+              dealLanguage: {
+                language: { id: normalizeStringArrayInput(filter.language) },
               },
-            },
-          },
-        }
-      : {}),
-    ...(filter?.district
-      ? {
-          deal: {
-            dealDistrict: {
-              district: {
-                id: normalizeStringArrayInput(filter.district),
+            }),
+            ...(filter?.district && {
+              dealDistrict: {
+                district: { id: normalizeStringArrayInput(filter.district) },
               },
-            },
-          },
-        }
-      : {}),
-    ...(filter?.activity
-      ? {
-          deal: {
-            dealActivity: {
-              activity: {
-                id: normalizeStringArrayInput(filter.activity),
+            }),
+            ...(filter?.activity && {
+              dealActivity: {
+                activity: { id: normalizeStringArrayInput(filter.activity) },
               },
-            },
+            }),
+            ...(filter?.skill && {
+              dealSkill: {
+                skill: { id: normalizeStringArrayInput(filter.skill) },
+              },
+            }),
           },
         }
       : {}),
