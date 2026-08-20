@@ -1006,6 +1006,12 @@
         "agentId": {
           "type": ["integer", "null"]
         },
+        "appointmentDate": {
+          "type": ["string", "null"]
+        },
+        "appointmentTime": {
+          "type": ["string", "null"]
+        },
         "volunteerNames": {
           "type": "array",
           "items": {
@@ -1029,7 +1035,9 @@
         "location",
         "accompanyingDetails",
         "agentTitle",
-        "agentId"
+        "agentId",
+        "appointmentDate",
+        "appointmentTime"
       ]
     },
     "ApiOpportunityGet": {
