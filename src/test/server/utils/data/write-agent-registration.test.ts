@@ -7,6 +7,7 @@ import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Person from "../../../../data/entity/person.entity";
 import {
   AgentAddressConflictError,
+  AgentTitleConflictError,
   classifyRegisterAgentConflict,
   createAgent,
   createAgentForPerson,
@@ -26,6 +27,15 @@ vi.mock("../../../../server/utils/data/is-trusted-domain", () => ({
 }));
 
 const txnManager: any = { getRepository: vi.fn() };
+
+// Agent.find (address-dedup lookup) and Agent.findOne (joinAgent's
+// exists/unclaimed check, createAgent's title-conflict lookup) — kept
+// distinct from the AgentPerson repo mocks below since routing now depends
+// on which entity's repository is requested (unlike before fe#911's
+// `unclaimed` flag, joinAgent only ever touched AgentPerson).
+const agentRepoFind = vi.fn();
+const agentRepoFindOne = vi.fn();
+
 const agentPersonRepoFindOne = vi.fn();
 const agentPersonRepoFind = vi.fn();
 const agentPersonRepoSave = vi.fn();
@@ -33,11 +43,14 @@ const agentPersonRepoSave = vi.fn();
 vi.mock("../../../../data/data-source", () => ({
   dataSource: {
     manager: { transaction: async (cb: any) => cb(txnManager) },
-    getRepository: () => ({
-      findOne: agentPersonRepoFindOne,
-      find: agentPersonRepoFind,
-      save: agentPersonRepoSave,
-    }),
+    getRepository: (entity: any) =>
+      entity?.name === "Agent"
+        ? { find: agentRepoFind, findOne: agentRepoFindOne }
+        : {
+            findOne: agentPersonRepoFindOne,
+            find: agentPersonRepoFind,
+            save: agentPersonRepoSave,
+          },
   },
 }));
 
@@ -69,7 +82,7 @@ beforeEach(() => {
 
   // Default: the address-dedup lookup (dataSource.getRepository(Agent).find)
   // finds no existing agent, so createAgentForPerson proceeds to create.
-  agentPersonRepoFind.mockResolvedValue([]);
+  agentRepoFind.mockResolvedValue([]);
 
   // Default: domain not on the trusted allowlist (member-match decides).
   isEmailDomainTrustedMock.mockResolvedValue(false);
@@ -126,7 +139,7 @@ describe("createAgentForPerson", () => {
   it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {
     // The dedup lookup finds an agent at the same address (getAgentByAddress
     // strict match on normalized street + postcode).
-    agentPersonRepoFind.mockResolvedValueOnce([
+    agentRepoFind.mockResolvedValueOnce([
       {
         id: 77,
         address: {
@@ -210,17 +223,31 @@ describe("createAgentForPerson", () => {
 // AgentPerson membership (and the phone-on-Person write, which has no person
 // to target here).
 describe("createAgent", () => {
-  it("persists the Agent alone — no AgentPerson, no phone write", async () => {
+  it("persists the Agent alone — no AgentPerson, no phone write — marked unclaimed", async () => {
     const result = await createAgent({ title: "Bare Agent HERO" });
 
     expect(agentSave).toHaveBeenCalledTimes(1);
     expect(agentSave.mock.calls[0][0]).toMatchObject({
       title: "Bare Agent HERO",
       addressId: undefined,
+      unclaimed: true,
     });
     expect(agentPersonSave).not.toHaveBeenCalled();
     expect(personUpdate).not.toHaveBeenCalled();
     expect(result).toEqual({ agentId: 33 });
+  });
+
+  it("throws AgentTitleConflictError with the existing agent's id on a unique-title violation", async () => {
+    agentSave.mockRejectedValueOnce({
+      code: "23505",
+      detail: "Key (title)=(Bare Agent HERO) already exists.",
+    });
+    agentRepoFindOne.mockResolvedValueOnce({ id: 55 });
+
+    const err = await createAgent({ title: "Bare Agent HERO" }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(AgentTitleConflictError);
+    expect(err.agentId).toBe(55);
   });
 
   it("creates Address and propagates addressId when street+postcode given", async () => {
@@ -236,7 +263,7 @@ describe("createAgent", () => {
   });
 
   it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {
-    agentPersonRepoFind.mockResolvedValueOnce([
+    agentRepoFind.mockResolvedValueOnce([
       {
         id: 77,
         address: {
@@ -316,13 +343,8 @@ describe("resolveJoinStatus", () => {
 });
 
 describe("joinAgent", () => {
-  // fe#911: a coordinator-created agent has zero AgentPerson rows until a
-  // real registration claims it. Excluding it from the /search picker isn't
-  // enough on its own — this is the endpoint that actually grants access, and
-  // it takes agentId directly from the client — so it must refuse to link
-  // anyone to an agent nobody has ever joined yet.
-  it("rejects joining an agent with no existing memberships at all", async () => {
-    agentPersonRepoFindOne.mockResolvedValueOnce(null);
+  it("rejects joining an agent that doesn't exist", async () => {
+    agentRepoFindOne.mockResolvedValueOnce(null);
 
     await expect(
       joinAgent(11, 33, AgentMembershipStatus.PENDING),
@@ -332,10 +354,28 @@ describe("joinAgent", () => {
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
   });
 
-  it("creates a new membership link with the given status when the agent already has a member", async () => {
-    agentPersonRepoFindOne
-      .mockResolvedValueOnce({ id: 1, role: AgentRoleType.SOCIAL_WORKER })
-      .mockResolvedValueOnce(null);
+  // fe#911: a coordinator-created agent is marked `unclaimed` until a real
+  // registration claims it. Excluding it from the /search picker isn't
+  // enough on its own — this is the endpoint that actually grants access, and
+  // it takes agentId directly from the client — so it must refuse to link
+  // anyone to an agent nobody has ever joined yet.
+  it("rejects joining an unclaimed (coordinator-created) agent", async () => {
+    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: true });
+
+    await expect(
+      joinAgent(11, 33, AgentMembershipStatus.PENDING),
+    ).rejects.toThrow(
+      "This agent has not been claimed yet and cannot be joined directly.",
+    );
+    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+  });
+
+  // A legacy agent (e.g. created via POST /opportunity/legacy with no
+  // rac_email) can also have zero AgentPerson rows, but it is not
+  // `unclaimed` — it must stay joinable, unlike a coordinator-created agent.
+  it("allows joining a non-unclaimed agent even with zero existing memberships", async () => {
+    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: false });
+    agentPersonRepoFindOne.mockResolvedValueOnce(null);
 
     const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
 
@@ -353,12 +393,11 @@ describe("joinAgent", () => {
   });
 
   it("is idempotent: returns the existing membership status without saving again", async () => {
-    agentPersonRepoFindOne
-      .mockResolvedValueOnce({ id: 1, role: AgentRoleType.SOCIAL_WORKER })
-      .mockResolvedValueOnce({
-        id: 7,
-        status: AgentMembershipStatus.ACTIVE,
-      });
+    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: false });
+    agentPersonRepoFindOne.mockResolvedValueOnce({
+      id: 7,
+      status: AgentMembershipStatus.ACTIVE,
+    });
 
     const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
 

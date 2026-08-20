@@ -49,11 +49,7 @@ import {
   updateAgentLanguages,
   updateAgentServices,
 } from "../../utils";
-import {
-  AgentAddressConflictError,
-  classifyRegisterAgentConflict,
-  createAgent,
-} from "../../utils/data/write-agent-registration";
+import { createAgent } from "../../utils/data/write-agent-registration";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
@@ -154,6 +150,17 @@ export default async function agentRoutes(
       const [skip, take] = getSkipTake({ page, limit });
       const where = await getAgentWhere(filter);
 
+      // A coordinator-created agent (fe#911) stays `unclaimed` until a real
+      // registration claims it — keep it out of the list for anyone but
+      // coordinator/admin. Filtered in the query itself (not in-memory after
+      // the page is fetched) so `count` and the returned page stay consistent.
+      const role = request.authUser?.role;
+      const isPrivileged =
+        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      if (!isPrivileged) {
+        where.unclaimed = false;
+      }
+
       logger.debug(
         `GET /agent: filters:${JSON.stringify(filter)}, skip:${skip}, take:${take}`,
       );
@@ -185,23 +192,10 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
-      // A coordinator-created agent (fe#911) has no AgentPerson at all until a
-      // real registration claims it — keep it out of the list for anyone but
-      // coordinator/admin. `count` intentionally still reflects the unfiltered
-      // total (this page's data is filtered, not the query itself).
-      const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-      const visibleAgents = isPrivileged
-        ? agentsDistrict
-        : agentsDistrict.filter(
-            (agent) => (agent.agentPerson?.length ?? 0) > 0,
-          );
-
       // DTO (dtoAgentGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agents page:${page || 1} fetched successfully`,
-        data: visibleAgents,
+        data: agentsDistrict,
         count,
       });
     },
@@ -225,35 +219,11 @@ export default async function agentRoutes(
       },
     },
     async (request, reply) => {
-      try {
-        const result = await createAgent(request.body);
-        return reply.status(201).send({
-          message: "Agent created successfully.",
-          data: result,
-        });
-      } catch (err) {
-        if (err instanceof AgentAddressConflictError) {
-          return reply.status(409).send({
-            message: "An agent at this address already exists.",
-            conflict: "address",
-            agentId: err.agentId,
-          });
-        }
-        if (classifyRegisterAgentConflict(err) === "title") {
-          const existing = await fastify.db.agentRepository.findOne({
-            where: { title: request.body.title },
-          });
-          return reply.status(409).send({
-            message: "An agent with this title already exists.",
-            conflict: "title",
-            ...(existing ? { agentId: existing.id } : {}),
-          });
-        }
-        logger.error(
-          `POST /agent: create failed: ${err instanceof Error ? err.message : err}`,
-        );
-        return reply.status(500).send({ message: "Failed to create agent." });
-      }
+      const result = await createAgent(request.body);
+      return reply.status(201).send({
+        message: "Agent created successfully.",
+        data: result,
+      });
     },
   );
 
@@ -282,6 +252,17 @@ export default async function agentRoutes(
       ];
       const agent = await agentRepository.findOne({ where: { id }, relations });
       if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+
+      // Mirrors the GET /agent list filter: a coordinator-created agent
+      // (fe#911) stays invisible to non-coordinator/admin callers until a
+      // real registration claims it. 404 rather than 403 so its existence
+      // isn't leaked to a caller guessing ids.
+      const role = request.authUser?.role;
+      const isPrivileged =
+        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      if (agent.unclaimed && !isPrivileged) {
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 

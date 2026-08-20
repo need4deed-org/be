@@ -4,7 +4,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
-import { UnauthorizedError } from "../../../config";
+import { BaseError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -25,10 +25,27 @@ export interface RegisterAgentResult {
  * existing agent (via the same getAgentByAddress picker POST /opportunity/legacy
  * uses). The route maps it to a 409 + agentId so the client can offer JOIN.
  */
-export class AgentAddressConflictError extends Error {
+export class AgentAddressConflictError extends BaseError {
   constructor(public readonly agentId: number) {
-    super("An agent at this address already exists.");
-    this.name = "AgentAddressConflictError";
+    super("An agent at this address already exists.", 409, true, {
+      conflict: "address",
+      agentId,
+    });
+  }
+}
+
+/**
+ * Raised by createAgent (coordinator/admin bare-create, fe#911) on a
+ * unique-title violation. Mirrors AgentAddressConflictError's response shape
+ * so the route can let it propagate to the global error handler instead of
+ * hand-building the 409 body itself.
+ */
+export class AgentTitleConflictError extends BaseError {
+  constructor(public readonly agentId?: number) {
+    super("An agent with this title already exists.", 409, true, {
+      conflict: "title",
+      ...(agentId !== undefined ? { agentId } : {}),
+    });
   }
 }
 
@@ -59,6 +76,7 @@ async function assertNoAddressConflict(
 async function createBareAgent(
   input: ApiAgentRegisterNew,
   manager: EntityManager,
+  unclaimed = false,
 ): Promise<Agent> {
   const address =
     input.addressStreet && input.addressPostcode
@@ -77,6 +95,7 @@ async function createBareAgent(
       website: input.website ?? undefined,
       districtId: input.districtId ?? undefined,
       addressId: address?.id,
+      unclaimed,
     }),
   );
 
@@ -166,10 +185,20 @@ export async function createAgent(
 
   let agentId!: number;
 
-  await dataSource.manager.transaction(async (manager) => {
-    const agent = await createBareAgent(input, manager);
-    agentId = agent.id;
-  });
+  try {
+    await dataSource.manager.transaction(async (manager) => {
+      const agent = await createBareAgent(input, manager, true);
+      agentId = agent.id;
+    });
+  } catch (err) {
+    if (classifyRegisterAgentConflict(err) === "title") {
+      const existing = await dataSource
+        .getRepository(Agent)
+        .findOne({ where: { title: input.title } });
+      throw new AgentTitleConflictError(existing?.id);
+    }
+    throw err;
+  }
 
   return { agentId };
 }
@@ -227,15 +256,19 @@ export async function joinAgent(
   status: AgentMembershipStatus,
 ): Promise<RegisterAgentResult> {
   const repo = dataSource.getRepository(AgentPerson);
+  const agentRepo = dataSource.getRepository(Agent);
 
-  // A coordinator-created agent (fe#911) has zero AgentPerson rows until a
-  // real registration claims it — that claim must go through a future,
+  // A coordinator-created agent (fe#911) is marked `unclaimed` until a real
+  // registration claims it — that claim must go through a future,
   // explicitly-reviewed flow, not this auto-approve-on-domain-match JOIN.
   // Excluding it from the /search picker isn't enough on its own: this route
   // takes agentId directly from the client, so anyone who already has (or
-  // guesses) the id could otherwise join straight past that picker.
-  const anyMembership = await repo.findOne({ where: { agentId } });
-  if (!anyMembership) {
+  // guesses) the id could otherwise join straight past that picker. Gating on
+  // this flag rather than "zero AgentPerson rows" matters: pre-existing
+  // legacy agents (created via POST /opportunity/legacy with no rac_email)
+  // can also have zero AgentPerson rows and must remain joinable.
+  const agent = await agentRepo.findOne({ where: { id: agentId } });
+  if (!agent || agent.unclaimed) {
     throw new UnauthorizedError(
       "This agent has not been claimed yet and cannot be joined directly.",
     );

@@ -136,6 +136,7 @@ export async function createServer(): Promise<FastifyInstance> {
       return reply.status(error.statusCode).send({
         error: error.constructor.name,
         message: error.message,
+        ...error.details,
       });
     }
 

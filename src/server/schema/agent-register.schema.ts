@@ -49,7 +49,11 @@ export const registerSearchResponseSchema = {
   },
 };
 
-export const registerAgentNewSchema = {
+// Fields shared by both create flows: self-registration's CREATE branch
+// (which also collects `phone`, written onto the registrant's own Person)
+// and the coordinator/admin bare-create below (which has no Person to
+// attach a phone to).
+const agentCreateBaseSchema = {
   type: "object",
   required: ["title"],
   additionalProperties: false,
@@ -62,7 +66,6 @@ export const registerAgentNewSchema = {
       type: "array",
       items: { type: "integer" },
     },
-    phone: { type: "string" },
     addressStreet: { type: "string" },
     addressPostcode: { type: "string" },
     districtId: { type: "integer" },
@@ -70,6 +73,14 @@ export const registerAgentNewSchema = {
       type: "array",
       items: { type: "integer" },
     },
+  },
+};
+
+export const registerAgentNewSchema = {
+  ...agentCreateBaseSchema,
+  properties: {
+    ...agentCreateBaseSchema.properties,
+    phone: { type: "string" },
   },
 };
 
@@ -124,9 +135,10 @@ export const registerAgentConflictSchema = {
 };
 
 // POST /agent (coordinator/admin-only, fe#911) — same create fields as
-// registration's CREATE branch (registerAgentNewSchema), but the body isn't
-// wrapped in { agent: ... } since this endpoint only ever creates, never joins.
-export const createAgentBodySchema = registerAgentNewSchema;
+// registration's CREATE branch, minus `phone` (a bare agent has no linked
+// Person to attach it to — see createBareAgent). The body isn't wrapped in
+// { agent: ... } since this endpoint only ever creates, never joins.
+export const createAgentBodySchema = agentCreateBaseSchema;
 
 export const createAgentResponseSchema = {
   type: "object",

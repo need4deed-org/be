@@ -601,6 +601,55 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     expect(
       asCoordinator.json().data.some((a: { id: number }) => a.id === agentId),
     ).toBe(true);
+
+    // Regression check: `count` must reflect the same filtered set as
+    // `data`, not the unfiltered total — the unclaimed agent just created
+    // is excluded from the where clause itself, not filtered in-memory
+    // after skip/take.
+    expect(asAgent.json().count).toBe(asAgent.json().data.length);
+  });
+
+  it("hides an unclaimed agent from GET /agent/:id for a non-privileged caller, but not a coordinator", async () => {
+    const createRes = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title: `Bare Agent For Get ${suffix}` },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const agentId = createRes.json().data.agentId;
+    createdAgentIds.push(agentId);
+
+    const asAgent = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agentId}`,
+      cookies: { access: agentCookie },
+    });
+    expect(asAgent.statusCode).toBe(404);
+
+    const asCoordinator = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agentId}`,
+      cookies: { access: coordinatorCookie },
+    });
+    expect(asCoordinator.statusCode).toBe(200);
+    expect(asCoordinator.json().data.id).toBe(agentId);
+  });
+
+  // createAgentBodySchema no longer declares `phone` (a bare agent has no
+  // linked Person to attach it to) — AJV's project-wide `removeAdditional`
+  // setting means it's now stripped before the handler ever sees it,
+  // rather than being accepted and then silently dropped deep in
+  // createBareAgent as it was before.
+  it("strips an unsupported phone field rather than silently accepting it", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title: `Bare Agent With Phone ${suffix}`, phone: "+491234" },
+    });
+    expect(res.statusCode).toBe(201);
+    createdAgentIds.push(res.json().data.agentId);
   });
 
   it("409s on a duplicate title", async () => {
