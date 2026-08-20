@@ -158,3 +158,13 @@ export const formatDate = (date: Date): string => {
 export const formatTime = (date: Date): string => {
   return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
 };
+
+// Single source of truth for deriving an appointmentDate/appointmentTime pair
+// from a onetimer date — used both for ApiOpportunityGetList's top-level
+// fields and ApiOpportunityAccompanyingDetails', so the two can't drift.
+export const formatAppointmentDateTime = (
+  date?: Date,
+): { appointmentDate: string | null; appointmentTime: string | null } => ({
+  appointmentDate: date ? formatDate(date) : null,
+  appointmentTime: date ? formatTime(date) : null,
+});
