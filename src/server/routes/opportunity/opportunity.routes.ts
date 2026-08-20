@@ -261,7 +261,7 @@ export default async function opportunityRoutes(
             ? { order: { createdAt: "ASC" } as const }
             : undefined;
 
-      const where = getOpportunityWhere(request.query.filter);
+      const where = getOpportunityWhere(request.query.filter, request.query);
 
       logger.debug(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,

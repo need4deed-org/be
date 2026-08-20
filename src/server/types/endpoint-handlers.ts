@@ -60,6 +60,11 @@ export type QuerystringOpportunityList = QuerystringPaginationLanguage &
     // only (not the shared QuerystringPaginationOrdering) — sorting by
     // start date only makes sense here, not for agent/volunteer/user lists.
     sortBy?: OpportunitySortField;
+    // Calendar view (be#889): filter by Opportunity.onetimer.date range.
+    appointmentDateFrom?: string;
+    appointmentDateTo?: string;
+    hasAppointmentDate?: boolean;
+    excludeAccompanying?: boolean;
   };
 
 export interface QuerystringAgentFiltering {

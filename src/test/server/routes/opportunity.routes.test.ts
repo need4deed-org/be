@@ -1305,3 +1305,220 @@ describe("GET /opportunity sortBy=start-date", () => {
     });
   });
 });
+
+// be#889: appointmentDateFrom/To + hasAppointmentDate + excludeAccompanying
+// filters on the calendar-view query. The sortBy=start-date case specifically
+// covers a known risk: that sort path excludes "onetimer" from the relations
+// it eager-loads and instead manually joins it under its own alias
+// ("onetimerSort") to avoid double-hydrating it — adding a relation-nested
+// `where.onetimer.date` condition must not conflict with that manual join.
+describe("GET /opportunity appointment date-range filters", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let dealInRange: Deal;
+  let dealOutOfRange: Deal;
+  let dealNoDate: Deal;
+  let dealAccompanying: Deal;
+  let onetimerInRange: Onetimer;
+  let onetimerOutOfRange: Onetimer;
+  let onetimerAccompanying: Onetimer;
+  let oppInRange: Opportunity;
+  let oppOutOfRange: Opportunity;
+  let oppNoDate: Opportunity;
+  let oppAccompanying: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (appointment-filters) ${suffix}` }),
+    );
+
+    onetimerInRange = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: new Date("2026-06-15T09:30:00Z") }),
+    );
+    onetimerOutOfRange = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: new Date("2026-07-15T09:30:00Z") }),
+    );
+    onetimerAccompanying = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date: new Date("2026-06-20T14:00:00Z") }),
+    );
+
+    dealInRange = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    dealOutOfRange = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    dealNoDate = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    dealAccompanying = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+
+    oppInRange = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Appt In Range ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealInRange.id,
+        onetimerId: onetimerInRange.id,
+      }),
+    );
+    oppOutOfRange = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Appt Out Of Range ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealOutOfRange.id,
+        onetimerId: onetimerOutOfRange.id,
+      }),
+    );
+    oppNoDate = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Appt No Date ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealNoDate.id,
+      }),
+    );
+    oppAccompanying = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Appt Accompanying In Range ${suffix}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: dealAccompanying.id,
+        onetimerId: onetimerAccompanying.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "ApptFilterCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    const coordinatorUser = await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-appt-filter-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorUser.email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: oppInRange.id });
+    await fastify.db.opportunityRepository.delete({ id: oppOutOfRange.id });
+    await fastify.db.opportunityRepository.delete({ id: oppNoDate.id });
+    await fastify.db.opportunityRepository.delete({ id: oppAccompanying.id });
+    await fastify.db.dealRepository.delete({ id: dealInRange.id });
+    await fastify.db.dealRepository.delete({ id: dealOutOfRange.id });
+    await fastify.db.dealRepository.delete({ id: dealNoDate.id });
+    await fastify.db.dealRepository.delete({ id: dealAccompanying.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimerInRange.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimerOutOfRange.id });
+    await fastify.db.onetimerRepository.delete({ id: onetimerAccompanying.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  const knownIds = () => [
+    oppInRange.id,
+    oppOutOfRange.id,
+    oppNoDate.id,
+    oppAccompanying.id,
+  ];
+
+  function relativeIds(data: { id: number }[]): number[] {
+    return data.map((o) => o.id).filter((id) => knownIds().includes(id));
+  }
+
+  it("returns only opportunities with an onetimer inside the date range", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(relativeIds(data).sort()).toEqual(
+      [oppInRange.id, oppAccompanying.id].sort(),
+    );
+  });
+
+  it("also excludes accompanying-type opportunities when excludeAccompanying=true", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(relativeIds(data)).toEqual([oppInRange.id]);
+  });
+
+  it("hasAppointmentDate=true alone excludes only the no-date opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?hasAppointmentDate=true&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    const ids = relativeIds(data);
+    expect(ids).toContain(oppInRange.id);
+    expect(ids).toContain(oppOutOfRange.id);
+    expect(ids).toContain(oppAccompanying.id);
+    expect(ids).not.toContain(oppNoDate.id);
+  });
+
+  it("throws a 400 on an unparseable appointmentDateFrom", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?appointmentDateFrom=not-a-date&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  // The join-safety risk: sortBy=start-date excludes "onetimer" from its
+  // eager-loaded relations and manually joins it under a different alias
+  // for ordering — the date-range where-condition must still apply correctly
+  // on top of that, not silently no-op or duplicate-join-error.
+  it("still applies the date range + excludeAccompanying correctly when combined with sortBy=start-date", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&sortBy=start-date&sortOrder=old-new&limit=120",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(relativeIds(data)).toEqual([oppInRange.id]);
+  });
+});
