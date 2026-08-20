@@ -42,6 +42,13 @@ export const opportunityListQuerySchema = {
     ...sortOrderProps,
     ...sortByProps,
     ...langProp,
+    // Calendar view (be#889): filter by Opportunity.onetimer.date range,
+    // top-level (not nested in `filter`) since they're specific to this
+    // list endpoint, matching `sortBy`.
+    appointmentDateFrom: { type: "string" },
+    appointmentDateTo: { type: "string" },
+    hasAppointmentDate: { type: "boolean" },
+    excludeAccompanying: { type: "boolean" },
     filter: {
       type: "object",
       properties: {
