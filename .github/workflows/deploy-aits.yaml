@@ -30,14 +30,15 @@ jobs:
           tags: ghcr.io/need4deed-org/be:develop
 
       - name: Publish develop digest for prod release pipeline
-        # infra's release-prod.yaml reads this as ${{ vars.BE_DEVELOP_DIGEST }}
-        # instead of scraping GHCR — be's own image isn't rebuilt for prod,
-        # it just promotes whatever's currently on :develop.
+        # A repository variable ON infra (not an org variable) - infra's
+        # release-prod.yaml reads this for free as ${{ vars.BE_DEVELOP_DIGEST }}
+        # since it's the same repo the variable lives on. be's own image
+        # isn't rebuilt for prod, it just promotes whatever's on :develop.
         # continue-on-error: the dev rollout below must still run even before
         # the PAT secret this needs exists, or once it's created but expires -
         # this step failing must never take down deploy-aits's actual job.
         continue-on-error: true
-        run: gh variable set BE_DEVELOP_DIGEST --org need4deed-org --repos infra --body "${{ steps.build.outputs.digest }}"
+        run: gh variable set BE_DEVELOP_DIGEST --repo need4deed-org/infra --body "${{ steps.build.outputs.digest }}"
         env:
           GH_TOKEN: ${{ secrets.PAT }}
 
