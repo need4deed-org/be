@@ -22,11 +22,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ghcr.io/need4deed-org/be:develop
+
+      - name: Publish develop digest for prod release pipeline
+        # infra's release-prod.yaml reads this as ${{ vars.BE_DEVELOP_DIGEST }}
+        # instead of scraping GHCR — be's own image isn't rebuilt for prod,
+        # it just promotes whatever's currently on :develop.
+        # continue-on-error: the dev rollout below must still run even before
+        # the PAT secret this needs exists, or once it's created but expires -
+        # this step failing must never take down deploy-aits's actual job.
+        continue-on-error: true
+        run: gh variable set BE_DEVELOP_DIGEST --org need4deed-org --repos infra --body "${{ steps.build.outputs.digest }}"
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
 
       - name: Roll out new image on AITS
         uses: appleboy/ssh-action@v1

@@ -6,6 +6,11 @@ on:
     paths:
       - data-bootstrap/**
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      digest:
+        description: Digest of the pushed bootstrap image
+        value: ${{ jobs.build.outputs.digest }}
 
 jobs:
   build:
@@ -13,6 +18,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +31,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push bootstrap image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
