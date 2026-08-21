@@ -2,7 +2,7 @@ import { ApiOpportunityAccompanyingDetails, OptionById } from "need4deed-sdk";
 import District from "../../data/entity/location/district.entity";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
-import { formatDate, formatTime } from "../utils";
+import { formatAppointmentDateTime } from "../utils";
 
 export function dtoOpportunityAccompanying(
   accompanying: Accompanying,
@@ -10,15 +10,13 @@ export function dtoOpportunityAccompanying(
   dealLanguage: DealLanguage[] = [],
   district?: District | null,
 ): ApiOpportunityAccompanyingDetails {
+  const { appointmentDate, appointmentTime } =
+    formatAppointmentDateTime(onetimerDate);
+
   return accompanying
     ? {
         appointmentAddress: accompanying.address,
-        ...(onetimerDate
-          ? {
-              appointmentDate: formatDate(onetimerDate),
-              appointmentTime: formatTime(onetimerDate),
-            }
-          : {}),
+        ...(appointmentDate ? { appointmentDate, appointmentTime } : {}),
         refugeeNumber: accompanying.phone,
         refugeeName: accompanying.name,
         appointmentLanguage: accompanying.languageToTranslate,

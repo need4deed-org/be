@@ -485,3 +485,197 @@ describe("PATCH /agent/:id organization details", () => {
     });
   });
 });
+
+// fe#911: a coordinator can create a bare Agent with no linked Person/User,
+// and it must stay invisible to non-coordinator/admin callers until a real
+// registration claims it.
+describe("POST /agent — coordinator-created agent (fe#911)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const createdAgentIds: number[] = [];
+  const createdPersonIds: number[] = [];
+  let coordinatorCookie: string;
+  let agentCookie: string;
+
+  async function login(email: string): Promise<string> {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: "test_password" },
+    });
+    return res.cookies.find((c) => c.name === "access")!.value;
+  }
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const coordinatorEmail = `coordinator-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: coordinatorEmail,
+        password: await hashPassword("test_password"),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+      }),
+    );
+    coordinatorCookie = await login(coordinatorEmail);
+
+    const agentPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: `Agent-${suffix}` }),
+    );
+    createdPersonIds.push(agentPerson.id);
+    const agentEmail = `agentrole-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: agentEmail,
+        password: await hashPassword("test_password"),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentPerson.id,
+      }),
+    );
+    agentCookie = await login(agentEmail);
+  });
+
+  afterAll(async () => {
+    for (const id of createdAgentIds) {
+      await fastify.db.agentRepository.delete({ id });
+    }
+    for (const personId of createdPersonIds) {
+      await fastify.db.userRepository.delete({ personId });
+      await fastify.db.personRepository.delete({ id: personId });
+    }
+    await fastify.db.userRepository.delete({
+      email: `coordinator-${suffix}@test.need4deed.org`,
+    });
+    await fastify.close();
+  });
+
+  it("rejects a non-coordinator/admin caller", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: agentCookie },
+      payload: { title: `Should Not Create ${suffix}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("creates a bare agent with no AgentPerson, hidden from non-privileged GET /agent", async () => {
+    const createRes = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title: `Bare Agent ${suffix}` },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const agentId = createRes.json().data.agentId;
+    createdAgentIds.push(agentId);
+
+    const memberships = await fastify.db.agentPersonRepository.find({
+      where: { agentId },
+    });
+    expect(memberships).toHaveLength(0);
+
+    const asAgent = await fastify.inject({
+      method: "GET",
+      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
+      // (DESC by id) puts the just-created agent reliably on page 1 no matter
+      // how many other agents already exist in the DB.
+      url: "/agent?limit=120&sortOrder=new-old",
+      cookies: { access: agentCookie },
+    });
+    expect(
+      asAgent.json().data.some((a: { id: number }) => a.id === agentId),
+    ).toBe(false);
+
+    const asCoordinator = await fastify.inject({
+      method: "GET",
+      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
+      // (DESC by id) puts the just-created agent reliably on page 1 no matter
+      // how many other agents already exist in the DB.
+      url: "/agent?limit=120&sortOrder=new-old",
+      cookies: { access: coordinatorCookie },
+    });
+    const coordinatorEntry = asCoordinator
+      .json()
+      .data.find((a: { id: number }) => a.id === agentId);
+    expect(coordinatorEntry).toBeDefined();
+    // Regression check: sdk-types.json's ApiAgentGetList schema must declare
+    // `unclaimed`, or fast-json-stringify silently strips it from the wire
+    // response even though dtoAgentGetList sets it (same bug class as be#575).
+    expect(coordinatorEntry.unclaimed).toBe(true);
+
+    // Regression check: `count` must reflect the same filtered set as
+    // `data`, not the unfiltered total — the unclaimed agent just created
+    // is excluded from the where clause itself, not filtered in-memory
+    // after skip/take.
+    expect(asAgent.json().count).toBe(asAgent.json().data.length);
+  });
+
+  it("hides an unclaimed agent from GET /agent/:id for a non-privileged caller, but not a coordinator", async () => {
+    const createRes = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title: `Bare Agent For Get ${suffix}` },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const agentId = createRes.json().data.agentId;
+    createdAgentIds.push(agentId);
+
+    const asAgent = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agentId}`,
+      cookies: { access: agentCookie },
+    });
+    expect(asAgent.statusCode).toBe(404);
+
+    const asCoordinator = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agentId}`,
+      cookies: { access: coordinatorCookie },
+    });
+    expect(asCoordinator.statusCode).toBe(200);
+    expect(asCoordinator.json().data.id).toBe(agentId);
+    expect(asCoordinator.json().data.unclaimed).toBe(true);
+  });
+
+  // createAgentBodySchema no longer declares `phone` (a bare agent has no
+  // linked Person to attach it to) — AJV's project-wide `removeAdditional`
+  // setting means it's now stripped before the handler ever sees it,
+  // rather than being accepted and then silently dropped deep in
+  // createBareAgent as it was before.
+  it("strips an unsupported phone field rather than silently accepting it", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title: `Bare Agent With Phone ${suffix}`, phone: "+491234" },
+    });
+    expect(res.statusCode).toBe(201);
+    createdAgentIds.push(res.json().data.agentId);
+  });
+
+  it("409s on a duplicate title", async () => {
+    const title = `Duplicate Agent ${suffix}`;
+    const first = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title },
+    });
+    expect(first.statusCode).toBe(201);
+    createdAgentIds.push(first.json().data.agentId);
+
+    const second = await fastify.inject({
+      method: "POST",
+      url: "/agent",
+      cookies: { access: coordinatorCookie },
+      payload: { title },
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.json()).toMatchObject({ conflict: "title" });
+  });
+});

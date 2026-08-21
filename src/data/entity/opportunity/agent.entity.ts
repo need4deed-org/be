@@ -152,4 +152,12 @@ export default class Agent {
   @IsOptional()
   @IsString()
   nid?: string;
+
+  // Coordinator/admin-created agent (fe#911) with no linked Person yet.
+  // joinAgent refuses to link anyone to it — claiming it is deferred to a
+  // future, explicitly-reviewed flow (not implemented yet). Distinct from
+  // "zero AgentPerson rows", which pre-existing legacy agents (created via
+  // POST /opportunity/legacy with no rac_email) can also have.
+  @Column({ default: false })
+  unclaimed: boolean;
 }

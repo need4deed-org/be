@@ -1,9 +1,11 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiCommunicationPost, UserRole } from "need4deed-sdk";
+import { NotFoundError } from "../../../config";
 import Communication from "../../../data/entity/communication.entity";
 import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
+import { assertAgentVisible } from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentCommunicationRoutes(
@@ -26,6 +28,12 @@ export default function agentCommunicationRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
+
+      const agent = await fastify.db.agentRepository.findOneBy({ id });
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+      assertAgentVisible(agent, request.authUser?.role);
 
       const communicationRepository = fastify.db.communicationRepository;
       const [communications, count] =

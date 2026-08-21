@@ -1006,6 +1006,12 @@
         "agentId": {
           "type": ["integer", "null"]
         },
+        "appointmentDate": {
+          "type": ["string", "null"]
+        },
+        "appointmentTime": {
+          "type": ["string", "null"]
+        },
         "volunteerNames": {
           "type": "array",
           "items": {
@@ -1029,7 +1035,9 @@
         "location",
         "accompanyingDetails",
         "agentTitle",
-        "agentId"
+        "agentId",
+        "appointmentDate",
+        "appointmentTime"
       ]
     },
     "ApiOpportunityGet": {
@@ -1333,6 +1341,9 @@
         },
         "volunteerSearch": {
           "$ref": "AgentVolunteerSearchType#"
+        },
+        "unclaimed": {
+          "type": "boolean"
         }
       }
     },
@@ -1348,7 +1359,8 @@
         "numActiveVolunteers",
         "numOpportunities",
         "email",
-        "volunteerSearch"
+        "volunteerSearch",
+        "unclaimed"
       ]
     },
     "AgentProps": {
@@ -1476,6 +1488,7 @@
         "numActiveVolunteers",
         "email",
         "volunteerSearch",
+        "unclaimed",
         "createdAt",
         "statusEngagement",
         "agentDetails",
