@@ -15,7 +15,11 @@ import {
   idParamSchema,
 } from "../../schema";
 import { ParamsId } from "../../types";
-import { createAgentContact, updateAgentContact } from "../../utils";
+import {
+  assertAgentVisible,
+  createAgentContact,
+  updateAgentContact,
+} from "../../utils";
 
 // Mirrors the role allowlist on PATCH /opportunity/:id: only these three
 // roles may reach the membership check, regardless of whether a stray
@@ -92,6 +96,7 @@ export default function agentContactRoutes(
       if (!agent) {
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
+      assertAgentVisible(agent, request.authUser?.role);
 
       await assertCanManageContacts(fastify, request, agentId);
 
@@ -129,6 +134,7 @@ export default function agentContactRoutes(
       if (!agent) {
         throw new NotFoundError(`Agent (id:${agentId}) not found.`);
       }
+      assertAgentVisible(agent, request.authUser?.role);
 
       await assertCanManageContacts(fastify, request, agentId);
 

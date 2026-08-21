@@ -1341,6 +1341,9 @@
         },
         "volunteerSearch": {
           "$ref": "AgentVolunteerSearchType#"
+        },
+        "unclaimed": {
+          "type": "boolean"
         }
       }
     },
@@ -1356,7 +1359,8 @@
         "numActiveVolunteers",
         "numOpportunities",
         "email",
-        "volunteerSearch"
+        "volunteerSearch",
+        "unclaimed"
       ]
     },
     "AgentProps": {
@@ -1484,6 +1488,7 @@
         "numActiveVolunteers",
         "email",
         "volunteerSearch",
+        "unclaimed",
         "createdAt",
         "statusEngagement",
         "agentDetails",

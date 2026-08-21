@@ -45,6 +45,9 @@ describe("GET /agent/:id/volunteer-linked", () => {
   let opportunityVolunteer: OpportunityVolunteer;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
+  let agentRolePerson: Person;
+  let agentRoleCookie: string;
+  let unclaimedAgent: Agent;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -122,6 +125,33 @@ describe("GET /agent/:id/volunteer-linked", () => {
       },
     });
     coordinatorCookie = getCookie(loginRes.cookies, accessCookieName);
+
+    agentRolePerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "AgentRole" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `agentrole-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentRolePerson.id,
+      }),
+    );
+    const agentRoleLoginRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `agentrole-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    agentRoleCookie = getCookie(agentRoleLoginRes.cookies, accessCookieName);
+
+    // fe#911: a coordinator-created agent with no linked Person/User yet.
+    unclaimedAgent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Unclaimed Agent ${suffix}`, unclaimed: true }),
+    );
   });
 
   afterAll(async () => {
@@ -134,8 +164,11 @@ describe("GET /agent/:id/volunteer-linked", () => {
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.db.agentRepository.delete({ id: emptyAgent.id });
+    await fastify.db.agentRepository.delete({ id: unclaimedAgent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.userRepository.delete({ personId: agentRolePerson.id });
+    await fastify.db.personRepository.delete({ id: agentRolePerson.id });
     await fastify.close();
   });
 
@@ -177,5 +210,24 @@ describe("GET /agent/:id/volunteer-linked", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().data).toEqual([]);
+  });
+
+  // fe#911: an unclaimed agent must stay invisible to non-coordinator/admin
+  // callers here too, not just on GET /agent/:id — otherwise this route
+  // leaks its existence via a 200 distinguishable from a nonexistent id.
+  it("404s for an unclaimed agent when the caller isn't coordinator/admin, but not for a coordinator", async () => {
+    const asAgentRole = await fastify.inject({
+      method: "GET",
+      url: `/agent/${unclaimedAgent.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: agentRoleCookie },
+    });
+    expect(asAgentRole.statusCode).toBe(404);
+
+    const asCoordinator = await fastify.inject({
+      method: "GET",
+      url: `/agent/${unclaimedAgent.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(asCoordinator.statusCode).toBe(200);
   });
 });

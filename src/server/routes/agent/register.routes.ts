@@ -22,8 +22,6 @@ import {
   responseErrors,
 } from "../../schema";
 import {
-  AgentAddressConflictError,
-  classifyRegisterAgentConflict,
   createAgentForPerson,
   joinAgent,
   resolveJoinStatus,
@@ -102,7 +100,17 @@ export default async function agentRegisterRoutes(
         .leftJoinAndSelect("agent.address", "address")
         .getMany();
 
-      const data = searchAgentCandidates(candidates, street).map((a) => ({
+      // A coordinator-created agent (fe#911) is `unclaimed` — it isn't
+      // claimable through self-registration's JOIN (which auto-approves on an
+      // email-domain match with zero coordinator review); exclude it here so
+      // it can only be linked through a future, explicitly-reviewed flow.
+      // Gating on this flag rather than "zero AgentPerson rows" matters: a
+      // legacy agent (created via POST /opportunity/legacy with no
+      // rac_email) can also have zero AgentPerson rows and must stay
+      // findable through this picker.
+      const claimable = candidates.filter((a) => !a.unclaimed);
+
+      const data = searchAgentCandidates(claimable, street).map((a) => ({
         id: a.id,
         title: a.title,
       }));
@@ -144,47 +152,25 @@ export default async function agentRegisterRoutes(
 
       const body = request.body;
 
-      try {
-        const result =
-          "agentId" in body
-            ? await joinAgent(
-                personId,
-                body.agentId,
-                await resolveJoinStatus(body.agentId, user!.email),
-              )
-            : await createAgentForPerson(personId, body.agent);
+      // joinAgent/createAgentForPerson throw typed BaseError subclasses
+      // (UnauthorizedError, NotFoundError, AgentAddressConflictError,
+      // AgentTitleConflictError) — let them propagate to the global error
+      // handler rather than translating them here.
+      const result =
+        "agentId" in body
+          ? await joinAgent(
+              personId,
+              body.agentId,
+              await resolveJoinStatus(body.agentId, user!.email),
+            )
+          : await createAgentForPerson(personId, body.agent);
 
-        const message =
-          result.membershipStatus === AgentMembershipStatus.PENDING
-            ? "Join request submitted — an administrator will review it."
-            : "Agent registration complete.";
+      const message =
+        result.membershipStatus === AgentMembershipStatus.PENDING
+          ? "Join request submitted — an administrator will review it."
+          : "Agent registration complete.";
 
-        return reply.status(201).send({ message, data: result });
-      } catch (err) {
-        if (err instanceof AgentAddressConflictError) {
-          return reply.status(409).send({
-            message: "An agent at this address already exists.",
-            conflict: "address",
-            agentId: err.agentId,
-          });
-        }
-        if (classifyRegisterAgentConflict(err) === "title") {
-          const title = "agent" in body ? body.agent.title : undefined;
-          const existing = title
-            ? await fastify.db.agentRepository.findOne({ where: { title } })
-            : null;
-          return reply.status(409).send({
-            message: "An agent with this title already exists.",
-            conflict: "title",
-            ...(existing ? { agentId: existing.id } : {}),
-          });
-        }
-        // Don't echo the request body — may contain personal data.
-        logger.error(
-          `register-agent: write failed: ${err instanceof Error ? err.message : err}`,
-        );
-        return reply.status(500).send({ message: "Failed to register agent." });
-      }
+      return reply.status(201).send({ message, data: result });
     },
   );
 }

@@ -4,6 +4,7 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoAgentOpportunity } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
+import { assertAgentVisible } from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default async function agentOpportunityRoutes(
@@ -40,6 +41,7 @@ export default async function agentOpportunityRoutes(
       if (!agent) {
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
+      assertAgentVisible(agent, request.authUser?.role);
 
       // DTO (dtoAgentOpportunity) runs in the preSerialization hook after PII
       // masking of the nested volunteer persons.
