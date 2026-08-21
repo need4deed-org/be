@@ -598,9 +598,14 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
       url: "/agent?limit=120&sortOrder=new-old",
       cookies: { access: coordinatorCookie },
     });
-    expect(
-      asCoordinator.json().data.some((a: { id: number }) => a.id === agentId),
-    ).toBe(true);
+    const coordinatorEntry = asCoordinator
+      .json()
+      .data.find((a: { id: number }) => a.id === agentId);
+    expect(coordinatorEntry).toBeDefined();
+    // Regression check: sdk-types.json's ApiAgentGetList schema must declare
+    // `unclaimed`, or fast-json-stringify silently strips it from the wire
+    // response even though dtoAgentGetList sets it (same bug class as be#575).
+    expect(coordinatorEntry.unclaimed).toBe(true);
 
     // Regression check: `count` must reflect the same filtered set as
     // `data`, not the unfiltered total — the unclaimed agent just created
@@ -634,6 +639,7 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     });
     expect(asCoordinator.statusCode).toBe(200);
     expect(asCoordinator.json().data.id).toBe(agentId);
+    expect(asCoordinator.json().data.unclaimed).toBe(true);
   });
 
   // createAgentBodySchema no longer declares `phone` (a bare agent has no

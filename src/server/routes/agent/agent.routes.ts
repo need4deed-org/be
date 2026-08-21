@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
   AgentMembershipStatus,
+  ApiAgentCreateResponse,
   ApiAgentPatch,
   ApiAgentRegisterNew,
   SortOrder,
@@ -206,7 +207,10 @@ export default async function agentRoutes(
   // (fe#911), for an NGO the coordinator already has details for before it has
   // self-registered. Distinct from POST /agent/register, which always links
   // the authenticated caller's own person.
-  fastify.post<{ Body: ApiAgentRegisterNew }>(
+  fastify.post<{
+    Body: ApiAgentRegisterNew;
+    Reply: ReplyData<ApiAgentCreateResponse>;
+  }>(
     "/",
     {
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),

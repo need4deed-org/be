@@ -56,6 +56,7 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
     email:
       agent.representative?.person?.email || agent.organization?.email || "",
     district: { id: agent.districtId, title: { de: agent?.district?.title } },
+    unclaimed: agent.unclaimed,
   };
 }
 
