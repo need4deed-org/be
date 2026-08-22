@@ -183,4 +183,31 @@ describe("getOpportunityWhere", () => {
       dealLanguage: { language: { id: "3" } },
     });
   });
+
+  // be#888's own repro: activity alone matched 1 row; activity plus a
+  // non-matching language still matched that same 1, because the language
+  // spread silently overwrote the activity spread on the shared `deal` key.
+  // Asserting both constraints survive together is the unit-level proof that
+  // no longer happens.
+  it("keeps both activity and language when combined, matching be#888's repro", () => {
+    const activityOnly = getOpportunityWhere({
+      type: "",
+      status: "",
+      activity: "3",
+    });
+    expect(activityOnly.deal).toEqual({
+      dealActivity: { activity: { id: "3" } },
+    });
+
+    const activityPlusLanguage = getOpportunityWhere({
+      type: "",
+      status: "",
+      activity: "3",
+      language: "9",
+    });
+    expect(activityPlusLanguage.deal).toEqual({
+      dealActivity: { activity: { id: "3" } },
+      dealLanguage: { language: { id: "9" } },
+    });
+  });
 });
