@@ -9,6 +9,7 @@ import {
   Not,
 } from "typeorm";
 import { describe, expect, it } from "vitest";
+import { QuerystringOpportunityFiltering } from "../../../../server/types";
 import { getOpportunityWhere } from "../../../../server/utils/data/get-opportunity-where";
 import { berlinDayBoundaries } from "../../../../services/jobs/german-holidays";
 
@@ -138,6 +139,75 @@ describe("getOpportunityWhere", () => {
       expect(where).toEqual({
         onetimer: { date: MoreThanOrEqual(startOfDay) },
       });
+    });
+  });
+
+  it("keeps every deal constraint when several are combined", () => {
+    const where = getOpportunityWhere({
+      type: "",
+      status: "",
+      language: "1",
+      district: "2",
+      activity: "3",
+      skill: "4",
+    });
+
+    expect(where.deal).toEqual({
+      dealLanguage: { language: { id: "1" } },
+      dealDistrict: { district: { id: "2" } },
+      dealActivity: { activity: { id: "3" } },
+      dealSkill: { skill: { id: "4" } },
+    });
+  });
+
+  // Multiple selections arrive as an array at runtime (?language=3&language=4)
+  // and become In([...]), which TypeORM ORs. The querystring type declares
+  // every filter as `string`, hence the cast, see the
+  // `// TODO: what about arrays?` above QuerystringOpportunityFiltering.
+  it("ORs multiple values within a single filter", () => {
+    const where = getOpportunityWhere({
+      type: "",
+      status: "",
+      language: ["3", "4"],
+    } as unknown as QuerystringOpportunityFiltering["filter"]);
+
+    expect(where.deal).toEqual({
+      dealLanguage: { language: { id: In(["3", "4"]) } },
+    });
+  });
+
+  it("applies only the language constraint when nothing else is selected", () => {
+    const where = getOpportunityWhere({ type: "", status: "", language: "3" });
+
+    expect(where.deal).toEqual({
+      dealLanguage: { language: { id: "3" } },
+    });
+  });
+
+  // be#888's own repro: activity alone matched 1 row; activity plus a
+  // non-matching language still matched that same 1, because the language
+  // spread silently overwrote the activity spread on the shared `deal` key.
+  // Asserting both constraints survive together is the unit-level proof that
+  // no longer happens.
+  it("keeps both activity and language when combined, matching be#888's repro", () => {
+    const activityOnly = getOpportunityWhere({
+      type: "",
+      status: "",
+      activity: "3",
+    });
+    expect(activityOnly.deal).toEqual({
+      dealActivity: { activity: { id: "3" } },
+    });
+
+    const activityPlusLanguage = getOpportunityWhere({
+      type: "",
+      status: "",
+      activity: "3",
+      language: "9",
+    });
+    expect(activityPlusLanguage.deal).toEqual({
+      dealActivity: { activity: { id: "3" } },
+      dealLanguage: { language: { id: "9" } },
     });
   });
 });

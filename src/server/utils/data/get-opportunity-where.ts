@@ -101,12 +101,46 @@ function getTypeWhere(
     : {};
 }
 
+// language, district, activity and skill all constrain the same `deal`
+// relation, so they must accumulate onto one shared `deal` key rather than
+// each writing their own top-level spread — two spreads with the same key
+// have the second replace the first, silently dropping the earlier
+// constraint. Mirrors get-volunteer-where.ts's identical dealFilter.
+function getDealWhere(
+  filter: QuerystringOpportunityFiltering["filter"],
+): Record<string, unknown> {
+  const dealFilter: Record<string, unknown> = {};
+  if (filter?.language) {
+    dealFilter.dealLanguage = {
+      language: { id: normalizeStringArrayInput(filter.language) },
+    };
+  }
+  if (filter?.district) {
+    dealFilter.dealDistrict = {
+      district: { id: normalizeStringArrayInput(filter.district) },
+    };
+  }
+  if (filter?.activity) {
+    dealFilter.dealActivity = {
+      activity: { id: normalizeStringArrayInput(filter.activity) },
+    };
+  }
+  if (filter?.skill) {
+    dealFilter.dealSkill = {
+      skill: { id: normalizeStringArrayInput(filter.skill) },
+    };
+  }
+  return dealFilter;
+}
+
 // SECURITY (#666): filters run on unmasked DB columns, so a non-privileged
 // caller can infer PII masked in the response by probing which rows match.
 export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   appointment?: OpportunityAppointmentFilter,
 ): FindOptionsWhere<Opportunity> {
+  const dealFilter = getDealWhere(filter);
+
   return {
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
@@ -120,38 +154,6 @@ export function getOpportunityWhere(
           title: ILike(`%${filter.search}%`),
         }
       : {}),
-    ...(filter?.language
-      ? {
-          deal: {
-            dealLanguage: {
-              language: {
-                id: normalizeStringArrayInput(filter.language),
-              },
-            },
-          },
-        }
-      : {}),
-    ...(filter?.district
-      ? {
-          deal: {
-            dealDistrict: {
-              district: {
-                id: normalizeStringArrayInput(filter.district),
-              },
-            },
-          },
-        }
-      : {}),
-    ...(filter?.activity
-      ? {
-          deal: {
-            dealActivity: {
-              activity: {
-                id: normalizeStringArrayInput(filter.activity),
-              },
-            },
-          },
-        }
-      : {}),
+    ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
   } as FindOptionsWhere<Opportunity>;
 }
