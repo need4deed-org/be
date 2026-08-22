@@ -4,8 +4,12 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoAgentOpportunity } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { assertAgentVisible, shouldMaskInactiveAgentData } from "../../utils";
-import { maskFields, PERSON_PII_FIELDS } from "../../utils/pii/mask";
+import {
+  assertAgentVisible,
+  maskVolunteerIdentities,
+  shouldMaskInactiveAgentData,
+} from "../../utils";
+import { maskFields } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default async function agentOpportunityRoutes(
@@ -50,24 +54,14 @@ export default async function agentOpportunityRoutes(
       // preSerialization hook's PII masking + DTO transform, same as that
       // hook's own masking order.
       if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
-        for (const opportunity of agent.opportunity ?? []) {
+        // .filter(Boolean): the findOne above joins several sibling
+        // one-to-many relations in one query, which can hydrate nulls into
+        // a collection like agent.opportunity.
+        for (const opportunity of (agent.opportunity ?? []).filter(Boolean)) {
           maskFields(opportunity as unknown as Record<string, unknown>, [
             "title",
           ]);
-          // .filter(Boolean): a multi-relation join (opportunity.deal.* +
-          // opportunity.opportunityVolunteer in one findOne) can hydrate
-          // nulls into this array — dtoAgentOpportunity already guards the
-          // same array below for the same reason.
-          for (const ov of (opportunity.opportunityVolunteer ?? []).filter(
-            Boolean,
-          )) {
-            if (ov.volunteer?.person) {
-              maskFields(
-                ov.volunteer.person as unknown as Record<string, unknown>,
-                PERSON_PII_FIELDS,
-              );
-            }
-          }
+          maskVolunteerIdentities(opportunity.opportunityVolunteer ?? []);
         }
       }
 

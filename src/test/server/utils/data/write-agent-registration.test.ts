@@ -1,4 +1,8 @@
-import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  AgentMembershipStatus,
+  AgentRoleType,
+} from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundError } from "../../../../config";
 import AgentLanguage from "../../../../data/entity/m2m/agent-language";
@@ -383,6 +387,22 @@ describe("joinAgent", () => {
     ).rejects.toThrow(
       "This agent has not been claimed yet and cannot be joined directly.",
     );
+    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+  });
+
+  // be#885: excluding an INACTIVE agent from the /search picker isn't enough
+  // on its own either, for the same reason as unclaimed above — this route
+  // takes agentId directly from the client.
+  it("rejects joining an INACTIVE agent", async () => {
+    agentRepoFindOne.mockResolvedValueOnce({
+      id: 33,
+      unclaimed: false,
+      engagementStatus: AgentEngagementStatusType.INACTIVE,
+    });
+
+    await expect(
+      joinAgent(11, 33, AgentMembershipStatus.PENDING),
+    ).rejects.toThrow("This agent is inactive and cannot be joined.");
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
   });
 

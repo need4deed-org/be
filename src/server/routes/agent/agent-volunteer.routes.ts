@@ -4,8 +4,11 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { assertAgentVisible, shouldMaskInactiveAgentData } from "../../utils";
-import { maskFields, PERSON_PII_FIELDS } from "../../utils/pii/mask";
+import {
+  assertAgentVisible,
+  maskVolunteerIdentities,
+  shouldMaskInactiveAgentData,
+} from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
@@ -57,14 +60,7 @@ export default function agentVolunteerRoutes(
       // actionable data (be#885) — mask volunteer identity for everyone
       // except coordinator/admin.
       if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
-        for (const ov of volunteers) {
-          if (ov.volunteer?.person) {
-            maskFields(
-              ov.volunteer.person as unknown as Record<string, unknown>,
-              PERSON_PII_FIELDS,
-            );
-          }
-        }
+        maskVolunteerIdentities(volunteers);
       }
 
       // DTO runs in the preSerialization hook after PII masking.
