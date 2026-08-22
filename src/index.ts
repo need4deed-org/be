@@ -17,8 +17,19 @@ export async function start() {
     // onClose hook, closing the DB connection.
     const shutdown = async (signal: string) => {
       logger.info(`Received ${signal}, shutting down...`);
-      await server.close();
-      process.exit(0);
+      // A hung close (slow query, in-flight upload, cron scan) must not
+      // reintroduce the same ride-out-the-grace-period bug this fix is for.
+      const forceExit = setTimeout(() => process.exit(1), 10_000);
+      try {
+        await server.close();
+      } catch (err) {
+        logger.error(err);
+      } finally {
+        clearTimeout(forceExit);
+        // pino-pretty runs on a worker thread; process.exit right after
+        // close() can race its flush and drop the final log lines.
+        logger.flush(() => process.exit(0));
+      }
     };
     process.on("SIGTERM", () => shutdown("SIGTERM"));
     process.on("SIGINT", () => shutdown("SIGINT"));

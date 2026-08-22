@@ -59,6 +59,9 @@ jobs:
             # 120s was too tight for a legitimately slow-but-healthy cold start
             # (observed ~85s just to bring up TypeORM/Fastify under this
             # container's cpu limit) — the rollout succeeded but CI still
-            # reported failure. startupProbe (infra/base/be/deployment.yaml)
-            # now absorbs that variance too; this is just matching slack.
-            kubectl rollout status deployment/be -n n4d-dev --timeout=300s
+            # reported failure. infra/base/be/deployment.yaml's startupProbe
+            # now absorbs that variance (worst case ~180s before it gives up),
+            # so this only needs to clear that ceiling plus one readiness
+            # check — not open all the way to 300s, which would blunt be#868's
+            # fast-fail on a genuinely stuck/unschedulable rollout.
+            kubectl rollout status deployment/be -n n4d-dev --timeout=220s
