@@ -133,6 +133,30 @@ async function jwtPlugin(
       }
     };
   });
+
+  // Best-effort caller identification for genuinely public routes that still
+  // need to vary behavior for a logged-in privileged caller (be#903: GET
+  // /event shows everything to a coordinator, only active events to everyone
+  // else). Unlike authenticate(), never throws — a missing/invalid/expired
+  // cookie just leaves request.authUser unset, same as an anonymous caller.
+  // Doesn't support the API-key path or role/allowSelf options: those only
+  // make sense for a route that actually requires auth.
+  fastify.decorate("tryAuthenticate", function () {
+    return async function (request: FastifyRequest) {
+      try {
+        await request.jwtVerify();
+      } catch {
+        return;
+      }
+
+      const user = await fastify.db.userRepository.findOne({
+        where: { id: request.user?.id },
+      });
+      if (user) {
+        request.authUser = user;
+      }
+    };
+  });
 }
 
 export default fp(jwtPlugin, {
