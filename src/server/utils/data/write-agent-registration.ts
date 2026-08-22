@@ -1,4 +1,5 @@
 import {
+  AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
   ApiAgentRegisterNew,
@@ -285,6 +286,14 @@ export async function joinAgent(
     throw new UnauthorizedError(
       "This agent has not been claimed yet and cannot be joined directly.",
     );
+  }
+  // An INACTIVE agent (be#885) isn't offered by the /search picker either,
+  // for the same reason: a new registrant shouldn't be routed toward an NGO
+  // that's been marked inactive. Same bypass risk as unclaimed above — this
+  // route takes agentId directly from the client, so the /search exclusion
+  // alone doesn't stop a direct join.
+  if (agent.engagementStatus === AgentEngagementStatusType.INACTIVE) {
+    throw new UnauthorizedError("This agent is inactive and cannot be joined.");
   }
 
   const existing = await repo.findOne({

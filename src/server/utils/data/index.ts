@@ -18,6 +18,7 @@ export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./is-trusted-domain";
+export * from "./mask-inactive-agent";
 export * from "./run-w-advisory-lock";
 export * from "./sync-comment-tags";
 export * from "./update-agent-contact";

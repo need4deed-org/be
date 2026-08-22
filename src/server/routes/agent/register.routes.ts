@@ -6,6 +6,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import {
+  AgentEngagementStatusType,
   AgentMembershipStatus,
   ApiAgentRegister,
   UserRole,
@@ -108,7 +109,16 @@ export default async function agentRegisterRoutes(
       // legacy agent (created via POST /opportunity/legacy with no
       // rac_email) can also have zero AgentPerson rows and must stay
       // findable through this picker.
-      const claimable = candidates.filter((a) => !a.unclaimed);
+      // An INACTIVE agent (be#885) is excluded too — a new registrant
+      // shouldn't be routed toward an NGO that's been marked inactive. Read
+      // live off the just-fetched `engagementStatus` (not snapshotted), so
+      // flipping the status back to ACTIVE immediately makes it findable
+      // again on the next search.
+      const claimable = candidates.filter(
+        (a) =>
+          !a.unclaimed &&
+          a.engagementStatus !== AgentEngagementStatusType.INACTIVE,
+      );
 
       const data = searchAgentCandidates(claimable, street).map((a) => ({
         id: a.id,
