@@ -8,7 +8,10 @@ import Person from "../../../data/entity/person.entity";
 import { CallerVisibility } from "./visible-persons";
 
 // PII columns masked for callers not permitted to see the owning Person.
-const PERSON_PII_FIELDS = [
+// Exported for reuse by the INACTIVE-agent masking (be#885), which needs the
+// same "hide a volunteer's identity" field set but is gated on the agent's
+// engagementStatus rather than personIds visibility.
+export const PERSON_PII_FIELDS = [
   "firstName",
   "middleName",
   "lastName",
@@ -30,7 +33,7 @@ export function maskString(): string {
   return `${c}***`;
 }
 
-function maskFields(
+export function maskFields(
   obj: Record<string, unknown>,
   fields: readonly string[],
 ): void {

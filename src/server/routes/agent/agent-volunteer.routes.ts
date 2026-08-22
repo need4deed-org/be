@@ -1,10 +1,12 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { AgentEngagementStatusType, UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
 import { assertAgentVisible } from "../../utils";
+import { maskFields, PERSON_PII_FIELDS } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
@@ -51,6 +53,28 @@ export default function agentVolunteerRoutes(
           "volunteer.deal.dealDistrict.district",
         ],
       });
+
+      // An INACTIVE agent's linked volunteers shouldn't read as live,
+      // actionable data (be#885) — mask volunteer identity for everyone
+      // except coordinator/admin. Read live off the just-fetched
+      // engagementStatus, not a snapshot: flipping the agent back to ACTIVE
+      // unmasks its next load.
+      const role = request.authUser?.role;
+      const isPrivileged =
+        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      if (
+        agent.engagementStatus === AgentEngagementStatusType.INACTIVE &&
+        !isPrivileged
+      ) {
+        for (const ov of volunteers) {
+          if (ov.volunteer?.person) {
+            maskFields(
+              ov.volunteer.person as unknown as Record<string, unknown>,
+              PERSON_PII_FIELDS,
+            );
+          }
+        }
+      }
 
       // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({

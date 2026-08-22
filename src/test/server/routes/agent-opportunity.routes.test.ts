@@ -7,8 +7,6 @@ import {
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
   UserRole,
-  VolunteerStateCommunicationType,
-  VolunteerStateEngagementType,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
@@ -37,11 +35,13 @@ function getCookie(
   return cookie;
 }
 
-describe("GET /agent/:id/volunteer-linked", () => {
+// be#885: an INACTIVE agent's opportunities/volunteers shouldn't read as
+// live, actionable data — title and linked-volunteer identity get masked,
+// live off the agent's current engagementStatus.
+describe("GET /agent/:id/opportunity-linked", () => {
   let fastify: FastifyInstance;
 
   let agent: Agent;
-  let emptyAgent: Agent;
   let opportunity: Opportunity;
   let deal: Deal;
   let person: Person;
@@ -51,7 +51,6 @@ describe("GET /agent/:id/volunteer-linked", () => {
   let coordinatorCookie: string;
   let agentRolePerson: Person;
   let agentRoleCookie: string;
-  let unclaimedAgent: Agent;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -60,10 +59,10 @@ describe("GET /agent/:id/volunteer-linked", () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
     agent = await fastify.db.agentRepository.save(
-      new Agent({ title: `Test Agent ${suffix}` }),
-    );
-    emptyAgent = await fastify.db.agentRepository.save(
-      new Agent({ title: `Test Agent (no volunteers) ${suffix}` }),
+      new Agent({
+        title: `Test Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
     );
 
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
@@ -86,8 +85,6 @@ describe("GET /agent/:id/volunteer-linked", () => {
         personId: person.id,
         dealId: deal.id,
         statusType: ProfileVolunteeringType.REGULAR,
-        statusEngagement: VolunteerStateEngagementType.ACTIVE,
-        statusCommunication: VolunteerStateCommunicationType.CALLED,
       }),
     );
 
@@ -152,15 +149,10 @@ describe("GET /agent/:id/volunteer-linked", () => {
     });
     agentRoleCookie = getCookie(agentRoleLoginRes.cookies, accessCookieName);
 
-    // fe#911: a coordinator-created agent with no linked Person/User yet.
-    unclaimedAgent = await fastify.db.agentRepository.save(
-      new Agent({ title: `Test Unclaimed Agent ${suffix}`, unclaimed: true }),
-    );
-
-    // Real membership on `agent` (not just an AGENT-role account) — the
-    // be#885 tests below need a caller with genuine pre-existing visibility
-    // into this agent's volunteers, so any masking observed there comes from
-    // the engagementStatus check under test, not the unrelated personIds-based
+    // Real membership on `agent` (not just an AGENT-role account) — this
+    // caller must have genuine pre-existing visibility into the agent's
+    // volunteers, so any masking observed in the tests below comes from the
+    // engagementStatus check under test, not the unrelated personIds-based
     // PII visibility rules.
     await fastify.db.agentPersonRepository.save(
       new AgentPerson({
@@ -182,8 +174,6 @@ describe("GET /agent/:id/volunteer-linked", () => {
     await fastify.db.personRepository.delete({ id: person.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
-    await fastify.db.agentRepository.delete({ id: emptyAgent.id });
-    await fastify.db.agentRepository.delete({ id: unclaimedAgent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.db.userRepository.delete({ personId: agentRolePerson.id });
@@ -191,102 +181,60 @@ describe("GET /agent/:id/volunteer-linked", () => {
     await fastify.close();
   });
 
-  it("returns the full volunteer shape for a volunteer matched via the agent's opportunity", async () => {
+  it("returns the opportunity and volunteer identity unmasked while the agent is ACTIVE", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: `/agent/${agent.id}/volunteer-linked`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-
-    expect(res.statusCode).toBe(200);
-    const { data } = res.json();
-    expect(data).toHaveLength(1);
-
-    const [item] = data;
-    expect(item.id).toBe(opportunityVolunteer.id);
-    expect(item.volunteerId).toBe(volunteer.id);
-    expect(item.opportunityId).toBe(opportunity.id);
-    expect(item.status).toBe(OpportunityVolunteerStatusType.PENDING);
-    // These are exactly the fields the broken schema ref used to strip.
-    expect(item.name).toBe("Test Volunteer");
-    expect(item.avatarUrl).toBe("https://cdn.need4deed.org/test-avatar.png");
-    expect(item.volunteeringType).toBe(ProfileVolunteeringType.REGULAR);
-    expect(item.engagement).toBe(VolunteerStateEngagementType.ACTIVE);
-    expect(item.communication).toBe(VolunteerStateCommunicationType.CALLED);
-    expect(item.activities).toEqual([]);
-    expect(item.skills).toEqual([]);
-    expect(item.languages).toEqual([]);
-    expect(item.availability).toEqual([]);
-    expect(item.locations).toEqual([]);
-  });
-
-  it("returns an empty array for an agent with no matched volunteers", async () => {
-    const res = await fastify.inject({
-      method: "GET",
-      url: `/agent/${emptyAgent.id}/volunteer-linked`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.json().data).toEqual([]);
-  });
-
-  // fe#911: an unclaimed agent must stay invisible to non-coordinator/admin
-  // callers here too, not just on GET /agent/:id — otherwise this route
-  // leaks its existence via a 200 distinguishable from a nonexistent id.
-  it("404s for an unclaimed agent when the caller isn't coordinator/admin, but not for a coordinator", async () => {
-    const asAgentRole = await fastify.inject({
-      method: "GET",
-      url: `/agent/${unclaimedAgent.id}/volunteer-linked`,
+      url: `/agent/${agent.id}/opportunity-linked`,
       cookies: { [accessCookieName]: agentRoleCookie },
     });
-    expect(asAgentRole.statusCode).toBe(404);
 
-    const asCoordinator = await fastify.inject({
-      method: "GET",
-      url: `/agent/${unclaimedAgent.id}/volunteer-linked`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-    expect(asCoordinator.statusCode).toBe(200);
+    expect(res.statusCode).toBe(200);
+    const [item] = res.json().data;
+    expect(item.title).toBe(opportunity.title);
+    expect(item.volunteers[0].name).toBe("Test Volunteer");
   });
 
-  // be#885: an INACTIVE agent's linked volunteers shouldn't read as live,
-  // actionable data — driven live off engagementStatus, not a snapshot.
-  it("masks volunteer identity for a non-coordinator once the agent is INACTIVE, but not for a coordinator, and unmasks again once ACTIVE", async () => {
+  it("masks title and volunteer identity for a non-coordinator once the agent is INACTIVE", async () => {
     await fastify.db.agentRepository.update(agent.id, {
       engagementStatus: AgentEngagementStatusType.INACTIVE,
     });
 
-    const asMember = await fastify.inject({
+    const res = await fastify.inject({
       method: "GET",
-      url: `/agent/${agent.id}/volunteer-linked`,
+      url: `/agent/${agent.id}/opportunity-linked`,
       cookies: { [accessCookieName]: agentRoleCookie },
     });
-    expect(asMember.statusCode).toBe(200);
-    const [maskedItem] = asMember.json().data;
-    // .name joins firstName + lastName, so a masked person renders as two
-    // masked tokens (each independently masked, per existing PII masking).
-    expect(maskedItem.name).toMatch(/^[a-z]\*\*\* [a-z]\*\*\*$/);
-    expect(maskedItem.avatarUrl).toMatch(/^[a-z]\*\*\*$/);
 
+    expect(res.statusCode).toBe(200);
+    const [item] = res.json().data;
+    expect(item.title).toMatch(/^[a-z]\*\*\*$/);
+    expect(item.title).not.toBe(opportunity.title);
+    expect(item.volunteers[0].name).not.toBe("Test Volunteer");
+
+    // Coordinator keeps full visibility regardless of engagementStatus.
     const asCoordinator = await fastify.inject({
       method: "GET",
-      url: `/agent/${agent.id}/volunteer-linked`,
+      url: `/agent/${agent.id}/opportunity-linked`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     const [coordinatorItem] = asCoordinator.json().data;
-    expect(coordinatorItem.name).toBe("Test Volunteer");
+    expect(coordinatorItem.title).toBe(opportunity.title);
+    expect(coordinatorItem.volunteers[0].name).toBe("Test Volunteer");
+  });
 
+  it("unmasks again immediately once the agent flips back to ACTIVE", async () => {
     await fastify.db.agentRepository.update(agent.id, {
       engagementStatus: AgentEngagementStatusType.ACTIVE,
     });
 
-    const asMemberAfterReactivation = await fastify.inject({
+    const res = await fastify.inject({
       method: "GET",
-      url: `/agent/${agent.id}/volunteer-linked`,
+      url: `/agent/${agent.id}/opportunity-linked`,
       cookies: { [accessCookieName]: agentRoleCookie },
     });
-    const [unmaskedItem] = asMemberAfterReactivation.json().data;
-    expect(unmaskedItem.name).toBe("Test Volunteer");
+
+    const [item] = res.json().data;
+    expect(item.title).toBe(opportunity.title);
+    expect(item.volunteers[0].name).toBe("Test Volunteer");
   });
 });
