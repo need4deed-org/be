@@ -4,6 +4,7 @@ export * from "./add-comments-entity";
 export * from "./add-district-to-agent";
 export * from "./add-district-to-opp";
 export * from "./assert-agent-visible";
+export * from "./mask-inactive-agent";
 export * from "./create-agent-contact";
 export * from "./for-routes";
 export * from "./get-agent-by-postcode";

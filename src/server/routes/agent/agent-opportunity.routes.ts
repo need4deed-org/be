@@ -1,11 +1,10 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { AgentEngagementStatusType, UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoAgentOpportunity } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { assertAgentVisible } from "../../utils";
+import { assertAgentVisible, shouldMaskInactiveAgentData } from "../../utils";
 import { maskFields, PERSON_PII_FIELDS } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
@@ -47,23 +46,21 @@ export default async function agentOpportunityRoutes(
 
       // An INACTIVE agent's opportunities shouldn't read as live, actionable
       // data (be#885) — mask title + linked-volunteer identity for everyone
-      // except coordinator/admin. Read live off the just-fetched
-      // engagementStatus, not a snapshot: flipping the agent back to ACTIVE
-      // unmasks its next load. Runs on the entity graph, ahead of the
+      // except coordinator/admin. Runs on the entity graph, ahead of the
       // preSerialization hook's PII masking + DTO transform, same as that
       // hook's own masking order.
-      const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-      if (
-        agent.engagementStatus === AgentEngagementStatusType.INACTIVE &&
-        !isPrivileged
-      ) {
+      if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
         for (const opportunity of agent.opportunity ?? []) {
           maskFields(opportunity as unknown as Record<string, unknown>, [
             "title",
           ]);
-          for (const ov of opportunity.opportunityVolunteer ?? []) {
+          // .filter(Boolean): a multi-relation join (opportunity.deal.* +
+          // opportunity.opportunityVolunteer in one findOne) can hydrate
+          // nulls into this array — dtoAgentOpportunity already guards the
+          // same array below for the same reason.
+          for (const ov of (opportunity.opportunityVolunteer ?? []).filter(
+            Boolean,
+          )) {
             if (ov.volunteer?.person) {
               maskFields(
                 ov.volunteer.person as unknown as Record<string, unknown>,
