@@ -40,7 +40,7 @@ export default async function eventRoutes(
       });
 
       const data = events
-        .map((event) => dtoEventN4DGetList(event, language))
+        .map((event) => dtoEventN4DGetList(event, language, isPrivileged))
         .filter((event): event is ApiEventN4DGetList => event !== null);
 
       return reply

@@ -209,15 +209,23 @@ describe("GET /event", () => {
     expect(ids).not.toContain(inactiveEvent.id);
   });
 
-  it("shows every event, including inactive ones, to a coordinator", async () => {
+  it("shows every event, including inactive and untranslated ones, to a coordinator", async () => {
     const res = await fastify.inject({
       method: "GET",
       url: "/event",
       cookies: { [accessCookieName]: coordinatorCookie },
     });
-    const ids = res.json().data.map((e: { id: number }) => e.id);
+    const data = res.json().data;
+    const ids = data.map((e: { id: number }) => e.id);
     expect(ids).toContain(activeEvent.id);
     expect(ids).toContain(inactiveEvent.id);
+    // A coordinator must still see an untranslated event to translate it —
+    // it just renders with blank text instead of disappearing.
+    expect(ids).toContain(untranslatedEvent.id);
+    const untranslated = data.find(
+      (e: { id: number }) => e.id === untranslatedEvent.id,
+    );
+    expect(untranslated.title).toBe("");
   });
 
   it("resolves the German translation by default and the English one when requested", async () => {
@@ -249,5 +257,29 @@ describe("GET /event", () => {
     // Only a German translation exists for this event; requesting English
     // still returns it rather than dropping the event.
     expect(event.menuTitle).toBe("Altes Event");
+  });
+
+  it("does not grant privileged access from a validly-signed non-access token (e.g. an email-verification token)", async () => {
+    // Mirrors sendEmailVerification's payload shape exactly — same secret,
+    // same coordinator id, but type: "verify" instead of "access", and (like
+    // the real verify token) no expiry at all.
+    const verifyToken = fastify.jwt.sign({
+      id: (
+        await fastify.db.userRepository.findOneByOrFail({
+          personId: coordinatorPerson.id,
+        })
+      ).id,
+      email: "irrelevant@test.need4deed.org",
+      type: "verify",
+    });
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/event",
+      cookies: { [accessCookieName]: verifyToken },
+    });
+
+    const ids = res.json().data.map((e: { id: number }) => e.id);
+    expect(ids).not.toContain(inactiveEvent.id);
   });
 });
