@@ -182,11 +182,13 @@ describe("GET /event", () => {
     await fastify.close();
   });
 
-  it("responds with the standard {message, data} envelope", async () => {
+  it("responds with the standard {message, data, count} envelope", async () => {
     const res = await fastify.inject({ method: "GET", url: "/event" });
     expect(res.statusCode).toBe(200);
-    expect(typeof res.json().message).toBe("string");
-    expect(Array.isArray(res.json().data)).toBe(true);
+    const body = res.json();
+    expect(typeof body.message).toBe("string");
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.count).toBe(body.data.length);
   });
 
   it("shows only active events to an anonymous caller, excluding one with no translations", async () => {

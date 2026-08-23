@@ -41,15 +41,14 @@ const eventItemSchema = {
   additionalProperties: false,
 };
 
-// No count — this list isn't paginated (matches ReplyData<T>, not
-// ReplyDataCount<T>).
 export const eventListResponseSchema = {
   200: {
     type: "object",
-    required: ["message", "data"],
+    required: ["message", "data", "count"],
     properties: {
       message: { type: "string" },
       data: { type: "array", items: eventItemSchema },
+      count: { type: "integer" },
     },
     additionalProperties: false,
   },
