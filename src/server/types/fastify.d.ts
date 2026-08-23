@@ -9,6 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Communication from "../../data/entity/communication.entity";
 import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
+import EventN4D from "../../data/entity/event/event.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
@@ -41,6 +42,7 @@ declare module "fastify" {
       optionRepository: Repository<Option>;
       commentRepository: Repository<Comment>;
       documentRepository: Repository<Document>;
+      eventRepository: Repository<EventN4D>;
       opportunityEventRegistrationRepository: Repository<OpportunityEventRegistration>;
       communicationRepository: Repository<Communication>;
       activityLogRepository: Repository<ActivityLog>;
@@ -59,6 +61,7 @@ declare module "fastify" {
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
+    tryAuthenticate(): onRequestHookHandler;
   }
   interface FastifyRequest {
     resolvedPerson?: Person; // Optional resolved person for account creation

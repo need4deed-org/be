@@ -1,6 +1,7 @@
 export * from "./agent-contact.schema";
 export * from "./agent-membership.schema";
 export * from "./agent-register.schema";
+export * from "./event.schema";
 export * from "./param";
 export * from "./person.schema";
 export * from "./querystring";

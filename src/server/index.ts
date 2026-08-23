@@ -20,6 +20,7 @@ import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
+import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
 import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
@@ -219,6 +220,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(communicationRoutes, {
     prefix: RoutePrefix.COMMUNICATION,
   });
+  await fastifyInstance.register(eventRoutes, { prefix: RoutePrefix.EVENT });
   await fastifyInstance.register(activityLogRoutes, {
     prefix: RoutePrefix.ACTIVITY_LOG,
   });
