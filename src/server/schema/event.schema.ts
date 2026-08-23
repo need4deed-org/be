@@ -1,4 +1,5 @@
 import { EventN4DType } from "need4deed-sdk";
+import { getRef } from "../utils";
 import { responseErrors } from "./responseErrors";
 
 // Item shape for GET /event (SDK ApiEventN4DGetList). Inline, not $ref'd —
@@ -51,6 +52,71 @@ export const eventListResponseSchema = {
       message: { type: "string" },
       data: { type: "array", items: eventItemSchema },
       count: { type: "integer" },
+    },
+    additionalProperties: false,
+  },
+  ...responseErrors,
+};
+
+// Body for POST /event (SDK ApiEventN4DTranslationInput).
+const eventTranslationInputSchema = {
+  type: "object",
+  properties: {
+    language: getRef("Lang#"),
+    title: { type: "string", minLength: 1 },
+    subTitle: { type: "string" },
+    menuTitle: { type: "string", minLength: 1 },
+    time: { type: "string" },
+    locationComment: { type: "string" },
+    description: { type: "string", minLength: 1 },
+    shortDescription: { type: "string", minLength: 1 },
+    additionalTitle: { type: "string" },
+    additionalInfo: { type: "array", items: { type: "string" } },
+    outro: { type: "string" },
+    followUpText: { type: "string" },
+  },
+  required: [
+    "language",
+    "title",
+    "menuTitle",
+    "description",
+    "shortDescription",
+  ],
+  additionalProperties: false,
+};
+
+// Body for POST /event (SDK ApiEventN4DCreate). translations requires at
+// least one entry — enforced here rather than in application code.
+export const eventCreateBodySchema = {
+  type: "object",
+  properties: {
+    date: { type: "string", format: "date-time" },
+    dateEnd: { type: "string", format: "date-time" },
+    type: { type: "string", enum: Object.values(EventN4DType) },
+    pic: { type: "string" },
+    locationLink: { type: "string" },
+    linkRSVP: { type: "string" },
+    followUpLink: { type: "string" },
+    address: { type: "string", minLength: 1 },
+    hostName: { type: "string" },
+    active: { type: "boolean" },
+    translations: {
+      type: "array",
+      items: eventTranslationInputSchema,
+      minItems: 1,
+    },
+  },
+  required: ["date", "type", "linkRSVP", "address", "translations"],
+  additionalProperties: false,
+};
+
+export const eventCreateResponseSchema = {
+  201: {
+    type: "object",
+    required: ["message", "data"],
+    properties: {
+      message: { type: "string" },
+      data: eventItemSchema,
     },
     additionalProperties: false,
   },
