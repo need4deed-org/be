@@ -24,6 +24,7 @@ export * from "./sync-comment-tags";
 export * from "./update-agent-contact";
 export * from "./update-leads";
 export * from "./write-agent-registration";
+export * from "./write-event";
 export * from "./write-opportunity-contact-comment";
 export * from "./write-opportunity-legacy";
 export * from "./write-volunteer-legacy";
