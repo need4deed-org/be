@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiEventN4DGetList, Lang, UserRole } from "need4deed-sdk";
 import { dtoEventN4DGetList } from "../../services";
 import { eventListResponseSchema, langQuerySchema } from "../schema";
-import { QuerystringEventGetList } from "../types";
+import { QuerystringEventGetList, ReplyData } from "../types";
 import { getLanguageCode } from "../utils";
 
 export default async function eventRoutes(
@@ -17,7 +17,7 @@ export default async function eventRoutes(
   // request.authUser from a cookie if one is present, but never requires it.
   fastify.get<{
     Querystring: QuerystringEventGetList;
-    Reply: ApiEventN4DGetList[];
+    Reply: ReplyData<ApiEventN4DGetList[]>;
   }>(
     "/",
     {
@@ -43,7 +43,7 @@ export default async function eventRoutes(
         .map((event) => dtoEventN4DGetList(event, language))
         .filter((event): event is ApiEventN4DGetList => event !== null);
 
-      return reply.status(200).send(data);
+      return reply.status(200).send({ message: "Events.", data });
     },
   );
 }

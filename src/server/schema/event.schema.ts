@@ -41,12 +41,17 @@ const eventItemSchema = {
   additionalProperties: false,
 };
 
-// GET /event replies with a bare array, not the usual {message, data, count}
-// envelope — website's useEvents hook (the only real caller today) parses
-// the response body directly as EventN4D[], predating this route's
-// implementation. Matching that rather than the rest of this API's
-// convention is deliberate here, not an oversight.
+// No count — this list isn't paginated (matches ReplyData<T>, not
+// ReplyDataCount<T>).
 export const eventListResponseSchema = {
-  200: { type: "array", items: eventItemSchema },
+  200: {
+    type: "object",
+    required: ["message", "data"],
+    properties: {
+      message: { type: "string" },
+      data: { type: "array", items: eventItemSchema },
+    },
+    additionalProperties: false,
+  },
   ...responseErrors,
 };

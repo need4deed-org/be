@@ -182,15 +182,16 @@ describe("GET /event", () => {
     await fastify.close();
   });
 
-  it("responds with a bare array, not the usual {message, data} envelope", async () => {
+  it("responds with the standard {message, data} envelope", async () => {
     const res = await fastify.inject({ method: "GET", url: "/event" });
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json())).toBe(true);
+    expect(typeof res.json().message).toBe("string");
+    expect(Array.isArray(res.json().data)).toBe(true);
   });
 
   it("shows only active events to an anonymous caller, excluding one with no translations", async () => {
     const res = await fastify.inject({ method: "GET", url: "/event" });
-    const ids = res.json().map((e: { id: number }) => e.id);
+    const ids = res.json().data.map((e: { id: number }) => e.id);
     expect(ids).toContain(activeEvent.id);
     expect(ids).not.toContain(inactiveEvent.id);
     expect(ids).not.toContain(untranslatedEvent.id);
@@ -202,7 +203,7 @@ describe("GET /event", () => {
       url: "/event",
       cookies: { [accessCookieName]: volunteerCookie },
     });
-    const ids = res.json().map((e: { id: number }) => e.id);
+    const ids = res.json().data.map((e: { id: number }) => e.id);
     expect(ids).not.toContain(inactiveEvent.id);
   });
 
@@ -212,7 +213,7 @@ describe("GET /event", () => {
       url: "/event",
       cookies: { [accessCookieName]: coordinatorCookie },
     });
-    const ids = res.json().map((e: { id: number }) => e.id);
+    const ids = res.json().data.map((e: { id: number }) => e.id);
     expect(ids).toContain(activeEvent.id);
     expect(ids).toContain(inactiveEvent.id);
   });
@@ -221,7 +222,7 @@ describe("GET /event", () => {
     const deRes = await fastify.inject({ method: "GET", url: "/event" });
     const deEvent = deRes
       .json()
-      .find((e: { id: number }) => e.id === activeEvent.id);
+      .data.find((e: { id: number }) => e.id === activeEvent.id);
     expect(deEvent.menuTitle).toBe("Sommerfest");
 
     const enRes = await fastify.inject({
@@ -230,7 +231,7 @@ describe("GET /event", () => {
     });
     const enEvent = enRes
       .json()
-      .find((e: { id: number }) => e.id === activeEvent.id);
+      .data.find((e: { id: number }) => e.id === activeEvent.id);
     expect(enEvent.menuTitle).toBe("Summer Party");
   });
 
@@ -242,7 +243,7 @@ describe("GET /event", () => {
     });
     const event = res
       .json()
-      .find((e: { id: number }) => e.id === inactiveEvent.id);
+      .data.find((e: { id: number }) => e.id === inactiveEvent.id);
     // Only a German translation exists for this event; requesting English
     // still returns it rather than dropping the event.
     expect(event.menuTitle).toBe("Altes Event");
