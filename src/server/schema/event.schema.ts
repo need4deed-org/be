@@ -1,16 +1,5 @@
 import { responseErrors } from "./responseErrors";
 
-// GET /event's querystring: language only, no pagination — the only real
-// caller (website's useEvents hook) never sends page/limit, just
-// `?language=<lang>`.
-export const eventListQuerySchema = {
-  type: "object",
-  properties: {
-    language: { type: "string" },
-  },
-  additionalProperties: false,
-};
-
 // Item shape for GET /event (SDK ApiEventN4DGetList). Inline, not $ref'd —
 // event_n4d is a new domain, not yet part of the hand-maintained
 // sdk-types.json bundle (which is already large enough as-is).

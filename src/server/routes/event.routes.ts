@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiEventN4DGetList, Lang, UserRole } from "need4deed-sdk";
 import { dtoEventN4DGetList } from "../../services";
-import { eventListQuerySchema, eventListResponseSchema } from "../schema";
+import { eventListResponseSchema, langQuerySchema } from "../schema";
 import { QuerystringEventGetList } from "../types";
 import { getLanguageCode } from "../utils";
 
@@ -22,7 +22,7 @@ export default async function eventRoutes(
     "/",
     {
       schema: {
-        querystring: eventListQuerySchema,
+        querystring: langQuerySchema,
         response: eventListResponseSchema,
       },
       onRequest: fastify.tryAuthenticate(),
