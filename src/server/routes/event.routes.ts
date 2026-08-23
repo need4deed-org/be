@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiEventN4DGetList, Lang, UserRole } from "need4deed-sdk";
 import { dtoEventN4DGetList } from "../../services";
 import { eventListQuerySchema, eventListResponseSchema } from "../schema";
+import { QuerystringEventGetList } from "../types";
 import { getLanguageCode } from "../utils";
 
 export default async function eventRoutes(
@@ -15,7 +16,7 @@ export default async function eventRoutes(
   // single public route able to vary by caller: it best-effort resolves
   // request.authUser from a cookie if one is present, but never requires it.
   fastify.get<{
-    Querystring: { language?: string };
+    Querystring: QuerystringEventGetList;
     Reply: ApiEventN4DGetList[];
   }>(
     "/",

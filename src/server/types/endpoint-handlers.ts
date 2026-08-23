@@ -32,6 +32,13 @@ export interface QuerystringPaginationLanguage
   language: Lang;
 }
 
+// GET /event has neither pagination nor ordering, and language is optional
+// (defaults to Lang.DE) rather than required — QuerystringPaginationLanguage
+// doesn't fit.
+export interface QuerystringEventGetList {
+  language?: Lang;
+}
+
 // TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
   filter?: {
