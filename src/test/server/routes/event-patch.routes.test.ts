@@ -184,6 +184,54 @@ describe("PATCH /event/:id", () => {
     expect(translations[0].title).toBe("Sommerfest (aktualisiert)");
   });
 
+  it("clears an omitted optional translation field instead of leaving it stale", async () => {
+    const id = await createTestEvent();
+
+    await fastify.inject({
+      method: "PATCH",
+      url: `/event/${id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        translations: [
+          {
+            language: "de",
+            title: "Sommerfest",
+            menuTitle: "Sommerfest",
+            description: "Wir feiern zusammen.",
+            shortDescription: "Wir feiern.",
+            outro: "Bis bald!",
+          },
+        ],
+      },
+    });
+
+    // Same language, same required fields, but outro omitted this time —
+    // the entry replaces the row entirely, so outro must clear, not survive.
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/event/${id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        translations: [
+          {
+            language: "de",
+            title: "Sommerfest",
+            menuTitle: "Sommerfest",
+            description: "Wir feiern zusammen.",
+            shortDescription: "Wir feiern.",
+          },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(204);
+    const translations = await getRepository(dataSource, EventTranslation).find(
+      { where: { eventn4dId: id } },
+    );
+    expect(translations).toHaveLength(1);
+    expect(translations[0].outro).toBeNull();
+  });
+
   it("adds a new language's translation without touching the existing one", async () => {
     const id = await createTestEvent();
 
@@ -302,5 +350,31 @@ describe("PATCH /event/:id", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  // be#905 review: the upsert is a find-then-insert with no locking, so a
+  // concurrent race could otherwise create two rows for one (event,
+  // language) pair. This proves the DB-level backstop (not the app-level
+  // duplicate-language check above, which only catches it within one
+  // request) actually rejects that at the database.
+  it("has a DB-level unique constraint on (event, language) backing the upsert", async () => {
+    const id = await createTestEvent();
+    const translationRepository = getRepository(dataSource, EventTranslation);
+    const de = await translationRepository.findOneByOrFail({
+      eventn4dId: id,
+    });
+
+    await expect(
+      translationRepository.save(
+        new EventTranslation({
+          eventn4dId: id,
+          languageId: de.languageId,
+          title: "Duplicate",
+          menuTitle: "Duplicate",
+          description: "Duplicate.",
+          shortDescription: "Duplicate.",
+        }),
+      ),
+    ).rejects.toThrow();
   });
 });
