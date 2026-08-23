@@ -110,13 +110,16 @@ describe("POST /event", () => {
     await fastify.close();
   });
 
-  it("creates the base row + one translation row for a single language, defaulting to inactive", async () => {
+  it("creates the base row + one translation row for a single language, defaulting to inactive, echoing back the full detail shape", async () => {
     const res = await fastify.inject({
       method: "POST",
       url: "/event",
       cookies: { [accessCookieName]: coordinatorCookie },
       payload: {
         ...baseBody,
+        hostName: "Du für Berlin",
+        locationLink: "https://maps.example/pin",
+        followUpLink: "https://need4deed.org/next-event",
         translations: [
           {
             language: "de",
@@ -124,6 +127,9 @@ describe("POST /event", () => {
             menuTitle: "Sommerfest",
             description: "Wir feiern zusammen.",
             shortDescription: "Wir feiern.",
+            time: "13:00-18:00",
+            outro: "Bis bald!",
+            followUpText: "Nächstes Event",
           },
         ],
       },
@@ -134,6 +140,14 @@ describe("POST /event", () => {
     createdEventIds.push(data.id);
     expect(data.title).toBe("Sommerfest");
     expect(data.active).toBe(false);
+    // Fields ApiEventN4DGetList doesn't carry, only ApiEventN4DGet does —
+    // must round-trip through the create response.
+    expect(data.hostName).toBe("Du für Berlin");
+    expect(data.locationLink).toBe("https://maps.example/pin");
+    expect(data.followUpLink).toBe("https://need4deed.org/next-event");
+    expect(data.time).toBe("13:00-18:00");
+    expect(data.outro).toBe("Bis bald!");
+    expect(data.followUpText).toBe("Nächstes Event");
 
     const translations = await getRepository(dataSource, EventTranslation).find(
       { where: { eventn4dId: data.id } },
@@ -209,6 +223,58 @@ describe("POST /event", () => {
       url: "/event",
       cookies: { [accessCookieName]: coordinatorCookie },
       payload: { ...baseBody, translations: [] },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects two translations for the same language", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        ...baseBody,
+        translations: [
+          {
+            language: "de",
+            title: "Sommerfest",
+            menuTitle: "Sommerfest",
+            description: "Wir feiern zusammen.",
+            shortDescription: "Wir feiern.",
+          },
+          {
+            language: "de",
+            title: "Sommerfest 2",
+            menuTitle: "Sommerfest 2",
+            description: "Nochmal.",
+            shortDescription: "Nochmal.",
+          },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects dateEnd at or before date", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        ...baseBody,
+        dateEnd: baseBody.date,
+        translations: [
+          {
+            language: "de",
+            title: "Sommerfest",
+            menuTitle: "Sommerfest",
+            description: "Wir feiern zusammen.",
+            shortDescription: "Wir feiern.",
+          },
+        ],
+      },
     });
 
     expect(res.statusCode).toBe(400);

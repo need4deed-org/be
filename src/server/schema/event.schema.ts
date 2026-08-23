@@ -44,6 +44,21 @@ export const eventItemSchema = {
   additionalProperties: false,
 };
 
+// Full detail shape for POST /event's response (SDK ApiEventN4DGet) — adds
+// the fields eventItemSchema (the list shape) doesn't carry.
+export const eventFullItemSchema = {
+  ...eventItemSchema,
+  properties: {
+    ...eventItemSchema.properties,
+    hostName: { type: ["string", "null"] },
+    time: { type: ["string", "null"] },
+    locationLink: { type: ["string", "null"] },
+    followUpText: { type: ["string", "null"] },
+    followUpLink: { type: ["string", "null"] },
+    outro: { type: ["string", "null"] },
+  },
+};
+
 export const eventListResponseSchema = {
   200: {
     type: "object",
@@ -116,7 +131,7 @@ export const eventCreateResponseSchema = {
     required: ["message", "data"],
     properties: {
       message: { type: "string" },
-      data: eventItemSchema,
+      data: eventFullItemSchema,
     },
     additionalProperties: false,
   },

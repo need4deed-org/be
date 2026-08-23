@@ -1,24 +1,35 @@
 import { ApiEventN4DCreate } from "need4deed-sdk";
+import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import EventTranslation from "../../../data/entity/event/event_translation.entity";
 import EventN4D from "../../../data/entity/event/event.entity";
-import Language from "../../../data/entity/profile/language.entity";
 import { getRepository } from "../../../data/utils";
+import { getLanguageIdByIsoCode } from "./get-language-title";
 
 // POST /event (be#904): one EventN4D row (structural fields) + one
 // EventTranslation row per submitted language, in a transaction.
 export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
+  const languages = input.translations.map((t) => t.language);
+  if (new Set(languages).size !== languages.length) {
+    throw new BadRequestError(
+      "Each translation must use a different language.",
+    );
+  }
+  if (input.dateEnd && new Date(input.dateEnd) <= new Date(input.date)) {
+    throw new BadRequestError("dateEnd must be after date.");
+  }
+
+  // Resolve each distinct language once — the event's own languageId reuses
+  // whichever id the first translation resolves to, rather than looking it
+  // up a second time.
+  const languageIds = new Map<string, number>();
+  for (const isoCode of new Set(languages)) {
+    languageIds.set(isoCode, await getLanguageIdByIsoCode(isoCode));
+  }
+
   return dataSource.manager.transaction(async (manager) => {
-    const languageRepository = getRepository(manager, Language);
     const eventRepository = getRepository(manager, EventN4D);
     const translationRepository = getRepository(manager, EventTranslation);
-
-    async function getLanguageId(isoCode: string): Promise<number> {
-      const language = await languageRepository.findOneOrFail({
-        where: { isoCode },
-      });
-      return language.id;
-    }
 
     const event = await eventRepository.save(
       new EventN4D({
@@ -36,16 +47,16 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
         hostName: input.hostName,
         // The language it was originally authored in — the first submitted
         // translation, by convention.
-        languageId: await getLanguageId(input.translations[0].language),
+        languageId: languageIds.get(input.translations[0].language),
       }),
     );
 
     await translationRepository.save(
-      await Promise.all(
-        input.translations.map(async (t) => {
-          return new EventTranslation({
+      input.translations.map(
+        (t) =>
+          new EventTranslation({
             eventn4dId: event.id,
-            languageId: await getLanguageId(t.language),
+            languageId: languageIds.get(t.language),
             title: t.title,
             subtitle: t.subTitle,
             menuTitle: t.menuTitle,
@@ -57,8 +68,7 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
             additionalInfo: t.additionalInfo,
             outro: t.outro,
             followupText: t.followUpText,
-          });
-        }),
+          }),
       ),
     );
 

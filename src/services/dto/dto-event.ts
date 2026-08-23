@@ -1,4 +1,4 @@
-import { ApiEventN4DGetList, Lang } from "need4deed-sdk";
+import { ApiEventN4DGet, ApiEventN4DGetList, Lang } from "need4deed-sdk";
 import EventN4D from "../../data/entity/event/event.entity";
 
 // Resolves the translation matching the requested language; falls back to
@@ -55,5 +55,31 @@ export function dtoEventN4DGetList(
     linkRSVP: event.rsvpLink,
     additionalTitle: translation?.additionalTitle,
     additionalInfo: sanitizeAdditionalInfo(translation?.additionalInfo),
+  };
+}
+
+// Full detail shape (SDK ApiEventN4DGet), adding the fields ApiEventN4DGetList
+// doesn't carry. Used by POST /event's response (be#904) — no GET /event/:id
+// exists yet, but the SDK type is already the right shape for "give the
+// caller back everything they just submitted".
+export function dtoEventN4DGet(
+  event: EventN4D,
+  language: Lang,
+  isPrivileged: boolean,
+): ApiEventN4DGet | null {
+  const list = dtoEventN4DGetList(event, language, isPrivileged);
+  if (!list) {
+    return null;
+  }
+  const translation = resolveTranslation(event, language);
+
+  return {
+    ...list,
+    hostName: event.hostName,
+    time: translation?.timeStr,
+    locationLink: event.locationLink,
+    followUpText: translation?.followupText,
+    followUpLink: event.followupLink,
+    outro: translation?.outro,
   };
 }

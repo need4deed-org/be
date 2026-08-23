@@ -1,12 +1,13 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiEventN4DCreate,
+  ApiEventN4DGet,
   ApiEventN4DGetList,
   Lang,
   UserRole,
 } from "need4deed-sdk";
 import { NotFoundError } from "../../config";
-import { dtoEventN4DGetList } from "../../services";
+import { dtoEventN4DGet, dtoEventN4DGetList } from "../../services";
 import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
@@ -64,7 +65,7 @@ export default async function eventRoutes(
   // EventTranslation row per submitted language.
   fastify.post<{
     Body: ApiEventN4DCreate;
-    Reply: ReplyData<ApiEventN4DGetList>;
+    Reply: ReplyData<ApiEventN4DGet>;
   }>(
     "/",
     {
@@ -86,10 +87,10 @@ export default async function eventRoutes(
       }
 
       // isPrivileged: true (this route is COORDINATOR-gated) means
-      // dtoEventN4DGetList's null branch is unreachable here — it only
-      // returns null for a non-privileged caller. Echoes back in whichever
-      // language was submitted first.
-      const data = dtoEventN4DGetList(
+      // dtoEventN4DGet's null branch is unreachable here — it only returns
+      // null for a non-privileged caller. Echoes back in whichever language
+      // was submitted first.
+      const data = dtoEventN4DGet(
         event,
         request.body.translations[0].language,
         true,
