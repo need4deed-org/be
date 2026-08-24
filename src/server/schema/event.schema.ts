@@ -137,3 +137,34 @@ export const eventCreateResponseSchema = {
   },
   ...responseErrors,
 };
+
+// Body for PATCH /event/:id (SDK ApiEventN4DPatch). Everything's optional —
+// omitted = unchanged. Only the fields that are actually nullable columns
+// (dateEnd, pic, locationLink, followUpLink, hostName) accept null-to-clear;
+// date/type/linkRSVP/address/active reject null here even though the SDK's
+// VoidableProps type technically allows it, since those columns are
+// required and "clear this required field" isn't a meaningful request.
+// translations is a full-content upsert per language (see write-event.ts),
+// not a field-by-field patch — reuses the same item shape as create, so an
+// included entry still needs title/menuTitle/description/shortDescription.
+export const eventPatchBodySchema = {
+  type: "object",
+  properties: {
+    date: { type: "string", format: "date-time" },
+    dateEnd: { type: ["string", "null"], format: "date-time" },
+    type: { type: "string", enum: Object.values(EventN4DType) },
+    pic: { type: ["string", "null"] },
+    locationLink: { type: ["string", "null"] },
+    linkRSVP: { type: "string" },
+    followUpLink: { type: ["string", "null"] },
+    address: { type: "string", minLength: 1 },
+    hostName: { type: ["string", "null"] },
+    active: { type: "boolean" },
+    translations: {
+      type: "array",
+      items: eventTranslationInputSchema,
+      minItems: 1,
+    },
+  },
+  additionalProperties: false,
+};

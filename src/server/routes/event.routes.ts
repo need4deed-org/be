@@ -3,6 +3,7 @@ import {
   ApiEventN4DCreate,
   ApiEventN4DGet,
   ApiEventN4DGetList,
+  ApiEventN4DPatch,
   Lang,
   UserRole,
 } from "need4deed-sdk";
@@ -12,10 +13,18 @@ import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
   eventListResponseSchema,
+  eventPatchBodySchema,
+  idParamSchema,
   langQuerySchema,
+  responseSchema,
 } from "../schema";
-import { QuerystringEventGetList, ReplyData, ReplyDataCount } from "../types";
-import { createEvent, getLanguageCode } from "../utils";
+import {
+  ParamsId,
+  QuerystringEventGetList,
+  ReplyData,
+  ReplyDataCount,
+} from "../types";
+import { createEvent, getLanguageCode, updateEvent } from "../utils";
 
 export default async function eventRoutes(
   fastify: FastifyInstance,
@@ -97,6 +106,29 @@ export default async function eventRoutes(
       )!;
 
       return reply.status(201).send({ message: "Event created.", data });
+    },
+  );
+
+  // PATCH /event/:id — coordinator update (be#905). Structural fields are a
+  // plain partial update; translations is an upsert per (event, language) —
+  // see write-event.ts's updateEvent for the exact semantics.
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiEventN4DPatch;
+    Reply: null;
+  }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        body: eventPatchBodySchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+    },
+    async (request, reply) => {
+      await updateEvent(request.params.id, request.body);
+      return reply.status(204).send();
     },
   );
 }
