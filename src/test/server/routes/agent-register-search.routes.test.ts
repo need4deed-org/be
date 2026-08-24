@@ -17,6 +17,7 @@ describe("GET /agent/register/search", () => {
   let token: string;
   let activeAgent: Agent;
   let inactiveAgent: Agent;
+  let unclaimedAgent: Agent;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -54,14 +55,57 @@ describe("GET /agent/register/search", () => {
         engagementStatus: AgentEngagementStatusType.INACTIVE,
       }),
     );
+    unclaimedAgent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Findable Unclaimed NGO ${suffix}`,
+        unclaimed: true,
+      }),
+    );
   });
 
   afterAll(async () => {
     await fastify.db.agentRepository.delete({ id: activeAgent.id });
     await fastify.db.agentRepository.delete({ id: inactiveAgent.id });
+    await fastify.db.agentRepository.delete({ id: unclaimedAgent.id });
     await fastify.db.userRepository.delete({ id: registrantUser.id });
     await fastify.db.personRepository.delete({ id: registrantPerson.id });
     await fastify.close();
+  });
+
+  it("400s with no token", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?street=${encodeURIComponent("Findable")}`,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("401s with an invalid token", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=not-a-real-token&street=${encodeURIComponent("Findable")}`,
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns an empty match list without querying when street is under 3 characters", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=ab`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
+  });
+
+  it("excludes an unclaimed agent from the candidates", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("Findable")}`,
+    });
+
+    const ids = res.json().data.map((a: { id: number }) => a.id);
+    expect(ids).not.toContain(unclaimedAgent.id);
   });
 
   it("excludes an INACTIVE agent from the candidates but keeps an ACTIVE one", async () => {
