@@ -23,6 +23,7 @@ import {
   QuerystringEventGetList,
   ReplyData,
   ReplyDataCount,
+  ReplyMessage,
 } from "../types";
 import { createEvent, getLanguageCode, updateEvent } from "../utils";
 
@@ -129,6 +130,39 @@ export default async function eventRoutes(
     async (request, reply) => {
       await updateEvent(request.params.id, request.body);
       return reply.status(204).send();
+    },
+  );
+
+  // DELETE /event/:id — coordinator delete (be#906). A real row delete
+  // (cascades to EventTranslation via the entity's onDelete: "CASCADE"),
+  // not a soft-deactivate — PATCH /event/:id { active: false } already
+  // covers "hide without losing data", so DELETE stays a distinct,
+  // standard-REST "remove it" rather than a second way to do the same
+  // thing. Matches the DELETE /agent/:id convention (200 + message, not
+  // 204 — this repo's PATCH/DELETE conventions differ).
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const eventRepository = fastify.db.eventRepository;
+      const event = await eventRepository.findOneBy({ id });
+
+      if (!event) {
+        throw new NotFoundError(`Event (id:${id}) not found.`);
+      }
+
+      await eventRepository.delete({ id });
+
+      return reply.status(200).send({
+        message: `Event (id:${id}) deleted successfully`,
+      });
     },
   );
 }
