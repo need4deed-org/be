@@ -19,7 +19,15 @@ describe("getDistrictFromPostcode", () => {
   let secondMapping: DistrictPostcode;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  const numericSuffix = String(Date.now() % 10000).padStart(4, "0");
+  // be#864: Date.now() % 10000 only has 10,000 possible values and is
+  // correlated across parallel Vitest workers that start at nearly the same
+  // wall-clock moment, so two workers can collide on the same postcode
+  // value. Math.random() over a much wider space (like `suffix` above)
+  // decorrelates workers and shrinks the collision odds to negligible.
+  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
+    6,
+    "0",
+  );
 
   beforeAll(async () => {
     fastify = await createServer();
