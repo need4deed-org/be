@@ -57,6 +57,11 @@ describe("DELETE /event/:id", () => {
         ],
       },
     });
+    if (res.statusCode !== 201) {
+      throw new Error(
+        `createTestEvent fixture setup failed: ${res.statusCode} ${res.body}`,
+      );
+    }
     const id = res.json().data.id;
     createdEventIds.push(id);
     return id;
@@ -118,15 +123,9 @@ describe("DELETE /event/:id", () => {
   });
 
   afterAll(async () => {
-    // Only cleans up events NOT already deleted by the tests themselves —
-    // delete() on an already-gone id is a harmless no-op.
-    const eventTranslationRepository = getRepository(
-      dataSource,
-      EventTranslation,
-    );
-    for (const id of createdEventIds) {
-      await eventTranslationRepository.delete({ eventn4dId: id });
-    }
+    // No separate EventTranslation cleanup needed — the FK's ON DELETE
+    // CASCADE handles it, and delete() on an already-gone id (events the
+    // tests themselves deleted) is a harmless no-op.
     await fastify.db.eventRepository.delete(createdEventIds);
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
