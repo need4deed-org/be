@@ -890,6 +890,26 @@ export default async function opportunityRoutes(
         );
       }
 
+      // An opportunity moving away from ACCOMPANYING into EVENTS has no
+      // further use for its old Accompanying row — the event's date/time
+      // now lives on `onetimer` (resolved above) — but the row still holds
+      // refugee PII (name/phone/email/address/language) that must not
+      // survive the type change. This clearing was silently dropped when
+      // #816 refactored EVENTS off the old blanked-out-Accompanying-row
+      // hack (be#780).
+      if (
+        effectiveType === OpportunityType.EVENTS &&
+        opportunity.type !== OpportunityType.EVENTS &&
+        opportunity.accompanyingId
+      ) {
+        await dataSource.manager.transaction(async (manager) => {
+          await manager.update(Opportunity, opportunity.id, {
+            accompanyingId: null,
+          });
+          await manager.delete(Accompanying, opportunity.accompanyingId);
+        });
+      }
+
       if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
         await updateOptionList(dealId, DealTimeslot, []);
       }

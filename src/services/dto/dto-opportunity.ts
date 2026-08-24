@@ -8,6 +8,7 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import District from "../../data/entity/location/district.entity";
+import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import {
@@ -30,6 +31,20 @@ function getOpportunityDescription(opportunity: Opportunity) {
     return opportunity.infoConfidential;
   }
   return opportunity.info;
+}
+
+// Defense-in-depth against be#780: `accompanying` carries refugee PII
+// (name/phone/email/address/language) that only ever belongs to an
+// ACCOMPANYING-type opportunity. Gating serialization on the *current* type
+// here means a leak can't recur from a future write-path bug that leaves a
+// stale/non-cleared row behind — the DTO layer no longer trusts the DB row
+// to already be clean.
+function accompanyingForType(
+  opportunity: Opportunity,
+): Accompanying | undefined {
+  return opportunity.type === OpportunityType.ACCOMPANYING
+    ? opportunity.accompanying
+    : undefined;
 }
 
 // Best-effort: returns the original submitter if they still hold an
@@ -90,7 +105,7 @@ export function dtoOpportunityGetList(
     })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunity.accompanying!,
+      accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
     ),
     agentTitle: opportunity.agent?.title ?? "",
@@ -134,7 +149,7 @@ export function dtoVolunteerOpportunityGetList(
     })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunity.accompanying!,
+      accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
       opportunity.deal.dealLanguage,
     ),
@@ -197,7 +212,7 @@ export function dtoOpportunityGet(
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunityComments.accompanying!,
+      accompanyingForType(opportunityComments)!,
       opportunityComments.onetimer?.date,
       opportunityComments.deal.dealLanguage,
       accompanyingDistrict,

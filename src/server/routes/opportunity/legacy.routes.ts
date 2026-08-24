@@ -327,8 +327,18 @@ export default async function opportunityLegacyRoutes(
             .filter(Boolean);
 
           const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
+          // be#780: this is a public, unauthenticated endpoint — gate on the
+          // opportunity's current type rather than trusting `raw.accompanying`
+          // to already be cleared, so a stale/uncleared row (e.g. from a past
+          // type change) can't leak refugee PII here regardless of what the
+          // write path did or didn't clean up.
           const { accomp_information, accomp_translation, accomp_datetime } =
-            parseAccompanying(raw.accompanying, raw.onetimer?.date);
+            parseAccompanying(
+              raw.type === OpportunityType.ACCOMPANYING
+                ? raw.accompanying
+                : undefined,
+              raw.onetimer?.date,
+            );
 
           return {
             id: raw.id,
