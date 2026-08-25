@@ -173,4 +173,21 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ data: [], count: 0 });
   });
+
+  it("ignores a PENDING membership", async () => {
+    await fastify.db.agentPersonRepository.delete({ personId });
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: ownAgentId,
+        personId,
+        role: AgentRoleType.SOCIAL_WORKER,
+        status: AgentMembershipStatus.PENDING,
+      }),
+    );
+
+    const res = await listOpportunities(agentCookie);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ data: [], count: 0 });
+  });
 });
