@@ -264,6 +264,8 @@ export default async function opportunityRoutes(
             : undefined;
 
       const where = getOpportunityWhere(request.query.filter, request.query);
+      const message = `Opportunities page:${request.query.page}.`;
+
       //  NGOs see only their own agent's opportunities
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(
@@ -275,7 +277,7 @@ export default async function opportunityRoutes(
         // skipping the filter, which would show everything.
         if (agentIds.length === 0) {
           return reply.status(200).send({
-            message: `Opportunities page:${request.query.page}.`,
+            message,
             data: [],
             count: 0,
           });
@@ -373,7 +375,7 @@ export default async function opportunityRoutes(
 
       // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
-        message: `Opportunities page:${request.query.page}.`,
+        message,
         data: opportunitiesCategoryDistrict,
         count,
       });
