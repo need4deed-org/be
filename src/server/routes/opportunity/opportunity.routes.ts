@@ -13,6 +13,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
+import { FindOptionsWhere, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -61,6 +62,7 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
@@ -262,6 +264,28 @@ export default async function opportunityRoutes(
             : undefined;
 
       const where = getOpportunityWhere(request.query.filter, request.query);
+      //  NGOs see only their own agent's opportunities
+      if (request.authUser?.role === UserRole.AGENT) {
+        const agentIds = await getCallerAgentIds(
+          fastify,
+          request.authUser.personId,
+        );
+
+        // An agent with no shelter must see nothing, so return here rather than
+        // skipping the filter, which would show everything.
+        if (agentIds.length === 0) {
+          return reply.status(200).send({
+            message: `Opportunities page:${request.query.page}.`,
+            data: [],
+            count: 0,
+          });
+        }
+        // Spread so this composes if getOpportunityWhere ever sets an agent filter;
+        where.agent = {
+          ...(where.agent as FindOptionsWhere<Agent> | undefined),
+          id: In(agentIds),
+        };
+      }
 
       logger.debug(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
