@@ -3,6 +3,7 @@ import {
   ApiEventN4DCreate,
   ApiEventN4DGet,
   ApiEventN4DGetList,
+  ApiEventN4DPatch,
   Lang,
   UserRole,
 } from "need4deed-sdk";
@@ -12,10 +13,19 @@ import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
   eventListResponseSchema,
+  eventPatchBodySchema,
+  idParamSchema,
   langQuerySchema,
+  responseSchema,
 } from "../schema";
-import { QuerystringEventGetList, ReplyData, ReplyDataCount } from "../types";
-import { createEvent, getLanguageCode } from "../utils";
+import {
+  ParamsId,
+  QuerystringEventGetList,
+  ReplyData,
+  ReplyDataCount,
+  ReplyMessage,
+} from "../types";
+import { createEvent, getLanguageCode, updateEvent } from "../utils";
 
 export default async function eventRoutes(
   fastify: FastifyInstance,
@@ -97,6 +107,62 @@ export default async function eventRoutes(
       )!;
 
       return reply.status(201).send({ message: "Event created.", data });
+    },
+  );
+
+  // PATCH /event/:id — coordinator update (be#905). Structural fields are a
+  // plain partial update; translations is an upsert per (event, language) —
+  // see write-event.ts's updateEvent for the exact semantics.
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiEventN4DPatch;
+    Reply: null;
+  }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        body: eventPatchBodySchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+    },
+    async (request, reply) => {
+      await updateEvent(request.params.id, request.body);
+      return reply.status(204).send();
+    },
+  );
+
+  // DELETE /event/:id — coordinator delete (be#906). A real row delete
+  // (cascades to EventTranslation via the entity's onDelete: "CASCADE"),
+  // not a soft-deactivate — PATCH /event/:id { active: false } already
+  // covers "hide without losing data", so DELETE stays a distinct,
+  // standard-REST "remove it" rather than a second way to do the same
+  // thing. Matches the DELETE /agent/:id convention (200 + message, not
+  // 204 — this repo's PATCH/DELETE conventions differ).
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const eventRepository = fastify.db.eventRepository;
+      const event = await eventRepository.findOneBy({ id });
+
+      if (!event) {
+        throw new NotFoundError(`Event (id:${id}) not found.`);
+      }
+
+      await eventRepository.delete({ id });
+
+      return reply.status(200).send({
+        message: `Event (id:${id}) deleted successfully`,
+      });
     },
   );
 }
