@@ -9,7 +9,15 @@ import {
   UserRole,
   VolunteerStateMatchType,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -1010,6 +1018,168 @@ describe("PATCH /opportunity/:id onetimer resolution", () => {
       })
       .getOne();
     expect(orphan).toBeNull();
+  });
+});
+
+describe("PATCH /opportunity/:id clears stale accompanying PII on type change (be#780)", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let deal: Deal;
+  let opportunity: Opportunity;
+  let accompanying: Accompanying;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  beforeEach(async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (clear-pii) ${suffix}` }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    accompanying = await fastify.db.accompanyingRepository.save(
+      new Accompanying({
+        address: "Secret Street 1",
+        name: "Refugee Secret Name",
+        phone: "+491234567",
+        email: "secret@example.com",
+      }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (clear-pii) ${suffix}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+        accompanyingId: accompanying.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    const coordinatorUser = await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-clear-pii-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: coordinatorUser.email,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterEach(async () => {
+    const updated = await fastify.db.opportunityRepository.findOneBy({
+      id: opportunity.id,
+    });
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    if (updated?.onetimerId) {
+      await fastify.db.onetimerRepository.delete({ id: updated.onetimerId });
+    }
+    if (updated?.accompanyingId) {
+      await fastify.db.accompanyingRepository.delete({
+        id: updated.accompanyingId,
+      });
+    }
+    await fastify.db.accompanyingRepository.delete({ id: accompanying.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+  });
+
+  it("deletes the old accompanying row and nulls accompanyingId when switching ACCOMPANYING to EVENTS", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunity_type: "events",
+        event: { date: "2026-09-01", time: "12:00" },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: opportunity.id,
+    });
+    expect(updated.accompanyingId).toBeNull();
+
+    const staleRow = await fastify.db.accompanyingRepository.findOneBy({
+      id: accompanying.id,
+    });
+    expect(staleRow).toBeNull();
+  });
+
+  it("no longer returns the old refugee's PII from GET after switching to EVENTS", async () => {
+    await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunity_type: "events",
+        event: { date: "2026-09-01", time: "12:00" },
+      },
+    });
+
+    const getRes = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    expect(getRes.statusCode).toBe(200);
+    const body = getRes.json().data;
+    expect(body.accompanyingDetails?.refugeeName).toBeUndefined();
+    expect(body.accompanyingDetails?.refugeeNumber).toBeUndefined();
+    expect(body.accompanyingDetails?.appointmentAddress).toBeUndefined();
+  });
+
+  it("does not touch the accompanying row when the type doesn't change away from ACCOMPANYING", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { numberVolunteers: 3 },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: opportunity.id,
+    });
+    expect(updated.accompanyingId).toBe(accompanying.id);
+
+    const stillThere = await fastify.db.accompanyingRepository.findOneBy({
+      id: accompanying.id,
+    });
+    expect(stillThere).not.toBeNull();
   });
 });
 
