@@ -18,6 +18,7 @@ import Person from "../../../data/entity/person.entity";
 import { getPostcode, getRepository } from "../../../data/utils";
 import logger from "../../../logger";
 import {
+  accompanyingForType,
   accompanyingParserOpportunity,
   parseAccompDatetime,
   parseFormData,
@@ -328,7 +329,7 @@ export default async function opportunityLegacyRoutes(
 
           const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
-            parseAccompanying(raw.accompanying, raw.onetimer?.date);
+            parseAccompanying(accompanyingForType(raw), raw.onetimer?.date);
 
           return {
             id: raw.id,
