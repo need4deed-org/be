@@ -40,4 +40,12 @@ describe("dtoAppreciation", () => {
     expect(result.opportunityId).toBeUndefined();
     expect(result.userId).toBeUndefined();
   });
+
+  it.each(["appr-received", "appr-pending", "appr-post"])(
+    "passes through status %s",
+    (status) => {
+      const result = dtoAppreciation({ ...base, status } as any);
+      expect(result.status).toBe(status);
+    },
+  );
 });
