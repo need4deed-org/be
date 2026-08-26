@@ -7,6 +7,7 @@ export function dtoAppreciation(
   return {
     id: appreciation.id,
     title: appreciation.title,
+    status: appreciation.status,
     dateDue: appreciation?.dateDue,
     dateDelivery: appreciation?.dateDelivery,
     volunteerId: appreciation.volunteerId,

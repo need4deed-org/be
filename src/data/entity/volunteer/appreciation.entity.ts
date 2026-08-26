@@ -1,4 +1,7 @@
-import { VolunteerStateAppreciationType } from "need4deed-sdk";
+import {
+  AppreciationStatusType,
+  VolunteerStateAppreciationType,
+} from "need4deed-sdk";
 import {
   Column,
   CreateDateColumn,
@@ -24,6 +27,9 @@ export default class Appreciation {
 
   @Column({ type: "enum", enum: VolunteerStateAppreciationType })
   title: VolunteerStateAppreciationType;
+
+  @Column({ type: "enum", enum: AppreciationStatusType })
+  status: AppreciationStatusType;
 
   @Column({ type: "timestamp", nullable: true })
   dateDue?: Date;
