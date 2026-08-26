@@ -1030,10 +1030,16 @@ describe("PATCH /opportunity/:id clears stale accompanying PII on type change (b
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
+  });
 
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  beforeEach(async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
@@ -1107,7 +1113,6 @@ describe("PATCH /opportunity/:id clears stale accompanying PII on type change (b
     await fastify.db.accompanyingRepository.delete({ id: accompanying.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
-    await fastify.close();
   });
 
   it("deletes the old accompanying row and nulls accompanyingId when switching ACCOMPANYING to EVENTS", async () => {

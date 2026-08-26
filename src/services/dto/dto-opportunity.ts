@@ -39,7 +39,7 @@ function getOpportunityDescription(opportunity: Opportunity) {
 // here means a leak can't recur from a future write-path bug that leaves a
 // stale/non-cleared row behind — the DTO layer no longer trusts the DB row
 // to already be clean.
-function accompanyingForType(
+export function accompanyingForType(
   opportunity: Opportunity,
 ): Accompanying | undefined {
   return opportunity.type === OpportunityType.ACCOMPANYING
