@@ -8,10 +8,15 @@ import { getRepository } from "../../../data/utils";
 // getAgentPersonRepresentative's single "primary" pick.
 export async function getActiveAgentMemberships(
   personId: number,
+  agentId?: number,
 ): Promise<AgentPerson[]> {
   const agentPersonRepository = getRepository(dataSource, AgentPerson);
   return agentPersonRepository.find({
-    where: { personId, status: AgentMembershipStatus.ACTIVE },
+    where: {
+      personId,
+      status: AgentMembershipStatus.ACTIVE,
+      ...(agentId ? { agentId } : {}),
+    },
     relations: ["agent"],
     order: { id: "ASC" },
   });

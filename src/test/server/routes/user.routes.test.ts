@@ -99,17 +99,21 @@ describe("GET /user/me — agentMemberships (be#809)", () => {
     agentTwo = await fastify.db.agentRepository.save(
       new Agent({ title: `RAC Two ${suffix}` }),
     );
+    // agentTwo's SOCIAL_WORKER row is inserted first (lower id) and
+    // agentOne's VOLUNTEER_COORDINATOR row second (higher id), so a
+    // regression that picks by insertion/id order instead of role would
+    // resolve agentId to agentTwo and fail the assertion below.
     await fastify.db.agentPersonRepository.save([
-      new AgentPerson({
-        agentId: agentOne.id,
-        personId: person.id,
-        role: AgentRoleType.VOLUNTEER_COORDINATOR,
-        status: AgentMembershipStatus.ACTIVE,
-      }),
       new AgentPerson({
         agentId: agentTwo.id,
         personId: person.id,
         role: AgentRoleType.SOCIAL_WORKER,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+      new AgentPerson({
+        agentId: agentOne.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
         status: AgentMembershipStatus.ACTIVE,
       }),
     ]);
@@ -148,8 +152,9 @@ describe("GET /user/me — agentMemberships (be#809)", () => {
     expect(res.statusCode).toBe(200);
     const { data } = res.json();
 
-    // The single "primary" field stays populated for existing consumers.
-    expect(typeof data.agentId).toBe("number");
+    // The single "primary" field prefers the VOLUNTEER_COORDINATOR
+    // membership regardless of insertion/id order (see setup above).
+    expect(data.agentId).toBe(agentOne.id);
 
     expect(data.agentMemberships).toEqual(
       expect.arrayContaining([
