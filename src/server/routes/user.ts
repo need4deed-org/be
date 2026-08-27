@@ -171,12 +171,18 @@ export default async function userRoutes(
           agentId = membership?.agentId;
 
           // All active memberships, not just the "representative" one — a
-          // person can belong to more than one agent (be#809).
+          // person can belong to more than one agent (be#809). Dedupe by
+          // agentId: a person can hold multiple roles at the same agent
+          // (AgentPerson's unique index is the (agentId, personId, role)
+          // triple), but ApiAgentMembershipSummary has no role field.
           const memberships = await getActiveAgentMemberships(user.personId);
-          agentMemberships = memberships.map((m) => ({
-            agentId: m.agentId,
-            agentTitle: m.agent?.title ?? "",
-          }));
+          const membershipsByAgentId = new Map(
+            memberships.map((m) => [
+              m.agentId,
+              { agentId: m.agentId, agentTitle: m.agent?.title ?? "" },
+            ]),
+          );
+          agentMemberships = Array.from(membershipsByAgentId.values());
         }
 
         const payload = serializeUserToMeDTO(user, agentId, agentMemberships);

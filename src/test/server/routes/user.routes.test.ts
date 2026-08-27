@@ -160,3 +160,79 @@ describe("GET /user/me — agentMemberships (be#809)", () => {
     expect(data.agentMemberships).toHaveLength(2);
   });
 });
+
+// be#809: a person can hold multiple roles at the *same* agent (that's what
+// AgentPerson's (agentId, personId, role) unique index allows) — those must
+// collapse to one agentMemberships entry, since ApiAgentMembershipSummary
+// has no role field to distinguish them by.
+describe("GET /user/me — agentMemberships dedupes same-agent roles (be#809)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  let person: Person;
+  let agent: Agent;
+  let user: User;
+  let accessToken: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    person = await fastify.db.personRepository.save(
+      new Person({ firstName: "DualRole", lastName: `Agent-${suffix}` }),
+    );
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `RAC Dual ${suffix}` }),
+    );
+    await fastify.db.agentPersonRepository.save([
+      new AgentPerson({
+        agentId: agent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+      new AgentPerson({
+        agentId: agent.id,
+        personId: person.id,
+        role: AgentRoleType.SOCIAL_WORKER,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    ]);
+    user = await fastify.db.userRepository.save(
+      new User({
+        email: `dual-role-${suffix}@test.need4deed.org`,
+        password: await hashPassword("test_password"),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    accessToken = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "access",
+    });
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ id: user.id });
+    await fastify.db.agentPersonRepository.delete({ personId: person.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.db.personRepository.delete({ id: person.id });
+    await fastify.close();
+  });
+
+  it("returns one entry, not one per role", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/user/me",
+      cookies: { access: accessToken },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+
+    expect(data.agentMemberships).toEqual([
+      { agentId: agent.id, agentTitle: agent.title },
+    ]);
+  });
+});
