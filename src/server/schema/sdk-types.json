@@ -494,7 +494,7 @@
             "type": "object",
             "properties": {
               "agentId": {
-                "type": "number"
+                "type": "integer"
               },
               "agentTitle": {
                 "type": "string"

@@ -1,6 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  AgentRoleType,
   ApiAgentMembershipSummary,
   ApiUserGet,
   ApiUserPost,
@@ -31,7 +32,6 @@ import {
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
-import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -166,16 +166,22 @@ export default async function userRoutes(
         let agentId: number | undefined;
         let agentMemberships: ApiAgentMembershipSummary[] | undefined;
         if (user.role === UserRole.AGENT && user.personId) {
-          // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
-          const membership = await getAgentPersonRepresentative(user.personId);
-          agentId = membership?.agentId;
-
-          // All active memberships, not just the "representative" one — a
-          // person can belong to more than one agent (be#809). Dedupe by
-          // agentId: a person can hold multiple roles at the same agent
-          // (AgentPerson's unique index is the (agentId, personId, role)
-          // triple), but ApiAgentMembershipSummary has no role field.
+          // Single query, derive both fields from it — querying agentId and
+          // agentMemberships separately let them race against a concurrent
+          // membership change and disagree (be#809 review).
           const memberships = await getActiveAgentMemberships(user.personId);
+
+          // Prefer VOLUNTEER_COORDINATOR role; fall back to the first active
+          // membership (both ordered by id ASC via getActiveAgentMemberships).
+          const representative =
+            memberships.find(
+              (m) => m.role === AgentRoleType.VOLUNTEER_COORDINATOR,
+            ) ?? memberships[0];
+          agentId = representative?.agentId;
+
+          // Dedupe by agentId: a person can hold multiple roles at the same
+          // agent (AgentPerson's unique index is the (agentId, personId,
+          // role) triple), but ApiAgentMembershipSummary has no role field.
           const membershipsByAgentId = new Map(
             memberships.map((m) => [
               m.agentId,
