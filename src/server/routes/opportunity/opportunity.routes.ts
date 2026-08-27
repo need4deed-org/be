@@ -13,7 +13,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { FindOptionsWhere, In } from "typeorm";
+import { EntityManager, FindOptionsWhere, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -126,6 +126,29 @@ async function sendNewOpportunityEmail(
       );
     });
     throw sendErr;
+  }
+}
+
+// Shared by the REGULAR and EVENTS transition-out-of-ACCOMPANYING branches
+// below (be#780) — an opportunity leaving ACCOMPANYING has no further use
+// for its old Accompanying row, which still holds refugee PII (name/phone/
+// email/address/language) that must not survive the type change. `onetimer`
+// is only cleared alongside it for REGULAR, since EVENTS keeps reusing
+// `onetimer` for the event's own date/time.
+async function clearStaleAccompanying(
+  manager: EntityManager,
+  opportunity: Opportunity,
+  { alsoClearOnetimer }: { alsoClearOnetimer: boolean },
+): Promise<void> {
+  await manager.update(Opportunity, opportunity.id, {
+    accompanyingId: null,
+    ...(alsoClearOnetimer ? { onetimerId: null } : {}),
+  });
+  if (opportunity.accompanyingId) {
+    await manager.delete(Accompanying, opportunity.accompanyingId);
+  }
+  if (alsoClearOnetimer && opportunity.onetimerId) {
+    await manager.delete(Onetimer, opportunity.onetimerId);
   }
 }
 
@@ -814,7 +837,11 @@ export default async function opportunityRoutes(
         }
       });
 
-      if (accompanying) {
+      // Skipped when the opportunity is moving away from ACCOMPANYING —
+      // otherwise `accompanyingDetails` sent alongside a type change would
+      // write refugee PII into the Accompanying row moments before the
+      // clearing block below deletes it (be#780 review).
+      if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
         const appointmentPostcodeValue =
           request.body.accompanyingDetails?.appointmentPostcode;
         if (appointmentPostcodeValue !== undefined) {
@@ -900,19 +927,24 @@ export default async function opportunityRoutes(
         opportunity.type !== OpportunityType.REGULAR &&
         (opportunity.accompanyingId || opportunity.onetimerId)
       ) {
-        await fastify.db.accompanyingRepository.manager.transaction(
-          async (manager) => {
-            await manager.update(Opportunity, opportunity.id, {
-              accompanyingId: null,
-              onetimerId: null,
-            });
-            if (opportunity.accompanyingId) {
-              await manager.delete(Accompanying, opportunity.accompanyingId);
-            }
-            if (opportunity.onetimerId) {
-              await manager.delete(Onetimer, opportunity.onetimerId);
-            }
-          },
+        await dataSource.manager.transaction((manager) =>
+          clearStaleAccompanying(manager, opportunity, {
+            alsoClearOnetimer: true,
+          }),
+        );
+      }
+
+      // This clearing was silently dropped when #816 refactored EVENTS off
+      // the old blanked-out-Accompanying-row hack (be#780).
+      if (
+        effectiveType === OpportunityType.EVENTS &&
+        opportunity.type !== OpportunityType.EVENTS &&
+        opportunity.accompanyingId
+      ) {
+        await dataSource.manager.transaction((manager) =>
+          clearStaleAccompanying(manager, opportunity, {
+            alsoClearOnetimer: false,
+          }),
         );
       }
 

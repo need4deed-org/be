@@ -5,6 +5,7 @@ describe("dtoAppreciation", () => {
   const base = {
     id: 1,
     title: "T-shirt",
+    status: "appr-received",
     dateDue: new Date("2025-01-01"),
     dateDelivery: new Date("2025-02-01"),
     volunteerId: 10,
@@ -17,6 +18,7 @@ describe("dtoAppreciation", () => {
     expect(result).toEqual({
       id: 1,
       title: "T-shirt",
+      status: "appr-received",
       dateDue: base.dateDue,
       dateDelivery: base.dateDelivery,
       volunteerId: 10,
@@ -38,4 +40,12 @@ describe("dtoAppreciation", () => {
     expect(result.opportunityId).toBeUndefined();
     expect(result.userId).toBeUndefined();
   });
+
+  it.each(["appr-received", "appr-pending", "appr-post"])(
+    "passes through status %s",
+    (status) => {
+      const result = dtoAppreciation({ ...base, status } as any);
+      expect(result.status).toBe(status);
+    },
+  );
 });

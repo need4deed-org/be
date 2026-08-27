@@ -636,6 +636,11 @@
       "$id": "ApiCommunicationPatch",
       "$ref": "ApiCommunication#"
     },
+    "AppreciationStatusType": {
+      "$id": "AppreciationStatusType",
+      "type": "string",
+      "enum": ["appr-received", "appr-pending", "appr-post"]
+    },
     "ApiAppreciation": {
       "$id": "ApiAppreciation",
       "type": "object",
@@ -645,6 +650,9 @@
         },
         "title": {
           "$ref": "VolunteerStateAppreciationType#"
+        },
+        "status": {
+          "$ref": "AppreciationStatusType#"
         },
         "dateDue": {
           "type": ["string", "null"],
@@ -671,6 +679,7 @@
       "required": [
         "id",
         "title",
+        "status",
         "dateDue",
         "userId",
         "opportunityId",
@@ -680,7 +689,7 @@
     "ApiAppreciationPost": {
       "$id": "ApiAppreciationPost",
       "$ref": "ApiAppreciation#",
-      "required": ["title", "dateDue"]
+      "required": ["title", "status", "dateDue"]
     },
     "ApiAppreciationPatch": {
       "$id": "ApiAppreciationPatch",
