@@ -32,6 +32,13 @@ export interface QuerystringPaginationLanguage
   language: Lang;
 }
 
+// GET /event has neither pagination nor ordering, and language is optional
+// (defaults to Lang.DE) rather than required — QuerystringPaginationLanguage
+// doesn't fit.
+export interface QuerystringEventGetList {
+  language?: Lang;
+}
+
 // TODO: what about arrays?
 export interface QuerystringOpportunityFiltering {
   filter?: {
@@ -60,6 +67,11 @@ export type QuerystringOpportunityList = QuerystringPaginationLanguage &
     // only (not the shared QuerystringPaginationOrdering) — sorting by
     // start date only makes sense here, not for agent/volunteer/user lists.
     sortBy?: OpportunitySortField;
+    // Calendar view (be#889): filter by Opportunity.onetimer.date range.
+    appointmentDateFrom?: string;
+    appointmentDateTo?: string;
+    hasAppointmentDate?: boolean;
+    excludeAccompanying?: boolean;
   };
 
 export interface QuerystringAgentFiltering {

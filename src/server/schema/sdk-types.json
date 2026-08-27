@@ -652,6 +652,11 @@
       "$id": "ApiCommunicationPatch",
       "$ref": "ApiCommunication#"
     },
+    "AppreciationStatusType": {
+      "$id": "AppreciationStatusType",
+      "type": "string",
+      "enum": ["appr-received", "appr-pending", "appr-post"]
+    },
     "ApiAppreciation": {
       "$id": "ApiAppreciation",
       "type": "object",
@@ -661,6 +666,9 @@
         },
         "title": {
           "$ref": "VolunteerStateAppreciationType#"
+        },
+        "status": {
+          "$ref": "AppreciationStatusType#"
         },
         "dateDue": {
           "type": ["string", "null"],
@@ -687,6 +695,7 @@
       "required": [
         "id",
         "title",
+        "status",
         "dateDue",
         "userId",
         "opportunityId",
@@ -696,7 +705,7 @@
     "ApiAppreciationPost": {
       "$id": "ApiAppreciationPost",
       "$ref": "ApiAppreciation#",
-      "required": ["title", "dateDue"]
+      "required": ["title", "status", "dateDue"]
     },
     "ApiAppreciationPatch": {
       "$id": "ApiAppreciationPatch",
@@ -1022,6 +1031,12 @@
         "agentId": {
           "type": ["integer", "null"]
         },
+        "appointmentDate": {
+          "type": ["string", "null"]
+        },
+        "appointmentTime": {
+          "type": ["string", "null"]
+        },
         "volunteerNames": {
           "type": "array",
           "items": {
@@ -1045,7 +1060,9 @@
         "location",
         "accompanyingDetails",
         "agentTitle",
-        "agentId"
+        "agentId",
+        "appointmentDate",
+        "appointmentTime"
       ]
     },
     "ApiOpportunityGet": {
@@ -1349,6 +1366,9 @@
         },
         "volunteerSearch": {
           "$ref": "AgentVolunteerSearchType#"
+        },
+        "unclaimed": {
+          "type": "boolean"
         }
       }
     },
@@ -1364,7 +1384,8 @@
         "numActiveVolunteers",
         "numOpportunities",
         "email",
-        "volunteerSearch"
+        "volunteerSearch",
+        "unclaimed"
       ]
     },
     "AgentProps": {
@@ -1492,6 +1513,7 @@
         "numActiveVolunteers",
         "email",
         "volunteerSearch",
+        "unclaimed",
         "createdAt",
         "statusEngagement",
         "agentDetails",

@@ -133,6 +133,39 @@ async function jwtPlugin(
       }
     };
   });
+
+  // Best-effort caller identification for genuinely public routes that still
+  // need to vary behavior for a logged-in privileged caller (be#903: GET
+  // /event shows everything to a coordinator, only active events to everyone
+  // else). Never throws — anything short of a valid, unexpired "access"
+  // token just leaves request.authUser unset, same as an anonymous caller.
+  // Doesn't support the API-key path or role/allowSelf options: those only
+  // make sense for a route that actually requires auth.
+  //
+  // Checks the token's `type` claim (authenticate()'s cookie path doesn't —
+  // a pre-existing gap tracked separately, out of scope to fix here): a
+  // "verify"/"reset" token (be#... email-verification tokens are signed with
+  // no expiry at all) is otherwise a validly-signed, never-expiring
+  // credential that would silently grant permanent access here.
+  fastify.decorate("tryAuthenticate", function () {
+    return async function (request: FastifyRequest) {
+      try {
+        await request.jwtVerify();
+        if ((request.user as { type?: string })?.type !== "access") {
+          return;
+        }
+
+        const user = await fastify.db.userRepository.findOne({
+          where: { id: request.user?.id },
+        });
+        if (user) {
+          request.authUser = user;
+        }
+      } catch {
+        return;
+      }
+    };
+  });
 }
 
 export default fp(jwtPlugin, {

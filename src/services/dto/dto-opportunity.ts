@@ -8,9 +8,15 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import District from "../../data/entity/location/district.entity";
+import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
-import { formatDate, formatTime, tryCatchFn } from "../utils";
+import {
+  formatAppointmentDateTime,
+  formatDate,
+  formatTime,
+  tryCatchFn,
+} from "../utils";
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";
 import { commentSerializer } from "./dto-comment";
@@ -25,6 +31,20 @@ function getOpportunityDescription(opportunity: Opportunity) {
     return opportunity.infoConfidential;
   }
   return opportunity.info;
+}
+
+// Defense-in-depth against be#780: `accompanying` carries refugee PII
+// (name/phone/email/address/language) that only ever belongs to an
+// ACCOMPANYING-type opportunity. Gating serialization on the *current* type
+// here means a leak can't recur from a future write-path bug that leaves a
+// stale/non-cleared row behind — the DTO layer no longer trusts the DB row
+// to already be clean.
+export function accompanyingForType(
+  opportunity: Opportunity,
+): Accompanying | undefined {
+  return opportunity.type === OpportunityType.ACCOMPANYING
+    ? opportunity.accompanying
+    : undefined;
 }
 
 // Best-effort: returns the original submitter if they still hold an
@@ -57,6 +77,10 @@ export function getOpportunityContact(
 export function dtoOpportunityGetList(
   opportunity: Opportunity,
 ): ApiOpportunityGetList {
+  const { appointmentDate, appointmentTime } = formatAppointmentDateTime(
+    opportunity.onetimer?.date,
+  );
+
   return {
     id: opportunity.id,
     title: opportunity.title,
@@ -81,11 +105,13 @@ export function dtoOpportunityGetList(
     })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunity.accompanying!,
+      accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
     ),
     agentTitle: opportunity.agent?.title ?? "",
     agentId: opportunity.agentId,
+    appointmentDate,
+    appointmentTime,
     // Names of the volunteers MATCHED to the opportunity (status opp-matched
     // only — not pending/active/past links). PII masking runs before this DTO,
     // so masked names pass through. Needs the
@@ -123,7 +149,7 @@ export function dtoVolunteerOpportunityGetList(
     })),
     availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunity.accompanying!,
+      accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
       opportunity.deal.dealLanguage,
     ),
@@ -140,6 +166,10 @@ export function dtoOpportunityGet(
       ? opportunityComments.onetimer?.date
       : undefined;
 
+  const { appointmentDate, appointmentTime } = formatAppointmentDateTime(
+    opportunityComments.onetimer?.date,
+  );
+
   return {
     id: opportunityComments.id,
     title: opportunityComments.title,
@@ -154,6 +184,8 @@ export function dtoOpportunityGet(
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
     agentId: opportunityComments.agentId,
+    appointmentDate,
+    appointmentTime,
     languages: opportunityComments.deal.dealLanguage
       .filter(Boolean)
       .map((pl) => ({
@@ -180,7 +212,7 @@ export function dtoOpportunityGet(
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
-      opportunityComments.accompanying!,
+      accompanyingForType(opportunityComments)!,
       opportunityComments.onetimer?.date,
       opportunityComments.deal.dealLanguage,
       accompanyingDistrict,

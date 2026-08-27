@@ -7,6 +7,7 @@ export const RoutePrefix = {
   COMMUNICATION: "/communication",
   CONTACT: "/contact",
   DOC: "/doc",
+  EVENT: "/event",
   EVENT_REGISTRATION: "/event-registration",
   HEALTH_CHECK: "/health-check",
   LEGACY: "/legacy",

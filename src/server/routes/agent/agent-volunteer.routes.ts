@@ -1,8 +1,14 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { NotFoundError } from "../../../config";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
+import {
+  assertAgentVisible,
+  maskVolunteerIdentities,
+  shouldMaskInactiveAgentData,
+} from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
@@ -27,6 +33,12 @@ export default function agentVolunteerRoutes(
     async (request, reply) => {
       const { id } = request.params;
 
+      const agent = await fastify.db.agentRepository.findOneBy({ id });
+      if (!agent) {
+        throw new NotFoundError(`Agent (id:${id}) not found.`);
+      }
+      assertAgentVisible(agent, request.authUser?.role);
+
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
 
@@ -43,6 +55,13 @@ export default function agentVolunteerRoutes(
           "volunteer.deal.dealDistrict.district",
         ],
       });
+
+      // An INACTIVE agent's linked volunteers shouldn't read as live,
+      // actionable data (be#885) — mask volunteer identity for everyone
+      // except coordinator/admin.
+      if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
+        maskVolunteerIdentities(volunteers);
+      }
 
       // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({

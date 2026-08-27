@@ -22,11 +22,25 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ghcr.io/need4deed-org/be:develop
+
+      - name: Publish develop digest for prod release pipeline
+        # A repository variable ON infra (not an org variable) - infra's
+        # release-prod.yaml reads this for free as ${{ vars.BE_DEVELOP_DIGEST }}
+        # since it's the same repo the variable lives on. be's own image
+        # isn't rebuilt for prod, it just promotes whatever's on :develop.
+        # continue-on-error: the dev rollout below must still run even before
+        # the PAT secret this needs exists, or once it's created but expires -
+        # this step failing must never take down deploy-aits's actual job.
+        continue-on-error: true
+        run: gh variable set BE_DEVELOP_DIGEST --repo need4deed-org/infra --body "${{ steps.build.outputs.digest }}"
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
 
       - name: Roll out new image on AITS
         uses: appleboy/ssh-action@v1
@@ -42,4 +56,12 @@ jobs:
           script: |
             set -e
             kubectl rollout restart deployment/be -n n4d-dev
-            kubectl rollout status deployment/be -n n4d-dev --timeout=120s
+            # 120s was too tight for a legitimately slow-but-healthy cold start
+            # (observed ~85s just to bring up TypeORM/Fastify under this
+            # container's cpu limit) — the rollout succeeded but CI still
+            # reported failure. infra/base/be/deployment.yaml's startupProbe
+            # now absorbs that variance (worst case ~180s before it gives up),
+            # so this only needs to clear that ceiling plus one readiness
+            # check — not open all the way to 300s, which would blunt be#868's
+            # fast-fail on a genuinely stuck/unschedulable rollout.
+            kubectl rollout status deployment/be -n n4d-dev --timeout=220s
