@@ -71,6 +71,42 @@ describe("serializeUserToMeDTO", () => {
     expect(result.agentId).toBe(99);
   });
 
+  it("includes agentMemberships in the result when provided", () => {
+    const user = {
+      id: 6,
+      personId: 12,
+      email: "multi-agent@example.com",
+      isActive: true,
+      role: "agent",
+      language: "en",
+      timezone: "CET",
+      person: { firstName: "Cy", name: "Cy Coordinator", avatarUrl: "" },
+    };
+
+    const agentMemberships = [
+      { agentId: 1, agentTitle: "RAC One" },
+      { agentId: 2, agentTitle: "RAC Two" },
+    ];
+    const result = serializeUserToMeDTO(user as any, 1, agentMemberships);
+    expect(result.agentMemberships).toEqual(agentMemberships);
+  });
+
+  it("omits agentMemberships when not provided", () => {
+    const user = {
+      id: 7,
+      personId: 13,
+      email: "single-agent@example.com",
+      isActive: true,
+      role: "agent",
+      language: "en",
+      timezone: "CET",
+      person: { firstName: "Al", name: "Al Agent", avatarUrl: "" },
+    };
+
+    const result = serializeUserToMeDTO(user as any, 1);
+    expect(result.agentMemberships).toBeUndefined();
+  });
+
   it("omits agentId when not provided", () => {
     const user = {
       id: 5,

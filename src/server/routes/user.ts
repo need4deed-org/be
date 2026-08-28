@@ -1,6 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  ApiAgentMembershipSummary,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -29,7 +30,8 @@ import {
 } from "../schema/user.schema";
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
-import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
+import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -61,7 +63,7 @@ export default async function userRoutes(
         order: { id: direction },
       });
 
-      const data = users.map(serializeUserToMeDTO);
+      const data = users.map((user) => serializeUserToMeDTO(user));
 
       return reply.status(200).send({
         message: `List of users page:${page || 1}`,
@@ -162,13 +164,27 @@ export default async function userRoutes(
         }
 
         let agentId: number | undefined;
+        let agentMemberships: ApiAgentMembershipSummary[] | undefined;
         if (user.role === UserRole.AGENT && user.personId) {
-          // Prefer VOLUNTEER_COORDINATOR role; fall back to any active membership.
-          const membership = await getAgentPersonRepresentative(user.personId);
-          agentId = membership?.agentId;
+          // Single query, derive both fields from it — querying agentId and
+          // agentMemberships separately let them race against a concurrent
+          // membership change and disagree (be#809 review).
+          const memberships = await getActiveAgentMemberships(user.personId);
+          agentId = pickRepresentativeMembership(memberships)?.agentId;
+
+          // Dedupe by agentId: a person can hold multiple roles at the same
+          // agent (AgentPerson's unique index is the (agentId, personId,
+          // role) triple), but ApiAgentMembershipSummary has no role field.
+          const membershipsByAgentId = new Map(
+            memberships.map((m) => [
+              m.agentId,
+              { agentId: m.agentId, agentTitle: m.agent?.title ?? "" },
+            ]),
+          );
+          agentMemberships = Array.from(membershipsByAgentId.values());
         }
 
-        const payload = serializeUserToMeDTO(user, agentId);
+        const payload = serializeUserToMeDTO(user, agentId, agentMemberships);
         return reply
           .status(200)
           .send({ message: "Logged in User", data: payload });
