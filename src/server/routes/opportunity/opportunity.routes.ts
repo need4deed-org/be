@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  AgentMembershipStatus,
   ApiOpportunityGet,
   ApiOpportunityPatch,
   CommunicationType,
@@ -464,6 +465,7 @@ export default async function opportunityRoutes(
           ? await fastify.db.agentPersonRepository.findOneBy({
               agentId,
               personId,
+              status: AgentMembershipStatus.ACTIVE,
             })
           : null;
         if (!membership) {
@@ -639,6 +641,7 @@ export default async function opportunityRoutes(
           ? await fastify.db.agentPersonRepository.findOneBy({
               agentId: opportunity.agentId,
               personId,
+              status: AgentMembershipStatus.ACTIVE,
             })
           : null;
         if (!membership) {
