@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The core API for the Need4Deed platform — a Berlin-based NGO that connects volunteers with refugee accommodation centers. This backend manages users, deeds (tasks/opportunities), volunteer profiles, center profiles, and the matching logic between them.
 
-Built with: **Node.js 22+ / TypeScript / Fastify 5 / TypeORM / PostgreSQL**, deployed on AWS.
+Built with: **Node.js 22+ / TypeScript / Fastify 5 / TypeORM / PostgreSQL**, deployed on Kubernetes (k3s) — prod on a dedicated Infomaniak VPS, dev/pre on the shared AITS VPS. See the `infra` repo (`infra/CLAUDE.md`, `infra/docs/dev-guide.md`) for the deployment setup.
 
 This is an open-source project. Contributors may be volunteer developers with varying experience levels. Be patient, explain clearly, and avoid introducing unnecessary complexity.
 
