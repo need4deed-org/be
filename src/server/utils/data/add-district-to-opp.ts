@@ -1,4 +1,5 @@
 import { OpportunityType } from "need4deed-sdk";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 
@@ -12,29 +13,37 @@ export function getDistrictToOpportunityHandler() {
       if (opportunity.districtId) {
         return opportunity;
       }
-      if (opportunity.type !== OpportunityType.ACCOMPANYING) {
-        const district = opportunity.deal?.dealDistrict?.[0]?.district;
+
+      // ACCOMPANYING: derive from the appointment's own postcode (be#895).
+      // `deal.postcode` mirrors the agent's own postcode — an unrelated
+      // concept — so it isn't used here.
+      if (opportunity.type === OpportunityType.ACCOMPANYING) {
+        const postcode =
+          opportunity.accompanying?.postcode ??
+          (opportunity.accompanying?.postcodeId
+            ? new Postcode({ id: opportunity.accompanying.postcodeId })
+            : undefined);
+        const district = postcode
+          ? await getDistrictFromPostcode(postcode)
+          : null;
         if (district) {
           opportunity.district = district;
           updates.push(opportunity);
+          return opportunity;
         }
-        return opportunity;
       }
-      // accompanying: use appointment postcode from the form
-      const district = await getDistrictFromPostcode(
-        opportunity.deal?.postcode,
-      );
-      if (district) {
-        opportunity.district = district;
-        updates.push(opportunity);
-        return opportunity;
-      }
-      // fallback to agent
+
+      // REGULAR/EVENTS use the opportunity's own agent's district (be#895).
+      // Also the fallback for an ACCOMPANYING opportunity whose appointment
+      // postcode didn't resolve to a district. `agent.districtId` is an
+      // already-loaded FK column wherever `agent` is loaded at all, no extra
+      // relation needed.
       if (opportunity.agent?.districtId) {
         opportunity.districtId = opportunity.agent.districtId;
         updates.push(opportunity);
         return opportunity;
       }
+
       const districtFromAgent = await getDistrictFromPostcode(
         opportunity.agent?.address?.postcode,
       );
