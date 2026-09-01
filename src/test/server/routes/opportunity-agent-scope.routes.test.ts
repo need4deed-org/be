@@ -88,6 +88,12 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
       .orderBy("COUNT(*)", "DESC")
       .getRawMany<{ agentId: number; count: string }>();
 
+    if (owned.length < 2) {
+      throw new Error(
+        `This suite needs at least 2 agents owning opportunities, found ${owned.length}.`,
+      );
+    }
+
     ownAgentId = Number(owned[0].agentId);
     otherAgentId = Number(owned[1].agentId);
     ownAgentOpportunityCount = Number(owned[0].count);
