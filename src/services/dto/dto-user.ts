@@ -1,7 +1,11 @@
-import { ApiUserGet } from "need4deed-sdk";
+import { ApiAgentMembershipSummary, ApiUserGet } from "need4deed-sdk";
 import User from "../../data/entity/user.entity";
 
-export function serializeUserToMeDTO(user: User, agentId?: number): ApiUserGet {
+export function serializeUserToMeDTO(
+  user: User,
+  agentId?: number,
+  agentMemberships?: ApiAgentMembershipSummary[],
+): ApiUserGet {
   return {
     id: user.id,
     // personId is nullable (person-less users); emit undefined so the
@@ -16,5 +20,6 @@ export function serializeUserToMeDTO(user: User, agentId?: number): ApiUserGet {
     isoCode: user.language || "en",
     timezone: user.timezone || "CET",
     agentId,
+    agentMemberships,
   };
 }
