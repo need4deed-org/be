@@ -81,7 +81,7 @@
       },
       "location": { "districts": ["Mitte"] }
     },
-    "volunteerNids": [["VOL-003", "opp-active"]]
+    "volunteerNids": [["VOL-003", "opp-past"]]
   },
   {
     "nid": "OPP-003",
