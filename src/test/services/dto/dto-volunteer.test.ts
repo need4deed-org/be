@@ -10,7 +10,6 @@ vi.mock("../../../services/dto/utils", () => ({
   ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
   getOptionItems: vi.fn(() => [{ id: 1, title: "Teaching" }]),
-  getTitles: vi.fn(() => ["Teaching"]),
 }));
 
 function makeVolunteer(overrides = {}) {
