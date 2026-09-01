@@ -14,7 +14,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { EntityManager, FindOptionsWhere, In } from "typeorm";
+import { EntityManager, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -306,11 +306,8 @@ export default async function opportunityRoutes(
             count: 0,
           });
         }
-        // Spread so this composes if getOpportunityWhere ever sets an agent filter;
-        where.agent = {
-          ...(where.agent as FindOptionsWhere<Agent> | undefined),
-          id: In(agentIds),
-        };
+        // NGOs are scoped to their own agents, so this overwrites any agent condition.
+        where.agent = { id: In(agentIds) };
       }
 
       logger.debug(
