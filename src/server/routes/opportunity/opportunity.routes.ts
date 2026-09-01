@@ -759,6 +759,7 @@ export default async function opportunityRoutes(
           await fastify.db.agentPersonRepository.findOneBy({
             agentId: effectiveAgentId,
             personId: contactLinkId,
+            status: AgentMembershipStatus.ACTIVE,
           });
         if (!agentContactMembership) {
           throw new NotFoundError(
