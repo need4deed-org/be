@@ -1,9 +1,11 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { BadRequestError } from "../../../config/error/fastify";
+import { UserRole } from "need4deed-sdk";
+import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import {
+  getCallerAgentIds,
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
@@ -54,12 +56,25 @@ export default function opportunityOpportunityVolunteerRoutes(
         ],
       });
 
+      const agent = volunteers[0]?.opportunity?.agent;
+
+      if (agent && request.authUser?.role === UserRole.AGENT) {
+        const agentIds = await getCallerAgentIds(
+          fastify,
+          request.authUser.personId,
+        );
+        if (!agentIds.includes(agent.id)) {
+          throw new NotFoundError(
+            `Opportunity (id:${opportunityId}) not found.`,
+          );
+        }
+      }
+
       // An INACTIVE agent's linked volunteers shouldn't read as live,
       // actionable data (be#885) here either — this route surfaces the same
       // underlying rows as GET /agent/:id/volunteer-linked, just scoped by
       // opportunityId instead of agentId, so it needs the same rule. All
       // rows share one opportunity/agent, so checking the first is enough.
-      const agent = volunteers[0]?.opportunity?.agent;
       if (agent && shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
         maskVolunteerIdentities(volunteers);
       }
