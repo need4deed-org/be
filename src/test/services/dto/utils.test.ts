@@ -130,7 +130,7 @@ describe("formatScheduleDe / formatScheduleBilingual", () => {
     ];
 
     expect(formatScheduleDe(dealTimeslot)).toBe(
-      "Montag, 08–11 Uhr, gelegentlich, werktags",
+      "Montag, 08–11 Uhr, gelegentlich, wochentags",
     );
   });
 

@@ -121,7 +121,7 @@ const TIME_SLOT_LABELS_DE: Record<TimeSlot, string> = {
 };
 
 const OCCASIONAL_LABELS_DE: Record<OccasionalType, string> = {
-  [OccasionalType.WEEKDAYS]: "gelegentlich, werktags",
+  [OccasionalType.WEEKDAYS]: "gelegentlich, wochentags",
   [OccasionalType.WEEKENDS]: "gelegentlich, am Wochenende",
 };
 
@@ -152,7 +152,7 @@ const TIME_SLOT_LABELS_NEUTRAL: Record<TimeSlot, string> = {
 };
 
 const OCCASIONAL_LABELS_BILINGUAL: Record<OccasionalType, string> = {
-  [OccasionalType.WEEKDAYS]: "werktags/on weekdays",
+  [OccasionalType.WEEKDAYS]: "wochentags/on weekdays",
   [OccasionalType.WEEKENDS]: "am Wochenende/on weekends",
 };
 
