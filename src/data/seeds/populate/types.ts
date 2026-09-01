@@ -107,8 +107,9 @@ export interface AgentJSON {
   postcodes: string[];
   phone: string;
   status: string;
-  person: (PersonJSON & { role: string })[];
+  person: (PersonJSON & { role: string; status?: string })[];
   operator: string;
   opportunityNids: string[];
   accompanyingRelations: string[];
+  unclaimed?: boolean;
 }
