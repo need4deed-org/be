@@ -11,6 +11,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionManifestUrl);
@@ -33,8 +34,12 @@ export async function sendEmailSuggestion(
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
   const plz = ov.volunteer.deal?.postcode?.value ?? "";
-  const schedule = formatScheduleBilingual(
+  const schedule = await resolveScheduleOrAlert(
+    email,
     ov.volunteer.deal?.dealTimeslot ?? [],
+    formatScheduleBilingual,
+    "wird noch abgestimmt/to be confirmed",
+    `sendEmailSuggestion, ov ${ov.id}`,
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);

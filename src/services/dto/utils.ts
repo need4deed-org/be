@@ -90,6 +90,14 @@ function formatSchedule(
             labels.occasional[daytime as OccasionalType] ?? String(daytime)
           );
         }
+        // `day === null` (as opposed to undefined, which is the genuine
+        // one-off-slot case below) means getByDay() couldn't find a BYDAY in
+        // a weekly rrule — malformed data, not a date string to fall back to.
+        if (day === null) {
+          throw new Error(
+            "Timeslot has a weekly rrule with no recognizable BYDAY",
+          );
+        }
         if (day) {
           const dayLabel = labels.day[day as ByDay] ?? String(day);
           const timeLabel =

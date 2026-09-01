@@ -18,6 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailIntroductionManifestUrl);
@@ -92,7 +93,13 @@ export async function sendEmailIntroduction(
     .map((s) => s.title)
     .join(", ");
 
-  const volSchedule = formatScheduleDe(volunteer.deal?.dealTimeslot ?? []);
+  const volSchedule = await resolveScheduleOrAlert(
+    email,
+    volunteer.deal?.dealTimeslot ?? [],
+    formatScheduleDe,
+    "wird noch abgestimmt",
+    `sendEmailIntroduction, ov ${ov.id}`,
+  );
 
   const agentAddress = (() => {
     const addr = opportunity.agent?.address;
