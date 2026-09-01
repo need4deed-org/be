@@ -72,6 +72,37 @@ export function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
   throw new Error("From or To hour value is not supported");
 }
 
+interface ScheduleLabels {
+  day: Record<ByDay, string>;
+  timeSlot: Record<TimeSlot, string>;
+  occasional: Record<OccasionalType, string>;
+}
+
+function formatSchedule(
+  dealTimeslot: DealTimeslot[],
+  labels: ScheduleLabels,
+): string {
+  return (
+    getAvailability(dealTimeslot)
+      ?.map(({ day, daytime }) => {
+        if (day === Occasionally.OCCASIONALLY) {
+          return (
+            labels.occasional[daytime as OccasionalType] ?? String(daytime)
+          );
+        }
+        if (day) {
+          const dayLabel = labels.day[day as ByDay] ?? String(day);
+          const timeLabel =
+            labels.timeSlot[daytime as TimeSlot] ?? String(daytime);
+          return `${dayLabel}, ${timeLabel}`;
+        }
+        // one-off slot: daytime is already a localized date/time string
+        return String(daytime);
+      })
+      .join(", ") ?? ""
+  );
+}
+
 const DAY_LABELS_DE: Record<ByDay, string> = {
   [ByDay.MO]: "Montag",
   [ByDay.TU]: "Dienstag",
@@ -96,25 +127,43 @@ const OCCASIONAL_LABELS_DE: Record<OccasionalType, string> = {
 
 // German-only, matching this codebase's other notify-email content (see be#838).
 export function formatScheduleDe(dealTimeslot: DealTimeslot[]): string {
-  return (
-    getAvailability(dealTimeslot)
-      ?.map(({ day, daytime }) => {
-        if (day === Occasionally.OCCASIONALLY) {
-          return (
-            OCCASIONAL_LABELS_DE[daytime as OccasionalType] ?? String(daytime)
-          );
-        }
-        if (day) {
-          const dayLabel = DAY_LABELS_DE[day as ByDay] ?? String(day);
-          const timeLabel =
-            TIME_SLOT_LABELS_DE[daytime as TimeSlot] ?? String(daytime);
-          return `${dayLabel}, ${timeLabel}`;
-        }
-        // one-off slot: daytime is already a localized date/time string
-        return String(daytime);
-      })
-      .join(", ") ?? ""
-  );
+  return formatSchedule(dealTimeslot, {
+    day: DAY_LABELS_DE,
+    timeSlot: TIME_SLOT_LABELS_DE,
+    occasional: OCCASIONAL_LABELS_DE,
+  });
+}
+
+const DAY_LABELS_BILINGUAL: Record<ByDay, string> = {
+  [ByDay.MO]: "Montag/Monday",
+  [ByDay.TU]: "Dienstag/Tuesday",
+  [ByDay.WE]: "Mittwoch/Wednesday",
+  [ByDay.TH]: "Donnerstag/Thursday",
+  [ByDay.FR]: "Freitag/Friday",
+  [ByDay.SA]: "Samstag/Saturday",
+  [ByDay.SU]: "Sonntag/Sunday",
+};
+
+const TIME_SLOT_LABELS_NEUTRAL: Record<TimeSlot, string> = {
+  [TimeSlot.morning]: "08:00–11:00",
+  [TimeSlot.noon]: "11:00–14:00",
+  [TimeSlot.afternoon]: "14:00–17:00",
+  [TimeSlot.evening]: "17:00–20:00",
+};
+
+const OCCASIONAL_LABELS_BILINGUAL: Record<OccasionalType, string> = {
+  [OccasionalType.WEEKDAYS]: "werktags/on weekdays",
+  [OccasionalType.WEEKENDS]: "am Wochenende/on weekends",
+};
+
+// For manifests that mix English and German in one flat body sharing a single
+// placeholder across both language halves (e.g. suggestion.json) — see be#933.
+export function formatScheduleBilingual(dealTimeslot: DealTimeslot[]): string {
+  return formatSchedule(dealTimeslot, {
+    day: DAY_LABELS_BILINGUAL,
+    timeSlot: TIME_SLOT_LABELS_NEUTRAL,
+    occasional: OCCASIONAL_LABELS_BILINGUAL,
+  });
 }
 
 export function getLanguages(dealLanguage: DealLanguage[]) {

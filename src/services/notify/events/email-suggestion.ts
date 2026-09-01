@@ -4,7 +4,7 @@ import {
   emailSuggestionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import { formatScheduleDe } from "../../dto/utils";
+import { formatScheduleBilingual } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -33,7 +33,9 @@ export async function sendEmailSuggestion(
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
   const plz = ov.volunteer.deal?.postcode?.value ?? "";
-  const schedule = formatScheduleDe(ov.volunteer.deal?.dealTimeslot ?? []);
+  const schedule = formatScheduleBilingual(
+    ov.volunteer.deal?.dealTimeslot ?? [],
+  );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
