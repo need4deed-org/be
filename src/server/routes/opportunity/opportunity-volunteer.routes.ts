@@ -38,6 +38,22 @@ export default function opportunityOpportunityVolunteerRoutes(
         throw new BadRequestError(msg400);
       }
 
+      if (request.authUser?.role === UserRole.AGENT) {
+        const opportunity = await fastify.db.opportunityRepository.findOne({
+          where: { id: opportunityId },
+          select: { id: true, agentId: true },
+        });
+        const agentIds = await getCallerAgentIds(
+          fastify,
+          request.authUser.personId,
+        );
+        if (!opportunity?.agentId || !agentIds.includes(opportunity.agentId)) {
+          throw new NotFoundError(
+            `Opportunity (id:${opportunityId}) not found.`,
+          );
+        }
+      }
+
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
 
@@ -57,19 +73,6 @@ export default function opportunityOpportunityVolunteerRoutes(
       });
 
       const agent = volunteers[0]?.opportunity?.agent;
-
-      if (agent && request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          fastify,
-          request.authUser.personId,
-        );
-        if (!agentIds.includes(agent.id)) {
-          throw new NotFoundError(
-            `Opportunity (id:${opportunityId}) not found.`,
-          );
-        }
-      }
-
       // An INACTIVE agent's linked volunteers shouldn't read as live,
       // actionable data (be#885) here either — this route surfaces the same
       // underlying rows as GET /agent/:id/volunteer-linked, just scoped by
