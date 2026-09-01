@@ -209,6 +209,15 @@ export default async function opportunityRoutes(
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
+      if (request.authUser?.role === UserRole.AGENT) {
+        const agentIds = await getCallerAgentIds(
+          fastify,
+          request.authUser.personId,
+        );
+        if (!opportunity.agentId || !agentIds.includes(opportunity.agentId)) {
+          throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+        }
+      }
 
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
