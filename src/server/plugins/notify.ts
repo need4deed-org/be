@@ -81,7 +81,13 @@ function buildVerifyEmailTransport(): EmailTransport {
   return new ValidatingEmailTransport(deliverable, smtp, errorEmailRecipient);
 }
 
-function buildNotifyEmailTransport(): EmailTransport {
+function buildNotifyEmailTransport(): {
+  deliverable: EmailTransport;
+  // The raw, un-dry-run-wrapped SMTP client — for alerts that must actually
+  // reach someone regardless of environment, same rationale as
+  // ValidatingEmailTransport's errorTransport just below (be#847).
+  raw: EmailTransport;
+} {
   const smtp = new SmtpEmailTransport({
     host: process.env.SMTP_NOTIFY_HOST ?? "mail.infomaniak.com",
     port: Number(process.env.SMTP_NOTIFY_PORT ?? 587),
@@ -90,7 +96,14 @@ function buildNotifyEmailTransport(): EmailTransport {
     from: process.env.EMAIL_FROM_NOTIFY ?? "",
   });
   const deliverable = isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
-  return new ValidatingEmailTransport(deliverable, smtp, errorEmailRecipient);
+  return {
+    deliverable: new ValidatingEmailTransport(
+      deliverable,
+      smtp,
+      errorEmailRecipient,
+    ),
+    raw: smtp,
+  };
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
@@ -113,7 +126,8 @@ function buildSlackTransport(): SlackTransport | undefined {
 
 async function notifyPlugin(fastify: FastifyInstance) {
   const emailVerify = buildVerifyEmailTransport();
-  const emailNotify = buildNotifyEmailTransport();
+  const { deliverable: emailNotify, raw: emailNotifyRaw } =
+    buildNotifyEmailTransport();
   const slack = buildSlackTransport();
 
   fastify.decorate("notify", {
@@ -125,10 +139,10 @@ async function notifyPlugin(fastify: FastifyInstance) {
     commentTagged: (input: CommentTaggedInput) =>
       sendCommentTagged({ slack }, input),
     emailSuggestion: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestion(emailNotify, ov),
+      sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(emailNotify, ov),
     emailIntroduction: (ov: OpportunityVolunteer) =>
-      sendEmailIntroduction(emailNotify, ov),
+      sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),
     emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
       sendEmailPostMatchCheckup(emailNotify, ov),
     emailAccompanyNotFound: (opportunity: Opportunity) =>

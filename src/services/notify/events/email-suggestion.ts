@@ -23,6 +23,10 @@ export function resetSuggestionTemplateCache(): void {
 export async function sendEmailSuggestion(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -35,7 +39,7 @@ export async function sendEmailSuggestion(
   const opportunityName = ov.opportunity?.title ?? "";
   const plz = ov.volunteer.deal?.postcode?.value ?? "";
   const schedule = await resolveScheduleOrAlert(
-    email,
+    errorTransport,
     ov.volunteer.deal?.dealTimeslot ?? [],
     formatScheduleBilingual,
     "wird noch abgestimmt/to be confirmed",

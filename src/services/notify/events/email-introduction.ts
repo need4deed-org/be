@@ -64,6 +64,10 @@ function resolveStatmentOnCertificates(
 export async function sendEmailIntroduction(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
@@ -94,7 +98,7 @@ export async function sendEmailIntroduction(
     .join(", ");
 
   const volSchedule = await resolveScheduleOrAlert(
-    email,
+    errorTransport,
     volunteer.deal?.dealTimeslot ?? [],
     formatScheduleDe,
     "wird noch abgestimmt",

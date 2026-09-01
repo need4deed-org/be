@@ -306,4 +306,27 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     );
     expect(message.text ?? "").not.toContain("undefined");
   });
+
+  it("sends the alert through errorTransport (not email) when the two differ", async () => {
+    const errorSend = vi.fn();
+    const errorTransport: EmailTransport = { send: errorSend };
+
+    await sendEmailIntroduction(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealTimeslot: malformedDealTimeslot },
+        }),
+      }) as unknown as Parameters<typeof sendEmailIntroduction>[1],
+      errorTransport,
+    );
+
+    // The real introduction email went out through `email`, exactly once —
+    // no alert mixed in.
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].to).not.toBe(errorEmailRecipient);
+    // The alert went through `errorTransport`, not `email`.
+    expect(errorSend).toHaveBeenCalledTimes(1);
+    expect(errorSend.mock.calls[0][0].to).toBe(errorEmailRecipient);
+  });
 });
