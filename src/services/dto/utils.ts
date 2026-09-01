@@ -184,12 +184,6 @@ export function getOptionItems<T>(
   }));
 }
 
-export function getTitles<T>(profileItems: T[], entityName: string) {
-  return profileItems?.map(
-    (pa) => pa[entityName].translation || pa[entityName].title,
-  );
-}
-
 export function getNameFields(name: string) {
   const names = name.split(" ");
 
