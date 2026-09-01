@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { errorEmailRecipient } from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   ACCOMPANY_MATCH_BUILTIN,
@@ -253,5 +254,79 @@ describe.each(CASES)("$name", ({ resetCache, send: doSend }) => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("MANIFEST SUBJECT MARKER");
+  });
+});
+
+describe("schedule fallback for malformed Timeslot data (be#932)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetIntroductionTemplateCache();
+    resetSuggestionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const malformedDealTimeslot = [
+    { timeslot: { id: 1, info: "only info set" } },
+  ];
+
+  it("sendEmailIntroduction still sends, with a fallback schedule and an alert to ERROR_EMAIL", async () => {
+    await sendEmailIntroduction(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealTimeslot: malformedDealTimeslot },
+        }),
+      }) as unknown as Parameters<typeof sendEmailIntroduction>[1],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const [alert, message] = send.mock.calls.map(([msg]) => msg);
+    expect(alert.to).toBe(errorEmailRecipient);
+    expect(alert.subject).toContain("sendEmailIntroduction");
+    expect(message.text ?? "").toContain("wird noch abgestimmt");
+    expect(message.text ?? "").not.toContain("undefined");
+  });
+
+  it("sendEmailSuggestion still sends, with a bilingual fallback schedule and an alert to ERROR_EMAIL", async () => {
+    await sendEmailSuggestion(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealTimeslot: malformedDealTimeslot },
+        }),
+      }) as unknown as Parameters<typeof sendEmailSuggestion>[1],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const [alert, message] = send.mock.calls.map(([msg]) => msg);
+    expect(alert.to).toBe(errorEmailRecipient);
+    expect(alert.subject).toContain("sendEmailSuggestion");
+    expect(message.text ?? "").toContain(
+      "wird noch abgestimmt/to be confirmed",
+    );
+    expect(message.text ?? "").not.toContain("undefined");
+  });
+
+  it("sends the alert through errorTransport (not email) when the two differ", async () => {
+    const errorSend = vi.fn();
+    const errorTransport: EmailTransport = { send: errorSend };
+
+    await sendEmailIntroduction(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealTimeslot: malformedDealTimeslot },
+        }),
+      }) as unknown as Parameters<typeof sendEmailIntroduction>[1],
+      errorTransport,
+    );
+
+    // The real introduction email went out through `email`, exactly once —
+    // no alert mixed in.
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].to).not.toBe(errorEmailRecipient);
+    // The alert went through `errorTransport`, not `email`.
+    expect(errorSend).toHaveBeenCalledTimes(1);
+    expect(errorSend.mock.calls[0][0].to).toBe(errorEmailRecipient);
   });
 });

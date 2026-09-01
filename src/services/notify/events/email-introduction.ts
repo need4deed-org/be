@@ -18,6 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailIntroductionManifestUrl);
@@ -63,6 +64,10 @@ function resolveStatmentOnCertificates(
 export async function sendEmailIntroduction(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
@@ -92,7 +97,13 @@ export async function sendEmailIntroduction(
     .map((s) => s.title)
     .join(", ");
 
-  const volSchedule = formatScheduleDe(volunteer.deal?.dealTimeslot ?? []);
+  const volSchedule = await resolveScheduleOrAlert(
+    errorTransport,
+    volunteer.deal?.dealTimeslot ?? [],
+    formatScheduleDe,
+    "wird noch abgestimmt",
+    `sendEmailIntroduction, ov ${ov.id}`,
+  );
 
   const agentAddress = (() => {
     const addr = opportunity.agent?.address;

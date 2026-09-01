@@ -161,4 +161,30 @@ describe("formatScheduleDe / formatScheduleBilingual", () => {
       "am Wochenende/on weekends",
     );
   });
+
+  it("should throw for a Timeslot with none of occasional/rrule/start", () => {
+    const dealTimeslot = [
+      new DealTimeslot({ timeslot: new Timeslot({ info: "only info set" }) }),
+    ];
+
+    expect(() => formatScheduleDe(dealTimeslot)).toThrow(
+      "Timeslot is lacking required fields",
+    );
+  });
+
+  it("should throw for a weekly rrule with no recognizable BYDAY", () => {
+    const dealTimeslot = [
+      new DealTimeslot({
+        timeslot: new Timeslot({
+          rrule: "FREQ=WEEKLY;",
+          start: new Date("2026-01-05T08:00:00Z"),
+          end: new Date("2026-01-05T11:00:00Z"),
+        }),
+      }),
+    ];
+
+    expect(() => formatScheduleDe(dealTimeslot)).toThrow(
+      "Timeslot has a weekly rrule with no recognizable BYDAY",
+    );
+  });
 });

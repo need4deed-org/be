@@ -11,6 +11,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionManifestUrl);
@@ -22,6 +23,10 @@ export function resetSuggestionTemplateCache(): void {
 export async function sendEmailSuggestion(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -33,8 +38,12 @@ export async function sendEmailSuggestion(
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
   const plz = ov.volunteer.deal?.postcode?.value ?? "";
-  const schedule = formatScheduleBilingual(
+  const schedule = await resolveScheduleOrAlert(
+    errorTransport,
     ov.volunteer.deal?.dealTimeslot ?? [],
+    formatScheduleBilingual,
+    "wird noch abgestimmt/to be confirmed",
+    `sendEmailSuggestion, ov ${ov.id}`,
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
