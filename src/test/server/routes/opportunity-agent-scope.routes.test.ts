@@ -151,6 +151,59 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     ).toBe(true);
   });
 
+  it("404s when an AGENT fetches another agent's linked volunteers", async () => {
+    const link = await fastify.db.opportunityVolunteerRepository.findOne({
+      where: { opportunity: { agentId: otherAgentId } },
+      relations: ["opportunity"],
+    });
+    expect(link).toBeTruthy();
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${link!.opportunityId}/volunteer-linked`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("lets an AGENT fetch their own agent's linked volunteers", async () => {
+    const link = await fastify.db.opportunityVolunteerRepository.findOne({
+      where: { opportunity: { agentId: ownAgentId } },
+      relations: ["opportunity"],
+    });
+    expect(link).toBeTruthy();
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${link!.opportunityId}/volunteer-linked`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("404s when an AGENT fetches another agent's opportunity by id", async () => {
+    const other = await fastify.db.opportunityRepository.findOneBy({
+      agentId: otherAgentId,
+    });
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${other!.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+  it("lets an AGENT fetch their own agent's opportunity by id", async () => {
+    const own = await fastify.db.opportunityRepository.findOneBy({
+      agentId: ownAgentId,
+    });
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${own!.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
   it("covers every agent a caller is a member of, not just the first", async () => {
     await fastify.db.agentPersonRepository.save(
       new AgentPerson({
