@@ -7,7 +7,11 @@ import {
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
-import { getLanguages, getOptionItems, getTitles } from "../../dto/utils";
+import {
+  formatScheduleDe,
+  getLanguages,
+  getOptionItems,
+} from "../../dto/utils";
 import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -88,10 +92,7 @@ export async function sendEmailIntroduction(
     .map((s) => s.title)
     .join(", ");
 
-  const volSchedule =
-    getTitles(volunteer.deal?.dealTimeslot ?? [], "timeslot")
-      .map((t) => String(t))
-      .join(", ") || "";
+  const volSchedule = formatScheduleDe(volunteer.deal?.dealTimeslot ?? []);
 
   const agentAddress = (() => {
     const addr = opportunity.agent?.address;

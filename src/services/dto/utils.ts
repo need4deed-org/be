@@ -2,6 +2,7 @@ import {
   ApiAvailability,
   ByDay,
   Occasionally,
+  OccasionalType,
   OptionItem,
   TimeSlot,
 } from "need4deed-sdk";
@@ -69,6 +70,51 @@ export function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {
   }
 
   throw new Error("From or To hour value is not supported");
+}
+
+const DAY_LABELS_DE: Record<ByDay, string> = {
+  [ByDay.MO]: "Montag",
+  [ByDay.TU]: "Dienstag",
+  [ByDay.WE]: "Mittwoch",
+  [ByDay.TH]: "Donnerstag",
+  [ByDay.FR]: "Freitag",
+  [ByDay.SA]: "Samstag",
+  [ByDay.SU]: "Sonntag",
+};
+
+const TIME_SLOT_LABELS_DE: Record<TimeSlot, string> = {
+  [TimeSlot.morning]: "08–11 Uhr",
+  [TimeSlot.noon]: "11–14 Uhr",
+  [TimeSlot.afternoon]: "14–17 Uhr",
+  [TimeSlot.evening]: "17–20 Uhr",
+};
+
+const OCCASIONAL_LABELS_DE: Record<OccasionalType, string> = {
+  [OccasionalType.WEEKDAYS]: "gelegentlich, werktags",
+  [OccasionalType.WEEKENDS]: "gelegentlich, am Wochenende",
+};
+
+// German-only, matching this codebase's other notify-email content (see be#838).
+export function formatScheduleDe(dealTimeslot: DealTimeslot[]): string {
+  return (
+    getAvailability(dealTimeslot)
+      ?.map(({ day, daytime }) => {
+        if (day === Occasionally.OCCASIONALLY) {
+          return (
+            OCCASIONAL_LABELS_DE[daytime as OccasionalType] ?? String(daytime)
+          );
+        }
+        if (day) {
+          const dayLabel = DAY_LABELS_DE[day as ByDay] ?? String(day);
+          const timeLabel =
+            TIME_SLOT_LABELS_DE[daytime as TimeSlot] ?? String(daytime);
+          return `${dayLabel}, ${timeLabel}`;
+        }
+        // one-off slot: daytime is already a localized date/time string
+        return String(daytime);
+      })
+      .join(", ") ?? ""
+  );
 }
 
 export function getLanguages(dealLanguage: DealLanguage[]) {
