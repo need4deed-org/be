@@ -82,6 +82,12 @@ export const seedVolunteersFile = path.join(
   "nid-volunteers.json",
 );
 
+export const seedEventsFile = path.join(
+  __dirname,
+  ...["..", "data", "seeds", "fixtures"],
+  "nid-events.json",
+);
+
 export const urlEmailVerification =
   process.env.URL_EMAIL_VERIFICATION ||
   "https://app.need4deed.org/verify-email";

@@ -3,6 +3,7 @@ import { check } from "..";
 import { seedAgentUsers } from "./populate/agent-user.seed";
 import { seedAgents } from "./populate/agent.seed";
 import { devTime } from "./populate/dev-parsing";
+import { seedEvents } from "./populate/event.seed";
 import { seedOpportunities } from "./populate/opportunity.seed";
 import { seedVolunteers } from "./populate/volunteer.seed";
 import { seedReference } from "./reference";
@@ -20,6 +21,7 @@ export async function seed(dataSource: DataSource) {
     await seedAgentUsers(dataSource);
     await seedOpportunities(dataSource);
     await seedVolunteers(dataSource);
+    await seedEvents(dataSource);
   }
 
   return dataSource;
