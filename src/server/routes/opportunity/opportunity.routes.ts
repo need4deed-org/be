@@ -764,7 +764,7 @@ export default async function opportunityRoutes(
           });
         if (!agentContactMembership) {
           throw new NotFoundError(
-            `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
+            `Contact (personId:${contactLinkId}) has no active membership at this opportunity's agent.`,
           );
         }
       }
