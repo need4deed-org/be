@@ -25,6 +25,7 @@ function makeOpportunity(
     district: undefined,
     agent: undefined,
     deal: undefined,
+    accompanying: undefined,
     ...overrides,
   } as Opportunity;
 }
@@ -43,69 +44,129 @@ describe("getDistrictToOpportunityHandler", () => {
   });
 
   describe("addDistrictToOpportunity", () => {
-    describe("Non-ACCOMPANYING Type", () => {
-      it("assigns district from deal location and returns early", async () => {
+    it("does nothing if opportunity.districtId is already set", async () => {
+      const handler = getDistrictToOpportunityHandler();
+      const opportunity = makeOpportunity({
+        type: OpportunityType.REGULAR,
+        districtId: 3,
+        agent: { districtId: 99 } as any,
+      });
+
+      const result = await handler.addDistrictToOpportunity(opportunity);
+
+      expect(result.districtId).toBe(3);
+      expect(handler.updates).toHaveLength(0);
+      expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+    });
+
+    describe("REGULAR / EVENTS", () => {
+      it("uses the opportunity's own agent's districtId", async () => {
         const handler = getDistrictToOpportunityHandler();
-        const district = makeDistrict({ id: 5 });
         const opportunity = makeOpportunity({
           type: OpportunityType.REGULAR,
-          deal: {
-            dealDistrict: [{ district }],
-          } as any,
+          agent: { districtId: 5 } as any,
         });
 
         const result = await handler.addDistrictToOpportunity(opportunity);
 
-        expect(result.district).toBe(district);
+        expect(result.districtId).toBe(5);
         expect(handler.updates).toContain(opportunity);
         expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
       });
-    });
 
-    describe("ACCOMPANYING Type Resolution Priority", () => {
-      it("Priority 1: assigns district from deal postcode", async () => {
+      it("falls back to the agent's own address postcode when agent.districtId is missing", async () => {
         const handler = getDistrictToOpportunityHandler();
-        const district = makeDistrict({ id: 101 });
+        const district = makeDistrict({ id: 202 });
         const opportunity = makeOpportunity({
-          type: OpportunityType.ACCOMPANYING,
-          deal: { postcode: "12345" } as any,
+          type: OpportunityType.EVENTS,
+          agent: { address: { postcode: "54321" } } as any,
         });
         mockedGetDistrictFromPostcode.mockResolvedValue(district as any);
 
         const result = await handler.addDistrictToOpportunity(opportunity);
 
-        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith("12345");
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith("54321");
         expect(result.district).toBe(district);
         expect(handler.updates).toContain(opportunity);
       });
 
-      it("Priority 2: falls back to agent.districtId if deal postcode lookup fails", async () => {
+      it("does not add to updates if no agent info is available", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.REGULAR,
+          agent: undefined,
+        });
+        mockedGetDistrictFromPostcode.mockResolvedValue(undefined!);
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(result.district).toBeUndefined();
+        expect(result.districtId).toBeUndefined();
+        expect(handler.updates).toHaveLength(0);
+      });
+    });
+
+    describe("ACCOMPANYING resolution priority", () => {
+      it("Priority 1: resolves from the accompanying's own postcode relation", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const district = makeDistrict({ id: 101 });
+        const postcode = { id: 7, value: "12345" };
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: { postcode } as any,
+        });
+        mockedGetDistrictFromPostcode.mockResolvedValue(district as any);
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(postcode);
+        expect(result.district).toBe(district);
+        expect(handler.updates).toContain(opportunity);
+      });
+
+      it("resolves from accompanying.postcodeId when the postcode relation isn't loaded", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const district = makeDistrict({ id: 303 });
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: { postcodeId: 42 } as any,
+        });
+        mockedGetDistrictFromPostcode.mockResolvedValue(district as any);
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(42);
+        expect(result.district).toBe(district);
+        expect(handler.updates).toContain(opportunity);
+      });
+
+      it("Priority 2: falls back to agent.districtId if the appointment postcode lookup fails", async () => {
         const handler = getDistrictToOpportunityHandler();
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          deal: { postcode: "INVALID" } as any,
+          accompanying: { postcode: { id: 7 } } as any,
           agent: { districtId: 99 } as any,
         });
         mockedGetDistrictFromPostcode.mockResolvedValue(undefined!);
 
         const result = await handler.addDistrictToOpportunity(opportunity);
 
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledTimes(1);
         expect(result.districtId).toBe(99);
         expect(handler.updates).toContain(opportunity);
       });
 
-      it("Priority 3: falls back to agent postcode if agent.districtId is missing", async () => {
+      it("Priority 3: falls back to the agent's address postcode if agent.districtId is also missing", async () => {
         const handler = getDistrictToOpportunityHandler();
         const district = makeDistrict({ id: 202 });
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          deal: { postcode: "INVALID" } as any,
-          agent: {
-            address: { postcode: "54321" },
-          } as any,
+          accompanying: { postcode: { id: 7 } } as any,
+          agent: { address: { postcode: "54321" } } as any,
         });
 
-        // First call (deal postcode) returns null, second call (agent postcode) returns district
+        // First call (appointment postcode) returns nothing, second call
+        // (agent's own postcode) resolves.
         mockedGetDistrictFromPostcode
           .mockResolvedValueOnce(undefined!)
           .mockResolvedValueOnce(district as any);
@@ -116,14 +177,27 @@ describe("getDistrictToOpportunityHandler", () => {
         expect(result.district).toBe(district);
         expect(handler.updates).toContain(opportunity);
       });
-    });
 
-    describe("Edge Cases", () => {
+      it("handles a missing accompanying object gracefully", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: undefined,
+          agent: { districtId: 77 } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(result.districtId).toBe(77);
+        expect(handler.updates).toHaveLength(1);
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+      });
+
       it("does not add to updates if no district info is found anywhere", async () => {
         const handler = getDistrictToOpportunityHandler();
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          deal: undefined,
+          accompanying: undefined,
           agent: undefined,
         });
         mockedGetDistrictFromPostcode.mockResolvedValue(undefined!);
@@ -133,19 +207,43 @@ describe("getDistrictToOpportunityHandler", () => {
         expect(result.district).toBeUndefined();
         expect(handler.updates).toHaveLength(0);
       });
+    });
 
-      it("handles missing deal object gracefully for ACCOMPANYING type", async () => {
+    describe("precomputed accompanyingDistrict (caller already resolved it)", () => {
+      it("reuses a truthy precomputed district instead of querying again", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const district = makeDistrict({ id: 404 });
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: { postcode: { id: 7 } } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(
+          opportunity,
+          district as any,
+        );
+
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+        expect(result.district).toBe(district);
+        expect(handler.updates).toContain(opportunity);
+      });
+
+      it("treats an explicit null as 'already tried, nothing found' and falls back to the agent", async () => {
         const handler = getDistrictToOpportunityHandler();
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          agent: { districtId: 77 } as any,
+          accompanying: { postcode: { id: 7 } } as any,
+          agent: { districtId: 99 } as any,
         });
-        mockedGetDistrictFromPostcode.mockResolvedValue(undefined!);
 
-        await handler.addDistrictToOpportunity(opportunity);
+        const result = await handler.addDistrictToOpportunity(
+          opportunity,
+          null,
+        );
 
-        expect(opportunity.districtId).toBe(77);
-        expect(handler.updates).toHaveLength(1);
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+        expect(result.districtId).toBe(99);
+        expect(handler.updates).toContain(opportunity);
       });
     });
   });
@@ -157,11 +255,11 @@ describe("getDistrictToOpportunityHandler", () => {
 
       const o1 = makeOpportunity({
         type: OpportunityType.ACCOMPANYING,
-        deal: { postcode: "1" } as any,
+        accompanying: { postcode: { id: 1 } } as any,
       });
       const o2 = makeOpportunity({
         type: OpportunityType.ACCOMPANYING,
-        deal: { postcode: "2" } as any,
+        accompanying: { postcode: { id: 2 } } as any,
       });
 
       await handler.addDistrictToOpportunity(o1);

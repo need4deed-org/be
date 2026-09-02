@@ -10,6 +10,7 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import District from "../../../data/entity/location/district.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -159,6 +160,115 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
     expect(saved.deal.dealLanguage.map((dl) => dl.language.id)).toEqual([
       language.id,
     ]);
+  });
+});
+
+// Regression test for be#926 review: POST /opportunity (dashboard create)
+// never assigned opportunity.agent (only opportunity.agentId), so
+// addDistrictToOpportunity's agent-based district resolution for
+// REGULAR/EVENTS opportunities silently found nothing and every opportunity
+// was created with district_id NULL until a later GET request happened to
+// load the agent relation and backfill it.
+describe("POST /opportunity resolves district from the agent at creation", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+  let addressId: number;
+  let district: District;
+  let createdOpportunityId: number;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    district = await getRepository(dataSource, District).save(
+      new District({ title: `Test District ${suffix}` }),
+    );
+
+    const addressRepository = getRepository(dataSource, Address);
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    addressId = address.id;
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent ${suffix}`,
+        addressId: address.id,
+        districtId: district.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-district-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-district-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    if (createdOpportunityId) {
+      await fastify.db.opportunityRepository.delete({
+        id: createdOpportunityId,
+      });
+    }
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: addressId });
+    await getRepository(dataSource, District).delete({ id: district.id });
+    await fastify.close();
+  });
+
+  it("sets districtId immediately from the agent, without needing a follow-up GET", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Opportunity District ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdOpportunityId = res.json().data.id;
+
+    const opportunityRepository = getRepository(dataSource, Opportunity);
+    const saved = await opportunityRepository.findOneOrFail({
+      where: { id: createdOpportunityId },
+    });
+
+    expect(saved.districtId).toBe(district.id);
   });
 });
 
