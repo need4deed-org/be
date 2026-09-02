@@ -31,6 +31,7 @@ import {
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
   getOrCreateSubmitterPerson,
+  syncAgentDistrictFromPostcode,
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -86,6 +87,11 @@ async function findOrCreateAgent(
       title: formData.rac_address,
       addressId: address.id,
     });
+    // Without this, a brand-new agent has no districtId and no loaded
+    // `address` relation, so addDistrictToOpportunity's agent-based
+    // resolution (be#895) below finds nothing and the opportunity is
+    // created with district_id NULL.
+    await syncAgentDistrictFromPostcode(agent, postcode);
     await em.save(agent);
 
     return agent;

@@ -22,15 +22,15 @@ export function getDistrictToOpportunityHandler() {
       // `deal.postcode` mirrors the agent's own postcode — an unrelated
       // concept — so it isn't used here.
       if (opportunity.type === OpportunityType.ACCOMPANYING) {
-        const postcode =
-          opportunity.accompanying?.postcode ??
-          opportunity.accompanying?.postcodeId;
-        const district =
-          accompanyingDistrict !== undefined
-            ? accompanyingDistrict
-            : postcode
-              ? await getDistrictFromPostcode(postcode)
-              : null;
+        let district: District | null;
+        if (accompanyingDistrict !== undefined) {
+          district = accompanyingDistrict;
+        } else {
+          const postcode =
+            opportunity.accompanying?.postcode ??
+            opportunity.accompanying?.postcodeId;
+          district = postcode ? await getDistrictFromPostcode(postcode) : null;
+        }
         if (district) {
           opportunity.district = district;
           updates.push(opportunity);

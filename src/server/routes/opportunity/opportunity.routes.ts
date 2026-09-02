@@ -235,12 +235,17 @@ export default async function opportunityRoutes(
 
       // Resolved once here (rather than inside addDistrictToOpportunity) so
       // it can be reused below for accompanyingDetails.appointmentDistrict
-      // without a second identical DB lookup.
-      const accompanyingDistrict = opportunityComments.accompanying?.postcode
-        ? await getDistrictFromPostcode(
-            opportunityComments.accompanying.postcode,
-          )
-        : null;
+      // without a second identical DB lookup. Gated on the current type
+      // (like accompanyingForType in dto-opportunity.ts, be#780) so a stale
+      // accompanying row on a non-ACCOMPANYING opportunity doesn't trigger a
+      // lookup whose result would be discarded anyway.
+      const accompanyingDistrict =
+        opportunityComments.type === OpportunityType.ACCOMPANYING &&
+        opportunityComments.accompanying?.postcode
+          ? await getDistrictFromPostcode(
+              opportunityComments.accompanying.postcode,
+            )
+          : null;
 
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
