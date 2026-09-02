@@ -1,5 +1,6 @@
 import {
   DocumentStatusType,
+  EventN4DType,
   LangProficiency,
   OpportunityType,
   VolunteerStateType,
@@ -107,8 +108,37 @@ export interface AgentJSON {
   postcodes: string[];
   phone: string;
   status: string;
-  person: (PersonJSON & { role: string })[];
+  person: (PersonJSON & { role: string; status?: string })[];
   operator: string;
   opportunityNids: string[];
   accompanyingRelations: string[];
+  unclaimed?: boolean;
+}
+export interface EventTranslationJSON {
+  isoCode: string;
+  title: string;
+  subtitle?: string;
+  menuTitle: string;
+  timeStr?: string;
+  locationComment?: string;
+  description: string;
+  shortDescription: string;
+  additionalTitle?: string;
+  additionalInfo?: string[];
+  outro?: string;
+  followupText?: string;
+}
+export interface EventJSON {
+  nid: string;
+  isActive: boolean;
+  date: string;
+  dateEnd?: string;
+  type: EventN4DType;
+  pic?: string;
+  locationLink?: string;
+  rsvpLink: string;
+  followupLink?: string;
+  address: string;
+  hostName?: string;
+  translations: EventTranslationJSON[];
 }

@@ -48,9 +48,6 @@ RUN chown -R nodejs:nodejs /app
 # Switch to nodejs user AFTER setting all permissions
 USER nodejs
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health-check || exit 1
-
 EXPOSE 8000
 
 # Use dumb-init to handle signals properly
