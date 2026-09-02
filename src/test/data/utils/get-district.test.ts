@@ -98,6 +98,12 @@ describe("getDistrictFromPostcode", () => {
     expect(result?.id).toBe(districtA.id);
   });
 
+  it("resolves when given a bare postcode id (number), not a Postcode object", async () => {
+    const result = await getDistrictFromPostcode(postcode.id);
+
+    expect(result?.id).toBe(districtA.id);
+  });
+
   it("returns null for a postcode with no district mapping", async () => {
     const postcodeRepository = dataSource.getRepository(Postcode);
     const unmapped = await postcodeRepository.save(
