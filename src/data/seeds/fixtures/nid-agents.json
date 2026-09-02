@@ -66,7 +66,7 @@
         "email": "anna.schmidt@example.com",
         "phone": "+4930111003",
         "address": null,
-        "role": "volunteer-coordinator"
+        "role": "project-staff"
       }
     ],
     "opportunityNids": ["OPP-005", "OPP-006"]
@@ -91,6 +91,15 @@
         "phone": "+4930111004",
         "address": null,
         "role": "manager"
+      },
+      {
+        "firstName": "Farah",
+        "middleName": "",
+        "lastName": "Nasser",
+        "email": "farah.nasser@example.com",
+        "phone": "+4930111014",
+        "address": null,
+        "role": "psychologist"
       }
     ],
     "opportunityNids": ["OPP-007", "OPP-008"]
@@ -130,7 +139,17 @@
     "statusEngagement": "agent-inactive",
     "services": ["childcare"],
     "postcodes": ["10405"],
-    "person": [],
+    "person": [
+      {
+        "firstName": "Katrin",
+        "middleName": "",
+        "lastName": "Vogel",
+        "email": "katrin.vogel@example.com",
+        "phone": "+4930111006",
+        "address": null,
+        "role": "childcare-worker"
+      }
+    ],
     "opportunityNids": ["OPP-011"]
   },
   {
@@ -144,7 +163,18 @@
     "statusEngagement": "agent-new",
     "services": ["voluntary-support"],
     "postcodes": ["13591"],
-    "person": [],
+    "person": [
+      {
+        "firstName": "Rainer",
+        "middleName": "",
+        "lastName": "Krüger",
+        "email": "rainer.krueger@example.com",
+        "phone": "+4930111007",
+        "address": null,
+        "role": "other",
+        "status": "pending"
+      }
+    ],
     "opportunityNids": ["OPP-012"]
   },
   {
@@ -159,6 +189,7 @@
     "services": ["welfare", "consultation"],
     "postcodes": ["12169"],
     "person": [],
-    "opportunityNids": []
+    "opportunityNids": [],
+    "unclaimed": true
   }
 ]

@@ -1,4 +1,8 @@
-import { AgentTypeKey, EntityTableName } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentTypeKey,
+  EntityTableName,
+} from "need4deed-sdk";
 import { DataSource } from "typeorm";
 import { seedAgentsFile, titleOrphanageAgent } from "../../../config";
 import { tryCatch } from "../../../services/utils";
@@ -19,6 +23,7 @@ import {
   getAgentTrustLevel,
   getAgentType,
   getCount,
+  getEnumValue,
   getOrCreatePerson,
 } from "../utils";
 import { AgentJSON } from "./types";
@@ -61,6 +66,7 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
       trustLevel: getAgentTrustLevel(agentJson.trustLevel),
       searchStatus: getAgentSearchStatus(agentJson.statusSearch),
       engagementStatus: getAgentEngagement(agentJson.statusEngagement),
+      unclaimed: !!agentJson.unclaimed,
     });
     const [agent, error] = await tryCatch(agentRepository.save(agentObj));
 
@@ -122,10 +128,15 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
       if (Object.values(personJson).filter(Boolean).length) {
         const person = await getOrCreatePerson(personJson, dataSource);
         const agentPersonRepository = getRepository(dataSource, AgentPerson);
+        const status = getEnumValue<AgentMembershipStatus>(
+          AgentMembershipStatus,
+          personJson.status,
+        );
         const agentPersonOnj = new AgentPerson({
           agentId: agent.id,
           personId: person.id,
           role: getAgentPersonRole(personJson.role),
+          ...(status ? { status } : {}),
         });
         const [, error] = await tryCatch(
           agentPersonRepository.save(agentPersonOnj),
