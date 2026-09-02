@@ -6,10 +6,10 @@ import DistrictPostcode from "../entity/m2m/district-postcode";
 import { getRepository } from "./get-repository";
 
 export async function getDistrictFromPostcode(
-  postcode: Voidable<Postcode>,
+  postcode: Voidable<Postcode | number>,
 ): Promise<District | null> {
-  let postcodeId = postcode?.id;
-  if (!postcodeId && postcode?.value) {
+  let postcodeId = typeof postcode === "number" ? postcode : postcode?.id;
+  if (!postcodeId && typeof postcode === "object" && postcode?.value) {
     const postcodeRepository = getRepository(dataSource, Postcode);
     const postcodeEntity = await postcodeRepository.findOne({
       where: { value: postcode.value },

@@ -1,5 +1,5 @@
 import { OpportunityType } from "need4deed-sdk";
-import Postcode from "../../../data/entity/location/postcode.entity";
+import District from "../../../data/entity/location/district.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
 
@@ -9,6 +9,10 @@ export function getDistrictToOpportunityHandler() {
   return {
     async addDistrictToOpportunity(
       opportunity: Opportunity,
+      // Optional caller-side precomputed resolution of the accompanying's
+      // own postcode -> district (e.g. GET /:id needs this same value for
+      // its response DTO) — pass it to reuse instead of querying it twice.
+      accompanyingDistrict?: District | null,
     ): Promise<Opportunity> {
       if (opportunity.districtId) {
         return opportunity;
@@ -20,12 +24,13 @@ export function getDistrictToOpportunityHandler() {
       if (opportunity.type === OpportunityType.ACCOMPANYING) {
         const postcode =
           opportunity.accompanying?.postcode ??
-          (opportunity.accompanying?.postcodeId
-            ? new Postcode({ id: opportunity.accompanying.postcodeId })
-            : undefined);
-        const district = postcode
-          ? await getDistrictFromPostcode(postcode)
-          : null;
+          opportunity.accompanying?.postcodeId;
+        const district =
+          accompanyingDistrict !== undefined
+            ? accompanyingDistrict
+            : postcode
+              ? await getDistrictFromPostcode(postcode)
+              : null;
         if (district) {
           opportunity.district = district;
           updates.push(opportunity);

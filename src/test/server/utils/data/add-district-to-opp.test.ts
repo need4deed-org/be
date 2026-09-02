@@ -135,9 +135,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         const result = await handler.addDistrictToOpportunity(opportunity);
 
-        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(
-          expect.objectContaining({ id: 42 }),
-        );
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(42);
         expect(result.district).toBe(district);
         expect(handler.updates).toContain(opportunity);
       });
@@ -208,6 +206,44 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(result.district).toBeUndefined();
         expect(handler.updates).toHaveLength(0);
+      });
+    });
+
+    describe("precomputed accompanyingDistrict (caller already resolved it)", () => {
+      it("reuses a truthy precomputed district instead of querying again", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const district = makeDistrict({ id: 404 });
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: { postcode: { id: 7 } } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(
+          opportunity,
+          district as any,
+        );
+
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+        expect(result.district).toBe(district);
+        expect(handler.updates).toContain(opportunity);
+      });
+
+      it("treats an explicit null as 'already tried, nothing found' and falls back to the agent", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          accompanying: { postcode: { id: 7 } } as any,
+          agent: { districtId: 99 } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(
+          opportunity,
+          null,
+        );
+
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+        expect(result.districtId).toBe(99);
+        expect(handler.updates).toContain(opportunity);
       });
     });
   });
