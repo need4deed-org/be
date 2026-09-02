@@ -195,6 +195,7 @@ export default async function opportunityRoutes(
         "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
         "agent.agentPerson.person.address.postcode",
+        "agent.address.postcode",
         "agent.district",
         "agent.agentType",
         "contactPerson",
@@ -241,23 +242,34 @@ export default async function opportunityRoutes(
         await agentRepository.save(districtUpdates);
       }
 
+      // Resolved once here (rather than inside addDistrictToOpportunity) so
+      // it can be reused below for accompanyingDetails.appointmentDistrict
+      // without a second identical DB lookup. Gated on the current type
+      // (like accompanyingForType in dto-opportunity.ts, be#780) so a stale
+      // accompanying row on a non-ACCOMPANYING opportunity doesn't trigger a
+      // lookup whose result would be discarded anyway.
+      const accompanyingDistrict =
+        opportunityComments.type === OpportunityType.ACCOMPANYING &&
+        opportunityComments.accompanying?.postcode
+          ? await getDistrictFromPostcode(
+              opportunityComments.accompanying.postcode,
+            )
+          : null;
+
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
       Object.assign(
         opportunityComments,
-        await addDistrictToOpportunity(opportunityComments),
+        await addDistrictToOpportunity(
+          opportunityComments,
+          accompanyingDistrict,
+        ),
       );
 
       if (opportunityUpdates.length) {
         const opportunityRepository = fastify.db.opportunityRepository;
         await opportunityRepository.save(opportunityUpdates);
       }
-
-      const accompanyingDistrict = opportunityComments.accompanying?.postcode
-        ? await getDistrictFromPostcode(
-            opportunityComments.accompanying.postcode,
-          )
-        : null;
 
       // dtoOpportunityGet takes a handler-computed arg, so mask inline (rather
       // than via the makePiiSerialization hook) before serializing.
@@ -327,6 +339,7 @@ export default async function opportunityRoutes(
         "deal.dealTimeslot.timeslot",
         "deal.dealDistrict.district",
         "agent",
+        "agent.address.postcode",
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
@@ -524,6 +537,10 @@ export default async function opportunityRoutes(
         ? opportunity.submittedByPersonId
         : agent.representative?.personId;
 
+      // `agent` was fetched with relations/address.postcode already loaded
+      // above; assign it here (not just agentId) so addDistrictToOpportunity
+      // can resolve REGULAR/EVENTS districts from it at creation time.
+      opportunity.agent = agent;
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
