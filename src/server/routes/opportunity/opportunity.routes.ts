@@ -465,8 +465,7 @@ export default async function opportunityRoutes(
       // An AGENT may only create opportunities for an agent they belong to;
       // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
-        const personId =
-          request.authUser?.personId || request.body.submitted_by_id;
+        const personId = request.authUser?.personId;
         const membership = personId
           ? await fastify.db.agentPersonRepository.findOneBy({
               agentId,
@@ -520,7 +519,9 @@ export default async function opportunityRoutes(
       // representative if the submitter isn't one (e.g. a coordinator
       // creating on the agent's behalf).
       opportunity.contactPersonId = agent.agentPerson?.some(
-        (ap) => ap.personId === opportunity.submittedByPersonId,
+        (ap) =>
+          ap.personId === opportunity.submittedByPersonId &&
+          ap.status === AgentMembershipStatus.ACTIVE,
       )
         ? opportunity.submittedByPersonId
         : agent.representative?.personId;

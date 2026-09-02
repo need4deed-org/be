@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
 import { getCallerAgentIds } from "../data/get-caller-agent-ids";
@@ -75,7 +75,7 @@ export async function resolveCallerVisibility(
 
   // Members of the caller's agent(s).
   const members = await agentPersonRepository.find({
-    where: { agentId: In([...agentIds]) },
+    where: { agentId: In([...agentIds]), status: AgentMembershipStatus.ACTIVE },
   });
   members.forEach((m) => personIds.add(m.personId));
 

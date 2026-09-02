@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
 import { resolveCallerVisibility } from "../../../../server/utils/pii/visible-persons";
@@ -81,10 +81,15 @@ describe("resolveCallerVisibility", () => {
       expect(sorted(v.agentIds)).toEqual([42, 43]);
       expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
-      // member lookup scoped to the caller's agent ids; raw query gets them too
+      // member lookup scoped to the caller's ACTIVE agent memberships only;
+      // a PENDING co-applicant must not get their PII unmasked
       expect(find).toHaveBeenNthCalledWith(2, {
-        where: { agentId: expect.anything() },
+        where: {
+          agentId: expect.anything(),
+          status: AgentMembershipStatus.ACTIVE,
+        },
       });
+
       expect(query.mock.calls[0][1]).toEqual([[42, 43]]);
     });
 
