@@ -1269,7 +1269,9 @@
         "agent-new",
         "agent-active",
         "agent-unresponsive",
-        "agent-inactive"
+        "agent-inactive",
+        "agent-incontact",
+        "agent-tried-to-contact"
       ]
     },
     "Service": {
