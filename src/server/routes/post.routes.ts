@@ -297,6 +297,59 @@ export default async function postRoutes(
   );
 
   //
+  // GET /post/:id/reply
+  //
+  fastify.get<{
+    Params: ParamsId;
+    Reply: ReplyData<ApiPostReplyGet[]>;
+  }>(
+    "/:id/reply",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({
+          dataSchemaRef: "ApiPostReplyGet#",
+          isArray: true,
+        }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        return reply.status(200).send({ message: "Replies.", data: [] });
+      }
+
+      const post = await fastify.db.postRepository.findOne({
+        where: getRootPostWhere(id),
+      });
+      if (!post) {
+        throw new NotFoundError(`Post ${id} not found.`);
+      }
+
+      // Full thread, unpaginated (see need4deed-org/sdk#219) — depth-1 and
+      // depth-2 replies share the same rootId, so this is a flat list; the
+      // client groups depth-2 replies under their parent via parentReplyId.
+      const replies = await fastify.db.postRepository.find({
+        where: { rootId: id },
+        relations: ["author"],
+        order: { createdAt: "ASC" },
+      });
+
+      return reply.status(200).send({
+        message: "Replies.",
+        data: replies.map(dtoPostReply),
+      });
+    },
+  );
+
+  //
   // POST /post/:id/reply
   //
   fastify.post<{

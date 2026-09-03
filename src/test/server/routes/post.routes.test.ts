@@ -236,6 +236,48 @@ describe("POST /post", () => {
       },
     });
     expect(reply3Res.statusCode).toBe(400);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(listRes.statusCode).toBe(200);
+    const replies = listRes.json().data;
+    expect(replies.map((r: { id: number }) => r.id)).toEqual([
+      reply1.id,
+      reply2.id,
+    ]);
+    expect(replies[0].parentReplyId).toBeNull();
+    expect(replies[1].parentReplyId).toBe(reply1.id);
+  });
+
+  it("returns an empty list for GET /post/:id/reply when the role can't view posts", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for volunteer reply-list test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
+  });
+
+  it("404s GET /post/:id/reply for a nonexistent post", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/post/999999999/reply",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it("403s when a volunteer tries to reply", async () => {
