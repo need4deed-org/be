@@ -13,6 +13,7 @@ import {
   BadRequestError,
   ConflictError,
   InvalidOrganizationEmailError,
+  PersonAlreadyRegisteredError,
   UnauthorizedError,
 } from "../../config";
 import Person from "../../data/entity/person.entity";
@@ -346,9 +347,7 @@ export default async function userRoutes(
           // role) is not re-registrable — point them at login instead of
           // silently attaching a second account to the same Person.
           if (existingPerson.users?.length) {
-            throw new ConflictError(
-              "An account already exists for this email. Please log in instead.",
-            );
+            throw new PersonAlreadyRegisteredError();
           }
           request.resolvedPerson = existingPerson;
           return;

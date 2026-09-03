@@ -129,7 +129,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
     expect(personCount).toBe(1);
   });
 
-  it("rejects (409) when the matched Person already has a User of any role", async () => {
+  it("rejects (400, PersonAlreadyRegisteredError) when the matched Person already has a User of any role", async () => {
     const email = `already-registered-${suffix}@example.com`;
     const existingPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Already", lastName: "Registered", email }),
@@ -160,7 +160,8 @@ describe("POST /user — links existing Person by email instead of duplicating (
       },
     });
 
-    expect(res.statusCode).toBe(409);
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: "PersonAlreadyRegisteredError" });
   });
 
   it("still creates a new Person for a genuinely new email (agent flow unaffected)", async () => {
