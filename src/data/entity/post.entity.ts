@@ -1,11 +1,14 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
@@ -14,6 +17,10 @@ import Opportunity from "./opportunity/opportunity.entity";
 import Person from "./person.entity";
 
 @Entity()
+// A row is either a root post (parentId/rootId both null) or a reply
+// (both set) — never a mix. Backs up the parentId/rootId pairing that
+// isDirectPostReply() and the reply-depth check assume holds.
+@Check(`("parent_id" IS NULL) = ("root_id" IS NULL)`)
 export default class Post {
   constructor(post?: Partial<Post>) {
     if (post) {
@@ -56,6 +63,34 @@ export default class Post {
     inverseJoinColumn: { name: "opportunity_id" },
   })
   linkedOpportunities: Opportunity[];
+
+  // Reply support: a row is a reply when `parentId` is set. `parentId` is the
+  // immediate parent (a root post, or a reply — one level of reply-to-reply
+  // nesting only); `rootId` is always the top-level post the thread belongs
+  // to, denormalized so counting/depth checks don't need recursive queries.
+  @ManyToOne(() => Post, { nullable: true, onDelete: "CASCADE" })
+  @JoinColumn({ name: "parent_id" })
+  parent: Post | null;
+
+  @Index()
+  @Column({ nullable: true })
+  parentId: number | null;
+
+  @ManyToOne(() => Post, { nullable: true, onDelete: "CASCADE" })
+  @JoinColumn({ name: "root_id" })
+  root: Post | null;
+
+  @Index()
+  @Column({ nullable: true })
+  rootId: number | null;
+
+  // Every reply belonging to this post's thread (direct + nested one level),
+  // used only for `loadRelationCountAndMap("post.replyCount", ...)`.
+  @OneToMany(() => Post, (post) => post.root)
+  descendantReplies: Post[];
+
+  // Populated via loadRelationCountAndMap — not a real column.
+  replyCount?: number;
 
   @CreateDateColumn()
   createdAt: Date;
