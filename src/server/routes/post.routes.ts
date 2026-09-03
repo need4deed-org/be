@@ -37,6 +37,8 @@ import {
   getPostReplyWhere,
   getRootPostWhere,
 } from "../utils/data/get-post-where";
+import { getRootPostOrThrow } from "../utils/data/get-root-post-or-throw";
+import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
 export default async function postRoutes(
@@ -72,13 +74,7 @@ export default async function postRoutes(
         .skip(skip)
         .take(take);
 
-      if (
-        role === UserRole.ADMIN ||
-        role === UserRole.COORDINATOR ||
-        role === UserRole.AGENT
-      ) {
-        // no filter — all posts visible
-      } else {
+      if (!isPostManagerRole(role)) {
         return reply
           .status(200)
           .send({ message: "Posts.", data: [], count: 0 });
@@ -192,11 +188,7 @@ export default async function postRoutes(
       const { id } = request.params;
       const { role } = request.user;
 
-      if (
-        role !== UserRole.ADMIN &&
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT
-      ) {
+      if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
       }
 
@@ -268,20 +260,11 @@ export default async function postRoutes(
       const { id } = request.params;
       const { role } = request.user;
 
-      if (
-        role !== UserRole.ADMIN &&
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT
-      ) {
+      if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
       }
 
-      const post = await fastify.db.postRepository.findOne({
-        where: getRootPostWhere(id),
-      });
-      if (!post) {
-        throw new NotFoundError(`Post ${id} not found.`);
-      }
+      const post = await getRootPostOrThrow(fastify, id);
 
       assertCanManagePost({
         authorId: post.authorId,
@@ -293,6 +276,57 @@ export default async function postRoutes(
 
       await fastify.db.postRepository.remove(post);
       return reply.status(204).send();
+    },
+  );
+
+  //
+  // GET /post/:id/reply
+  //
+  fastify.get<{
+    Params: ParamsId;
+    Reply: ReplyData<ApiPostReplyGet[]>;
+  }>(
+    "/:id/reply",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({
+          dataSchemaRef: "ApiPostReplyGet#",
+          isArray: true,
+          count: false,
+        }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (!isPostManagerRole(role)) {
+        // Matches GET /post's own convention: an empty list rather than a
+        // 404, so a disallowed role can't distinguish a nonexistent post
+        // from one it just isn't allowed to see.
+        return reply.status(200).send({ message: "Replies.", data: [] });
+      }
+
+      // Full thread, unpaginated (see need4deed-org/sdk#219) — depth-1 and
+      // depth-2 replies share the same rootId, so this is a flat list; the
+      // client groups depth-2 replies under their parent via parentReplyId.
+      // Run alongside the existence check rather than after it — neither
+      // depends on the other's result.
+      const [, replies] = await Promise.all([
+        getRootPostOrThrow(fastify, id),
+        fastify.db.postRepository.find({
+          where: { rootId: id },
+          relations: ["author"],
+          order: { createdAt: "ASC", id: "ASC" },
+        }),
+      ]);
+
+      return reply.status(200).send({
+        message: "Replies.",
+        data: replies.map(dtoPostReply),
+      });
     },
   );
 
@@ -343,16 +377,13 @@ export default async function postRoutes(
       }
 
       const [post, parentReply] = await Promise.all([
-        fastify.db.postRepository.findOne({ where: getRootPostWhere(id) }),
+        getRootPostOrThrow(fastify, id),
         parentReplyId !== undefined
           ? fastify.db.postRepository.findOne({
               where: { id: parentReplyId, rootId: id },
             })
           : Promise.resolve(null),
       ]);
-      if (!post) {
-        throw new NotFoundError(`Post ${id} not found.`);
-      }
 
       let parentId: number = post.id;
       if (parentReplyId !== undefined) {
@@ -412,11 +443,7 @@ export default async function postRoutes(
       const { id } = request.params;
       const { role } = request.user;
 
-      if (
-        role !== UserRole.ADMIN &&
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT
-      ) {
+      if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
       }
 
@@ -465,11 +492,7 @@ export default async function postRoutes(
       const { id } = request.params;
       const { role } = request.user;
 
-      if (
-        role !== UserRole.ADMIN &&
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT
-      ) {
+      if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
       }
 
