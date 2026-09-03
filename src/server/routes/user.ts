@@ -334,6 +334,26 @@ export default async function userRoutes(
           return;
         }
 
+        // No explicit person.id — look up an existing Person by email
+        // (case-insensitively) before creating a new, disconnected one, e.g.
+        // a Person that already exists via a legacy Volunteer row (be#923).
+        const existingPerson = await personRepository.findOne({
+          where: { email: ILike(email) },
+          relations: ["users"],
+        });
+        if (existingPerson) {
+          // Conservative default: a Person that already has a User (any
+          // role) is not re-registrable — point them at login instead of
+          // silently attaching a second account to the same Person.
+          if (existingPerson.users?.length) {
+            throw new ConflictError(
+              "An account already exists for this email. Please log in instead.",
+            );
+          }
+          request.resolvedPerson = existingPerson;
+          return;
+        }
+
         // New person. Mirror the account email onto the person so the person
         // record carries the same email the user registered with.
         const newPerson = new Person(personData);

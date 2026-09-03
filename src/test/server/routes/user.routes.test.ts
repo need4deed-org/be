@@ -74,6 +74,115 @@ describe("POST /user — AGENT email-domain gate", () => {
   });
 });
 
+// be#923: POST /user previously always created a brand-new, disconnected
+// Person when the body omitted person.id — even when a Person with that
+// exact email already existed (e.g. from a legacy Volunteer row) — splitting
+// one human across two unrelated records instead of linking them.
+describe("POST /user — links existing Person by email instead of duplicating (be#923)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const createdPersonIds: number[] = [];
+  const createdUserIds: number[] = [];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    for (const id of createdUserIds) {
+      await fastify.db.userRepository.delete({ id });
+    }
+    for (const id of createdPersonIds) {
+      await fastify.db.personRepository.delete({ id });
+    }
+    await fastify.close();
+  });
+
+  it("links to an existing Person by email (case-insensitive) instead of creating a duplicate", async () => {
+    const email = `existing-person-${suffix}@example.com`;
+    const existingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Existing", lastName: "Volunteer" }),
+    );
+    existingPerson.email = email;
+    await fastify.db.personRepository.save(existingPerson);
+    createdPersonIds.push(existingPerson.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email: email.toUpperCase(),
+        password: "test_password",
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Existing", lastName: "Volunteer" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+    expect(res.json().person.id).toBe(existingPerson.id);
+
+    const personCount = await fastify.db.personRepository.count({
+      where: { email },
+    });
+    expect(personCount).toBe(1);
+  });
+
+  it("rejects (409) when the matched Person already has a User of any role", async () => {
+    const email = `already-registered-${suffix}@example.com`;
+    const existingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Already", lastName: "Registered", email }),
+    );
+    createdPersonIds.push(existingPerson.id);
+
+    const existingUser = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        language: "en",
+        timezone: "CET",
+        personId: existingPerson.id,
+      }),
+    );
+    createdUserIds.push(existingUser.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email,
+        password: "another_password",
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Already", lastName: "Registered" },
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("still creates a new Person for a genuinely new email (agent flow unaffected)", async () => {
+    const email = `brand-new-${suffix}@example.com`;
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email,
+        password: "test_password",
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Brand", lastName: "New" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+    createdPersonIds.push(res.json().person.id);
+  });
+});
+
 // be#809: a person can hold more than one active AgentPerson membership (the
 // unique index is on the (agentId, personId, role) triple, not personId
 // alone) — /me previously only ever surfaced one via agentId.
