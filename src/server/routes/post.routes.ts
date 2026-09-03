@@ -1,12 +1,21 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiPostGet, ApiPostPatch, ApiPostPost, UserRole } from "need4deed-sdk";
-import { In } from "typeorm";
+import {
+  ApiPostGet,
+  ApiPostPatch,
+  ApiPostPost,
+  ApiPostReplyGet,
+  ApiPostReplyPatch,
+  ApiPostReplyPost,
+  UserRole,
+} from "need4deed-sdk";
+import { In, IsNull, Not } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
   UnauthorizedError,
 } from "../../config/error/fastify";
 import { dtoPost } from "../../services/dto/dto-post";
+import { dtoPostReply } from "../../services/dto/dto-post-reply";
 import {
   idParamSchema,
   paginationQuerySchema,
@@ -55,6 +64,8 @@ export default async function postRoutes(
         .leftJoinAndSelect("post.author", "author")
         .leftJoinAndSelect("post.taggedPersons", "taggedPerson")
         .leftJoinAndSelect("post.linkedOpportunities", "opportunity")
+        .loadRelationCountAndMap("post.replyCount", "post.descendantReplies")
+        .where("post.parentId IS NULL")
         .orderBy("post.createdAt", "DESC")
         .skip(skip)
         .take(take);
@@ -188,7 +199,7 @@ export default async function postRoutes(
       }
 
       const post = await fastify.db.postRepository.findOne({
-        where: { id },
+        where: { id, parentId: IsNull() },
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
       if (!post) {
@@ -259,7 +270,9 @@ export default async function postRoutes(
         throw new UnauthorizedError("Permission denied.");
       }
 
-      const post = await fastify.db.postRepository.findOne({ where: { id } });
+      const post = await fastify.db.postRepository.findOne({
+        where: { id, parentId: IsNull() },
+      });
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
       }
@@ -274,6 +287,177 @@ export default async function postRoutes(
       }
 
       await fastify.db.postRepository.remove(post);
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // POST /post/:id/reply
+  //
+  fastify.post<{
+    Params: ParamsId;
+    Body: ApiPostReplyPost;
+    Reply: ReplyData<ApiPostReplyGet>;
+  }>(
+    "/:id/reply",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReplyPost#" },
+        response: responseSchema({
+          dataSchemaRef: "ApiPostReplyGet#",
+          statusCode: 201,
+        }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+      if (role !== UserRole.AGENT && role !== UserRole.COORDINATOR) {
+        throw new UnauthorizedError(
+          "Only agents and coordinators can reply to posts.",
+        );
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const { text, parentReplyId } = request.body;
+
+      const post = await fastify.db.postRepository.findOne({
+        where: { id, parentId: IsNull() },
+      });
+      if (!post) {
+        throw new NotFoundError(`Post ${id} not found.`);
+      }
+
+      let parentId: number = post.id;
+      if (parentReplyId !== undefined) {
+        const parentReply = await fastify.db.postRepository.findOne({
+          where: { id: parentReplyId, rootId: post.id },
+        });
+        if (!parentReply) {
+          throw new NotFoundError(
+            `Reply ${parentReplyId} not found on post ${post.id}.`,
+          );
+        }
+        if (parentReply.parentId !== parentReply.rootId) {
+          throw new BadRequestError(
+            "Cannot reply to a reply-to-a-reply; nesting is limited to one level.",
+          );
+        }
+        parentId = parentReply.id;
+      }
+
+      const savedReply = await fastify.db.postRepository.save(
+        fastify.db.postRepository.create({
+          text,
+          authorId: personId,
+          parentId,
+          rootId: post.id,
+        }),
+      );
+
+      const full = await fastify.db.postRepository.findOne({
+        where: { id: savedReply.id },
+        relations: ["author"],
+      });
+      if (!full) {
+        throw new NotFoundError("Reply not found.");
+      }
+      return reply
+        .status(201)
+        .send({ message: "Reply created.", data: dtoPostReply(full) });
+    },
+  );
+
+  //
+  // PATCH /post/reply/:id
+  //
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiPostReplyPatch;
+    Reply: ReplyData<ApiPostReplyGet>;
+  }>(
+    "/reply/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReplyPatch#" },
+        response: responseSchema("ApiPostReplyGet#"),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: { id, parentId: Not(IsNull()) },
+        relations: ["author"],
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+
+      const isAuthor = request.authUser?.personId === postReply.authorId;
+      const isPrivileged =
+        role === UserRole.ADMIN || role === UserRole.COORDINATOR;
+      if (!isAuthor && !isPrivileged) {
+        throw new UnauthorizedError(
+          "Only the author, coordinators, or admins can edit replies.",
+        );
+      }
+
+      const { text } = request.body;
+      if (text !== null && text !== undefined) {
+        postReply.text = text;
+      }
+
+      const updated = await fastify.db.postRepository.save(postReply);
+      return reply.status(200).send({
+        message: `Reply ${id} updated.`,
+        data: dtoPostReply(updated),
+      });
+    },
+  );
+
+  //
+  // DELETE /post/reply/:id
+  //
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/reply/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: { id, parentId: Not(IsNull()) },
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+
+      const isAuthor = request.authUser?.personId === postReply.authorId;
+      const isPrivileged =
+        role === UserRole.ADMIN || role === UserRole.COORDINATOR;
+      if (!isAuthor && !isPrivileged) {
+        throw new UnauthorizedError(
+          "Only the author, coordinators, or admins can delete replies.",
+        );
+      }
+
+      await fastify.db.postRepository.remove(postReply);
       return reply.status(204).send();
     },
   );
