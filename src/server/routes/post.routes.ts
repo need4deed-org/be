@@ -241,15 +241,14 @@ export default async function postRoutes(
       }
 
       const updated = await fastify.db.postRepository.save(post);
-      const full = await buildPostQuery(fastify)
-        .where("post.id = :id", { id: updated.id })
-        .getOne();
-      if (!full) {
-        throw new NotFoundError(`Post ${id} not found.`);
-      }
+      // A lightweight count, not a full buildPostQuery() re-fetch — author/
+      // taggedPersons/linkedOpportunities are already loaded on `updated`.
+      updated.replyCount = await fastify.db.postRepository.count({
+        where: { rootId: updated.id },
+      });
       return reply
         .status(200)
-        .send({ message: `Post ${id} updated.`, data: dtoPost(full) });
+        .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });
     },
   );
 
@@ -337,19 +336,26 @@ export default async function postRoutes(
           `Body postId (${postId}) does not match the post id in the URL (${id}).`,
         );
       }
+      if (parentReplyId === id) {
+        throw new BadRequestError(
+          `parentReplyId (${parentReplyId}) must reference a reply, not the post itself — omit parentReplyId to reply directly to the post.`,
+        );
+      }
 
-      const post = await fastify.db.postRepository.findOne({
-        where: getRootPostWhere(id),
-      });
+      const [post, parentReply] = await Promise.all([
+        fastify.db.postRepository.findOne({ where: getRootPostWhere(id) }),
+        parentReplyId !== undefined
+          ? fastify.db.postRepository.findOne({
+              where: { id: parentReplyId, rootId: id },
+            })
+          : Promise.resolve(null),
+      ]);
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
       }
 
       let parentId: number = post.id;
       if (parentReplyId !== undefined) {
-        const parentReply = await fastify.db.postRepository.findOne({
-          where: { id: parentReplyId, rootId: post.id },
-        });
         if (!parentReply) {
           throw new NotFoundError(
             `Reply ${parentReplyId} not found on post ${post.id}.`,
@@ -363,25 +369,25 @@ export default async function postRoutes(
         parentId = parentReply.id;
       }
 
-      const savedReply = await fastify.db.postRepository.save(
-        fastify.db.postRepository.create({
-          text,
-          authorId: personId,
-          parentId,
-          rootId: post.id,
-        }),
-      );
-
-      const full = await fastify.db.postRepository.findOne({
-        where: { id: savedReply.id },
-        relations: ["author"],
-      });
-      if (!full) {
-        throw new NotFoundError("Reply not found.");
+      const [savedReply, author] = await Promise.all([
+        fastify.db.postRepository.save(
+          fastify.db.postRepository.create({
+            text,
+            authorId: personId,
+            parentId,
+            rootId: post.id,
+          }),
+        ),
+        fastify.db.personRepository.findOneBy({ id: personId }),
+      ]);
+      if (!author) {
+        throw new NotFoundError("Person not found.");
       }
+      savedReply.author = author;
+
       return reply
         .status(201)
-        .send({ message: "Reply created.", data: dtoPostReply(full) });
+        .send({ message: "Reply created.", data: dtoPostReply(savedReply) });
     },
   );
 
@@ -405,6 +411,14 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
 
       const postReply = await fastify.db.postRepository.findOne({
         where: getPostReplyWhere(id),
@@ -450,6 +464,14 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
 
       const postReply = await fastify.db.postRepository.findOne({
         where: getPostReplyWhere(id),

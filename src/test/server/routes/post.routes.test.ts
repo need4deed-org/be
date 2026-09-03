@@ -276,6 +276,42 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("400s when parentReplyId equals the post's own id", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for self-referencing parentReplyId test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { postId, text: "Self-referencing", parentReplyId: postId },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("403s a volunteer on reply PATCH/DELETE without hitting the DB for a nonexistent reply id", async () => {
+    const patchRes = await fastify.inject({
+      method: "PATCH",
+      url: "/post/reply/999999999",
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { text: "Should not be allowed" },
+    });
+    expect(patchRes.statusCode).toBe(403);
+
+    const deleteRes = await fastify.inject({
+      method: "DELETE",
+      url: "/post/reply/999999999",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(deleteRes.statusCode).toBe(403);
+  });
+
   it("updates and deletes a reply via /post/reply/:id, and guards route boundaries", async () => {
     const postRes = await fastify.inject({
       method: "POST",
