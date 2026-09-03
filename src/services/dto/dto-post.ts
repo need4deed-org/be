@@ -20,6 +20,7 @@ export function dtoPost(post: Post): ApiPostGet {
       id: o.id,
       title: o.title,
     })),
+    replyCount: post.replyCount ?? 0,
     createdAt: post.createdAt,
   };
 }

@@ -1,12 +1,22 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiPostGet, ApiPostPatch, ApiPostPost, UserRole } from "need4deed-sdk";
+import {
+  ApiPostGet,
+  ApiPostPatch,
+  ApiPostPost,
+  ApiPostReplyGet,
+  ApiPostReplyPatch,
+  ApiPostReplyPost,
+  UserRole,
+} from "need4deed-sdk";
 import { In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
   UnauthorizedError,
 } from "../../config/error/fastify";
+import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
+import { dtoPostReply } from "../../services/dto/dto-post-reply";
 import {
   idParamSchema,
   paginationQuerySchema,
@@ -20,7 +30,13 @@ import {
   ReplyMessage,
 } from "../types";
 import { getSkipTake } from "../utils";
+import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
+import { buildPostQuery } from "../utils/data/build-post-query";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import {
+  getPostReplyWhere,
+  getRootPostWhere,
+} from "../utils/data/get-post-where";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
 export default async function postRoutes(
@@ -50,11 +66,8 @@ export default async function postRoutes(
       const { role } = request.user;
       const [skip, take] = getSkipTake(request.query);
 
-      const qb = fastify.db.postRepository
-        .createQueryBuilder("post")
-        .leftJoinAndSelect("post.author", "author")
-        .leftJoinAndSelect("post.taggedPersons", "taggedPerson")
-        .leftJoinAndSelect("post.linkedOpportunities", "opportunity")
+      const qb = buildPostQuery(fastify)
+        .where("post.parentId IS NULL")
         .orderBy("post.createdAt", "DESC")
         .skip(skip)
         .take(take);
@@ -188,21 +201,20 @@ export default async function postRoutes(
       }
 
       const post = await fastify.db.postRepository.findOne({
-        where: { id },
+        where: getRootPostWhere(id),
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
       }
 
-      const isAuthor = request.authUser?.personId === post.authorId;
-      const isPrivileged =
-        role === UserRole.ADMIN || role === UserRole.COORDINATOR;
-      if (!isAuthor && !isPrivileged) {
-        throw new UnauthorizedError(
-          "Only the author, coordinators, or admins can edit posts.",
-        );
-      }
+      assertCanManagePost({
+        authorId: post.authorId,
+        requestPersonId: request.authUser?.personId,
+        role,
+        action: "edit",
+        resource: "posts",
+      });
 
       const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
 
@@ -229,6 +241,11 @@ export default async function postRoutes(
       }
 
       const updated = await fastify.db.postRepository.save(post);
+      // A lightweight count, not a full buildPostQuery() re-fetch — author/
+      // taggedPersons/linkedOpportunities are already loaded on `updated`.
+      updated.replyCount = await fastify.db.postRepository.count({
+        where: { rootId: updated.id },
+      });
       return reply
         .status(200)
         .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });
@@ -259,21 +276,219 @@ export default async function postRoutes(
         throw new UnauthorizedError("Permission denied.");
       }
 
-      const post = await fastify.db.postRepository.findOne({ where: { id } });
+      const post = await fastify.db.postRepository.findOne({
+        where: getRootPostWhere(id),
+      });
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
       }
 
-      const isAuthor = request.authUser?.personId === post.authorId;
-      const isPrivileged =
-        role === UserRole.ADMIN || role === UserRole.COORDINATOR;
-      if (!isAuthor && !isPrivileged) {
+      assertCanManagePost({
+        authorId: post.authorId,
+        requestPersonId: request.authUser?.personId,
+        role,
+        action: "delete",
+        resource: "posts",
+      });
+
+      await fastify.db.postRepository.remove(post);
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // POST /post/:id/reply
+  //
+  fastify.post<{
+    Params: ParamsId;
+    Body: ApiPostReplyPost;
+    Reply: ReplyData<ApiPostReplyGet>;
+  }>(
+    "/:id/reply",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReplyPost#" },
+        response: responseSchema({
+          dataSchemaRef: "ApiPostReplyGet#",
+          statusCode: 201,
+        }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+      if (role !== UserRole.AGENT && role !== UserRole.COORDINATOR) {
         throw new UnauthorizedError(
-          "Only the author, coordinators, or admins can delete posts.",
+          "Only agents and coordinators can reply to posts.",
         );
       }
 
-      await fastify.db.postRepository.remove(post);
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const { postId, text, parentReplyId } = request.body;
+      if (postId !== id) {
+        throw new BadRequestError(
+          `Body postId (${postId}) does not match the post id in the URL (${id}).`,
+        );
+      }
+      if (parentReplyId === id) {
+        throw new BadRequestError(
+          `parentReplyId (${parentReplyId}) must reference a reply, not the post itself — omit parentReplyId to reply directly to the post.`,
+        );
+      }
+
+      const [post, parentReply] = await Promise.all([
+        fastify.db.postRepository.findOne({ where: getRootPostWhere(id) }),
+        parentReplyId !== undefined
+          ? fastify.db.postRepository.findOne({
+              where: { id: parentReplyId, rootId: id },
+            })
+          : Promise.resolve(null),
+      ]);
+      if (!post) {
+        throw new NotFoundError(`Post ${id} not found.`);
+      }
+
+      let parentId: number = post.id;
+      if (parentReplyId !== undefined) {
+        if (!parentReply) {
+          throw new NotFoundError(
+            `Reply ${parentReplyId} not found on post ${post.id}.`,
+          );
+        }
+        if (!isDirectPostReply(parentReply)) {
+          throw new BadRequestError(
+            "Cannot reply to a reply-to-a-reply; nesting is limited to one level.",
+          );
+        }
+        parentId = parentReply.id;
+      }
+
+      const [savedReply, author] = await Promise.all([
+        fastify.db.postRepository.save(
+          fastify.db.postRepository.create({
+            text,
+            authorId: personId,
+            parentId,
+            rootId: post.id,
+          }),
+        ),
+        fastify.db.personRepository.findOneBy({ id: personId }),
+      ]);
+      if (!author) {
+        throw new NotFoundError("Person not found.");
+      }
+      savedReply.author = author;
+
+      return reply
+        .status(201)
+        .send({ message: "Reply created.", data: dtoPostReply(savedReply) });
+    },
+  );
+
+  //
+  // PATCH /post/reply/:id
+  //
+  fastify.patch<{
+    Params: ParamsId;
+    Body: ApiPostReplyPatch;
+    Reply: ReplyData<ApiPostReplyGet>;
+  }>(
+    "/reply/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReplyPatch#" },
+        response: responseSchema("ApiPostReplyGet#"),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: getPostReplyWhere(id),
+        relations: ["author"],
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+
+      assertCanManagePost({
+        authorId: postReply.authorId,
+        requestPersonId: request.authUser?.personId,
+        role,
+        action: "edit",
+        resource: "replies",
+      });
+
+      const { text } = request.body;
+      if (text !== null && text !== undefined) {
+        postReply.text = text;
+      }
+
+      const updated = await fastify.db.postRepository.save(postReply);
+      return reply.status(200).send({
+        message: `Reply ${id} updated.`,
+        data: dtoPostReply(updated),
+      });
+    },
+  );
+
+  //
+  // DELETE /post/reply/:id
+  //
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/reply/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (
+        role !== UserRole.ADMIN &&
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.AGENT
+      ) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: getPostReplyWhere(id),
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+
+      assertCanManagePost({
+        authorId: postReply.authorId,
+        requestPersonId: request.authUser?.personId,
+        role,
+        action: "delete",
+        resource: "replies",
+      });
+
+      await fastify.db.postRepository.remove(postReply);
       return reply.status(204).send();
     },
   );
