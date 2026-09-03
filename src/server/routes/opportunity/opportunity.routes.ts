@@ -212,7 +212,6 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
       await assertAgentOwnsOpportunity(
-        fastify,
         request.authUser,
         id,
         opportunity.agentId,
@@ -311,10 +310,7 @@ export default async function opportunityRoutes(
 
       //  NGOs see only their own agent's opportunities
       if (request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          fastify,
-          request.authUser.personId,
-        );
+        const agentIds = await getCallerAgentIds(request.authUser.personId);
 
         // An agent with no shelter must see nothing, so return here rather than
         // skipping the filter, which would show everything.

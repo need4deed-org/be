@@ -66,7 +66,7 @@ export async function resolveCallerVisibility(
   }
 
   const agentPersonRepository = fastify.db.agentPersonRepository;
-  const callerAgentIds = await getCallerAgentIds(fastify, personId);
+  const callerAgentIds = await getCallerAgentIds(personId);
   callerAgentIds.forEach((id) => agentIds.add(id));
 
   if (agentIds.size === 0) {

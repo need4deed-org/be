@@ -1,4 +1,3 @@
-import { FastifyInstance } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import User from "../../../data/entity/user.entity";
@@ -9,7 +8,6 @@ import { getCallerAgentIds } from "./get-caller-agent-ids";
 // an opportunity they don't own from one that doesn't exist. COORDINATOR and
 // ADMIN callers are unaffected.
 export async function assertAgentOwnsOpportunity(
-  fastify: FastifyInstance,
   authUser: User | undefined,
   opportunityId: number,
   opportunityAgentId: number | null | undefined,
@@ -18,7 +16,7 @@ export async function assertAgentOwnsOpportunity(
     return;
   }
 
-  const agentIds = await getCallerAgentIds(fastify, authUser.personId);
+  const agentIds = await getCallerAgentIds(authUser.personId);
 
   if (!opportunityAgentId || !agentIds.includes(opportunityAgentId)) {
     throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);

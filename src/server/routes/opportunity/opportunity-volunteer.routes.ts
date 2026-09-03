@@ -44,7 +44,6 @@ export default function opportunityOpportunityVolunteerRoutes(
           select: { id: true, agentId: true },
         });
         await assertAgentOwnsOpportunity(
-          fastify,
           request.authUser,
           opportunityId,
           opportunity?.agentId,
