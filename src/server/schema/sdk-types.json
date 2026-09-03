@@ -1674,6 +1674,7 @@
           "type": "array",
           "items": { "$ref": "ApiPostLinkedOpportunity#" }
         },
+        "replyCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
@@ -1683,8 +1684,48 @@
         "agentId",
         "taggedPersons",
         "linkedOpportunities",
+        "replyCount",
         "createdAt"
       ]
+    },
+    "ApiPostReplyGet": {
+      "$id": "ApiPostReplyGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "text": { "type": "string" },
+        "author": { "$ref": "ApiPostPerson#" },
+        "postId": { "type": "integer" },
+        "parentReplyId": { "type": ["integer", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "text",
+        "author",
+        "postId",
+        "parentReplyId",
+        "createdAt"
+      ]
+    },
+    "ApiPostReplyPost": {
+      "$id": "ApiPostReplyPost",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "integer" },
+        "text": { "type": "string", "minLength": 1 },
+        "parentReplyId": { "type": "integer" }
+      },
+      "required": ["postId", "text"],
+      "additionalProperties": false
+    },
+    "ApiPostReplyPatch": {
+      "$id": "ApiPostReplyPatch",
+      "type": "object",
+      "properties": {
+        "text": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "additionalProperties": false
     },
     "ApiPostPost": {
       "$id": "ApiPostPost",
