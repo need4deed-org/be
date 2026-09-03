@@ -269,6 +269,19 @@ describe("POST /post", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data).toEqual([]);
+    expect(res.json()).not.toHaveProperty("count");
+  });
+
+  it("returns an empty list (not 404) for a disallowed role on a nonexistent post", async () => {
+    // Deliberate: matches GET /post's convention of not leaking whether a
+    // post exists to a role that can't view posts at all.
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/post/999999999/reply",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
   });
 
   it("404s GET /post/:id/reply for a nonexistent post", async () => {
