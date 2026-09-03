@@ -183,6 +183,15 @@ describe("POST /post", () => {
       .json()
       .data.find((p: { id: number }) => p.id === postId);
     expect(listedPost.replyCount).toBe(1);
+
+    const patchRes = await fastify.inject({
+      method: "PATCH",
+      url: `/post/${postId}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post with a reply, edited" },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().data.replyCount).toBe(1);
   });
 
   it("allows a reply-to-a-reply but rejects a third level of nesting", async () => {
@@ -246,6 +255,25 @@ describe("POST /post", () => {
       payload: { postId, text: "Should not be allowed" },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it("400s when the body postId doesn't match the URL post id", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for postId mismatch test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { postId: postId + 1, text: "Mismatched postId" },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it("updates and deletes a reply via /post/reply/:id, and guards route boundaries", async () => {

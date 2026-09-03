@@ -1,7 +1,9 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   JoinTable,
   ManyToMany,
@@ -15,6 +17,10 @@ import Opportunity from "./opportunity/opportunity.entity";
 import Person from "./person.entity";
 
 @Entity()
+// A row is either a root post (parentId/rootId both null) or a reply
+// (both set) — never a mix. Backs up the parentId/rootId pairing that
+// isDirectPostReply() and the reply-depth check assume holds.
+@Check(`("parent_id" IS NULL) = ("root_id" IS NULL)`)
 export default class Post {
   constructor(post?: Partial<Post>) {
     if (post) {
@@ -66,6 +72,7 @@ export default class Post {
   @JoinColumn({ name: "parent_id" })
   parent: Post | null;
 
+  @Index()
   @Column({ nullable: true })
   parentId: number | null;
 
@@ -73,6 +80,7 @@ export default class Post {
   @JoinColumn({ name: "root_id" })
   root: Post | null;
 
+  @Index()
   @Column({ nullable: true })
   rootId: number | null;
 
