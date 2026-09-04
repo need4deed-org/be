@@ -1,12 +1,15 @@
 import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
-import { hashPassword } from "../../../data/utils";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { DealType } from "../../../data/types";
+import { getPostcode, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
 // Regression coverage for two things landed together:
@@ -181,6 +184,140 @@ describe("POST /user — links existing Person by email instead of duplicating (
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
     createdPersonIds.push(res.json().person.id);
+  });
+});
+
+// be#943: POST /user/verify-email now also reports whether a VOLUNTEER's
+// linked Person already has a Volunteer profile, so fe#956 can skip the
+// completion form and send an already-existing volunteer straight to login.
+describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const createdPersonIds: number[] = [];
+  const createdUserIds: number[] = [];
+  const createdDealIds: number[] = [];
+  const createdVolunteerIds: number[] = [];
+
+  async function makeInactiveUser(
+    email: string,
+    role: UserRole,
+    personId: number,
+  ): Promise<User> {
+    const user = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role,
+        isActive: false,
+        language: "en",
+        timezone: "CET",
+        personId,
+      }),
+    );
+    createdUserIds.push(user.id);
+    return user;
+  }
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    for (const id of createdVolunteerIds) {
+      await fastify.db.volunteerRepository.delete({ id });
+    }
+    for (const id of createdDealIds) {
+      await fastify.db.dealRepository.delete({ id });
+    }
+    for (const id of createdUserIds) {
+      await fastify.db.userRepository.delete({ id });
+    }
+    for (const id of createdPersonIds) {
+      await fastify.db.personRepository.delete({ id });
+    }
+    await fastify.close();
+  });
+
+  it("reports hasVolunteerProfile: false for a VOLUNTEER with no Volunteer row yet", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "New", lastName: "Volunteer" }),
+    );
+    createdPersonIds.push(person.id);
+    const user = await makeInactiveUser(
+      `new-volunteer-${suffix}@example.com`,
+      UserRole.VOLUNTEER,
+      person.id,
+    );
+    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      verified: true,
+      hasVolunteerProfile: false,
+    });
+  });
+
+  it("reports hasVolunteerProfile: true for a VOLUNTEER whose Person already has one", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Existing", lastName: "Volunteer" }),
+    );
+    createdPersonIds.push(person.id);
+    const postcode = await getPostcode("10115");
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    createdDealIds.push(deal.id);
+    const volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ personId: person.id, dealId: deal.id }),
+    );
+    createdVolunteerIds.push(volunteer.id);
+    const user = await makeInactiveUser(
+      `existing-volunteer-${suffix}@example.com`,
+      UserRole.VOLUNTEER,
+      person.id,
+    );
+    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      verified: true,
+      hasVolunteerProfile: true,
+    });
+  });
+
+  it("omits hasVolunteerProfile for non-VOLUNTEER roles", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Some", lastName: "Agent" }),
+    );
+    createdPersonIds.push(person.id);
+    const user = await makeInactiveUser(
+      `agent-${suffix}@example.com`,
+      UserRole.AGENT,
+      person.id,
+    );
+    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).not.toHaveProperty("hasVolunteerProfile");
   });
 });
 

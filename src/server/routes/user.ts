@@ -207,6 +207,7 @@ export default async function userRoutes(
             properties: {
               message: { type: "string" },
               verified: { type: "boolean" },
+              hasVolunteerProfile: { type: "boolean" },
             },
             required: ["message", "verified"],
           },
@@ -253,10 +254,27 @@ export default async function userRoutes(
           return reply.status(400).send({ message: "Invalid token." });
         }
 
+        // Only meaningful for VOLUNTEER: does the Person this account is
+        // linked to (possibly an existing one, via be#947's email-linking)
+        // already have a Volunteer profile — same email-first check
+        // documented in fe#956 (never resolved via userId/personId
+        // assumptions on their own, always the verified email's Person).
+        let hasVolunteerProfile: boolean | undefined;
+        if (user.role === UserRole.VOLUNTEER && user.personId) {
+          const existingVolunteer =
+            await fastify.db.volunteerRepository.findOneBy({
+              personId: user.personId,
+            });
+          hasVolunteerProfile = !!existingVolunteer;
+        }
+
         if (user.isActive) {
           return reply.status(200).send({
             message: "Email is already verified.",
             verified: true,
+            ...(hasVolunteerProfile !== undefined
+              ? { hasVolunteerProfile }
+              : {}),
           });
         }
 
@@ -266,6 +284,7 @@ export default async function userRoutes(
         return reply.status(200).send({
           message: "Email verified successfully.",
           verified: true,
+          ...(hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {}),
         });
       } catch (error) {
         logger.error(`Error verifying email: ${error}`);

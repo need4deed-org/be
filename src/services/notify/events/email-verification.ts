@@ -40,7 +40,9 @@ export async function sendEmailVerification(
     type: "verify" as TokenType,
   });
   const roleParam =
-    user.role === UserRole.AGENT ? `?role=${UserRole.AGENT}` : "";
+    user.role === UserRole.AGENT || user.role === UserRole.VOLUNTEER
+      ? `?role=${user.role}`
+      : "";
   const url = `${urlEmailVerification}/${token}${roleParam}`;
 
   logger.debug(`sendEmailVerification: ${user.email}, url: ${url}`);
