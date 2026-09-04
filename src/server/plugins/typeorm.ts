@@ -13,6 +13,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import PostReaction from "../../data/entity/m2m/post-reaction";
 import OpportunityEventRegistration from "../../data/entity/opportunity-event-registration.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
@@ -66,6 +67,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       organizationRepository: dataSource.getRepository(Organization),
       postcodeRepository: dataSource.getRepository(Postcode),
       postRepository: dataSource.getRepository(Post),
+      postReactionRepository: dataSource.getRepository(PostReaction),
       trustedDomainRepository: dataSource.getRepository(TrustedDomain),
     });
 
