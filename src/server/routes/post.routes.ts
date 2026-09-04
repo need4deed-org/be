@@ -3,6 +3,7 @@ import {
   ApiPostGet,
   ApiPostPatch,
   ApiPostPost,
+  ApiPostReactionPost,
   ApiPostReplyGet,
   ApiPostReplyPatch,
   ApiPostReplyPost,
@@ -31,6 +32,7 @@ import {
 } from "../types";
 import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
+import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 import {
@@ -39,6 +41,7 @@ import {
 } from "../utils/data/get-post-where";
 import { getRootPostOrThrow } from "../utils/data/get-root-post-or-throw";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
+import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
 export default async function postRoutes(
@@ -81,6 +84,7 @@ export default async function postRoutes(
       }
 
       const [posts, count] = await qb.getManyAndCount();
+      await attachReactionData(fastify, posts, request.authUser?.personId);
       return reply.status(200).send({
         message: "Posts.",
         data: posts.map(dtoPost),
@@ -238,6 +242,7 @@ export default async function postRoutes(
       updated.replyCount = await fastify.db.postRepository.count({
         where: { rootId: updated.id },
       });
+      await attachReactionData(fastify, [updated], request.authUser?.personId);
       return reply
         .status(200)
         .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });
@@ -323,6 +328,7 @@ export default async function postRoutes(
         }),
       ]);
 
+      await attachReactionData(fastify, replies, request.authUser?.personId);
       return reply.status(200).send({
         message: "Replies.",
         data: replies.map(dtoPostReply),
@@ -469,6 +475,7 @@ export default async function postRoutes(
       }
 
       const updated = await fastify.db.postRepository.save(postReply);
+      await attachReactionData(fastify, [updated], request.authUser?.personId);
       return reply.status(200).send({
         message: `Reply ${id} updated.`,
         data: dtoPostReply(updated),
@@ -512,6 +519,167 @@ export default async function postRoutes(
       });
 
       await fastify.db.postRepository.remove(postReply);
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // POST /post/:id/reaction
+  //
+  fastify.post<{
+    Params: ParamsId;
+    Body: ApiPostReactionPost;
+    Reply: ReplyMessage;
+  }>(
+    "/:id/reaction",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReactionPost#" },
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (!isPostManagerRole(role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const post = await getRootPostOrThrow(fastify, id);
+      await upsertPostReaction(fastify, post.id, personId, request.body.emoji);
+
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // DELETE /post/:id/reaction
+  //
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id/reaction",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (!isPostManagerRole(role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const post = await getRootPostOrThrow(fastify, id);
+      // Idempotent — deleting an already-absent reaction is a no-op success,
+      // matching typical un-react/un-like UX.
+      await fastify.db.postReactionRepository.delete({
+        postId: post.id,
+        personId,
+      });
+
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // POST /post/reply/:id/reaction
+  //
+  fastify.post<{
+    Params: ParamsId;
+    Body: ApiPostReactionPost;
+    Reply: ReplyMessage;
+  }>(
+    "/reply/:id/reaction",
+    {
+      schema: {
+        params: idParamSchema,
+        body: { $ref: "ApiPostReactionPost#" },
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (!isPostManagerRole(role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: getPostReplyWhere(id),
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+      await upsertPostReaction(
+        fastify,
+        postReply.id,
+        personId,
+        request.body.emoji,
+      );
+
+      return reply.status(204).send();
+    },
+  );
+
+  //
+  // DELETE /post/reply/:id/reaction
+  //
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/reply/:id/reaction",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema({ statusCode: 204 }),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { role } = request.user;
+
+      if (!isPostManagerRole(role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
+
+      const personId = request.authUser?.personId;
+      if (!personId) {
+        throw new BadRequestError("No person linked to this user.");
+      }
+
+      const postReply = await fastify.db.postRepository.findOne({
+        where: getPostReplyWhere(id),
+      });
+      if (!postReply) {
+        throw new NotFoundError(`Reply ${id} not found.`);
+      }
+      await fastify.db.postReactionRepository.delete({
+        postId: postReply.id,
+        personId,
+      });
+
       return reply.status(204).send();
     },
   );
