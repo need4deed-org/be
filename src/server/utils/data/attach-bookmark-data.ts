@@ -15,18 +15,16 @@ export async function attachBookmarkData(
     return;
   }
 
-  const bookmarkedPostIds = requestPersonId
-    ? new Set(
-        (
-          await fastify.db.postBookmarkRepository.find({
-            where: {
-              postId: In(posts.map((post) => post.id)),
-              personId: requestPersonId,
-            },
-          })
-        ).map((b) => b.postId),
-      )
-    : new Set<number>();
+  const bookmarks = requestPersonId
+    ? await fastify.db.postBookmarkRepository.find({
+        select: ["postId"],
+        where: {
+          postId: In(posts.map((post) => post.id)),
+          personId: requestPersonId,
+        },
+      })
+    : [];
+  const bookmarkedPostIds = new Set(bookmarks.map((b) => b.postId));
 
   for (const post of posts) {
     post.bookmarked = bookmarkedPostIds.has(post.id);

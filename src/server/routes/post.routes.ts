@@ -40,6 +40,7 @@ import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildPostQuery } from "../utils/data/build-post-query";
+import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
 import {
   getPostReplyOrThrow,
@@ -53,6 +54,7 @@ import {
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
+import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
@@ -320,12 +322,7 @@ export default async function postRoutes(
       );
 
       const post = await getRootPostOrThrow(fastify, id);
-      // Atomic upsert (not find-then-write) — bookmarking twice in quick
-      // succession must not race into a unique (postId, personId) violation.
-      await fastify.db.postBookmarkRepository.upsert(
-        { postId: post.id, personId },
-        { conflictPaths: ["postId", "personId"] },
-      );
+      await upsertPostBookmark(fastify, post.id, personId);
 
       return reply.status(204).send();
     },
@@ -350,14 +347,7 @@ export default async function postRoutes(
         request.authUser?.personId,
       );
 
-      // Idempotent, no existence check needed first — same reasoning as the
-      // reaction DELETE routes: a delete-by-criteria matches zero rows
-      // whether the post doesn't exist or was never bookmarked, both a
-      // no-op 204 either way.
-      await fastify.db.postBookmarkRepository.delete({
-        postId: id,
-        personId,
-      });
+      await deletePostBookmark(fastify, id, personId);
 
       return reply.status(204).send();
     },
