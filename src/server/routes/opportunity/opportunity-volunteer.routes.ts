@@ -44,7 +44,7 @@ export default function opportunityOpportunityVolunteerRoutes(
           select: { id: true, agentId: true },
         });
         await assertAgentOwnsOpportunity(
-          request.authUser,
+          request,
           opportunityId,
           opportunity?.agentId,
         );

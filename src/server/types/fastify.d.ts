@@ -69,6 +69,7 @@ declare module "fastify" {
     agents?: Agent[];
     registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
     authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
+    callerAgentIds?: number[]; // Resolved once per request, shared by the ownership check and the PII masking hook
   }
 }
 

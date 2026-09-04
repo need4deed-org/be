@@ -19,7 +19,7 @@ export async function resolveCallerMask(
   if (!user || privileged) {
     return null;
   }
-  return resolveCallerVisibility(request.server, user);
+  return resolveCallerVisibility(request, user);
 }
 
 /**

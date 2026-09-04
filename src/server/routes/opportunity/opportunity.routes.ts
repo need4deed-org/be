@@ -211,11 +211,7 @@ export default async function opportunityRoutes(
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
-      await assertAgentOwnsOpportunity(
-        request.authUser,
-        id,
-        opportunity.agentId,
-      );
+      await assertAgentOwnsOpportunity(request, id, opportunity.agentId);
 
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
@@ -310,7 +306,10 @@ export default async function opportunityRoutes(
 
       //  NGOs see only their own agent's opportunities
       if (request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(request.authUser.personId);
+        const agentIds = await getCallerAgentIds(
+          request,
+          request.authUser.personId,
+        );
 
         // An agent with no shelter must see nothing, so return here rather than
         // skipping the filter, which would show everything.

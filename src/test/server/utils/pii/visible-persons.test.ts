@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyRequest } from "fastify";
 import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
@@ -14,9 +14,9 @@ const mockMemberships = vi.mocked(getActiveAgentMemberships);
 const find = vi.fn();
 const query = vi.fn();
 
-const fastify = {
-  db: { agentPersonRepository: { find, manager: { query } } },
-} as unknown as FastifyInstance;
+const request = {
+  server: { db: { agentPersonRepository: { find, manager: { query } } } },
+} as unknown as FastifyRequest;
 
 const makeUser = (
   role: UserRole,
@@ -24,15 +24,16 @@ const makeUser = (
   id = 100,
 ): User => ({ id, role, personId }) as unknown as User;
 
-const sorted = (s: Set<number>) => [...s].sort((a, b) => a - b);
-
 beforeEach(() => {
   vi.resetAllMocks();
+  request.callerAgentIds = undefined;
 });
+
+const sorted = (s: Set<number>) => [...s].sort((a, b) => a - b);
 
 describe("resolveCallerVisibility", () => {
   it("returns empty sets (just the caller userId) for USER, no DB calls", async () => {
-    const v = await resolveCallerVisibility(fastify, makeUser(UserRole.USER));
+    const v = await resolveCallerVisibility(request, makeUser(UserRole.USER));
     expect(v.userId).toBe(100);
     expect([...v.personIds]).toEqual([]);
     expect([...v.opportunityIds]).toEqual([]);
@@ -43,7 +44,7 @@ describe("resolveCallerVisibility", () => {
 
   it("returns empty when the caller has no personId", async () => {
     const v = await resolveCallerVisibility(
-      fastify,
+      request,
       makeUser(UserRole.VOLUNTEER, null),
     );
     expect([...v.personIds]).toEqual([]);
@@ -58,7 +59,7 @@ describe("resolveCallerVisibility", () => {
       ]);
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.VOLUNTEER, 7),
       );
 
@@ -84,7 +85,7 @@ describe("resolveCallerVisibility", () => {
       ]);
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.AGENT, 1),
       );
 
@@ -107,7 +108,7 @@ describe("resolveCallerVisibility", () => {
       mockMemberships.mockResolvedValueOnce([]); // no memberships
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.AGENT, 5),
       );
 
