@@ -574,4 +574,94 @@ describe("POST /post", () => {
     });
     expect(res.statusCode).toBe(403);
   });
+
+  it("bookmarks a post, reports it on GET /post and PATCH, and un-bookmarking is idempotent", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for bookmark test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const bookmarkRes = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/bookmark`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(bookmarkRes.statusCode).toBe(204);
+
+    // Bookmarking again (double-tap) must not error — upsert, not insert.
+    const bookmarkAgainRes = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/bookmark`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(bookmarkAgainRes.statusCode).toBe(204);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const listedPost = listRes
+      .json()
+      .data.find((p: { id: number }) => p.id === postId);
+    expect(listedPost.bookmarked).toBe(true);
+
+    // Bookmarked is scoped per-user — the coordinator never bookmarked it.
+    const listResOther = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    const listedPostOther = listResOther
+      .json()
+      .data.find((p: { id: number }) => p.id === postId);
+    expect(listedPostOther.bookmarked).toBe(false);
+
+    // PATCH must not silently reset bookmarked to false.
+    const patchRes = await fastify.inject({
+      method: "PATCH",
+      url: `/post/${postId}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for bookmark test, edited" },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().data.bookmarked).toBe(true);
+
+    const unbookmarkRes = await fastify.inject({
+      method: "DELETE",
+      url: `/post/${postId}/bookmark`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(unbookmarkRes.statusCode).toBe(204);
+
+    // Idempotent — un-bookmarking an already-absent bookmark still succeeds.
+    const unbookmarkAgainRes = await fastify.inject({
+      method: "DELETE",
+      url: `/post/${postId}/bookmark`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(unbookmarkAgainRes.statusCode).toBe(204);
+  });
+
+  it("403s when a volunteer tries to bookmark", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for volunteer bookmark test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/bookmark`,
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
 });

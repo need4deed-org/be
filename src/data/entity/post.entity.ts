@@ -98,6 +98,11 @@ export default class Post {
   reactions?: ApiPostReactionSummary[];
   myReaction?: string | null;
 
+  // Populated by attachBookmarkData() — not a real column. Posts only, not
+  // replies — bookmarking is scoped to "save this post for later", per
+  // sdk#215 (ApiPostReplyGet has no bookmarked field).
+  bookmarked?: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
