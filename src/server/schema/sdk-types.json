@@ -1674,6 +1674,12 @@
           "type": "array",
           "items": { "$ref": "ApiPostLinkedOpportunity#" }
         },
+        "replyCount": { "type": "integer" },
+        "reactions": {
+          "type": "array",
+          "items": { "$ref": "ApiPostReactionSummary#" }
+        },
+        "myReaction": { "type": ["string", "null"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
@@ -1683,8 +1689,75 @@
         "agentId",
         "taggedPersons",
         "linkedOpportunities",
+        "replyCount",
+        "reactions",
+        "myReaction",
         "createdAt"
       ]
+    },
+    "ApiPostReactionSummary": {
+      "$id": "ApiPostReactionSummary",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string" },
+        "count": { "type": "integer" }
+      },
+      "required": ["emoji", "count"]
+    },
+    "ApiPostReactionPost": {
+      "$id": "ApiPostReactionPost",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string", "minLength": 1, "maxLength": 32 }
+      },
+      "required": ["emoji"],
+      "additionalProperties": false
+    },
+    "ApiPostReplyGet": {
+      "$id": "ApiPostReplyGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "text": { "type": "string" },
+        "author": { "$ref": "ApiPostPerson#" },
+        "postId": { "type": "integer" },
+        "parentReplyId": { "type": ["integer", "null"] },
+        "reactions": {
+          "type": "array",
+          "items": { "$ref": "ApiPostReactionSummary#" }
+        },
+        "myReaction": { "type": ["string", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "text",
+        "author",
+        "postId",
+        "parentReplyId",
+        "reactions",
+        "myReaction",
+        "createdAt"
+      ]
+    },
+    "ApiPostReplyPost": {
+      "$id": "ApiPostReplyPost",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "integer" },
+        "text": { "type": "string", "minLength": 1 },
+        "parentReplyId": { "type": "integer" }
+      },
+      "required": ["postId", "text"],
+      "additionalProperties": false
+    },
+    "ApiPostReplyPatch": {
+      "$id": "ApiPostReplyPatch",
+      "type": "object",
+      "properties": {
+        "text": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "additionalProperties": false
     },
     "ApiPostPost": {
       "$id": "ApiPostPost",
