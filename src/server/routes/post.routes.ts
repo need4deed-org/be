@@ -40,13 +40,15 @@ import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
+import {
+  getPostReplyOrThrow,
+  getRootPostOrThrow,
+} from "../utils/data/find-post-or-throw";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
-import { getPostReplyOrThrow } from "../utils/data/get-post-reply-or-throw";
 import {
   getPostReplyWhere,
   getRootPostWhere,
 } from "../utils/data/get-post-where";
-import { getRootPostOrThrow } from "../utils/data/get-root-post-or-throw";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import { requireReactorPersonId } from "../utils/data/require-reactor-person-id";
