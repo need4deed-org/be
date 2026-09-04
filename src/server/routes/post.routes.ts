@@ -34,6 +34,7 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildPostQuery } from "../utils/data/build-post-query";
+import { deletePostReaction } from "../utils/data/delete-post-reaction";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 import { getPostReplyOrThrow } from "../utils/data/get-post-reply-or-throw";
 import {
@@ -42,6 +43,7 @@ import {
 } from "../utils/data/get-post-where";
 import { getRootPostOrThrow } from "../utils/data/get-root-post-or-throw";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
+import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import { requireReactorPersonId } from "../utils/data/require-reactor-person-id";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
@@ -118,10 +120,7 @@ export default async function postRoutes(
         );
       }
 
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
+      const personId = requireLinkedPersonId(request.authUser?.personId);
 
       const {
         text,
@@ -241,10 +240,12 @@ export default async function postRoutes(
       const updated = await fastify.db.postRepository.save(post);
       // A lightweight count, not a full buildPostQuery() re-fetch — author/
       // taggedPersons/linkedOpportunities are already loaded on `updated`.
-      updated.replyCount = await fastify.db.postRepository.count({
-        where: { rootId: updated.id },
-      });
-      await attachReactionData(fastify, [updated], request.authUser?.personId);
+      // Runs alongside attachReactionData — neither depends on the other.
+      const [replyCount] = await Promise.all([
+        fastify.db.postRepository.count({ where: { rootId: updated.id } }),
+        attachReactionData(fastify, [updated], request.authUser?.personId),
+      ]);
+      updated.replyCount = replyCount;
       return reply
         .status(200)
         .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });
@@ -367,10 +368,7 @@ export default async function postRoutes(
         );
       }
 
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
+      const personId = requireLinkedPersonId(request.authUser?.personId);
 
       const { postId, text, parentReplyId } = request.body;
       if (postId !== id) {
@@ -570,10 +568,7 @@ export default async function postRoutes(
         request.authUser?.personId,
       );
 
-      // Idempotent, and no existence check needed first: a plain delete-by-
-      // criteria matches zero rows whether the post doesn't exist or the
-      // person just never reacted — both cases are a no-op 204 either way.
-      await fastify.db.postReactionRepository.delete({ postId: id, personId });
+      await deletePostReaction(fastify, id, personId);
 
       return reply.status(204).send();
     },
@@ -634,7 +629,7 @@ export default async function postRoutes(
         request.authUser?.personId,
       );
 
-      await fastify.db.postReactionRepository.delete({ postId: id, personId });
+      await deletePostReaction(fastify, id, personId);
 
       return reply.status(204).send();
     },

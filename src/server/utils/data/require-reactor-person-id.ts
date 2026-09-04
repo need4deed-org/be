@@ -1,13 +1,11 @@
 import { UserRole } from "need4deed-sdk";
-import {
-  BadRequestError,
-  UnauthorizedError,
-} from "../../../config/error/fastify";
+import { UnauthorizedError } from "../../../config/error/fastify";
 import { isPostManagerRole } from "./is-post-manager-role";
+import { requireLinkedPersonId } from "./require-linked-person-id";
 
 // Shared by all four reaction endpoints: same eligibility rule (anything
-// that can view posts can react to them) and the same "must have a linked
-// person" requirement every mutation in this file needs.
+// that can view posts can react to them) as well as the linked-person
+// requirement.
 export function requireReactorPersonId(
   role: UserRole,
   personId: number | undefined,
@@ -15,8 +13,5 @@ export function requireReactorPersonId(
   if (!isPostManagerRole(role)) {
     throw new UnauthorizedError("Permission denied.");
   }
-  if (!personId) {
-    throw new BadRequestError("No person linked to this user.");
-  }
-  return personId;
+  return requireLinkedPersonId(personId);
 }
