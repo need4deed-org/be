@@ -1,4 +1,9 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  FastifyInstance,
+  FastifyPluginOptions,
+  FastifyReply,
+  FastifyRequest,
+} from "fastify";
 import {
   ApiPostGet,
   ApiPostPatch,
@@ -550,28 +555,41 @@ export default async function postRoutes(
   );
 
   //
-  // DELETE /post/:id/reaction
+  // DELETE /:id/reaction and /reply/:id/reaction — deletePostReaction has no
+  // root/reply distinction at all (a reaction's postId is just a row in the
+  // shared table either way), so the same handler is registered at both
+  // paths rather than duplicated.
   //
-  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+  const deleteReactionOptions = {
+    schema: {
+      params: idParamSchema,
+      response: responseSchema({ statusCode: 204 }),
+    },
+    onRequest: [fastify.authenticate()],
+  };
+  const deleteReactionHandler = async (
+    request: FastifyRequest<{ Params: ParamsId }>,
+    reply: FastifyReply,
+  ) => {
+    const { id } = request.params;
+    const personId = requireReactorPersonId(
+      request.user.role,
+      request.authUser?.personId,
+    );
+
+    await deletePostReaction(fastify, id, personId);
+
+    return reply.status(204).send();
+  };
+  fastify.delete<{ Params: ParamsId }>(
     "/:id/reaction",
-    {
-      schema: {
-        params: idParamSchema,
-        response: responseSchema({ statusCode: 204 }),
-      },
-      onRequest: [fastify.authenticate()],
-    },
-    async (request, reply) => {
-      const { id } = request.params;
-      const personId = requireReactorPersonId(
-        request.user.role,
-        request.authUser?.personId,
-      );
-
-      await deletePostReaction(fastify, id, personId);
-
-      return reply.status(204).send();
-    },
+    deleteReactionOptions,
+    deleteReactionHandler,
+  );
+  fastify.delete<{ Params: ParamsId }>(
+    "/reply/:id/reaction",
+    deleteReactionOptions,
+    deleteReactionHandler,
   );
 
   //
@@ -605,31 +623,6 @@ export default async function postRoutes(
         personId,
         request.body.emoji,
       );
-
-      return reply.status(204).send();
-    },
-  );
-
-  //
-  // DELETE /post/reply/:id/reaction
-  //
-  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
-    "/reply/:id/reaction",
-    {
-      schema: {
-        params: idParamSchema,
-        response: responseSchema({ statusCode: 204 }),
-      },
-      onRequest: [fastify.authenticate()],
-    },
-    async (request, reply) => {
-      const { id } = request.params;
-      const personId = requireReactorPersonId(
-        request.user.role,
-        request.authUser?.personId,
-      );
-
-      await deletePostReaction(fastify, id, personId);
 
       return reply.status(204).send();
     },
