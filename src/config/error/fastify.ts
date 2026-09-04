@@ -38,3 +38,15 @@ export class InvalidOrganizationEmailError extends BaseError {
     super(message, 400);
   }
 }
+
+// Distinct class (see InvalidOrganizationEmailError above for the same
+// rationale) so the frontend can discriminate this case from the route's
+// other BadRequestError throws via error.constructor.name — e.g. to point
+// the caller at login instead of showing a generic validation error.
+export class PersonAlreadyRegisteredError extends BaseError {
+  constructor(
+    message = "An account already exists for this email. Please log in instead.",
+  ) {
+    super(message, 400);
+  }
+}

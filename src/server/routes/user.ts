@@ -13,6 +13,7 @@ import {
   BadRequestError,
   ConflictError,
   InvalidOrganizationEmailError,
+  PersonAlreadyRegisteredError,
   UnauthorizedError,
 } from "../../config";
 import Person from "../../data/entity/person.entity";
@@ -331,6 +332,24 @@ export default async function userRoutes(
             resolvedPerson.email = email;
           }
           request.resolvedPerson = resolvedPerson;
+          return;
+        }
+
+        // No explicit person.id — look up an existing Person by email
+        // (case-insensitively) before creating a new, disconnected one, e.g.
+        // a Person that already exists via a legacy Volunteer row (be#923).
+        const existingPerson = await personRepository.findOne({
+          where: { email: ILike(email) },
+          relations: ["users"],
+        });
+        if (existingPerson) {
+          // Conservative default: a Person that already has a User (any
+          // role) is not re-registrable — point them at login instead of
+          // silently attaching a second account to the same Person.
+          if (existingPerson.users?.length) {
+            throw new PersonAlreadyRegisteredError();
+          }
+          request.resolvedPerson = existingPerson;
           return;
         }
 
