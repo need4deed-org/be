@@ -13,6 +13,8 @@ export function dtoPostReply(reply: Post): ApiPostReplyGet {
     },
     postId: reply.rootId as number,
     parentReplyId: isDirectPostReply(reply) ? null : reply.parentId,
+    reactions: reply.reactions ?? [],
+    myReaction: reply.myReaction ?? null,
     createdAt: reply.createdAt,
   };
 }

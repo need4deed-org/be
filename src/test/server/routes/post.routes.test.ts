@@ -421,4 +421,157 @@ describe("POST /post", () => {
     expect(deleteRes.statusCode).toBe(204);
     createdPostIds.splice(createdPostIds.indexOf(replyId), 1);
   });
+
+  it("reacting again with a different emoji replaces (not duplicates) the reaction, and PATCH doesn't lose it", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for reaction test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const react1 = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { emoji: "👍" },
+    });
+    expect(react1.statusCode).toBe(204);
+
+    const react2 = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { emoji: "👍" },
+    });
+    expect(react2.statusCode).toBe(204);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    let listedPost = listRes
+      .json()
+      .data.find((p: { id: number }) => p.id === postId);
+    expect(listedPost.reactions).toEqual([{ emoji: "👍", count: 2 }]);
+    expect(listedPost.myReaction).toBe("👍");
+
+    // Replace the agent's own reaction — upsert, not a second row.
+    const react3 = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { emoji: "❤️" },
+    });
+    expect(react3.statusCode).toBe(204);
+
+    const listRes2 = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    listedPost = listRes2
+      .json()
+      .data.find((p: { id: number }) => p.id === postId);
+    expect(listedPost.myReaction).toBe("❤️");
+    expect(
+      listedPost.reactions.reduce(
+        (sum: number, r: { count: number }) => sum + r.count,
+        0,
+      ),
+    ).toBe(2);
+
+    // PATCH must not silently reset reactions/myReaction to empty.
+    const patchRes = await fastify.inject({
+      method: "PATCH",
+      url: `/post/${postId}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for reaction test, edited" },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().data.myReaction).toBe("❤️");
+
+    const deleteRes = await fastify.inject({
+      method: "DELETE",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(deleteRes.statusCode).toBe(204);
+
+    // Idempotent — deleting an already-absent reaction still succeeds.
+    const deleteAgainRes = await fastify.inject({
+      method: "DELETE",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(deleteAgainRes.statusCode).toBe(204);
+  });
+
+  it("supports reacting to a reply", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for reply reaction test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const replyRes = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { postId, text: "A reply to react to" },
+    });
+    const replyId = replyRes.json().data.id;
+    createdPostIds.push(replyId);
+
+    const reactRes = await fastify.inject({
+      method: "POST",
+      url: `/post/reply/${replyId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { emoji: "🎉" },
+    });
+    expect(reactRes.statusCode).toBe(204);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: `/post/${postId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const reply = listRes
+      .json()
+      .data.find((r: { id: number }) => r.id === replyId);
+    expect(reply.reactions).toEqual([{ emoji: "🎉", count: 1 }]);
+    expect(reply.myReaction).toBe("🎉");
+
+    const deleteRes = await fastify.inject({
+      method: "DELETE",
+      url: `/post/reply/${replyId}/reaction`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(deleteRes.statusCode).toBe(204);
+  });
+
+  it("403s when a volunteer tries to react", async () => {
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: "Post for volunteer reaction test" },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/post/${postId}/reaction`,
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { emoji: "👍" },
+    });
+    expect(res.statusCode).toBe(403);
+  });
 });
