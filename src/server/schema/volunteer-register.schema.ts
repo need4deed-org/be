@@ -5,12 +5,10 @@
 // be#947). Authorization is the verify token carried in the querystring (see
 // the route's preHandler), not a logged-in session.
 //
-// Body shape mirrors fe's VolunteerRegistration/ProfileCompletion (fe#972)
-// as literally as possible — not yet an SDK type since fe#972 itself hasn't
-// merged/stabilized. Numeric-id-based (locations/activities/skills/leadFrom,
-// languages[].language as a stringified id), same pattern as
-// dealParserOpportunityCreate/POST /opportunity, not the legacy title-based
-// form.
+// Body shape mirrors sdk#222's proposed ApiVolunteerRegisterNew
+// (https://github.com/need4deed-org/sdk/pull/222) field-for-field, since
+// that's the contract this flow is adopting — not yet an SDK $ref since
+// sdk#222 isn't merged/published yet.
 
 export const registerVolunteerQuerySchema = {
   type: "object",
@@ -21,32 +19,46 @@ export const registerVolunteerQuerySchema = {
   },
 };
 
-const timeSlotSchema = {
+// OptionById — id required, title optional (sdk#222).
+const optionByIdSchema = {
   type: "object",
-  required: ["id", "selected"],
-  properties: {
-    id: { type: "string" },
-    selected: { type: "boolean" },
-  },
-};
-
-const availabilityDaySchema = {
-  type: "object",
-  required: ["weekday", "timeSlots"],
-  properties: {
-    weekday: { type: "integer", minimum: 0, maximum: 7 },
-    timeSlots: { type: "array", items: timeSlotSchema },
-  },
-};
-
-const languageEntrySchema = {
-  type: "object",
-  required: ["id", "language", "level"],
+  required: ["id"],
   properties: {
     id: { type: "integer" },
-    // The Language option id, stringified by fe's <select> control.
-    language: { type: "string" },
-    level: { type: "string" },
+    title: { type: "string" },
+  },
+};
+
+// OptionItem — id and title both required (sdk#222).
+const optionItemSchema = {
+  type: "object",
+  required: ["id", "title"],
+  properties: {
+    id: { type: "integer" },
+    title: { type: "string" },
+    isoCode: { type: "string" },
+  },
+};
+
+// ApiLanguage (sdk#222) — purpose omitted here, not meaningful for a
+// volunteer's own languages (see parser-volunteer-self-register.ts).
+const apiLanguageSchema = {
+  type: "object",
+  required: ["id", "title"],
+  properties: {
+    id: { type: "integer" },
+    title: { type: "string" },
+    proficiency: { type: "string" },
+  },
+};
+
+// ApiAvailability (sdk#222) — all fields optional.
+const apiAvailabilitySchema = {
+  type: "object",
+  properties: {
+    id: { type: "integer" },
+    day: { type: "string" },
+    daytime: { type: "string" },
   },
 };
 
@@ -61,12 +73,12 @@ export const volunteerRegisterBodySchema = {
       additionalProperties: false,
       properties: {
         addressPostcode: { type: "string", minLength: 1 },
-        locations: { type: "array", items: { type: "integer" } },
-        languages: { type: "array", items: languageEntrySchema },
-        availability: { type: "array", items: availabilityDaySchema },
-        activities: { type: "array", items: { type: "integer" } },
-        skills: { type: "array", items: { type: "integer" } },
-        leadFrom: { type: "array", items: { type: "integer" } },
+        locations: { type: "array", items: optionByIdSchema },
+        languages: { type: "array", items: apiLanguageSchema },
+        availability: { type: "array", items: apiAvailabilitySchema },
+        activities: { type: "array", items: optionItemSchema },
+        skills: { type: "array", items: optionItemSchema },
+        leadFrom: { type: "array", items: optionItemSchema },
         goodConductCertificate: { type: "string" },
         measlesVaccination: { type: "string" },
         comments: { type: "string" },

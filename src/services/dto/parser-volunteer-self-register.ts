@@ -19,56 +19,96 @@ import { getPostcode, getRepository } from "../../data/utils";
 import { buildDealTimeslots } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
-// Wire shape POSTed by fe's VolunteerRegistration/ProfileCompletion (fe#972),
-// same numeric-id-based option pattern as dealParserOpportunityCreate — not
-// yet an SDK type since fe#972 itself hasn't merged/stabilized (see be#943
-// PR description). languages[].language carries the Language option id as a
-// string (fe's <select> value), not a title — same id-based pattern as the
-// other fields, just string-encoded by the form control.
+// Wire shape mirrors sdk#222's proposed ApiVolunteerRegisterNew
+// (https://github.com/need4deed-org/sdk/pull/222) field-for-field. sdk#222
+// isn't merged/published yet, so these are local TS interfaces, not an SDK
+// import — swap for the real types once that PR lands (be#943 PR
+// description / thread). OptionById/OptionItem/ApiLanguage/ApiAvailability
+// shapes copied here match sdk#222 exactly so the swap is a no-op rename.
+interface OptionById {
+  id: number;
+  title?: string;
+}
+
+interface OptionItem {
+  id: number;
+  title: string;
+  isoCode?: string;
+}
+
+interface ApiLanguage {
+  id: number;
+  title: string;
+  proficiency?: LangProficiency;
+}
+
+interface ApiAvailability {
+  id?: number;
+  // ByDay value (e.g. "Monday") or Occasionally ("occasionally") — a day
+  // name string, not the weekday-number tuple buildDealTimeslots expects;
+  // converted below.
+  day?: string;
+  // TimeSlot (e.g. "08-11") or OccasionalType (e.g. "weekends") value.
+  daytime?: string;
+}
+
 export interface VolunteerSelfRegisterBody {
   addressPostcode: string;
-  locations: number[];
-  languages: Array<{ id: number; language: string; level: string }>;
-  availability: Array<{
-    weekday: number;
-    timeSlots: Array<{ id: string; selected: boolean }>;
-  }>;
-  activities: number[];
-  skills: number[];
-  leadFrom: number[];
+  locations: OptionById[];
+  languages: ApiLanguage[];
+  availability: ApiAvailability[];
+  activities: OptionItem[];
+  skills: OptionItem[];
+  leadFrom: OptionItem[];
   goodConductCertificate: DocumentStatusType;
   measlesVaccination: DocumentStatusType;
   comments: string;
 }
 
-// fe's Availability shape (weekday 0-7, 0 = occasional) into the [day,
-// daytime][] tuple format buildDealTimeslots already knows how to resolve —
-// same tuple shape dealParserOpportunityCreate's formData.timeslots uses.
+const BY_DAY_TO_WEEKDAY: Record<string, number> = {
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+  Sunday: 7,
+};
+
+// ApiAvailability's {day, daytime} (day a name string, "occasionally" or
+// absent meaning the occasional bucket) into the [day, daytime][] tuple
+// format buildDealTimeslots already knows how to resolve — same tuple shape
+// dealParserOpportunityCreate's formData.timeslots uses.
 function availabilityToTimeslots(
-  availability: VolunteerSelfRegisterBody["availability"] | undefined | null,
+  availability: ApiAvailability[] | undefined | null,
 ): [number, string][] {
   const result: [number, string][] = [];
-  for (const { weekday, timeSlots } of availability || []) {
-    for (const slot of timeSlots || []) {
-      if (slot.selected) {
-        result.push([weekday, String(slot.id)]);
-      }
+  for (const entry of availability || []) {
+    if (!entry.daytime) {
+      continue;
     }
+    const weekday = entry.day ? (BY_DAY_TO_WEEKDAY[entry.day] ?? 0) : 0;
+    result.push([weekday, entry.daytime]);
   }
   return result;
 }
 
+function optionIds(
+  options: Array<{ id: number }> | undefined | null,
+): number[] {
+  return (options || []).map((option) => option.id);
+}
+
 async function resolveDealLanguages(
-  languages: VolunteerSelfRegisterBody["languages"] | undefined | null,
+  languages: ApiLanguage[] | undefined | null,
 ): Promise<DealLanguage[]> {
-  const levelByLanguageId = new Map<number, string>();
+  const proficiencyById = new Map<number, LangProficiency | undefined>();
   for (const entry of languages || []) {
-    const languageId = Number(entry.language);
-    if (Number.isFinite(languageId) && languageId > 0 && entry.level) {
-      levelByLanguageId.set(languageId, entry.level);
+    if (Number.isFinite(entry.id) && entry.id > 0) {
+      proficiencyById.set(entry.id, entry.proficiency);
     }
   }
-  const languageIds = [...levelByLanguageId.keys()];
+  const languageIds = [...proficiencyById.keys()];
   if (!languageIds.length) {
     return [];
   }
@@ -78,19 +118,19 @@ async function resolveDealLanguages(
 
   // purpose left unset (entity default GENERAL) — RECIPIENT is specific to
   // an opportunity's language need, not a volunteer's own languages.
-  return resolved.map(
-    (language) =>
-      new DealLanguage({
-        language,
-        proficiency: levelByLanguageId.get(language.id) as LangProficiency,
-      }),
-  );
+  return resolved.map((language) => {
+    const proficiency = proficiencyById.get(language.id);
+    return new DealLanguage({
+      language,
+      ...(proficiency ? { proficiency } : {}),
+    });
+  });
 }
 
 async function resolveLeadFrom(
-  ids: number[] | undefined | null,
+  options: OptionItem[] | undefined | null,
 ): Promise<LeadFrom[]> {
-  const uniqueIds = toIds(ids);
+  const uniqueIds = toIds(optionIds(options));
   if (!uniqueIds.length) {
     return [];
   }
@@ -108,14 +148,19 @@ export async function parserVolunteerSelfRegister(
   person.address = new Address({ postcode });
 
   const dealActivity = await resolveByIds(
-    body.activities,
+    optionIds(body.activities),
     Activity,
     DealActivity,
     "activity",
   );
-  const dealSkill = await resolveByIds(body.skills, Skill, DealSkill, "skill");
+  const dealSkill = await resolveByIds(
+    optionIds(body.skills),
+    Skill,
+    DealSkill,
+    "skill",
+  );
   const dealDistrict = await resolveByIds(
-    body.locations,
+    optionIds(body.locations),
     District,
     DealDistrict,
     "district",

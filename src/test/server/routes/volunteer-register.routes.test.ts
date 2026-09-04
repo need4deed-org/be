@@ -200,16 +200,7 @@ describe("POST /volunteer/register", () => {
           addressPostcode: "10115",
           locations: [],
           languages: [],
-          availability: [
-            {
-              weekday: 1,
-              timeSlots: [{ id: "08-11", selected: true }],
-            },
-            {
-              weekday: 0,
-              timeSlots: [{ id: "weekends", selected: false }],
-            },
-          ],
+          availability: [{ day: "Monday", daytime: "08-11" }],
           activities: [],
           skills: [],
           leadFrom: [],
