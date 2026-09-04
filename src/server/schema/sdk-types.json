@@ -1708,7 +1708,7 @@
       "$id": "ApiPostReactionPost",
       "type": "object",
       "properties": {
-        "emoji": { "type": "string", "minLength": 1, "maxLength": 8 }
+        "emoji": { "type": "string", "minLength": 1, "maxLength": 32 }
       },
       "required": ["emoji"],
       "additionalProperties": false

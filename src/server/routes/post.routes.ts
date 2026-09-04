@@ -35,12 +35,14 @@ import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import { getPostReplyOrThrow } from "../utils/data/get-post-reply-or-throw";
 import {
   getPostReplyWhere,
   getRootPostWhere,
 } from "../utils/data/get-post-where";
 import { getRootPostOrThrow } from "../utils/data/get-root-post-or-throw";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
+import { requireReactorPersonId } from "../utils/data/require-reactor-person-id";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
@@ -503,12 +505,7 @@ export default async function postRoutes(
         throw new UnauthorizedError("Permission denied.");
       }
 
-      const postReply = await fastify.db.postRepository.findOne({
-        where: getPostReplyWhere(id),
-      });
-      if (!postReply) {
-        throw new NotFoundError(`Reply ${id} not found.`);
-      }
+      const postReply = await getPostReplyOrThrow(fastify, id);
 
       assertCanManagePost({
         authorId: postReply.authorId,
@@ -542,16 +539,10 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
-
-      if (!isPostManagerRole(role)) {
-        throw new UnauthorizedError("Permission denied.");
-      }
-
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
+      const personId = requireReactorPersonId(
+        request.user.role,
+        request.authUser?.personId,
+      );
 
       const post = await getRootPostOrThrow(fastify, id);
       await upsertPostReaction(fastify, post.id, personId, request.body.emoji);
@@ -574,24 +565,15 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const personId = requireReactorPersonId(
+        request.user.role,
+        request.authUser?.personId,
+      );
 
-      if (!isPostManagerRole(role)) {
-        throw new UnauthorizedError("Permission denied.");
-      }
-
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
-
-      const post = await getRootPostOrThrow(fastify, id);
-      // Idempotent — deleting an already-absent reaction is a no-op success,
-      // matching typical un-react/un-like UX.
-      await fastify.db.postReactionRepository.delete({
-        postId: post.id,
-        personId,
-      });
+      // Idempotent, and no existence check needed first: a plain delete-by-
+      // criteria matches zero rows whether the post doesn't exist or the
+      // person just never reacted — both cases are a no-op 204 either way.
+      await fastify.db.postReactionRepository.delete({ postId: id, personId });
 
       return reply.status(204).send();
     },
@@ -616,23 +598,12 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const personId = requireReactorPersonId(
+        request.user.role,
+        request.authUser?.personId,
+      );
 
-      if (!isPostManagerRole(role)) {
-        throw new UnauthorizedError("Permission denied.");
-      }
-
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
-
-      const postReply = await fastify.db.postRepository.findOne({
-        where: getPostReplyWhere(id),
-      });
-      if (!postReply) {
-        throw new NotFoundError(`Reply ${id} not found.`);
-      }
+      const postReply = await getPostReplyOrThrow(fastify, id);
       await upsertPostReaction(
         fastify,
         postReply.id,
@@ -658,27 +629,12 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const personId = requireReactorPersonId(
+        request.user.role,
+        request.authUser?.personId,
+      );
 
-      if (!isPostManagerRole(role)) {
-        throw new UnauthorizedError("Permission denied.");
-      }
-
-      const personId = request.authUser?.personId;
-      if (!personId) {
-        throw new BadRequestError("No person linked to this user.");
-      }
-
-      const postReply = await fastify.db.postRepository.findOne({
-        where: getPostReplyWhere(id),
-      });
-      if (!postReply) {
-        throw new NotFoundError(`Reply ${id} not found.`);
-      }
-      await fastify.db.postReactionRepository.delete({
-        postId: postReply.id,
-        personId,
-      });
+      await fastify.db.postReactionRepository.delete({ postId: id, personId });
 
       return reply.status(204).send();
     },
