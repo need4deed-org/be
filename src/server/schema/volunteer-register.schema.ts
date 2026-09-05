@@ -5,11 +5,8 @@
 // be#947). Authorization is the verify token carried in the querystring (see
 // the route's preHandler), not a logged-in session.
 //
-// Body shape mirrors sdk#222's proposed ApiVolunteerRegisterNew
-// (https://github.com/need4deed-org/sdk/pull/222) field-for-field, flat (no
-// "volunteer" wrapper) — sdk#222 is being revised to drop the nested
-// { volunteer: ... } union in favor of this flat shape. Not yet an SDK $ref
-// since sdk#222 isn't merged/published yet.
+// Body shape matches need4deed-sdk's ApiVolunteerRegisterNew (sdk#222) —
+// flat, no "volunteer" wrapper.
 
 export const registerVolunteerQuerySchema = {
   type: "object",

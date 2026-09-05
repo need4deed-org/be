@@ -268,13 +268,14 @@ export default async function userRoutes(
           hasVolunteerProfile = !!existingVolunteer;
         }
 
+        const volunteerProfileFields =
+          hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
+
         if (user.isActive) {
           return reply.status(200).send({
             message: "Email is already verified.",
             verified: true,
-            ...(hasVolunteerProfile !== undefined
-              ? { hasVolunteerProfile }
-              : {}),
+            ...volunteerProfileFields,
           });
         }
 
@@ -284,7 +285,7 @@ export default async function userRoutes(
         return reply.status(200).send({
           message: "Email verified successfully.",
           verified: true,
-          ...(hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {}),
+          ...volunteerProfileFields,
         });
       } catch (error) {
         logger.error(`Error verifying email: ${error}`);

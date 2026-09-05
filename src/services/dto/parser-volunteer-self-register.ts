@@ -1,10 +1,19 @@
-import { DocumentStatusType, LangProficiency } from "need4deed-sdk";
+import {
+  ApiAvailability,
+  ApiLanguage,
+  ApiVolunteerRegisterNew,
+  LangProficiency,
+  OccasionalType,
+  OptionItem,
+} from "need4deed-sdk";
 import { In } from "typeorm";
+import { BadRequestError } from "../../config";
 import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import LeadFrom from "../../data/entity/lead.entity";
 import Address from "../../data/entity/location/address.entity";
 import District from "../../data/entity/location/district.entity";
+import Postcode from "../../data/entity/location/postcode.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
@@ -16,77 +25,32 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import { buildDealTimeslots } from "./build-deal-timeslots";
+import { DUMMY_ADDRESS_TITLE } from "../../server/utils";
+import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
-// Wire shape mirrors sdk#222's proposed ApiVolunteerRegisterNew
-// (https://github.com/need4deed-org/sdk/pull/222) field-for-field, flat (no
-// "volunteer" wrapper) — sdk#222 is being revised to drop the nested
-// { volunteer: ... } union in favor of this flat shape. sdk#222 isn't
-// merged/published yet, so these are local TS interfaces, not an SDK
-// import — swap for the real types once that PR lands (be#943 PR
-// description / thread). OptionById/OptionItem/ApiLanguage/ApiAvailability
-// shapes copied here match sdk#222 exactly so the swap is a no-op rename.
-interface OptionById {
-  id: number;
-  title?: string;
-}
+export type VolunteerSelfRegisterBody = ApiVolunteerRegisterNew;
 
-interface OptionItem {
-  id: number;
-  title: string;
-  isoCode?: string;
-}
+// Derived from build-deal-timeslots.ts's WEEKDAYS (["", "Monday", ...,
+// "Sunday"], index 1-7) instead of a second hand-maintained table, so the two
+// can't drift apart on a future day-name/ordering change.
+const BY_DAY_TO_WEEKDAY: Record<string, number> = Object.fromEntries(
+  WEEKDAYS.map((day, index) => [day, index]).filter(([day]) => day !== ""),
+);
 
-interface ApiLanguage {
-  id: number;
-  title: string;
-  proficiency?: LangProficiency;
-}
-
-interface ApiAvailability {
-  id?: number;
-  // ByDay value (e.g. "Monday") or Occasionally ("occasionally") — a day
-  // name string, not the weekday-number tuple buildDealTimeslots expects;
-  // converted below.
-  day?: string;
-  // TimeSlot (e.g. "08-11") or OccasionalType (e.g. "weekends") value.
-  daytime?: string;
-}
-
-export interface VolunteerSelfRegisterBody {
-  addressPostcode: string;
-  locations: OptionById[];
-  languages: ApiLanguage[];
-  availability: ApiAvailability[];
-  activities: OptionItem[];
-  skills: OptionItem[];
-  leadFrom: OptionItem[];
-  goodConductCertificate: DocumentStatusType;
-  measlesVaccination: DocumentStatusType;
-  comments: string;
-}
-
-const BY_DAY_TO_WEEKDAY: Record<string, number> = {
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-  Sunday: 7,
-};
+const OCCASIONAL_DAYTIMES: string[] = Object.values(OccasionalType);
 
 // ApiAvailability's {day, daytime} (day a name string, "occasionally" or
 // absent meaning the occasional bucket) into the [day, daytime][] tuple
 // format buildDealTimeslots already knows how to resolve — same tuple shape
 // dealParserOpportunityCreate's formData.timeslots uses.
 //
-// `entry.day` is schema-validated (volunteerRegisterBodySchema's
-// ApiAvailability# $ref) to be one of the 7 weekday names or "occasionally"
-// before this ever runs, so BY_DAY_TO_WEEKDAY[entry.day] is only undefined
-// for the "occasionally" sentinel — that's the intended fall-through to the
-// occasional bucket (weekday 0), not a silent default for bad input.
+// `entry.day` and `entry.daytime` are independently optional at the schema
+// level (need4deed-sdk's ApiAvailability), so a client can send a
+// time-of-day daytime ("08-11") with no day at all. Only an occasional
+// daytime ("weekdays"/"weekends") is meaningful without a day — anything
+// else missing a day is a malformed entry, not a silent "occasional" default
+// (buildDealTimeslots would otherwise store a bogus occasional value).
 function availabilityToTimeslots(
   availability: ApiAvailability[] | undefined | null,
 ): [number, string][] {
@@ -95,16 +59,27 @@ function availabilityToTimeslots(
     if (!entry.daytime) {
       continue;
     }
-    const weekday = entry.day ? (BY_DAY_TO_WEEKDAY[entry.day] ?? 0) : 0;
+    if (!entry.day) {
+      if (!OCCASIONAL_DAYTIMES.includes(entry.daytime)) {
+        throw new BadRequestError(
+          `Availability entry with daytime "${entry.daytime}" is missing "day" — only an occasional daytime (${OCCASIONAL_DAYTIMES.join(", ")}) may omit it.`,
+        );
+      }
+      result.push([0, entry.daytime]);
+      continue;
+    }
+    const weekday = BY_DAY_TO_WEEKDAY[entry.day] ?? 0;
     result.push([weekday, entry.daytime]);
   }
   return result;
 }
 
 function optionIds(
-  options: Array<{ id: number }> | undefined | null,
+  // OptionById.id is `OptionId` (string | number) SDK-wide, unlike OptionItem
+  // (always numeric) — coerce so callers get real numbers regardless.
+  options: Array<{ id: number | string }> | undefined | null,
 ): number[] {
-  return (options || []).map((option) => option.id);
+  return (options || []).map((option) => Number(option.id));
 }
 
 async function resolveDealLanguages(
@@ -146,6 +121,29 @@ async function resolveLeadFrom(
   return leadFromRepository.findBy({ id: In(uniqueIds) });
 }
 
+// Reuses the Person's existing Address (patching its postcode) instead of
+// always minting a fresh one — the Person attached here can be pre-existing
+// (email-linked, be#947), and may already own a real address from an earlier
+// flow (e.g. an opportunity/event submission, get-or-create-submitter-person).
+// Mirrors that same file's "Dummy" placeholder guard: the seeded placeholder
+// is shared across many Person rows, so it must never be patched in place.
+async function resolveAddress(
+  person: Person,
+  postcode: Postcode,
+): Promise<Address> {
+  if (person.addressId) {
+    const addressRepository = getRepository(dataSource, Address);
+    const existing = await addressRepository.findOneBy({
+      id: person.addressId,
+    });
+    if (existing && existing.title !== DUMMY_ADDRESS_TITLE) {
+      existing.postcode = postcode;
+      return existing;
+    }
+  }
+  return new Address({ postcode });
+}
+
 export async function parserVolunteerSelfRegister(
   person: Person,
   body: VolunteerSelfRegisterBody,
@@ -153,31 +151,31 @@ export async function parserVolunteerSelfRegister(
   // Required: both Address.postcodeId and Deal.postcodeId are NOT NULL, and
   // a volunteer can't be matched to anything without a location.
   const postcode = await getPostcode(String(body.addressPostcode));
-  person.address = new Address({ postcode });
 
-  const dealActivity = await resolveByIds(
-    optionIds(body.activities),
-    Activity,
-    DealActivity,
-    "activity",
-  );
-  const dealSkill = await resolveByIds(
-    optionIds(body.skills),
-    Skill,
-    DealSkill,
-    "skill",
-  );
-  const dealDistrict = await resolveByIds(
-    optionIds(body.locations),
-    District,
-    DealDistrict,
-    "district",
-  );
-  const dealLanguage = await resolveDealLanguages(body.languages);
-  const dealTimeslot = await buildDealTimeslots(
-    availabilityToTimeslots(body.availability),
-    null,
-  );
+  // None of these depend on each other's result, only on the final
+  // Deal/Volunteer construction below — resolve them concurrently instead of
+  // paying for each round-trip in series.
+  const [
+    address,
+    dealActivity,
+    dealSkill,
+    dealDistrict,
+    dealLanguage,
+    dealTimeslot,
+  ] = await Promise.all([
+    resolveAddress(person, postcode),
+    resolveByIds(
+      optionIds(body.activities),
+      Activity,
+      DealActivity,
+      "activity",
+    ),
+    resolveByIds(optionIds(body.skills), Skill, DealSkill, "skill"),
+    resolveByIds(optionIds(body.locations), District, DealDistrict, "district"),
+    resolveDealLanguages(body.languages),
+    buildDealTimeslots(availabilityToTimeslots(body.availability), null),
+  ]);
+  person.address = address;
 
   const deal = new Deal({
     type: DealType.VOLUNTEER,

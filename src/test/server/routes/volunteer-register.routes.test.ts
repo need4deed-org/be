@@ -2,6 +2,8 @@ import { FastifyInstance } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Person from "../../../data/entity/person.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import User from "../../../data/entity/user.entity";
@@ -25,6 +27,8 @@ describe("POST /volunteer/register", () => {
   const createdPersonIds: number[] = [];
   const createdVolunteerIds: number[] = [];
   const createdDealIds: number[] = [];
+  const createdAddressIds: number[] = [];
+  const createdPostcodeIds: number[] = [];
 
   async function makeRegistrant(role: UserRole = UserRole.VOLUNTEER): Promise<{
     person: Person;
@@ -71,6 +75,12 @@ describe("POST /volunteer/register", () => {
     }
     for (const id of createdPersonIds) {
       await fastify.db.personRepository.delete({ id });
+    }
+    for (const id of createdAddressIds) {
+      await getRepository(dataSource, Address).delete({ id });
+    }
+    for (const id of createdPostcodeIds) {
+      await getRepository(dataSource, Postcode).delete({ id });
     }
     await fastify.close();
   });
@@ -286,5 +296,89 @@ describe("POST /volunteer/register", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  it("400s an availability entry with a time-of-day daytime but no day", async () => {
+    const { token } = await makeRegistrant();
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/volunteer/register?token=${token}`,
+      payload: {
+        addressPostcode: "10115",
+        locations: [],
+        languages: [],
+        availability: [{ daytime: "08-11" }],
+        activities: [],
+        skills: [],
+        leadFrom: [],
+        goodConductCertificate: "undefined",
+        measlesVaccination: "undefined",
+        comments: "",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("reuses the registrant's existing Address instead of minting a new one", async () => {
+    const { person, token } = await makeRegistrant();
+
+    const originalPostcode = await getRepository(dataSource, Postcode).save(
+      new Postcode({ value: `9${Date.now() % 10000}` }),
+    );
+    const address = await getRepository(dataSource, Address).save(
+      new Address({ street: "Existing Street 1", postcode: originalPostcode }),
+    );
+    await fastify.db.personRepository.update(
+      { id: person.id },
+      { addressId: address.id },
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/volunteer/register?token=${token}`,
+      payload: {
+        addressPostcode: "10115",
+        locations: [],
+        languages: [],
+        availability: [],
+        activities: [],
+        skills: [],
+        leadFrom: [],
+        goodConductCertificate: "undefined",
+        measlesVaccination: "undefined",
+        comments: "",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdVolunteerIds.push(res.json().data.id);
+    const volunteer = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: res.json().data.id,
+    });
+    createdDealIds.push(volunteer.dealId);
+
+    const updatedPerson = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(updatedPerson.addressId).toBe(address.id);
+
+    const updatedAddress = await getRepository(
+      dataSource,
+      Address,
+    ).findOneOrFail({
+      where: { id: address.id },
+      relations: ["postcode"],
+    });
+    expect(updatedAddress.street).toBe("Existing Street 1");
+    expect(updatedAddress.postcode.value).toBe("10115");
+
+    // Address.person has onDelete: CASCADE, so deleting the Address here
+    // (while person.addressId still points at it) would cascade-delete the
+    // Person row too, ahead of afterAll's own cleanup — defer both to
+    // afterAll instead, after persons (and thus this reference) are gone.
+    createdAddressIds.push(address.id);
+    createdPostcodeIds.push(originalPostcode.id);
   });
 });
