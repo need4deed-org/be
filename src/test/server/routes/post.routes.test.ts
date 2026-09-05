@@ -838,4 +838,53 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().data).toEqual([]);
   });
+
+  it("treats a literal % in the search term as text, not a wildcard", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const matchingRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `50% off ${suffix}` },
+    });
+    createdPostIds.push(matchingRes.json().data.id);
+
+    const decoyRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `50X off ${suffix}` },
+    });
+    createdPostIds.push(decoyRes.json().data.id);
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`50% off ${suffix}`)}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const ids = res.json().data.map((p: { id: number }) => p.id);
+    expect(ids).toEqual([matchingRes.json().data.id]);
+  });
+
+  it("reports the correct total count even when the requested page is past the last match", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `Findable for page overrun test ${suffix}` },
+    });
+    createdPostIds.push(postRes.json().data.id);
+
+    const res = await fastify.inject({
+      method: "GET",
+      // Only one post matches; page 2 is past the end.
+      url: `/post?search=${encodeURIComponent(`page overrun test ${suffix}`)}&page=2&limit=1`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
+    expect(res.json().count).toBe(1);
+  });
 });

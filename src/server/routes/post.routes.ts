@@ -93,24 +93,53 @@ export default async function postRoutes(
       // Two-step pagination — see buildMatchingPostIdsQuery's own comment
       // for why a single leftJoinAndSelect + skip/take query (what this
       // used to be) mis-paginates once a post has more than one tagged
-      // person/opportunity/reply.
-      const [idRows, countRow] = await Promise.all([
-        buildMatchingPostIdsQuery(fastify, search)
-          .select("post.id", "id")
-          .addSelect("post.createdAt", "createdAt")
-          .groupBy("post.id")
-          .addGroupBy("post.createdAt")
-          .orderBy("post.createdAt", "DESC")
-          .addOrderBy("post.id", "DESC")
-          .skip(skip)
-          .take(take)
-          .getRawMany<{ id: number; createdAt: Date }>(),
-        buildMatchingPostIdsQuery(fastify, search)
-          .select("COUNT(DISTINCT post.id)", "count")
-          .getRawOne<{ count: string }>(),
-      ]);
+      // person/opportunity/reply. GROUP BY collapses that fan-out before
+      // LIMIT/OFFSET applies; COUNT(*) OVER() then gets the total alongside
+      // the page in the same query (a window function, computed over the
+      // full pre-LIMIT result set, not just the page).
+      //
+      // .limit()/.offset(), not .skip()/.take(): TypeORM's skip/take are
+      // meant for getMany()/getManyAndCount() (where it applies its own
+      // subquery-based pagination once relations are joined) — on a raw,
+      // manually-grouped query like this one, skip/take silently produce
+      // NO LIMIT/OFFSET at all the moment any join is present, since
+      // TypeORM can't run that automatic rewrite outside getMany(). Traced
+      // via .getSql() while writing the fan-out regression test above.
+      // limit/offset always emit a literal LIMIT/OFFSET, which is exactly
+      // right here since GROUP BY has already made each row one distinct
+      // post.
+      const idsQb = buildMatchingPostIdsQuery(fastify, search)
+        .select("post.id", "id")
+        .addSelect("post.createdAt", "createdAt")
+        .addSelect("COUNT(*) OVER()", "totalCount")
+        .orderBy("post.createdAt", "DESC")
+        .addOrderBy("post.id", "DESC")
+        .offset(skip)
+        .limit(take);
+      if (search) {
+        idsQb.groupBy("post.id");
+      }
+      const idRows = await idsQb.getRawMany<{
+        id: number;
+        createdAt: Date;
+        totalCount: string;
+      }>();
       const ids = idRows.map((row) => row.id);
-      const count = Number(countRow?.count ?? 0);
+
+      // COUNT(*) OVER() only appears on rows that are actually returned —
+      // if the requested page is past the last match (idRows is empty),
+      // fall back to a direct count so pagination metadata stays correct
+      // instead of collapsing to 0. No GROUP BY needed here: COUNT(DISTINCT
+      // post.id) is correct with or without the search joins.
+      const count = idRows.length
+        ? Number(idRows[0].totalCount)
+        : Number(
+            (
+              await buildMatchingPostIdsQuery(fastify, search)
+                .select("COUNT(DISTINCT post.id)", "count")
+                .getRawOne<{ count: string }>()
+            )?.count ?? 0,
+          );
 
       const posts = ids.length
         ? await buildPostQuery(fastify)
