@@ -829,6 +829,63 @@ describe("POST /post", () => {
     expect(res.json().data[0].linkedOpportunities).toHaveLength(2);
   });
 
+  it("lists a post with multiple tagged persons and opportunities exactly once (no search)", async () => {
+    // Regression test for the plain (non-search) listing path: buildPostQuery's
+    // leftJoinAndSelect + getManyAndCount must collapse the to-many-relation
+    // fan-out on its own (no search param, so no manual GROUP BY applies here).
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Plain Fanout Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    createdAgentIds.push(agent.id);
+    const [opp1, opp2] = await Promise.all([
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Plain Fanout Opportunity 1 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Plain Fanout Opportunity 2 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+    ]);
+    createdOpportunityIds.push(opp1.id, opp2.id);
+
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        text: `Plain fanout test post ${suffix}`,
+        taggedPersonIds: [coordinatorPerson.id, volunteerPerson.id],
+        linkedOpportunityIds: [opp1.id, opp2.id],
+      },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const matches = listRes
+      .json()
+      .data.filter((p: { id: number }) => p.id === postId);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].taggedPersons).toHaveLength(2);
+    expect(matches[0].linkedOpportunities).toHaveLength(2);
+  });
+
   it("returns an empty search result for a disallowed role", async () => {
     const res = await fastify.inject({
       method: "GET",
