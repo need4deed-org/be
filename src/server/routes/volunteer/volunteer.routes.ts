@@ -66,6 +66,7 @@ import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
+import volunteerRegisterRoutes from "./register.routes";
 import volunteerOpportunityRoutes from "./volunteer-opportunity.routes";
 
 export default async function volunteerRoutes(
@@ -130,6 +131,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerLegacyRoutes, {
     prefix: `${RoutePrefix.LEGACY}`,
+  });
+
+  await fastify.register(volunteerRegisterRoutes, {
+    prefix: RoutePrefix.REGISTER,
   });
 
   fastify.get<{
