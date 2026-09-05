@@ -1675,6 +1675,12 @@
           "items": { "$ref": "ApiPostLinkedOpportunity#" }
         },
         "replyCount": { "type": "integer" },
+        "reactions": {
+          "type": "array",
+          "items": { "$ref": "ApiPostReactionSummary#" }
+        },
+        "myReaction": { "type": ["string", "null"] },
+        "bookmarked": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
@@ -1685,8 +1691,29 @@
         "taggedPersons",
         "linkedOpportunities",
         "replyCount",
+        "reactions",
+        "myReaction",
+        "bookmarked",
         "createdAt"
       ]
+    },
+    "ApiPostReactionSummary": {
+      "$id": "ApiPostReactionSummary",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string" },
+        "count": { "type": "integer" }
+      },
+      "required": ["emoji", "count"]
+    },
+    "ApiPostReactionPost": {
+      "$id": "ApiPostReactionPost",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string", "minLength": 1, "maxLength": 32 }
+      },
+      "required": ["emoji"],
+      "additionalProperties": false
     },
     "ApiPostReplyGet": {
       "$id": "ApiPostReplyGet",
@@ -1697,6 +1724,11 @@
         "author": { "$ref": "ApiPostPerson#" },
         "postId": { "type": "integer" },
         "parentReplyId": { "type": ["integer", "null"] },
+        "reactions": {
+          "type": "array",
+          "items": { "$ref": "ApiPostReactionSummary#" }
+        },
+        "myReaction": { "type": ["string", "null"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
@@ -1705,6 +1737,8 @@
         "author",
         "postId",
         "parentReplyId",
+        "reactions",
+        "myReaction",
         "createdAt"
       ]
     },

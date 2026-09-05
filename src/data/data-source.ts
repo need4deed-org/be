@@ -27,6 +27,8 @@ import DealSkill from "./entity/m2m/deal-skill";
 import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
+import PostBookmark from "./entity/m2m/post-bookmark";
+import PostReaction from "./entity/m2m/post-reaction";
 import NotionRelation from "./entity/notion-relation.entity";
 import OpportunityEventRegistration from "./entity/opportunity-event-registration.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
@@ -105,6 +107,8 @@ export const dataSource = new DataSource({
     Person,
     Post,
     Postcode,
+    PostBookmark,
+    PostReaction,
     Option,
     Service,
     Skill,

@@ -1,3 +1,4 @@
+import { ApiPostReactionSummary } from "need4deed-sdk";
 import {
   Check,
   Column,
@@ -91,6 +92,16 @@ export default class Post {
 
   // Populated via loadRelationCountAndMap — not a real column.
   replyCount?: number;
+
+  // Populated by attachReactionData() — not real columns. Applies to root
+  // posts and replies alike, since both are rows in this same table.
+  reactions?: ApiPostReactionSummary[];
+  myReaction?: string | null;
+
+  // Populated by attachBookmarkData() — not a real column. Posts only, not
+  // replies — bookmarking is scoped to "save this post for later", per
+  // sdk#215 (ApiPostReplyGet has no bookmarked field).
+  bookmarked?: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
