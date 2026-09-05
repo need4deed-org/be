@@ -20,17 +20,14 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../config/error/fastify";
+import Post from "../../data/entity/post.entity";
 import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
 import { dtoPostReply } from "../../services/dto/dto-post-reply";
-import {
-  idParamSchema,
-  paginationQuerySchema,
-  responseSchema,
-} from "../schema";
+import { idParamSchema, postListQuerySchema, responseSchema } from "../schema";
 import {
   ParamsId,
-  QuerystringPagination,
+  QuerystringPostList,
   ReplyData,
   ReplyDataCount,
   ReplyMessage,
@@ -39,6 +36,7 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
+import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
@@ -66,13 +64,13 @@ export default async function postRoutes(
   // GET /post
   //
   fastify.get<{
-    Querystring: QuerystringPagination;
+    Querystring: QuerystringPostList;
     Reply: ReplyDataCount<ApiPostGet[]>;
   }>(
     "/",
     {
       schema: {
-        querystring: paginationQuerySchema,
+        querystring: postListQuerySchema,
         response: responseSchema({
           dataSchemaRef: "ApiPostGet#",
           isArray: true,
@@ -83,13 +81,8 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { role } = request.user;
+      const { search } = request.query;
       const [skip, take] = getSkipTake(request.query);
-
-      const qb = buildPostQuery(fastify)
-        .where("post.parentId IS NULL")
-        .orderBy("post.createdAt", "DESC")
-        .skip(skip)
-        .take(take);
 
       if (!isPostManagerRole(role)) {
         return reply
@@ -97,14 +90,45 @@ export default async function postRoutes(
           .send({ message: "Posts.", data: [], count: 0 });
       }
 
-      const [posts, count] = await qb.getManyAndCount();
+      // Two-step pagination — see buildMatchingPostIdsQuery's own comment
+      // for why a single leftJoinAndSelect + skip/take query (what this
+      // used to be) mis-paginates once a post has more than one tagged
+      // person/opportunity/reply.
+      const [idRows, countRow] = await Promise.all([
+        buildMatchingPostIdsQuery(fastify, search)
+          .select("post.id", "id")
+          .addSelect("post.createdAt", "createdAt")
+          .groupBy("post.id")
+          .addGroupBy("post.createdAt")
+          .orderBy("post.createdAt", "DESC")
+          .addOrderBy("post.id", "DESC")
+          .skip(skip)
+          .take(take)
+          .getRawMany<{ id: number; createdAt: Date }>(),
+        buildMatchingPostIdsQuery(fastify, search)
+          .select("COUNT(DISTINCT post.id)", "count")
+          .getRawOne<{ count: string }>(),
+      ]);
+      const ids = idRows.map((row) => row.id);
+      const count = Number(countRow?.count ?? 0);
+
+      const posts = ids.length
+        ? await buildPostQuery(fastify)
+            .where("post.id IN (:...ids)", { ids })
+            .getMany()
+        : [];
+      const postsById = new Map(posts.map((post) => [post.id, post]));
+      const orderedPosts = ids
+        .map((id) => postsById.get(id))
+        .filter((post): post is Post => post !== undefined);
+
       await Promise.all([
-        attachReactionData(fastify, posts, request.authUser?.personId),
-        attachBookmarkData(fastify, posts, request.authUser?.personId),
+        attachReactionData(fastify, orderedPosts, request.authUser?.personId),
+        attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
       ]);
       return reply.status(200).send({
         message: "Posts.",
-        data: posts.map(dtoPost),
+        data: orderedPosts.map(dtoPost),
         count,
       });
     },
