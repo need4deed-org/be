@@ -1,7 +1,13 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  OpportunityType,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import Agent from "../../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -30,6 +36,8 @@ describe("POST /post", () => {
   let coordinatorCookie: string;
   let volunteerCookie: string;
   const createdPostIds: number[] = [];
+  const createdOpportunityIds: number[] = [];
+  const createdAgentIds: number[] = [];
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -97,6 +105,12 @@ describe("POST /post", () => {
   afterAll(async () => {
     if (createdPostIds.length) {
       await fastify.db.postRepository.delete(createdPostIds);
+    }
+    if (createdOpportunityIds.length) {
+      await fastify.db.opportunityRepository.delete(createdOpportunityIds);
+    }
+    if (createdAgentIds.length) {
+      await fastify.db.agentRepository.delete(createdAgentIds);
     }
     await fastify.db.userRepository.delete({ personId: agentPerson.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
@@ -663,5 +677,271 @@ describe("POST /post", () => {
       cookies: { [accessCookieName]: volunteerCookie },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it("finds posts by post text, reply text, tagged person name, and opportunity title", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Search Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    createdAgentIds.push(agent.id);
+    const opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Findable Opportunity ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: agent.id,
+      }),
+    );
+    createdOpportunityIds.push(opportunity.id);
+
+    const postByTextRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `Findable by post text ${suffix}` },
+    });
+    const postByTextId = postByTextRes.json().data.id;
+    createdPostIds.push(postByTextId);
+
+    const postByReplyRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `Post with a findable reply ${suffix}` },
+    });
+    const postByReplyId = postByReplyRes.json().data.id;
+    createdPostIds.push(postByReplyId);
+    const replyRes = await fastify.inject({
+      method: "POST",
+      url: `/post/${postByReplyId}/reply`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        postId: postByReplyId,
+        text: `Findable by reply text ${suffix}`,
+      },
+    });
+    createdPostIds.push(replyRes.json().data.id);
+
+    const postByTagRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        text: `Post tagging someone ${suffix}`,
+        taggedPersonIds: [coordinatorPerson.id],
+      },
+    });
+    const postByTagId = postByTagRes.json().data.id;
+    createdPostIds.push(postByTagId);
+
+    const postByOpportunityRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        text: `Post linking an opportunity ${suffix}`,
+        linkedOpportunityIds: [opportunity.id],
+      },
+    });
+    const postByOpportunityId = postByOpportunityRes.json().data.id;
+    createdPostIds.push(postByOpportunityId);
+
+    const search = async (term: string) => {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/post?search=${encodeURIComponent(term)}`,
+        cookies: { [accessCookieName]: agentCookie },
+      });
+      return res.json().data.map((p: { id: number }) => p.id);
+    };
+
+    expect(await search(`Findable by post text ${suffix}`)).toEqual([
+      postByTextId,
+    ]);
+    expect(await search(`Findable by reply text ${suffix}`)).toEqual([
+      postByReplyId,
+    ]);
+    expect(await search("Test Coordinator")).toContain(postByTagId);
+    expect(await search(`Findable Opportunity ${suffix}`)).toEqual([
+      postByOpportunityId,
+    ]);
+    expect(await search(`no-such-text-${suffix}`)).toEqual([]);
+  });
+
+  it("paginates search results correctly for a post with multiple tagged persons and opportunities", async () => {
+    // Regression test for the join fan-out bug: a post with several to-many
+    // relations must still count/paginate as exactly one post, not be
+    // split or duplicated across pages.
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Fanout Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    createdAgentIds.push(agent.id);
+    const [opp1, opp2] = await Promise.all([
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Fanout Opportunity 1 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Fanout Opportunity 2 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+    ]);
+    createdOpportunityIds.push(opp1.id, opp2.id);
+
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        text: `Fanout test post ${suffix}`,
+        taggedPersonIds: [coordinatorPerson.id, volunteerPerson.id],
+        linkedOpportunityIds: [opp1.id, opp2.id],
+      },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`Fanout test post ${suffix}`)}&limit=1`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().count).toBe(1);
+    expect(res.json().data).toHaveLength(1);
+    expect(res.json().data[0].id).toBe(postId);
+    expect(res.json().data[0].taggedPersons).toHaveLength(2);
+    expect(res.json().data[0].linkedOpportunities).toHaveLength(2);
+  });
+
+  it("lists a post with multiple tagged persons and opportunities exactly once (no search)", async () => {
+    // Regression test for the plain (non-search) listing path: buildPostQuery's
+    // leftJoinAndSelect + getManyAndCount must collapse the to-many-relation
+    // fan-out on its own (no search param, so no manual GROUP BY applies here).
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Plain Fanout Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    createdAgentIds.push(agent.id);
+    const [opp1, opp2] = await Promise.all([
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Plain Fanout Opportunity 1 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+      fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Plain Fanout Opportunity 2 ${suffix}`,
+          type: OpportunityType.REGULAR,
+          agentId: agent.id,
+        }),
+      ),
+    ]);
+    createdOpportunityIds.push(opp1.id, opp2.id);
+
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        text: `Plain fanout test post ${suffix}`,
+        taggedPersonIds: [coordinatorPerson.id, volunteerPerson.id],
+        linkedOpportunityIds: [opp1.id, opp2.id],
+      },
+    });
+    const postId = postRes.json().data.id;
+    createdPostIds.push(postId);
+
+    const listRes = await fastify.inject({
+      method: "GET",
+      url: "/post?limit=100",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const matches = listRes
+      .json()
+      .data.filter((p: { id: number }) => p.id === postId);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].taggedPersons).toHaveLength(2);
+    expect(matches[0].linkedOpportunities).toHaveLength(2);
+  });
+
+  it("returns an empty search result for a disallowed role", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/post?search=anything",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
+  });
+
+  it("treats a literal % in the search term as text, not a wildcard", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const matchingRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `50% off ${suffix}` },
+    });
+    createdPostIds.push(matchingRes.json().data.id);
+
+    const decoyRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `50X off ${suffix}` },
+    });
+    createdPostIds.push(decoyRes.json().data.id);
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`50% off ${suffix}`)}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    const ids = res.json().data.map((p: { id: number }) => p.id);
+    expect(ids).toEqual([matchingRes.json().data.id]);
+  });
+
+  it("reports the correct total count even when the requested page is past the last match", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `Findable for page overrun test ${suffix}` },
+    });
+    createdPostIds.push(postRes.json().data.id);
+
+    const res = await fastify.inject({
+      method: "GET",
+      // Only one post matches; page 2 is past the end.
+      url: `/post?search=${encodeURIComponent(`page overrun test ${suffix}`)}&page=2&limit=1`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual([]);
+    expect(res.json().count).toBe(1);
   });
 });

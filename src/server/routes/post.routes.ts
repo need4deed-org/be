@@ -20,17 +20,14 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../config/error/fastify";
+import Post from "../../data/entity/post.entity";
 import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
 import { dtoPostReply } from "../../services/dto/dto-post-reply";
-import {
-  idParamSchema,
-  paginationQuerySchema,
-  responseSchema,
-} from "../schema";
+import { idParamSchema, postListQuerySchema, responseSchema } from "../schema";
 import {
   ParamsId,
-  QuerystringPagination,
+  QuerystringPostList,
   ReplyData,
   ReplyDataCount,
   ReplyMessage,
@@ -39,6 +36,7 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
+import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
@@ -66,13 +64,13 @@ export default async function postRoutes(
   // GET /post
   //
   fastify.get<{
-    Querystring: QuerystringPagination;
+    Querystring: QuerystringPostList;
     Reply: ReplyDataCount<ApiPostGet[]>;
   }>(
     "/",
     {
       schema: {
-        querystring: paginationQuerySchema,
+        querystring: postListQuerySchema,
         response: responseSchema({
           dataSchemaRef: "ApiPostGet#",
           isArray: true,
@@ -83,13 +81,8 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { role } = request.user;
+      const { search } = request.query;
       const [skip, take] = getSkipTake(request.query);
-
-      const qb = buildPostQuery(fastify)
-        .where("post.parentId IS NULL")
-        .orderBy("post.createdAt", "DESC")
-        .skip(skip)
-        .take(take);
 
       if (!isPostManagerRole(role)) {
         return reply
@@ -97,14 +90,90 @@ export default async function postRoutes(
           .send({ message: "Posts.", data: [], count: 0 });
       }
 
-      const [posts, count] = await qb.getManyAndCount();
+      let orderedPosts: Post[];
+      let count: number;
+
+      if (!search) {
+        // Plain listing: buildPostQuery's leftJoinAndSelect + getManyAndCount
+        // already paginates correctly despite the to-many joins — TypeORM
+        // wraps this in its own distinct-primary-key subquery whenever
+        // relations are joined alongside skip/take (see the same pattern,
+        // and the comment explaining why, in opportunity.routes.ts). No
+        // manual GROUP BY/two-step hydration needed here.
+        const qb = buildPostQuery(fastify)
+          .where("post.parentId IS NULL")
+          .orderBy("post.createdAt", "DESC")
+          .addOrderBy("post.id", "DESC")
+          .skip(skip)
+          .take(take);
+        [orderedPosts, count] = await qb.getManyAndCount();
+      } else {
+        // Search: buildMatchingPostIdsQuery only ever plain-leftJoins (for
+        // filtering, not hydration) and runs via getRawMany, so none of
+        // TypeORM's automatic pagination handling applies here — GROUP BY
+        // collapses the to-many-join fan-out before LIMIT/OFFSET applies,
+        // and COUNT(*) OVER() gets the total alongside the page in the same
+        // query (a window function, computed over the full pre-LIMIT result
+        // set, not just the page). Full posts are then hydrated separately
+        // via buildPostQuery, keyed by the fixed page of ids.
+        //
+        // .limit()/.offset(), not .skip()/.take(): TypeORM's skip/take are
+        // meant for getMany()/getManyAndCount() — on a raw, manually-grouped
+        // query like this one, skip/take silently produce NO LIMIT/OFFSET at
+        // all the moment any join is present, since TypeORM can't run that
+        // automatic rewrite outside getMany(). Traced via .getSql() while
+        // writing the fan-out regression test above. limit/offset always
+        // emit a literal LIMIT/OFFSET, which is exactly right here since
+        // GROUP BY has already made each row one distinct post.
+        const idsQb = buildMatchingPostIdsQuery(fastify, search)
+          .select("post.id", "id")
+          .addSelect("COUNT(*) OVER()", "totalCount")
+          .groupBy("post.id")
+          .orderBy("post.createdAt", "DESC")
+          .addOrderBy("post.id", "DESC")
+          .offset(skip)
+          .limit(take);
+        const idRows = await idsQb.getRawMany<{
+          id: number;
+          totalCount: string;
+        }>();
+        const ids = idRows.map((row) => row.id);
+
+        // COUNT(*) OVER() only appears on rows that are actually returned —
+        // if the requested page is past the last match (idRows is empty),
+        // fall back to a direct count so pagination metadata stays correct
+        // instead of collapsing to 0.
+        count = idRows.length
+          ? Number(idRows[0].totalCount)
+          : Number(
+              (
+                await buildMatchingPostIdsQuery(fastify, search)
+                  .select("COUNT(DISTINCT post.id)", "count")
+                  .getRawOne<{ count: string }>()
+              )?.count ?? 0,
+            );
+
+        const posts = ids.length
+          ? await buildPostQuery(fastify)
+              .where("post.id IN (:...ids)", { ids })
+              .getMany()
+          : [];
+        const postsById = new Map(posts.map((post) => [post.id, post]));
+        orderedPosts = ids
+          .map((id) => postsById.get(id))
+          .filter((post): post is Post => post !== undefined);
+        // A post deleted between the ids query and hydration would leave
+        // `count` inconsistent with `data.length` — keep them in sync.
+        count -= ids.length - orderedPosts.length;
+      }
+
       await Promise.all([
-        attachReactionData(fastify, posts, request.authUser?.personId),
-        attachBookmarkData(fastify, posts, request.authUser?.personId),
+        attachReactionData(fastify, orderedPosts, request.authUser?.personId),
+        attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
       ]);
       return reply.status(200).send({
         message: "Posts.",
-        data: posts.map(dtoPost),
+        data: orderedPosts.map(dtoPost),
         count,
       });
     },
