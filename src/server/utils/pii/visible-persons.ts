@@ -1,7 +1,8 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
+import { getCallerAgentIds } from "../data/get-caller-agent-ids";
 
 /**
  * What a non COORDINATOR/ADMIN caller may see UNMASKED, resolved per request
@@ -65,15 +66,16 @@ export async function resolveCallerVisibility(
   }
 
   const agentPersonRepository = fastify.db.agentPersonRepository;
-  const memberships = await agentPersonRepository.find({ where: { personId } });
-  memberships.forEach((m) => agentIds.add(m.agentId));
+  const callerAgentIds = await getCallerAgentIds(personId);
+  callerAgentIds.forEach((id) => agentIds.add(id));
+
   if (agentIds.size === 0) {
     return visibility;
   }
 
   // Members of the caller's agent(s).
   const members = await agentPersonRepository.find({
-    where: { agentId: In([...agentIds]) },
+    where: { agentId: In([...agentIds]), status: AgentMembershipStatus.ACTIVE },
   });
   members.forEach((m) => personIds.add(m.personId));
 

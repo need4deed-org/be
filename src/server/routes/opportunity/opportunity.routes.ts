@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  AgentMembershipStatus,
   ApiOpportunityGet,
   ApiOpportunityPatch,
   CommunicationType,
@@ -13,7 +14,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { EntityManager } from "typeorm";
+import { EntityManager, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -62,6 +63,8 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  assertAgentOwnsOpportunity,
+  getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
@@ -208,6 +211,11 @@ export default async function opportunityRoutes(
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
+      await assertAgentOwnsOpportunity(
+        request.authUser,
+        id,
+        opportunity.agentId,
+      );
 
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
@@ -298,6 +306,24 @@ export default async function opportunityRoutes(
             : undefined;
 
       const where = getOpportunityWhere(request.query.filter, request.query);
+      const message = `Opportunities page:${request.query.page}.`;
+
+      //  NGOs see only their own agent's opportunities
+      if (request.authUser?.role === UserRole.AGENT) {
+        const agentIds = await getCallerAgentIds(request.authUser.personId);
+
+        // An agent with no shelter must see nothing, so return here rather than
+        // skipping the filter, which would show everything.
+        if (agentIds.length === 0) {
+          return reply.status(200).send({
+            message,
+            data: [],
+            count: 0,
+          });
+        }
+        // NGOs are scoped to their own agents, so this overwrites any agent condition.
+        where.agent = { id: In(agentIds) };
+      }
 
       logger.debug(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
@@ -386,7 +412,7 @@ export default async function opportunityRoutes(
 
       // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
-        message: `Opportunities page:${request.query.page}.`,
+        message,
         data: opportunitiesCategoryDistrict,
         count,
       });
@@ -446,12 +472,12 @@ export default async function opportunityRoutes(
       // An AGENT may only create opportunities for an agent they belong to;
       // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
-        const personId =
-          request.authUser?.personId || request.body.submitted_by_id;
+        const personId = request.authUser?.personId;
         const membership = personId
           ? await fastify.db.agentPersonRepository.findOneBy({
               agentId,
               personId,
+              status: AgentMembershipStatus.ACTIVE,
             })
           : null;
         if (!membership) {
@@ -500,7 +526,9 @@ export default async function opportunityRoutes(
       // representative if the submitter isn't one (e.g. a coordinator
       // creating on the agent's behalf).
       opportunity.contactPersonId = agent.agentPerson?.some(
-        (ap) => ap.personId === opportunity.submittedByPersonId,
+        (ap) =>
+          ap.personId === opportunity.submittedByPersonId &&
+          ap.status === AgentMembershipStatus.ACTIVE,
       )
         ? opportunity.submittedByPersonId
         : agent.representative?.personId;
@@ -631,6 +659,7 @@ export default async function opportunityRoutes(
           ? await fastify.db.agentPersonRepository.findOneBy({
               agentId: opportunity.agentId,
               personId,
+              status: AgentMembershipStatus.ACTIVE,
             })
           : null;
         if (!membership) {
@@ -742,10 +771,11 @@ export default async function opportunityRoutes(
           await fastify.db.agentPersonRepository.findOneBy({
             agentId: effectiveAgentId,
             personId: contactLinkId,
+            status: AgentMembershipStatus.ACTIVE,
           });
         if (!agentContactMembership) {
           throw new NotFoundError(
-            `Contact (personId:${contactLinkId}) is not registered as a contact of this opportunity's agent.`,
+            `Contact (personId:${contactLinkId}) has no active membership at this opportunity's agent.`,
           );
         }
       }

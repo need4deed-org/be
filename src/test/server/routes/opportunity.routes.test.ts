@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentMembershipStatus,
   AgentRoleType,
   AgentVolunteerSearchType,
   EntityTableName,
@@ -60,6 +61,7 @@ describe("PATCH /opportunity/:id agent status update", () => {
   let agentPerson: Person;
   let coordinatorPerson: Person;
   let agentContactPerson: Person;
+  let pendingContactPerson: Person;
   let unrelatedPerson: Person;
   let agentCookie: string;
   let coordinatorCookie: string;
@@ -118,6 +120,9 @@ describe("PATCH /opportunity/:id agent status update", () => {
     unrelatedPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Unrelated" }),
     );
+    pendingContactPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "PendingContact" }),
+    );
 
     const pwHash = await hashPassword(PASSWORD);
     await fastify.db.userRepository.save(
@@ -156,6 +161,15 @@ describe("PATCH /opportunity/:id agent status update", () => {
         agentId: otherAgent.id,
         personId: unrelatedPerson.id,
         role: AgentRoleType.OTHER,
+      }),
+    );
+
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: ownAgent.id,
+        personId: pendingContactPerson.id,
+        role: AgentRoleType.OTHER,
+        status: AgentMembershipStatus.PENDING,
       }),
     );
 
@@ -379,6 +393,23 @@ describe("PATCH /opportunity/:id agent status update", () => {
       url: `/opportunity/${ownOpportunity.id}`,
       cookies: { [accessCookieName]: agentCookie },
       payload: { contact: { id: unrelatedPerson.id } },
+    });
+    expect(res.statusCode).toBe(404);
+
+    const unchanged = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: ownOpportunity.id,
+    });
+    expect(unchanged.contactPersonId).toBeFalsy();
+  });
+
+  // pendingContactPerson IS a member of ownAgent, just not approved yet.
+  // A PENDING membership grants nothing, so it cannot be set as a contact.
+  it("404s when an agent tries to relink their opportunity's contact to a PENDING member of their own agent", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { contact: { id: pendingContactPerson.id } },
     });
     expect(res.statusCode).toBe(404);
 
