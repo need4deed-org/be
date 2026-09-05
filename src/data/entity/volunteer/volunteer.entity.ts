@@ -155,7 +155,7 @@ export default class Volunteer {
   @JoinColumn({ name: "person_id" })
   person: Person;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   personId: number;
 
   @OneToMany(

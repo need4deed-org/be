@@ -22,6 +22,16 @@ import {
 } from "../../schema";
 import { updateLeads, writeVolunteerLegacy } from "../../utils";
 
+// Same DB-conflict-classification pattern as write-agent-registration.ts's
+// classifyRegisterAgentConflict: the findOneBy check below is a fast path,
+// not the guarantee — two concurrent submissions can both pass it before
+// either commits, so the actual guarantee is the unique constraint added on
+// volunteer.person_id (be#950 migration), and this catches its violation.
+function isDuplicateVolunteerProfile(err: unknown): boolean {
+  const e = err as { code?: string; detail?: string };
+  return e?.code === "23505" && !!e.detail?.includes("person_id");
+}
+
 // Same pattern as agent/register.routes.ts's authByVerifyToken: authorizes via
 // the email-verification JWT carried in the querystring (not a cookie/
 // Bearer), not a logged-in session — the caller has only just verified their
@@ -67,7 +77,7 @@ export default async function volunteerRegisterRoutes(
   _options: FastifyPluginOptions,
 ) {
   fastify.post<{
-    Body: { volunteer: VolunteerSelfRegisterBody };
+    Body: VolunteerSelfRegisterBody;
     Querystring: { token: string };
     Reply: { message: string; data?: { id: number } };
   }>(
@@ -114,10 +124,20 @@ export default async function volunteerRegisterRoutes(
 
       const { volunteer, leads } = await parserVolunteerSelfRegister(
         person,
-        request.body.volunteer,
+        request.body,
       );
 
-      const id = await writeVolunteerLegacy(volunteer);
+      let id: number;
+      try {
+        id = await writeVolunteerLegacy(volunteer);
+      } catch (err) {
+        if (isDuplicateVolunteerProfile(err)) {
+          throw new BadRequestError(
+            "A volunteer profile already exists for this account.",
+          );
+        }
+        throw err;
+      }
       if (leads.length) {
         await updateLeads(leads);
       }

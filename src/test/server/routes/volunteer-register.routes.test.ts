@@ -79,7 +79,7 @@ describe("POST /volunteer/register", () => {
     const res = await fastify.inject({
       method: "POST",
       url: "/volunteer/register",
-      payload: { volunteer: { addressPostcode: "10115" } },
+      payload: { addressPostcode: "10115" },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -88,7 +88,7 @@ describe("POST /volunteer/register", () => {
     const res = await fastify.inject({
       method: "POST",
       url: "/volunteer/register?token=not-a-real-token",
-      payload: { volunteer: { addressPostcode: "10115" } },
+      payload: { addressPostcode: "10115" },
     });
     expect(res.statusCode).toBe(401);
   });
@@ -99,7 +99,7 @@ describe("POST /volunteer/register", () => {
     const res = await fastify.inject({
       method: "POST",
       url: `/volunteer/register?token=${token}`,
-      payload: { volunteer: { addressPostcode: "10115" } },
+      payload: { addressPostcode: "10115" },
     });
     expect(res.statusCode).toBe(403);
   });
@@ -111,18 +111,16 @@ describe("POST /volunteer/register", () => {
       method: "POST",
       url: `/volunteer/register?token=${token}`,
       payload: {
-        volunteer: {
-          addressPostcode: "10115",
-          locations: [],
-          languages: [],
-          availability: [],
-          activities: [],
-          skills: [],
-          leadFrom: [],
-          goodConductCertificate: "undefined",
-          measlesVaccination: "undefined",
-          comments: "test comment",
-        },
+        addressPostcode: "10115",
+        locations: [],
+        languages: [],
+        availability: [],
+        activities: [],
+        skills: [],
+        leadFrom: [],
+        goodConductCertificate: "undefined",
+        measlesVaccination: "undefined",
+        comments: "test comment",
       },
     });
 
@@ -142,18 +140,16 @@ describe("POST /volunteer/register", () => {
     const { token } = await makeRegistrant();
 
     const body = {
-      volunteer: {
-        addressPostcode: "10115",
-        locations: [],
-        languages: [],
-        availability: [],
-        activities: [],
-        skills: [],
-        leadFrom: [],
-        goodConductCertificate: "undefined",
-        measlesVaccination: "undefined",
-        comments: "",
-      },
+      addressPostcode: "10115",
+      locations: [],
+      languages: [],
+      availability: [],
+      activities: [],
+      skills: [],
+      leadFrom: [],
+      goodConductCertificate: "undefined",
+      measlesVaccination: "undefined",
+      comments: "",
     };
 
     const first = await fastify.inject({
@@ -176,6 +172,55 @@ describe("POST /volunteer/register", () => {
     expect(second.statusCode).toBe(400);
   });
 
+  it("400s both submissions of a concurrent double-submit race, only one Volunteer is created", async () => {
+    const { person, token } = await makeRegistrant();
+
+    const body = {
+      addressPostcode: "10115",
+      locations: [],
+      languages: [],
+      availability: [],
+      activities: [],
+      skills: [],
+      leadFrom: [],
+      goodConductCertificate: "undefined",
+      measlesVaccination: "undefined",
+      comments: "",
+    };
+
+    // Both requests race past the findOneBy pre-check before either has
+    // committed its INSERT — the volunteer.person_id unique constraint
+    // (be#950 migration) must be what actually prevents the duplicate, not
+    // the pre-check.
+    const [first, second] = await Promise.all([
+      fastify.inject({
+        method: "POST",
+        url: `/volunteer/register?token=${token}`,
+        payload: body,
+      }),
+      fastify.inject({
+        method: "POST",
+        url: `/volunteer/register?token=${token}`,
+        payload: body,
+      }),
+    ]);
+
+    const statusCodes = [first.statusCode, second.statusCode].sort();
+    expect(statusCodes).toEqual([201, 400]);
+
+    const created = first.statusCode === 201 ? first : second;
+    createdVolunteerIds.push(created.json().data.id);
+    const volunteer = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: created.json().data.id,
+    });
+    createdDealIds.push(volunteer.dealId);
+
+    const count = await fastify.db.volunteerRepository.countBy({
+      personId: person.id,
+    });
+    expect(count).toBe(1);
+  });
+
   it("resolves availability into deal timeslots", async () => {
     const { token } = await makeRegistrant();
 
@@ -196,18 +241,16 @@ describe("POST /volunteer/register", () => {
       method: "POST",
       url: `/volunteer/register?token=${token}`,
       payload: {
-        volunteer: {
-          addressPostcode: "10115",
-          locations: [],
-          languages: [],
-          availability: [{ day: "Monday", daytime: "08-11" }],
-          activities: [],
-          skills: [],
-          leadFrom: [],
-          goodConductCertificate: "undefined",
-          measlesVaccination: "undefined",
-          comments: "",
-        },
+        addressPostcode: "10115",
+        locations: [],
+        languages: [],
+        availability: [{ day: "Monday", daytime: "08-11" }],
+        activities: [],
+        skills: [],
+        leadFrom: [],
+        goodConductCertificate: "undefined",
+        measlesVaccination: "undefined",
+        comments: "",
       },
     });
 
@@ -220,5 +263,28 @@ describe("POST /volunteer/register", () => {
     });
     createdDealIds.push(volunteer.dealId);
     expect(volunteer.deal.dealTimeslot.length).toBe(1);
+  });
+
+  it("400s an unrecognized availability.day value instead of silently treating it as occasional", async () => {
+    const { token } = await makeRegistrant();
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/volunteer/register?token=${token}`,
+      payload: {
+        addressPostcode: "10115",
+        locations: [],
+        languages: [],
+        availability: [{ day: "monday", daytime: "08-11" }],
+        activities: [],
+        skills: [],
+        leadFrom: [],
+        goodConductCertificate: "undefined",
+        measlesVaccination: "undefined",
+        comments: "",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 });

@@ -20,8 +20,10 @@ import { buildDealTimeslots } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
 // Wire shape mirrors sdk#222's proposed ApiVolunteerRegisterNew
-// (https://github.com/need4deed-org/sdk/pull/222) field-for-field. sdk#222
-// isn't merged/published yet, so these are local TS interfaces, not an SDK
+// (https://github.com/need4deed-org/sdk/pull/222) field-for-field, flat (no
+// "volunteer" wrapper) — sdk#222 is being revised to drop the nested
+// { volunteer: ... } union in favor of this flat shape. sdk#222 isn't
+// merged/published yet, so these are local TS interfaces, not an SDK
 // import — swap for the real types once that PR lands (be#943 PR
 // description / thread). OptionById/OptionItem/ApiLanguage/ApiAvailability
 // shapes copied here match sdk#222 exactly so the swap is a no-op rename.
@@ -79,6 +81,12 @@ const BY_DAY_TO_WEEKDAY: Record<string, number> = {
 // absent meaning the occasional bucket) into the [day, daytime][] tuple
 // format buildDealTimeslots already knows how to resolve — same tuple shape
 // dealParserOpportunityCreate's formData.timeslots uses.
+//
+// `entry.day` is schema-validated (volunteerRegisterBodySchema's
+// ApiAvailability# $ref) to be one of the 7 weekday names or "occasionally"
+// before this ever runs, so BY_DAY_TO_WEEKDAY[entry.day] is only undefined
+// for the "occasionally" sentinel — that's the intended fall-through to the
+// occasional bucket (weekday 0), not a silent default for bad input.
 function availabilityToTimeslots(
   availability: ApiAvailability[] | undefined | null,
 ): [number, string][] {
