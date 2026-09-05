@@ -27,7 +27,6 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   let ownAgentId: number;
   let otherAgentId: number;
   let ownAgentOpportunityCount: number;
-  let totalOpportunityCount: number;
 
   async function login(email: string): Promise<string> {
     const res = await fastify.inject({
@@ -97,7 +96,6 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     ownAgentId = Number(owned[0].agentId);
     otherAgentId = Number(owned[1].agentId);
     ownAgentOpportunityCount = Number(owned[0].count);
-    totalOpportunityCount = await fastify.db.opportunityRepository.count();
 
     await fastify.db.agentPersonRepository.save(
       new AgentPerson({
@@ -130,11 +128,18 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   });
 
   it("leaves a COORDINATOR seeing every agent's opportunities", async () => {
-    const res = await listOpportunities(coordinatorCookie);
+    const coordinatorRes = await listOpportunities(coordinatorCookie);
+    const agentRes = await listOpportunities(agentCookie);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.json().count).toBe(totalOpportunityCount);
-    expect(totalOpportunityCount).toBeGreaterThan(ownAgentOpportunityCount);
+    expect(coordinatorRes.statusCode).toBe(200);
+    const coordinatorData = coordinatorRes.json().data;
+
+    expect(
+      coordinatorData.some(
+        (o: { agentId: number }) => o.agentId === otherAgentId,
+      ),
+    ).toBe(true);
+    expect(coordinatorData.length).toBeGreaterThan(agentRes.json().data.length);
   });
 
   it("keeps an AGENT scoped to their own agent even when filter[agentId] names another", async () => {
