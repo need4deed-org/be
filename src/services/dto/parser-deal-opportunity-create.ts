@@ -18,14 +18,16 @@ import { getPostcode, getRepository } from "../../data/utils";
 import { buildDealTimeslots } from "./build-deal-timeslots";
 
 // Numeric ids from GET /option/* only — de-duped, non-positive/NaN entries
-// dropped (a stray bad id shouldn't 500 the whole create).
-function toIds(ids: number[] | undefined | null): number[] {
+// dropped (a stray bad id shouldn't 500 the whole create). Exported: shared
+// with parser-volunteer-self-register (be#943), the other id-based deal
+// parser (as opposed to the title-based legacy dealParser).
+export function toIds(ids: number[] | undefined | null): number[] {
   return [...new Set((ids || []).map(Number))].filter(
     (id) => Number.isFinite(id) && id > 0,
   );
 }
 
-async function resolveByIds<
+export async function resolveByIds<
   E extends new () => { id: number },
   M extends object,
 >(

@@ -112,3 +112,7 @@ export interface QuerystringUserList extends QuerystringPagination {
   sortOrder?: SortOrder;
   role?: UserRole;
 }
+
+export interface QuerystringPostList extends QuerystringPagination {
+  search?: string;
+}

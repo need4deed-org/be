@@ -25,7 +25,7 @@ const FALLBACK_PLZ = "12345";
 // Seeded placeholder address (see seeds/user.seed.ts) used for "unknown
 // address". It is shared by many Person rows, so it must never be patched in
 // place — a fresh Address is minted instead.
-const DUMMY_ADDRESS_TITLE = "Dummy";
+export const DUMMY_ADDRESS_TITLE = "Dummy";
 
 /**
  * Extract the street portion of a free-text address, cutting the German 5-digit

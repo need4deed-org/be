@@ -15,6 +15,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import PostBookmark from "../../data/entity/m2m/post-bookmark";
 import PostReaction from "../../data/entity/m2m/post-reaction";
 import OpportunityEventRegistration from "../../data/entity/opportunity-event-registration.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -59,6 +60,7 @@ declare module "fastify" {
       postcodeRepository: Repository<Postcode>;
       postRepository: Repository<Post>;
       postReactionRepository: Repository<PostReaction>;
+      postBookmarkRepository: Repository<PostBookmark>;
       trustedDomainRepository: Repository<TrustedDomain>;
     };
     jwt: JWT;

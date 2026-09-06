@@ -166,6 +166,15 @@ export const userListQuerySchema = {
   additionalProperties: false,
 };
 
+export const postListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    search: { type: "string" },
+  },
+  additionalProperties: false,
+};
+
 export const volunteerOpportunityListQuerySchema = {
   type: "object",
   properties: {

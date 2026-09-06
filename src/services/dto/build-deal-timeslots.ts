@@ -6,7 +6,7 @@ import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
 import logger from "../../logger";
 import { getTimeslot } from "../../server/utils";
 
-const WEEKDAYS = [
+export const WEEKDAYS = [
   "",
   "Monday",
   "Tuesday",

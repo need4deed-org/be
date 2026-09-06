@@ -1680,6 +1680,7 @@
           "items": { "$ref": "ApiPostReactionSummary#" }
         },
         "myReaction": { "type": ["string", "null"] },
+        "bookmarked": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": [
@@ -1692,6 +1693,7 @@
         "replyCount",
         "reactions",
         "myReaction",
+        "bookmarked",
         "createdAt"
       ]
     },

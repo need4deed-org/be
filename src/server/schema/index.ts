@@ -12,3 +12,4 @@ export * from "./responseErrors";
 export * from "./trusted-domain.schema";
 export * from "./user.schema";
 export * from "./volunteer-doc.schema";
+export * from "./volunteer-register.schema";

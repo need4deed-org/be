@@ -86,7 +86,16 @@ describe("sendEmailVerification", () => {
     expect(msg.text).toContain(`${expectedUrl}?role=agent`);
   });
 
-  it("does not append a role param for non-agent users", async () => {
+  it("appends ?role=volunteer to the URL for VOLUNTEER users (be#943)", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
+
+    await sendEmailVerification(deps, user({ role: UserRole.VOLUNTEER }));
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain(`${expectedUrl}?role=volunteer`);
+  });
+
+  it("does not append a role param for a plain USER", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
 
     await sendEmailVerification(deps, user({ role: UserRole.USER }));

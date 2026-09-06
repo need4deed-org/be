@@ -23,6 +23,7 @@ export function dtoPost(post: Post): ApiPostGet {
     replyCount: post.replyCount ?? 0,
     reactions: post.reactions ?? [],
     myReaction: post.myReaction ?? null,
+    bookmarked: post.bookmarked ?? false,
     createdAt: post.createdAt,
   };
 }
