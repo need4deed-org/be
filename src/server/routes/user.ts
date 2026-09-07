@@ -33,6 +33,7 @@ import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
+import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -187,10 +188,7 @@ export default async function userRoutes(
 
         let volunteerId: number | undefined;
         if (user.role === UserRole.VOLUNTEER && user.personId) {
-          const volunteer = await fastify.db.volunteerRepository.findOneBy({
-            personId: user.personId,
-          });
-          volunteerId = volunteer?.id;
+          volunteerId = await getVolunteerIdByPersonId(user.personId);
         }
 
         const payload = serializeUserToMeDTO(
@@ -274,11 +272,8 @@ export default async function userRoutes(
         // assumptions on their own, always the verified email's Person).
         let hasVolunteerProfile: boolean | undefined;
         if (user.role === UserRole.VOLUNTEER && user.personId) {
-          const existingVolunteer =
-            await fastify.db.volunteerRepository.findOneBy({
-              personId: user.personId,
-            });
-          hasVolunteerProfile = !!existingVolunteer;
+          hasVolunteerProfile =
+            (await getVolunteerIdByPersonId(user.personId)) !== undefined;
         }
 
         const volunteerProfileFields =
