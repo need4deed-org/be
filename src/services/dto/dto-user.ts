@@ -5,6 +5,7 @@ export function serializeUserToMeDTO(
   user: User,
   agentId?: number,
   agentMemberships?: ApiAgentMembershipSummary[],
+  volunteerId?: number,
 ): ApiUserGet {
   return {
     id: user.id,
@@ -21,5 +22,6 @@ export function serializeUserToMeDTO(
     timezone: user.timezone || "CET",
     agentId,
     agentMemberships,
+    volunteerId,
   };
 }
