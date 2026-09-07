@@ -1,15 +1,22 @@
-import type { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import type { FastifyRequest } from "fastify";
+import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
+import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
 import { resolveCallerVisibility } from "../../../../server/utils/pii/visible-persons";
+
+vi.mock("../../../../server/utils/data/get-agent-memberships", () => ({
+  getActiveAgentMemberships: vi.fn(),
+}));
+
+const mockMemberships = vi.mocked(getActiveAgentMemberships);
 
 const find = vi.fn();
 const query = vi.fn();
 
-const fastify = {
-  db: { agentPersonRepository: { find, manager: { query } } },
-} as unknown as FastifyInstance;
+const request = {
+  server: { db: { agentPersonRepository: { find, manager: { query } } } },
+} as unknown as FastifyRequest;
 
 const makeUser = (
   role: UserRole,
@@ -17,15 +24,16 @@ const makeUser = (
   id = 100,
 ): User => ({ id, role, personId }) as unknown as User;
 
-const sorted = (s: Set<number>) => [...s].sort((a, b) => a - b);
-
 beforeEach(() => {
   vi.resetAllMocks();
+  request.callerAgentIds = undefined;
 });
+
+const sorted = (s: Set<number>) => [...s].sort((a, b) => a - b);
 
 describe("resolveCallerVisibility", () => {
   it("returns empty sets (just the caller userId) for USER, no DB calls", async () => {
-    const v = await resolveCallerVisibility(fastify, makeUser(UserRole.USER));
+    const v = await resolveCallerVisibility(request, makeUser(UserRole.USER));
     expect(v.userId).toBe(100);
     expect([...v.personIds]).toEqual([]);
     expect([...v.opportunityIds]).toEqual([]);
@@ -36,7 +44,7 @@ describe("resolveCallerVisibility", () => {
 
   it("returns empty when the caller has no personId", async () => {
     const v = await resolveCallerVisibility(
-      fastify,
+      request,
       makeUser(UserRole.VOLUNTEER, null),
     );
     expect([...v.personIds]).toEqual([]);
@@ -51,7 +59,7 @@ describe("resolveCallerVisibility", () => {
       ]);
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.VOLUNTEER, 7),
       );
 
@@ -65,7 +73,10 @@ describe("resolveCallerVisibility", () => {
 
   describe("AGENT", () => {
     it("sees own ∪ members ∪ matched volunteers' persons, plus their agents + opportunities", async () => {
-      find.mockResolvedValueOnce([{ agentId: 42 }, { agentId: 43 }]); // memberships
+      mockMemberships.mockResolvedValueOnce([
+        { agentId: 42 },
+        { agentId: 43 },
+      ] as unknown as Awaited<ReturnType<typeof getActiveAgentMemberships>>);
       find.mockResolvedValueOnce([{ personId: 1 }, { personId: 2 }]); // members
       query.mockResolvedValueOnce([
         { id: 100, person_id: 8 },
@@ -74,32 +85,37 @@ describe("resolveCallerVisibility", () => {
       ]);
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.AGENT, 1),
       );
 
       expect(sorted(v.agentIds)).toEqual([42, 43]);
       expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
-      // member lookup scoped to the caller's agent ids; raw query gets them too
-      expect(find).toHaveBeenNthCalledWith(2, {
-        where: { agentId: expect.anything() },
+      // member lookup scoped to the caller's ACTIVE agent memberships only;
+      // a PENDING co-applicant must not get their PII unmasked
+      expect(find).toHaveBeenNthCalledWith(1, {
+        where: {
+          agentId: expect.anything(),
+          status: AgentMembershipStatus.ACTIVE,
+        },
       });
+
       expect(query.mock.calls[0][1]).toEqual([[42, 43]]);
     });
 
     it("stops at own person when the AGENT has no memberships", async () => {
-      find.mockResolvedValueOnce([]); // no memberships
+      mockMemberships.mockResolvedValueOnce([]); // no memberships
 
       const v = await resolveCallerVisibility(
-        fastify,
+        request,
         makeUser(UserRole.AGENT, 5),
       );
 
       expect([...v.personIds]).toEqual([5]);
       expect([...v.agentIds]).toEqual([]);
       expect([...v.opportunityIds]).toEqual([]);
-      expect(find).toHaveBeenCalledTimes(1); // no member lookup
+      expect(find).not.toHaveBeenCalled(); // no member lookup
       expect(query).not.toHaveBeenCalled(); // no opportunity query
     });
   });
