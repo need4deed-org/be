@@ -503,6 +503,9 @@
             "additionalProperties": false,
             "required": ["agentId", "agentTitle"]
           }
+        },
+        "volunteerId": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,

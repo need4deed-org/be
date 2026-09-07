@@ -185,7 +185,20 @@ export default async function userRoutes(
           agentMemberships = Array.from(membershipsByAgentId.values());
         }
 
-        const payload = serializeUserToMeDTO(user, agentId, agentMemberships);
+        let volunteerId: number | undefined;
+        if (user.role === UserRole.VOLUNTEER && user.personId) {
+          const volunteer = await fastify.db.volunteerRepository.findOneBy({
+            personId: user.personId,
+          });
+          volunteerId = volunteer?.id;
+        }
+
+        const payload = serializeUserToMeDTO(
+          user,
+          agentId,
+          agentMemberships,
+          volunteerId,
+        );
         return reply
           .status(200)
           .send({ message: "Logged in User", data: payload });

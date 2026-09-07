@@ -488,3 +488,97 @@ describe("GET /user/me — agentMemberships dedupes same-agent roles (be#809)", 
     ]);
   });
 });
+
+// be#948: /me previously resolved agentId for role: AGENT but had no
+// equivalent for role: VOLUNTEER, leaving the frontend with no way to learn
+// "which Volunteer row is mine".
+describe("GET /user/me — volunteerId (be#948)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  async function makeVolunteerUser(email: string, personId: number) {
+    const user = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId,
+      }),
+    );
+    return {
+      user,
+      accessToken: fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        type: "access",
+      }),
+    };
+  }
+
+  it("resolves volunteerId for a VOLUNTEER with an existing Volunteer profile", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Existing", lastName: `Volunteer-${suffix}` }),
+    );
+    const postcode = await getPostcode("10115");
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    const volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ personId: person.id, dealId: deal.id }),
+    );
+    const { user, accessToken } = await makeVolunteerUser(
+      `existing-volunteer-me-${suffix}@example.com`,
+      person.id,
+    );
+
+    try {
+      const res = await fastify.inject({
+        method: "GET",
+        url: "/user/me",
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.volunteerId).toBe(volunteer.id);
+    } finally {
+      await fastify.db.userRepository.delete({ id: user.id });
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+      await fastify.db.dealRepository.delete({ id: deal.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+  });
+
+  it("omits volunteerId for a VOLUNTEER who hasn't completed profile registration yet", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "New", lastName: `Volunteer-${suffix}` }),
+    );
+    const { user, accessToken } = await makeVolunteerUser(
+      `new-volunteer-me-${suffix}@example.com`,
+      person.id,
+    );
+
+    try {
+      const res = await fastify.inject({
+        method: "GET",
+        url: "/user/me",
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).not.toHaveProperty("volunteerId");
+    } finally {
+      await fastify.db.userRepository.delete({ id: user.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+  });
+});
