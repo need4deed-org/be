@@ -10,17 +10,20 @@ import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-fo
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
-import { isCronMuted, runWithAdvisoryLock } from "../utils";
+import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240701;
 
+// Hourly on the hour, 08:00–19:00 Berlin time, weekdays only, by default.
+const CRON_SCHEDULE_HOURLY =
+  process.env.CRON_SCHEDULE_HOURLY || "0 8-19 * * 1-5";
+
 async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
-  // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only.
   // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
-    "0 8-19 * * 1-5",
+    CRON_SCHEDULE_HOURLY,
     async () => {
       try {
         if (isCronMuted()) {
@@ -35,20 +38,28 @@ async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
 
         logger.info("scheduler: running hourly email scans");
 
-        await runWithAdvisoryLock(async () => {
-          const results = await Promise.allSettled([
-            scanStalePending(fastify),
-            scanPostMatchCheckup(fastify),
-            scanAccompanyNotFound(fastify),
-            scanRegularUpdate(fastify),
-          ]);
-
-          for (const r of results) {
-            if (r.status === "rejected") {
-              logger.error({ err: r.reason }, "scheduler: scan failed");
-            }
-          }
-        }, SCHEDULER_LOCK_ID);
+        await runWithAdvisoryLock(
+          () =>
+            runNamedCronJobs([
+              {
+                name: "scanStalePending",
+                run: () => scanStalePending(fastify),
+              },
+              {
+                name: "scanPostMatchCheckup",
+                run: () => scanPostMatchCheckup(fastify),
+              },
+              {
+                name: "scanAccompanyNotFound",
+                run: () => scanAccompanyNotFound(fastify),
+              },
+              {
+                name: "scanRegularUpdate",
+                run: () => scanRegularUpdate(fastify),
+              },
+            ]),
+          SCHEDULER_LOCK_ID,
+        );
       } catch (err) {
         logger.error({ err }, "scheduler: unhandled error in cron callback");
       }
