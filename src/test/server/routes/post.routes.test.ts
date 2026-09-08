@@ -152,16 +152,6 @@ describe("POST /post", () => {
     expect(saved.agentId).toBeNull();
   });
 
-  it("403s when a volunteer tries to create a post", async () => {
-    const res = await fastify.inject({
-      method: "POST",
-      url: "/post",
-      cookies: { [accessCookieName]: volunteerCookie },
-      payload: { text: "Should not be allowed" },
-    });
-    expect(res.statusCode).toBe(403);
-  });
-
   it("excludes replies from GET /post and reports replyCount", async () => {
     const postRes = await fastify.inject({
       method: "POST",

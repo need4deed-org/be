@@ -195,13 +195,6 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { role } = request.user;
-      if (role !== UserRole.AGENT && role !== UserRole.COORDINATOR) {
-        throw new UnauthorizedError(
-          "Only agents and coordinators can create posts.",
-        );
-      }
-
       const personId = requireLinkedPersonId(request.authUser?.personId);
 
       const {
