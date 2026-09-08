@@ -3,7 +3,7 @@ import fp from "fastify-plugin";
 import cron from "node-cron";
 import logger from "../../logger";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
-import { runWithAdvisoryLock } from "../utils";
+import { isCronMuted, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
@@ -16,6 +16,11 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
     "0 6 * * *",
     async () => {
       try {
+        if (isCronMuted()) {
+          logger.info("scheduler: skipping daily scans — cron muted");
+          return;
+        }
+
         logger.info("scheduler: running daily scans");
 
         await runWithAdvisoryLock(async () => {

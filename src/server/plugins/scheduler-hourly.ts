@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
-import { TRUTHY } from "../../config/constants";
 import logger from "../../logger";
 import {
   berlinToday,
@@ -11,7 +10,7 @@ import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-fo
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
-import { runWithAdvisoryLock } from "../utils";
+import { isCronMuted, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
@@ -24,8 +23,8 @@ async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
     "0 8-19 * * 1-5",
     async () => {
       try {
-        if (TRUTHY.has(process.env.NOTIFY_CRON_MUTED ?? "")) {
-          logger.info("scheduler: skipping — NOTIFY_CRON_MUTED is set");
+        if (isCronMuted()) {
+          logger.info("scheduler: skipping hourly scans — cron muted");
           return;
         }
 
