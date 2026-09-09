@@ -29,20 +29,11 @@ Data protection is critical. Never log personal data. Never expose personal data
 
 ## Commands
 
+`package.json`'s `scripts` has the standard ones (dev, start, lint, typecheck, format, test:run, test:watch, migration:run/revert/show). Two are worth calling out because the argument convention isn't obvious from the script name alone:
+
 ```bash
-yarn dev                    # start with nodemon (hot reload)
-yarn start                  # start without nodemon
-yarn test:run               # run all tests once (vitest)
-yarn test:watch             # run tests in watch mode
-yarn test -- path/to/file   # run a single test file
-yarn lint                   # ESLint
-yarn typecheck              # TypeScript type checking (no emit)
-yarn format                 # Prettier
-yarn migration:run          # run pending migrations
 yarn migration:generate src/data/migrations/kebab-case-name  # generate migration from entity diff
 yarn migration:create src/data/migrations/kebab-case-name    # create bare migration
-yarn migration:revert       # revert last migration
-yarn migration:show         # show migration status
 ```
 
 Pending migrations are auto-run on server startup only when `RUN_MIGRATIONS=true` (or `NODE_ENV=production`); see `src/data/index.ts:26`. Without it, run `yarn migration:run` yourself. `docker compose up` sets `RUN_MIGRATIONS=true` by default; bare `yarn dev` honours whatever is in your `.env`.
@@ -53,28 +44,9 @@ Docker alternative (includes Postgres):
 docker compose up           # starts db + bootstrap + be
 ```
 
-### Flushing the database (fresh rebuild)
-
-To wipe the DB and replay the full migration chain from scratch — e.g. to
-verify migrations are self-contained and replay cleanly:
-
-```bash
-docker compose down -v                  # stop + drop the be_database volume
-RUN_MIGRATIONS=1 docker compose up      # db -> bootstrap (re-seeds) -> be runs all migrations
-```
-
-`down -v` removes the `be_database` volume (the data); the next `up` re-seeds
-via the `bootstrap` service, then `be` runs every migration on startup
-(`RUN_MIGRATIONS=1` forces it on regardless of `.env`). Watch the `be` logs —
-the run must reach `Migrations completed` with no `column ... does not exist`
-errors.
-
-**This is the canonical check that a data/seed migration is self-contained.**
-Migrations must depend only on **raw SQL + hardcoded literals** — never import
-live entities, app helpers, config constants, or **SDK enums** (an enum value
-can change with a contract update, retroactively altering what an old migration
-emits). A migration that reaches for the current entity/enum shape will pass on
-the DB it was written against but break on a fresh replay once that shape drifts.
+To wipe the DB and replay the full migration chain from scratch (the canonical
+check that a data/seed migration is self-contained) — see the
+`flush-db-rebuild` skill.
 
 ---
 
@@ -165,11 +137,9 @@ Copy `.env.example` to `.env` and fill in real values. Key variables:
 - `DB_SSL_CA_PATH` — optional; path to the CA certificate used to verify the Postgres server in `production`/`staging` (defaults to the baked-in AWS RDS bundle; TLS verification is always strict)
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
-- `RUN_MIGRATIONS` — when truthy, auto-run pending migrations on server startup (always on in prod regardless of this flag); see Commands section
-- `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` — Infomaniak SMTP account for verification emails (email-verification, password-reset)
-- `EMAIL_FROM_NOTIFY`, `SMTP_NOTIFY_HOST`, `SMTP_NOTIFY_PORT`, `SMTP_NOTIFY_USER`, `SMTP_NOTIFY_PASS` — Infomaniak SMTP account for notification emails (cron scans, status-change triggers); separate account because Infomaniak does not allow multiple senders on one SMTP account
-- `EMAIL_TEMPLATE_TTL_MS`, `EMAIL_TEMPLATE_FETCH_TIMEOUT_MS` — optional; cache TTL + fetch timeout for the verification-email CDN manifest (`${CDN_BASE_URL}emails/verification.json`); falls back to built-in copy
-- `CORS_ORIGINS` — comma-separated list of allowed origins
+- `RUN_MIGRATIONS` — see Commands section above
+
+See `.env.example` for `EMAIL_FROM`/`SMTP_*`, `EMAIL_FROM_NOTIFY`/`SMTP_NOTIFY_*`, `EMAIL_TEMPLATE_*`, and `CORS_ORIGINS` — each documented there with inline comments.
 
 ---
 
@@ -180,16 +150,6 @@ Any changes in entities that are registered in `src/data/data-source.ts` must be
 ```
 yarn migration:generate src/data/migrations/<short-description-in-kebab=case>
 ```
-
----
-
-## Handling throws in endpoint handlers
-
-Avoid `try {} catch {}` blocks relaying on error handling by fastify.
-
-Just throw specific error based on `src/config/error`
-
-If needed update error handling in `src/server/index.ts`
 
 ---
 
