@@ -148,7 +148,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailAccompanyNotFound: (opportunity: Opportunity) =>
       sendEmailAccompanyNotFound(emailNotify, opportunity),
     emailAccompanyMatch: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatch(emailNotify, ov),
+      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
     emailRegularUpdate: (opportunity: Opportunity) =>
       sendEmailRegularUpdate(emailNotify, opportunity),
     emailNewRegular: (opportunity: Opportunity) =>

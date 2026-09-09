@@ -12,6 +12,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailAccompanyMatchManifestUrl);
@@ -37,6 +38,10 @@ function resolveContactSharing(
 export async function sendEmailAccompanyMatch(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
   const contactPersonEmail = contactPerson?.email;
@@ -66,9 +71,17 @@ export async function sendEmailAccompanyMatch(
   const volunteerPhone = volunteer.person.phone ?? "";
   const contactpersonName = contactPerson.name;
 
-  const volunteerLanguage = getLanguages(volunteer.deal?.dealLanguage ?? [])
-    .map((l) => l.title)
-    .join(", ");
+  const volunteerLanguage = await resolveOrAlert(
+    errorTransport,
+    volunteer.deal?.dealLanguage ?? [],
+    (dealLanguage) =>
+      getLanguages(dealLanguage)
+        .map((l) => l.title)
+        .join(", "),
+    "",
+    `sendEmailAccompanyMatch, ov ${ov.id}`,
+    DEAL_LANGUAGE_LABELS,
+  );
 
   const clientName = accompanying?.name ?? "";
   const appointmentDate = opportunity.onetimer?.date

@@ -330,3 +330,74 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     expect(errorSend.mock.calls[0][0].to).toBe(errorEmailRecipient);
   });
 });
+
+describe("language/skill fallback for malformed dealLanguage/dealSkill data (be#942)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetIntroductionTemplateCache();
+    resetAccompanyMatchTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  // An orphaned FK (the language/skill relation is null) is exactly what
+  // getLanguages/getOptionItems throw on — see be#942.
+  const malformedDealLanguage = [{ language: null }];
+  const malformedDealSkill = [{ skill: null }];
+
+  it("sendEmailIntroduction still sends, with a fallback language and an alert to ERROR_EMAIL", async () => {
+    await sendEmailIntroduction(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealLanguage: malformedDealLanguage },
+        }),
+      }) as unknown as Parameters<typeof sendEmailIntroduction>[1],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const [alert, message] = send.mock.calls.map(([msg]) => msg);
+    expect(alert.to).toBe(errorEmailRecipient);
+    expect(alert.subject).toContain("sendEmailIntroduction");
+    expect(alert.subject).toContain("dealLanguage data");
+    expect(message.text ?? "").not.toContain("undefined");
+    expect(message.text ?? "").not.toMatch(UNRESOLVED_PLACEHOLDER_RE);
+  });
+
+  it("sendEmailIntroduction still sends, with a fallback skills list and an alert to ERROR_EMAIL", async () => {
+    await sendEmailIntroduction(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealSkill: malformedDealSkill },
+        }),
+      }) as unknown as Parameters<typeof sendEmailIntroduction>[1],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const [alert, message] = send.mock.calls.map(([msg]) => msg);
+    expect(alert.to).toBe(errorEmailRecipient);
+    expect(alert.subject).toContain("sendEmailIntroduction");
+    expect(alert.subject).toContain("dealSkill data");
+    expect(message.text ?? "").not.toContain("undefined");
+    expect(message.text ?? "").not.toMatch(UNRESOLVED_PLACEHOLDER_RE);
+  });
+
+  it("sendEmailAccompanyMatch still sends, with a fallback language and an alert to ERROR_EMAIL", async () => {
+    await sendEmailAccompanyMatch(
+      email,
+      ov({
+        volunteer: volunteer({
+          deal: { dealLanguage: malformedDealLanguage },
+        }),
+      }) as unknown as Parameters<typeof sendEmailAccompanyMatch>[1],
+    );
+
+    expect(send).toHaveBeenCalledTimes(2);
+    const [alert, message] = send.mock.calls.map(([msg]) => msg);
+    expect(alert.to).toBe(errorEmailRecipient);
+    expect(alert.subject).toContain("sendEmailAccompanyMatch");
+    expect(alert.subject).toContain("dealLanguage data");
+    expect(message.text ?? "").not.toContain("undefined");
+    expect(message.text ?? "").not.toMatch(UNRESOLVED_PLACEHOLDER_RE);
+  });
+});
