@@ -11,6 +11,15 @@ export interface ResolveOrAlertLabels {
   rowsLabel: string;
 }
 
+// Shared across every caller that resolves a volunteer's dealLanguage
+// relation (email-introduction.ts, email-accompany-match.ts) — kept in one
+// place so the two alert emails can't drift out of sync with each other.
+export const DEAL_LANGUAGE_LABELS: ResolveOrAlertLabels = {
+  dataLabel: "dealLanguage data",
+  fieldLabel: "the volunteer's language",
+  rowsLabel: "dealLanguage rows",
+};
+
 /**
  * Resolves a value via `formatter`, degrading to `fallback` and alerting
  * `errorEmailRecipient` instead of throwing when the underlying relation
@@ -34,7 +43,14 @@ export async function resolveOrAlert<T, R>(
   { dataLabel, fieldLabel, rowsLabel }: ResolveOrAlertLabels,
 ): Promise<R> {
   try {
-    return formatter(input);
+    // Must be awaited, not just returned: a `return somePromise;` inside a
+    // try block is NOT caught by the surrounding catch if that promise
+    // later rejects — the try/catch's synchronous scope has already
+    // exited by the time the rejection happens. `formatter`'s signature
+    // (`(input: T) => R`) doesn't forbid R itself being a Promise, so an
+    // async formatter would silently bypass the fallback+alert this
+    // function exists to guarantee.
+    return await formatter(input);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(

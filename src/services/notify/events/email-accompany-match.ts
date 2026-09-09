@@ -12,7 +12,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
-import { resolveOrAlert } from "../resolve-or-alert";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailAccompanyMatchManifestUrl);
@@ -80,11 +80,7 @@ export async function sendEmailAccompanyMatch(
         .join(", "),
     "",
     `sendEmailAccompanyMatch, ov ${ov.id}`,
-    {
-      dataLabel: "dealLanguage data",
-      fieldLabel: "the volunteer's language",
-      rowsLabel: "dealLanguage rows",
-    },
+    DEAL_LANGUAGE_LABELS,
   );
 
   const clientName = accompanying?.name ?? "";

@@ -18,7 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
-import { resolveOrAlert } from "../resolve-or-alert";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
@@ -96,11 +96,7 @@ export async function sendEmailIntroduction(
         .join(", "),
     "",
     `sendEmailIntroduction, ov ${ov.id}`,
-    {
-      dataLabel: "dealLanguage data",
-      fieldLabel: "the volunteer's language",
-      rowsLabel: "dealLanguage rows",
-    },
+    DEAL_LANGUAGE_LABELS,
   );
 
   const volunteerSkills = await resolveOrAlert(
