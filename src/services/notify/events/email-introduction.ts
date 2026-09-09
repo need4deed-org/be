@@ -18,6 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveOrAlert } from "../resolve-or-alert";
 import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
@@ -86,16 +87,37 @@ export async function sendEmailIntroduction(
   const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = opportunity.title;
 
-  const volunteerLanguage = getLanguages(volunteer.deal?.dealLanguage ?? [])
-    .map((l) => l.title)
-    .join(", ");
+  const volunteerLanguage = await resolveOrAlert(
+    errorTransport,
+    volunteer.deal?.dealLanguage ?? [],
+    (dealLanguage) =>
+      getLanguages(dealLanguage)
+        .map((l) => l.title)
+        .join(", "),
+    "",
+    `sendEmailIntroduction, ov ${ov.id}`,
+    {
+      dataLabel: "dealLanguage data",
+      fieldLabel: "the volunteer's language",
+      rowsLabel: "dealLanguage rows",
+    },
+  );
 
-  const volunteerSkills = getOptionItems(
+  const volunteerSkills = await resolveOrAlert(
+    errorTransport,
     volunteer.deal?.dealSkill ?? [],
-    "skill",
-  )
-    .map((s) => s.title)
-    .join(", ");
+    (dealSkill) =>
+      getOptionItems(dealSkill, "skill")
+        .map((s) => s.title)
+        .join(", "),
+    "",
+    `sendEmailIntroduction, ov ${ov.id}`,
+    {
+      dataLabel: "dealSkill data",
+      fieldLabel: "the volunteer's skills",
+      rowsLabel: "dealSkill rows",
+    },
+  );
 
   const volSchedule = await resolveScheduleOrAlert(
     errorTransport,
