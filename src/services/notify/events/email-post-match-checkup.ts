@@ -4,6 +4,7 @@ import {
   emailPostMatchCheckupManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import logger from "../../../logger";
 import { POST_MATCH_CHECKUP_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -32,6 +33,14 @@ export async function sendEmailPostMatchCheckup(
   const volunteerName = ov.volunteer.person.name;
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, { volunteerName });
+
+  // TODO(be#961): temporary — remove once the cron-email rendering issue is
+  // confirmed fixed. Logs the rendered email body, so it must not stay past
+  // that.
+  logger.debug(
+    { ovId: ov.id, subject, text, html },
+    "attempting to send post-match-checkup cron email",
+  );
 
   await email.send({
     to: volunteerEmail,
