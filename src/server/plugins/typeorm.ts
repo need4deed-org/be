@@ -28,6 +28,7 @@ import Language from "../../data/entity/profile/language.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import Appreciation from "../../data/entity/volunteer/appreciation.entity";
+import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
 
@@ -71,6 +72,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       postReactionRepository: dataSource.getRepository(PostReaction),
       postBookmarkRepository: dataSource.getRepository(PostBookmark),
       trustedDomainRepository: dataSource.getRepository(TrustedDomain),
+      volunteerAuditLogRepository: dataSource.getRepository(VolunteerAuditLog),
     });
 
     // TODO: add validation of others

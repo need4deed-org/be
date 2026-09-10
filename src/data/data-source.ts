@@ -51,6 +51,7 @@ import Timeline from "./entity/timeline.entity";
 import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
+import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { getLoggingForDataSource, getSslForDataSource } from "./utils";
@@ -118,6 +119,7 @@ export const dataSource = new DataSource({
     TrustedDomain,
     User,
     Volunteer,
+    VolunteerAuditLog,
   ],
   ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
