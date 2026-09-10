@@ -11,7 +11,7 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
-import { NotFoundError } from "../../../config";
+import { NotFoundError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -279,7 +279,10 @@ export default async function volunteerRoutes(
   }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      // COORDINATOR/ADMIN may patch any volunteer; a VOLUNTEER may only
+      // patch their own profile (checked below, once the target volunteer's
+      // personId is known — `allowSelf` doesn't apply here since it compares
+      // against the User id, not this route's Volunteer id).
       schema: {
         params: idParamSchema,
         querystring: langQuerySchema,
@@ -306,10 +309,20 @@ export default async function volunteerRoutes(
       }
 
       const volunteerRepository = fastify.db.volunteerRepository;
-      const dealId = (await volunteerRepository.findOneByOrFail({ id })).dealId;
+      const volunteer = await volunteerRepository.findOneByOrFail({ id });
+      const dealId = volunteer.dealId;
+
+      const role = request.authUser?.role;
+      const isSelf =
+        role === UserRole.VOLUNTEER &&
+        !!request.authUser?.personId &&
+        request.authUser.personId === volunteer.personId;
+      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
+        throw new UnauthorizedError();
+      }
 
       const {
-        volunteerData,
+        volunteerData: patchedVolunteerData,
         personData,
         addressData,
         postcodeData,
@@ -319,6 +332,32 @@ export default async function volunteerRoutes(
         skills,
         locations,
       } = getVolunteerPatchData(request.body, ["dateReturn"]);
+
+      // A volunteer editing their own profile may only touch contact details
+      // and preferences (fe#1001) — internal coordinator-owned workflow
+      // state (engagement/match/communication/appreciation/CGC-process
+      // status, return date) must stay off-limits to a self-edit.
+      let volunteerData = patchedVolunteerData;
+      if (isSelf && patchedVolunteerData) {
+        const filtered = Object.fromEntries(
+          Object.entries(patchedVolunteerData).filter(
+            ([key]) =>
+              ![
+                "statusEngagement",
+                "statusCommunication",
+                "statusAppreciation",
+                "statusType",
+                "statusMatch",
+                "statusCgcProcess",
+                "dateReturn",
+              ].includes(key),
+          ),
+        ) as typeof patchedVolunteerData;
+        // Mirror getVolunteerPatchData's own empty-object-becomes-undefined
+        // convention (getEmptyPropsNull) so an all-internal-fields self-edit
+        // request cleanly no-ops instead of hitting patchEntity with `{}`.
+        volunteerData = Object.keys(filtered).length ? filtered : undefined;
+      }
 
       try {
         if (volunteerData) {
