@@ -14,6 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # github.sha is already this repo's HEAD here (unlike fe/be's own
+      # reusable workflows, which get cross-repo-called and need an explicit
+      # git rev-parse) - resolving it explicitly anyway keeps this in sync
+      # with how build-fe.yaml does it, and avoids relying on github.sha
+      # continuing to mean the same thing if this job's trigger ever changes.
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -28,6 +36,8 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/need4deed-org/be:develop
+          build-args: |
+            GIT_COMMIT_SHA=${{ steps.sha.outputs.sha }}
 
       - name: Publish develop digest for prod release pipeline
         # A repository variable ON infra (not an org variable) - infra's
