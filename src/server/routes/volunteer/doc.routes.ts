@@ -1,6 +1,7 @@
 import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { DocumentType, UserRole } from "need4deed-sdk";
+import { UnauthorizedError } from "../../../config";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
@@ -19,12 +20,14 @@ export default async function volunteerDocRoutes(
   _options: FastifyPluginOptions,
 ) {
   // Documents can't be PII-masked (they're files/metadata), so these GETs stay
-  // COORDINATOR-only — the parent /volunteer hook was relaxed to logged-in for
-  // the masked GET work, which would otherwise expose them to any user.
+  // COORDINATOR-only for everyone else — the parent /volunteer hook was
+  // relaxed to logged-in for the masked GET work, which would otherwise
+  // expose them to any user. A VOLUNTEER may still list their own documents
+  // (be#965's fe#1001 follow-up) — masking exists to hide *other* people's
+  // PII, not the caller's own.
   fastify.get<{ Params: { id: number } }>(
     "/",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -34,10 +37,26 @@ export default async function volunteerDocRoutes(
       },
     },
     async (request, reply) => {
-      const documents = await getVolunteerDocuments(request.params.id);
+      const id = request.params.id;
+      const role = request.authUser?.role;
+      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+        const volunteer = await fastify.db.volunteerRepository.findOneBy({
+          id,
+        });
+        const isSelf =
+          role === UserRole.VOLUNTEER &&
+          request.authUser?.personId !== undefined &&
+          request.authUser?.personId !== null &&
+          volunteer?.personId === request.authUser.personId;
+        if (!isSelf) {
+          throw new UnauthorizedError();
+        }
+      }
+
+      const documents = await getVolunteerDocuments(id);
 
       return reply.send({
-        message: `Documents for volunteer ${request.params.id}`,
+        message: `Documents for volunteer ${id}`,
         data: documents,
       });
     },
