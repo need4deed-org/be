@@ -11,7 +11,7 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
-import { NotFoundError } from "../../../config";
+import { NotFoundError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -279,7 +279,10 @@ export default async function volunteerRoutes(
   }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      // COORDINATOR/ADMIN may patch any volunteer; a VOLUNTEER may only
+      // patch their own profile (checked below, once the target volunteer's
+      // personId is known — `allowSelf` doesn't apply here since it compares
+      // against the User id, not this route's Volunteer id).
       schema: {
         params: idParamSchema,
         querystring: langQuerySchema,
@@ -306,12 +309,23 @@ export default async function volunteerRoutes(
       }
 
       const volunteerRepository = fastify.db.volunteerRepository;
-      const dealId = (await volunteerRepository.findOneByOrFail({ id })).dealId;
+      const volunteer = await volunteerRepository.findOneByOrFail({ id });
+      const dealId = volunteer.dealId;
+
+      const role = request.authUser?.role;
+      const isSelf =
+        role === UserRole.VOLUNTEER &&
+        request.authUser?.personId !== undefined &&
+        request.authUser?.personId !== null &&
+        request.authUser.personId === volunteer.personId;
+      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
+        throw new UnauthorizedError();
+      }
 
       const {
-        volunteerData,
-        personData,
-        addressData,
+        volunteerData: patchedVolunteerData,
+        personData: patchedPersonData,
+        addressData: patchedAddressData,
         postcodeData,
         languages,
         availability,
@@ -319,6 +333,58 @@ export default async function volunteerRoutes(
         skills,
         locations,
       } = getVolunteerPatchData(request.body, ["dateReturn"]);
+
+      // A volunteer editing their own profile may only touch contact details
+      // and preferences (fe#1001) — an explicit allowlist rather than a
+      // denylist of "internal" fields, so a new coordinator-owned Volunteer
+      // column is safe-by-default instead of accidentally self-editable.
+      const SELF_EDITABLE_VOLUNTEER_FIELDS = new Set<keyof Volunteer>([
+        "infoAbout",
+        "infoExperience",
+        "statusCGC",
+        "statusVaccination",
+        "statusCGCApplicationDate",
+        "statusCGCDate",
+        "statusVaccinationDate",
+        "preferredCommunicationType",
+      ]);
+      let volunteerData = patchedVolunteerData;
+      if (isSelf && patchedVolunteerData) {
+        const filtered = Object.fromEntries(
+          Object.entries(patchedVolunteerData).filter(([key]) =>
+            SELF_EDITABLE_VOLUNTEER_FIELDS.has(key as keyof Volunteer),
+          ),
+        ) as typeof patchedVolunteerData;
+        // Mirror getVolunteerPatchData's own empty-object-becomes-undefined
+        // convention (getEmptyPropsNull) so an all-restricted-fields
+        // self-edit request cleanly no-ops instead of hitting patchEntity
+        // with `{}`.
+        volunteerData = Object.keys(filtered).length ? filtered : undefined;
+      }
+
+      // personData/addressData/postcodeData carry ids straight from the
+      // request body (be#965 review) — a self-edit must never trust those:
+      // patchEntity falls back to `data.id` when patching, so an
+      // unauthorized body-supplied id would let a volunteer overwrite any
+      // other person's or address's row. For isSelf, force personData.id to
+      // the caller's own Person, and addressData.id to that Person's own
+      // (already-existing) Address, dropping the address patch entirely
+      // otherwise rather than trusting the body's id.
+      let personData = patchedPersonData;
+      let addressData = patchedAddressData;
+      if (isSelf) {
+        if (personData) {
+          personData = { ...personData, id: volunteer.personId };
+        }
+        if (addressData) {
+          const ownPerson = await fastify.db.personRepository.findOneBy({
+            id: volunteer.personId,
+          });
+          addressData = ownPerson?.addressId
+            ? { ...addressData, id: ownPerson.addressId }
+            : undefined;
+        }
+      }
 
       try {
         if (volunteerData) {
