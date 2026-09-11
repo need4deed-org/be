@@ -15,12 +15,14 @@ import { NotFoundError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
+import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
@@ -62,6 +64,7 @@ import {
   resolveCallerMask,
 } from "../../utils/pii/pre-serialization";
 import volunteerAppreciationRoutes from "./appreciation.routes";
+import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerDocRoutes from "./doc.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
@@ -123,6 +126,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
+  });
+
+  await fastify.register(volunteerAuditLogRoutes, {
+    prefix: `/:id${RoutePrefix.ACTIVITY_LOG}`,
   });
 
   await fastify.register(volunteerOpportunityVolunteerRoutes, {
@@ -386,6 +393,46 @@ export default async function volunteerRoutes(
         }
       }
 
+      // Captured before any writes, for the audit-trail diff below (be#919)
+      // — patchEntity only performs the UPDATE, it doesn't hand back what
+      // the row looked like beforehand.
+      const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
+      if (
+        volunteerData?.statusEngagement !== undefined &&
+        volunteerData.statusEngagement !== volunteer.statusEngagement
+      ) {
+        auditLogEntries.push({
+          type: "availability_changed",
+          detail: `Status changed from ${volunteer.statusEngagement} to ${volunteerData.statusEngagement}.`,
+        });
+      }
+      let hasContactChange = false;
+      if ((personData && personData.id) || (addressData && addressData.id)) {
+        const prevPerson = await fastify.db.personRepository.findOne({
+          where: { id: (personData?.id ?? volunteer.personId) as number },
+          relations: ["address"],
+        });
+        if (personData) {
+          hasContactChange ||= Object.entries(personData).some(
+            ([key, value]) =>
+              key !== "id" && prevPerson?.[key as keyof Person] !== value,
+          );
+        }
+        if (addressData) {
+          hasContactChange ||= Object.entries(addressData).some(
+            ([key, value]) =>
+              key !== "id" &&
+              prevPerson?.address?.[key as keyof Address] !== value,
+          );
+        }
+      }
+      if (hasContactChange) {
+        auditLogEntries.push({
+          type: "contact_details_changed",
+          detail: "Contact details updated.",
+        });
+      }
+
       try {
         if (volunteerData) {
           const success = await patchEntity(Volunteer, volunteerData, id);
@@ -484,6 +531,21 @@ export default async function volunteerRoutes(
       } catch (error) {
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
+      }
+
+      if (auditLogEntries.length) {
+        const occurredAt = new Date();
+        await fastify.db.volunteerAuditLogRepository.save(
+          auditLogEntries.map(
+            (entry) =>
+              new VolunteerAuditLog({
+                ...entry,
+                volunteerId: id,
+                actorUserId: request.authUser?.id,
+                occurredAt,
+              }),
+          ),
+        );
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;

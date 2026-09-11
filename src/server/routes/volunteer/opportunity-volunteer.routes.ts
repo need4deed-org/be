@@ -5,6 +5,7 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
+import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import {
   updateOpportunityMatching,
   updateVolunteerMatching,
@@ -13,6 +14,7 @@ import { volunteerOpportunityVolunteerDTO } from "../../../services";
 import {
   idmM2mIdParamSchema,
   idParamSchema,
+  opportunityVolunteerPatchSchema,
   responseErrors,
   responseSchema,
 } from "../../schema";
@@ -81,7 +83,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
-        body: { $ref: "ApiVolunteerOpportunityPatch#" },
+        body: opportunityVolunteerPatchSchema,
         response: responseSchema("ApiVolunteerOpportunityGet#"),
       },
     },
@@ -103,8 +105,28 @@ export default function volunteerOpportunityVolunteerRoutes(
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
+      const previousStatus = opportunity.status;
+
       opportunityVolunteerRepository.merge(opportunity, request.body);
       await opportunityVolunteerRepository.save(opportunity, { reload: true });
+
+      // Volunteer audit trail (be#919) — only when the status actually
+      // changed; this route also merges other future fields someday, which
+      // shouldn't spuriously log a "status changed" entry.
+      if (
+        request.body.status !== undefined &&
+        request.body.status !== previousStatus
+      ) {
+        await fastify.db.volunteerAuditLogRepository.save(
+          new VolunteerAuditLog({
+            volunteerId,
+            type: "opportunity_status_changed",
+            detail: `Opportunity status changed from ${previousStatus} to ${request.body.status}.`,
+            actorUserId: request.authUser?.id,
+            occurredAt: new Date(),
+          }),
+        );
+      }
 
       const data = volunteerOpportunityVolunteerDTO(opportunity);
       return reply.status(200).send({

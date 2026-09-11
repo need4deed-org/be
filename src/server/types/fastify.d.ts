@@ -29,6 +29,7 @@ import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
+import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { AuthOptions } from "./auth";
 
@@ -62,6 +63,7 @@ declare module "fastify" {
       postReactionRepository: Repository<PostReaction>;
       postBookmarkRepository: Repository<PostBookmark>;
       trustedDomainRepository: Repository<TrustedDomain>;
+      volunteerAuditLogRepository: Repository<VolunteerAuditLog>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
