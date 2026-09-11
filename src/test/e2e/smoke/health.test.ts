@@ -20,4 +20,15 @@ describe("smoke: health check", () => {
       message: expect.stringContaining("up and running"),
     });
   });
+
+  it("GET /health-check echoes GIT_COMMIT_SHA from the environment", async () => {
+    const sha = "1234567890abcdef1234567890abcdef12345678";
+    process.env.GIT_COMMIT_SHA = sha;
+    try {
+      const res = await app.inject({ method: "GET", url: "/health-check" });
+      expect(res.json().commit).toBe(sha);
+    } finally {
+      delete process.env.GIT_COMMIT_SHA;
+    }
+  });
 });
