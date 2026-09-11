@@ -397,7 +397,10 @@ export default async function volunteerRoutes(
       // — patchEntity only performs the UPDATE, it doesn't hand back what
       // the row looked like beforehand.
       const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
-      if (volunteerData?.statusEngagement !== undefined) {
+      if (
+        volunteerData?.statusEngagement !== undefined &&
+        volunteerData.statusEngagement !== volunteer.statusEngagement
+      ) {
         auditLogEntries.push({
           type: "availability_changed",
           detail: `Status changed from ${volunteer.statusEngagement} to ${volunteerData.statusEngagement}.`,

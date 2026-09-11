@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { UnauthorizedError } from "../../../config";
 import { dtoVolunteerAuditLog } from "../../../services/dto/dto-volunteer-audit-log";
-import { idParamSchema } from "../../schema";
+import { idParamSchema, volunteerAuditLogSchemaGet200 } from "../../schema";
 
 // Read-only audit trail for a volunteer's own record (be#919). Same
 // self-access shape as GET /volunteer/:id/doc (be#967): COORDINATOR/ADMIN
@@ -17,34 +17,7 @@ export default function volunteerAuditLogRoutes(
       schema: {
         params: idParamSchema,
         response: {
-          200: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    id: { type: "number" },
-                    volunteerId: { type: "number" },
-                    type: { type: "string" },
-                    detail: { type: "string" },
-                    actorUserId: { type: ["number", "null"] },
-                    occurredAt: { type: "string", format: "date-time" },
-                  },
-                  required: [
-                    "id",
-                    "volunteerId",
-                    "type",
-                    "detail",
-                    "occurredAt",
-                  ],
-                },
-              },
-            },
-            required: ["message", "data"],
-          },
+          200: volunteerAuditLogSchemaGet200,
         },
       },
     },
@@ -53,11 +26,13 @@ export default function volunteerAuditLogRoutes(
       const role = request.authUser?.role;
 
       if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+        if (role !== UserRole.VOLUNTEER) {
+          throw new UnauthorizedError();
+        }
         const volunteer = await fastify.db.volunteerRepository.findOneBy({
           id,
         });
         const isSelf =
-          role === UserRole.VOLUNTEER &&
           request.authUser?.personId !== undefined &&
           request.authUser?.personId !== null &&
           volunteer?.personId === request.authUser.personId;

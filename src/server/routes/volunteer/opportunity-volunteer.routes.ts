@@ -14,6 +14,7 @@ import { volunteerOpportunityVolunteerDTO } from "../../../services";
 import {
   idmM2mIdParamSchema,
   idParamSchema,
+  opportunityVolunteerPatchSchema,
   responseErrors,
   responseSchema,
 } from "../../schema";
@@ -82,7 +83,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
-        body: { $ref: "ApiVolunteerOpportunityPatch#" },
+        body: opportunityVolunteerPatchSchema,
         response: responseSchema("ApiVolunteerOpportunityGet#"),
       },
     },
