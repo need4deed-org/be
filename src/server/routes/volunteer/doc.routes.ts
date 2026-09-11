@@ -40,11 +40,13 @@ export default async function volunteerDocRoutes(
       const id = request.params.id;
       const role = request.authUser?.role;
       if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+        if (role !== UserRole.VOLUNTEER) {
+          throw new UnauthorizedError();
+        }
         const volunteer = await fastify.db.volunteerRepository.findOneBy({
           id,
         });
         const isSelf =
-          role === UserRole.VOLUNTEER &&
           request.authUser?.personId !== undefined &&
           request.authUser?.personId !== null &&
           volunteer?.personId === request.authUser.personId;
