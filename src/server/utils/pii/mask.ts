@@ -44,6 +44,23 @@ export function maskFields(
   }
 }
 
+// Nulls out an address's postcode coordinates (be#661's map-pin lat/lon) by
+// replacing the postcode reference with a copy — a Postcode row is shared
+// across every Address in the same area, so mutating its fields in place
+// would leak into every other (possibly visible) address pointing at the
+// same postcode.
+function maskAddressCoordinates(address: Record<string, unknown>): void {
+  const postcode = address.postcode;
+  if (postcode && typeof postcode === "object") {
+    address.postcode = { ...postcode, latitude: null, longitude: null };
+  }
+}
+
+function maskAddress(address: Record<string, unknown>): void {
+  maskFields(address, ADDRESS_PII_FIELDS);
+  maskAddressCoordinates(address);
+}
+
 // An entity whose comments/accompanying the caller may see unmasked.
 function isEntityVisible(
   entityType: EntityTableName,
@@ -84,9 +101,10 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
  * (the walker still descends them to reach nested PII). A WeakSet guards the
  * entity graph's cycles.
  *
- * Masked: a Person not in `personIds` (and its own Address); an Agent not in
- * `agentIds` (and its own Address); a standalone Address reached some other
- * way; an Opportunity's accompanying when the opportunity isn't visible; a
+ * Masked: a Person not in `personIds` (and its own Address, including its
+ * postcode's lat/lon); an Agent not in `agentIds` (and its own Address); a
+ * standalone Address reached some other way; an Opportunity's accompanying
+ * when the opportunity isn't visible; a
  * Comment that isn't visible (see isCommentVisible).
  */
 export function maskPii<T>(data: T, ctx: CallerVisibility): T {
@@ -123,10 +141,7 @@ function walk(
     // re-mask a visible person's address (and don't double-mask a hidden one).
     if (node.address && typeof node.address === "object") {
       if (!isVisible) {
-        maskFields(
-          node.address as unknown as Record<string, unknown>,
-          ADDRESS_PII_FIELDS,
-        );
+        maskAddress(node.address as unknown as Record<string, unknown>);
       }
       seen.add(node.address);
     }
@@ -140,7 +155,7 @@ function walk(
   } else if (node instanceof Address) {
     // Reached not via a visible Person/Agent (e.g. another agent's address)
     // -> standalone PII, mask it.
-    maskFields(node as unknown as Record<string, unknown>, ADDRESS_PII_FIELDS);
+    maskAddress(node as unknown as Record<string, unknown>);
   } else if (node instanceof Opportunity) {
     // Accompanying (refugee contact) follows its opportunity's visibility.
     if (

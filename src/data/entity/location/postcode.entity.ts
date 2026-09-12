@@ -7,6 +7,12 @@ import DistrictPostcode from "../m2m/district-postcode";
 import Accompanying from "../opportunity/accompanying.entity";
 import Address from "./address.entity";
 
+// Coerces the pg driver's string return for numeric columns to number.
+const numericTransformer = {
+  to: (v?: number) => v,
+  from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
+};
+
 @Entity()
 export default class Postcode {
   constructor(postcode?: Partial<Postcode>) {
@@ -18,16 +24,12 @@ export default class Postcode {
   @PrimaryGeneratedColumn()
   id: number;
 
-  // Stored as numeric; transformer coerces the pg driver's string return to number.
   @Column({
     type: "numeric",
     precision: 10,
     scale: 7,
     nullable: true,
-    transformer: {
-      to: (v?: number) => v,
-      from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
-    },
+    transformer: numericTransformer,
   })
   longitude?: number;
 
@@ -36,10 +38,7 @@ export default class Postcode {
     precision: 9,
     scale: 7,
     nullable: true,
-    transformer: {
-      to: (v?: number) => v,
-      from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
-    },
+    transformer: numericTransformer,
   })
   latitude?: number;
 

@@ -241,7 +241,9 @@ describe("GET /volunteer", () => {
   let deal: Deal;
   let address: Address;
   let postcode: Postcode;
+  let unrelatedPerson: Person;
   let coordinatorCookie: string;
+  let unrelatedUserCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
@@ -285,6 +287,9 @@ describe("GET /volunteer", () => {
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Coordinator" }),
     );
+    unrelatedPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Unrelated" }),
+    );
     const pwHash = await hashPassword(PASSWORD);
     await fastify.db.userRepository.save(
       new User({
@@ -295,21 +300,40 @@ describe("GET /volunteer", () => {
         personId: coordinatorPerson.id,
       }),
     );
+    // USER has no visibility into anyone (resolveCallerVisibility) — used to
+    // verify masked callers get lat/lon nulled alongside the rest of a
+    // volunteer's PII (be#661 review).
+    await fastify.db.userRepository.save(
+      new User({
+        email: `unrelated-user-vol-list-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.USER,
+        isActive: true,
+        personId: unrelatedPerson.id,
+      }),
+    );
 
-    const login = await fastify.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: {
-        email: `coordinator-vol-list-${suffix}@test.need4deed.org`,
-        password: PASSWORD,
-      },
-    });
-    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+    const login = async (email: string): Promise<string> => {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      return getCookie(res.cookies, accessCookieName);
+    };
+    coordinatorCookie = await login(
+      `coordinator-vol-list-${suffix}@test.need4deed.org`,
+    );
+    unrelatedUserCookie = await login(
+      `unrelated-user-vol-list-${suffix}@test.need4deed.org`,
+    );
   });
 
   afterAll(async () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.userRepository.delete({ personId: unrelatedPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.personRepository.delete({ id: volunteerPerson.id });
@@ -332,5 +356,20 @@ describe("GET /volunteer", () => {
     expect(body.data[0].lon).toBe(LON);
     expect(typeof body.data[0].lat).toBe("number");
     expect(typeof body.data[0].lon).toBe("number");
+  });
+
+  it("nulls lat/lon for a caller with no visibility into the volunteer, alongside their masked name", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].name).not.toContain(lastName);
+    expect(body.data[0].lat).toBeNull();
+    expect(body.data[0].lon).toBeNull();
   });
 });

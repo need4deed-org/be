@@ -34,8 +34,15 @@ const makePerson = (id: number): Person =>
     email: "john@example.de",
   });
 
-const makeAddress = (street: string): Address =>
-  Object.assign(new Address(), { street, city: "Berlin" });
+const makeAddress = (
+  street: string,
+  postcode?: { latitude: number; longitude: number },
+): Address =>
+  Object.assign(new Address(), {
+    street,
+    city: "Berlin",
+    ...(postcode ? { postcode } : {}),
+  });
 
 const makeAccompanying = (): Accompanying =>
   Object.assign(new Accompanying(), {
@@ -88,6 +95,25 @@ describe("maskPii", () => {
 
     expect(hidden.address.street).toMatch(MASKED);
     expect(visible.address.street).toBe("Side 2");
+  });
+
+  it("masks a hidden person's postcode lat/lon but keeps a visible person's coordinates (be#661)", () => {
+    const sharedPostcode = { latitude: 52.52, longitude: 13.405 };
+    const hidden = makePerson(2);
+    hidden.address = makeAddress("Main 1", sharedPostcode);
+    const visible = makePerson(1);
+    visible.address = makeAddress("Side 2", sharedPostcode);
+
+    maskPii([hidden, visible], ctx({ personIds: [1] }));
+
+    expect(hidden.address.postcode.latitude).toBeNull();
+    expect(hidden.address.postcode.longitude).toBeNull();
+    // The same Postcode row/object is shared by both addresses — masking the
+    // hidden one must not mutate the shared reference and blank the visible
+    // person's coordinates too.
+    expect(visible.address.postcode.latitude).toBe(52.52);
+    expect(visible.address.postcode.longitude).toBe(13.405);
+    expect(sharedPostcode.latitude).toBe(52.52);
   });
 
   it("masks a standalone Address (not under a Person/Agent) and leaves non-PII fields", () => {
