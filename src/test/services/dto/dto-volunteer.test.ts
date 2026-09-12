@@ -79,6 +79,26 @@ describe("volunteerListSerializer", () => {
     expect(result).toBeDefined();
     expect(result!.avatarUrl).toBeNull();
   });
+
+  it("returns null lat/lon when person has no address", () => {
+    const result = volunteerListSerializer(makeVolunteer() as any);
+    expect(result).toBeDefined();
+    expect(result!.lat).toBeNull();
+    expect(result!.lon).toBeNull();
+  });
+
+  it("maps postcode coordinates to lat/lon", () => {
+    const v = makeVolunteer({
+      person: {
+        ...makeVolunteer().person,
+        address: { postcode: { latitude: 52.52, longitude: 13.405 } },
+      },
+    });
+    const result = volunteerListSerializer(v as any);
+    expect(result).toBeDefined();
+    expect(result!.lat).toBe(52.52);
+    expect(result!.lon).toBe(13.405);
+  });
 });
 
 describe("volunteerSerializer", () => {

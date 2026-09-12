@@ -89,11 +89,13 @@ export default async function volunteerRoutes(
   ];
 
   // Relations the list view actually serializes (volunteerListSerializer):
-  // neither person.address.postcode nor deal.postcode are used, so they are
-  // omitted. The table view renders only languages + locations; the card view
-  // additionally renders activities, skills and availability.
+  // deal.postcode is unused, so it's omitted. person.address.postcode is
+  // included for the map view's lat/lon pins (be#661). The table view renders
+  // only languages + locations; the card view additionally renders
+  // activities, skills and availability.
   const listRelationsCommon = [
     "person",
+    "person.address.postcode",
     "deal",
     "deal.dealLanguage.language",
     "deal.dealDistrict.district",

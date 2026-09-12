@@ -33,6 +33,9 @@ export function volunteerListSerializer(
     const skills = getOptionItems(volunteer.deal.dealSkill, "skill") ?? [];
     const locations =
       getOptionItems(volunteer.deal.dealDistrict, "district") ?? [];
+    const postcode = volunteer.person.address?.postcode;
+    const lat = postcode?.latitude ?? null;
+    const lon = postcode?.longitude ?? null;
 
     return {
       id,
@@ -48,6 +51,8 @@ export function volunteerListSerializer(
       activities,
       skills,
       locations,
+      lat,
+      lon,
     };
   } catch (error) {
     logger.error(`Error serializing volunteer (id:${volunteer.id}): ${error}`);
