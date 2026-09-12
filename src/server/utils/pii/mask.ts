@@ -94,28 +94,23 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
   return isEntityVisible(comment.entityType, comment.entityId, ctx);
 }
 
-/**
- * Masks PII the caller may not see, in place, on the loaded entity graph (run
- * before the DTO). TypeORM returns class instances, so PII is identified by
- * `instanceof`; reference objects and non-PII entities pass through untouched
- * (the walker still descends them to reach nested PII). A WeakSet guards the
- * entity graph's cycles.
- *
- * Masked: a Person not in `personIds` (and its own Address, including its
- * postcode's lat/lon); an Agent not in `agentIds` (and its own Address); a
- * standalone Address reached some other way; an Opportunity's accompanying
- * when the opportunity isn't visible; a
- * Comment that isn't visible (see isCommentVisible).
- */
-export function maskPii<T>(data: T, ctx: CallerVisibility): T {
-  walk(data, ctx, new WeakSet<object>());
-  return data;
-}
-
-function walk(
+// Address is a real OneToMany off Person/Organization (household members,
+// agent contacts sharing one office, etc.), and TypeORM's relation loader
+// returns the *same* Address (and Postcode) object instance for every row
+// that references it — confirmed empirically: two Persons sharing an
+// addressId, loaded via relationLoadStrategy "query", get
+// `person.address === otherPerson.address`. Deciding whether to mask an
+// address from a single Person/Agent's own visibility would then be
+// order-dependent: whichever of two co-residents the walker reaches first
+// determines the masked/unmasked outcome for *both*, since mutating one
+// mutates the shared object for the other too. `collectVisibleAddresses`
+// pre-scans the whole graph so an address already known to be visible via
+// some Person/Agent is never masked, regardless of walk order.
+function collectVisibleAddresses(
   node: unknown,
   ctx: CallerVisibility,
   seen: WeakSet<object>,
+  visibleAddresses: WeakSet<object>,
 ): void {
   if (node === null || typeof node !== "object") {
     return;
@@ -127,7 +122,77 @@ function walk(
 
   if (Array.isArray(node)) {
     for (const item of node) {
-      walk(item, ctx, seen);
+      collectVisibleAddresses(item, ctx, seen, visibleAddresses);
+    }
+    return;
+  }
+
+  if (node instanceof Person) {
+    if (
+      ctx.personIds.has(node.id) &&
+      node.address &&
+      typeof node.address === "object"
+    ) {
+      visibleAddresses.add(node.address);
+    }
+  } else if (node instanceof Agent) {
+    if (
+      ctx.agentIds.has(node.id) &&
+      node.address &&
+      typeof node.address === "object"
+    ) {
+      visibleAddresses.add(node.address);
+    }
+  }
+
+  for (const key of Object.keys(node)) {
+    collectVisibleAddresses(
+      (node as Record<string, unknown>)[key],
+      ctx,
+      seen,
+      visibleAddresses,
+    );
+  }
+}
+
+/**
+ * Masks PII the caller may not see, in place, on the loaded entity graph (run
+ * before the DTO). TypeORM returns class instances, so PII is identified by
+ * `instanceof`; reference objects and non-PII entities pass through untouched
+ * (the walker still descends them to reach nested PII). A WeakSet guards the
+ * entity graph's cycles.
+ *
+ * Masked: a Person not in `personIds` (and its Address, unless that Address
+ * is also reachable from a visible Person/Agent elsewhere in the same
+ * response — see `collectVisibleAddresses`); an Agent not in `agentIds` (and
+ * its Address, same rule); a standalone Address reached some other way; an
+ * Opportunity's accompanying when the opportunity isn't visible; a Comment
+ * that isn't visible (see isCommentVisible).
+ */
+export function maskPii<T>(data: T, ctx: CallerVisibility): T {
+  const visibleAddresses = new WeakSet<object>();
+  collectVisibleAddresses(data, ctx, new WeakSet<object>(), visibleAddresses);
+  walk(data, ctx, new WeakSet<object>(), visibleAddresses);
+  return data;
+}
+
+function walk(
+  node: unknown,
+  ctx: CallerVisibility,
+  seen: WeakSet<object>,
+  visibleAddresses: WeakSet<object>,
+): void {
+  if (node === null || typeof node !== "object") {
+    return;
+  }
+  if (seen.has(node)) {
+    return;
+  }
+  seen.add(node);
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      walk(item, ctx, seen, visibleAddresses);
     }
     return;
   }
@@ -140,22 +205,29 @@ function walk(
     // Claim the person's own Address so the standalone-Address rule below can't
     // re-mask a visible person's address (and don't double-mask a hidden one).
     if (node.address && typeof node.address === "object") {
-      if (!isVisible) {
+      if (!visibleAddresses.has(node.address)) {
         maskAddress(node.address as unknown as Record<string, unknown>);
       }
       seen.add(node.address);
     }
   } else if (node instanceof Agent) {
-    const isVisible = ctx.agentIds.has(node.id);
     // Claim the agent's own Address so the standalone-Address rule below
-    // can't re-mask it when the caller has visibility into this agent.
-    if (isVisible && node.address && typeof node.address === "object") {
+    // can't re-mask it when it's visible (via this agent, or some other
+    // visible Person/Agent sharing the same Address).
+    if (
+      node.address &&
+      typeof node.address === "object" &&
+      visibleAddresses.has(node.address)
+    ) {
       seen.add(node.address);
     }
   } else if (node instanceof Address) {
     // Reached not via a visible Person/Agent (e.g. another agent's address)
-    // -> standalone PII, mask it.
-    maskAddress(node as unknown as Record<string, unknown>);
+    // -> standalone PII, mask it, unless it's known visible via some other
+    // Person/Agent in this same response.
+    if (!visibleAddresses.has(node)) {
+      maskAddress(node as unknown as Record<string, unknown>);
+    }
   } else if (node instanceof Opportunity) {
     // Accompanying (refugee contact) follows its opportunity's visibility.
     if (
@@ -177,6 +249,6 @@ function walk(
   }
 
   for (const key of Object.keys(node)) {
-    walk((node as Record<string, unknown>)[key], ctx, seen);
+    walk((node as Record<string, unknown>)[key], ctx, seen, visibleAddresses);
   }
 }

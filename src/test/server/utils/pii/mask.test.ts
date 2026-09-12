@@ -116,6 +116,43 @@ describe("maskPii", () => {
     expect(sharedPostcode.latitude).toBe(52.52);
   });
 
+  it("keeps a shared Address unmasked for a visible co-resident, regardless of walk order (be#974 review)", () => {
+    // Address.person is a real OneToMany — TypeORM's relation loader returns
+    // the *same* Address object for every Person row referencing it, so two
+    // co-residents sharing one address literally share one JS object.
+    const sharedAddress = makeAddress("Shared House 1", {
+      latitude: 52.52,
+      longitude: 13.405,
+    });
+    const hidden = makePerson(2);
+    hidden.address = sharedAddress;
+    const visible = makePerson(1);
+    visible.address = sharedAddress;
+
+    // Hidden person walked first: must not mask the address the visible
+    // co-resident is also entitled to see.
+    maskPii([hidden, visible], ctx({ personIds: [1] }));
+    expect(sharedAddress.street).toBe("Shared House 1");
+    expect(sharedAddress.postcode.latitude).toBe(52.52);
+    expect(sharedAddress.postcode.longitude).toBe(13.405);
+  });
+
+  it("keeps a shared Address unmasked for a visible co-resident when walked visible-first too", () => {
+    const sharedAddress = makeAddress("Shared House 2", {
+      latitude: 48.13,
+      longitude: 11.58,
+    });
+    const hidden = makePerson(2);
+    hidden.address = sharedAddress;
+    const visible = makePerson(1);
+    visible.address = sharedAddress;
+
+    maskPii([visible, hidden], ctx({ personIds: [1] }));
+    expect(sharedAddress.street).toBe("Shared House 2");
+    expect(sharedAddress.postcode.latitude).toBe(48.13);
+    expect(sharedAddress.postcode.longitude).toBe(11.58);
+  });
+
   it("masks a standalone Address (not under a Person/Agent) and leaves non-PII fields", () => {
     const agentLike = {
       id: 5,
