@@ -1,17 +1,12 @@
 import { IsNotEmpty } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { IsPostcode } from "../../../services/validators/custom";
+import { numericTransformer } from "../../lib/numeric-transformer";
 import { Country, GermanCity } from "../../types";
 import Deal from "../deal.entity";
 import DistrictPostcode from "../m2m/district-postcode";
 import Accompanying from "../opportunity/accompanying.entity";
 import Address from "./address.entity";
-
-// Coerces the pg driver's string return for numeric columns to number.
-const numericTransformer = {
-  to: (v?: number) => v,
-  from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
-};
 
 @Entity()
 export default class Postcode {

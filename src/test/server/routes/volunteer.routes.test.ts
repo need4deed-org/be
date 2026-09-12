@@ -247,7 +247,9 @@ describe("GET /volunteer", () => {
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
-  const numericSuffix = String(Date.now() % 10000).padStart(4, "0");
+  // A valid-looking 5-digit Berlin postcode, unique enough per test run:
+  // derived from the same suffix rather than a second Date.now() call.
+  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
   const LAT = 52.52;
   const LON = 13.405;
 
@@ -356,6 +358,20 @@ describe("GET /volunteer", () => {
     expect(body.data[0].lon).toBe(LON);
     expect(typeof body.data[0].lat).toBe("number");
     expect(typeof body.data[0].lon).toBe("number");
+  });
+
+  it("returns null lat/lon for listType=table, which doesn't load the postcode relation", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?listType=table&filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].lat).toBeNull();
+    expect(body.data[0].lon).toBeNull();
   });
 
   it("nulls lat/lon for a caller with no visibility into the volunteer, alongside their masked name", async () => {
