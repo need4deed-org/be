@@ -192,6 +192,16 @@ export function getOptionItems<T>(
   }));
 }
 
+export function getCoordinates(postcode?: {
+  latitude?: number | null;
+  longitude?: number | null;
+}): { latitude: number | null; longitude: number | null } {
+  return {
+    latitude: postcode?.latitude ?? null,
+    longitude: postcode?.longitude ?? null,
+  };
+}
+
 export function getNameFields(name: string) {
   const names = name.split(" ");
 

@@ -18,10 +18,29 @@ export default class Postcode {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 7, nullable: true })
+  // Stored as numeric; transformer coerces the pg driver's string return to number.
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 7,
+    nullable: true,
+    transformer: {
+      to: (v?: number) => v,
+      from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
+    },
+  })
   longitude?: number;
 
-  @Column({ type: "numeric", precision: 9, scale: 7, nullable: true })
+  @Column({
+    type: "numeric",
+    precision: 9,
+    scale: 7,
+    nullable: true,
+    transformer: {
+      to: (v?: number) => v,
+      from: (v?: string) => (v === null || v === undefined ? v : Number(v)),
+    },
+  })
   latitude?: number;
 
   @Column()

@@ -10,6 +10,12 @@ vi.mock("../../../services/dto/utils", () => ({
   ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
   getOptionItems: vi.fn(() => [{ id: 1, title: "Teaching" }]),
+  getCoordinates: vi.fn(
+    (postcode?: { latitude?: number; longitude?: number }) => ({
+      latitude: postcode?.latitude ?? null,
+      longitude: postcode?.longitude ?? null,
+    }),
+  ),
 }));
 
 function makeVolunteer(overrides = {}) {
