@@ -202,6 +202,24 @@ export function getCoordinates(postcode?: {
   };
 }
 
+// Like getCoordinates, but omits latitude/longitude entirely instead of
+// nulling them when absent/masked — for embedding into the shared, nested
+// `Postcode` shape (sdk-types.json's Postcode/Address types), whose schema
+// declares them as plain, non-nullable numbers with no `required` entry. A
+// literal `null` there isn't rejected: fast-json-stringify silently coerces
+// it to `0`, a real-looking (wrong) coordinate. Omitting the key entirely is
+// schema-safe since the field isn't required.
+export function getOptionalCoordinates(postcode?: {
+  latitude?: number | null;
+  longitude?: number | null;
+}): { latitude?: number; longitude?: number } {
+  const { latitude, longitude } = getCoordinates(postcode);
+  return {
+    ...(latitude !== null ? { latitude } : {}),
+    ...(longitude !== null ? { longitude } : {}),
+  };
+}
+
 export function getNameFields(name: string) {
   const names = name.split(" ");
 

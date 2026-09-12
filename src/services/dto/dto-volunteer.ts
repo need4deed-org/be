@@ -13,6 +13,7 @@ import {
   getAvailability,
   getCoordinates,
   getLanguages,
+  getOptionalCoordinates,
   getOptionItems,
 } from "./utils";
 
@@ -77,7 +78,13 @@ export function volunteerSerializer(
           ...volunteer.person.address.postcode,
           id: volunteer.person.address.postcode.id,
           code: volunteer.person.address.postcode.value,
-          ...getCoordinates(volunteer.person.address.postcode),
+          // Reset before the conditional spread below: the raw entity spread
+          // above may already carry a real (or masked-to-null) latitude/
+          // longitude under these same keys, and an omitted key from a later
+          // spread does not erase an earlier one.
+          latitude: undefined,
+          longitude: undefined,
+          ...getOptionalCoordinates(volunteer.person.address.postcode),
         },
       }
     : null;
