@@ -22,6 +22,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -247,12 +248,7 @@ describe("GET /volunteer", () => {
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
-  // Wide random space (not Date.now()-derived) to avoid cross-worker
-  // collisions on the postcode value — see be#864 in get-district.test.ts.
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix();
   const LAT = 52.52;
   const LON = 13.405;
 

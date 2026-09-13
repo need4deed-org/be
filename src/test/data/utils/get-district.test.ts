@@ -10,6 +10,7 @@ import {
   getDistrictFromPostcode,
 } from "../../../data/utils/get-district";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 describe("getDistrictFromPostcode", () => {
   let fastify: FastifyInstance;
@@ -20,15 +21,7 @@ describe("getDistrictFromPostcode", () => {
   let secondMapping: DistrictPostcode;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  // be#864: Date.now() % 10000 only has 10,000 possible values and is
-  // correlated across parallel Vitest workers that start at nearly the same
-  // wall-clock moment, so two workers can collide on the same postcode
-  // value. Math.random() over a much wider space (like `suffix` above)
-  // decorrelates workers and shrinks the collision odds to negligible.
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix(); // be#864
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -158,10 +151,7 @@ describe("getDistrictCentroids", () => {
   let mappingUngeocoded: DistrictPostcode;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix();
 
   beforeAll(async () => {
     fastify = await createServer();

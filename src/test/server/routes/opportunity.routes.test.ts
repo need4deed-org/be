@@ -40,6 +40,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { formatDate, formatTime } from "../../../services/utils";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -1741,12 +1742,7 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
   let coordinatorCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  // Wide random space (not Date.now()-derived) to avoid cross-worker
-  // collisions on the postcode value — see be#864 in get-district.test.ts.
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix();
   const LAT = 52.52;
   const LON = 13.405;
 
@@ -1878,12 +1874,7 @@ describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {
   let coordinatorCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  // Wide random space (not Date.now()-derived) to avoid cross-worker
-  // collisions on the postcode value — see be#864 in get-district.test.ts.
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix();
   const LAT_A = 52.4;
   const LON_A = 13.3;
   const LAT_B = 52.6;
@@ -2025,12 +2016,7 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
   let unrelatedUserCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  // Wide random space (not Date.now()-derived) to avoid cross-worker
-  // collisions on the postcode value — see be#864 in get-district.test.ts.
-  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
-    6,
-    "0",
-  );
+  const numericSuffix = randomNumericSuffix();
   // Agent's own coordinates — visible only to a caller who can see this
   // agent. Deliberately different from the district centroid below so the
   // two outcomes are unambiguous.
