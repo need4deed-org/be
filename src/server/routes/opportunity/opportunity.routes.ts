@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   AgentMembershipStatus,
   ApiOpportunityGet,
+  ApiOpportunityGetList,
   ApiOpportunityPatch,
   CommunicationType,
   EntityTableName,
@@ -32,7 +33,10 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { updateVolunteerMatching } from "../../../data/utils";
-import { getDistrictFromPostcode } from "../../../data/utils/get-district";
+import {
+  getDistrictCentroids,
+  getDistrictFromPostcode,
+} from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
@@ -44,6 +48,7 @@ import {
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
 import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
+import { getCoordinates } from "../../../services/dto/utils";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -83,10 +88,7 @@ import {
 } from "../../utils";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
-import {
-  makePiiSerialization,
-  maskForCaller,
-} from "../../utils/pii/pre-serialization";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -200,8 +202,6 @@ export default async function opportunityRoutes(
         "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
-        // Map-pin fallback (be#662) when the agent has no geocoded address.
-        "district.districtPostcode.postcode",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -268,10 +268,30 @@ export default async function opportunityRoutes(
         await opportunityRepository.save(opportunityUpdates);
       }
 
-      // dtoOpportunityGet takes a handler-computed arg, so mask inline (rather
+      // dtoOpportunityGet takes handler-computed args, so mask inline (rather
       // than via the makePiiSerialization hook) before serializing.
       await maskForCaller(request, opportunityComments);
-      const data = dtoOpportunityGet(opportunityComments, accompanyingDistrict);
+
+      // Map-pin centroid fallback (be#662), only queried when the agent has
+      // no geocoded address of its own — see the list route above for why
+      // this isn't an eager relation.
+      const agentCoordinates = getCoordinates(
+        opportunityComments.agent?.address?.postcode,
+      );
+      const districtId =
+        opportunityComments.district?.id ?? opportunityComments.districtId;
+      const districtCentroid =
+        (agentCoordinates.latitude === null ||
+          agentCoordinates.longitude === null) &&
+        districtId
+          ? (await getDistrictCentroids([districtId])).get(districtId)
+          : undefined;
+
+      const data = dtoOpportunityGet(
+        opportunityComments,
+        accompanyingDistrict,
+        districtCentroid,
+      );
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
@@ -279,9 +299,7 @@ export default async function opportunityRoutes(
 
   fastify.get<{
     Querystring: QuerystringOpportunityList;
-    // Handler sends entities; the DTO (ApiOpportunityGetList) runs in the
-    // preSerialization hook.
-    Reply: ReplyDataCount<Opportunity[]>;
+    Reply: ReplyDataCount<ApiOpportunityGetList[]>;
   }>(
     "/",
     {
@@ -289,7 +307,6 @@ export default async function opportunityRoutes(
         querystring: opportunityListQuerySchema,
         response: responseSchema("ApiOpportunityGetList#", true),
       },
-      preSerialization: makePiiSerialization(dtoOpportunityGetList),
     },
     async (request, reply) => {
       const [skip, take] = getSkipTake({
@@ -337,8 +354,6 @@ export default async function opportunityRoutes(
         "deal.dealDistrict.district",
         "agent",
         "agent.address.postcode",
-        // Map-pin fallback (be#662) when the agent has no geocoded address.
-        "district.districtPostcode.postcode",
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
@@ -413,10 +428,52 @@ export default async function opportunityRoutes(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
-      // DTO (dtoOpportunityGetList) runs in the preSerialization hook after PII masking.
+      // dtoOpportunityGetList takes a handler-computed district-centroid arg
+      // (be#662), so mask inline (rather than via the makePiiSerialization
+      // hook) before serializing, same as GET /opportunity/:id below.
+      await maskForCaller(request, opportunitiesCategoryDistrict);
+
+      // Map-pin centroid fallback (be#662): a targeted, batched lookup for
+      // just the opportunities whose agent has no geocoded address, rather
+      // than an eager `district.districtPostcode.postcode` relation on this
+      // (paginated) query — a district can have dozens of postcodes, which
+      // would multiply result rows on every page even though most
+      // opportunities' agents are already geocoded and never need it.
+      const districtIdsNeedingCentroid = [
+        ...new Set(
+          opportunitiesCategoryDistrict
+            .filter((opportunity) => {
+              const agentCoordinates = getCoordinates(
+                opportunity.agent?.address?.postcode,
+              );
+              return (
+                agentCoordinates.latitude === null ||
+                agentCoordinates.longitude === null
+              );
+            })
+            .map(
+              (opportunity) =>
+                opportunity.district?.id ?? opportunity.districtId,
+            )
+            .filter((id): id is number => Boolean(id)),
+        ),
+      ];
+      const districtCentroids = await getDistrictCentroids(
+        districtIdsNeedingCentroid,
+      );
+
+      const data = opportunitiesCategoryDistrict.map((opportunity) =>
+        dtoOpportunityGetList(
+          opportunity,
+          districtCentroids.get(
+            opportunity.district?.id ?? opportunity.districtId ?? -1,
+          ),
+        ),
+      );
+
       return reply.status(200).send({
         message,
-        data: opportunitiesCategoryDistrict,
+        data,
         count,
       });
     },

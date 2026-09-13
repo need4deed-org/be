@@ -24,8 +24,10 @@ import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -1854,5 +1856,145 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
     expect(found).toBeDefined();
     expect(found.lat).toBeNull();
     expect(found.lon).toBeNull();
+  });
+});
+
+describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {
+  let fastify: FastifyInstance;
+  let district: District;
+  let postcodeA: Postcode;
+  let postcodeB: Postcode;
+  let mappingA: DistrictPostcode;
+  let mappingB: DistrictPostcode;
+  let agentNoAddress: Agent;
+  let deal: Deal;
+  let oppNew: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  const LAT_A = 52.4;
+  const LON_A = 13.3;
+  const LAT_B = 52.6;
+  const LON_B = 13.5;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const districtRepository = dataSource.getRepository(District);
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    const districtPostcodeRepository =
+      dataSource.getRepository(DistrictPostcode);
+
+    district = await districtRepository.save(
+      new District({ title: `Test Centroid Fallback District ${suffix}` }),
+    );
+    postcodeA = await postcodeRepository.save(
+      new Postcode({
+        value: `1${numericSuffix}`,
+        latitude: LAT_A,
+        longitude: LON_A,
+      }),
+    );
+    postcodeB = await postcodeRepository.save(
+      new Postcode({
+        value: `2${numericSuffix}`,
+        latitude: LAT_B,
+        longitude: LON_B,
+      }),
+    );
+    mappingA = await districtPostcodeRepository.save(
+      new DistrictPostcode({
+        postcodeId: postcodeA.id,
+        districtId: district.id,
+      }),
+    );
+    mappingB = await districtPostcodeRepository.save(
+      new DistrictPostcode({
+        postcodeId: postcodeB.id,
+        districtId: district.id,
+      }),
+    );
+
+    // Agent has NO address (no geocoded coordinates of its own), but its
+    // districtId is already set directly — this exercises
+    // addDistrictToOpportunity's "agent.districtId" fast path (be#895),
+    // which only ever sets opportunity.districtId, never the full
+    // opportunity.district relation object. The fallback must still resolve
+    // the centroid via that bare id (be#662 review finding).
+    agentNoAddress = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent No Address (map-pin) ${suffix}`,
+        districtId: district.id,
+      }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcodeA.id }),
+    );
+    oppNew = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Map Pin Centroid Fallback ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agentNoAddress.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "MapPinCentroidCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-map-pin-centroid-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-map-pin-centroid-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: oppNew.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agentNoAddress.id });
+    const districtPostcodeRepository =
+      dataSource.getRepository(DistrictPostcode);
+    await districtPostcodeRepository.delete({ id: mappingA.id });
+    await districtPostcodeRepository.delete({ id: mappingB.id });
+    await dataSource.getRepository(District).delete({ id: district.id });
+    await getRepository(dataSource, Postcode).delete({ id: postcodeA.id });
+    await getRepository(dataSource, Postcode).delete({ id: postcodeB.id });
+    await fastify.close();
+  });
+
+  it("falls back to the district centroid, resolved from a bare districtId with no district relation preloaded", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppNew.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    const found = body.data.find((o: { id: number }) => o.id === oppNew.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBeCloseTo((LAT_A + LAT_B) / 2);
+    expect(found.lon).toBeCloseTo((LON_A + LON_B) / 2);
   });
 });

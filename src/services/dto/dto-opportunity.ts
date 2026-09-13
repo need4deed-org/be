@@ -11,6 +11,7 @@ import Comment from "../../data/entity/comment.entity";
 import District from "../../data/entity/location/district.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import { Centroid } from "../../data/utils/get-district";
 import logger from "../../logger";
 import {
   formatAppointmentDateTime,
@@ -21,15 +22,21 @@ import {
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";
 import { commentSerializer } from "./dto-comment";
-import { getAvailability, getCoordinates, getDistrictCentroid } from "./utils";
+import { getAvailability, getCoordinates } from "./utils";
 
 // Map-pin coordinates for a card/list-view "map tab" (be#662): only NEW/
 // SEARCHING opportunities get placed on the map, sourced from the agent's
-// own geocoded address, falling back to the opportunity's district centroid.
-// Reads the (already PII-masked, where applicable) entity graph — the
-// agent's postcode is nulled by mask.ts for a caller without visibility into
-// that agent, same as every other agent/person address field.
-function getOpportunityCoordinates(opportunity: Opportunity): {
+// own geocoded address, falling back to the opportunity's district centroid
+// (batch-resolved by the route handler via getDistrictCentroids — a
+// district's postcodes aren't eagerly loaded onto the entity graph, since
+// most opportunities never need the fallback at all). Reads the (already
+// PII-masked, where applicable) entity graph — the agent's postcode is
+// nulled by mask.ts for a caller without visibility into that agent, same as
+// every other agent/person address field.
+function getOpportunityCoordinates(
+  opportunity: Opportunity,
+  districtCentroid?: Centroid,
+): {
   lat: number | null;
   lon: number | null;
 } {
@@ -48,8 +55,10 @@ function getOpportunityCoordinates(opportunity: Opportunity): {
     return { lat: agentCoordinates.latitude, lon: agentCoordinates.longitude };
   }
 
-  const centroid = getDistrictCentroid(opportunity.district);
-  return { lat: centroid.latitude, lon: centroid.longitude };
+  return {
+    lat: districtCentroid?.latitude ?? null,
+    lon: districtCentroid?.longitude ?? null,
+  };
 }
 
 const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
@@ -106,6 +115,7 @@ export function getOpportunityContact(
 
 export function dtoOpportunityGetList(
   opportunity: Opportunity,
+  districtCentroid?: Centroid,
 ): ApiOpportunityGetList {
   const { appointmentDate, appointmentTime } = formatAppointmentDateTime(
     opportunity.onetimer?.date,
@@ -150,7 +160,7 @@ export function dtoOpportunityGetList(
       .filter((ov) => ov.status === OpportunityVolunteerStatusType.MATCHED)
       .map((ov) => ov.volunteer?.person?.name)
       .filter((name): name is string => Boolean(name)),
-    ...getOpportunityCoordinates(opportunity),
+    ...getOpportunityCoordinates(opportunity, districtCentroid),
   } as ApiOpportunityGetList;
 }
 
@@ -191,6 +201,7 @@ export function dtoVolunteerOpportunityGetList(
 export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
   accompanyingDistrict?: District | null,
+  districtCentroid?: Centroid,
 ): ApiOpportunityGet {
   const eventStart =
     opportunityComments.type === OpportunityType.EVENTS
@@ -256,6 +267,6 @@ export function dtoOpportunityGet(
       : undefined,
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
-    ...getOpportunityCoordinates(opportunityComments),
+    ...getOpportunityCoordinates(opportunityComments, districtCentroid),
   } as ApiOpportunityGet;
 }

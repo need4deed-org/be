@@ -202,38 +202,6 @@ export function getCoordinates(postcode?: {
   };
 }
 
-// Map-pin fallback for an opportunity whose agent has no geocoded address
-// (be#662): the arithmetic mean of a district's own geocoded postcodes. A
-// district's postcodes span at most a few km in Berlin/Potsdam, so a plain
-// lat/lon average is an adequate approximation of a "centroid" — no need for
-// a proper geodesic/projected calculation at this scale.
-export function getDistrictCentroid(district?: {
-  districtPostcode?: {
-    postcode?: { latitude?: number | null; longitude?: number | null };
-  }[];
-}): { latitude: number | null; longitude: number | null } {
-  const geocoded = (district?.districtPostcode ?? [])
-    .map((dp) => dp.postcode)
-    .filter(
-      (postcode): postcode is { latitude: number; longitude: number } =>
-        postcode?.latitude !== undefined &&
-        postcode?.latitude !== null &&
-        postcode?.longitude !== undefined &&
-        postcode?.longitude !== null,
-    );
-
-  if (!geocoded.length) {
-    return { latitude: null, longitude: null };
-  }
-
-  return {
-    latitude:
-      geocoded.reduce((sum, p) => sum + p.latitude, 0) / geocoded.length,
-    longitude:
-      geocoded.reduce((sum, p) => sum + p.longitude, 0) / geocoded.length,
-  };
-}
-
 export function getNameFields(name: string) {
   const names = name.split(" ");
 
