@@ -1741,7 +1741,12 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
   let coordinatorCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  // Wide random space (not Date.now()-derived) to avoid cross-worker
+  // collisions on the postcode value — see be#864 in get-district.test.ts.
+  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
+    6,
+    "0",
+  );
   const LAT = 52.52;
   const LON = 13.405;
 
@@ -1873,7 +1878,12 @@ describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {
   let coordinatorCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  // Wide random space (not Date.now()-derived) to avoid cross-worker
+  // collisions on the postcode value — see be#864 in get-district.test.ts.
+  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
+    6,
+    "0",
+  );
   const LAT_A = 52.4;
   const LON_A = 13.3;
   const LAT_B = 52.6;
@@ -1996,5 +2006,191 @@ describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {
     expect(found).toBeDefined();
     expect(found.lat).toBeCloseTo((LAT_A + LAT_B) / 2);
     expect(found.lon).toBeCloseTo((LON_A + LON_B) / 2);
+  });
+});
+
+describe("GET /opportunity map-pin falls back to district centroid for a masked caller (be#662 review)", () => {
+  let fastify: FastifyInstance;
+  let district: District;
+  let districtPostcode: Postcode;
+  let mapping: DistrictPostcode;
+  let agentPostcode: Postcode;
+  let agentAddress: Address;
+  let agent: Agent;
+  let deal: Deal;
+  let oppNew: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let unrelatedPerson: Person;
+  let unrelatedUserCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  // Wide random space (not Date.now()-derived) to avoid cross-worker
+  // collisions on the postcode value — see be#864 in get-district.test.ts.
+  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
+    6,
+    "0",
+  );
+  // Agent's own coordinates — visible only to a caller who can see this
+  // agent. Deliberately different from the district centroid below so the
+  // two outcomes are unambiguous.
+  const AGENT_LAT = 52.52;
+  const AGENT_LON = 13.405;
+  const DISTRICT_LAT = 52.4;
+  const DISTRICT_LON = 13.3;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const districtRepository = dataSource.getRepository(District);
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    const addressRepository = getRepository(dataSource, Address);
+    const districtPostcodeRepository =
+      dataSource.getRepository(DistrictPostcode);
+
+    district = await districtRepository.save(
+      new District({ title: `Test Masked Fallback District ${suffix}` }),
+    );
+    districtPostcode = await postcodeRepository.save(
+      new Postcode({
+        value: `1${numericSuffix}`,
+        latitude: DISTRICT_LAT,
+        longitude: DISTRICT_LON,
+      }),
+    );
+    mapping = await districtPostcodeRepository.save(
+      new DistrictPostcode({
+        postcodeId: districtPostcode.id,
+        districtId: district.id,
+      }),
+    );
+
+    agentPostcode = await postcodeRepository.save(
+      new Postcode({
+        value: `2${numericSuffix}`,
+        latitude: AGENT_LAT,
+        longitude: AGENT_LON,
+      }),
+    );
+    agentAddress = await addressRepository.save(
+      new Address({ postcodeId: agentPostcode.id }),
+    );
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent (masked map-pin) ${suffix}`,
+        addressId: agentAddress.id,
+        districtId: district.id,
+      }),
+    );
+
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: agentPostcode.id }),
+    );
+    oppNew = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Map Pin Masked Fallback ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "MaskedFallbackCoordinator" }),
+    );
+    unrelatedPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "MaskedFallbackUnrelated" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-masked-fallback-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    // USER has no visibility into any agent (resolveCallerVisibility), so
+    // mask.ts nulls this agent's address/postcode for this caller — the
+    // exact condition the district-centroid fallback exists for.
+    await fastify.db.userRepository.save(
+      new User({
+        email: `unrelated-user-masked-fallback-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.USER,
+        isActive: true,
+        personId: unrelatedPerson.id,
+      }),
+    );
+
+    const login = async (email: string): Promise<string> => {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      return getCookie(res.cookies, accessCookieName);
+    };
+    coordinatorCookie = await login(
+      `coordinator-masked-fallback-${suffix}@test.need4deed.org`,
+    );
+    unrelatedUserCookie = await login(
+      `unrelated-user-masked-fallback-${suffix}@test.need4deed.org`,
+    );
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.userRepository.delete({ personId: unrelatedPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: oppNew.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: agentAddress.id });
+    const districtPostcodeRepository =
+      dataSource.getRepository(DistrictPostcode);
+    await districtPostcodeRepository.delete({ id: mapping.id });
+    await dataSource.getRepository(District).delete({ id: district.id });
+    await getRepository(dataSource, Postcode).delete({ id: agentPostcode.id });
+    await getRepository(dataSource, Postcode).delete({
+      id: districtPostcode.id,
+    });
+    await fastify.close();
+  });
+
+  it("shows the agent's own coordinates to a caller who can see that agent", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppNew.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === oppNew.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBe(AGENT_LAT);
+    expect(found.lon).toBe(AGENT_LON);
+  });
+
+  it("falls back to the district centroid once the agent's address is masked for a caller without visibility", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppNew.title)}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === oppNew.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBe(DISTRICT_LAT);
+    expect(found.lon).toBe(DISTRICT_LON);
   });
 });

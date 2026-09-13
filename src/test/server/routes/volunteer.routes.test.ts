@@ -247,9 +247,12 @@ describe("GET /volunteer", () => {
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
-  // A valid-looking 5-digit Berlin postcode, unique enough per test run:
-  // derived from the same suffix rather than a second Date.now() call.
-  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  // Wide random space (not Date.now()-derived) to avoid cross-worker
+  // collisions on the postcode value — see be#864 in get-district.test.ts.
+  const numericSuffix = String(Math.floor(Math.random() * 1e6)).padStart(
+    6,
+    "0",
+  );
   const LAT = 52.52;
   const LON = 13.405;
 

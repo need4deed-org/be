@@ -24,22 +24,23 @@ import { dtoOpportunityAgent } from "./dto-agent";
 import { commentSerializer } from "./dto-comment";
 import { getAvailability, getCoordinates } from "./utils";
 
-// Map-pin coordinates for a card/list-view "map tab" (be#662): only NEW/
-// SEARCHING opportunities get placed on the map, sourced from the agent's
-// own geocoded address, falling back to the opportunity's district centroid
-// (batch-resolved by the route handler via getDistrictCentroids — a
-// district's postcodes aren't eagerly loaded onto the entity graph, since
-// most opportunities never need the fallback at all). Reads the (already
-// PII-masked, where applicable) entity graph — the agent's postcode is
-// nulled by mask.ts for a caller without visibility into that agent, same as
-// every other agent/person address field.
-function getOpportunityCoordinates(
-  opportunity: Opportunity,
-  districtCentroid?: Centroid,
-): {
+interface MapPinResolution {
   lat: number | null;
   lon: number | null;
-} {
+  // Set only when a district-centroid fallback is actually needed (map-
+  // eligible status, agent not geocoded) — lets a caller batch-fetch
+  // centroids for just the opportunities that need one, without
+  // re-implementing this same status/agent-coordinate gating itself.
+  neededDistrictId?: number;
+}
+
+// Map-pin coordinates for a card/list-view "map tab" (be#662): only NEW/
+// SEARCHING opportunities get placed on the map, sourced from the agent's
+// own geocoded address, falling back to the opportunity's district centroid.
+// Reads the (already PII-masked, where applicable) entity graph — the
+// agent's postcode is nulled by mask.ts for a caller without visibility into
+// that agent, same as every other agent/person address field.
+function resolveMapPin(opportunity: Opportunity): MapPinResolution {
   if (
     opportunity.status !== OpportunityStatusType.NEW &&
     opportunity.status !== OpportunityStatusType.SEARCHING
@@ -55,6 +56,36 @@ function getOpportunityCoordinates(
     return { lat: agentCoordinates.latitude, lon: agentCoordinates.longitude };
   }
 
+  return {
+    lat: null,
+    lon: null,
+    neededDistrictId:
+      opportunity.district?.id ?? opportunity.districtId ?? undefined,
+  };
+}
+
+// Exported so the route handler can decide which district ids to batch-
+// fetch centroids for (getDistrictCentroids, data/utils/get-district.ts) —
+// a district's postcodes aren't eagerly loaded onto the entity graph, since
+// most opportunities never need the fallback at all — without duplicating
+// resolveMapPin's status/agent-coordinate gating logic (be#978 review).
+export function getOpportunityDistrictIdNeedingCentroid(
+  opportunity: Opportunity,
+): number | undefined {
+  return resolveMapPin(opportunity).neededDistrictId;
+}
+
+function getOpportunityCoordinates(
+  opportunity: Opportunity,
+  districtCentroid?: Centroid,
+): {
+  lat: number | null;
+  lon: number | null;
+} {
+  const resolved = resolveMapPin(opportunity);
+  if (resolved.neededDistrictId === undefined) {
+    return { lat: resolved.lat, lon: resolved.lon };
+  }
   return {
     lat: districtCentroid?.latitude ?? null,
     lon: districtCentroid?.longitude ?? null,

@@ -42,13 +42,13 @@ import {
   accompanyingParserOpportunity,
   dtoOpportunityGet,
   dtoOpportunityGetList,
+  getOpportunityDistrictIdNeedingCentroid,
   parseAccompDatetime,
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
 import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
-import { getCoordinates } from "../../../services/dto/utils";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -272,20 +272,16 @@ export default async function opportunityRoutes(
       // than via the makePiiSerialization hook) before serializing.
       await maskForCaller(request, opportunityComments);
 
-      // Map-pin centroid fallback (be#662), only queried when the agent has
-      // no geocoded address of its own — see the list route above for why
-      // this isn't an eager relation.
-      const agentCoordinates = getCoordinates(
-        opportunityComments.agent?.address?.postcode,
-      );
-      const districtId =
-        opportunityComments.district?.id ?? opportunityComments.districtId;
-      const districtCentroid =
-        (agentCoordinates.latitude === null ||
-          agentCoordinates.longitude === null) &&
-        districtId
-          ? (await getDistrictCentroids([districtId])).get(districtId)
-          : undefined;
+      // Map-pin centroid fallback (be#662), only queried when actually
+      // needed (map-eligible status, agent not geocoded) — see the list
+      // route above for why this isn't an eager relation.
+      const districtIdNeedingCentroid =
+        getOpportunityDistrictIdNeedingCentroid(opportunityComments);
+      const districtCentroid = districtIdNeedingCentroid
+        ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
+            districtIdNeedingCentroid,
+          )
+        : undefined;
 
       const data = dtoOpportunityGet(
         opportunityComments,
@@ -434,42 +430,36 @@ export default async function opportunityRoutes(
       await maskForCaller(request, opportunitiesCategoryDistrict);
 
       // Map-pin centroid fallback (be#662): a targeted, batched lookup for
-      // just the opportunities whose agent has no geocoded address, rather
-      // than an eager `district.districtPostcode.postcode` relation on this
+      // just the opportunities that actually need one (map-eligible status,
+      // agent not geocoded — getOpportunityDistrictIdNeedingCentroid keeps
+      // that gating in one place, shared with the DTO), rather than an
+      // eager `district.districtPostcode.postcode` relation on this
       // (paginated) query — a district can have dozens of postcodes, which
       // would multiply result rows on every page even though most
       // opportunities' agents are already geocoded and never need it.
-      const districtIdsNeedingCentroid = [
-        ...new Set(
-          opportunitiesCategoryDistrict
-            .filter((opportunity) => {
-              const agentCoordinates = getCoordinates(
-                opportunity.agent?.address?.postcode,
-              );
-              return (
-                agentCoordinates.latitude === null ||
-                agentCoordinates.longitude === null
-              );
-            })
-            .map(
-              (opportunity) =>
-                opportunity.district?.id ?? opportunity.districtId,
-            )
-            .filter((id): id is number => Boolean(id)),
-        ),
-      ];
-      const districtCentroids = await getDistrictCentroids(
-        districtIdsNeedingCentroid,
+      const neededDistrictIds = new Map(
+        opportunitiesCategoryDistrict.map((opportunity) => [
+          opportunity.id,
+          getOpportunityDistrictIdNeedingCentroid(opportunity),
+        ]),
       );
-
-      const data = opportunitiesCategoryDistrict.map((opportunity) =>
-        dtoOpportunityGetList(
-          opportunity,
-          districtCentroids.get(
-            opportunity.district?.id ?? opportunity.districtId ?? -1,
+      const districtCentroids = await getDistrictCentroids([
+        ...new Set(
+          [...neededDistrictIds.values()].filter(
+            (id): id is number => id !== undefined,
           ),
         ),
-      );
+      ]);
+
+      const data = opportunitiesCategoryDistrict.map((opportunity) => {
+        const districtId = neededDistrictIds.get(opportunity.id);
+        return dtoOpportunityGetList(
+          opportunity,
+          districtId !== undefined
+            ? districtCentroids.get(districtId)
+            : undefined,
+        );
+      });
 
       return reply.status(200).send({
         message,
