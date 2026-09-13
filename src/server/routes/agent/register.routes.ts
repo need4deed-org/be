@@ -96,11 +96,14 @@ export default async function agentRegisterRoutes(
       // agent.address.street (or agent.title when there's no address).
       // Whether a picked agent auto-approves (ACTIVE) or needs review
       // (PENDING) is decided later, at JOIN time, by resolveJoinStatus.
-      const candidates = await fastify.db.agentRepository
-        .createQueryBuilder("agent")
-        .leftJoinAndSelect("agent.address", "address")
-        .getMany();
-
+      //
+      // Filtered in SQL rather than fetched-then-filtered in JS (be#902) —
+      // this route backs a per-keystroke autocomplete, so excluded agents no
+      // longer pay for an address join, a full row transfer, and entity
+      // hydration just to be discarded afterward. (No index on unclaimed/
+      // engagementStatus yet, so this doesn't avoid a sequential scan at the
+      // Postgres level — see be#980 if the agent table grows enough to matter.)
+      //
       // A coordinator-created agent (fe#911) is `unclaimed` — it isn't
       // claimable through self-registration's JOIN (which auto-approves on an
       // email-domain match with zero coordinator review); exclude it here so
@@ -110,17 +113,19 @@ export default async function agentRegisterRoutes(
       // rac_email) can also have zero AgentPerson rows and must stay
       // findable through this picker.
       // An INACTIVE agent (be#885) is excluded too — a new registrant
-      // shouldn't be routed toward an NGO that's been marked inactive. Read
-      // live off the just-fetched `engagementStatus` (not snapshotted), so
-      // flipping the status back to ACTIVE immediately makes it findable
-      // again on the next search.
-      const claimable = candidates.filter(
-        (a) =>
-          !a.unclaimed &&
-          a.engagementStatus !== AgentEngagementStatusType.INACTIVE,
-      );
+      // shouldn't be routed toward an NGO that's been marked inactive. This
+      // stays a fresh query on every request, so flipping the status back to
+      // ACTIVE immediately makes it findable again on the next search.
+      const candidates = await fastify.db.agentRepository
+        .createQueryBuilder("agent")
+        .leftJoinAndSelect("agent.address", "address")
+        .where("agent.unclaimed = :unclaimed", { unclaimed: false })
+        .andWhere("agent.engagementStatus != :inactive", {
+          inactive: AgentEngagementStatusType.INACTIVE,
+        })
+        .getMany();
 
-      const data = searchAgentCandidates(claimable, street).map((a) => ({
+      const data = searchAgentCandidates(candidates, street).map((a) => ({
         id: a.id,
         title: a.title,
       }));
