@@ -22,6 +22,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -247,9 +248,7 @@ describe("GET /volunteer", () => {
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
-  // A valid-looking 5-digit Berlin postcode, unique enough per test run:
-  // derived from the same suffix rather than a second Date.now() call.
-  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  const numericSuffix = randomNumericSuffix();
   const LAT = 52.52;
   const LON = 13.405;
 
