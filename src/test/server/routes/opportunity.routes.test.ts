@@ -20,8 +20,11 @@ import {
   it,
 } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
@@ -32,7 +35,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { formatDate, formatTime } from "../../../services/utils";
 
@@ -1721,5 +1724,135 @@ describe("GET /opportunity appointment date-range filters", () => {
 
     const { data } = res.json();
     expect(relativeIds(data)).toEqual([oppInRange.id]);
+  });
+});
+
+describe("GET /opportunity map-pin lat/lon (be#662)", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let postcode: Postcode;
+  let address: Address;
+  let deal: Deal;
+  let oppNew: Opportunity;
+  let oppActive: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  const LAT = 52.52;
+  const LON = 13.405;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    postcode = await postcodeRepository.save(
+      new Postcode({
+        value: `1${numericSuffix}`,
+        latitude: LAT,
+        longitude: LON,
+      }),
+    );
+    const addressRepository = getRepository(dataSource, Address);
+    address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent (map-pin) ${suffix}`,
+        addressId: address.id,
+      }),
+    );
+
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    oppNew = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Map Pin NEW ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+    oppActive = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Map Pin ACTIVE ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "MapPinCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-map-pin-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-map-pin-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: oppNew.id });
+    await fastify.db.opportunityRepository.delete({ id: oppActive.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: address.id });
+    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
+    await fastify.close();
+  });
+
+  it("serializes the agent's geocoded coordinates as numeric lat/lon for a NEW opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppNew.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    const found = body.data.find((o: { id: number }) => o.id === oppNew.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBe(LAT);
+    expect(found.lon).toBe(LON);
+    expect(typeof found.lat).toBe("number");
+    expect(typeof found.lon).toBe("number");
+  });
+
+  it("nulls lat/lon for a status outside NEW/SEARCHING, even with a geocoded agent", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppActive.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    const found = body.data.find((o: { id: number }) => o.id === oppActive.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBeNull();
+    expect(found.lon).toBeNull();
   });
 });

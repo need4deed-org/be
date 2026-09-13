@@ -200,6 +200,8 @@ export default async function opportunityRoutes(
         "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
+        // Map-pin fallback (be#662) when the agent has no geocoded address.
+        "district.districtPostcode.postcode",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -335,6 +337,8 @@ export default async function opportunityRoutes(
         "deal.dealDistrict.district",
         "agent",
         "agent.address.postcode",
+        // Map-pin fallback (be#662) when the agent has no geocoded address.
+        "district.districtPostcode.postcode",
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",

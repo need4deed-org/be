@@ -6,6 +6,7 @@ import { getNameFields } from "../../../services/dto";
 import {
   formatScheduleBilingual,
   formatScheduleDe,
+  getDistrictCentroid,
 } from "../../../services/dto/utils";
 
 describe("getNameFields", () => {
@@ -186,5 +187,44 @@ describe("formatScheduleDe / formatScheduleBilingual", () => {
     expect(() => formatScheduleDe(dealTimeslot)).toThrow(
       "Timeslot has a weekly rrule with no recognizable BYDAY",
     );
+  });
+});
+
+describe("getDistrictCentroid", () => {
+  it("returns null lat/lon for a district with no districtPostcode rows", () => {
+    expect(getDistrictCentroid({ districtPostcode: [] })).toEqual({
+      latitude: null,
+      longitude: null,
+    });
+  });
+
+  it("returns null lat/lon when the district itself is undefined", () => {
+    expect(getDistrictCentroid(undefined)).toEqual({
+      latitude: null,
+      longitude: null,
+    });
+  });
+
+  it("averages lat/lon across the district's geocoded postcodes", () => {
+    const result = getDistrictCentroid({
+      districtPostcode: [
+        { postcode: { latitude: 52.4, longitude: 13.3 } },
+        { postcode: { latitude: 52.6, longitude: 13.5 } },
+      ],
+    });
+    expect(result.latitude).toBeCloseTo(52.5);
+    expect(result.longitude).toBeCloseTo(13.4);
+  });
+
+  it("ignores postcodes with no coordinates rather than treating them as 0,0", () => {
+    const result = getDistrictCentroid({
+      districtPostcode: [
+        { postcode: { latitude: 52.4, longitude: 13.3 } },
+        { postcode: { latitude: null, longitude: null } },
+        { postcode: undefined },
+      ],
+    });
+    expect(result.latitude).toBe(52.4);
+    expect(result.longitude).toBe(13.3);
   });
 });

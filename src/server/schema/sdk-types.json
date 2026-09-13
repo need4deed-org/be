@@ -1045,6 +1045,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "lat": {
+          "type": ["number", "null"]
+        },
+        "lon": {
+          "type": ["number", "null"]
         }
       },
       "required": [
@@ -1065,7 +1071,9 @@
         "agentTitle",
         "agentId",
         "appointmentDate",
-        "appointmentTime"
+        "appointmentTime",
+        "lat",
+        "lon"
       ]
     },
     "ApiOpportunityGet": {

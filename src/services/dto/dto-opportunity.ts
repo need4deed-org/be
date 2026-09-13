@@ -3,6 +3,7 @@ import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
+  OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
@@ -20,7 +21,36 @@ import {
 import { dtoOpportunityAccompanying } from "./dto-accompanying";
 import { dtoOpportunityAgent } from "./dto-agent";
 import { commentSerializer } from "./dto-comment";
-import { getAvailability } from "./utils";
+import { getAvailability, getCoordinates, getDistrictCentroid } from "./utils";
+
+// Map-pin coordinates for a card/list-view "map tab" (be#662): only NEW/
+// SEARCHING opportunities get placed on the map, sourced from the agent's
+// own geocoded address, falling back to the opportunity's district centroid.
+// Reads the (already PII-masked, where applicable) entity graph — the
+// agent's postcode is nulled by mask.ts for a caller without visibility into
+// that agent, same as every other agent/person address field.
+function getOpportunityCoordinates(opportunity: Opportunity): {
+  lat: number | null;
+  lon: number | null;
+} {
+  if (
+    opportunity.status !== OpportunityStatusType.NEW &&
+    opportunity.status !== OpportunityStatusType.SEARCHING
+  ) {
+    return { lat: null, lon: null };
+  }
+
+  const agentCoordinates = getCoordinates(opportunity.agent?.address?.postcode);
+  if (
+    agentCoordinates.latitude !== null &&
+    agentCoordinates.longitude !== null
+  ) {
+    return { lat: agentCoordinates.latitude, lon: agentCoordinates.longitude };
+  }
+
+  const centroid = getDistrictCentroid(opportunity.district);
+  return { lat: centroid.latitude, lon: centroid.longitude };
+}
 
 const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
   logger.error(`Error getting availability for opportunity: ${error}`);
@@ -120,6 +150,7 @@ export function dtoOpportunityGetList(
       .filter((ov) => ov.status === OpportunityVolunteerStatusType.MATCHED)
       .map((ov) => ov.volunteer?.person?.name)
       .filter((name): name is string => Boolean(name)),
+    ...getOpportunityCoordinates(opportunity),
   } as ApiOpportunityGetList;
 }
 
@@ -225,5 +256,6 @@ export function dtoOpportunityGet(
       : undefined,
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
+    ...getOpportunityCoordinates(opportunityComments),
   } as ApiOpportunityGet;
 }
