@@ -137,10 +137,7 @@ describe("dtoSerializePerson", () => {
     });
   });
 
-  it("omits (rather than nulls) postcode lat/lon when masked or ungeocoded", () => {
-    // Same reasoning as dto-volunteer.test.ts: the shared SDK Postcode type
-    // has no null variant for latitude/longitude, and fast-json-stringify
-    // silently coerces a literal null there to 0 rather than throwing.
+  it("nulls postcode lat/lon when masked or ungeocoded (be#976: Postcode.latitude/longitude are nullable)", () => {
     const person = {
       id: "user-123",
       address: {
@@ -155,17 +152,8 @@ describe("dtoSerializePerson", () => {
 
     const result = dtoSerializePerson(person);
 
-    // Serialization (fast-json-stringify) drops an explicit `undefined`
-    // value the same as an absent key — verified separately against the
-    // actual Postcode schema shape; JSON.stringify does too.
-    expect(result.address.postcode.latitude).toBeUndefined();
-    expect(result.address.postcode.longitude).toBeUndefined();
-    expect(
-      JSON.parse(JSON.stringify(result.address.postcode)),
-    ).not.toHaveProperty("latitude");
-    expect(
-      JSON.parse(JSON.stringify(result.address.postcode)),
-    ).not.toHaveProperty("longitude");
+    expect(result.address.postcode.latitude).toBeNull();
+    expect(result.address.postcode.longitude).toBeNull();
   });
 
   it("should handle a person without an address object", () => {
@@ -183,12 +171,13 @@ describe("dtoSerializePerson", () => {
     expect(result.address.id).toBe("addr-999");
     expect(result.address.street).toBeUndefined();
 
-    // Nested postcode will also exist but with undefined values
+    // Nested postcode will also exist but with undefined id/code and
+    // null lat/lon (getCoordinates' no-postcode default)
     expect(result.address.postcode).toEqual({
       id: undefined,
       code: undefined,
-      latitude: undefined,
-      longitude: undefined,
+      latitude: null,
+      longitude: null,
     });
   });
 

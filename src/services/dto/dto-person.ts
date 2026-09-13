@@ -1,7 +1,7 @@
 import { ApiPersonGet, ApiPersonPatch } from "need4deed-sdk";
 import { DeepPartial } from "typeorm";
 import Person from "../../data/entity/person.entity";
-import { getOptionalCoordinates } from "./utils";
+import { getCoordinates } from "./utils";
 
 export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
   return {
@@ -53,9 +53,7 @@ export function dtoSerializePerson(person: Person): ApiPersonGet {
           postcode: {
             id: person.address?.postcode?.id,
             code: person.address?.postcode?.value,
-            latitude: undefined,
-            longitude: undefined,
-            ...getOptionalCoordinates(person.address?.postcode),
+            ...getCoordinates(person.address?.postcode),
           },
         },
       }

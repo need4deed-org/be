@@ -111,10 +111,10 @@
           "type": "string"
         },
         "latitude": {
-          "type": "number"
+          "type": ["number", "null"]
         },
         "longitude": {
-          "type": "number"
+          "type": ["number", "null"]
         }
       },
       "additionalProperties": false
