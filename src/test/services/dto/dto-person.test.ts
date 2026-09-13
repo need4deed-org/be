@@ -137,6 +137,37 @@ describe("dtoSerializePerson", () => {
     });
   });
 
+  it("omits (rather than nulls) postcode lat/lon when masked or ungeocoded", () => {
+    // Same reasoning as dto-volunteer.test.ts: the shared SDK Postcode type
+    // has no null variant for latitude/longitude, and fast-json-stringify
+    // silently coerces a literal null there to 0 rather than throwing.
+    const person = {
+      id: "user-123",
+      address: {
+        postcode: {
+          id: "pc-789",
+          value: "SW1A 1AA",
+          latitude: null,
+          longitude: null,
+        },
+      },
+    } as unknown as Person;
+
+    const result = dtoSerializePerson(person);
+
+    // Serialization (fast-json-stringify) drops an explicit `undefined`
+    // value the same as an absent key — verified separately against the
+    // actual Postcode schema shape; JSON.stringify does too.
+    expect(result.address.postcode.latitude).toBeUndefined();
+    expect(result.address.postcode.longitude).toBeUndefined();
+    expect(
+      JSON.parse(JSON.stringify(result.address.postcode)),
+    ).not.toHaveProperty("latitude");
+    expect(
+      JSON.parse(JSON.stringify(result.address.postcode)),
+    ).not.toHaveProperty("longitude");
+  });
+
   it("should handle a person without an address object", () => {
     const person = {
       id: "user-123",

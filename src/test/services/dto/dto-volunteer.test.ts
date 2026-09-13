@@ -10,6 +10,22 @@ vi.mock("../../../services/dto/utils", () => ({
   ]),
   getAvailability: vi.fn(() => [{ id: 1, day: "MO", daytime: "08-11" }]),
   getOptionItems: vi.fn(() => [{ id: 1, title: "Teaching" }]),
+  getCoordinates: vi.fn(
+    (postcode?: { latitude?: number; longitude?: number }) => ({
+      latitude: postcode?.latitude ?? null,
+      longitude: postcode?.longitude ?? null,
+    }),
+  ),
+  getOptionalCoordinates: vi.fn(
+    (postcode?: { latitude?: number | null; longitude?: number | null }) => {
+      const latitude = postcode?.latitude ?? null;
+      const longitude = postcode?.longitude ?? null;
+      return {
+        ...(latitude !== null ? { latitude } : {}),
+        ...(longitude !== null ? { longitude } : {}),
+      };
+    },
+  ),
 }));
 
 function makeVolunteer(overrides = {}) {
@@ -79,6 +95,26 @@ describe("volunteerListSerializer", () => {
     expect(result).toBeDefined();
     expect(result!.avatarUrl).toBeNull();
   });
+
+  it("returns null lat/lon when person has no address", () => {
+    const result = volunteerListSerializer(makeVolunteer() as any);
+    expect(result).toBeDefined();
+    expect(result!.lat).toBeNull();
+    expect(result!.lon).toBeNull();
+  });
+
+  it("maps postcode coordinates to lat/lon", () => {
+    const v = makeVolunteer({
+      person: {
+        ...makeVolunteer().person,
+        address: { postcode: { latitude: 52.52, longitude: 13.405 } },
+      },
+    });
+    const result = volunteerListSerializer(v as any);
+    expect(result).toBeDefined();
+    expect(result!.lat).toBe(52.52);
+    expect(result!.lon).toBe(13.405);
+  });
 });
 
 describe("volunteerSerializer", () => {
@@ -111,6 +147,42 @@ describe("volunteerSerializer", () => {
     expect(result.timelineLogs[0].content).toBe("Matched");
     expect(result.statusMatch).toBe("vol-matched");
     expect(result.createdAt).toEqual(new Date("2025-01-01"));
+  });
+
+  it("includes real postcode coordinates on the nested address", () => {
+    const v = makeVolunteer({
+      person: {
+        ...makeVolunteer().person,
+        address: { postcode: { latitude: 52.52, longitude: 13.405 } },
+      },
+    });
+    const result = volunteerSerializer(v as any, [], []);
+    expect(result.person.address?.postcode.latitude).toBe(52.52);
+    expect(result.person.address?.postcode.longitude).toBe(13.405);
+  });
+
+  it("omits (rather than nulls) postcode lat/lon when masked or ungeocoded, to avoid violating the strict non-nullable Postcode schema", () => {
+    // A masked (mask.ts) or simply ungeocoded postcode has latitude/longitude
+    // set to null — the shared SDK Postcode type has no null variant for
+    // these fields, and fast-json-stringify silently coerces a literal null
+    // there to 0 (a fake, real-looking coordinate) instead of throwing.
+    const v = makeVolunteer({
+      person: {
+        ...makeVolunteer().person,
+        address: { postcode: { latitude: null, longitude: null } },
+      },
+    });
+    const result = volunteerSerializer(v as any, [], []);
+    // Serialization (fast-json-stringify) drops an explicit `undefined`
+    // value the same as an absent key — verified separately against the
+    // actual Postcode schema shape; JSON.stringify does too.
+    expect(result.person.address?.postcode.latitude).toBeUndefined();
+    expect(result.person.address?.postcode.longitude).toBeUndefined();
+    const serialized = JSON.parse(
+      JSON.stringify(result.person.address?.postcode),
+    );
+    expect(serialized).not.toHaveProperty("latitude");
+    expect(serialized).not.toHaveProperty("longitude");
   });
 
   it("uses 'Unknown Author' when comment user has no person", () => {

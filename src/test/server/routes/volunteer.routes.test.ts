@@ -9,15 +9,18 @@ import {
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
 const PASSWORD = "test_password";
@@ -227,5 +230,162 @@ describe("DELETE /volunteer/:id", () => {
     expect(survivingOpportunity?.statusMatch).toBe(
       OpportunityMatchStatusType.NEEDS_REMATCH,
     );
+  });
+});
+
+describe("GET /volunteer", () => {
+  let fastify: FastifyInstance;
+  let coordinatorPerson: Person;
+  let volunteerPerson: Person;
+  let volunteer: Volunteer;
+  let deal: Deal;
+  let address: Address;
+  let postcode: Postcode;
+  let unrelatedPerson: Person;
+  let coordinatorCookie: string;
+  let unrelatedUserCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const lastName = `MapPin-${suffix}`;
+  // A valid-looking 5-digit Berlin postcode, unique enough per test run:
+  // derived from the same suffix rather than a second Date.now() call.
+  const numericSuffix = suffix.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  const LAT = 52.52;
+  const LON = 13.405;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    postcode = await postcodeRepository.save(
+      new Postcode({
+        value: `1${numericSuffix}`,
+        latitude: LAT,
+        longitude: LON,
+      }),
+    );
+
+    const addressRepository = getRepository(dataSource, Address);
+    address = await addressRepository.save(
+      new Address({ postcodeId: postcode.id }),
+    );
+
+    volunteerPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Test",
+        lastName,
+        addressId: address.id,
+      }),
+    );
+
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: volunteerPerson.id }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    unrelatedPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Unrelated" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-vol-list-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    // USER has no visibility into anyone (resolveCallerVisibility) — used to
+    // verify masked callers get lat/lon nulled alongside the rest of a
+    // volunteer's PII (be#661 review).
+    await fastify.db.userRepository.save(
+      new User({
+        email: `unrelated-user-vol-list-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.USER,
+        isActive: true,
+        personId: unrelatedPerson.id,
+      }),
+    );
+
+    const login = async (email: string): Promise<string> => {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      return getCookie(res.cookies, accessCookieName);
+    };
+    coordinatorCookie = await login(
+      `coordinator-vol-list-${suffix}@test.need4deed.org`,
+    );
+    unrelatedUserCookie = await login(
+      `unrelated-user-vol-list-${suffix}@test.need4deed.org`,
+    );
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.userRepository.delete({ personId: unrelatedPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    await getRepository(dataSource, Address).delete({ id: address.id });
+    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
+    await fastify.close();
+  });
+
+  it("serializes postcode coordinates as numeric lat/lon through the actual response schema", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].lat).toBe(LAT);
+    expect(body.data[0].lon).toBe(LON);
+    expect(typeof body.data[0].lat).toBe("number");
+    expect(typeof body.data[0].lon).toBe("number");
+  });
+
+  it("returns null lat/lon for listType=table, which doesn't load the postcode relation", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?listType=table&filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].lat).toBeNull();
+    expect(body.data[0].lon).toBeNull();
+  });
+
+  it("nulls lat/lon for a caller with no visibility into the volunteer, alongside their masked name", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].name).not.toContain(lastName);
+    expect(body.data[0].lat).toBeNull();
+    expect(body.data[0].lon).toBeNull();
   });
 });

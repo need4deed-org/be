@@ -62,6 +62,12 @@
           "items": {
             "$ref": "OptionItem#"
           }
+        },
+        "lat": {
+          "type": ["number", "null"]
+        },
+        "lon": {
+          "type": ["number", "null"]
         }
       },
       "required": [
@@ -75,7 +81,9 @@
         "availability",
         "activities",
         "skills",
-        "locations"
+        "locations",
+        "lat",
+        "lon"
       ],
       "additionalProperties": false
     }

@@ -1,6 +1,7 @@
 import { IsNotEmpty } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { IsPostcode } from "../../../services/validators/custom";
+import { numericTransformer } from "../../lib/numeric-transformer";
 import { Country, GermanCity } from "../../types";
 import Deal from "../deal.entity";
 import DistrictPostcode from "../m2m/district-postcode";
@@ -18,10 +19,22 @@ export default class Postcode {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 7, nullable: true })
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 7,
+    nullable: true,
+    transformer: numericTransformer,
+  })
   longitude?: number;
 
-  @Column({ type: "numeric", precision: 9, scale: 7, nullable: true })
+  @Column({
+    type: "numeric",
+    precision: 9,
+    scale: 7,
+    nullable: true,
+    transformer: numericTransformer,
+  })
   latitude?: number;
 
   @Column()

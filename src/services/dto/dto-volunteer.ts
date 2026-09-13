@@ -9,7 +9,13 @@ import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
-import { getAvailability, getLanguages, getOptionItems } from "./utils";
+import {
+  getAvailability,
+  getCoordinates,
+  getLanguages,
+  getOptionalCoordinates,
+  getOptionItems,
+} from "./utils";
 
 export function volunteerListSerializer(
   volunteer: Volunteer,
@@ -33,6 +39,9 @@ export function volunteerListSerializer(
     const skills = getOptionItems(volunteer.deal.dealSkill, "skill") ?? [];
     const locations =
       getOptionItems(volunteer.deal.dealDistrict, "district") ?? [];
+    const { latitude: lat, longitude: lon } = getCoordinates(
+      volunteer.person.address?.postcode,
+    );
 
     return {
       id,
@@ -48,6 +57,8 @@ export function volunteerListSerializer(
       activities,
       skills,
       locations,
+      lat,
+      lon,
     };
   } catch (error) {
     logger.error(`Error serializing volunteer (id:${volunteer.id}): ${error}`);
@@ -67,8 +78,13 @@ export function volunteerSerializer(
           ...volunteer.person.address.postcode,
           id: volunteer.person.address.postcode.id,
           code: volunteer.person.address.postcode.value,
-          latitude: volunteer.person.address.postcode.latitude || null,
-          longitude: volunteer.person.address.postcode.longitude || null,
+          // Reset before the conditional spread below: the raw entity spread
+          // above may already carry a real (or masked-to-null) latitude/
+          // longitude under these same keys, and an omitted key from a later
+          // spread does not erase an earlier one.
+          latitude: undefined,
+          longitude: undefined,
+          ...getOptionalCoordinates(volunteer.person.address.postcode),
         },
       }
     : null;
