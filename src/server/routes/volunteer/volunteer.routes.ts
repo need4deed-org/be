@@ -47,6 +47,8 @@ import {
   VolunteerListType,
 } from "../../types";
 import {
+  erasePersonPii,
+  ErasePersonPiiSummary,
   fetchVolunteerById,
   getLanguageCode,
   getOrCreateTimeslot,
@@ -660,7 +662,7 @@ export default async function volunteerRoutes(
         throw new NotFoundError(`Volunteer (id:${id}) not found.`);
       }
 
-      const { dealId } = volunteer;
+      const { dealId, personId } = volunteer;
 
       // OpportunityVolunteer rows cascade at the DB level, which bypasses
       // TypeORM's @AfterRemove hook (it never loads/removes those entities
@@ -672,6 +674,12 @@ export default async function volunteerRoutes(
         })
       ).map((ov) => ov.opportunityId);
 
+      // GDPR Art. 17 (be#727): deleting the volunteer profile alone leaves
+      // the underlying Person's PII (and their User login, if any) fully
+      // intact — anonymize it in the same transaction. personId is optional
+      // on Volunteer, so a profile with none skips this entirely.
+      let eraseSummary: ErasePersonPiiSummary | undefined;
+
       await dataSource.manager.transaction(async (manager) => {
         await manager.delete(Comment, {
           entityType: EntityTableName.VOLUNTEER,
@@ -681,15 +689,34 @@ export default async function volunteerRoutes(
         if (dealId) {
           await manager.delete(Deal, { id: dealId });
         }
+        if (personId) {
+          eraseSummary = await erasePersonPii(manager, personId);
+        }
       });
 
       await Promise.all(
         linkedOpportunityIds.map((oId) => updateOpportunityMatching(oId)),
       );
 
-      return reply.status(200).send({
-        message: `Volunteer (id:${id}) deleted.`,
-      });
+      const otherRoles = eraseSummary
+        ? [
+            eraseSummary.agentRoles > 0 &&
+              `${eraseSummary.agentRoles} agent representative role(s)`,
+            eraseSummary.organizationContact > 0 &&
+              `${eraseSummary.organizationContact} organization contact record(s)`,
+            eraseSummary.communityPosts > 0 &&
+              `${eraseSummary.communityPosts} community post(s)`,
+          ].filter((s): s is string => Boolean(s))
+        : [];
+
+      const message = !eraseSummary
+        ? `Volunteer (id:${id}) deleted.`
+        : otherRoles.length
+          ? `Volunteer (id:${id}) deleted; this person's PII was anonymized. ` +
+            `Note: this person also has ${otherRoles.join(", ")} — those records now show an anonymized identity too.`
+          : `Volunteer (id:${id}) deleted; this person's PII was anonymized.`;
+
+      return reply.status(200).send({ message });
     },
   );
 }

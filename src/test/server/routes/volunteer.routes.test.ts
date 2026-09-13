@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentRoleType,
   EntityTableName,
   OpportunityMatchStatusType,
   OpportunityStatusType,
@@ -14,9 +15,13 @@ import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
+import Post from "../../../data/entity/post.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
@@ -214,10 +219,15 @@ describe("DELETE /volunteer/:id", () => {
       }),
     ).toBeNull();
 
-    // The underlying Person is untouched by a volunteer delete.
-    expect(
-      await fastify.db.personRepository.findOneBy({ id: volunteerPerson.id }),
-    ).not.toBeNull();
+    // The underlying Person row survives (be#727: anonymized in place, not
+    // hard-deleted — see the dedicated describe block below for the full
+    // erasure assertions), but its PII is gone and its login is deactivated.
+    const survivingPerson = await fastify.db.personRepository.findOneBy({
+      id: volunteerPerson.id,
+    });
+    expect(survivingPerson).not.toBeNull();
+    expect(survivingPerson?.firstName).toBe("[deleted]");
+    expect(survivingPerson?.lastName).toBeNull();
 
     // The linked opportunity's match status is recomputed now that the
     // match link is gone — confirming the deleted OpportunityVolunteer's
@@ -386,5 +396,247 @@ describe("GET /volunteer", () => {
     expect(body.data[0].name).not.toContain(lastName);
     expect(body.data[0].lat).toBeNull();
     expect(body.data[0].lon).toBeNull();
+  });
+});
+
+describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
+  let fastify: FastifyInstance;
+  let postcode: Postcode;
+  let address: Address;
+  let erasedPerson: Person;
+  let erasedUser: User;
+  let deal: Deal;
+  let volunteer: Volunteer;
+  let agent: Agent;
+  let agentPerson: AgentPerson;
+  let organization: Organization;
+  let post: Post;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const numericSuffix = randomNumericSuffix();
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    postcode = await postcodeRepository.save(
+      new Postcode({ value: `1${numericSuffix}` }),
+    );
+    const addressRepository = getRepository(dataSource, Address);
+    address = await addressRepository.save(
+      new Address({ street: "Original Street 1", postcodeId: postcode.id }),
+    );
+
+    erasedPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Erase",
+        lastName: "Me",
+        email: `erase-me-${suffix}@test.need4deed.org`,
+        phone: "+491234567",
+        landline: "+497654321",
+        avatarUrl: "https://example.com/avatar.png",
+        addressId: address.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    erasedUser = await fastify.db.userRepository.save(
+      new User({
+        email: `volunteer-login-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: erasedPerson.id,
+      }),
+    );
+
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: erasedPerson.id }),
+    );
+
+    // The same Person also holds two other, unrelated roles — erasure must
+    // anonymize their identity everywhere without deleting these records.
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (erasure) ${suffix}` }),
+    );
+    agentPerson = await getRepository(dataSource, AgentPerson).save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: erasedPerson.id,
+        role: AgentRoleType.MANAGER,
+      }),
+    );
+    organization = await getRepository(dataSource, Organization).save(
+      new Organization({
+        title: `Test Org (erasure) ${suffix}`,
+        personId: erasedPerson.id,
+      }),
+    );
+    post = await getRepository(dataSource, Post).save(
+      new Post({ text: "Hello from a volunteer", authorId: erasedPerson.id }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "EraseCoordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-erase-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-erase-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await getRepository(dataSource, Post).delete({ id: post.id });
+    await getRepository(dataSource, Organization).delete({
+      id: organization.id,
+    });
+    await getRepository(dataSource, AgentPerson).delete({ id: agentPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.db.userRepository.delete({ id: erasedUser.id });
+    // volunteer/deal are deleted by the DELETE call itself in the test below.
+    await fastify.db.personRepository.delete({ id: erasedPerson.id });
+    await getRepository(dataSource, Address).delete({ id: address.id });
+    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
+    await fastify.close();
+  });
+
+  it("anonymizes the Person's PII, detaches (not mutates) their address, deactivates their login, and warns about other roles", async () => {
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/volunteer/${volunteer.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json();
+    expect(body.message).toContain("anonymized");
+    expect(body.message).toContain("agent representative");
+    expect(body.message).toContain("organization contact");
+    expect(body.message).toContain("community post");
+
+    const person = await fastify.db.personRepository.findOneBy({
+      id: erasedPerson.id,
+    });
+    expect(person).not.toBeNull();
+    expect(person?.firstName).toBe("[deleted]");
+    expect(person?.lastName).toBeNull();
+    expect(person?.email).toBeNull();
+    expect(person?.phone).toBeNull();
+    expect(person?.landline).toBeNull();
+    expect(person?.avatarUrl).toBeNull();
+    expect(person?.addressId).toBeNull();
+
+    // The Address row itself is untouched — only detached from the Person,
+    // since it may be shared with another entity.
+    const survivingAddress = await getRepository(dataSource, Address).findOneBy(
+      { id: address.id },
+    );
+    expect(survivingAddress?.street).toBe("Original Street 1");
+
+    const user = await fastify.db.userRepository.findOneBy({
+      id: erasedUser.id,
+    });
+    expect(user?.isActive).toBe(false);
+
+    // Other roles survive — anonymization, not cascading deletion.
+    expect(
+      await getRepository(dataSource, AgentPerson).findOneBy({
+        id: agentPerson.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      await getRepository(dataSource, Organization).findOneBy({
+        id: organization.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      await getRepository(dataSource, Post).findOneBy({ id: post.id }),
+    ).not.toBeNull();
+  });
+});
+
+describe("DELETE /volunteer/:id with no linked Person (be#727)", () => {
+  let fastify: FastifyInstance;
+  let deal: Deal;
+  let volunteer: Volunteer;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "NoPersonCoordinator" }),
+    );
+    const pwHash = await hashPassword(PASSWORD);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-no-person-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-no-person-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.close();
+  });
+
+  it("deletes cleanly with a plain message and no anonymization note", async () => {
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/volunteer/${volunteer.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().message).toBe(`Volunteer (id:${volunteer.id}) deleted.`);
   });
 });
