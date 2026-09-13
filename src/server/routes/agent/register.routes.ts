@@ -98,8 +98,11 @@ export default async function agentRegisterRoutes(
       // (PENDING) is decided later, at JOIN time, by resolveJoinStatus.
       //
       // Filtered in SQL rather than fetched-then-filtered in JS (be#902) —
-      // this route backs a per-keystroke autocomplete, so an unfiltered
-      // table scan on every request doesn't scale with the agent table.
+      // this route backs a per-keystroke autocomplete, so excluded agents no
+      // longer pay for an address join, a full row transfer, and entity
+      // hydration just to be discarded afterward. (No index on unclaimed/
+      // engagementStatus yet, so this doesn't avoid a sequential scan at the
+      // Postgres level — see be#980 if the agent table grows enough to matter.)
       //
       // A coordinator-created agent (fe#911) is `unclaimed` — it isn't
       // claimable through self-registration's JOIN (which auto-approves on an
