@@ -22,8 +22,11 @@ export async function scanExpiredOnetimers(
     .where("opportunity.type IN (:...types)", {
       types: [OpportunityType.ACCOMPANYING, OpportunityType.EVENTS],
     })
-    .andWhere("opportunity.status != :inactive", {
-      inactive: OpportunityStatusType.INACTIVE,
+    .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
+      terminalStatuses: [
+        OpportunityStatusType.INACTIVE,
+        OpportunityStatusType.PAST,
+      ],
     })
     .andWhere("onetimer.date < :yesterday", {
       yesterday: dayBeforeToday,

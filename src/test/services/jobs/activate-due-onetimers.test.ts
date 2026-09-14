@@ -87,7 +87,7 @@ describe("activateDueOnetimers", () => {
       OpportunityVolunteerStatusType.ACTIVE,
     );
     expect(loggerInfoMock).toHaveBeenCalledWith(
-      expect.stringContaining("activated 1 opportunities"),
+      expect.stringContaining("processed 1 due opportunities"),
     );
   });
 

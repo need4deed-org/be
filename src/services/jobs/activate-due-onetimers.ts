@@ -44,24 +44,20 @@ export async function activateDueOnetimers(
       await fastify.db.opportunityRepository.save(opportunity);
 
       for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-        if (
-          opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
-        ) {
-          try {
-            opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
-            await fastify.db.opportunityVolunteerRepository.save(
-              opportunityVolunteer,
-            );
-          } catch (err) {
-            logger.error(
-              {
-                err,
-                opportunityId: opportunity.id,
-                opportunityVolunteerId: opportunityVolunteer.id,
-              },
-              "activateDueOnetimers: failed to mark opportunity volunteer as ACTIVE",
-            );
-          }
+        try {
+          opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
+          await fastify.db.opportunityVolunteerRepository.save(
+            opportunityVolunteer,
+          );
+        } catch (err) {
+          logger.error(
+            {
+              err,
+              opportunityId: opportunity.id,
+              opportunityVolunteerId: opportunityVolunteer.id,
+            },
+            "activateDueOnetimers: failed to mark opportunity volunteer as ACTIVE",
+          );
         }
       }
     } catch (err) {
@@ -73,6 +69,6 @@ export async function activateDueOnetimers(
   }
 
   logger.info(
-    `activateDueOnetimers: activated ${dueOpportunities.length} opportunities`,
+    `activateDueOnetimers: processed ${dueOpportunities.length} due opportunities`,
   );
 }
