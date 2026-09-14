@@ -3,6 +3,7 @@ import {
   OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
+import { EntityManager } from "typeorm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -18,8 +19,7 @@ vi.mock("../../../logger", () => ({
 }));
 
 const getMany = vi.fn();
-const opportunityRepositorySave = vi.fn();
-const opportunityVolunteerRepositorySave = vi.fn();
+const managerSave = vi.fn();
 
 const qbMock = {
   leftJoinAndSelect: vi.fn().mockReturnThis(),
@@ -28,14 +28,21 @@ const qbMock = {
   getMany,
 };
 
+// Runs the transaction callback against a fake EntityManager whose save()
+// delegates to the managerSave mock — good enough to assert what was written
+// and to simulate a mid-transaction failure without a real DB.
+const transaction = vi.fn(
+  async (cb: (manager: EntityManager) => Promise<void>) =>
+    cb({
+      save: (...args: unknown[]) => managerSave(...args),
+    } as unknown as EntityManager),
+);
+
 const fastify = {
   db: {
     opportunityRepository: {
       createQueryBuilder: vi.fn(() => qbMock),
-      save: (...args: unknown[]) => opportunityRepositorySave(...args),
-    },
-    opportunityVolunteerRepository: {
-      save: (...args: unknown[]) => opportunityVolunteerRepositorySave(...args),
+      manager: { transaction },
     },
   },
 } as unknown as FastifyInstance;
@@ -53,12 +60,12 @@ function buildOpportunity(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  opportunityRepositorySave.mockImplementation(
-    async (opportunity: Opportunity) => opportunity,
+  transaction.mockImplementation(async (cb) =>
+    cb({
+      save: (...args: unknown[]) => managerSave(...args),
+    } as unknown as EntityManager),
   );
-  opportunityVolunteerRepositorySave.mockImplementation(
-    async (ov: OpportunityVolunteer) => ov,
-  );
+  managerSave.mockImplementation(async (_entity: unknown, obj: unknown) => obj);
 });
 
 describe("activateDueOnetimers", () => {
@@ -67,8 +74,7 @@ describe("activateDueOnetimers", () => {
 
     await activateDueOnetimers(fastify);
 
-    expect(opportunityRepositorySave).not.toHaveBeenCalled();
-    expect(opportunityVolunteerRepositorySave).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
     expect(loggerInfoMock).not.toHaveBeenCalled();
   });
 
@@ -80,18 +86,21 @@ describe("activateDueOnetimers", () => {
     await activateDueOnetimers(fastify);
 
     expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
-    expect(opportunityRepositorySave).toHaveBeenCalledWith(opportunity);
+    expect(managerSave).toHaveBeenCalledWith(Opportunity, opportunity);
 
-    expect(opportunityVolunteerRepositorySave).toHaveBeenCalledTimes(1);
     expect(opportunity.opportunityVolunteer[0].status).toBe(
       OpportunityVolunteerStatusType.ACTIVE,
+    );
+    expect(managerSave).toHaveBeenCalledWith(
+      OpportunityVolunteer,
+      opportunity.opportunityVolunteer[0],
     );
     expect(loggerInfoMock).toHaveBeenCalledWith(
       expect.stringContaining("processed 1 due opportunities"),
     );
   });
 
-  it("keeps processing remaining opportunities when one fails to save", async () => {
+  it("keeps processing remaining opportunities when one's transaction fails", async () => {
     const failing = buildOpportunity(1, [
       { id: 1, status: OpportunityVolunteerStatusType.MATCHED },
     ]);
@@ -100,7 +109,9 @@ describe("activateDueOnetimers", () => {
     ]);
     getMany.mockResolvedValue([failing, succeeding]);
 
-    opportunityRepositorySave.mockImplementationOnce(async () => {
+    // Fails on the very first save of the run — the opportunity save for
+    // `failing` — before its transaction ever reaches the volunteer save.
+    managerSave.mockImplementationOnce(async () => {
       throw new Error("db unavailable");
     });
 
@@ -108,10 +119,16 @@ describe("activateDueOnetimers", () => {
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({ opportunityId: 1 }),
-      expect.stringContaining("failed to mark opportunity as ACTIVE"),
+      expect.stringContaining(
+        "failed to activate opportunity and its volunteer(s)",
+      ),
     );
 
     // The failing opportunity's volunteer must not have been touched.
+    expect(managerSave).not.toHaveBeenCalledWith(
+      OpportunityVolunteer,
+      failing.opportunityVolunteer[0],
+    );
     expect(failing.opportunityVolunteer[0].status).toBe(
       OpportunityVolunteerStatusType.MATCHED,
     );
@@ -123,30 +140,37 @@ describe("activateDueOnetimers", () => {
     );
   });
 
-  it("keeps processing remaining volunteers when one volunteer save fails", async () => {
+  it("be#988: rolls back the whole opportunity when one volunteer save fails, instead of partially applying it", async () => {
     const first = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
     const second = { id: 2, status: OpportunityVolunteerStatusType.MATCHED };
     const opportunity = buildOpportunity(1, [first, second]);
     getMany.mockResolvedValue([opportunity]);
 
-    opportunityVolunteerRepositorySave.mockImplementationOnce(async () => {
-      throw new Error("db unavailable");
+    managerSave.mockImplementation(async (entity: unknown, obj: unknown) => {
+      if (entity === OpportunityVolunteer && (obj as { id: number }).id === 1) {
+        throw new Error("db unavailable");
+      }
+      return obj;
     });
 
     await activateDueOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        opportunityId: opportunity.id,
-        opportunityVolunteerId: 1,
-      }),
-      expect.stringContaining("failed to mark opportunity volunteer as ACTIVE"),
+      expect.objectContaining({ opportunityId: opportunity.id }),
+      expect.stringContaining(
+        "failed to activate opportunity and its volunteer(s)",
+      ),
     );
 
-    // Second volunteer still gets updated despite the first one failing.
-    expect(opportunity.opportunityVolunteer[1].status).toBe(
-      OpportunityVolunteerStatusType.ACTIVE,
+    // The transaction aborts as soon as the first volunteer's save throws —
+    // the second volunteer's save is never even attempted, proving this is
+    // all-or-nothing per opportunity rather than best-effort per volunteer.
+    expect(managerSave).not.toHaveBeenCalledWith(
+      OpportunityVolunteer,
+      opportunity.opportunityVolunteer[1],
     );
-    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
+    expect(opportunity.opportunityVolunteer[1].status).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
   });
 });

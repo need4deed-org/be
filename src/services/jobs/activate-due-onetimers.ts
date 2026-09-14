@@ -4,6 +4,8 @@ import {
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
+import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import { berlinDayBoundaries, berlinToday } from "./german-holidays";
 
@@ -40,30 +42,24 @@ export async function activateDueOnetimers(
 
   for (const opportunity of dueOpportunities) {
     try {
-      opportunity.status = OpportunityStatusType.ACTIVE;
-      await fastify.db.opportunityRepository.save(opportunity);
+      // Both writes happen in one transaction — if either fails, both roll
+      // back, so an opportunity can never end up ACTIVE while its volunteer
+      // is stuck at MATCHED (be#988).
+      await fastify.db.opportunityRepository.manager.transaction(
+        async (manager) => {
+          opportunity.status = OpportunityStatusType.ACTIVE;
+          await manager.save(Opportunity, opportunity);
 
-      for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-        try {
-          opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
-          await fastify.db.opportunityVolunteerRepository.save(
-            opportunityVolunteer,
-          );
-        } catch (err) {
-          logger.error(
-            {
-              err,
-              opportunityId: opportunity.id,
-              opportunityVolunteerId: opportunityVolunteer.id,
-            },
-            "activateDueOnetimers: failed to mark opportunity volunteer as ACTIVE",
-          );
-        }
-      }
+          for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
+            opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
+            await manager.save(OpportunityVolunteer, opportunityVolunteer);
+          }
+        },
+      );
     } catch (err) {
       logger.error(
         { err, opportunityId: opportunity.id },
-        "activateDueOnetimers: failed to mark opportunity as ACTIVE",
+        "activateDueOnetimers: failed to activate opportunity and its volunteer(s)",
       );
     }
   }
