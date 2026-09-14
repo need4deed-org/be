@@ -1,3 +1,5 @@
+import { VolunteerAuditLogType } from "need4deed-sdk";
+
 export const volunteerAuditLogSchemaGet200 = {
   type: "object",
   properties: {
@@ -9,7 +11,7 @@ export const volunteerAuditLogSchemaGet200 = {
         properties: {
           id: { type: "number" },
           volunteerId: { type: "number" },
-          type: { type: "string" },
+          type: { type: "string", enum: Object.values(VolunteerAuditLogType) },
           detail: { type: "string" },
           actorUserId: { type: ["number", "null"] },
           occurredAt: { type: "string", format: "date-time" },

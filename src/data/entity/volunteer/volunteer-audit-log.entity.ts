@@ -1,3 +1,4 @@
+import { VolunteerAuditLogType as SdkVolunteerAuditLogType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -13,12 +14,29 @@ import Volunteer from "./volunteer.entity";
 // hours-worked ledger per opportunity-volunteer pairing — a different
 // feature that happens to share a name (be#919). This one is a read-only
 // audit trail of things that changed on a volunteer's record.
+//
+// Kept as its own string-literal union (rather than the SDK's TS enum
+// directly) so plain string literals stay assignable at the write-hook call
+// sites without casts. The assertion below fails to compile if this drifts
+// from the SDK's VolunteerAuditLogType (be#984).
 export const VOLUNTEER_AUDIT_LOG_TYPES = [
   "contact_details_changed",
   "availability_changed",
   "opportunity_status_changed",
 ] as const;
 export type VolunteerAuditLogType = (typeof VOLUNTEER_AUDIT_LOG_TYPES)[number];
+
+type AssertSameStringValues<A extends string, B extends string> = [A] extends [
+  B,
+]
+  ? [B] extends [A]
+    ? true
+    : never
+  : never;
+type _AuditLogTypeInSyncWithSdk = AssertSameStringValues<
+  VolunteerAuditLogType,
+  `${SdkVolunteerAuditLogType}`
+>;
 
 @Entity()
 export default class VolunteerAuditLog {
