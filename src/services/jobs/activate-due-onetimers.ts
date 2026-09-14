@@ -1,12 +1,12 @@
 import { FastifyInstance } from "fastify";
 import {
   OpportunityStatusType,
-  OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
+import { buildOnetimerOpportunityQuery } from "../../server/utils/data/build-onetimer-opportunity-query";
 import { berlinDayBoundaries, berlinToday } from "./german-holidays";
 
 export async function activateDueOnetimers(
@@ -14,16 +14,7 @@ export async function activateDueOnetimers(
 ): Promise<void> {
   const { startOfDay, endOfDay } = berlinDayBoundaries(berlinToday());
 
-  const dueOpportunities = await fastify.db.opportunityRepository
-    .createQueryBuilder("opportunity")
-    .leftJoinAndSelect("opportunity.onetimer", "onetimer")
-    .leftJoinAndSelect(
-      "opportunity.opportunityVolunteer",
-      "opportunityVolunteer",
-    )
-    .where("opportunity.type IN (:...types)", {
-      types: [OpportunityType.ACCOMPANYING, OpportunityType.EVENTS],
-    })
+  const dueOpportunities = await buildOnetimerOpportunityQuery(fastify)
     .andWhere("opportunity.status != :active", {
       active: OpportunityStatusType.ACTIVE,
     })
