@@ -16,6 +16,7 @@ import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import CommentPerson from "../../../data/entity/m2m/comment-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -406,6 +407,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   let address: Address;
   let erasedPerson: Person;
   let erasedUser: User;
+  let unrelatedAgentUser: User;
   let deal: Deal;
   let volunteer: Volunteer;
   let agent: Agent;
@@ -413,6 +415,8 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   let organization: Organization;
   let post: Post;
   let testimonial: Testimonial;
+  let comment: Comment;
+  let commentPerson: CommentPerson;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
 
@@ -450,6 +454,18 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
         email: `volunteer-login-${suffix}@test.need4deed.org`,
         password: pwHash,
         role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: erasedPerson.id,
+      }),
+    );
+    // Same Person, a second, unrelated login (User.personId has no
+    // uniqueness constraint) — erasing the volunteer profile must not
+    // silently deactivate a staff login that has nothing to do with it.
+    unrelatedAgentUser = await fastify.db.userRepository.save(
+      new User({
+        email: `unrelated-agent-login-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.AGENT,
         isActive: true,
         personId: erasedPerson.id,
       }),
@@ -494,7 +510,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "EraseCoordinator" }),
     );
-    await fastify.db.userRepository.save(
+    const coordinatorUser = await fastify.db.userRepository.save(
       new User({
         email: `coordinator-erase-${suffix}@test.need4deed.org`,
         password: pwHash,
@@ -503,6 +519,28 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
         personId: coordinatorPerson.id,
       }),
     );
+
+    const language = await fastify.db.languageRepository.findOneOrFail({
+      where: {},
+    });
+    // Attached to the Agent, not this Volunteer — a comment scoped to the
+    // volunteer profile being deleted is cleaned up by the route's own
+    // pre-existing logic before erasePersonPii ever runs, which would
+    // cascade-delete this fixture's CommentPerson row too early to exercise
+    // the count this test is actually for.
+    comment = await fastify.db.commentRepository.save(
+      new Comment({
+        text: "Tagging the person in an unrelated comment thread",
+        entityType: EntityTableName.AGENT,
+        entityId: agent.id,
+        languageId: language.id,
+        userId: coordinatorUser.id,
+      }),
+    );
+    commentPerson = await getRepository(dataSource, CommentPerson).save(
+      new CommentPerson({ commentId: comment.id, personId: erasedPerson.id }),
+    );
+
     const login = await fastify.inject({
       method: "POST",
       url: "/auth/login",
@@ -515,6 +553,10 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   });
 
   afterAll(async () => {
+    await getRepository(dataSource, CommentPerson).delete({
+      id: commentPerson.id,
+    });
+    await fastify.db.commentRepository.delete({ id: comment.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await getRepository(dataSource, Testimonial).delete({ id: testimonial.id });
@@ -525,6 +567,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     await getRepository(dataSource, AgentPerson).delete({ id: agentPerson.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.db.userRepository.delete({ id: erasedUser.id });
+    await fastify.db.userRepository.delete({ id: unrelatedAgentUser.id });
     // volunteer/deal are deleted by the DELETE call itself in the test below.
     await fastify.db.personRepository.delete({ id: erasedPerson.id });
     await getRepository(dataSource, Address).delete({ id: address.id });
@@ -542,10 +585,11 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
 
     const body = res.json();
     expect(body.message).toContain("anonymized");
-    expect(body.message).toContain("agent representative");
+    expect(body.message).toContain("agent-membership");
     expect(body.message).toContain("organization contact");
     expect(body.message).toContain("community post");
     expect(body.message).toContain("testimonial");
+    expect(body.message).toContain("comment mention");
 
     const person = await fastify.db.personRepository.findOneBy({
       id: erasedPerson.id,
@@ -577,8 +621,20 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     );
     expect(user?.email).toMatch(/^deleted-user-\d+@erased\.need4deed\.org$/);
 
+    // A second, unrelated (non-VOLUNTEER-role) login for the same Person is
+    // untouched — erasing the volunteer profile must not silently deactivate
+    // a staff login that has nothing to do with it.
+    const survivingAgentUser = await fastify.db.userRepository.findOneBy({
+      id: unrelatedAgentUser.id,
+    });
+    expect(survivingAgentUser?.isActive).toBe(true);
+    expect(survivingAgentUser?.email).toBe(
+      `unrelated-agent-login-${suffix}@test.need4deed.org`,
+    );
+
     // Testimonial survives (not cascade-deleted) but its own denormalized
-    // name/pic — independent of Person — are anonymized too.
+    // name/pic — independent of Person — are anonymized too, and it's
+    // taken off public display.
     const survivingTestimonial = await getRepository(
       dataSource,
       Testimonial,
@@ -586,6 +642,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     expect(survivingTestimonial).not.toBeNull();
     expect(survivingTestimonial?.name).toBeNull();
     expect(survivingTestimonial?.pic).toBeNull();
+    expect(survivingTestimonial?.isActive).toBe(false);
 
     // Other roles survive — anonymization, not cascading deletion.
     expect(
@@ -600,6 +657,11 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     ).not.toBeNull();
     expect(
       await getRepository(dataSource, Post).findOneBy({ id: post.id }),
+    ).not.toBeNull();
+    expect(
+      await getRepository(dataSource, CommentPerson).findOneBy({
+        id: commentPerson.id,
+      }),
     ).not.toBeNull();
   });
 });

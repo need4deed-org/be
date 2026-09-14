@@ -47,6 +47,7 @@ import {
   VolunteerListType,
 } from "../../types";
 import {
+  describeOtherRoles,
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
@@ -698,20 +699,7 @@ export default async function volunteerRoutes(
         linkedOpportunityIds.map((oId) => updateOpportunityMatching(oId)),
       );
 
-      const otherRoles = eraseSummary
-        ? [
-            eraseSummary.agentRoles > 0 &&
-              `${eraseSummary.agentRoles} agent representative role(s)`,
-            eraseSummary.organizationContact > 0 &&
-              `${eraseSummary.organizationContact} organization contact record(s)`,
-            eraseSummary.communityPosts > 0 &&
-              `${eraseSummary.communityPosts} community post(s)`,
-            eraseSummary.testimonials > 0 &&
-              `${eraseSummary.testimonials} testimonial(s) (also anonymized)`,
-            eraseSummary.opportunitySubmitterOrContact > 0 &&
-              `${eraseSummary.opportunitySubmitterOrContact} opportunity submission(s)/contact record(s)`,
-          ].filter((s): s is string => Boolean(s))
-        : [];
+      const otherRoles = eraseSummary ? describeOtherRoles(eraseSummary) : [];
 
       const message = !eraseSummary
         ? `Volunteer (id:${id}) deleted.`
