@@ -1,24 +1,18 @@
+import {
+  ApiVolunteerAuditLogGet,
+  VolunteerAuditLogType as SdkVolunteerAuditLogType,
+} from "need4deed-sdk";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
-
-// Not yet in the SDK (be#919 landed ahead of a published contract for this
-// endpoint) — fe#957 should get this typed properly via the SDK before
-// consuming it, per the shared "API changes go through the SDK first" rule.
-export interface VolunteerAuditLogEntryDto {
-  id: number;
-  volunteerId: number;
-  type: string;
-  detail: string;
-  actorUserId: number | null;
-  occurredAt: Date;
-}
 
 export function dtoVolunteerAuditLog(
   entry: VolunteerAuditLog,
-): VolunteerAuditLogEntryDto {
+): ApiVolunteerAuditLogGet {
   return {
     id: entry.id,
     volunteerId: entry.volunteerId,
-    type: entry.type,
+    // Cast justified by the compile-time sync assertion on
+    // VolunteerAuditLogType in the entity file (be#984).
+    type: entry.type as SdkVolunteerAuditLogType,
     detail: entry.detail,
     actorUserId: entry.actorUserId ?? null,
     occurredAt: entry.occurredAt,
