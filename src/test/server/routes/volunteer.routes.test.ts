@@ -22,6 +22,7 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
 import Post from "../../../data/entity/post.entity";
+import Testimonial from "../../../data/entity/testimonial.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
@@ -411,6 +412,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   let agentPerson: AgentPerson;
   let organization: Organization;
   let post: Post;
+  let testimonial: Testimonial;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
 
@@ -481,6 +483,13 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     post = await getRepository(dataSource, Post).save(
       new Post({ text: "Hello from a volunteer", authorId: erasedPerson.id }),
     );
+    testimonial = await getRepository(dataSource, Testimonial).save(
+      new Testimonial({
+        name: "Erase Me (as shown on testimonial)",
+        pic: "https://example.com/testimonial-pic.png",
+        personId: erasedPerson.id,
+      }),
+    );
 
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "EraseCoordinator" }),
@@ -508,6 +517,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   afterAll(async () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await getRepository(dataSource, Testimonial).delete({ id: testimonial.id });
     await getRepository(dataSource, Post).delete({ id: post.id });
     await getRepository(dataSource, Organization).delete({
       id: organization.id,
@@ -535,6 +545,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     expect(body.message).toContain("agent representative");
     expect(body.message).toContain("organization contact");
     expect(body.message).toContain("community post");
+    expect(body.message).toContain("testimonial");
 
     const person = await fastify.db.personRepository.findOneBy({
       id: erasedPerson.id,
@@ -559,6 +570,22 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
       id: erasedUser.id,
     });
     expect(user?.isActive).toBe(false);
+    // The login email is itself identifying PII — replaced, not just
+    // deactivated (it's NOT NULL + unique, so it can't simply be nulled).
+    expect(user?.email).not.toBe(
+      `volunteer-login-${suffix}@test.need4deed.org`,
+    );
+    expect(user?.email).toMatch(/^deleted-user-\d+@erased\.need4deed\.org$/);
+
+    // Testimonial survives (not cascade-deleted) but its own denormalized
+    // name/pic — independent of Person — are anonymized too.
+    const survivingTestimonial = await getRepository(
+      dataSource,
+      Testimonial,
+    ).findOneBy({ id: testimonial.id });
+    expect(survivingTestimonial).not.toBeNull();
+    expect(survivingTestimonial?.name).toBeNull();
+    expect(survivingTestimonial?.pic).toBeNull();
 
     // Other roles survive — anonymization, not cascading deletion.
     expect(

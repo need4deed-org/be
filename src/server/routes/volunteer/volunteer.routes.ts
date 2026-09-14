@@ -706,6 +706,10 @@ export default async function volunteerRoutes(
               `${eraseSummary.organizationContact} organization contact record(s)`,
             eraseSummary.communityPosts > 0 &&
               `${eraseSummary.communityPosts} community post(s)`,
+            eraseSummary.testimonials > 0 &&
+              `${eraseSummary.testimonials} testimonial(s) (also anonymized)`,
+            eraseSummary.opportunitySubmitterOrContact > 0 &&
+              `${eraseSummary.opportunitySubmitterOrContact} opportunity submission(s)/contact record(s)`,
           ].filter((s): s is string => Boolean(s))
         : [];
 
