@@ -47,7 +47,7 @@ import {
   VolunteerListType,
 } from "../../types";
 import {
-  describeOtherRoles,
+  buildEraseSummaryMessage,
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
@@ -699,14 +699,10 @@ export default async function volunteerRoutes(
         linkedOpportunityIds.map((oId) => updateOpportunityMatching(oId)),
       );
 
-      const otherRoles = eraseSummary ? describeOtherRoles(eraseSummary) : [];
-
-      const message = !eraseSummary
-        ? `Volunteer (id:${id}) deleted.`
-        : otherRoles.length
-          ? `Volunteer (id:${id}) deleted; this person's PII was anonymized. ` +
-            `Note: this person also has ${otherRoles.join(", ")} — those records now show an anonymized identity too.`
-          : `Volunteer (id:${id}) deleted; this person's PII was anonymized.`;
+      const message = buildEraseSummaryMessage(
+        `Volunteer (id:${id})`,
+        eraseSummary,
+      );
 
       return reply.status(200).send({ message });
     },

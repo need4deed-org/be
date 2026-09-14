@@ -104,6 +104,24 @@ export function describeOtherRoles(summary: ErasePersonPiiSummary): string[] {
   );
 }
 
+// Builds the caller-facing message for a delete route that may have run
+// erasePersonPii — shared so a future endpoint reusing erasePersonPii (e.g.
+// an Agent/Organization-contact delete) gets identical wording for free
+// rather than re-deriving this same three-way logic.
+export function buildEraseSummaryMessage(
+  deletedDescription: string,
+  eraseSummary: ErasePersonPiiSummary | undefined,
+): string {
+  if (!eraseSummary) {
+    return `${deletedDescription} deleted.`;
+  }
+  const otherRoles = describeOtherRoles(eraseSummary);
+  const base = `${deletedDescription} deleted; this person's PII was anonymized.`;
+  return otherRoles.length
+    ? `${base} Note: this person also has ${otherRoles.join(", ")} — those records now show an anonymized identity too.`
+    : base;
+}
+
 // GDPR Art. 17 erasure (be#727): anonymizes a Person's PII in place rather
 // than hard-deleting the row. A Person can simultaneously be a volunteer, an
 // agent representative, an organization contact, and a community-board
