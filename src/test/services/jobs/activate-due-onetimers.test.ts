@@ -6,7 +6,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { scanExpiredOnetimers } from "../../../services/jobs/scan-expired-onetimers";
+import { activateDueOnetimers } from "../../../services/jobs/activate-due-onetimers";
 
 const loggerErrorMock = vi.fn();
 const loggerInfoMock = vi.fn();
@@ -46,7 +46,7 @@ function buildOpportunity(
 ): Opportunity {
   return new Opportunity({
     id,
-    status: OpportunityStatusType.ACTIVE,
+    status: OpportunityStatusType.SEARCHING,
     opportunityVolunteer: ovs.map((ov) => new OpportunityVolunteer(ov)),
   } as Partial<Opportunity>);
 }
@@ -61,52 +61,33 @@ beforeEach(() => {
   );
 });
 
-describe("scanExpiredOnetimers", () => {
-  it("does nothing when there are no expired opportunities", async () => {
+describe("activateDueOnetimers", () => {
+  it("does nothing when there are no opportunities due today", async () => {
     getMany.mockResolvedValue([]);
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(opportunityRepositorySave).not.toHaveBeenCalled();
     expect(opportunityVolunteerRepositorySave).not.toHaveBeenCalled();
     expect(loggerInfoMock).not.toHaveBeenCalled();
   });
 
-  it("marks expired opportunities with a matched volunteer PAST, and flips that volunteer to PAST", async () => {
+  it("activates opportunities due today with a matched volunteer", async () => {
     const matched = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
-    const pending = { id: 2, status: OpportunityVolunteerStatusType.PENDING };
-    const opportunity = buildOpportunity(10, [matched, pending]);
+    const opportunity = buildOpportunity(10, [matched]);
     getMany.mockResolvedValue([opportunity]);
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
-    expect(opportunity.status).toBe(OpportunityStatusType.PAST);
+    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
     expect(opportunityRepositorySave).toHaveBeenCalledWith(opportunity);
 
     expect(opportunityVolunteerRepositorySave).toHaveBeenCalledTimes(1);
     expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
-    );
-    expect(opportunity.opportunityVolunteer[1].status).toBe(
-      OpportunityVolunteerStatusType.PENDING,
+      OpportunityVolunteerStatusType.ACTIVE,
     );
     expect(loggerInfoMock).toHaveBeenCalledWith(
-      expect.stringContaining("processed 1 expired opportunities"),
-    );
-  });
-
-  it("marks expired opportunities with no matched volunteer INACTIVE", async () => {
-    const pending = { id: 2, status: OpportunityVolunteerStatusType.PENDING };
-    const opportunity = buildOpportunity(11, [pending]);
-    getMany.mockResolvedValue([opportunity]);
-
-    await scanExpiredOnetimers(fastify);
-
-    expect(opportunity.status).toBe(OpportunityStatusType.INACTIVE);
-    expect(opportunityRepositorySave).toHaveBeenCalledWith(opportunity);
-    expect(opportunityVolunteerRepositorySave).not.toHaveBeenCalled();
-    expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PENDING,
+      expect.stringContaining("activated 1 opportunities"),
     );
   });
 
@@ -123,11 +104,11 @@ describe("scanExpiredOnetimers", () => {
       throw new Error("db unavailable");
     });
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({ opportunityId: 1 }),
-      expect.stringContaining("failed to mark opportunity as PAST/INACTIVE"),
+      expect.stringContaining("failed to mark opportunity as ACTIVE"),
     );
 
     // The failing opportunity's volunteer must not have been touched.
@@ -136,9 +117,9 @@ describe("scanExpiredOnetimers", () => {
     );
 
     // The second opportunity is still processed despite the first one failing.
-    expect(succeeding.status).toBe(OpportunityStatusType.PAST);
+    expect(succeeding.status).toBe(OpportunityStatusType.ACTIVE);
     expect(succeeding.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
+      OpportunityVolunteerStatusType.ACTIVE,
     );
   });
 
@@ -152,20 +133,20 @@ describe("scanExpiredOnetimers", () => {
       throw new Error("db unavailable");
     });
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({
         opportunityId: opportunity.id,
         opportunityVolunteerId: 1,
       }),
-      expect.stringContaining("failed to mark opportunity volunteer as PAST"),
+      expect.stringContaining("failed to mark opportunity volunteer as ACTIVE"),
     );
 
     // Second volunteer still gets updated despite the first one failing.
     expect(opportunity.opportunityVolunteer[1].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
+      OpportunityVolunteerStatusType.ACTIVE,
     );
-    expect(opportunity.status).toBe(OpportunityStatusType.PAST);
+    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
   });
 });

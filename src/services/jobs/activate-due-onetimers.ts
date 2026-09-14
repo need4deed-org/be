@@ -5,14 +5,14 @@ import {
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import logger from "../../logger";
-import { addWorkingDays, berlinToday } from "./german-holidays";
+import { berlinDayBoundaries, berlinToday } from "./german-holidays";
 
-export async function scanExpiredOnetimers(
+export async function activateDueOnetimers(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const dayBeforeToday = addWorkingDays(berlinToday(), -1);
+  const { startOfDay, endOfDay } = berlinDayBoundaries(berlinToday());
 
-  const expiredOpportunities = await fastify.db.opportunityRepository
+  const dueOpportunities = await fastify.db.opportunityRepository
     .createQueryBuilder("opportunity")
     .leftJoinAndSelect("opportunity.onetimer", "onetimer")
     .leftJoinAndSelect(
@@ -22,29 +22,25 @@ export async function scanExpiredOnetimers(
     .where("opportunity.type IN (:...types)", {
       types: [OpportunityType.ACCOMPANYING, OpportunityType.EVENTS],
     })
-    .andWhere("opportunity.status != :inactive", {
-      inactive: OpportunityStatusType.INACTIVE,
+    .andWhere("opportunity.status != :active", {
+      active: OpportunityStatusType.ACTIVE,
     })
-    .andWhere("onetimer.date < :yesterday", {
-      yesterday: dayBeforeToday,
+    .andWhere("onetimer.date BETWEEN :startOfDay AND :endOfDay", {
+      startOfDay,
+      endOfDay,
+    })
+    .andWhere("opportunityVolunteer.status = :matched", {
+      matched: OpportunityVolunteerStatusType.MATCHED,
     })
     .getMany();
 
-  if (!expiredOpportunities.length) {
+  if (!dueOpportunities.length) {
     return;
   }
 
-  for (const opportunity of expiredOpportunities) {
+  for (const opportunity of dueOpportunities) {
     try {
-      const hadMatchedVolunteer = opportunity.opportunityVolunteer.some(
-        (opportunityVolunteer) =>
-          opportunityVolunteer.status ===
-          OpportunityVolunteerStatusType.MATCHED,
-      );
-
-      opportunity.status = hadMatchedVolunteer
-        ? OpportunityStatusType.PAST
-        : OpportunityStatusType.INACTIVE;
+      opportunity.status = OpportunityStatusType.ACTIVE;
       await fastify.db.opportunityRepository.save(opportunity);
 
       for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
@@ -52,7 +48,7 @@ export async function scanExpiredOnetimers(
           opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
         ) {
           try {
-            opportunityVolunteer.status = OpportunityVolunteerStatusType.PAST;
+            opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
             await fastify.db.opportunityVolunteerRepository.save(
               opportunityVolunteer,
             );
@@ -63,7 +59,7 @@ export async function scanExpiredOnetimers(
                 opportunityId: opportunity.id,
                 opportunityVolunteerId: opportunityVolunteer.id,
               },
-              "scanExpiredOnetimers: failed to mark opportunity volunteer as PAST",
+              "activateDueOnetimers: failed to mark opportunity volunteer as ACTIVE",
             );
           }
         }
@@ -71,12 +67,12 @@ export async function scanExpiredOnetimers(
     } catch (err) {
       logger.error(
         { err, opportunityId: opportunity.id },
-        "scanExpiredOnetimers: failed to mark opportunity as PAST/INACTIVE",
+        "activateDueOnetimers: failed to mark opportunity as ACTIVE",
       );
     }
   }
 
   logger.info(
-    `scanExpiredOnetimers: processed ${expiredOpportunities.length} expired opportunities`,
+    `activateDueOnetimers: activated ${dueOpportunities.length} opportunities`,
   );
 }
