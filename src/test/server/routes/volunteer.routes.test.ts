@@ -18,6 +18,8 @@ import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import CommentPerson from "../../../data/entity/m2m/comment-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import PostBookmark from "../../../data/entity/m2m/post-bookmark";
+import PostReaction from "../../../data/entity/m2m/post-reaction";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Organization from "../../../data/entity/organization.entity";
@@ -414,6 +416,8 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
   let agentPerson: AgentPerson;
   let organization: Organization;
   let post: Post;
+  let postReaction: PostReaction;
+  let postBookmark: PostBookmark;
   let testimonial: Testimonial;
   let comment: Comment;
   let commentPerson: CommentPerson;
@@ -497,7 +501,25 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
       }),
     );
     post = await getRepository(dataSource, Post).save(
-      new Post({ text: "Hello from a volunteer", authorId: erasedPerson.id }),
+      new Post({
+        text: "Hello from a volunteer",
+        authorId: erasedPerson.id,
+        // Tags the same Person via the post_person join table — distinct
+        // from authorship, and from the (unrelated) PostReaction/PostBookmark
+        // rows below — so all three post_person/post_reaction/post_bookmark
+        // checks get exercised independently.
+        taggedPersons: [erasedPerson],
+      }),
+    );
+    postReaction = await getRepository(dataSource, PostReaction).save(
+      new PostReaction({
+        postId: post.id,
+        personId: erasedPerson.id,
+        emoji: "👍",
+      }),
+    );
+    postBookmark = await getRepository(dataSource, PostBookmark).save(
+      new PostBookmark({ postId: post.id, personId: erasedPerson.id }),
     );
     testimonial = await getRepository(dataSource, Testimonial).save(
       new Testimonial({
@@ -560,6 +582,12 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await getRepository(dataSource, Testimonial).delete({ id: testimonial.id });
+    await getRepository(dataSource, PostReaction).delete({
+      id: postReaction.id,
+    });
+    await getRepository(dataSource, PostBookmark).delete({
+      id: postBookmark.id,
+    });
     await getRepository(dataSource, Post).delete({ id: post.id });
     await getRepository(dataSource, Organization).delete({
       id: organization.id,
@@ -590,6 +618,9 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
     expect(body.message).toContain("community post");
     expect(body.message).toContain("testimonial");
     expect(body.message).toContain("comment mention");
+    expect(body.message).toContain("post tag");
+    expect(body.message).toContain("post reaction");
+    expect(body.message).toContain("post bookmark");
 
     const person = await fastify.db.personRepository.findOneBy({
       id: erasedPerson.id,
@@ -663,6 +694,24 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
         id: commentPerson.id,
       }),
     ).not.toBeNull();
+    expect(
+      await getRepository(dataSource, PostReaction).findOneBy({
+        id: postReaction.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      await getRepository(dataSource, PostBookmark).findOneBy({
+        id: postBookmark.id,
+      }),
+    ).not.toBeNull();
+
+    // post_person has no dedicated entity/repository (see erase-person-pii's
+    // own comment) — checked with the same raw query it counts with.
+    const [{ count: postTagCount }] = await dataSource.query(
+      "SELECT COUNT(*)::int AS count FROM post_person WHERE post_id = $1 AND person_id = $2",
+      [post.id, erasedPerson.id],
+    );
+    expect(postTagCount).toBe(1);
   });
 });
 

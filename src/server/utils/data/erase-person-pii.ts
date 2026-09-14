@@ -2,6 +2,8 @@ import { UserRole } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import CommentPerson from "../../../data/entity/m2m/comment-person";
+import PostBookmark from "../../../data/entity/m2m/post-bookmark";
+import PostReaction from "../../../data/entity/m2m/post-reaction";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
@@ -61,6 +63,32 @@ const OTHER_ROLE_CHECKS = [
     label: "internal comment mention(s)",
     count: (manager: EntityManager, personId: number) =>
       manager.count(CommentPerson, { where: { personId } }),
+  },
+  {
+    key: "postTags",
+    label: "community post tag(s)",
+    count: async (manager: EntityManager, personId: number) => {
+      // Post.taggedPersons is a plain @ManyToMany with no dedicated entity
+      // for its post_person join table, so there's no repository to
+      // .count() against — a raw count on the join table itself instead.
+      const [{ count }] = await manager.query(
+        "SELECT COUNT(*)::int AS count FROM post_person WHERE person_id = $1",
+        [personId],
+      );
+      return count as number;
+    },
+  },
+  {
+    key: "postReactions",
+    label: "post reaction(s)",
+    count: (manager: EntityManager, personId: number) =>
+      manager.count(PostReaction, { where: { personId } }),
+  },
+  {
+    key: "postBookmarks",
+    label: "post bookmark(s)",
+    count: (manager: EntityManager, personId: number) =>
+      manager.count(PostBookmark, { where: { personId } }),
   },
 ] as const;
 
