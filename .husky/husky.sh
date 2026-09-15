@@ -7,12 +7,6 @@ export NVM_DIR="$HOME/.nvm"
 # 2. If nvm was found, tell it to use the project's version
 if command -v nvm >/dev/null 2>&1; then
   if [ -f ".nvmrc" ]; then
-    # Read the version string from .nvmrc safely
-    NODE_VERSION=$(cat .nvmrc | tr -d '\r' | xargs)
-
-    echo "Found .nvmrc, switching to Node $NODE_VERSION..."
-    
-    # Run 'nvm use' without the unsupported --silent flag, hiding output cross-platform
-    nvm use "$NODE_VERSION" >/dev/null 2>&1 || true
+    nvm use --silent
   fi
 fi
