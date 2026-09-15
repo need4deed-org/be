@@ -85,6 +85,21 @@ describe("activateDueOnetimers", () => {
 
     await activateDueOnetimers(fastify);
 
+    expect(qbMock.andWhere).toHaveBeenCalledWith(
+      "opportunity.status NOT IN (:...terminalStatuses)",
+      {
+        terminalStatuses: [
+          OpportunityStatusType.ACTIVE,
+          OpportunityStatusType.INACTIVE,
+          OpportunityStatusType.PAST,
+        ],
+      },
+    );
+    expect(qbMock.andWhere).toHaveBeenCalledWith(
+      "opportunityVolunteer.status = :matched",
+      { matched: OpportunityVolunteerStatusType.MATCHED },
+    );
+
     expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
     expect(managerSave).toHaveBeenCalledWith(Opportunity, opportunity);
 

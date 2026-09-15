@@ -15,8 +15,12 @@ export async function activateDueOnetimers(
   const { startOfDay, endOfDay } = berlinDayBoundaries(berlinToday());
 
   const dueOpportunities = await buildOnetimerOpportunityQuery(fastify)
-    .andWhere("opportunity.status != :active", {
-      active: OpportunityStatusType.ACTIVE,
+    .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
+      terminalStatuses: [
+        OpportunityStatusType.ACTIVE,
+        OpportunityStatusType.INACTIVE,
+        OpportunityStatusType.PAST,
+      ],
     })
     .andWhere("onetimer.date BETWEEN :startOfDay AND :endOfDay", {
       startOfDay,

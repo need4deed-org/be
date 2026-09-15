@@ -3,9 +3,20 @@ import {
   OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
+import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import { buildOnetimerOpportunityQuery } from "../../server/utils/data/build-onetimer-opportunity-query";
 import { addWorkingDays, berlinToday } from "./german-holidays";
+
+// activateDueOnetimers already promotes a matched volunteer to ACTIVE on the
+// appointment day, so by the time this job revisits the opportunity its
+// volunteer may still be MATCHED (never got activated) or already ACTIVE —
+// both count as "was engaged" for deciding PAST vs INACTIVE (be#987 review).
+const ENGAGED_VOLUNTEER_STATUSES: OpportunityVolunteerStatusType[] = [
+  OpportunityVolunteerStatusType.MATCHED,
+  OpportunityVolunteerStatusType.ACTIVE,
+];
 
 export async function scanExpiredOnetimers(
   fastify: FastifyInstance,
@@ -30,42 +41,33 @@ export async function scanExpiredOnetimers(
 
   for (const opportunity of expiredOpportunities) {
     try {
-      const hadMatchedVolunteer = opportunity.opportunityVolunteer.some(
+      const engagedVolunteers = opportunity.opportunityVolunteer.filter(
         (opportunityVolunteer) =>
-          opportunityVolunteer.status ===
-          OpportunityVolunteerStatusType.MATCHED,
+          ENGAGED_VOLUNTEER_STATUSES.includes(opportunityVolunteer.status),
       );
 
-      opportunity.status = hadMatchedVolunteer
+      opportunity.status = engagedVolunteers.length
         ? OpportunityStatusType.PAST
         : OpportunityStatusType.INACTIVE;
-      await fastify.db.opportunityRepository.save(opportunity);
 
-      for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-        if (
-          opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
-        ) {
-          try {
+      // Both writes happen in one transaction — if either fails, both roll
+      // back, so an opportunity can never end up PAST/INACTIVE while its
+      // volunteer is left stuck at MATCHED/ACTIVE (be#987 review, mirroring
+      // the be#988 fix in activateDueOnetimers).
+      await fastify.db.opportunityRepository.manager.transaction(
+        async (manager) => {
+          await manager.save(Opportunity, opportunity);
+
+          for (const opportunityVolunteer of engagedVolunteers) {
             opportunityVolunteer.status = OpportunityVolunteerStatusType.PAST;
-            await fastify.db.opportunityVolunteerRepository.save(
-              opportunityVolunteer,
-            );
-          } catch (err) {
-            logger.error(
-              {
-                err,
-                opportunityId: opportunity.id,
-                opportunityVolunteerId: opportunityVolunteer.id,
-              },
-              "scanExpiredOnetimers: failed to mark opportunity volunteer as PAST",
-            );
+            await manager.save(OpportunityVolunteer, opportunityVolunteer);
           }
-        }
-      }
+        },
+      );
     } catch (err) {
       logger.error(
         { err, opportunityId: opportunity.id },
-        "scanExpiredOnetimers: failed to mark opportunity as PAST/INACTIVE",
+        "scanExpiredOnetimers: failed to mark opportunity and its volunteer(s) as PAST/INACTIVE",
       );
     }
   }
