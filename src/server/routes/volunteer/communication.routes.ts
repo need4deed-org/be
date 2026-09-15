@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
+import { UnauthorizedError } from "../../../config";
 import { dtoCommunication } from "../../../services/dto/dto-communication";
 import { idParamSchema } from "../../schema";
 
@@ -10,7 +11,7 @@ export default function volunteerCommunicationRoutes(
   fastify.get<{ Params: { id: string } }>(
     "/",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      // onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -27,6 +28,21 @@ export default function volunteerCommunicationRoutes(
     },
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
+      const volunteerRepository = fastify.db.volunteerRepository;
+      const id = volunteerId;
+      const volunteer = await volunteerRepository.findOneByOrFail({
+        id,
+      });
+
+      const role = request.authUser?.role;
+      const isSelf =
+        role === UserRole.VOLUNTEER &&
+        request.authUser?.personId !== undefined &&
+        request.authUser?.personId !== null &&
+        request.authUser.personId === volunteer.personId;
+      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
+        throw new UnauthorizedError();
+      }
 
       const communications = await fastify.db.communicationRepository.find({
         where: { volunteerId },
