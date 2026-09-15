@@ -24,7 +24,7 @@ services:
       - DB_NAME=postgres
       - DB_SCHEMA=public
     ports:
-      - ${BE_PORT:-5000}:${PORT:-8000}
+      - ${BE_PORT:-5000}:8000
     networks:
       - n4d-net
     volumes:

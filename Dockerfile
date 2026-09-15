@@ -53,17 +53,8 @@ EXPOSE 8000
 # Use dumb-init to handle signals properly
 USER root
 
-RUN cat <<EOF > /usr/local/bin/entrypoint.sh
-#!/bin/sh
-if [ "\$NODE_ENV" = "production" ]; then
-    exec dumb-init -- "\$@"
-else
-    exec "\$@"
-fi
-EOF
-
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    chown nodejs:nodejs /usr/local/bin/entrypoint.sh
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chown nodejs:nodejs /usr/local/bin/entrypoint.sh
 
 USER nodejs
 

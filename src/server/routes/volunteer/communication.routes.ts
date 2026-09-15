@@ -11,7 +11,6 @@ export default function volunteerCommunicationRoutes(
   fastify.get<{ Params: { id: string } }>(
     "/",
     {
-      // onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {

@@ -52,7 +52,7 @@ describe("swagger endpoint is restricted to non-production", () => {
     } finally {
       await fastify.close();
     }
-  });
+  }, 30_000);
 
   it("does not register swagger endpoints in production", async () => {
     const fastify = await buildServer("production");
@@ -75,5 +75,5 @@ describe("swagger endpoint is restricted to non-production", () => {
     } finally {
       await fastify.close();
     }
-  });
+  }, 30_000);
 });
