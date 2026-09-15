@@ -898,12 +898,6 @@
             },
             "name": {
               "type": "string"
-            },
-            "address": {
-              "type": "string"
-            },
-            "district": {
-              "type": "string"
             }
           }
         },
