@@ -140,8 +140,6 @@ describe("parseOpportunity", () => {
       agent: {
         id: 7,
         name: "ignored",
-        address: "ignored",
-        district: "ignored",
       },
     });
 
