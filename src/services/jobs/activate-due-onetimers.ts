@@ -3,27 +3,30 @@ import {
   OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
-import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
-import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
+import { applyOnetimerTransition } from "../../server/utils/data/apply-onetimer-transition";
 import { buildOnetimerOpportunityQuery } from "../../server/utils/data/build-onetimer-opportunity-query";
+import { ONETIMER_TERMINAL_OPPORTUNITY_STATUSES } from "../../server/utils/data/onetimer-statuses";
 import { berlinDayBoundaries, berlinToday } from "./german-holidays";
 
 export async function activateDueOnetimers(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const { startOfDay, endOfDay } = berlinDayBoundaries(berlinToday());
+  const { endOfDay } = berlinDayBoundaries(berlinToday());
 
+  // `<= endOfDay` (rather than restricting to today's window) lets a onetimer
+  // whose exact appointment day the job missed — a deploy, an outage, a
+  // failed transaction — still get activated on the next run, instead of
+  // being silently skipped straight to PAST by scanExpiredOnetimers with no
+  // error raised (be#987 review).
   const dueOpportunities = await buildOnetimerOpportunityQuery(fastify)
     .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
       terminalStatuses: [
         OpportunityStatusType.ACTIVE,
-        OpportunityStatusType.INACTIVE,
-        OpportunityStatusType.PAST,
+        ...ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
       ],
     })
-    .andWhere("onetimer.date BETWEEN :startOfDay AND :endOfDay", {
-      startOfDay,
+    .andWhere("onetimer.date <= :endOfDay", {
       endOfDay,
     })
     .andWhere("opportunityVolunteer.status = :matched", {
@@ -36,27 +39,16 @@ export async function activateDueOnetimers(
   }
 
   for (const opportunity of dueOpportunities) {
-    try {
-      // Both writes happen in one transaction — if either fails, both roll
-      // back, so an opportunity can never end up ACTIVE while its volunteer
-      // is stuck at MATCHED (be#988).
-      await fastify.db.opportunityRepository.manager.transaction(
-        async (manager) => {
-          opportunity.status = OpportunityStatusType.ACTIVE;
-          await manager.save(Opportunity, opportunity);
-
-          for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-            opportunityVolunteer.status = OpportunityVolunteerStatusType.ACTIVE;
-            await manager.save(OpportunityVolunteer, opportunityVolunteer);
-          }
-        },
-      );
-    } catch (err) {
-      logger.error(
-        { err, opportunityId: opportunity.id },
-        "activateDueOnetimers: failed to activate opportunity and its volunteer(s)",
-      );
-    }
+    await applyOnetimerTransition(
+      fastify,
+      opportunity,
+      OpportunityStatusType.ACTIVE,
+      opportunity.opportunityVolunteer.map((volunteer) => ({
+        volunteer,
+        status: OpportunityVolunteerStatusType.ACTIVE,
+      })),
+      "activateDueOnetimers: failed to activate opportunity and its volunteer(s)",
+    );
   }
 
   logger.info(

@@ -218,7 +218,10 @@ describe("scanExpiredOnetimers", () => {
     await scanExpiredOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
-      expect.objectContaining({ opportunityId: opportunity.id }),
+      expect.objectContaining({
+        opportunityId: opportunity.id,
+        opportunityVolunteerIds: [first.id, second.id],
+      }),
       expect.stringContaining(
         "failed to mark opportunity and its volunteer(s) as PAST/INACTIVE",
       ),

@@ -115,6 +115,20 @@ describe("activateDueOnetimers", () => {
     );
   });
 
+  it("be#987 review: matches onetimers due on or before today, not just exactly today, so a missed cron run still catches up", async () => {
+    getMany.mockResolvedValue([]);
+
+    await activateDueOnetimers(fastify);
+
+    expect(qbMock.andWhere).toHaveBeenCalledWith("onetimer.date <= :endOfDay", {
+      endOfDay: expect.any(Date),
+    });
+    expect(qbMock.andWhere).not.toHaveBeenCalledWith(
+      "onetimer.date BETWEEN :startOfDay AND :endOfDay",
+      expect.anything(),
+    );
+  });
+
   it("keeps processing remaining opportunities when one's transaction fails", async () => {
     const failing = buildOpportunity(1, [
       { id: 1, status: OpportunityVolunteerStatusType.MATCHED },
