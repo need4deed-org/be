@@ -1,4 +1,10 @@
-import { Lang, OpportunitySortField, SortOrder, UserRole } from "need4deed-sdk";
+import {
+  ApiPostListQuery,
+  Lang,
+  OpportunitySortField,
+  SortOrder,
+  UserRole,
+} from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -113,6 +119,4 @@ export interface QuerystringUserList extends QuerystringPagination {
   role?: UserRole;
 }
 
-export interface QuerystringPostList extends QuerystringPagination {
-  search?: string;
-}
+export type QuerystringPostList = ApiPostListQuery;

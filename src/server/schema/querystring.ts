@@ -171,6 +171,7 @@ export const postListQuerySchema = {
   properties: {
     ...paginationProps,
     search: { type: "string" },
+    authorId: { type: "integer" },
   },
   additionalProperties: false,
 };

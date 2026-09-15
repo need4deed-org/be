@@ -762,6 +762,74 @@ describe("POST /post", () => {
     expect(await search(`no-such-text-${suffix}`)).toEqual([]);
   });
 
+  it("filters GET /post by authorId to only that author's posts", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+    const agentPostRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text: `Agent authored post ${suffix}` },
+    });
+    const agentPostId = agentPostRes.json().data.id;
+    createdPostIds.push(agentPostId);
+
+    const coordinatorPostRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { text: `Coordinator authored post ${suffix}` },
+    });
+    const coordinatorPostId = coordinatorPostRes.json().data.id;
+    createdPostIds.push(coordinatorPostId);
+
+    const byAuthor = async (authorId: number) => {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/post?authorId=${authorId}`,
+        cookies: { [accessCookieName]: agentCookie },
+      });
+      return res.json().data.map((p: { id: number }) => p.id);
+    };
+
+    expect(await byAuthor(agentPerson.id)).toContain(agentPostId);
+    expect(await byAuthor(agentPerson.id)).not.toContain(coordinatorPostId);
+    expect(await byAuthor(coordinatorPerson.id)).toContain(coordinatorPostId);
+    expect(await byAuthor(coordinatorPerson.id)).not.toContain(agentPostId);
+  });
+
+  it("combines authorId and search with AND", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const text = `Combo filter target ${suffix}`;
+
+    const agentPostRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { text },
+    });
+    const agentPostId = agentPostRes.json().data.id;
+    createdPostIds.push(agentPostId);
+
+    const coordinatorPostRes = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { text },
+    });
+    createdPostIds.push(coordinatorPostRes.json().data.id);
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/post?authorId=${agentPerson.id}&search=${encodeURIComponent(text)}`,
+      cookies: { [accessCookieName]: agentCookie },
+    });
+
+    expect(res.json().data.map((p: { id: number }) => p.id)).toEqual([
+      agentPostId,
+    ]);
+  });
+
   it("paginates search results correctly for a post with multiple tagged persons and opportunities", async () => {
     // Regression test for the join fan-out bug: a post with several to-many
     // relations must still count/paginate as exactly one post, not be

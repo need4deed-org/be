@@ -81,7 +81,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { role } = request.user;
-      const { search } = request.query;
+      const { search, authorId } = request.query;
       const [skip, take] = getSkipTake(request.query);
 
       if (!isPostManagerRole(role)) {
@@ -93,7 +93,7 @@ export default async function postRoutes(
       let orderedPosts: Post[];
       let count: number;
 
-      if (!search) {
+      if (!search && !authorId) {
         // Plain listing: buildPostQuery's leftJoinAndSelect + getManyAndCount
         // already paginates correctly despite the to-many joins — TypeORM
         // wraps this in its own distinct-primary-key subquery whenever
@@ -108,14 +108,15 @@ export default async function postRoutes(
           .take(take);
         [orderedPosts, count] = await qb.getManyAndCount();
       } else {
-        // Search: buildMatchingPostIdsQuery only ever plain-leftJoins (for
-        // filtering, not hydration) and runs via getRawMany, so none of
-        // TypeORM's automatic pagination handling applies here — GROUP BY
-        // collapses the to-many-join fan-out before LIMIT/OFFSET applies,
-        // and COUNT(*) OVER() gets the total alongside the page in the same
-        // query (a window function, computed over the full pre-LIMIT result
-        // set, not just the page). Full posts are then hydrated separately
-        // via buildPostQuery, keyed by the fixed page of ids.
+        // Search and/or authorId: buildMatchingPostIdsQuery only ever
+        // plain-leftJoins (for filtering, not hydration) and runs via
+        // getRawMany, so none of TypeORM's automatic pagination handling
+        // applies here — GROUP BY collapses any to-many-join fan-out before
+        // LIMIT/OFFSET applies, and COUNT(*) OVER() gets the total alongside
+        // the page in the same query (a window function, computed over the
+        // full pre-LIMIT result set, not just the page). Full posts are then
+        // hydrated separately via buildPostQuery, keyed by the fixed page of
+        // ids.
         //
         // .limit()/.offset(), not .skip()/.take(): TypeORM's skip/take are
         // meant for getMany()/getManyAndCount() — on a raw, manually-grouped
@@ -125,7 +126,7 @@ export default async function postRoutes(
         // writing the fan-out regression test above. limit/offset always
         // emit a literal LIMIT/OFFSET, which is exactly right here since
         // GROUP BY has already made each row one distinct post.
-        const idsQb = buildMatchingPostIdsQuery(fastify, search)
+        const idsQb = buildMatchingPostIdsQuery(fastify, { search, authorId })
           .select("post.id", "id")
           .addSelect("COUNT(*) OVER()", "totalCount")
           .groupBy("post.id")
@@ -147,7 +148,7 @@ export default async function postRoutes(
           ? Number(idRows[0].totalCount)
           : Number(
               (
-                await buildMatchingPostIdsQuery(fastify, search)
+                await buildMatchingPostIdsQuery(fastify, { search, authorId })
                   .select("COUNT(DISTINCT post.id)", "count")
                   .getRawOne<{ count: string }>()
               )?.count ?? 0,
