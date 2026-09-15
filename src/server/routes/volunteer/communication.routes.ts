@@ -39,6 +39,7 @@ export default function volunteerCommunicationRoutes(
         request.authUser?.personId !== undefined &&
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
+      // only COORDINATOR or volunteer viewing own profile can view
       if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
         throw new UnauthorizedError();
       }
