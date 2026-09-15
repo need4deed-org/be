@@ -45,9 +45,7 @@ describe("getSslForDataSource", () => {
       /DB_SSL_CA_PATH/,
     );
     expect(() => getSslForDataSource("production", missing)).toThrowError(
-      expect.objectContaining({
-        message: expect.stringContaining(missing),
-      }),
+      new RegExp(missing),
     );
   });
 
