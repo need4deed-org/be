@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
 import logger from "../../logger";
+import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
@@ -25,9 +26,17 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
 
         logger.info("scheduler: running daily scans");
 
+        // Listed in logical order, but runNamedCronJobs runs them
+        // concurrently (Promise.allSettled) — harmless only because their
+        // onetimer date windows don't overlap (be#987 review). Revisit if
+        // either job's window changes.
         await runWithAdvisoryLock(
           () =>
             runNamedCronJobs([
+              {
+                name: "activateDueOnetimers",
+                run: () => activateDueOnetimers(fastify),
+              },
               {
                 name: "scanExpiredOnetimers",
                 run: () => scanExpiredOnetimers(fastify),

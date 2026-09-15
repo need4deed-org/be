@@ -7,7 +7,7 @@ import { EntityManager } from "typeorm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { scanExpiredOnetimers } from "../../../services/jobs/scan-expired-onetimers";
+import { activateDueOnetimers } from "../../../services/jobs/activate-due-onetimers";
 
 const loggerErrorMock = vi.fn();
 const loggerInfoMock = vi.fn();
@@ -53,7 +53,7 @@ function buildOpportunity(
 ): Opportunity {
   return new Opportunity({
     id,
-    status: OpportunityStatusType.ACTIVE,
+    status: OpportunityStatusType.SEARCHING,
     opportunityVolunteer: ovs.map((ov) => new OpportunityVolunteer(ov)),
   } as Partial<Opportunity>);
 }
@@ -68,97 +68,64 @@ beforeEach(() => {
   managerSave.mockImplementation(async (_entity: unknown, obj: unknown) => obj);
 });
 
-describe("scanExpiredOnetimers", () => {
-  it("does nothing when there are no expired opportunities", async () => {
+describe("activateDueOnetimers", () => {
+  it("does nothing when there are no opportunities due today", async () => {
     getMany.mockResolvedValue([]);
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(transaction).not.toHaveBeenCalled();
     expect(loggerInfoMock).not.toHaveBeenCalled();
   });
 
-  it("queries with the terminal-status and date-window guards", async () => {
-    getMany.mockResolvedValue([]);
+  it("activates opportunities due today with a matched volunteer", async () => {
+    const matched = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
+    const opportunity = buildOpportunity(10, [matched]);
+    getMany.mockResolvedValue([opportunity]);
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(qbMock.andWhere).toHaveBeenCalledWith(
       "opportunity.status NOT IN (:...terminalStatuses)",
       {
         terminalStatuses: [
+          OpportunityStatusType.ACTIVE,
           OpportunityStatusType.INACTIVE,
           OpportunityStatusType.PAST,
         ],
       },
     );
-    expect(qbMock.andWhere).toHaveBeenCalledWith("onetimer.date < :yesterday", {
-      yesterday: expect.any(Date),
-    });
-  });
+    expect(qbMock.andWhere).toHaveBeenCalledWith(
+      "opportunityVolunteer.status = :matched",
+      { matched: OpportunityVolunteerStatusType.MATCHED },
+    );
 
-  it("marks expired opportunities with a matched volunteer PAST, and flips that volunteer to PAST", async () => {
-    const matched = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
-    const pending = { id: 2, status: OpportunityVolunteerStatusType.PENDING };
-    const opportunity = buildOpportunity(10, [matched, pending]);
-    getMany.mockResolvedValue([opportunity]);
-
-    await scanExpiredOnetimers(fastify);
-
-    expect(opportunity.status).toBe(OpportunityStatusType.PAST);
+    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
     expect(managerSave).toHaveBeenCalledWith(Opportunity, opportunity);
 
     expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
+      OpportunityVolunteerStatusType.ACTIVE,
     );
     expect(managerSave).toHaveBeenCalledWith(
       OpportunityVolunteer,
       opportunity.opportunityVolunteer[0],
-    );
-    expect(opportunity.opportunityVolunteer[1].status).toBe(
-      OpportunityVolunteerStatusType.PENDING,
-    );
-    expect(managerSave).not.toHaveBeenCalledWith(
-      OpportunityVolunteer,
-      opportunity.opportunityVolunteer[1],
     );
     expect(loggerInfoMock).toHaveBeenCalledWith(
-      expect.stringContaining("processed 1 expired opportunities"),
+      expect.stringContaining("processed 1 due opportunities"),
     );
   });
 
-  it("be#987 review: also finalizes an already-ACTIVE volunteer (activated by activateDueOnetimers) to PAST, not just MATCHED", async () => {
-    const active = { id: 1, status: OpportunityVolunteerStatusType.ACTIVE };
-    const opportunity = buildOpportunity(10, [active]);
-    getMany.mockResolvedValue([opportunity]);
+  it("be#987 review: matches onetimers due on or before today, not just exactly today, so a missed cron run still catches up", async () => {
+    getMany.mockResolvedValue([]);
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
-    expect(opportunity.status).toBe(OpportunityStatusType.PAST);
-    expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
-    );
-    expect(managerSave).toHaveBeenCalledWith(
-      OpportunityVolunteer,
-      opportunity.opportunityVolunteer[0],
-    );
-  });
-
-  it("marks expired opportunities with no matched/active volunteer INACTIVE", async () => {
-    const pending = { id: 2, status: OpportunityVolunteerStatusType.PENDING };
-    const opportunity = buildOpportunity(11, [pending]);
-    getMany.mockResolvedValue([opportunity]);
-
-    await scanExpiredOnetimers(fastify);
-
-    expect(opportunity.status).toBe(OpportunityStatusType.INACTIVE);
-    expect(managerSave).toHaveBeenCalledWith(Opportunity, opportunity);
-    expect(managerSave).not.toHaveBeenCalledWith(
-      OpportunityVolunteer,
+    expect(qbMock.andWhere).toHaveBeenCalledWith("onetimer.date <= :endOfDay", {
+      endOfDay: expect.any(Date),
+    });
+    expect(qbMock.andWhere).not.toHaveBeenCalledWith(
+      "onetimer.date BETWEEN :startOfDay AND :endOfDay",
       expect.anything(),
-    );
-    expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PENDING,
     );
   });
 
@@ -177,12 +144,12 @@ describe("scanExpiredOnetimers", () => {
       throw new Error("db unavailable");
     });
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
       expect.objectContaining({ opportunityId: 1 }),
       expect.stringContaining(
-        "failed to mark opportunity and its volunteer(s) as PAST/INACTIVE",
+        "failed to activate opportunity and its volunteer(s)",
       ),
     );
 
@@ -196,13 +163,13 @@ describe("scanExpiredOnetimers", () => {
     );
 
     // The second opportunity is still processed despite the first one failing.
-    expect(succeeding.status).toBe(OpportunityStatusType.PAST);
+    expect(succeeding.status).toBe(OpportunityStatusType.ACTIVE);
     expect(succeeding.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.PAST,
+      OpportunityVolunteerStatusType.ACTIVE,
     );
   });
 
-  it("rolls back the whole opportunity when one volunteer save fails, instead of partially applying it", async () => {
+  it("be#988: rolls back the whole opportunity when one volunteer save fails, instead of partially applying it", async () => {
     const first = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
     const second = { id: 2, status: OpportunityVolunteerStatusType.MATCHED };
     const opportunity = buildOpportunity(1, [first, second]);
@@ -215,20 +182,18 @@ describe("scanExpiredOnetimers", () => {
       return obj;
     });
 
-    await scanExpiredOnetimers(fastify);
+    await activateDueOnetimers(fastify);
 
     expect(loggerErrorMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        opportunityId: opportunity.id,
-        opportunityVolunteerIds: [first.id, second.id],
-      }),
+      expect.objectContaining({ opportunityId: opportunity.id }),
       expect.stringContaining(
-        "failed to mark opportunity and its volunteer(s) as PAST/INACTIVE",
+        "failed to activate opportunity and its volunteer(s)",
       ),
     );
 
     // The transaction aborts as soon as the first volunteer's save throws —
-    // the second volunteer's save is never even attempted.
+    // the second volunteer's save is never even attempted, proving this is
+    // all-or-nothing per opportunity rather than best-effort per volunteer.
     expect(managerSave).not.toHaveBeenCalledWith(
       OpportunityVolunteer,
       opportunity.opportunityVolunteer[1],
