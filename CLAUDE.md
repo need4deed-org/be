@@ -123,9 +123,11 @@ All route prefixes are defined in `RoutePrefix` in `src/server/types/enums.ts`. 
 
 ## Testing
 
-Tests live in `src/test/`, mirroring the `src/` structure. Vitest runs with `NODE_ENV=test` and skips migrations. Tests do **not** use mocked repositories — they hit a real database. Run `docker compose up db` or have Postgres available locally before running tests.
+Tests live in `src/test/`, mirroring the `src/` structure. Vitest runs with `NODE_ENV=test` and skips migrations. Tests do **not** use mocked repositories — they hit a real database. Run `docker compose up db` or have Postgres available locally before running tests, then run migrations. On a genuinely fresh database (new volume, no prior seed data), also run `yarn seed` before testing — most of the suite depends on seeded reference data (languages, skills, categories, etc.) that an existing local dev database already has, and skipping it causes widespread, unrelated-looking failures.
 
 Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts`
+
+Test files run serially against the shared database (`fileParallelism: false` in `vitest.config.ts`) — each file opens its own connection pool, and running them in parallel exhausted Postgres's `max_connections` and caused random cross-file failures (be#996). The full suite takes longer as a result; that's the intended trade-off over flaky runs.
 
 ---
 
