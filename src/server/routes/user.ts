@@ -21,7 +21,7 @@ import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
-import { responseSchema, userListQuerySchema } from "../schema";
+import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
   createUserBodySchema,
@@ -29,7 +29,13 @@ import {
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
 } from "../schema/user.schema";
-import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
+import {
+  ParamsId,
+  QuerystringUserList,
+  ReplyDataCount,
+  ReplyMessage,
+  RoutePrefix,
+} from "../types";
 import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
@@ -119,6 +125,36 @@ export default async function userRoutes(
         logger.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
+    },
+  );
+
+  // Self-service account deletion (be#583). Soft delete only — sets
+  // isActive to false rather than removing the row. allowSelf lets an
+  // authenticated user act on their own id; admins bypass the self check
+  // per fastify.authenticate's own semantics, same as GET /:id above.
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+      onRequest: [fastify.authenticate({ allowSelf: true })],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const userRepository = fastify.db.userRepository;
+      const user = await userRepository.findOne({ where: { id } });
+
+      if (!user) {
+        return reply.status(404).send({ message: `User id:${id} not found.` });
+      }
+
+      await userRepository.update({ id }, { isActive: false });
+
+      return reply
+        .status(200)
+        .send({ message: `Account id:${id} deactivated.` });
     },
   );
 

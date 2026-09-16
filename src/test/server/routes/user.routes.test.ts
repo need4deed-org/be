@@ -582,3 +582,117 @@ describe("GET /user/me — volunteerId (be#948)", () => {
     }
   });
 });
+
+describe("DELETE /user/:id (be#583)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  async function makeUser(email: string) {
+    const user = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+      }),
+    );
+    return {
+      user,
+      accessToken: fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        type: "access",
+      }),
+    };
+  }
+
+  it("deactivates the caller's own account", async () => {
+    const { user, accessToken } = await makeUser(
+      `self-delete-${suffix}@example.com`,
+    );
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${user.id}`,
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(200);
+
+      const updated = await fastify.db.userRepository.findOneOrFail({
+        where: { id: user.id },
+      });
+      expect(updated.isActive).toBe(false);
+    } finally {
+      await fastify.db.userRepository.delete({ id: user.id });
+    }
+  });
+
+  it("rejects deactivating another account (self-only)", async () => {
+    const { user: caller, accessToken } = await makeUser(
+      `caller-${suffix}@example.com`,
+    );
+    const { user: other } = await makeUser(`other-${suffix}@example.com`);
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${other.id}`,
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(403);
+
+      const untouched = await fastify.db.userRepository.findOneOrFail({
+        where: { id: other.id },
+      });
+      expect(untouched.isActive).toBe(true);
+    } finally {
+      await fastify.db.userRepository.delete({ id: caller.id });
+      await fastify.db.userRepository.delete({ id: other.id });
+    }
+  });
+
+  // A non-ADMIN caller can never hit this branch on their own id: allowSelf
+  // requires the caller's own account to already exist (authenticate() looks
+  // it up first). ADMIN bypasses the self check, so it's the only way to
+  // reach this route for an id that doesn't exist.
+  it("404s for a nonexistent id", async () => {
+    const admin = await fastify.db.userRepository.save(
+      new User({
+        email: `admin-${suffix}@example.com`,
+        password: await hashPassword("test_password"),
+        role: UserRole.ADMIN,
+        isActive: true,
+      }),
+    );
+    const adminToken = fastify.jwt.sign({
+      id: admin.id,
+      email: admin.email,
+      type: "access",
+    });
+    const ghostId = 999_999_999;
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${ghostId}`,
+        cookies: { access: adminToken },
+      });
+
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await fastify.db.userRepository.delete({ id: admin.id });
+    }
+  });
+});
