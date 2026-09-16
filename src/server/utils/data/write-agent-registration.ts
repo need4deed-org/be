@@ -14,7 +14,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { createAddress } from "./for-routes";
 import { getAgentByAddress } from "./get-agent-by-postcode";
-import { isEmailDomainTrusted } from "./is-trusted-domain";
+import { isAgentDomainAllowed } from "./is-agent-domain-allowed";
 
 export interface RegisterAgentResult {
   agentId: number;
@@ -229,31 +229,27 @@ export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
 ): Promise<AgentMembershipStatus> {
-  const domain = registrantEmail.split("@").pop()?.toLowerCase();
-  if (!domain) {
-    return AgentMembershipStatus.PENDING;
-  }
-  const suffix = `@${domain}`;
+  const allowed = await isAgentDomainAllowed(
+    registrantEmail,
+    async (domain) => {
+      const suffix = `@${domain}`;
+      const members = await dataSource.getRepository(AgentPerson).find({
+        where: { agentId },
+        relations: ["person", "person.users"],
+      });
+      return members.some((member) => {
+        const personEmail = member.person?.email;
+        if (personEmail) {
+          return personEmail.toLowerCase().endsWith(suffix);
+        }
+        return (member.person?.users ?? []).some((user) =>
+          user.email?.toLowerCase().endsWith(suffix),
+        );
+      });
+    },
+  );
 
-  const members = await dataSource.getRepository(AgentPerson).find({
-    where: { agentId },
-    relations: ["person", "person.users"],
-  });
-
-  const matched = members.some((member) => {
-    const personEmail = member.person?.email;
-    if (personEmail) {
-      return personEmail.toLowerCase().endsWith(suffix);
-    }
-    return (member.person?.users ?? []).some((user) =>
-      user.email?.toLowerCase().endsWith(suffix),
-    );
-  });
-
-  // Auto-approve when an existing member shares the domain, or the domain is on
-  // the trusted allowlist (a brand-new org's first representative).
-  const trusted = matched || (await isEmailDomainTrusted(registrantEmail));
-  return trusted ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
+  return allowed ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
 /**
