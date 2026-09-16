@@ -20,7 +20,13 @@ export async function validateAndSaveUser(
   userRepository: Repository<User>,
   newUser: User,
 ): Promise<ValidateAndSaveUserResult> {
-  const errors = await validate(newUser);
+  // target/value suppressed: a ValidationError otherwise carries the full
+  // entity (including the hashed password and email) and the raw invalid
+  // value — logging that unfiltered would violate "never log personal data"
+  // (be#1011 review).
+  const errors = await validate(newUser, {
+    validationError: { target: false, value: false },
+  });
   if (errors.length > 0) {
     logger.error(`User entity validation errors: ${JSON.stringify(errors)}`);
     return {

@@ -18,9 +18,7 @@ import {
 import { FindOptionsWhere, ILike } from "typeorm";
 import {
   BadRequestError,
-  ConflictError,
   InvalidOrganizationEmailError,
-  PersonAlreadyRegisteredError,
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../config";
@@ -52,8 +50,10 @@ import {
   RoutePrefix,
 } from "../types";
 import {
+  assertEmailAvailable,
   getSkipTake,
   getUserWhere,
+  resolvePersonByEmail,
   validateAndSaveUser,
   verifyTokenOfType,
 } from "../utils";
@@ -402,38 +402,11 @@ export default async function userRoutes(
         // No explicit person.id — look up an existing Person by email
         // (case-insensitively) before creating a new, disconnected one, e.g.
         // a Person that already exists via a legacy Volunteer row (be#923).
-        const existingPerson = await personRepository.findOne({
-          where: { email: ILike(email) },
-          relations: ["users"],
-        });
-        if (existingPerson) {
-          // Conservative default: a Person that already has a User (any
-          // role) is not re-registrable — point them at login instead of
-          // silently attaching a second account to the same Person.
-          if (existingPerson.users?.length) {
-            throw new PersonAlreadyRegisteredError();
-          }
-          request.resolvedPerson = existingPerson;
-          return;
-        }
-
-        // New person. Mirror the account email onto the person so the person
-        // record carries the same email the user registered with.
-        const newPerson = new Person(personData);
-        newPerson.email = email;
-        const errors = await validate(newPerson);
-        if (errors.length > 0) {
-          logger.error(
-            `New Person entity validation errors: ${JSON.stringify(errors)}`,
-          );
-          const messages = errors.flatMap((err) =>
-            Object.values(err.constraints || {}),
-          );
-          throw new BadRequestError(
-            `Validation failed for new person data: ${messages.join("; ")}`,
-          );
-        }
-        request.resolvedPerson = newPerson;
+        request.resolvedPerson = await resolvePersonByEmail(
+          personRepository,
+          email,
+          personData,
+        );
       },
     },
     async (request, reply) => {
@@ -442,9 +415,7 @@ export default async function userRoutes(
 
       // Surface the duplicate-email case as 409 up front (the DB unique
       // constraint remains the ultimate guard for the rare race).
-      if (await userRepository.findOneBy({ email })) {
-        throw new ConflictError("User with this email already exists.");
-      }
+      await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
         email,
@@ -533,9 +504,7 @@ export default async function userRoutes(
       const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
 
-      if (await userRepository.findOneBy({ email })) {
-        throw new ConflictError("User with this email already exists.");
-      }
+      await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
         email,
@@ -582,9 +551,7 @@ export default async function userRoutes(
     async (request, reply) => {
       const { email, person } = request.body;
 
-      if (await fastify.db.userRepository.findOneBy({ email })) {
-        throw new ConflictError("User with this email already exists.");
-      }
+      await assertEmailAvailable(fastify.db.userRepository, email);
 
       const token = fastify.jwt.sign(
         { email, person, type: "coordinator-invite" },
@@ -645,29 +612,23 @@ export default async function userRoutes(
           throw new UnauthenticatedError("Invalid invite token.");
         }
 
-        if (
-          await fastify.db.userRepository.findOneBy({ email: payload.email })
-        ) {
-          throw new ConflictError("User with this email already exists.");
-        }
-
         // Same email-first lookup as POST / (be#923) — an invited
         // coordinator's email may already have a Person row (e.g. a prior
         // Volunteer signup with no User yet); link to it instead of
         // creating a disconnected duplicate. Shares request.resolvedPerson
         // with POST / and POST /admin rather than a separate field.
-        const existingPerson = await fastify.db.personRepository.findOne({
-          where: { email: ILike(payload.email) },
-          relations: ["users"],
-        });
-        if (existingPerson?.users?.length) {
-          throw new PersonAlreadyRegisteredError();
-        }
+        // Checked before the User-uniqueness guard below, matching POST /'s
+        // ordering, so the same underlying "already registered" case
+        // surfaces the same error regardless of entry point (be#1011 review).
+        request.resolvedPerson = await resolvePersonByEmail(
+          fastify.db.personRepository,
+          payload.email,
+          payload.person,
+        );
+
+        await assertEmailAvailable(fastify.db.userRepository, payload.email);
 
         request.coordinatorInvite = { email: payload.email };
-        request.resolvedPerson =
-          existingPerson ??
-          new Person({ ...payload.person, email: payload.email });
       },
     },
     async (request, reply) => {

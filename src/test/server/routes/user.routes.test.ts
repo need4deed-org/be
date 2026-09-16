@@ -949,7 +949,7 @@ describe("POST /user/register-with-invite", () => {
     expect(res.json()).toMatchObject({ error: "PersonAlreadyRegisteredError" });
   });
 
-  it("409s a replay of an already-consumed invite token (single-use)", async () => {
+  it("rejects a replay of an already-consumed invite token (single-use)", async () => {
     const email = `replay-${suffix}@example.com`;
     const token = makeInviteToken(email);
 
@@ -967,6 +967,13 @@ describe("POST /user/register-with-invite", () => {
       url: `/user/register-with-invite?token=${token}`,
       payload: { password: "another_password" },
     });
-    expect(second.statusCode).toBe(409);
+    // The Person-already-registered check runs before the User-email
+    // guard (be#1011 review, matching POST /'s ordering), so a replay
+    // surfaces as the same 400/PersonAlreadyRegisteredError as any other
+    // "this identity is already registered" case, not a 409.
+    expect(second.statusCode).toBe(400);
+    expect(second.json()).toMatchObject({
+      error: "PersonAlreadyRegisteredError",
+    });
   });
 });
