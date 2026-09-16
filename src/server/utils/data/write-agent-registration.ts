@@ -13,6 +13,7 @@ import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { createAddress } from "./for-routes";
+import { isFreeEmailDomain } from "./free-email-domains";
 import { getAgentByAddress } from "./get-agent-by-postcode";
 import { isEmailDomainTrusted } from "./is-trusted-domain";
 
@@ -233,22 +234,29 @@ export async function resolveJoinStatus(
   if (!domain) {
     return AgentMembershipStatus.PENDING;
   }
-  const suffix = `@${domain}`;
 
-  const members = await dataSource.getRepository(AgentPerson).find({
-    where: { agentId },
-    relations: ["person", "person.users"],
-  });
-
-  const matched = members.some((member) => {
-    const personEmail = member.person?.email;
-    if (personEmail) {
-      return personEmail.toLowerCase().endsWith(suffix);
-    }
-    return (member.person?.users ?? []).some((user) =>
-      user.email?.toLowerCase().endsWith(suffix),
-    );
-  });
+  // A free/consumer domain (gmail.com, yahoo.com, ...) never auto-approves
+  // via the existing-member shortcut below — anyone can register an address
+  // there, so one member already using it says nothing about this
+  // registrant. Only an explicit TrustedDomain entry can clear the gate for
+  // those domains (be#1001).
+  let matched = false;
+  if (!isFreeEmailDomain(domain)) {
+    const suffix = `@${domain}`;
+    const members = await dataSource.getRepository(AgentPerson).find({
+      where: { agentId },
+      relations: ["person", "person.users"],
+    });
+    matched = members.some((member) => {
+      const personEmail = member.person?.email;
+      if (personEmail) {
+        return personEmail.toLowerCase().endsWith(suffix);
+      }
+      return (member.person?.users ?? []).some((user) =>
+        user.email?.toLowerCase().endsWith(suffix),
+      );
+    });
+  }
 
   // Auto-approve when an existing member shares the domain, or the domain is on
   // the trusted allowlist (a brand-new org's first representative).
