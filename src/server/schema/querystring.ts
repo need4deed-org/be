@@ -166,11 +166,16 @@ export const userListQuerySchema = {
   additionalProperties: false,
 };
 
+// Field names/types here must mirror need4deed-sdk's ApiPostListQuery (which
+// QuerystringPostList aliases, see endpoint-handlers.ts) — this AJV schema
+// isn't derived from that type, so a future SDK field addition/rename won't
+// surface here on its own; update both by hand together.
 export const postListQuerySchema = {
   type: "object",
   properties: {
     ...paginationProps,
     search: { type: "string" },
+    authorId: { type: "integer", minimum: 1 },
   },
   additionalProperties: false,
 };
@@ -182,7 +187,7 @@ export const volunteerOpportunityListQuerySchema = {
     ...langProp,
     type: getRef("VolunteerStateTypeType#"),
     status: getRef("OpportunityStatusType#"),
-    agentId: { type: "number" },
+    agentId: { type: "number", minimum: 1 },
     search: { type: "string" },
     german: { type: "boolean" },
     activity: { type: "string" },

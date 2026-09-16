@@ -72,7 +72,7 @@ export const userLoginResponseSchema = {
 };
 
 const userAttrs = {
-  id: { type: "number" },
+  id: { type: "number", minimum: 1 },
   email: { type: "string" },
   isActive: { type: "boolean" },
   role: { type: "string" },
@@ -86,7 +86,7 @@ export const userResponseSchema = {
   type: "object",
   properties: {
     ...userAttrs,
-    personId: { type: "number" },
+    personId: { type: "number", minimum: 1 },
   },
   required: [
     "id",
@@ -108,7 +108,7 @@ export const userResponseSchemaIncludePerson = {
     person: {
       type: "object",
       properties: {
-        id: { type: "number" },
+        id: { type: "number", minimum: 1 },
         firstName: { type: "string" },
         middleName: { type: ["string", "null"] },
         lastName: { type: "string" },

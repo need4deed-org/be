@@ -23,7 +23,7 @@ export const idmM2mIdParamSchema = {
   type: "object",
   properties: {
     id: { type: "integer", minimum: 1 },
-    m2mId: { type: "integer" },
+    m2mId: { type: "integer", minimum: 1 },
   },
   required: ["id", "m2mId"],
 };

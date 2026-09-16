@@ -322,6 +322,7 @@ describe("volunteer activity audit log (be#919)", () => {
       expect(entries[0].detail).toContain(
         OpportunityVolunteerStatusType.MATCHED,
       );
+      expect(entries[0].detail).toContain(opportunity.title);
     });
   });
 });
