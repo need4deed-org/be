@@ -1,10 +1,15 @@
 import { FastifyInstance } from "fastify";
 import {
   OpportunityStatusType,
-  OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import logger from "../../logger";
+import { applyOnetimerTransition } from "../../server/utils/data/apply-onetimer-transition";
+import { buildOnetimerOpportunityQuery } from "../../server/utils/data/build-onetimer-opportunity-query";
+import {
+  ONETIMER_ENGAGED_VOLUNTEER_STATUSES,
+  ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
+} from "../../server/utils/data/onetimer-statuses";
 import { addWorkingDays, berlinToday } from "./german-holidays";
 
 export async function scanExpiredOnetimers(
@@ -12,18 +17,9 @@ export async function scanExpiredOnetimers(
 ): Promise<void> {
   const dayBeforeToday = addWorkingDays(berlinToday(), -1);
 
-  const expiredOpportunities = await fastify.db.opportunityRepository
-    .createQueryBuilder("opportunity")
-    .leftJoinAndSelect("opportunity.onetimer", "onetimer")
-    .leftJoinAndSelect(
-      "opportunity.opportunityVolunteer",
-      "opportunityVolunteer",
-    )
-    .where("opportunity.type IN (:...types)", {
-      types: [OpportunityType.ACCOMPANYING, OpportunityType.EVENTS],
-    })
-    .andWhere("opportunity.status != :inactive", {
-      inactive: OpportunityStatusType.INACTIVE,
+  const expiredOpportunities = await buildOnetimerOpportunityQuery(fastify)
+    .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
+      terminalStatuses: ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
     })
     .andWhere("onetimer.date < :yesterday", {
       yesterday: dayBeforeToday,
@@ -35,40 +31,28 @@ export async function scanExpiredOnetimers(
   }
 
   for (const opportunity of expiredOpportunities) {
-    try {
-      opportunity.status = OpportunityStatusType.INACTIVE;
-      await fastify.db.opportunityRepository.save(opportunity);
+    const engagedVolunteers = opportunity.opportunityVolunteer.filter(
+      (opportunityVolunteer) =>
+        ONETIMER_ENGAGED_VOLUNTEER_STATUSES.includes(
+          opportunityVolunteer.status,
+        ),
+    );
 
-      for (const opportunityVolunteer of opportunity.opportunityVolunteer) {
-        if (
-          opportunityVolunteer.status === OpportunityVolunteerStatusType.MATCHED
-        ) {
-          try {
-            opportunityVolunteer.status = OpportunityVolunteerStatusType.PAST;
-            await fastify.db.opportunityVolunteerRepository.save(
-              opportunityVolunteer,
-            );
-          } catch (err) {
-            logger.error(
-              {
-                err,
-                opportunityId: opportunity.id,
-                opportunityVolunteerId: opportunityVolunteer.id,
-              },
-              "scanExpiredOnetimers: failed to mark opportunity volunteer as PAST",
-            );
-          }
-        }
-      }
-    } catch (err) {
-      logger.error(
-        { err, opportunityId: opportunity.id },
-        "scanExpiredOnetimers: failed to mark opportunity as INACTIVE",
-      );
-    }
+    await applyOnetimerTransition(
+      fastify,
+      opportunity,
+      engagedVolunteers.length
+        ? OpportunityStatusType.PAST
+        : OpportunityStatusType.INACTIVE,
+      engagedVolunteers.map((volunteer) => ({
+        volunteer,
+        status: OpportunityVolunteerStatusType.PAST,
+      })),
+      "scanExpiredOnetimers: failed to mark opportunity and its volunteer(s) as PAST/INACTIVE",
+    );
   }
 
   logger.info(
-    `scanExpiredOnetimers: marked ${expiredOpportunities.length} opportunities as INACTIVE`,
+    `scanExpiredOnetimers: processed ${expiredOpportunities.length} expired opportunities`,
   );
 }
