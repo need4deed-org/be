@@ -1,6 +1,9 @@
 import { UserRole } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { urlEmailVerification } from "../../../config/constants";
+import {
+  urlEmailVerification,
+  VERIFY_LIFESPAN_MS,
+} from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   resetVerificationTemplateCache,
@@ -12,7 +15,8 @@ vi.mock("../../../data/utils", () => ({
 }));
 
 const send = vi.fn();
-const deps = { email: { send }, jwt: { sign: () => "tok" } } as any;
+const sign = vi.fn(() => "tok");
+const deps = { email: { send }, jwt: { sign } } as any;
 const user = (over: any = {}) => ({ id: 1, email: "u@x.de", ...over });
 const expectedUrl = `${urlEmailVerification}/tok`;
 
@@ -103,5 +107,16 @@ describe("sendEmailVerification", () => {
     const msg = send.mock.calls[0][0];
     expect(msg.text).toContain(expectedUrl);
     expect(msg.text).not.toContain("?role=");
+  });
+
+  it("signs the verify token with a 24h expiry (be#651)", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue(manifest);
+
+    await sendEmailVerification(deps, user());
+
+    expect(sign).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "verify" }),
+      { expiresIn: `${VERIFY_LIFESPAN_MS}` },
+    );
   });
 });
