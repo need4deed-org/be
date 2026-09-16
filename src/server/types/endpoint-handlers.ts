@@ -1,4 +1,10 @@
-import { Lang, OpportunitySortField, SortOrder, UserRole } from "need4deed-sdk";
+import {
+  ApiPostListQuery,
+  Lang,
+  OpportunitySortField,
+  SortOrder,
+  UserRole,
+} from "need4deed-sdk";
 
 export interface ParamsId {
   id: number;
@@ -113,6 +119,9 @@ export interface QuerystringUserList extends QuerystringPagination {
   role?: UserRole;
 }
 
-export interface QuerystringPostList extends QuerystringPagination {
-  search?: string;
-}
+// Aliases the SDK contract type directly rather than a hand-maintained
+// interface (per shared-rules.md: never duplicate SDK types) — but that
+// means postListQuerySchema (querystring.ts) isn't derived from this type
+// and can silently drift from it on a future SDK bump; keep them in sync by
+// hand (see the comment on postListQuerySchema).
+export type QuerystringPostList = ApiPostListQuery;

@@ -7,7 +7,7 @@ export const opportunityEventRegistrationBodySchema = {
   required: ["opportunityId", "fullName", "email", "numberOfPeople"],
   additionalProperties: false,
   properties: {
-    opportunityId: { type: "integer" },
+    opportunityId: { type: "integer", minimum: 1 },
     fullName: { type: "string", minLength: 1 },
     email: { type: "string", minLength: 1, format: "email" },
     phone: { type: ["string", "null"] },
@@ -27,7 +27,7 @@ export const opportunityEventRegistrationResponseSchema = responseSchema({
 const opportunityEventRegistrationItemSchema = {
   type: "object",
   properties: {
-    id: { type: "integer" },
+    id: { type: "integer", minimum: 1 },
     fullName: { type: "string" },
     email: { type: "string" },
     phone: { type: ["string", "null"] },

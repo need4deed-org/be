@@ -6,7 +6,7 @@ const trustedDomainSchema = {
   required: ["id", "domain"],
   additionalProperties: false,
   properties: {
-    id: { type: "integer" },
+    id: { type: "integer", minimum: 1 },
     domain: { type: "string" },
   },
 };

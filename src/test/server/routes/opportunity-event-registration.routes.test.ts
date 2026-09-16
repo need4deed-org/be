@@ -118,7 +118,7 @@ describe("POST /event-registration", () => {
       method: "POST",
       url: "/event-registration/",
       payload: {
-        opportunityId: -1,
+        opportunityId: 999999999,
         fullName: "Ali K.",
         email: "ali@example.com",
         numberOfPeople: 1,
@@ -126,6 +126,21 @@ describe("POST /event-registration", () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  it("400s a negative opportunityId instead of reaching the DB", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event-registration/",
+      payload: {
+        opportunityId: -1,
+        fullName: "Ali K.",
+        email: "ali@example.com",
+        numberOfPeople: 1,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 
   it("returns 400 for an accompanying-type opportunity", async () => {

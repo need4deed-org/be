@@ -9,7 +9,7 @@ import { responseErrors } from "./responseErrors";
 export const eventItemSchema = {
   type: "object",
   properties: {
-    id: { type: "integer" },
+    id: { type: "integer", minimum: 1 },
     active: { type: "boolean" },
     title: { type: "string" },
     subTitle: { type: ["string", "null"] },
