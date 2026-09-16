@@ -1,11 +1,13 @@
 import { FastifyInstance } from "fastify";
-import { Lang } from "need4deed-sdk";
+import { EntityTableName, Lang } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import Deal from "../../../../data/entity/deal.entity";
+import FieldTranslation from "../../../../data/entity/field_translation.entity";
 import Postcode from "../../../../data/entity/location/postcode.entity";
 import DealLanguage from "../../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../../data/entity/m2m/deal-skill";
+import Language from "../../../../data/entity/profile/language.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../../data/types/enums";
 import { createServer } from "../../../../server";
@@ -16,6 +18,12 @@ import { addTranslatedFields } from "../../../../server/utils/data/for-routes";
 // are reference data, not something a test should be writing into, even
 // temporarily. Only the transactional rows (postcode/deal/volunteer/
 // dealLanguage/dealSkill) linking to them are created and cleaned up here.
+//
+// Which specific language/skill rows have a German translation (or lack an
+// English one) isn't hardcoded — skill/language seed data comes from an
+// external source (see language.seed.ts/skill.seed.ts) whose row order (and
+// therefore ids) isn't stable across a from-scratch reseed. Looked up by
+// querying field_translation directly instead (be#996).
 describe("addTranslatedFields", () => {
   let fastify: FastifyInstance;
   let postcode: Postcode;
@@ -24,12 +32,12 @@ describe("addTranslatedFields", () => {
   let dealLanguage: DealLanguage;
   let dealSkill: DealSkill;
 
-  // German itself (id 1540) — has a real German field_translation ("Deutsch").
-  const languageWithGermanTranslation = 1540;
-  // "Ghotuo" (id 1) — a real, seeded language with no English translation.
-  const languageWithNoEnglishTranslation = 1;
-  // "Woodworking" (id 1) — has a real German field_translation ("Holzverarbeitung").
-  const skillWithGermanTranslation = 1;
+  let languageWithGermanTranslation: number;
+  let germanLanguageTranslationText: string;
+  let skillWithGermanTranslation: number;
+  let germanSkillTranslationText: string;
+  let languageWithNoEnglishTranslation: number;
+  let languageWithNoEnglishTranslationTitle: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -42,6 +50,48 @@ describe("addTranslatedFields", () => {
     const volunteerRepository = dataSource.getRepository(Volunteer);
     const dealLanguageRepository = dataSource.getRepository(DealLanguage);
     const dealSkillRepository = dataSource.getRepository(DealSkill);
+    const languageRepository = dataSource.getRepository(Language);
+    const fieldTranslationRepository =
+      dataSource.getRepository(FieldTranslation);
+
+    const germanLanguage = await languageRepository.findOneOrFail({
+      where: { isoCode: "de" },
+    });
+    const englishLanguage = await languageRepository.findOneOrFail({
+      where: { isoCode: "en" },
+    });
+
+    const languageTranslation = await fieldTranslationRepository.findOneOrFail({
+      where: {
+        language: { id: germanLanguage.id },
+        entityType: EntityTableName.LANGUAGE,
+      },
+    });
+    languageWithGermanTranslation = languageTranslation.entityId;
+    germanLanguageTranslationText = languageTranslation.translation;
+
+    const skillTranslation = await fieldTranslationRepository.findOneOrFail({
+      where: {
+        language: { id: germanLanguage.id },
+        entityType: EntityTableName.SKILL,
+      },
+    });
+    skillWithGermanTranslation = skillTranslation.entityId;
+    germanSkillTranslationText = skillTranslation.translation;
+
+    const languageWithoutEnglish = await languageRepository
+      .createQueryBuilder("language")
+      .leftJoin(
+        FieldTranslation,
+        "ft",
+        "ft.entity_id = language.id AND ft.entity_type = :entityType AND ft.language_id = :englishId",
+        { entityType: EntityTableName.LANGUAGE, englishId: englishLanguage.id },
+      )
+      .where("ft.id IS NULL")
+      .andWhere("language.id != :germanId", { germanId: germanLanguage.id })
+      .getOneOrFail();
+    languageWithNoEnglishTranslation = languageWithoutEnglish.id;
+    languageWithNoEnglishTranslationTitle = languageWithoutEnglish.title;
 
     postcode = await postcodeRepository.save(
       new Postcode({ value: `1${suffix.slice(-4)}` }),
@@ -95,8 +145,12 @@ describe("addTranslatedFields", () => {
 
     await addTranslatedFields([v], Lang.DE);
 
-    expect(v.deal.dealLanguage[0].language.translation).toBe("Deutsch");
-    expect(v.deal.dealSkill[0].skill.translation).toBe("Holzverarbeitung");
+    expect(v.deal.dealLanguage[0].language.translation).toBe(
+      germanLanguageTranslationText,
+    );
+    expect(v.deal.dealSkill[0].skill.translation).toBe(
+      germanSkillTranslationText,
+    );
   });
 
   it("leaves .translation unset when no field_translation row exists for the requested language, falling back to the original field value downstream", async () => {
@@ -111,7 +165,9 @@ describe("addTranslatedFields", () => {
 
     // getOptionItems/getLanguages then fall back to language.title itself.
     expect(v.deal.dealLanguage[0].language.translation).toBeUndefined();
-    expect(v.deal.dealLanguage[0].language.title).toBe("Ghotuo");
+    expect(v.deal.dealLanguage[0].language.title).toBe(
+      languageWithNoEnglishTranslationTitle,
+    );
 
     await dealLanguageRepository.update(
       { id: dealLanguage.id },

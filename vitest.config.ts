@@ -8,6 +8,14 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"], // Optional: for DB connection logic
     include: ["**/*.{test,spec}.ts"],
     exclude: ["**/node_modules/**", "src/test/e2e/**"],
+    // Each test file opens its own TypeORM connection pool against the same
+    // real Postgres instance (max_connections: 100, see docker-compose.yaml).
+    // Running files in parallel (Vitest's default) exhausts that ceiling
+    // across ~98 files, causing random, file-order-dependent failures
+    // (be#996) — a query on one file's pool intermittently fails while
+    // another file's pool is mid-teardown. Serial execution is slower but
+    // deterministic.
+    fileParallelism: false,
     env: {
       JWT_SECRET: "test-secret-only-for-vitest",
       NODE_ENV: "test",
