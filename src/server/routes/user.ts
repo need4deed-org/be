@@ -1,7 +1,14 @@
 import { validate } from "class-validator";
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  FastifyContextConfig,
+  FastifyInstance,
+  FastifyPluginOptions,
+} from "fastify";
 import {
   ApiAgentMembershipSummary,
+  ApiCoordinatorInvitePost,
+  ApiCoordinatorInviteResponse,
+  ApiCoordinatorRegisterWithInvite,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -14,8 +21,13 @@ import {
   ConflictError,
   InvalidOrganizationEmailError,
   PersonAlreadyRegisteredError,
+  UnauthenticatedError,
   UnauthorizedError,
 } from "../../config";
+import {
+  COORDINATOR_INVITE_LIFESPAN_MS,
+  urlCoordinatorInvite,
+} from "../../config/constants";
 import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
@@ -24,7 +36,11 @@ import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
+  coordinatorInviteBodySchema,
+  coordinatorInviteResponseSchema,
   createUserBodySchema,
+  registerWithInviteBodySchema,
+  registerWithInviteQuerySchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
@@ -539,6 +555,136 @@ export default async function userRoutes(
       }
 
       const savedUser = await userRepository.save(newUser);
+      return reply.status(201).send(savedUser);
+    },
+  );
+
+  // Admin-only: generate a coordinator invite link, so the admin never sets
+  // or sees the coordinator's password themselves (be#1002 epic). The
+  // upfront email check below is the same race-tolerant pattern as POST
+  // /user/admin above — a concurrent duplicate falls through to the global
+  // error handler rather than a clean 409, same trade-off made there.
+  fastify.post<{
+    Body: ApiCoordinatorInvitePost;
+    Reply: ApiCoordinatorInviteResponse | { message: string; errors?: any };
+  }>(
+    "/admin/coordinator-invite",
+    {
+      schema: {
+        body: coordinatorInviteBodySchema,
+        response: {
+          201: coordinatorInviteResponseSchema,
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
+    },
+    async (request, reply) => {
+      const { email, person } = request.body;
+
+      if (await fastify.db.userRepository.findOneBy({ email })) {
+        throw new ConflictError("User with this email already exists.");
+      }
+
+      const token = fastify.jwt.sign(
+        { email, person, type: "coordinator-invite" },
+        { expiresIn: `${COORDINATOR_INVITE_LIFESPAN_MS}` },
+      );
+
+      return reply.status(201).send({
+        token,
+        link: `${urlCoordinatorInvite}?token=${token}`,
+        expiresAt: new Date(
+          Date.now() + COORDINATOR_INVITE_LIFESPAN_MS,
+        ).toISOString(),
+      });
+    },
+  );
+
+  // Public: consume a coordinator invite link. Mirrors the authByVerifyToken
+  // preHandler pattern in volunteer/register.routes.ts — the caller is
+  // authorized by the invite JWT itself, not a session (be#1002 epic).
+  // Single-use is enforced the same way the email-uniqueness race is
+  // tolerated elsewhere in this file: once consumed, the User row for this
+  // email exists, so a token replay hits the same "already exists" check
+  // below (backed by the DB's unique constraint on User.email) rather than
+  // creating a second account. No separate used/consumedAt row needed.
+  fastify.post<{
+    Body: ApiCoordinatorRegisterWithInvite;
+    Querystring: { token: string };
+    Reply: User | { message: string; errors?: any };
+  }>(
+    "/register-with-invite",
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: {
+        querystring: registerWithInviteQuerySchema,
+        body: registerWithInviteBodySchema,
+        response: {
+          201: userResponseSchemaIncludePerson,
+          ...responseErrors,
+        },
+      },
+      preHandler: async (request) => {
+        const { token } = request.query as { token?: string };
+
+        let payload: {
+          email: string;
+          type?: string;
+          person?: {
+            firstName: string;
+            middleName?: string;
+            lastName?: string;
+          };
+        };
+        try {
+          payload = await fastify.jwt.verify(token as string);
+        } catch {
+          throw new UnauthenticatedError("Invalid or expired invite token.");
+        }
+
+        if (payload.type !== "coordinator-invite" || !payload.person) {
+          throw new UnauthenticatedError("Invalid invite token.");
+        }
+
+        if (
+          await fastify.db.userRepository.findOneBy({ email: payload.email })
+        ) {
+          throw new ConflictError("User with this email already exists.");
+        }
+
+        request.coordinatorInvite = {
+          email: payload.email,
+          person: payload.person,
+        };
+      },
+    },
+    async (request, reply) => {
+      const { email, person } = request.coordinatorInvite!;
+      const { password } = request.body;
+
+      const newUser = new User({
+        email,
+        password: await hashPassword(password),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        language: Lang.EN,
+        timezone: "CET",
+        person: new Person({ ...person, email }),
+      });
+
+      const errors = await validate(newUser);
+      if (errors.length > 0) {
+        logger.error(
+          `User entity validation errors: ${JSON.stringify(errors)}`,
+        );
+        return reply.status(400).send({
+          message: "Validation failed for newUser data",
+          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+        });
+      }
+
+      const savedUser = await fastify.db.userRepository.save(newUser);
       return reply.status(201).send(savedUser);
     },
   );

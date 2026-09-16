@@ -655,3 +655,264 @@ describe("GET /user/me — volunteerId (be#948)", () => {
     }
   });
 });
+
+// be#1008: admin-generated invite-link flow for coordinator account
+// creation, so the admin never sets/sees the coordinator's password
+// themselves (be#1002 epic).
+describe("POST /user/admin/coordinator-invite", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const createdUserIds: number[] = [];
+  const createdPersonIds: number[] = [];
+  let adminAccessToken: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const adminPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Admin", lastName: `User-${suffix}` }),
+    );
+    createdPersonIds.push(adminPerson.id);
+    const admin = await fastify.db.userRepository.save(
+      new User({
+        email: `admin-${suffix}@test.need4deed.org`,
+        password: await hashPassword("test_password"),
+        role: UserRole.ADMIN,
+        isActive: true,
+        personId: adminPerson.id,
+      }),
+    );
+    createdUserIds.push(admin.id);
+    adminAccessToken = fastify.jwt.sign({
+      id: admin.id,
+      email: admin.email,
+      type: "access",
+    });
+  });
+
+  afterAll(async () => {
+    for (const id of createdUserIds) {
+      await fastify.db.userRepository.delete({ id });
+    }
+    for (const id of createdPersonIds) {
+      await fastify.db.personRepository.delete({ id });
+    }
+    await fastify.close();
+  });
+
+  it("401s an unauthenticated request", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      payload: {
+        email: `invitee-${suffix}@example.com`,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("403s a non-admin session", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Regular", lastName: `Volunteer-${suffix}` }),
+    );
+    createdPersonIds.push(person.id);
+    const volunteer = await fastify.db.userRepository.save(
+      new User({
+        email: `volunteer-${suffix}@example.com`,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    createdUserIds.push(volunteer.id);
+    const accessToken = fastify.jwt.sign({
+      id: volunteer.id,
+      email: volunteer.email,
+      type: "access",
+    });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      cookies: { access: accessToken },
+      payload: {
+        email: `invitee-${suffix}@example.com`,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("returns a signed invite link for an admin caller", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email: `invitee-${suffix}@example.com`,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const { token, link, expiresAt } = res.json();
+    expect(typeof token).toBe("string");
+    expect(link).toContain(token);
+    expect(new Date(expiresAt).getTime()).toBeGreaterThan(Date.now());
+
+    const payload = fastify.jwt.decode(token) as {
+      email: string;
+      type: string;
+      person: { firstName: string; lastName: string };
+    };
+    expect(payload.type).toBe("coordinator-invite");
+    expect(payload.email).toBe(`invitee-${suffix}@example.com`);
+    expect(payload.person).toMatchObject({
+      firstName: "New",
+      lastName: "Coordinator",
+    });
+  });
+
+  it("409s when a User with that email already exists", async () => {
+    const email = `existing-${suffix}@example.com`;
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Existing", lastName: "User" }),
+    );
+    createdPersonIds.push(person.id);
+    const existingUser = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    createdUserIds.push(existingUser.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+});
+
+// be#1008: the public side of the invite flow — the invitee sets their own
+// password to activate a COORDINATOR account.
+describe("POST /user/register-with-invite", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const createdUserIds: number[] = [];
+  const createdPersonIds: number[] = [];
+
+  function makeInviteToken(
+    email: string,
+    person = { firstName: "New", lastName: "Coordinator" },
+  ): string {
+    return fastify.jwt.sign(
+      { email, person, type: "coordinator-invite" },
+      { expiresIn: "7d" },
+    );
+  }
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    for (const id of createdUserIds) {
+      await fastify.db.userRepository.delete({ id });
+    }
+    for (const id of createdPersonIds) {
+      await fastify.db.personRepository.delete({ id });
+    }
+    await fastify.close();
+  });
+
+  it("400s with no token", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/register-with-invite",
+      payload: { password: "chosen_password" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("401s an invalid token", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/register-with-invite?token=not-a-real-token",
+      payload: { password: "chosen_password" },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("401s a wrong-type token (e.g. an email-verification token)", async () => {
+    const token = fastify.jwt.sign({
+      id: 1,
+      email: `wrong-type-${suffix}@example.com`,
+      type: "verify",
+    });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("creates an active COORDINATOR account from a valid invite token", async () => {
+    const email = `invitee-${suffix}@example.com`;
+    const token = makeInviteToken(email);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    createdUserIds.push(body.id);
+    createdPersonIds.push(body.person.id);
+    expect(body.email).toBe(email);
+    expect(body.role).toBe(UserRole.COORDINATOR);
+    expect(body.isActive).toBe(true);
+    expect(body.person).toMatchObject({
+      firstName: "New",
+      lastName: "Coordinator",
+    });
+  });
+
+  it("409s a replay of an already-consumed invite token (single-use)", async () => {
+    const email = `replay-${suffix}@example.com`;
+    const token = makeInviteToken(email);
+
+    const first = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+    expect(first.statusCode).toBe(201);
+    createdUserIds.push(first.json().id);
+    createdPersonIds.push(first.json().person.id);
+
+    const second = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "another_password" },
+    });
+    expect(second.statusCode).toBe(409);
+  });
+});

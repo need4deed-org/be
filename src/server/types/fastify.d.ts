@@ -74,6 +74,10 @@ declare module "fastify" {
     personId?: number; // Optional foreign key ID for the Person entity
     agents?: Agent[];
     registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
+    coordinatorInvite?: {
+      email: string;
+      person: { firstName: string; middleName?: string; lastName?: string };
+    }; // Verified invite payload resolved from the querystring token on POST /user/register-with-invite
     authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
     callerAgentIds?: number[]; // Resolved once per request, shared by the ownership check and the PII masking hook
   }
@@ -83,13 +87,28 @@ declare module "@fastify/jwt" {
   // It's crucial to extend the original FastifyJWT interface here
   // so that your custom 'payload' and 'user' types merge correctly
   // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
-  type TokenType = "access" | "refresh" | "verify" | "reset";
+  type TokenType =
+    | "access"
+    | "refresh"
+    | "verify"
+    | "reset"
+    | "coordinator-invite";
   interface FastifyJWT {
     // Payload type when signing a token (`reply.jwtSign(payload)`)
     payload: {
-      id: number;
+      // Optional: a coordinator-invite token has no User row yet to carry an
+      // id for (be#1008) — every other token type still sets it.
+      id?: number;
       email: string;
       type?: TokenType;
+      // coordinator-invite only: carries the admin-entered person details
+      // through to POST /user/register-with-invite, which creates the
+      // Person record on consumption (be#1008).
+      person?: {
+        firstName: string;
+        middleName?: string;
+        lastName?: string;
+      };
     };
     // User type that will be attached to `request.user` after `request.jwtVerify()`
     user: {
