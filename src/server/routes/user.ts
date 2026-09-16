@@ -45,8 +45,18 @@ import {
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
 } from "../schema/user.schema";
-import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
-import { getSkipTake, getUserWhere } from "../utils";
+import {
+  CoordinatorInvitePerson,
+  QuerystringUserList,
+  ReplyDataCount,
+  RoutePrefix,
+} from "../types";
+import {
+  getSkipTake,
+  getUserWhere,
+  validateAndSaveUser,
+  verifyTokenOfType,
+} from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
@@ -449,28 +459,22 @@ export default async function userRoutes(
         person: request.resolvedPerson,
       });
 
-      // Validate the User entity using class-validator
-      const errors = await validate(newUser);
-      if (errors.length > 0) {
-        logger.error(
-          `User entity validation errors: ${JSON.stringify(errors)}`,
-        );
+      // Unexpected DB errors propagate to the global error handler.
+      const result = await validateAndSaveUser(userRepository, newUser);
+      if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: result.errors,
         });
       }
 
-      // Unexpected DB errors propagate to the global error handler.
-      const savedUser = await userRepository.save(newUser);
-
-      fastify.notify.emailVerification(savedUser).catch((err) => {
+      fastify.notify.emailVerification(result.user).catch((err) => {
         logger.error(
-          `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
+          `Failed to send verification email for user ${result.user.id}: ${err instanceof Error ? err.message : err}`,
         );
       });
 
-      return reply.status(201).send(savedUser);
+      return reply.status(201).send(result.user);
     },
   );
 
@@ -543,19 +547,15 @@ export default async function userRoutes(
         person: request.resolvedPerson,
       });
 
-      const errors = await validate(newUser);
-      if (errors.length > 0) {
-        logger.error(
-          `User entity validation errors: ${JSON.stringify(errors)}`,
-        );
+      const result = await validateAndSaveUser(userRepository, newUser);
+      if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: result.errors,
         });
       }
 
-      const savedUser = await userRepository.save(newUser);
-      return reply.status(201).send(savedUser);
+      return reply.status(201).send(result.user);
     },
   );
 
@@ -590,13 +590,15 @@ export default async function userRoutes(
         { email, person, type: "coordinator-invite" },
         { expiresIn: `${COORDINATOR_INVITE_LIFESPAN_MS}` },
       );
+      // Derived from the token's own exp claim rather than a second
+      // Date.now() call, so it can't drift from what the server actually
+      // enforces on consumption.
+      const { exp } = fastify.jwt.decode<{ exp: number }>(token)!;
 
       return reply.status(201).send({
         token,
-        link: `${urlCoordinatorInvite}?token=${token}`,
-        expiresAt: new Date(
-          Date.now() + COORDINATOR_INVITE_LIFESPAN_MS,
-        ).toISOString(),
+        link: `${urlCoordinatorInvite}?token=${encodeURIComponent(token)}`,
+        expiresAt: new Date(exp * 1000).toISOString(),
       });
     },
   );
@@ -628,22 +630,18 @@ export default async function userRoutes(
       preHandler: async (request) => {
         const { token } = request.query as { token?: string };
 
-        let payload: {
+        const payload = await verifyTokenOfType<{
           email: string;
-          type?: string;
-          person?: {
-            firstName: string;
-            middleName?: string;
-            lastName?: string;
-          };
-        };
-        try {
-          payload = await fastify.jwt.verify(token as string);
-        } catch {
-          throw new UnauthenticatedError("Invalid or expired invite token.");
-        }
+          person?: CoordinatorInvitePerson;
+        }>(
+          fastify,
+          token,
+          "coordinator-invite",
+          "Invalid or expired invite token.",
+          "Invalid invite token.",
+        );
 
-        if (payload.type !== "coordinator-invite" || !payload.person) {
+        if (!payload.person) {
           throw new UnauthenticatedError("Invalid invite token.");
         }
 
@@ -653,14 +651,27 @@ export default async function userRoutes(
           throw new ConflictError("User with this email already exists.");
         }
 
-        request.coordinatorInvite = {
-          email: payload.email,
-          person: payload.person,
-        };
+        // Same email-first lookup as POST / (be#923) — an invited
+        // coordinator's email may already have a Person row (e.g. a prior
+        // Volunteer signup with no User yet); link to it instead of
+        // creating a disconnected duplicate. Shares request.resolvedPerson
+        // with POST / and POST /admin rather than a separate field.
+        const existingPerson = await fastify.db.personRepository.findOne({
+          where: { email: ILike(payload.email) },
+          relations: ["users"],
+        });
+        if (existingPerson?.users?.length) {
+          throw new PersonAlreadyRegisteredError();
+        }
+
+        request.coordinatorInvite = { email: payload.email };
+        request.resolvedPerson =
+          existingPerson ??
+          new Person({ ...payload.person, email: payload.email });
       },
     },
     async (request, reply) => {
-      const { email, person } = request.coordinatorInvite!;
+      const { email } = request.coordinatorInvite!;
       const { password } = request.body;
 
       const newUser = new User({
@@ -670,22 +681,21 @@ export default async function userRoutes(
         isActive: true,
         language: Lang.EN,
         timezone: "CET",
-        person: new Person({ ...person, email }),
+        person: request.resolvedPerson,
       });
 
-      const errors = await validate(newUser);
-      if (errors.length > 0) {
-        logger.error(
-          `User entity validation errors: ${JSON.stringify(errors)}`,
-        );
+      const result = await validateAndSaveUser(
+        fastify.db.userRepository,
+        newUser,
+      );
+      if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: result.errors,
         });
       }
 
-      const savedUser = await fastify.db.userRepository.save(newUser);
-      return reply.status(201).send(savedUser);
+      return reply.status(201).send(result.user);
     },
   );
 }

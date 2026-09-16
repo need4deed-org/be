@@ -895,6 +895,60 @@ describe("POST /user/register-with-invite", () => {
     });
   });
 
+  it("links to an existing Person by email instead of creating a duplicate (be#1008 review)", async () => {
+    const email = `existing-person-invite-${suffix}@example.com`;
+    const existingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Legacy", lastName: "Volunteer" }),
+    );
+    existingPerson.email = email;
+    await fastify.db.personRepository.save(existingPerson);
+    createdPersonIds.push(existingPerson.id);
+
+    const token = makeInviteToken(email);
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+    expect(res.json().person.id).toBe(existingPerson.id);
+
+    const personCount = await fastify.db.personRepository.count({
+      where: { email },
+    });
+    expect(personCount).toBe(1);
+  });
+
+  it("409s (PersonAlreadyRegisteredError-style rejection) when the matched Person already has a User", async () => {
+    const email = `already-registered-invite-${suffix}@example.com`;
+    const existingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Already", lastName: "Registered", email }),
+    );
+    createdPersonIds.push(existingPerson.id);
+    const existingUser = await fastify.db.userRepository.save(
+      new User({
+        email: `distinct-login-${suffix}@example.com`,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: existingPerson.id,
+      }),
+    );
+    createdUserIds.push(existingUser.id);
+
+    const token = makeInviteToken(email);
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: "PersonAlreadyRegisteredError" });
+  });
+
   it("409s a replay of an already-consumed invite token (single-use)", async () => {
     const email = `replay-${suffix}@example.com`;
     const token = makeInviteToken(email);

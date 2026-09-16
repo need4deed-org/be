@@ -28,6 +28,8 @@ export * from "./run-w-advisory-lock";
 export * from "./sync-comment-tags";
 export * from "./update-agent-contact";
 export * from "./update-leads";
+export * from "./validate-and-save-user";
+export * from "./verify-token-of-type";
 export * from "./write-agent-registration";
 export * from "./write-event";
 export * from "./write-opportunity-contact-comment";
