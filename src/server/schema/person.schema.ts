@@ -31,7 +31,7 @@ export const newPersonSchema = {
 export const personResponseSchema = {
   type: "object",
   properties: {
-    id: { type: "number" },
+    id: { type: "number", minimum: 1 },
     firstName: { type: "string" },
     lastName: { type: "string" },
     middleName: { type: ["string", "null"] },

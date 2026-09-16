@@ -81,7 +81,8 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { role } = request.user;
-      const { search, authorId } = request.query;
+      const filter = request.query;
+      const { search, authorId } = filter;
       const [skip, take] = getSkipTake(request.query);
 
       if (!isPostManagerRole(role)) {
@@ -93,30 +94,39 @@ export default async function postRoutes(
       let orderedPosts: Post[];
       let count: number;
 
-      if (!search && !authorId) {
-        // Plain listing: buildPostQuery's leftJoinAndSelect + getManyAndCount
-        // already paginates correctly despite the to-many joins — TypeORM
-        // wraps this in its own distinct-primary-key subquery whenever
-        // relations are joined alongside skip/take (see the same pattern,
-        // and the comment explaining why, in opportunity.routes.ts). No
-        // manual GROUP BY/two-step hydration needed here.
+      // `authorId !== undefined`, not `!authorId` / truthiness: 0 is never a
+      // real person id (PrimaryGeneratedColumn starts at 1, and the schema
+      // now enforces minimum: 1 besides), but falsy-checking it here would
+      // silently treat authorId: 0 as "no filter".
+      if (!search) {
+        // Plain listing, optionally filtered by authorId: buildPostQuery's
+        // leftJoinAndSelect + getManyAndCount already paginates correctly
+        // despite the to-many joins — TypeORM wraps this in its own
+        // distinct-primary-key subquery whenever relations are joined
+        // alongside skip/take (see the same pattern, and the comment
+        // explaining why, in opportunity.routes.ts). authorId adds no join
+        // (it's a plain column on post), so it never needs the heavier
+        // search path below — just an extra andWhere.
         const qb = buildPostQuery(fastify)
           .where("post.parentId IS NULL")
           .orderBy("post.createdAt", "DESC")
           .addOrderBy("post.id", "DESC")
           .skip(skip)
           .take(take);
+        if (authorId !== undefined) {
+          qb.andWhere("post.authorId = :authorId", { authorId });
+        }
         [orderedPosts, count] = await qb.getManyAndCount();
       } else {
-        // Search and/or authorId: buildMatchingPostIdsQuery only ever
-        // plain-leftJoins (for filtering, not hydration) and runs via
-        // getRawMany, so none of TypeORM's automatic pagination handling
-        // applies here — GROUP BY collapses any to-many-join fan-out before
-        // LIMIT/OFFSET applies, and COUNT(*) OVER() gets the total alongside
-        // the page in the same query (a window function, computed over the
-        // full pre-LIMIT result set, not just the page). Full posts are then
-        // hydrated separately via buildPostQuery, keyed by the fixed page of
-        // ids.
+        // Search (with authorId optionally AND-combined):
+        // buildMatchingPostIdsQuery only ever plain-leftJoins (for
+        // filtering, not hydration) and runs via getRawMany, so none of
+        // TypeORM's automatic pagination handling applies here — GROUP BY
+        // collapses any to-many-join fan-out before LIMIT/OFFSET applies,
+        // and COUNT(*) OVER() gets the total alongside the page in the same
+        // query (a window function, computed over the full pre-LIMIT result
+        // set, not just the page). Full posts are then hydrated separately
+        // via buildPostQuery, keyed by the fixed page of ids.
         //
         // .limit()/.offset(), not .skip()/.take(): TypeORM's skip/take are
         // meant for getMany()/getManyAndCount() — on a raw, manually-grouped
@@ -126,7 +136,7 @@ export default async function postRoutes(
         // writing the fan-out regression test above. limit/offset always
         // emit a literal LIMIT/OFFSET, which is exactly right here since
         // GROUP BY has already made each row one distinct post.
-        const idsQb = buildMatchingPostIdsQuery(fastify, { search, authorId })
+        const idsQb = buildMatchingPostIdsQuery(fastify, filter)
           .select("post.id", "id")
           .addSelect("COUNT(*) OVER()", "totalCount")
           .groupBy("post.id")
@@ -148,7 +158,7 @@ export default async function postRoutes(
           ? Number(idRows[0].totalCount)
           : Number(
               (
-                await buildMatchingPostIdsQuery(fastify, { search, authorId })
+                await buildMatchingPostIdsQuery(fastify, filter)
                   .select("COUNT(DISTINCT post.id)", "count")
                   .getRawOne<{ count: string }>()
               )?.count ?? 0,

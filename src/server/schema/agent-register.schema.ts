@@ -41,7 +41,7 @@ export const registerSearchResponseSchema = {
         required: ["id", "title"],
         additionalProperties: false,
         properties: {
-          id: { type: "integer" },
+          id: { type: "integer", minimum: 1 },
           title: { type: "string" },
         },
       },
@@ -59,19 +59,19 @@ const agentCreateBaseSchema = {
   additionalProperties: false,
   properties: {
     title: { type: "string", minLength: 1 },
-    typeId: { type: "integer" },
+    typeId: { type: "integer", minimum: 1 },
     info: { type: "string" },
     website: { type: "string" },
     serviceIds: {
       type: "array",
-      items: { type: "integer" },
+      items: { type: "integer", minimum: 1 },
     },
     addressStreet: { type: "string" },
     addressPostcode: { type: "string" },
-    districtId: { type: "integer" },
+    districtId: { type: "integer", minimum: 1 },
     languages: {
       type: "array",
-      items: { type: "integer" },
+      items: { type: "integer", minimum: 1 },
     },
   },
 };
@@ -91,7 +91,7 @@ export const registerAgentBodySchema = {
       required: ["agentId"],
       additionalProperties: false,
       properties: {
-        agentId: { type: "integer" },
+        agentId: { type: "integer", minimum: 1 },
       },
     },
     {
@@ -114,7 +114,7 @@ export const registerAgentResponseSchema = {
       type: "object",
       required: ["agentId", "membershipStatus"],
       properties: {
-        agentId: { type: "integer" },
+        agentId: { type: "integer", minimum: 1 },
         membershipStatus: { type: "string", enum: ["active", "pending"] },
       },
     },
@@ -130,7 +130,7 @@ export const registerAgentConflictSchema = {
   properties: {
     message: { type: "string" },
     conflict: { type: "string", enum: ["title", "address"] },
-    agentId: { type: "integer" },
+    agentId: { type: "integer", minimum: 1 },
   },
 };
 
@@ -149,7 +149,7 @@ export const createAgentResponseSchema = {
       type: "object",
       required: ["agentId"],
       properties: {
-        agentId: { type: "integer" },
+        agentId: { type: "integer", minimum: 1 },
       },
     },
   },

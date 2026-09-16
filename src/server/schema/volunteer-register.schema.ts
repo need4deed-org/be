@@ -27,7 +27,7 @@ const apiLanguageSchema = {
   type: "object",
   required: ["id", "title"],
   properties: {
-    id: { type: "integer" },
+    id: { type: "integer", minimum: 1 },
     title: { type: "string" },
     proficiency: { type: "string" },
   },

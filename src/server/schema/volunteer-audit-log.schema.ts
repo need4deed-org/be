@@ -9,11 +9,11 @@ export const volunteerAuditLogSchemaGet200 = {
       items: {
         type: "object",
         properties: {
-          id: { type: "number" },
-          volunteerId: { type: "number" },
+          id: { type: "number", minimum: 1 },
+          volunteerId: { type: "number", minimum: 1 },
           type: { type: "string", enum: Object.values(VolunteerAuditLogType) },
           detail: { type: "string" },
-          actorUserId: { type: ["number", "null"] },
+          actorUserId: { type: ["number", "null"], minimum: 1 },
           occurredAt: { type: "string", format: "date-time" },
         },
         required: ["id", "volunteerId", "type", "detail", "occurredAt"],

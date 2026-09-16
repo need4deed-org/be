@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { Brackets, SelectQueryBuilder } from "typeorm";
 import Post from "../../../data/entity/post.entity";
+import { QuerystringPostList } from "../../types";
 import {
   escapeLikePattern,
   personNameIlikeCondition,
@@ -30,13 +31,15 @@ import {
 // joins.
 export function buildMatchingPostIdsQuery(
   fastify: FastifyInstance,
-  { search, authorId }: { search?: string; authorId?: number },
+  { search, authorId }: Pick<QuerystringPostList, "search" | "authorId">,
 ): SelectQueryBuilder<Post> {
   const qb = fastify.db.postRepository
     .createQueryBuilder("post")
     .where("post.parentId IS NULL");
 
-  if (authorId) {
+  // authorId !== undefined, not truthiness: 0 is never a real id, but a
+  // falsy check would silently drop the filter for it (see post.routes.ts).
+  if (authorId !== undefined) {
     qb.andWhere("post.authorId = :authorId", { authorId });
   }
 

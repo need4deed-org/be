@@ -830,6 +830,26 @@ describe("POST /post", () => {
     ]);
   });
 
+  it("400s on authorId=0 or a negative authorId instead of silently ignoring it", async () => {
+    // Regression test: authorId is a real person id (always >= 1), and the
+    // route code treats 0 as "no filter" via a straight `!== undefined`
+    // check further down the stack — the schema's minimum: 1 is what has to
+    // catch 0/negative values before they get that far.
+    const zeroRes = await fastify.inject({
+      method: "GET",
+      url: "/post?authorId=0",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(zeroRes.statusCode).toBe(400);
+
+    const negativeRes = await fastify.inject({
+      method: "GET",
+      url: "/post?authorId=-1",
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(negativeRes.statusCode).toBe(400);
+  });
+
   it("paginates search results correctly for a post with multiple tagged persons and opportunities", async () => {
     // Regression test for the join fan-out bug: a post with several to-many
     // relations must still count/paginate as exactly one post, not be
