@@ -26,22 +26,27 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
 
         logger.info("scheduler: running daily scans");
 
-        // Listed in logical order, but runNamedCronJobs runs them
-        // concurrently (Promise.allSettled) — harmless only because their
-        // onetimer date windows don't overlap (be#987 review). Revisit if
-        // either job's window changes.
+        // Run in this order, sequentially: their WHERE clauses can both
+        // match the same onetimer opportunity in the same tick (e.g. one
+        // stuck in SEARCHING past its date with a MATCHED volunteer), and
+        // running them concurrently let whichever transaction committed
+        // last silently win, leaving an unpredictable ACTIVE/PAST state
+        // (be#987 review).
         await runWithAdvisoryLock(
           () =>
-            runNamedCronJobs([
-              {
-                name: "activateDueOnetimers",
-                run: () => activateDueOnetimers(fastify),
-              },
-              {
-                name: "scanExpiredOnetimers",
-                run: () => scanExpiredOnetimers(fastify),
-              },
-            ]),
+            runNamedCronJobs(
+              [
+                {
+                  name: "activateDueOnetimers",
+                  run: () => activateDueOnetimers(fastify),
+                },
+                {
+                  name: "scanExpiredOnetimers",
+                  run: () => scanExpiredOnetimers(fastify),
+                },
+              ],
+              { sequential: true },
+            ),
           SCHEDULER_LOCK_ID,
         );
       } catch (err) {

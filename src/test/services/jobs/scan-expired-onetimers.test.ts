@@ -236,5 +236,16 @@ describe("scanExpiredOnetimers", () => {
     expect(opportunity.opportunityVolunteer[1].status).toBe(
       OpportunityVolunteerStatusType.MATCHED,
     );
+
+    // be#987 review: the opportunity and first volunteer were mutated
+    // in-memory to PAST before their saves ran (the opportunity's save
+    // even succeeded) — both must be restored to their pre-transaction
+    // status once the transaction as a whole rolls back, or a caller
+    // reading these fields afterward would see a status that was never
+    // actually persisted.
+    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
+    expect(opportunity.opportunityVolunteer[0].status).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
   });
 });

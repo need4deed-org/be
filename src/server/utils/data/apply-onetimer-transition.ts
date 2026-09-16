@@ -16,9 +16,7 @@ interface VolunteerStatusUpdate {
 // Shared by activateDueOnetimers and scanExpiredOnetimers: saves the
 // opportunity and the given volunteers in one transaction, so a save failure
 // can't leave the opportunity in a new status while a volunteer is left
-// stuck in its old one (be#988). Statuses are assigned immediately before
-// each save (not upfront) so an in-memory entity's status still reflects
-// reality if the transaction rolls back partway through.
+// stuck in its old one (be#988).
 export async function applyOnetimerTransition(
   fastify: FastifyInstance,
   opportunity: Opportunity,
@@ -26,6 +24,11 @@ export async function applyOnetimerTransition(
   volunteerUpdates: VolunteerStatusUpdate[],
   errorMessage: string,
 ): Promise<void> {
+  const originalOpportunityStatus = opportunity.status;
+  const originalVolunteerStatuses = volunteerUpdates.map(
+    ({ volunteer }) => volunteer.status,
+  );
+
   try {
     await fastify.db.opportunityRepository.manager.transaction(
       async (manager: EntityManager) => {
@@ -39,6 +42,16 @@ export async function applyOnetimerTransition(
       },
     );
   } catch (err) {
+    // A save partway through the loop above can leave earlier entities'
+    // in-memory status mutated even though the transaction as a whole
+    // rolled back (be#987 review) — restore them so a caller that reads
+    // these fields afterward doesn't see a status that was never
+    // actually persisted.
+    opportunity.status = originalOpportunityStatus;
+    volunteerUpdates.forEach(({ volunteer }, i) => {
+      volunteer.status = originalVolunteerStatuses[i];
+    });
+
     logger.error(
       {
         err,
