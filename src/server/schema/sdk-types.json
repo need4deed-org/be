@@ -12,7 +12,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "date": {
           "type": "string",
@@ -145,7 +146,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "timestamp": {
           "type": "string",
@@ -191,7 +193,8 @@
     },
     "OptionId": {
       "$id": "OptionId",
-      "type": ["string", "number"]
+      "type": ["string", "number"],
+      "minimum": 1
     },
     "OptionTitle": {
       "$id": "OptionTitle",
@@ -211,13 +214,15 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "content": {
           "type": "string"
         },
         "entityId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "entityType": {
           "type": "string"
@@ -243,7 +248,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "avatarUrl": {
           "type": "string"
@@ -300,7 +306,8 @@
               "$ref": "AgentRoleType#"
             },
             "agentId": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         }
@@ -396,7 +403,8 @@
           "type": "string"
         },
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "isoCode": {
           "type": "string"
@@ -429,7 +437,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "day": {
           "type": "string",
@@ -455,10 +464,12 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "personId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "email": {
           "type": "string"
@@ -486,7 +497,8 @@
           "type": "string"
         },
         "agentId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "agentMemberships": {
           "type": "array",
@@ -494,7 +506,8 @@
             "type": "object",
             "properties": {
               "agentId": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1
               },
               "agentTitle": {
                 "type": "string"
@@ -505,7 +518,8 @@
           }
         },
         "volunteerId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": false,
@@ -526,7 +540,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "type": {
           "$ref": "DocumentType#"
@@ -622,16 +637,20 @@
           "type": "object",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "userId": {
-              "type": "number"
+              "type": "number",
+              "minimum": 1
             },
             "agentId": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "volunteerId": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         }
@@ -665,7 +684,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "title": {
           "$ref": "VolunteerStateAppreciationType#"
@@ -682,13 +702,16 @@
           "format": "date-time"
         },
         "userId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "opportunityId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "volunteerId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         }
       }
     },
@@ -719,16 +742,19 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "status": {
           "$ref": "OpportunityVolunteerStatusType#"
         },
         "opportunityId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "volunteerId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "updatedAt": {
           "type": "string",
@@ -886,7 +912,8 @@
           "type": "object",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         },
@@ -894,7 +921,8 @@
           "type": "object",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "name": {
               "type": "string"
@@ -924,10 +952,12 @@
       "type": "object",
       "properties": {
         "opportunityId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "volunteerId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "status": {
           "$ref": "OpportunityVolunteerStatusType#"
@@ -968,7 +998,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "title": {
           "type": "string"
@@ -1026,7 +1057,8 @@
           "type": "string"
         },
         "agentId": {
-          "type": ["integer", "null"]
+          "type": ["integer", "null"],
+          "minimum": 1
         },
         "appointmentDate": {
           "type": ["string", "null"]
@@ -1105,7 +1137,8 @@
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": 1
                 },
                 "name": {
                   "type": "string"
@@ -1128,7 +1161,8 @@
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": 1
                 },
                 "type": {
                   "$ref": "AgentType#"
@@ -1171,10 +1205,12 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "volunteerId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "status": {
           "$ref": "OpportunityVolunteerStatusType#"
@@ -1193,7 +1229,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "title": {
           "type": "string"
@@ -1345,7 +1382,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "title": {
           "type": "string"
@@ -1403,7 +1441,8 @@
           "type": "string"
         },
         "typeId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "volunteerSearch": {
           "$ref": "AgentVolunteerSearchType#"
@@ -1442,10 +1481,12 @@
           }
         },
         "districtId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         },
         "organizationId": {
-          "type": "number"
+          "type": "number",
+          "minimum": 1
         }
       }
     },
@@ -1621,7 +1662,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "title": {
           "type": "string"
@@ -1635,7 +1677,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         "readAt": {
           "type": ["string", "null"],
@@ -1648,7 +1691,7 @@
       "$id": "ApiPostPerson",
       "type": "object",
       "properties": {
-        "id": { "type": "integer" },
+        "id": { "type": "integer", "minimum": 1 },
         "fullName": { "type": "string" },
         "avatarUrl": { "type": "string" }
       },
@@ -1658,7 +1701,7 @@
       "$id": "ApiPostLinkedOpportunity",
       "type": "object",
       "properties": {
-        "id": { "type": "integer" },
+        "id": { "type": "integer", "minimum": 1 },
         "title": { "type": "string" }
       },
       "required": ["id", "title"]
@@ -1667,10 +1710,10 @@
       "$id": "ApiPostGet",
       "type": "object",
       "properties": {
-        "id": { "type": "integer" },
+        "id": { "type": "integer", "minimum": 1 },
         "text": { "type": "string" },
         "author": { "$ref": "ApiPostPerson#" },
-        "agentId": { "type": ["integer", "null"] },
+        "agentId": { "type": ["integer", "null"], "minimum": 1 },
         "taggedPersons": {
           "type": "array",
           "items": { "$ref": "ApiPostPerson#" }
@@ -1724,11 +1767,11 @@
       "$id": "ApiPostReplyGet",
       "type": "object",
       "properties": {
-        "id": { "type": "integer" },
+        "id": { "type": "integer", "minimum": 1 },
         "text": { "type": "string" },
         "author": { "$ref": "ApiPostPerson#" },
-        "postId": { "type": "integer" },
-        "parentReplyId": { "type": ["integer", "null"] },
+        "postId": { "type": "integer", "minimum": 1 },
+        "parentReplyId": { "type": ["integer", "null"], "minimum": 1 },
         "reactions": {
           "type": "array",
           "items": { "$ref": "ApiPostReactionSummary#" }
@@ -1751,9 +1794,9 @@
       "$id": "ApiPostReplyPost",
       "type": "object",
       "properties": {
-        "postId": { "type": "integer" },
+        "postId": { "type": "integer", "minimum": 1 },
         "text": { "type": "string", "minLength": 1 },
-        "parentReplyId": { "type": "integer" }
+        "parentReplyId": { "type": "integer", "minimum": 1 }
       },
       "required": ["postId", "text"],
       "additionalProperties": false
