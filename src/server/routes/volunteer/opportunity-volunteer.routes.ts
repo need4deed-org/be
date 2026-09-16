@@ -121,7 +121,7 @@ export default function volunteerOpportunityVolunteerRoutes(
           new VolunteerAuditLog({
             volunteerId,
             type: "opportunity_status_changed",
-            detail: `Opportunity status changed from ${previousStatus} to ${request.body.status}.`,
+            detail: `Opportunity "${opportunity.opportunity.title}" status changed from ${previousStatus} to ${request.body.status}.`,
             actorUserId: request.authUser?.id,
             occurredAt: new Date(),
           }),
