@@ -155,6 +155,50 @@ export const resetPasswordSchema = {
   required: ["token", "newPassword"],
 };
 
+// Matches the SDK ApiCoordinatorInvitePost contract.
+export const coordinatorInviteBodySchema = {
+  type: "object",
+  required: ["email", "person"],
+  properties: {
+    email: { type: "string", format: "email" },
+    person: {
+      type: "object",
+      required: ["firstName", "lastName"],
+      properties: {
+        firstName: { type: "string", minLength: 1 },
+        middleName: { type: ["string", "null"] },
+        lastName: { type: "string", minLength: 1 },
+      },
+      additionalProperties: false,
+    },
+  },
+  additionalProperties: false,
+};
+
+// Matches the SDK ApiCoordinatorInviteResponse contract.
+export const coordinatorInviteResponseSchema = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+    link: { type: "string" },
+    expiresAt: { type: "string", format: "date-time" },
+  },
+  required: ["token", "link", "expiresAt"],
+};
+
+export const registerWithInviteQuerySchema = {
+  type: "object",
+  properties: { token: { type: "string" } },
+  required: ["token"],
+};
+
+// Matches the SDK ApiCoordinatorRegisterWithInvite contract.
+export const registerWithInviteBodySchema = {
+  type: "object",
+  properties: { password: { type: "string", minLength: 8, maxLength: 50 } },
+  required: ["password"],
+};
+
 export const changePasswordSchema = {
   type: "object",
   properties: {

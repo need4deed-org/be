@@ -202,6 +202,30 @@ describe("X-API-Key authentication", () => {
     }
   });
 
+  it("be#1011: rejects an id-less token used as the access cookie instead of matching an arbitrary user", async () => {
+    // Regression for a critical finding: TypeORM's findOne({where:{id:
+    // undefined}}) drops the id key entirely rather than filtering by it,
+    // so an id-less token (only the coordinator-invite type has one, since
+    // it's issued before any User row exists) previously returned an
+    // arbitrary — often the first, e.g. an admin — user instead of failing.
+    const findOneSpy = vi.spyOn(fastify.db.userRepository, "findOne");
+
+    const idLessToken = fastify.jwt.sign({
+      email: "invitee@example.com",
+      type: "coordinator-invite",
+      person: { firstName: "New", lastName: "Coordinator" },
+    });
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/trusted-domain",
+      cookies: { access: idLessToken },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(findOneSpy).not.toHaveBeenCalled();
+  });
+
   it("leaves the existing JWT-cookie flow unaffected when no header is sent", async () => {
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
       coordinatorUser as any,

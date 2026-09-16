@@ -94,6 +94,21 @@ async function jwtPlugin(
         const userId = request.user?.id;
         logger.debug(`jwtPlugin:authenticated: ${userId}`);
 
+        // A token with no id (currently only the coordinator-invite type,
+        // be#1008 — it has no User row yet to carry one) must never reach
+        // the lookup below unconstrained: TypeORM's `where: { id: undefined }`
+        // drops the id key entirely instead of filtering by it, turning this
+        // into a WHERE-less query that returns an arbitrary — often the
+        // very first, e.g. an admin — user. This doesn't fix the pre-existing,
+        // separately-tracked gap that this cookie path never checks the
+        // token's `type` claim at all (see tryAuthenticate below): every
+        // token type before coordinator-invite always carried a real id, so
+        // that gap only ever authenticated the legitimate owner of the
+        // token, never an arbitrary account.
+        if (!userId) {
+          throw new UnauthenticatedError("Authorization failed.");
+        }
+
         user = await fastify.db.userRepository.findOne({
           where: { id: userId },
         });

@@ -1,4 +1,4 @@
-import type { JWT, TokenType } from "@fastify/jwt";
+import type { JWT } from "@fastify/jwt";
 import { UserRole } from "need4deed-sdk";
 import {
   emailVerificationManifestUrl,
@@ -39,7 +39,7 @@ export async function sendEmailVerification(
     {
       id: user.id,
       email: user.email,
-      type: "verify" as TokenType,
+      type: "verify",
     },
     { expiresIn: `${VERIFY_LIFESPAN_MS}` },
   );

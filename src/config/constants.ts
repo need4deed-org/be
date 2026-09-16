@@ -95,6 +95,10 @@ export const urlEmailVerification =
 export const urlPasswordReset =
   process.env.URL_PASSWORD_RESET || "https://app.need4deed.org/reset-password";
 
+export const urlCoordinatorInvite =
+  process.env.URL_COORDINATOR_INVITE ||
+  "https://app.need4deed.org/register-with-invite";
+
 // CDN manifest (flat, bilingual subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
@@ -143,6 +147,7 @@ export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in millise
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24h in milliseconds
 export const RESET_LIFESPAN_MS = 60 * 60 * 1000; // 60 minutes in milliseconds
+export const COORDINATOR_INVITE_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 export const pluginTimeout = 300 * 1000; // 30s in milliseconds
 
 export const accessCookieName = "access";

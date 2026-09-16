@@ -20,7 +20,11 @@ import {
   responseErrors,
   volunteerRegisterBodySchema,
 } from "../../schema";
-import { updateLeads, writeVolunteerLegacy } from "../../utils";
+import {
+  updateLeads,
+  verifyTokenOfType,
+  writeVolunteerLegacy,
+} from "../../utils";
 
 // Same DB-conflict-classification pattern as write-agent-registration.ts's
 // classifyRegisterAgentConflict: the findOneBy check below is a fast path,
@@ -43,16 +47,13 @@ async function authByVerifyToken(
 ) {
   const { token } = request.query as { token?: string };
 
-  let payload: { id: number; email: string; type?: string };
-  try {
-    payload = await fastify.jwt.verify(token as string);
-  } catch {
-    throw new UnauthenticatedError("Invalid or expired registration token.");
-  }
-
-  if (payload.type !== "verify") {
-    throw new UnauthenticatedError("Invalid registration token.");
-  }
+  const payload = await verifyTokenOfType<{ id: number; email: string }>(
+    fastify,
+    token,
+    "verify",
+    "Invalid or expired registration token.",
+    "Invalid registration token.",
+  );
 
   const user = await fastify.db.userRepository.findOne({
     where: { id: payload.id },

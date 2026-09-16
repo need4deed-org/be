@@ -31,7 +31,7 @@ import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import { AuthOptions } from "./auth";
+import { AuthOptions, CoordinatorInvitePerson } from "./auth";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -74,6 +74,7 @@ declare module "fastify" {
     personId?: number; // Optional foreign key ID for the Person entity
     agents?: Agent[];
     registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
+    coordinatorInvite?: { email: string }; // Verified invite email resolved from the querystring token on POST /user/register-with-invite; person details are attached via resolvedPerson (shared with POST /user and POST /user/admin)
     authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
     callerAgentIds?: number[]; // Resolved once per request, shared by the ownership check and the PII masking hook
   }
@@ -83,14 +84,32 @@ declare module "@fastify/jwt" {
   // It's crucial to extend the original FastifyJWT interface here
   // so that your custom 'payload' and 'user' types merge correctly
   // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
-  type TokenType = "access" | "refresh" | "verify" | "reset";
+  type TokenType =
+    | "access"
+    | "refresh"
+    | "verify"
+    | "reset"
+    | "coordinator-invite";
   interface FastifyJWT {
-    // Payload type when signing a token (`reply.jwtSign(payload)`)
-    payload: {
-      id: number;
-      email: string;
-      type?: TokenType;
-    };
+    // Payload type when signing a token (`reply.jwtSign(payload)`). A
+    // discriminated union rather than one shape with everything optional —
+    // access/refresh/verify/reset tokens always have a User row to carry an
+    // id for; a coordinator-invite token doesn't (no User exists yet) but
+    // carries the admin-entered person details instead, consumed by
+    // POST /user/register-with-invite to create the Person record (be#1008).
+    // Loosening `id` to optional on every type to fit the one new case would
+    // have silently dropped that guarantee for the other four.
+    payload:
+      | {
+          id: number;
+          email: string;
+          type?: Exclude<TokenType, "coordinator-invite">;
+        }
+      | {
+          email: string;
+          type: "coordinator-invite";
+          person: CoordinatorInvitePerson;
+        };
     // User type that will be attached to `request.user` after `request.jwtVerify()`
     user: {
       id: number;
