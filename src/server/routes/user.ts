@@ -30,10 +30,11 @@ import {
   userVerifyEmailSchema,
 } from "../schema/user.schema";
 import { QuerystringUserList, ReplyDataCount, RoutePrefix } from "../types";
-import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
+import { getSkipTake, getUserWhere } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
+import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -330,14 +331,23 @@ export default async function userRoutes(
         // existing agent member already shares it, or it's on the trusted-domain
         // allowlist (so a brand-new org's first representative can register).
         // Volunteers and users self-register freely.
+        //
+        // A free/consumer domain (gmail.com, yahoo.com, ...) never qualifies
+        // via the existing-member shortcut — anyone can register an address
+        // there, so one agent already using it says nothing about this
+        // signup. Only an explicit TrustedDomain entry can clear the gate for
+        // those domains (be#1001).
         if (role === UserRole.AGENT) {
-          const domain = (email || "").split("@").pop();
-          const matchingAgent = await fastify.db.agentRepository.findOne({
-            where: {
-              agentPerson: { person: { email: ILike(`%@${domain}`) } },
-            },
-          });
-          if (!matchingAgent && !(await isEmailDomainTrusted(email))) {
+          const allowed = await isAgentDomainAllowed(email, (domain) =>
+            fastify.db.agentRepository
+              .findOne({
+                where: {
+                  agentPerson: { person: { email: ILike(`%@${domain}`) } },
+                },
+              })
+              .then((agent) => !!agent),
+          );
+          if (!allowed) {
             throw new InvalidOrganizationEmailError();
           }
         }

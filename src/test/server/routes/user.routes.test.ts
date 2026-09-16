@@ -23,13 +23,40 @@ describe("POST /user — AGENT email-domain gate", () => {
   let fastify: FastifyInstance;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const trustedDomain = `trusted-${suffix}.example`;
+  // be#1001: a free-email domain the existing-agent shortcut must not
+  // auto-approve. Distinct from the seeded gmail.com volunteer addresses, to
+  // isolate this test from unrelated dev-data collisions.
+  const freeEmailDomain = "gmx.net";
   const createdUserIds: number[] = [];
+  let freeDomainAgent: Agent;
+  let freeDomainPerson: Person;
 
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
     await fastify.db.trustedDomainRepository.save(
       new TrustedDomain({ domain: trustedDomain }),
+    );
+
+    // An existing agent member on the free-email domain — this is exactly
+    // the shortcut be#1001 says must not apply to free domains.
+    freeDomainPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Existing",
+        lastName: `Agent-${suffix}`,
+        email: `existing-agent-${suffix}@${freeEmailDomain}`,
+      }),
+    );
+    freeDomainAgent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Free Domain RAC ${suffix}` }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: freeDomainAgent.id,
+        personId: freeDomainPerson.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
     );
   });
 
@@ -38,6 +65,14 @@ describe("POST /user — AGENT email-domain gate", () => {
       await fastify.db.userRepository.delete({ id });
     }
     await fastify.db.trustedDomainRepository.delete({ domain: trustedDomain });
+    await fastify.db.trustedDomainRepository.delete({
+      domain: freeEmailDomain,
+    });
+    await fastify.db.agentPersonRepository.delete({
+      personId: freeDomainPerson.id,
+    });
+    await fastify.db.agentRepository.delete({ id: freeDomainAgent.id });
+    await fastify.db.personRepository.delete({ id: freeDomainPerson.id });
     await fastify.close();
   });
 
@@ -66,6 +101,44 @@ describe("POST /user — AGENT email-domain gate", () => {
       url: "/user",
       payload: {
         email: `agent-${suffix}@${trustedDomain}`,
+        password: "test_password",
+        role: UserRole.AGENT,
+        person: { firstName: "Test", lastName: "Agent" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+  });
+
+  it("be#1001: rejects a free-email-domain signup even though an existing agent already uses that domain", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email: `agent-${suffix}@${freeEmailDomain}`,
+        password: "test_password",
+        role: UserRole.AGENT,
+        person: { firstName: "Test", lastName: "Agent" },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      error: "InvalidOrganizationEmailError",
+    });
+  });
+
+  it("be#1001: allows a free-email-domain signup once that domain is explicitly trusted", async () => {
+    await fastify.db.trustedDomainRepository.save(
+      new TrustedDomain({ domain: freeEmailDomain }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email: `agent-trusted-${suffix}@${freeEmailDomain}`,
         password: "test_password",
         role: UserRole.AGENT,
         person: { firstName: "Test", lastName: "Agent" },

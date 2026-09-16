@@ -360,6 +360,24 @@ describe("resolveJoinStatus", () => {
     const status = await resolveJoinStatus(33, "newcomer@brandnew.de");
     expect(status).toBe(AgentMembershipStatus.ACTIVE);
   });
+
+  it("be#1001: returns PENDING for a free-email domain even when an existing member shares it, skipping the member lookup entirely", async () => {
+    isEmailDomainTrustedMock.mockResolvedValueOnce(false);
+
+    const status = await resolveJoinStatus(33, "newcomer@gmail.com");
+
+    expect(status).toBe(AgentMembershipStatus.PENDING);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
+
+  it("be#1001: returns ACTIVE for a free-email domain once it's explicitly trusted", async () => {
+    isEmailDomainTrustedMock.mockResolvedValueOnce(true);
+
+    const status = await resolveJoinStatus(33, "newcomer@gmail.com");
+
+    expect(status).toBe(AgentMembershipStatus.ACTIVE);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
 });
 
 describe("joinAgent", () => {
