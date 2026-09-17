@@ -54,6 +54,8 @@ import {
   getLanguageCode,
   getOrCreateTimeslot,
   getSkipTake,
+  getVolunteerClones,
+  getVolunteerNotificationText,
   getVolunteerPatchData,
   getVolunteerWhere,
   patchAddress,
@@ -619,13 +621,21 @@ export default async function volunteerRoutes(
         );
 
         const leads = await parseFormData(
-          request.body.leadFrom,
+          request.body.leadFrom as string[],
           leadFromParser,
         );
 
         const id = await writeVolunteerLegacy(volunteer);
         if (id) {
           await updateLeads(leads);
+          const volunteerCloneIds = await getVolunteerClones(id);
+          fastify.notify.opsAlert(
+            getVolunteerNotificationText(
+              volunteer.person.email || "No email",
+              volunteer.person.name,
+              volunteerCloneIds,
+            ),
+          );
         }
 
         return reply.status(201).send({
