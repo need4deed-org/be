@@ -17,6 +17,7 @@ import {
 } from "need4deed-sdk";
 import { FindOptionsWhere, ILike } from "typeorm";
 import {
+  AlreadyUsedTokenError,
   BadRequestError,
   InvalidOrganizationEmailError,
   UnauthenticatedError,
@@ -289,7 +290,7 @@ export default async function userRoutes(
 
         if (!user) {
           logger.warn("User not found for login attempt.");
-          return reply.status(400).send({ message: "Invalid token." });
+          throw new BadRequestError("Invalid token.");
         }
 
         // Only meaningful for VOLUNTEER: does the Person this account is
@@ -307,11 +308,7 @@ export default async function userRoutes(
           hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
 
         if (user.isActive) {
-          return reply.status(200).send({
-            message: "Email is already verified.",
-            verified: true,
-            ...volunteerProfileFields,
-          });
+          throw new AlreadyUsedTokenError();
         }
 
         user.isActive = true;

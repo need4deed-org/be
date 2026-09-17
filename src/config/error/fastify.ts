@@ -50,3 +50,9 @@ export class PersonAlreadyRegisteredError extends BaseError {
     super(message, 400);
   }
 }
+
+export class AlreadyUsedTokenError extends BaseError {
+  constructor(message = "Already used token.") {
+    super(message, 409);
+  }
+}
