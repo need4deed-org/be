@@ -4,21 +4,26 @@ import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository } from "../../../data/utils";
 
-export async function getVolunteerClones(id: number): Promise<number[]> {
-  const volunteerRepository = getRepository(dataSource, Volunteer);
+export interface VolunteerCloneLookup {
+  id: number;
+  email?: string | null;
+  phone?: string | null;
+}
 
-  const volunteer = await volunteerRepository.findOne({
-    where: { id },
-    relations: ["person"],
-  });
+export async function getVolunteerClones({
+  id,
+  email,
+  phone,
+}: VolunteerCloneLookup): Promise<number[]> {
+  const volunteerRepository = getRepository(dataSource, Volunteer);
   const personConditions: FindOptionsWhere<Person>[] = [];
 
-  if (volunteer?.person?.email) {
-    personConditions.push({ email: volunteer.person.email });
+  if (email) {
+    personConditions.push({ email });
   }
 
-  if (volunteer?.person?.phone) {
-    personConditions.push({ phone: volunteer.person.phone });
+  if (phone) {
+    personConditions.push({ phone });
   }
 
   if (personConditions.length === 0) {
