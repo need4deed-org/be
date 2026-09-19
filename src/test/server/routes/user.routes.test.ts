@@ -274,7 +274,7 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
   async function makeInactiveUser(
     email: string,
     role: UserRole,
-    personId: number,
+    personId?: number,
   ): Promise<User> {
     const user = await fastify.db.userRepository.save(
       new User({
@@ -391,6 +391,31 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json()).not.toHaveProperty("hasVolunteerProfile");
+  });
+
+  it("throws AlreadyUsedTokenError for an already used token", async () => {
+    const user = await makeInactiveUser(
+      "user-already-used-token@example.com",
+      UserRole.VOLUNTEER,
+      undefined,
+    );
+    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+
+    // make user active, so the token is now "used"
+    user.isActive = true;
+    await fastify.db.userRepository.save(user);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({
+      error: "AlreadyUsedTokenError",
+      message: "Already used token.",
+    });
   });
 });
 
