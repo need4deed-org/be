@@ -613,39 +613,34 @@ export default async function volunteerRoutes(
       },
     },
     async (request, reply) => {
-      logger.debug(`endpoint:POST: ${JSON.stringify(request.body)}`);
-      try {
-        const volunteer = await parseFormData(
-          request.body,
-          volunteerFormParser,
-        );
+      const volunteer = await parseFormData(request.body, volunteerFormParser);
 
-        const leads = await parseFormData(
-          request.body.leadFrom as string[],
-          leadFromParser,
-        );
+      const leads = await parseFormData(request.body.leadFrom, leadFromParser);
 
-        const id = await writeVolunteerLegacy(volunteer);
-        if (id) {
-          await updateLeads(leads);
-          const volunteerCloneIds = await getVolunteerClones(id);
-          fastify.notify.opsAlert(
-            getVolunteerNotificationText(
-              volunteer.person.email || "No email",
-              volunteer.person.name,
-              volunteerCloneIds,
-            ),
-          );
-        }
-
-        return reply.status(201).send({
-          message: "Volunteer stored.",
-          data: { id },
+      const id = await writeVolunteerLegacy(volunteer);
+      if (id) {
+        updateLeads(leads).catch((error) => {
+          logger.warn(`Failed to update lead counts: ${error}`);
         });
-      } catch (error) {
-        logger.error(`Error writing volunteer: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
+        getVolunteerClones(id)
+          .then((volunteerCloneIds) => {
+            fastify.notify.opsAlert(
+              getVolunteerNotificationText(
+                volunteer.person.email || "No email",
+                volunteer.person.name,
+                volunteerCloneIds,
+              ),
+            );
+          })
+          .catch((error) => {
+            logger.warn(`Volunteer clone lookup/notify failed: ${error}`);
+          });
       }
+
+      return reply.status(201).send({
+        message: "Volunteer stored.",
+        data: { id },
+      });
     },
   );
 
