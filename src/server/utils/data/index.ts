@@ -24,6 +24,7 @@ export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./is-trusted-domain";
 export * from "./mask-inactive-agent";
+export * from "./notify-new-volunteer";
 export * from "./resolve-person-by-email";
 export * from "./run-named-cron-jobs";
 export * from "./run-w-advisory-lock";

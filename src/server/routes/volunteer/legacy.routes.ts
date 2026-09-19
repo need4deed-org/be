@@ -58,7 +58,11 @@ export default async function volunteerLegacyRoutes(
         }
       }
 
-      const volunteerCloneIds = await getVolunteerClones(id);
+      const volunteerCloneIds = await getVolunteerClones({
+        id,
+        email: volunteer.person.email,
+        phone: volunteer.person.phone,
+      });
 
       const opportunityMessage = request.body.origin_opportunity
         ? ` with opportunity id:${request.body.origin_opportunity}`

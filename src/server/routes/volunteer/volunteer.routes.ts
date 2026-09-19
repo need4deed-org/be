@@ -3,11 +3,9 @@ import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
   EntityTableName,
-  Id,
   Lang,
   SortOrder,
   UserRole,
-  VolunteerFormData,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
@@ -26,12 +24,7 @@ import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-lo
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
-import {
-  leadFromParser,
-  parseFormData,
-  volunteerFormParser,
-  volunteerListSerializer,
-} from "../../../services";
+import { volunteerListSerializer } from "../../../services";
 import {
   idParamSchema,
   langQuerySchema,
@@ -58,9 +51,7 @@ import {
   getVolunteerWhere,
   patchAddress,
   patchEntity,
-  updateLeads,
   updateOptionList,
-  writeVolunteerLegacy,
 } from "../../utils";
 import {
   maskForCaller,
@@ -572,68 +563,6 @@ export default async function volunteerRoutes(
         });
       } catch (error) {
         logger.error(`Error fetching volunteer (id=${id}): ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
-      }
-    },
-  );
-
-  fastify.post<{
-    Querystring: {
-      language: string;
-    };
-    Body: VolunteerFormData;
-    Reply: {
-      message: string;
-      data?: { id: Id };
-    };
-  }>(
-    "/",
-    {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
-      schema: {
-        querystring: langQuerySchema,
-        body: { $ref: "volunteer-form-data" },
-        response: {
-          201: {
-            type: "object",
-            properties: {
-              message: { type: "string" },
-              data: {
-                type: "object",
-                properties: { id: { type: ["string", "number"] } },
-                required: ["id"],
-              },
-            },
-            required: ["message", "data"],
-          },
-          ...responseErrors,
-        },
-      },
-    },
-    async (request, reply) => {
-      logger.debug(`endpoint:POST: ${JSON.stringify(request.body)}`);
-      try {
-        const volunteer = await parseFormData(
-          request.body,
-          volunteerFormParser,
-        );
-
-        const leads = await parseFormData(
-          request.body.leadFrom,
-          leadFromParser,
-        );
-
-        const id = await writeVolunteerLegacy(volunteer);
-        if (id) {
-          await updateLeads(leads);
-        }
-
-        return reply.status(201).send({
-          message: "Volunteer stored.",
-          data: { id },
-        });
-      } catch (error) {
-        logger.error(`Error writing volunteer: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },

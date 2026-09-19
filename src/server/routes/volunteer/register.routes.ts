@@ -11,6 +11,7 @@ import {
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../../config";
+import logger from "../../../logger";
 import {
   parserVolunteerSelfRegister,
   VolunteerSelfRegisterBody,
@@ -21,6 +22,7 @@ import {
   volunteerRegisterBodySchema,
 } from "../../schema";
 import {
+  notifyNewVolunteer,
   updateLeads,
   verifyTokenOfType,
   writeVolunteerLegacy,
@@ -140,8 +142,17 @@ export default async function volunteerRegisterRoutes(
         throw err;
       }
       if (leads.length) {
-        await updateLeads(leads);
+        updateLeads(leads).catch((error) => {
+          logger.warn(`Failed to update lead counts: ${error}`);
+        });
       }
+
+      notifyNewVolunteer(fastify, {
+        id,
+        email: person.email,
+        phone: person.phone,
+        name: person.name,
+      });
 
       return reply.status(201).send({
         message: "Volunteer registration complete.",
