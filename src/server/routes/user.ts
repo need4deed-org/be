@@ -283,48 +283,41 @@ export default async function userRoutes(
         return reply.status(400).send({ message: "Invalid token format." });
       }
 
-      try {
-        const user = await userRepository.findOne({
-          where: { email },
-        });
+      const user = await userRepository.findOne({
+        where: { email },
+      });
 
-        if (!user) {
-          logger.warn("User not found for login attempt.");
-          throw new BadRequestError("Invalid token.");
-        }
-
-        // Only meaningful for VOLUNTEER: does the Person this account is
-        // linked to (possibly an existing one, via be#947's email-linking)
-        // already have a Volunteer profile — same email-first check
-        // documented in fe#956 (never resolved via userId/personId
-        // assumptions on their own, always the verified email's Person).
-        let hasVolunteerProfile: boolean | undefined;
-        if (user.role === UserRole.VOLUNTEER && user.personId) {
-          hasVolunteerProfile =
-            (await getVolunteerIdByPersonId(user.personId)) !== undefined;
-        }
-
-        const volunteerProfileFields =
-          hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
-
-        if (user.isActive) {
-          throw new AlreadyUsedTokenError();
-        }
-
-        user.isActive = true;
-        await userRepository.save(user);
-
-        return reply.status(200).send({
-          message: "Email verified successfully.",
-          verified: true,
-          ...volunteerProfileFields,
-        });
-      } catch (error) {
-        logger.error(`Error verifying email: ${error}`);
-        return reply.status(500).send({
-          message: "Failed to verify email due to an internal error.",
-        });
+      if (!user) {
+        logger.warn("User not found for login attempt.");
+        throw new BadRequestError("Invalid token.");
       }
+
+      // Only meaningful for VOLUNTEER: does the Person this account is
+      // linked to (possibly an existing one, via be#947's email-linking)
+      // already have a Volunteer profile — same email-first check
+      // documented in fe#956 (never resolved via userId/personId
+      // assumptions on their own, always the verified email's Person).
+      let hasVolunteerProfile: boolean | undefined;
+      if (user.role === UserRole.VOLUNTEER && user.personId) {
+        hasVolunteerProfile =
+          (await getVolunteerIdByPersonId(user.personId)) !== undefined;
+      }
+
+      const volunteerProfileFields =
+        hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
+
+      if (user.isActive) {
+        throw new AlreadyUsedTokenError();
+      }
+
+      user.isActive = true;
+      await userRepository.save(user);
+
+      return reply.status(200).send({
+        message: "Email verified successfully.",
+        verified: true,
+        ...volunteerProfileFields,
+      });
     },
   );
 

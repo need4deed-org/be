@@ -1,7 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AlreadyUsedTokenError } from "../../../config";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -404,16 +403,19 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
 
     // make user active, so the token is now "used"
     user.isActive = true;
+    await fastify.db.userRepository.save(user);
 
-    try {
-      await fastify.inject({
-        method: "POST",
-        url: "/user/verify-email",
-        payload: { token },
-      });
-    } catch (error) {
-      expect(error).toBeInstanceOf(AlreadyUsedTokenError);
-    }
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({
+      error: "AlreadyUsedTokenError",
+      message: "Already used token.",
+    });
   });
 });
 
