@@ -43,4 +43,39 @@ describe("mergeIntoWhere", () => {
 
     expect(where).toEqual([{ agentId: In([1, 2]) }, { agentId: In([1, 2]) }]);
   });
+
+  // be#1022 review: a shallow Object.assign would silently drop an existing
+  // nested constraint (e.g. deal.dealDistrict) whenever the extra condition
+  // also sets `deal` — the same "silently dropped constraint" bug class
+  // be#1018 fixed, just one level up.
+  it("deep-merges a shared key that's a plain object on both sides, instead of overwriting it", () => {
+    const where: Where = {
+      deal: { dealDistrict: { district: { id: "2" } } },
+    };
+
+    mergeIntoWhere(where, {
+      deal: { dealLanguage: { language: { id: "9" } } },
+    });
+
+    expect(where).toEqual({
+      deal: {
+        dealDistrict: { district: { id: "2" } },
+        dealLanguage: { language: { id: "9" } },
+      },
+    });
+  });
+
+  it("still lets the extra condition overwrite a FindOperator under a shared key, instead of trying to merge into it", () => {
+    const where: Where = {
+      deal: { dealLanguage: { language: { id: In(["1"]) } } },
+    };
+
+    mergeIntoWhere(where, {
+      deal: { dealLanguage: { language: { id: In(["2"]) } } },
+    });
+
+    expect(where).toEqual({
+      deal: { dealLanguage: { language: { id: In(["2"]) } } },
+    });
+  });
 });

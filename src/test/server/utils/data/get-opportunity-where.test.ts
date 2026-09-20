@@ -251,6 +251,31 @@ describe("getOpportunityWhere", () => {
     });
   });
 
+  // be#1022 review: the "arrays are truthy even when empty" bug the district
+  // fix addressed applies to every other array-shaped filter in this file
+  // too — each goes through hasFilterValue instead of a bare `if (filter?.x)`.
+  describe("empty-array filter values are treated as no filter", () => {
+    it("filter.type: []", () => {
+      expect(getOpportunityWhere({ type: [] } as never)).toEqual({});
+    });
+
+    it("filter.status: []", () => {
+      expect(getOpportunityWhere({ status: [] } as never)).toEqual({});
+    });
+
+    it("filter.language: []", () => {
+      expect(getOpportunityWhere({ language: [] } as never)).toEqual({});
+    });
+
+    it("filter.activity: []", () => {
+      expect(getOpportunityWhere({ activity: [] } as never)).toEqual({});
+    });
+
+    it("filter.skill: []", () => {
+      expect(getOpportunityWhere({ skill: [] } as never)).toEqual({});
+    });
+  });
+
   // Multiple selections arrive as an array at runtime (?language=3&language=4)
   // and become In([...]), which TypeORM ORs. The querystring type declares
   // every filter as `string`, hence the cast, see the

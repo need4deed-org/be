@@ -26,6 +26,16 @@ export type OpportunityAppointmentFilter = Pick<
   | "excludeAccompanying"
 >;
 
+// Arrays are truthy even when empty, so a plain `if (filter?.x)` check
+// treats `x: []` as "filter requested" — and normalizeStringArrayInput's
+// In([]) compiles to an always-false 0=1, silently zeroing every result
+// instead of applying no filter at all. Every array-shaped filter value in
+// this file goes through this check instead of a bare truthiness one
+// (be#1018's district fix was the first instance of this bug class here).
+function hasFilterValue(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value.length > 0 : Boolean(value);
+}
+
 // appointmentDateFrom/To are Berlin calendar days ("2026-06-30"), not UTC
 // ones — this is a Berlin-based product and Opportunity.onetimer.date is
 // filtered the same way elsewhere (berlinDayBoundaries, used by
@@ -82,7 +92,7 @@ function getTypeWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   excludeAccompanying?: boolean,
 ): FindOptionsWhere<Opportunity> {
-  if (filter?.type) {
+  if (hasFilterValue(filter?.type)) {
     const types = Array.isArray(filter.type) ? filter.type : [filter.type];
     // Combine rather than defer: an explicit type list that happens to
     // include "accompanying" still gets it stripped when excludeAccompanying
@@ -116,17 +126,17 @@ function getDealWhere(
   filter: QuerystringOpportunityFiltering["filter"],
 ): Record<string, unknown> {
   const dealFilter: Record<string, unknown> = {};
-  if (filter?.language) {
+  if (hasFilterValue(filter?.language)) {
     dealFilter.dealLanguage = {
       language: { id: normalizeStringArrayInput(filter.language) },
     };
   }
-  if (filter?.activity) {
+  if (hasFilterValue(filter?.activity)) {
     dealFilter.dealActivity = {
       activity: { id: normalizeStringArrayInput(filter.activity) },
     };
   }
-  if (filter?.skill) {
+  if (hasFilterValue(filter?.skill)) {
     dealFilter.dealSkill = {
       skill: { id: normalizeStringArrayInput(filter.skill) },
     };
@@ -145,7 +155,7 @@ export function getOpportunityWhere(
   const base = {
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
-    ...(filter?.status
+    ...(hasFilterValue(filter?.status)
       ? {
           status: normalizeStringArrayInput(filter.status),
         }
@@ -158,17 +168,8 @@ export function getOpportunityWhere(
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
   } as FindOptionsWhere<Opportunity>;
 
-  // Arrays are truthy even when empty, so `filter?.district` alone would
-  // treat `district: []` (a valid empty-array shape from a non-FE caller)
-  // as "filter by district", writing an unsatisfiable `IN ()` into both
-  // branches below instead of applying no district constraint at all.
-  const district = filter?.district;
-  const hasDistrict = Array.isArray(district)
-    ? district.length > 0
-    : Boolean(district);
-
-  if (hasDistrict) {
-    const districtIds = normalizeStringArrayInput(district!);
+  if (hasFilterValue(filter?.district)) {
+    const districtIds = normalizeStringArrayInput(filter!.district!);
     // Two independent, differently-shaped sources can place an opportunity
     // in a district: its own reliable `districtId` FK, or the optional
     // `deal.dealDistrict` preference list (be#1018). They live on different
