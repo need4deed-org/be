@@ -60,14 +60,13 @@ export class ConsolidateLegacyDistricts1777973964566
       );
 
       // Delete the legacy district record itself.
-      await queryRunner.query(
-        `DELETE FROM district WHERE title = $1`,
-        [legacy],
-      );
+      await queryRunner.query(`DELETE FROM district WHERE title = $1`, [
+        legacy,
+      ]);
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Re-inserting legacy district rows is not meaningful — down() is a no-op.
   }
 }

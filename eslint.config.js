@@ -8,11 +8,20 @@ const unusedImports = require("eslint-plugin-unused-imports");
 const globals = require("globals");
 
 module.exports = [
+  { ignores: ["dist", "node_modules", "dev/**", "**/dev.*.ts"] },
   js.configs.recommended,
   prettier,
   {
+    files: ["eslint.config.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ["**/*.ts"],
-    ignores: ["dist", "node_modules"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
