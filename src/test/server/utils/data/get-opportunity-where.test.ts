@@ -43,6 +43,14 @@ describe("getOpportunityWhere", () => {
     });
   });
 
+  // A literal "%" or "_" in a search term must match as text, not act as a
+  // SQL wildcard/single-char-match.
+  it("escapes LIKE metacharacters in filter.search", () => {
+    expect(getOpportunityWhere({ search: "50%_off" } as never)).toEqual({
+      title: ILike("%50\\%\\_off%"),
+    });
+  });
+
   it("applies filter.activity unchanged", () => {
     expect(getOpportunityWhere({ activity: ["3"] } as never)).toEqual({
       deal: { dealActivity: { activity: { id: In(["3"]) } } },
@@ -175,7 +183,7 @@ describe("getOpportunityWhere", () => {
   // sources — which, living on different root relations, TypeORM can only
   // express as an array of alternative FindOptionsWhere.
   describe("district filter (be#1018)", () => {
-    it("ORs Opportunity.district against deal.dealDistrict", () => {
+    it("ORs Opportunity.districtId against deal.dealDistrict", () => {
       const where = getOpportunityWhere({
         type: "",
         status: "",
@@ -183,7 +191,7 @@ describe("getOpportunityWhere", () => {
       });
 
       expect(where).toEqual([
-        { district: { id: "2" } },
+        { districtId: "2" },
         { deal: { dealDistrict: { district: { id: "2" } } } },
       ]);
     });
@@ -196,7 +204,7 @@ describe("getOpportunityWhere", () => {
       } as unknown as QuerystringOpportunityFiltering["filter"]);
 
       expect(where).toEqual([
-        { district: { id: In(["2", "5"]) } },
+        { districtId: In(["2", "5"]) },
         { deal: { dealDistrict: { district: { id: In(["2", "5"]) } } } },
       ]);
     });
@@ -218,7 +226,7 @@ describe("getOpportunityWhere", () => {
       };
 
       expect(where).toEqual([
-        { district: { id: "2" }, deal: otherDealConstraints },
+        { districtId: "2", deal: otherDealConstraints },
         {
           deal: {
             ...otherDealConstraints,
@@ -226,6 +234,20 @@ describe("getOpportunityWhere", () => {
           },
         },
       ]);
+    });
+
+    // Arrays are truthy even when empty — `filter?.district` alone would
+    // otherwise treat `district: []` as "filter by district" and write an
+    // unsatisfiable `IN ()` into both OR branches instead of applying no
+    // district constraint.
+    it("treats an empty district array as no district filter", () => {
+      const where = getOpportunityWhere({
+        type: "",
+        status: "",
+        district: [],
+      } as unknown as QuerystringOpportunityFiltering["filter"]);
+
+      expect(where).toEqual({});
     });
   });
 

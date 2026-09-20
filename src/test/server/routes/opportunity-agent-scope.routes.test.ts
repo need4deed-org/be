@@ -7,13 +7,15 @@ import {
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
 // GET /opportunity returns every agent's opportunities to everyone.
@@ -202,6 +204,124 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     } finally {
       await fastify.db.opportunityRepository.delete(ownDistrictOpp.id);
       await fastify.db.opportunityRepository.delete(otherDistrictOpp.id);
+      await dealRepository.delete(ownDeal.id);
+      await dealRepository.delete(otherDeal.id);
+    }
+  });
+
+  // Covers the OTHER OR branch: an opportunity reachable only through
+  // deal.dealDistrict (no districtId of its own) — the case be#1018 was
+  // actually filed about, and the one the district-filter fix exists for.
+  it("also scopes a district match found only via deal.dealDistrict", async () => {
+    const districtId = 2; // seeded "Friedrichshain-Kreuzberg"
+    const postcodeId = 1;
+
+    const dealRepository = fastify.db.dealRepository;
+    const dealDistrictRepository = getRepository(dataSource, DealDistrict);
+
+    const ownDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+    const otherDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+    await dealDistrictRepository.save(
+      new DealDistrict({ dealId: ownDeal.id, districtId }),
+    );
+    await dealDistrictRepository.save(
+      new DealDistrict({ dealId: otherDeal.id, districtId }),
+    );
+
+    // No districtId set — only reachable through deal.dealDistrict.
+    const ownOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 own-agent dealDistrict-only opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: ownAgentId,
+        dealId: ownDeal.id,
+      } as Partial<Opportunity>),
+    );
+    const otherOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 other-agent dealDistrict-only opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: otherAgentId,
+        dealId: otherDeal.id,
+      } as Partial<Opportunity>),
+    );
+
+    try {
+      const res = await listOpportunities(
+        agentCookie,
+        `&filter[district]=${districtId}`,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      expect(data.some((o: { id: number }) => o.id === ownOpp.id)).toBe(true);
+      expect(
+        data.every((o: { agentId: number }) => o.agentId === ownAgentId),
+      ).toBe(true);
+    } finally {
+      await fastify.db.opportunityRepository.delete(ownOpp.id);
+      await fastify.db.opportunityRepository.delete(otherOpp.id);
+      await dealDistrictRepository.delete({ dealId: ownDeal.id });
+      await dealDistrictRepository.delete({ dealId: otherDeal.id });
+      await dealRepository.delete(ownDeal.id);
+      await dealRepository.delete(otherDeal.id);
+    }
+  });
+
+  // The district filter's array `where` also has to work through the
+  // sortBy=start-date query path, which uses createQueryBuilder +
+  // setFindOptions + a DISTINCT-forcing pagination subquery instead of
+  // findAndCount — a structurally different query than the other tests here.
+  it("keeps a district-filtered, sortBy=start-date result scoped to the caller's own agent", async () => {
+    const districtId = 1; // seeded "Mitte"
+    const postcodeId = 1;
+
+    const dealRepository = fastify.db.dealRepository;
+    const ownDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+    const otherDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+
+    const ownOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 own-agent sortBy=start-date opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: ownAgentId,
+        dealId: ownDeal.id,
+        districtId,
+      } as Partial<Opportunity>),
+    );
+    const otherOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 other-agent sortBy=start-date opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: otherAgentId,
+        dealId: otherDeal.id,
+        districtId,
+      } as Partial<Opportunity>),
+    );
+
+    try {
+      const res = await listOpportunities(
+        agentCookie,
+        `&filter[district]=${districtId}&sortBy=start-date`,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      expect(data.some((o: { id: number }) => o.id === ownOpp.id)).toBe(true);
+      expect(
+        data.every((o: { agentId: number }) => o.agentId === ownAgentId),
+      ).toBe(true);
+    } finally {
+      await fastify.db.opportunityRepository.delete(ownOpp.id);
+      await fastify.db.opportunityRepository.delete(otherOpp.id);
       await dealRepository.delete(ownDeal.id);
       await dealRepository.delete(otherDeal.id);
     }

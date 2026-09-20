@@ -16,6 +16,7 @@ import {
   QuerystringOpportunityList,
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
+import { escapeLikePattern } from "./person-name-ilike";
 
 export type OpportunityAppointmentFilter = Pick<
   QuerystringOpportunityList,
@@ -151,25 +152,34 @@ export function getOpportunityWhere(
       : {}),
     ...(filter?.search
       ? {
-          title: ILike(`%${filter.search}%`),
+          title: ILike(`%${escapeLikePattern(filter.search)}%`),
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
   } as FindOptionsWhere<Opportunity>;
 
-  if (filter?.district) {
-    const districtIds = normalizeStringArrayInput(filter.district);
+  // Arrays are truthy even when empty, so `filter?.district` alone would
+  // treat `district: []` (a valid empty-array shape from a non-FE caller)
+  // as "filter by district", writing an unsatisfiable `IN ()` into both
+  // branches below instead of applying no district constraint at all.
+  const district = filter?.district;
+  const hasDistrict = Array.isArray(district)
+    ? district.length > 0
+    : Boolean(district);
+
+  if (hasDistrict) {
+    const districtIds = normalizeStringArrayInput(district!);
     // Two independent, differently-shaped sources can place an opportunity
     // in a district: its own reliable `districtId` FK, or the optional
     // `deal.dealDistrict` preference list (be#1018). They live on different
     // root relations, so expressing "either" requires TypeORM's array-of-
     // FindOptionsWhere OR — nesting them under one key isn't possible.
     return [
-      { ...base, district: { id: districtIds } },
+      { ...base, districtId: districtIds },
       {
         ...base,
         deal: {
-          ...dealFilter,
+          ...((base.deal as Record<string, unknown>) ?? {}),
           dealDistrict: { district: { id: districtIds } },
         },
       },
