@@ -5,7 +5,9 @@ export default cors;
 export const corsOptions = {
   origin: (origin, cb) => {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return cb(null, true);
+    if (!origin) {
+      return cb(null, true);
+    }
 
     // Allow specific origins
     const allowedOrigins = (process.env.CORS_ORIGINS || "")
