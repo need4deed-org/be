@@ -103,7 +103,7 @@ export function dtoOpportunityAgent(agent: Agent): ApiOpportunityAgent {
     id: agent.id,
     type: dtoOptionTitle(agent.agentTypeId, agent.agentType),
     name: agent.title,
-    address: serializeAddress(agent.representative?.person?.address),
+    address: serializeAddress(agent.address),
     district: {
       id: agent.districtId,
       title: { de: agent.district?.title, en: agent.district?.title },
