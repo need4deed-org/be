@@ -16,6 +16,7 @@ import {
   QuerystringOpportunityList,
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
+import { escapeLikePattern } from "./person-name-ilike";
 
 export type OpportunityAppointmentFilter = Pick<
   QuerystringOpportunityList,
@@ -24,6 +25,16 @@ export type OpportunityAppointmentFilter = Pick<
   | "hasAppointmentDate"
   | "excludeAccompanying"
 >;
+
+// Arrays are truthy even when empty, so a plain `if (filter?.x)` check
+// treats `x: []` as "filter requested" — and normalizeStringArrayInput's
+// In([]) compiles to an always-false 0=1, silently zeroing every result
+// instead of applying no filter at all. Every array-shaped filter value in
+// this file goes through this check instead of a bare truthiness one
+// (be#1018's district fix was the first instance of this bug class here).
+function hasFilterValue(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value.length > 0 : Boolean(value);
+}
 
 // appointmentDateFrom/To are Berlin calendar days ("2026-06-30"), not UTC
 // ones — this is a Berlin-based product and Opportunity.onetimer.date is
@@ -81,7 +92,7 @@ function getTypeWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   excludeAccompanying?: boolean,
 ): FindOptionsWhere<Opportunity> {
-  if (filter?.type) {
+  if (hasFilterValue(filter?.type)) {
     const types = Array.isArray(filter.type) ? filter.type : [filter.type];
     // Combine rather than defer: an explicit type list that happens to
     // include "accompanying" still gets it stripped when excludeAccompanying
@@ -101,31 +112,31 @@ function getTypeWhere(
     : {};
 }
 
-// language, district, activity and skill all constrain the same `deal`
-// relation, so they must accumulate onto one shared `deal` key rather than
-// each writing their own top-level spread — two spreads with the same key
-// have the second replace the first, silently dropping the earlier
-// constraint. Mirrors get-volunteer-where.ts's identical dealFilter.
+// language, activity and skill all constrain the same `deal` relation, so
+// they must accumulate onto one shared `deal` key rather than each writing
+// their own top-level spread — two spreads with the same key have the
+// second replace the first, silently dropping the earlier constraint.
+// Mirrors get-volunteer-where.ts's identical dealFilter.
+//
+// district is deliberately NOT included here (see getOpportunityWhere):
+// `deal.dealDistrict` is an optional preference list that's empty for most
+// opportunities, so filtering on it alone excludes ones that only have the
+// reliable `Opportunity.districtId` set (be#1018).
 function getDealWhere(
   filter: QuerystringOpportunityFiltering["filter"],
 ): Record<string, unknown> {
   const dealFilter: Record<string, unknown> = {};
-  if (filter?.language) {
+  if (hasFilterValue(filter?.language)) {
     dealFilter.dealLanguage = {
       language: { id: normalizeStringArrayInput(filter.language) },
     };
   }
-  if (filter?.district) {
-    dealFilter.dealDistrict = {
-      district: { id: normalizeStringArrayInput(filter.district) },
-    };
-  }
-  if (filter?.activity) {
+  if (hasFilterValue(filter?.activity)) {
     dealFilter.dealActivity = {
       activity: { id: normalizeStringArrayInput(filter.activity) },
     };
   }
-  if (filter?.skill) {
+  if (hasFilterValue(filter?.skill)) {
     dealFilter.dealSkill = {
       skill: { id: normalizeStringArrayInput(filter.skill) },
     };
@@ -138,22 +149,43 @@ function getDealWhere(
 export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   appointment?: OpportunityAppointmentFilter,
-): FindOptionsWhere<Opportunity> {
+): FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[] {
   const dealFilter = getDealWhere(filter);
 
-  return {
+  const base = {
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
-    ...(filter?.status
+    ...(hasFilterValue(filter?.status)
       ? {
           status: normalizeStringArrayInput(filter.status),
         }
       : {}),
     ...(filter?.search
       ? {
-          title: ILike(`%${filter.search}%`),
+          title: ILike(`%${escapeLikePattern(filter.search)}%`),
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
   } as FindOptionsWhere<Opportunity>;
+
+  if (hasFilterValue(filter?.district)) {
+    const districtIds = normalizeStringArrayInput(filter!.district!);
+    // Two independent, differently-shaped sources can place an opportunity
+    // in a district: its own reliable `districtId` FK, or the optional
+    // `deal.dealDistrict` preference list (be#1018). They live on different
+    // root relations, so expressing "either" requires TypeORM's array-of-
+    // FindOptionsWhere OR — nesting them under one key isn't possible.
+    return [
+      { ...base, districtId: districtIds },
+      {
+        ...base,
+        deal: {
+          ...((base.deal as Record<string, unknown>) ?? {}),
+          dealDistrict: { district: { id: districtIds } },
+        },
+      },
+    ] as FindOptionsWhere<Opportunity>[];
+  }
+
+  return base;
 }

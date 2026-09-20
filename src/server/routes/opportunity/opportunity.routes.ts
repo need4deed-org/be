@@ -80,6 +80,7 @@ import {
   getPostcode,
   getSkipTake,
   impliesAgentSearching,
+  mergeIntoWhere,
   patchEntity,
   setAgentSearching,
   updateOptionList,
@@ -335,8 +336,12 @@ export default async function opportunityRoutes(
             count: 0,
           });
         }
-        // NGOs are scoped to their own agents, so this overwrites any agent condition.
-        where.agent = { id: In(agentIds) };
+        // NGOs are scoped to their own agents, so this overwrites any agent
+        // condition. `where` may be an array (district filter ORs across
+        // two relations, be#1018) — mergeIntoWhere applies the scope to
+        // every branch, since a scoped caller must not see other agents'
+        // opportunities via an un-scoped branch.
+        mergeIntoWhere(where, { agent: { id: In(agentIds) } });
       }
 
       logger.debug(
