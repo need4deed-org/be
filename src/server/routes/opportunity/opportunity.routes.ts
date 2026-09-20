@@ -335,8 +335,17 @@ export default async function opportunityRoutes(
             count: 0,
           });
         }
-        // NGOs are scoped to their own agents, so this overwrites any agent condition.
-        where.agent = { id: In(agentIds) };
+        // NGOs are scoped to their own agents, so this overwrites any agent
+        // condition. `where` may be an array (district filter ORs across
+        // two relations, be#1018) — the scope must apply to every branch or
+        // an agent-scoped caller would see other agents' opportunities in
+        // the un-scoped branches.
+        const agentScope = { agent: { id: In(agentIds) } };
+        if (Array.isArray(where)) {
+          where.forEach((branch) => Object.assign(branch, agentScope));
+        } else {
+          Object.assign(where, agentScope);
+        }
       }
 
       logger.debug(

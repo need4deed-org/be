@@ -1,10 +1,18 @@
 import { FastifyInstance } from "fastify";
-import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentRoleType,
+  OpportunityType,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
+import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
@@ -140,6 +148,63 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
       ),
     ).toBe(true);
     expect(coordinatorData.length).toBeGreaterThan(agentRes.json().data.length);
+  });
+
+  // be#1018: the district filter ORs Opportunity.districtId against
+  // deal.dealDistrict, since either can hold an opportunity's district —
+  // which turns `where` into an array of alternative FindOptionsWhere. The
+  // AGENT-scope condition must be applied to every element of that array,
+  // or a caller scoped to their own agent would still see another agent's
+  // opportunity that only matches through the un-scoped OR branch.
+  it("scopes a district-filtered result to the caller's own agent", async () => {
+    const districtId = 1; // seeded "Mitte"
+    const postcodeId = 1; // seeded postcode, arbitrary — deal requires one
+
+    const dealRepository = fastify.db.dealRepository;
+    const ownDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+    const otherDeal = await dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
+    );
+
+    const ownDistrictOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 own-agent district opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: ownAgentId,
+        dealId: ownDeal.id,
+        districtId,
+      } as Partial<Opportunity>),
+    );
+    const otherDistrictOpp = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `be#1018 other-agent district opp ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: otherAgentId,
+        dealId: otherDeal.id,
+        districtId,
+      } as Partial<Opportunity>),
+    );
+
+    try {
+      const res = await listOpportunities(
+        agentCookie,
+        `&filter[district]=${districtId}`,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      expect(data.length).toBeGreaterThan(0);
+      expect(
+        data.every((o: { agentId: number }) => o.agentId === ownAgentId),
+      ).toBe(true);
+    } finally {
+      await fastify.db.opportunityRepository.delete(ownDistrictOpp.id);
+      await fastify.db.opportunityRepository.delete(otherDistrictOpp.id);
+      await dealRepository.delete(ownDeal.id);
+      await dealRepository.delete(otherDeal.id);
+    }
   });
 
   it("keeps an AGENT scoped to their own agent even when filter[agentId] names another", async () => {
