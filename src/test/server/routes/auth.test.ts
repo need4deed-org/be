@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { UserRole } from "need4deed-sdk";
 import {
   afterAll,
   afterEach,
@@ -252,6 +253,56 @@ describe("POST /auth/password-change", () => {
       { password: "hashed-password-newpass123456" },
     );
     expect(response.statusCode).toBe(200);
+  });
+});
+
+describe("POST /auth/refresh", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("issues a new access token carrying the user's role and type", async () => {
+    const refreshToken = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      role: UserRole.COORDINATOR,
+      type: "refresh",
+    });
+
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      id: 999,
+      email: "test@example.com",
+      role: UserRole.COORDINATOR,
+      isActive: true,
+    } as any);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      payload: { refresh: refreshToken },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { access } = response.json();
+    const decoded = fastify.jwt.decode(access) as {
+      id: number;
+      email: string;
+      role: string;
+      type: string;
+    };
+    expect(decoded.role).toBe(UserRole.COORDINATOR);
+    expect(decoded.type).toBe("access");
   });
 });
 

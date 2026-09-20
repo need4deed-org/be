@@ -103,6 +103,7 @@ declare module "@fastify/jwt" {
       | {
           id: number;
           email: string;
+          role?: UserRole;
           type?: Exclude<TokenType, "coordinator-invite">;
         }
       | {

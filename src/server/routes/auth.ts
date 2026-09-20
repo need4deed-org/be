@@ -193,11 +193,12 @@ async function authRoutes(
           return reply.status(403).send({ message: "User is not active." });
         }
 
-        const userPayload = { id: user.id, email: user.email };
+        const userPayload = { id: user.id, email: user.email, role: user.role };
 
-        const access = fastify.jwt.sign(userPayload, {
-          expiresIn: `${ACCESS_LIFESPAN_MS}`,
-        });
+        const access = fastify.jwt.sign(
+          { ...userPayload, type: "access" },
+          { expiresIn: `${ACCESS_LIFESPAN_MS}` },
+        );
 
         if (!access) {
           throw new Error("No token generated.");
