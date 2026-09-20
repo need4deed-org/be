@@ -99,12 +99,23 @@ declare module "@fastify/jwt" {
     // POST /user/register-with-invite to create the Person record (be#1008).
     // Loosening `id` to optional on every type to fit the one new case would
     // have silently dropped that guarantee for the other four.
+    //
+    // `role` is required (not optional) on the access/refresh branch, and
+    // `type` is required everywhere — be#1023/#1024: a refresh-issued access
+    // token once silently dropped `role` because the type here allowed it
+    // to. Verify/reset tokens are keyed off `id` alone (a fresh DB lookup
+    // provides the current role), so they don't carry one.
     payload:
       | {
           id: number;
           email: string;
-          role?: UserRole;
-          type?: Exclude<TokenType, "coordinator-invite">;
+          role: UserRole;
+          type: "access" | "refresh";
+        }
+      | {
+          id: number;
+          email: string;
+          type: "verify" | "reset";
         }
       | {
           email: string;

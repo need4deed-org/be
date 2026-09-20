@@ -7,7 +7,7 @@ import { requireLinkedPersonId } from "./require-linked-person-id";
 // that can view posts can react to/bookmark them) as well as the
 // linked-person requirement.
 export function requireEngagementPersonId(
-  role: UserRole,
+  role: UserRole | undefined,
   personId: number | undefined,
 ): number {
   if (!isPostManagerRole(role)) {

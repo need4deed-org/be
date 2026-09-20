@@ -92,6 +92,7 @@ describe("POST /auth/reset-password", () => {
     const nonResetToken = fastify.jwt.sign({
       id: 999,
       email: "test@example.com",
+      role: UserRole.VOLUNTEER,
       type: "access",
     });
 
@@ -200,6 +201,7 @@ describe("POST /auth/password-change", () => {
     const accessToken = fastify.jwt.sign({
       id: 999,
       email: "test@example.com",
+      role: UserRole.VOLUNTEER,
       type: "access",
     });
 
@@ -227,6 +229,7 @@ describe("POST /auth/password-change", () => {
     const accessToken = fastify.jwt.sign({
       id: 999,
       email: "test@example.com",
+      role: UserRole.VOLUNTEER,
       type: "access",
     });
 
@@ -303,6 +306,38 @@ describe("POST /auth/refresh", () => {
     };
     expect(decoded.role).toBe(UserRole.COORDINATOR);
     expect(decoded.type).toBe("access");
+  });
+
+  it("rejects a non-refresh token (e.g. a verify or access token)", async () => {
+    const findOneSpy = vi.spyOn(fastify.db.userRepository, "findOne");
+
+    for (const type of ["verify", "reset", "access"]) {
+      const token = fastify.jwt.sign(
+        type === "access"
+          ? {
+              id: 999,
+              email: "test@example.com",
+              role: UserRole.COORDINATOR,
+              type: "access" as const,
+            }
+          : {
+              id: 999,
+              email: "test@example.com",
+              type: type as "verify" | "reset",
+            },
+      );
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: { refresh: token },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: "Invalid refresh token." });
+    }
+
+    expect(findOneSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -473,6 +508,7 @@ describe("Rate limiting", () => {
     const accessToken = fastify.jwt.sign({
       id: 999,
       email: "test@example.com",
+      role: UserRole.VOLUNTEER,
       type: "access",
     });
 

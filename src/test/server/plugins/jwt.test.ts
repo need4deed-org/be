@@ -236,6 +236,8 @@ describe("X-API-Key authentication", () => {
     const accessToken = fastify.jwt.sign({
       id: 42,
       email: "coordinator@example.com",
+      role: UserRole.COORDINATOR,
+      type: "access",
     });
 
     const response = await fastify.inject({

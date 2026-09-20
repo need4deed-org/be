@@ -22,7 +22,8 @@ import {
   userLoginSchema,
 } from "../schema/user.schema";
 import { ReplyMessage, RoutePrefix } from "../types";
-import { buildAuthUserPayload } from "../utils/data/build-auth-user-payload";
+import { signAccessToken } from "../utils/data/sign-access-token";
+import { signRefreshToken } from "../utils/data/sign-refresh-token";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -83,21 +84,13 @@ async function authRoutes(
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
-        const userPayload = buildAuthUserPayload(user);
-
-        const access = fastify.jwt.sign(
-          { ...userPayload, type: "access" },
-          { expiresIn: `${ACCESS_LIFESPAN_MS}` },
-        );
+        const access = signAccessToken(fastify, user);
 
         if (!access) {
           throw new Error("No token generated.");
         }
 
-        const refresh = fastify.jwt.sign(
-          { ...userPayload, type: "refresh" },
-          { expiresIn: `${REFRESH_LIFESPAN_MS}` },
-        );
+        const refresh = signRefreshToken(fastify, user);
 
         if (!refresh) {
           throw new Error("No token generated.");
@@ -166,8 +159,13 @@ async function authRoutes(
         const decoded = (await fastify.jwt.verify(token)) as {
           email: string;
           id: number;
+          type?: string;
         };
-        if (!decoded || !(decoded.id && decoded.email)) {
+        if (
+          !decoded ||
+          !(decoded.id && decoded.email) ||
+          decoded.type !== "refresh"
+        ) {
           return reply.status(400).send({ message: "Invalid refresh token." });
         }
 
@@ -194,12 +192,7 @@ async function authRoutes(
           return reply.status(403).send({ message: "User is not active." });
         }
 
-        const userPayload = buildAuthUserPayload(user);
-
-        const access = fastify.jwt.sign(
-          { ...userPayload, type: "access" },
-          { expiresIn: `${ACCESS_LIFESPAN_MS}` },
-        );
+        const access = signAccessToken(fastify, user);
 
         if (!access) {
           throw new Error("No token generated.");
