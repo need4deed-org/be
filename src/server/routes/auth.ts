@@ -22,6 +22,7 @@ import {
   userLoginSchema,
 } from "../schema/user.schema";
 import { ReplyMessage, RoutePrefix } from "../types";
+import { buildAuthUserPayload } from "../utils/data/build-auth-user-payload";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -82,7 +83,7 @@ async function authRoutes(
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
-        const userPayload = { id: user.id, email: user.email, role: user.role };
+        const userPayload = buildAuthUserPayload(user);
 
         const access = fastify.jwt.sign(
           { ...userPayload, type: "access" },
@@ -193,7 +194,7 @@ async function authRoutes(
           return reply.status(403).send({ message: "User is not active." });
         }
 
-        const userPayload = { id: user.id, email: user.email, role: user.role };
+        const userPayload = buildAuthUserPayload(user);
 
         const access = fastify.jwt.sign(
           { ...userPayload, type: "access" },
