@@ -14,6 +14,7 @@ const personSave = vi.fn();
 const personUpdate = vi.fn((..._args: any[]) =>
   Promise.resolve({ affected: 1 }),
 );
+const personCount = vi.fn();
 const agentPersonFind = vi.fn();
 const agentPersonSave = vi.fn();
 const addressCreate = vi.fn((d: any) => d);
@@ -28,7 +29,12 @@ const fakeManager: any = {
   getRepository: (entity: any) => {
     switch (entity) {
       case Person:
-        return { findOne: personFind, save: personSave, update: personUpdate };
+        return {
+          findOne: personFind,
+          save: personSave,
+          update: personUpdate,
+          count: personCount,
+        };
       case AgentPerson:
         return { findOne: agentPersonFind, save: agentPersonSave };
       case Address:
@@ -315,7 +321,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      addressFindOneBy.mockResolvedValueOnce({ id: 500, title: "Echtstr." });
+      personCount.mockResolvedValueOnce(1); // exclusively owned
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -343,7 +349,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      addressFindOneBy.mockResolvedValueOnce({ id: 500, title: "Echtstr." });
+      personCount.mockResolvedValueOnce(1); // exclusively owned
       postcodeFindOneBy.mockResolvedValueOnce(null); // rac_plz not found
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -373,6 +379,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 1,
       });
       personSave.mockImplementation(async (p: any) => p);
+      personCount.mockResolvedValueOnce(529); // shared by many Person rows
       addressFindOneBy.mockResolvedValueOnce({ id: 1, title: "Dummy" });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 888 });
@@ -393,6 +400,36 @@ describe("getOrCreateSubmitterPerson", () => {
         postcodeId: 9,
       });
       expect(personUpdate).toHaveBeenCalledWith({ id: 7 }, { addressId: 888 });
+    });
+
+    it("person on an address shared for a reason other than the Dummy title (e.g. a per-postcode placeholder) — still creates a fresh address and re-points", async () => {
+      // be#1026: the old guard only special-cased title === "Dummy" and
+      // missed this — sharing is detected by reference count now, not title.
+      personFind.mockResolvedValueOnce({
+        id: 7,
+        email: "sam@center.de",
+        addressId: 2,
+      });
+      personSave.mockImplementation(async (p: any) => p);
+      personCount.mockResolvedValueOnce(309); // shared, untitled
+      addressFindOneBy.mockResolvedValueOnce({ id: 2, title: null });
+      postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
+      addressSave.mockResolvedValueOnce({ id: 889 });
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(addressBody, 42, fakeManager);
+
+      expect(addressUpdate).not.toHaveBeenCalled();
+      expect(addressCreate).toHaveBeenCalledTimes(1);
+      expect(addressCreate.mock.calls[0][0]).toMatchObject({
+        street: "Musterstr. 1",
+        postcodeId: 9,
+      });
+      expect(personUpdate).toHaveBeenCalledWith({ id: 7 }, { addressId: 889 });
     });
 
     it("new person without an address — creates one and links it to the person", async () => {

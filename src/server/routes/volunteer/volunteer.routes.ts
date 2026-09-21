@@ -49,8 +49,8 @@ import {
   getSkipTake,
   getVolunteerPatchData,
   getVolunteerWhere,
-  patchAddress,
   patchEntity,
+  patchOrReplaceAddress,
   updateOptionList,
 } from "../../utils";
 import {
@@ -449,7 +449,11 @@ export default async function volunteerRoutes(
         }
 
         if (addressData && addressData.id) {
-          const success = await patchAddress(addressData, postcodeData);
+          const success = await patchOrReplaceAddress(
+            personData?.id ?? volunteer.personId,
+            addressData as Partial<Address> & { id: number },
+            postcodeData,
+          );
           if (!success) {
             return reply.status(400).send({
               message: `Address (id=${addressData.id}) not updated.`,

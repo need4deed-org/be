@@ -7,7 +7,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
-import { createAddress, patchAddress } from "./for-routes";
+import { createAddress, patchOrReplaceAddress } from "./for-routes";
 
 // rac_address / rac_plz are optional so existing callers that only carry the
 // name/phone/email blob (e.g. backfill migrations) still satisfy the type.
@@ -48,14 +48,16 @@ export function streetFromAddress(raw: string | undefined): string {
  *   - rac_address -> address.street (postcode + city stripped).
  *   - rac_plz     -> resolved to an existing Postcode by value (never created).
  *
- * The person's address is patched in place only when they own a real,
- * non-placeholder Address. When they have no address, or only the shared
- * "Dummy" placeholder, a fresh Address is created and the person re-pointed at
- * it (so we never mutate an address other Person rows depend on):
+ * When the submitter already has an Address, it's patched via
+ * patchOrReplaceAddress — which patches in place unless that Address is
+ * shared with another Person (the seeded "Dummy" placeholder or any other
+ * row multiple Person rows happen to point at, see be#1019), in which case it
+ * mints this submitter their own row instead. When they have no address at
+ * all, a fresh one is created here directly:
  *
- *       - own real address + plz resolves -> update street/postcode.
- *       - own real address + plz unknown  -> update street, leave postcode.
- *       - no address / Dummy              -> create one, falling back to
+ *       - own address + plz resolves -> update street/postcode.
+ *       - own address + plz unknown  -> update street, leave postcode.
+ *       - no address                 -> create one, falling back to
  *         FALLBACK_PLZ when rac_plz does not resolve (Address needs a Postcode).
  */
 async function syncSubmitterAddress(
@@ -74,29 +76,19 @@ async function syncSubmitterAddress(
     ? await postcodeRepository.findOneBy({ value: plz })
     : null;
 
-  // Only patch an address the submitter exclusively owns. The seeded "Dummy"
-  // placeholder is shared across many Person rows, so treat it as "no address"
-  // and mint a dedicated one below instead of corrupting the shared row.
-  let ownAddress: Address | null = null;
   if (person.addressId) {
-    const current = await getRepository(manager, Address).findOneBy({
-      id: person.addressId,
-    });
-    if (current && current.title !== DUMMY_ADDRESS_TITLE) {
-      ownAddress = current;
-    }
-  }
-
-  if (ownAddress) {
     if (!street && !resolved) {
       return; // nothing to change (street empty, plz unknown)
     }
-    const addressData: Partial<Address> = { id: ownAddress.id };
+    const addressData: Partial<Address> & { id: number } = {
+      id: person.addressId,
+    };
     if (street) {
       addressData.street = street;
     }
     // resolved ? set postcode : leave the existing postcode untouched.
-    await patchAddress(
+    await patchOrReplaceAddress(
+      person.id,
       addressData,
       resolved ? { id: resolved.id } : {},
       manager,

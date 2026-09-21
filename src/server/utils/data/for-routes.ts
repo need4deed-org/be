@@ -433,6 +433,73 @@ export async function createAddress(
 }
 
 /**
+ * Whether `addressId` is exclusively owned by `personId` — i.e. safe to
+ * patch in place. An Address becomes shared not just via the seeded "Dummy"
+ * placeholder but via any row multiple Person rows happen to point at (see
+ * be#1019/#1025), so this checks the actual reference count rather than a
+ * title convention.
+ */
+export async function isAddressExclusivelyOwned(
+  addressId: number,
+  manager: DataSource | EntityManager,
+): Promise<boolean> {
+  const owners = await getRepository(manager, Person).count({
+    where: { addressId },
+  });
+  return owners <= 1;
+}
+
+/**
+ * Patch an Address by id — unless it's shared with another Person, in which
+ * case patching in place would silently change every other Person still
+ * pointing at it (be#1019). When shared, clones the current row (with this
+ * patch's changes applied) into a new Address exclusively owned by
+ * `personId`, and repoints `personId` at it instead; the shared row is left
+ * untouched for everyone else still on it.
+ */
+export async function patchOrReplaceAddress(
+  personId: number,
+  addressData: Partial<Address> & { id: number },
+  postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<boolean> {
+  const exclusivelyOwned = await isAddressExclusivelyOwned(
+    addressData.id,
+    manager,
+  );
+  if (exclusivelyOwned) {
+    return patchAddress(addressData, postcodeData, manager);
+  }
+
+  const current = await getRepository(manager, Address).findOneBy({
+    id: addressData.id,
+  });
+  if (!current) {
+    return false;
+  }
+
+  const created = await createAddress(
+    {
+      street: addressData.street ?? current.street,
+      city: addressData.city ?? current.city,
+    },
+    postcodeData?.id || postcodeData?.value
+      ? postcodeData
+      : { id: current.postcodeId },
+    manager,
+  );
+  if (!created) {
+    return false;
+  }
+
+  await getRepository(manager, Person).update(
+    { id: personId },
+    { addressId: created.id },
+  );
+  return true;
+}
+
+/**
  * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
  * de-selected rows and insert the newly selected ones (rows that are unchanged
  * are left untouched). Language `id`s come from the SDK as `OptionById`.
