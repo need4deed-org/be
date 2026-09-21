@@ -80,7 +80,7 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      const { role } = request.user;
+      const role = request.authUser?.role;
       const filter = request.query;
       const { search, authorId } = filter;
       const [skip, take] = getSkipTake(request.query);
@@ -277,7 +277,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
@@ -354,7 +354,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
@@ -390,7 +390,7 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const personId = requireEngagementPersonId(
-        request.user.role,
+        request.authUser?.role,
         request.authUser?.personId,
       );
 
@@ -416,7 +416,7 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const personId = requireEngagementPersonId(
-        request.user.role,
+        request.authUser?.role,
         request.authUser?.personId,
       );
 
@@ -447,7 +447,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
         // Matches GET /post's own convention: an empty list rather than a
@@ -500,7 +500,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
       if (role !== UserRole.AGENT && role !== UserRole.COORDINATOR) {
         throw new UnauthorizedError(
           "Only agents and coordinators can reply to posts.",
@@ -586,7 +586,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
@@ -636,7 +636,7 @@ export default async function postRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const { role } = request.user;
+      const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
         throw new UnauthorizedError("Permission denied.");
@@ -677,7 +677,7 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const personId = requireEngagementPersonId(
-        request.user.role,
+        request.authUser?.role,
         request.authUser?.personId,
       );
 
@@ -707,7 +707,7 @@ export default async function postRoutes(
   ) => {
     const { id } = request.params;
     const personId = requireEngagementPersonId(
-      request.user.role,
+      request.authUser?.role,
       request.authUser?.personId,
     );
 
@@ -746,7 +746,7 @@ export default async function postRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const personId = requireEngagementPersonId(
-        request.user.role,
+        request.authUser?.role,
         request.authUser?.personId,
       );
 

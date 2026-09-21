@@ -322,7 +322,11 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
       UserRole.VOLUNTEER,
       person.id,
     );
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    });
 
     const res = await fastify.inject({
       method: "POST",
@@ -356,7 +360,11 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
       UserRole.VOLUNTEER,
       person.id,
     );
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    });
 
     const res = await fastify.inject({
       method: "POST",
@@ -381,7 +389,11 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
       UserRole.AGENT,
       person.id,
     );
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    });
 
     const res = await fastify.inject({
       method: "POST",
@@ -399,7 +411,11 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
       UserRole.VOLUNTEER,
       undefined,
     );
-    const token = fastify.jwt.sign({ id: user.id, email: user.email });
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    });
 
     // make user active, so the token is now "used"
     user.isActive = true;
@@ -474,6 +490,7 @@ describe("GET /user/me — agentMemberships (be#809)", () => {
     accessToken = fastify.jwt.sign({
       id: user.id,
       email: user.email,
+      role: user.role,
       type: "access",
     });
   });
@@ -559,6 +576,7 @@ describe("GET /user/me — agentMemberships dedupes same-agent roles (be#809)", 
     accessToken = fastify.jwt.sign({
       id: user.id,
       email: user.email,
+      role: user.role,
       type: "access",
     });
   });
@@ -618,6 +636,7 @@ describe("GET /user/me — volunteerId (be#948)", () => {
       accessToken: fastify.jwt.sign({
         id: user.id,
         email: user.email,
+        role: user.role,
         type: "access",
       }),
     };
@@ -712,6 +731,7 @@ describe("POST /user/admin/coordinator-invite", () => {
     adminAccessToken = fastify.jwt.sign({
       id: admin.id,
       email: admin.email,
+      role: admin.role,
       type: "access",
     });
   });
@@ -756,6 +776,7 @@ describe("POST /user/admin/coordinator-invite", () => {
     const accessToken = fastify.jwt.sign({
       id: volunteer.id,
       email: volunteer.email,
+      role: volunteer.role,
       type: "access",
     });
 

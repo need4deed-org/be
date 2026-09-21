@@ -110,6 +110,7 @@ describe("POST /agent/register", () => {
     const accessToken = fastify.jwt.sign({
       id: user.id,
       email: user.email,
+      role: user.role,
       type: "access",
     });
 
