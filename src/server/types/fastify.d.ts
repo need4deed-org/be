@@ -122,11 +122,19 @@ declare module "@fastify/jwt" {
           type: "coordinator-invite";
           person: CoordinatorInvitePerson;
         };
-    // User type that will be attached to `request.user` after `request.jwtVerify()`
+    // User type that will be attached to `request.user` after
+    // `request.jwtVerify()`. `role` is optional, not required: per
+    // `payload` above, only access/refresh tokens carry one — a
+    // verify/reset/coordinator-invite token has no role claim at all, so a
+    // handler reading `request.user.role` for one of those would get
+    // `undefined` at runtime while this type previously claimed a real
+    // `UserRole` (be#1024 review). `type` is included so callers can
+    // narrow on it before trusting `role`.
     user: {
       id: number;
       email: string;
-      role: UserRole;
+      role?: UserRole;
+      type?: TokenType;
       iat: number; // issued at (timestamp)
       exp: number; // expiration (timestamp)
     };

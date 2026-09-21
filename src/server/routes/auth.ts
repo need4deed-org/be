@@ -156,11 +156,14 @@ async function authRoutes(
       }
 
       try {
-        const decoded = (await fastify.jwt.verify(token)) as {
-          email: string;
-          id: number;
-          type?: string;
-        };
+        // `fastify.jwt.verify()` (unlike `request.jwtVerify()`) isn't
+        // auto-typed off the module-augmented `FastifyJWT["user"]` shape —
+        // cast to it explicitly rather than a hand-rolled local type, so
+        // `type` stays the real TokenType union instead of a bare string
+        // disconnected from it (be#1024 review).
+        const decoded = (await fastify.jwt.verify(
+          token,
+        )) as import("@fastify/jwt").FastifyJWT["user"];
         if (
           !decoded ||
           !(decoded.id && decoded.email) ||

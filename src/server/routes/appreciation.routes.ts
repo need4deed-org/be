@@ -54,7 +54,7 @@ export default async function appreciationRoutes(
         !validatePermissions(
           appreciation,
           [UserRole.ADMIN, UserRole.COORDINATOR],
-          request.user,
+          request.authUser!,
         )
       ) {
         throw new UnauthorizedError(
@@ -126,7 +126,7 @@ export default async function appreciationRoutes(
         !validatePermissions(
           appreciation,
           [UserRole.ADMIN, UserRole.COORDINATOR],
-          request.user,
+          request.authUser!,
         )
       ) {
         throw new UnauthorizedError(

@@ -339,6 +339,100 @@ describe("POST /auth/refresh", () => {
 
     expect(findOneSpy).not.toHaveBeenCalled();
   });
+
+  // End-to-end regression for be#1023's actual reported symptom ("coordinator
+  // posts list goes empty after tab refocus"): the two tests above only
+  // assert the refreshed token *decodes* correctly — this chains it into a
+  // real GET /post call to confirm the refreshed session still sees real
+  // content, not the isPostManagerRole(role) => [] fallback a dropped role
+  // claim used to trigger. Mocks userRepository.findOne (matching this
+  // describe block's existing convention) and the post query chain, rather
+  // than hitting a real DB — this file mocks initDatabase file-wide (see the
+  // vi.mock("../../../data", ...) above), so no entity metadata is ever
+  // registered here and a real repository.save() throws
+  // EntityMetadataNotFoundError.
+  it("a refreshed access token still authorizes GET /post for a COORDINATOR (be#1023 regression)", async () => {
+    const coordinator = {
+      id: 999,
+      email: "refresh-regression@test.need4deed.org",
+      role: UserRole.COORDINATOR,
+      isActive: true,
+    };
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
+      coordinator as any,
+    );
+
+    const realPost = {
+      id: 4242,
+      text: "Refresh regression post",
+      agentId: null,
+      createdAt: new Date(),
+      author: {
+        id: coordinator.id,
+        name: "Refresh Regression",
+        avatarUrl: null,
+      },
+      taggedPersons: [],
+      linkedOpportunities: [],
+    };
+    const queryBuilder: any = {
+      leftJoinAndSelect: () => queryBuilder,
+      loadRelationCountAndMap: () => queryBuilder,
+      where: () => queryBuilder,
+      orderBy: () => queryBuilder,
+      addOrderBy: () => queryBuilder,
+      skip: () => queryBuilder,
+      take: () => queryBuilder,
+      getManyAndCount: () => Promise.resolve([[realPost], 1]),
+    };
+    vi.spyOn(fastify.db.postRepository, "createQueryBuilder").mockReturnValue(
+      queryBuilder,
+    );
+
+    // attachReactionData (called on every GET /post result, regardless of
+    // requestPersonId) always runs its postReactionRepository count query.
+    const reactionQueryBuilder: any = {
+      select: () => reactionQueryBuilder,
+      addSelect: () => reactionQueryBuilder,
+      where: () => reactionQueryBuilder,
+      groupBy: () => reactionQueryBuilder,
+      addGroupBy: () => reactionQueryBuilder,
+      getRawMany: () => Promise.resolve([]),
+    };
+    vi.spyOn(
+      fastify.db.postReactionRepository,
+      "createQueryBuilder",
+    ).mockReturnValue(reactionQueryBuilder);
+
+    const refreshToken = fastify.jwt.sign({
+      id: coordinator.id,
+      email: coordinator.email,
+      role: UserRole.COORDINATOR,
+      type: "refresh",
+    });
+
+    const refreshResponse = await fastify.inject({
+      method: "POST",
+      url: "/auth/refresh",
+      payload: { refresh: refreshToken },
+    });
+    expect(refreshResponse.statusCode).toBe(200);
+    const newAccessCookie = refreshResponse.cookies.find(
+      (c) => c.name === accessCookieName,
+    )?.value;
+    expect(newAccessCookie).toBeTruthy();
+
+    const postsResponse = await fastify.inject({
+      method: "GET",
+      url: "/post",
+      cookies: { [accessCookieName]: newAccessCookie! },
+    });
+
+    expect(postsResponse.statusCode).toBe(200);
+    const { data, count } = postsResponse.json();
+    expect(count).toBe(1);
+    expect(data.some((p: { id: number }) => p.id === realPost.id)).toBe(true);
+  });
 });
 
 describe("POST /auth/request-reset", () => {
