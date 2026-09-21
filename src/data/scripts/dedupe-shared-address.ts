@@ -1,0 +1,257 @@
+import "reflect-metadata";
+import { DataSource, EntityManager, In } from "typeorm";
+import logger from "../../logger";
+import { createAddress } from "../../server/utils/data/for-routes";
+import { dataSource } from "../data-source";
+import Address from "../entity/location/address.entity";
+import Person from "../entity/person.entity";
+import VolunteerAuditLog from "../entity/volunteer/volunteer-audit-log.entity";
+import Volunteer from "../entity/volunteer/volunteer.entity";
+
+// One-off backfill for be#1019/be#1028: before the seeding/write-path fixes
+// in be#1025/be#1026, many Person rows could end up sharing one Address row
+// (the seeded "Dummy" placeholder, or a per-postcode placeholder reused
+// across an entire bulk import). This gives every affected Person but one a
+// fresh, exclusively-owned Address, without ever deleting or mutating the
+// original row.
+//
+// Usage: yarn dedupe-shared-address [--apply] [--address-ids 1,2,3]
+//   (no flags)    dry run — prints the plan, writes nothing.
+//   --apply       performs the writes, in one transaction.
+//   --address-ids restrict to specific shared Address ids (comma-separated),
+//                 e.g. to apply the fix in cautious batches rather than all
+//                 shared rows in prod at once. Omit to process every shared
+//                 Address row.
+
+export interface DedupeSharedAddressOptions {
+  apply: boolean;
+  addressIds?: number[];
+}
+
+export function parseArgs(argv: string[]): DedupeSharedAddressOptions {
+  const flagIndex = argv.indexOf("--address-ids");
+  const addressIds =
+    flagIndex !== -1 && argv[flagIndex + 1]
+      ? argv[flagIndex + 1].split(",").map(Number)
+      : undefined;
+
+  return { apply: argv.includes("--apply"), addressIds };
+}
+
+export interface DedupeGroupResult {
+  addressId: number;
+  postcodeId: number;
+  blank: boolean;
+  affectedPersonIds: number[];
+  keeperPersonId: number | null;
+  keeperReason: string | null;
+  repointedPersonIds: number[];
+}
+
+export interface DedupeReport {
+  groups: DedupeGroupResult[];
+  // Non-blank groups where no keeper could be identified: the real data in
+  // that Address row isn't confidently anyone's any more, and it's now (or
+  // would be, in a dry run) fully orphaned rather than guessed at — surfaced
+  // here for manual review/attribution.
+  needsManualAttribution: DedupeGroupResult[];
+}
+
+async function findSharedAddressGroups(
+  ds: DataSource,
+  addressIds?: number[],
+): Promise<{ addressId: number; personIds: number[] }[]> {
+  const query = ds
+    .getRepository(Person)
+    .createQueryBuilder("person")
+    .select("person.addressId", "addressId")
+    .addSelect("array_agg(person.id ORDER BY person.id)", "personIds")
+    .where("person.addressId IS NOT NULL");
+
+  if (addressIds?.length) {
+    query.andWhere("person.addressId IN (:...addressIds)", { addressIds });
+  }
+
+  const rows = await query
+    .groupBy("person.addressId")
+    .having("COUNT(*) > 1")
+    .orderBy("person.addressId", "ASC")
+    .getRawMany<{ addressId: string; personIds: number[] }>();
+
+  return rows.map((row) => ({
+    addressId: Number(row.addressId),
+    personIds: row.personIds,
+  }));
+}
+
+// Best-guess signal for "who does this Address's current data actually
+// belong to": the most recent contact_details_changed entry among the
+// affected Persons' Volunteers. Not proof — the audit log stores a generic
+// description, not field-level before/after values — and agent contacts
+// (no Volunteer) have no signal at all.
+async function findKeeperSignal(
+  manager: EntityManager,
+  personIds: number[],
+): Promise<{ personId: number; reason: string } | null> {
+  const volunteers = await manager
+    .getRepository(Volunteer)
+    .find({ where: { personId: In(personIds) } });
+  if (!volunteers.length) {
+    return null;
+  }
+
+  const latest = await manager.getRepository(VolunteerAuditLog).findOne({
+    where: {
+      volunteerId: In(volunteers.map((v) => v.id)),
+      type: "contact_details_changed",
+    },
+    order: { occurredAt: "DESC" },
+  });
+  if (!latest) {
+    return null;
+  }
+
+  const owner = volunteers.find((v) => v.id === latest.volunteerId);
+  if (!owner) {
+    return null;
+  }
+
+  return {
+    personId: owner.personId,
+    reason:
+      `most recent contact_details_changed audit entry ` +
+      `(volunteerId=${latest.volunteerId}, occurredAt=${latest.occurredAt.toISOString()})`,
+  };
+}
+
+async function processGroup(
+  manager: EntityManager,
+  addressId: number,
+  personIds: number[],
+  apply: boolean,
+): Promise<DedupeGroupResult> {
+  const address = await manager
+    .getRepository(Address)
+    .findOneByOrFail({ id: addressId });
+  const blank = !address.street || address.street.trim() === "";
+
+  let keeperPersonId: number | null = null;
+  let keeperReason: string | null = null;
+  if (!blank) {
+    const signal = await findKeeperSignal(manager, personIds);
+    if (signal) {
+      keeperPersonId = signal.personId;
+      keeperReason = signal.reason;
+    }
+  }
+
+  const repointedPersonIds = personIds.filter((id) => id !== keeperPersonId);
+
+  if (apply) {
+    for (const personId of repointedPersonIds) {
+      const created = await createAddress(
+        {},
+        { id: address.postcodeId },
+        manager,
+      );
+      if (!created) {
+        throw new Error(
+          `Failed to create a replacement Address for Person ${personId} ` +
+            `(postcodeId=${address.postcodeId}).`,
+        );
+      }
+      await manager
+        .getRepository(Person)
+        .update({ id: personId }, { addressId: created.id });
+    }
+  }
+
+  return {
+    addressId,
+    postcodeId: address.postcodeId,
+    blank,
+    affectedPersonIds: personIds,
+    keeperPersonId,
+    keeperReason,
+    repointedPersonIds,
+  };
+}
+
+export async function runDedupe(
+  ds: DataSource,
+  { apply, addressIds }: DedupeSharedAddressOptions,
+): Promise<DedupeReport> {
+  const groups = await findSharedAddressGroups(ds, addressIds);
+
+  const process = async (manager: EntityManager) => {
+    const results: DedupeGroupResult[] = [];
+    for (const group of groups) {
+      results.push(
+        await processGroup(manager, group.addressId, group.personIds, apply),
+      );
+    }
+    return results;
+  };
+
+  const results = apply
+    ? await ds.transaction((manager) => process(manager))
+    : await process(ds.manager);
+
+  const needsManualAttribution = results.filter(
+    (group) => !group.blank && group.keeperPersonId === null,
+  );
+
+  return { groups: results, needsManualAttribution };
+}
+
+function printReport(report: DedupeReport, apply: boolean): void {
+  logger.info(
+    `${apply ? "Applied" : "[dry-run] Would apply"} dedupe across ${
+      report.groups.length
+    } shared Address group(s).`,
+  );
+  for (const group of report.groups) {
+    logger.info(
+      `Address ${group.addressId} (postcode ${group.postcodeId}, ${
+        group.blank ? "blank" : "non-blank"
+      }): ${group.affectedPersonIds.length} Person(s) [${group.affectedPersonIds.join(", ")}]. ` +
+        `Keeper: ${group.keeperPersonId ?? "none"}${
+          group.keeperReason ? ` (${group.keeperReason})` : ""
+        }. ${apply ? "Repointed" : "Would repoint"}: [${group.repointedPersonIds.join(", ")}].`,
+    );
+  }
+
+  if (report.needsManualAttribution.length) {
+    logger.info(
+      "Needs manual attribution — original Address rows with real, " +
+        "unattributed data (never deleted, just orphaned from every Person):",
+    );
+    for (const group of report.needsManualAttribution) {
+      logger.info(
+        `  Address ${group.addressId} (postcode ${group.postcodeId}) — ` +
+          `formerly shared by Person(s) [${group.affectedPersonIds.join(", ")}].`,
+      );
+    }
+  } else {
+    logger.info("No rows need manual attribution.");
+  }
+}
+
+async function main() {
+  const { apply, addressIds } = parseArgs(process.argv.slice(2));
+
+  await dataSource.initialize();
+  try {
+    const report = await runDedupe(dataSource, { apply, addressIds });
+    printReport(report, apply);
+  } finally {
+    await dataSource.destroy();
+  }
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+}
