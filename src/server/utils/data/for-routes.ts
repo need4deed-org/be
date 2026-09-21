@@ -21,6 +21,7 @@ import {
   EntityManager,
   FindOptionsWhere,
   In,
+  Not,
   QueryFailedError,
   Repository,
 } from "typeorm";
@@ -430,6 +431,79 @@ export async function createAddress(
 
   const address = addressRepository.create({ ...addressData, postcodeId });
   return await addressRepository.save(address);
+}
+
+/**
+ * Whether `addressId` is exclusively owned by `personId` — i.e. safe to
+ * patch in place. An Address becomes shared not just via the seeded "Dummy"
+ * placeholder but via any row multiple Person rows happen to point at (see
+ * be#1019/#1025), so this checks the actual reference count rather than a
+ * title convention. Checks for any *other* Person referencing the address,
+ * not just the total count — a count-only check would also pass for an
+ * address some other single Person exclusively owns.
+ */
+export async function isAddressExclusivelyOwned(
+  personId: number,
+  addressId: number,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<boolean> {
+  const otherOwners = await getRepository(manager, Person).count({
+    where: { addressId, id: Not(personId) },
+  });
+  return otherOwners === 0;
+}
+
+/**
+ * Patch an Address by id — unless it's shared with another Person, in which
+ * case patching in place would silently change every other Person still
+ * pointing at it (be#1019). When shared, clones the current row (with this
+ * patch's changes applied) into a new Address exclusively owned by
+ * `personId`, and repoints `personId` at it instead; the shared row is left
+ * untouched for everyone else still on it.
+ */
+export async function patchOrReplaceAddress(
+  personId: number,
+  addressData: Partial<Address> & { id: number },
+  postcodeData: Partial<Postcode>,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<boolean> {
+  const exclusivelyOwned = await isAddressExclusivelyOwned(
+    personId,
+    addressData.id,
+    manager,
+  );
+  if (exclusivelyOwned) {
+    return patchAddress(addressData, postcodeData, manager);
+  }
+
+  const current = await getRepository(manager, Address).findOneBy({
+    id: addressData.id,
+  });
+  if (!current) {
+    return false;
+  }
+
+  const { id: _addressId, ...patchFields } = addressData;
+  const created = await createAddress(
+    {
+      street: current.street,
+      city: current.city,
+      ...patchFields,
+    },
+    postcodeData?.id || postcodeData?.value
+      ? postcodeData
+      : { id: current.postcodeId },
+    manager,
+  );
+  if (!created) {
+    return false;
+  }
+
+  await getRepository(manager, Person).update(
+    { id: personId },
+    { addressId: created.id },
+  );
+  return true;
 }
 
 /**

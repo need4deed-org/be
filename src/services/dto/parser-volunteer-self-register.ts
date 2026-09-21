@@ -25,7 +25,7 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import { DUMMY_ADDRESS_TITLE } from "../../server/utils";
+import { isAddressExclusivelyOwned } from "../../server/utils";
 import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
@@ -125,18 +125,22 @@ async function resolveLeadFrom(
 // always minting a fresh one — the Person attached here can be pre-existing
 // (email-linked, be#947), and may already own a real address from an earlier
 // flow (e.g. an opportunity/event submission, get-or-create-submitter-person).
-// Mirrors that same file's "Dummy" placeholder guard: the seeded placeholder
-// is shared across many Person rows, so it must never be patched in place.
+// Never reused when that Address is shared with another Person (the seeded
+// "Dummy" placeholder or any other row multiple Person rows happen to point
+// at, see be#1019) — a fresh, exclusively-owned Address is returned instead.
 async function resolveAddress(
   person: Person,
   postcode: Postcode,
 ): Promise<Address> {
-  if (person.addressId) {
+  if (
+    person.addressId &&
+    (await isAddressExclusivelyOwned(person.id, person.addressId, dataSource))
+  ) {
     const addressRepository = getRepository(dataSource, Address);
     const existing = await addressRepository.findOneBy({
       id: person.addressId,
     });
-    if (existing && existing.title !== DUMMY_ADDRESS_TITLE) {
+    if (existing) {
       existing.postcode = postcode;
       return existing;
     }
