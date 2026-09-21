@@ -161,3 +161,135 @@ describe("PATCH /volunteer/:id does not corrupt a shared Address (be#1026)", () 
     expect(untouchedShared.street).toBe("Original Street");
   });
 });
+
+// be#1026 review finding: isAddressExclusivelyOwned originally checked the
+// total reference count (<=1), not that the *caller* was that one owner —
+// so an address exclusively owned by a completely different Person still
+// passed as "safe to patch in place".
+describe("PATCH /volunteer/:id does not patch an address owned by a different Person (be#1026)", () => {
+  let fastify: FastifyInstance;
+  let addressRepository: Repository<Address>;
+  let postcode: Postcode;
+  let addressOwnedByB: Address;
+  let personA: Person;
+  let personB: Person;
+  let volunteerA: Volunteer;
+  let dealA: Deal;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    addressRepository = dataSource.getRepository(Address);
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    addressOwnedByB = await addressRepository.save(
+      new Address({ street: "B's Real Street", postcode }),
+    );
+
+    personB = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Exclusive-B",
+        lastName: "Volunteer",
+        email: `exclusive-b-${suffix}@example.com`,
+        addressId: addressOwnedByB.id,
+      }),
+    );
+    personA = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Exclusive-A",
+        lastName: "Volunteer",
+        email: `exclusive-a-${suffix}@example.com`,
+      }),
+    );
+
+    dealA = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteerA = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: dealA.id, personId: personA.id }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-other-owner-${suffix}@test.need4deed.org`,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-other-owner-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.volunteerRepository.delete({ id: volunteerA.id });
+    await fastify.db.dealRepository.delete({ id: dealA.id });
+    const refreshedA = await fastify.db.personRepository.findOneBy({
+      id: personA.id,
+    });
+    await fastify.db.personRepository.delete({ id: personA.id });
+    await fastify.db.personRepository.delete({ id: personB.id });
+    if (refreshedA?.addressId) {
+      await addressRepository.delete({ id: refreshedA.addressId });
+    }
+    await addressRepository.delete({ id: addressOwnedByB.id });
+    await fastify.close();
+  });
+
+  it("gives personA a new Address instead of patching personB's exclusively-owned one, even though personA has no address of their own", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteerA.id}?language=en`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        person: {
+          id: personA.id,
+          firstName: personA.firstName,
+          email: personA.email,
+          // personA's client supplies personB's own address id — a request
+          // this route never validated ownership of for non-self callers.
+          address: { id: addressOwnedByB.id, street: "Hijacked Street" },
+        },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refreshedA = await fastify.db.personRepository.findOneByOrFail({
+      id: personA.id,
+    });
+    const refreshedB = await fastify.db.personRepository.findOneByOrFail({
+      id: personB.id,
+    });
+
+    // personA never gets pointed at personB's address.
+    expect(refreshedA.addressId).not.toBe(addressOwnedByB.id);
+    expect(refreshedA.addressId).not.toBeNull();
+
+    // personB's address is completely untouched.
+    expect(refreshedB.addressId).toBe(addressOwnedByB.id);
+    const untouched = await addressRepository.findOneByOrFail({
+      id: addressOwnedByB.id,
+    });
+    expect(untouched.street).toBe("B's Real Street");
+  });
+});

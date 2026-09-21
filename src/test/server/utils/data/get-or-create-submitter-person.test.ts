@@ -321,7 +321,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(1); // exclusively owned
+      personCount.mockResolvedValueOnce(0); // no other Person shares it
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -349,7 +349,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(1); // exclusively owned
+      personCount.mockResolvedValueOnce(0); // no other Person shares it
       postcodeFindOneBy.mockResolvedValueOnce(null); // rac_plz not found
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -379,7 +379,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 1,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(529); // shared by many Person rows
+      personCount.mockResolvedValueOnce(528); // shared by many other Person rows
       addressFindOneBy.mockResolvedValueOnce({ id: 1, title: "Dummy" });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 888 });
@@ -411,7 +411,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 2,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(309); // shared, untitled
+      personCount.mockResolvedValueOnce(308); // shared with other Persons, untitled
       addressFindOneBy.mockResolvedValueOnce({ id: 2, title: null });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 889 });
@@ -430,6 +430,38 @@ describe("getOrCreateSubmitterPerson", () => {
         postcodeId: 9,
       });
       expect(personUpdate).toHaveBeenCalledWith({ id: 7 }, { addressId: 889 });
+    });
+
+    it("person.addressId points at a since-deleted Address row — self-heals by creating a fresh one", async () => {
+      // be#1026 regression: patchOrReplaceAddress's exclusively-owned fast
+      // path calls patchAddress directly, which no-ops (affected: 0) against
+      // a dangling id instead of throwing — that false must fall through to
+      // the same createAddress fallback the "no address at all" path uses,
+      // not be silently swallowed.
+      personFind.mockResolvedValueOnce({
+        id: 7,
+        email: "sam@center.de",
+        addressId: 999,
+      });
+      personSave.mockImplementation(async (p: any) => p);
+      personCount.mockResolvedValueOnce(0); // dangling id, nobody references it
+      addressUpdate.mockResolvedValueOnce({ affected: 0 }); // row doesn't exist
+      postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
+      addressSave.mockResolvedValueOnce({ id: 890 });
+      agentPersonFind.mockResolvedValueOnce({
+        id: 100,
+        agentId: 42,
+        personId: 7,
+      });
+
+      await getOrCreateSubmitterPerson(addressBody, 42, fakeManager);
+
+      expect(addressCreate).toHaveBeenCalledTimes(1);
+      expect(addressCreate.mock.calls[0][0]).toMatchObject({
+        street: "Musterstr. 1",
+        postcodeId: 9,
+      });
+      expect(personUpdate).toHaveBeenCalledWith({ id: 7 }, { addressId: 890 });
     });
 
     it("new person without an address — creates one and links it to the person", async () => {

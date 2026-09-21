@@ -23,8 +23,10 @@ type SubmitterFields = Pick<
 const FALLBACK_PLZ = "12345";
 
 // Seeded placeholder address (see seeds/user.seed.ts) used for "unknown
-// address". It is shared by many Person rows, so it must never be patched in
-// place — a fresh Address is minted instead.
+// address". Sharing it is now guarded structurally (isAddressExclusivelyOwned,
+// be#1026) rather than by this title, so nothing in src/ reads it as a guard
+// any more — kept as the one stable marker for identifying the legacy shared
+// row itself, needed by the be#1028 prod backfill.
 export const DUMMY_ADDRESS_TITLE = "Dummy";
 
 /**
@@ -87,13 +89,17 @@ async function syncSubmitterAddress(
       addressData.street = street;
     }
     // resolved ? set postcode : leave the existing postcode untouched.
-    await patchOrReplaceAddress(
+    const patched = await patchOrReplaceAddress(
       person.id,
       addressData,
       resolved ? { id: resolved.id } : {},
       manager,
     );
-    return;
+    if (patched) {
+      return;
+    }
+    // Dangling addressId (the Address row no longer exists) — fall through
+    // to create a fresh one below, same as the "no address at all" path.
   }
 
   const address = await createAddress(

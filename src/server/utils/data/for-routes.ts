@@ -21,6 +21,7 @@ import {
   EntityManager,
   FindOptionsWhere,
   In,
+  Not,
   QueryFailedError,
   Repository,
 } from "typeorm";
@@ -437,16 +438,19 @@ export async function createAddress(
  * patch in place. An Address becomes shared not just via the seeded "Dummy"
  * placeholder but via any row multiple Person rows happen to point at (see
  * be#1019/#1025), so this checks the actual reference count rather than a
- * title convention.
+ * title convention. Checks for any *other* Person referencing the address,
+ * not just the total count — a count-only check would also pass for an
+ * address some other single Person exclusively owns.
  */
 export async function isAddressExclusivelyOwned(
+  personId: number,
   addressId: number,
-  manager: DataSource | EntityManager,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const owners = await getRepository(manager, Person).count({
-    where: { addressId },
+  const otherOwners = await getRepository(manager, Person).count({
+    where: { addressId, id: Not(personId) },
   });
-  return owners <= 1;
+  return otherOwners === 0;
 }
 
 /**
@@ -464,6 +468,7 @@ export async function patchOrReplaceAddress(
   manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
   const exclusivelyOwned = await isAddressExclusivelyOwned(
+    personId,
     addressData.id,
     manager,
   );
@@ -478,10 +483,12 @@ export async function patchOrReplaceAddress(
     return false;
   }
 
+  const { id: _addressId, ...patchFields } = addressData;
   const created = await createAddress(
     {
-      street: addressData.street ?? current.street,
-      city: addressData.city ?? current.city,
+      street: current.street,
+      city: current.city,
+      ...patchFields,
     },
     postcodeData?.id || postcodeData?.value
       ? postcodeData

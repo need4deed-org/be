@@ -134,7 +134,7 @@ async function resolveAddress(
 ): Promise<Address> {
   if (
     person.addressId &&
-    (await isAddressExclusivelyOwned(person.addressId, dataSource))
+    (await isAddressExclusivelyOwned(person.id, person.addressId, dataSource))
   ) {
     const addressRepository = getRepository(dataSource, Address);
     const existing = await addressRepository.findOneBy({
