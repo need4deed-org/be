@@ -1,3 +1,4 @@
+import { FastifyJWT } from "@fastify/jwt";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import {
@@ -156,10 +157,10 @@ async function authRoutes(
       }
 
       try {
-        const decoded = (await fastify.jwt.verify(token)) as {
-          email: string;
+        const decoded = (await fastify.jwt.verify(
+          token,
+        )) as FastifyJWT["payload"] & {
           id: number;
-          type?: string;
         };
         if (
           !decoded ||
