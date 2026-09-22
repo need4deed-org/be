@@ -25,7 +25,10 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import { isAddressExclusivelyOwned } from "../../server/utils";
+import {
+  AddressWritePlan,
+  isAddressExclusivelyOwned,
+} from "../../server/utils";
 import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
@@ -128,10 +131,18 @@ async function resolveLeadFrom(
 // Never reused when that Address is shared with another Person (the seeded
 // "Dummy" placeholder or any other row multiple Person rows happen to point
 // at, see be#1019) — a fresh, exclusively-owned Address is returned instead.
+//
+// Deliberately does NOT mutate the fetched entity and hand it back for a
+// blind save much later (writeVolunteerLegacy runs after several more
+// awaited round-trips in parserVolunteerSelfRegister below) — a concurrent
+// edit to this same Address landing in that window would get silently
+// reverted by that later full-entity save (be#1031 review). Instead this
+// returns an AddressWritePlan describing exactly what, if anything, needs to
+// change, so the caller can apply a narrow, targeted update at write time.
 async function resolveAddress(
   person: Person,
   postcode: Postcode,
-): Promise<Address> {
+): Promise<{ address: Address; addressWrite?: AddressWritePlan }> {
   if (
     person.addressId &&
     (await isAddressExclusivelyOwned(person.id, person.addressId, dataSource))
@@ -141,17 +152,30 @@ async function resolveAddress(
       id: person.addressId,
     });
     if (existing) {
-      existing.postcode = postcode;
-      return existing;
+      return {
+        address: existing,
+        addressWrite:
+          existing.postcodeId === postcode.id
+            ? { action: "skip" }
+            : {
+                action: "patch",
+                addressId: existing.id,
+                postcodeId: postcode.id,
+              },
+      };
     }
   }
-  return new Address({ postcode });
+  return { address: new Address({ postcode }) };
 }
 
 export async function parserVolunteerSelfRegister(
   person: Person,
   body: VolunteerSelfRegisterBody,
-): Promise<{ volunteer: Volunteer; leads: LeadFrom[] }> {
+): Promise<{
+  volunteer: Volunteer;
+  leads: LeadFrom[];
+  addressWrite?: AddressWritePlan;
+}> {
   // Required: both Address.postcodeId and Deal.postcodeId are NOT NULL, and
   // a volunteer can't be matched to anything without a location.
   const postcode = await getPostcode(String(body.addressPostcode));
@@ -160,7 +184,7 @@ export async function parserVolunteerSelfRegister(
   // Deal/Volunteer construction below — resolve them concurrently instead of
   // paying for each round-trip in series.
   const [
-    address,
+    { address, addressWrite },
     dealActivity,
     dealSkill,
     dealDistrict,
@@ -201,5 +225,5 @@ export async function parserVolunteerSelfRegister(
 
   const leads = await resolveLeadFrom(body.leadFrom);
 
-  return { volunteer, leads };
+  return { volunteer, leads, addressWrite };
 }

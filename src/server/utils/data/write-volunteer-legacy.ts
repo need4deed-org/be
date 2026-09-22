@@ -9,8 +9,27 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 
+// What to do with volunteer.person.address at write time, decided by the
+// caller much earlier (e.g. resolveAddress in parser-volunteer-self-register.ts)
+// based on a read that may now be stale:
+//   - omitted:      brand-new Address, nothing else could have raced it — save
+//                    the whole entity (insert) as before.
+//   - "skip":       reusing the Person's existing Address unchanged — do not
+//                    write it at all.
+//   - "patch":      reusing the Person's existing Address, only its postcode
+//                    needs to change — a targeted update touching just that
+//                    column.
+// A blind `addressRepository.save(volunteer.person.address)` for the reused
+// cases would re-persist the whole entity as it was read at resolve time,
+// silently clobbering any other field (street, city) a concurrent request
+// legitimately changed in the meantime (be#1031 review: lost-update race).
+export type AddressWritePlan =
+  | { action: "skip" }
+  | { action: "patch"; addressId: number; postcodeId: number };
+
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
+  addressWrite?: AddressWritePlan,
 ): Promise<number> {
   // Use a transaction to ensure atomicity
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
@@ -32,8 +51,16 @@ export async function writeVolunteerLegacy(
       transactionalEntityManager.getRepository(Volunteer);
 
     // 2. Perform all save operations using the transactional repositories
-    // Address
-    await addressRepository.save(volunteer.person.address);
+    // Address — see AddressWritePlan above for why this isn't always a
+    // blind full-entity save.
+    if (addressWrite?.action === "patch") {
+      await addressRepository.update(
+        { id: addressWrite.addressId },
+        { postcodeId: addressWrite.postcodeId },
+      );
+    } else if (addressWrite?.action !== "skip") {
+      await addressRepository.save(volunteer.person.address);
+    }
 
     // Person
     await personRepository.save(volunteer.person);
