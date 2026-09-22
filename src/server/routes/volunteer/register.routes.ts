@@ -125,12 +125,12 @@ export default async function volunteerRegisterRoutes(
         );
       }
 
-      const { volunteer, leads, addressWrite } =
+      const { volunteer, leads, addressReuse } =
         await parserVolunteerSelfRegister(person, request.body);
 
       let id: number;
       try {
-        id = await writeVolunteerLegacy(volunteer, addressWrite);
+        id = await writeVolunteerLegacy(volunteer, addressReuse);
       } catch (err) {
         if (isDuplicateVolunteerProfile(err)) {
           throw new BadRequestError(

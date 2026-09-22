@@ -13,15 +13,16 @@ import {
   VolunteerSelfRegisterBody,
 } from "../../../services/dto/parser-volunteer-self-register";
 
-// be#1031 review: resolveAddress used to fetch+mutate the Person's existing
-// Address in memory and hand it back for a blind full-entity save much later
-// in writeVolunteerLegacy — a window in which a concurrent, legitimate edit
-// to that same Address (e.g. via PATCH /volunteer/:id) would get silently
-// reverted. This exercises the real reuse-existing-address path end to end
-// (not mocked) to confirm a concurrent street edit in that window now
-// survives, while the postcode change this flow itself asked for still
-// lands.
-describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (be#1031 review)", () => {
+// be#1031/#1033 review: resolveAddress used to check exclusive ownership and
+// fetch+mutate the Person's existing Address up front, then hand a plan (or
+// the mutated entity itself) back for use much later in writeVolunteerLegacy
+// — a window in which a concurrent edit to that Address, or a concurrent
+// change to who else shares it, would go undetected. writeVolunteerLegacy now
+// applies the reuse via patchOrReplaceAddress inside its own transaction,
+// which re-checks exclusive ownership fresh right before writing. These
+// tests exercise the real reuse-existing-address path end to end (not
+// mocked) against both kinds of staleness.
+describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (be#1031/#1033 review)", () => {
   const body: VolunteerSelfRegisterBody = {
     addressPostcode: "10115",
     locations: [],
@@ -81,15 +82,12 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     createdAddressIds.push(address.id);
     createdPostcodeIds.push(originalPostcode.id);
 
-    const { volunteer, addressWrite } = await parserVolunteerSelfRegister(
+    const { volunteer, addressReuse } = await parserVolunteerSelfRegister(
       person,
       body,
     );
 
-    expect(addressWrite).toMatchObject({
-      action: "patch",
-      addressId: address.id,
-    });
+    expect(addressReuse).toMatchObject({ addressId: address.id });
 
     // Simulate a concurrent request legitimately editing this same Person's
     // address street in the window between the read above and the write
@@ -99,7 +97,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
       { street: "Concurrently Edited Street" },
     );
 
-    const volunteerId = await writeVolunteerLegacy(volunteer, addressWrite);
+    const volunteerId = await writeVolunteerLegacy(volunteer, addressReuse);
     createdVolunteerIds.push(volunteerId);
     createdDealIds.push(volunteer.dealId);
 
@@ -112,7 +110,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     expect(updatedAddress.postcode.value).toBe("10115");
   });
 
-  it("skips writing the Address entirely when reused unchanged (postcode already matches)", async () => {
+  it("applies the postcode idempotently without disturbing a concurrent street edit when it already matches", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const postcode10115 = await getRepository(
       dataSource,
@@ -133,22 +131,24 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     );
     createdAddressIds.push(address.id);
 
-    const { volunteer, addressWrite } = await parserVolunteerSelfRegister(
+    const { volunteer, addressReuse } = await parserVolunteerSelfRegister(
       person,
       body,
     );
 
-    expect(addressWrite).toEqual({ action: "skip" });
+    expect(addressReuse).toMatchObject({
+      addressId: address.id,
+      postcodeId: postcode10115.id,
+    });
 
-    // Concurrent edit in the same window as above — this time nothing this
-    // flow does should touch the Address row at all, so it must survive
-    // untouched.
+    // Concurrent edit in the same window as above — this only touches
+    // street, which this flow never intends to change, so it must survive.
     await getRepository(dataSource, Address).update(
       { id: address.id },
       { street: "Concurrently Edited Street 2" },
     );
 
-    const volunteerId = await writeVolunteerLegacy(volunteer, addressWrite);
+    const volunteerId = await writeVolunteerLegacy(volunteer, addressReuse);
     createdVolunteerIds.push(volunteerId);
     createdDealIds.push(volunteer.dealId);
 
@@ -157,5 +157,80 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
       Address,
     ).findOneByOrFail({ id: address.id });
     expect(updatedAddress.street).toBe("Concurrently Edited Street 2");
+  });
+
+  it("clones into a fresh Address instead of patching in place when the Address became shared in the meantime (be#1033 review)", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const originalPostcode = await getRepository(dataSource, Postcode).save(
+      new Postcode({ value: `9${(Date.now() + 1) % 10000}` }),
+    );
+    const address = await getRepository(dataSource, Address).save(
+      new Address({ street: "Shared Later St", postcode: originalPostcode }),
+    );
+    const person = await getRepository(dataSource, Person).save(
+      new Person({
+        firstName: "BecomesShared",
+        lastName: `Test-${suffix}`,
+        addressId: address.id,
+      }),
+    );
+    createdAddressIds.push(address.id);
+    createdPostcodeIds.push(originalPostcode.id);
+
+    const { volunteer, addressReuse } = await parserVolunteerSelfRegister(
+      person,
+      body,
+    );
+    expect(addressReuse).toMatchObject({ addressId: address.id });
+
+    // Simulate a concurrent flow (e.g. get-or-create-submitter-person)
+    // attaching a second Person to this same Address in the window between
+    // resolveAddress's decision and writeVolunteerLegacy's write — the
+    // Address is no longer exclusively this Person's by the time the write
+    // actually happens.
+    const otherPerson = await getRepository(dataSource, Person).save(
+      new Person({
+        firstName: "OtherOwner",
+        lastName: `Test-${suffix}`,
+        addressId: address.id,
+      }),
+    );
+
+    const volunteerId = await writeVolunteerLegacy(volunteer, addressReuse);
+    createdVolunteerIds.push(volunteerId);
+    createdDealIds.push(volunteer.dealId);
+
+    // The now-shared original row must be untouched — otherPerson's address
+    // (same row) must still show the original postcode/street, not this
+    // registration's postcode.
+    const untouchedShared = await getRepository(
+      dataSource,
+      Address,
+    ).findOneOrFail({ where: { id: address.id }, relations: ["postcode"] });
+    expect(untouchedShared.street).toBe("Shared Later St");
+    expect(untouchedShared.postcode.value).toBe(originalPostcode.value);
+
+    const refreshedOther = await getRepository(
+      dataSource,
+      Person,
+    ).findOneByOrFail({ id: otherPerson.id });
+    expect(refreshedOther.addressId).toBe(address.id);
+
+    // This registration's Person must have been repointed to a brand-new,
+    // exclusively-owned Address carrying the postcode it asked for.
+    const refreshedSelf = await getRepository(
+      dataSource,
+      Person,
+    ).findOneByOrFail({ id: person.id });
+    expect(refreshedSelf.addressId).not.toBe(address.id);
+    const newAddress = await getRepository(dataSource, Address).findOneOrFail({
+      where: { id: refreshedSelf.addressId as number },
+      relations: ["postcode"],
+    });
+    expect(newAddress.postcode.value).toBe("10115");
+
+    createdAddressIds.push(newAddress.id);
+    // otherPerson deleted via cascade once address is deleted in afterAll;
+    // no separate person cleanup needed (matches the existing convention).
   });
 });

@@ -25,10 +25,7 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import {
-  AddressWritePlan,
-  isAddressExclusivelyOwned,
-} from "../../server/utils";
+import { AddressReusePlan } from "../../server/utils";
 import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
@@ -128,42 +125,27 @@ async function resolveLeadFrom(
 // always minting a fresh one — the Person attached here can be pre-existing
 // (email-linked, be#947), and may already own a real address from an earlier
 // flow (e.g. an opportunity/event submission, get-or-create-submitter-person).
-// Never reused when that Address is shared with another Person (the seeded
-// "Dummy" placeholder or any other row multiple Person rows happen to point
-// at, see be#1019) — a fresh, exclusively-owned Address is returned instead.
 //
-// Deliberately does NOT mutate the fetched entity and hand it back for a
-// blind save much later (writeVolunteerLegacy runs after several more
-// awaited round-trips in parserVolunteerSelfRegister below) — a concurrent
-// edit to this same Address landing in that window would get silently
-// reverted by that later full-entity save (be#1031 review). Instead this
-// returns an AddressWritePlan describing exactly what, if anything, needs to
-// change, so the caller can apply a narrow, targeted update at write time.
-async function resolveAddress(
+// Deliberately does NOT fetch/check the existing Address here at all — an
+// earlier version did (checking exclusive ownership, then fetching and
+// mutating the entity for a blind save much later), but writeVolunteerLegacy
+// runs after several more awaited round-trips, and both that ownership check
+// and the fetched postcode value could go stale in the gap (be#1031/#1033
+// review). Instead this just returns which existing Address to reuse and the
+// postcode it should end up with; writeVolunteerLegacy applies it via
+// patchOrReplaceAddress inside its own transaction, which re-checks exclusive
+// ownership fresh immediately before writing — collapsing the race window to
+// effectively nothing, and cloning into a fresh Address instead of patching
+// in place if the row became shared with another Person in the meantime
+// (be#1019).
+function resolveAddress(
   person: Person,
   postcode: Postcode,
-): Promise<{ address: Address; addressWrite?: AddressWritePlan }> {
-  if (
-    person.addressId &&
-    (await isAddressExclusivelyOwned(person.id, person.addressId, dataSource))
-  ) {
-    const addressRepository = getRepository(dataSource, Address);
-    const existing = await addressRepository.findOneBy({
-      id: person.addressId,
-    });
-    if (existing) {
-      return {
-        address: existing,
-        addressWrite:
-          existing.postcodeId === postcode.id
-            ? { action: "skip" }
-            : {
-                action: "patch",
-                addressId: existing.id,
-                postcodeId: postcode.id,
-              },
-      };
-    }
+): { address?: Address; addressReuse?: AddressReusePlan } {
+  if (person.addressId) {
+    return {
+      addressReuse: { addressId: person.addressId, postcodeId: postcode.id },
+    };
   }
   return { address: new Address({ postcode }) };
 }
@@ -174,7 +156,7 @@ export async function parserVolunteerSelfRegister(
 ): Promise<{
   volunteer: Volunteer;
   leads: LeadFrom[];
-  addressWrite?: AddressWritePlan;
+  addressReuse?: AddressReusePlan;
 }> {
   // Required: both Address.postcodeId and Deal.postcodeId are NOT NULL, and
   // a volunteer can't be matched to anything without a location.
@@ -183,27 +165,28 @@ export async function parserVolunteerSelfRegister(
   // None of these depend on each other's result, only on the final
   // Deal/Volunteer construction below — resolve them concurrently instead of
   // paying for each round-trip in series.
-  const [
-    { address, addressWrite },
-    dealActivity,
-    dealSkill,
-    dealDistrict,
-    dealLanguage,
-    dealTimeslot,
-  ] = await Promise.all([
-    resolveAddress(person, postcode),
-    resolveByIds(
-      optionIds(body.activities),
-      Activity,
-      DealActivity,
-      "activity",
-    ),
-    resolveByIds(optionIds(body.skills), Skill, DealSkill, "skill"),
-    resolveByIds(optionIds(body.locations), District, DealDistrict, "district"),
-    resolveDealLanguages(body.languages),
-    buildDealTimeslots(availabilityToTimeslots(body.availability), null),
-  ]);
-  person.address = address;
+  const [dealActivity, dealSkill, dealDistrict, dealLanguage, dealTimeslot] =
+    await Promise.all([
+      resolveByIds(
+        optionIds(body.activities),
+        Activity,
+        DealActivity,
+        "activity",
+      ),
+      resolveByIds(optionIds(body.skills), Skill, DealSkill, "skill"),
+      resolveByIds(
+        optionIds(body.locations),
+        District,
+        DealDistrict,
+        "district",
+      ),
+      resolveDealLanguages(body.languages),
+      buildDealTimeslots(availabilityToTimeslots(body.availability), null),
+    ]);
+  const { address, addressReuse } = resolveAddress(person, postcode);
+  if (address) {
+    person.address = address;
+  }
 
   const deal = new Deal({
     type: DealType.VOLUNTEER,
@@ -225,5 +208,5 @@ export async function parserVolunteerSelfRegister(
 
   const leads = await resolveLeadFrom(body.leadFrom);
 
-  return { volunteer, leads, addressWrite };
+  return { volunteer, leads, addressReuse };
 }
