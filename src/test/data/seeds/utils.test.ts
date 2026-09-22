@@ -69,3 +69,33 @@ describe("getOrCreatePerson address seeding (be#1025)", () => {
     expect(address?.street).toBe("Musterstr. 1");
   });
 });
+
+// be#1027: getOrCreatePerson used to hand every personless caller (undefined
+// personData) the same shared seeded "Anna" Person row instead of minting
+// one per caller, same pattern as be#1025's Address fix.
+describe("getOrCreatePerson personless seeding (be#1027)", () => {
+  beforeAll(async () => {
+    if (!dataSource.isInitialized) {
+      await dataSource.initialize();
+    }
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+  });
+
+  it("gives two personless callers their own distinct Person row", async () => {
+    const a = await getOrCreatePerson(
+      undefined as unknown as PersonJSON,
+      dataSource,
+    );
+    const b = await getOrCreatePerson(
+      undefined as unknown as PersonJSON,
+      dataSource,
+    );
+
+    expect(a.id).toBeTruthy();
+    expect(b.id).toBeTruthy();
+    expect(a.id).not.toBe(b.id);
+  });
+});
