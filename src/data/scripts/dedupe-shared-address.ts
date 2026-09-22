@@ -17,7 +17,8 @@ import Volunteer from "../entity/volunteer/volunteer.entity";
 //
 // Usage: yarn dedupe-shared-address [--apply] [--address-ids 1,2,3]
 //   (no flags)    dry run — prints the plan, writes nothing.
-//   --apply       performs the writes, in one transaction.
+//   --apply       performs the writes, one transaction per shared Address
+//                 group (so one group's failure can't roll back another).
 //   --address-ids restrict to specific shared Address ids (comma-separated),
 //                 e.g. to apply the fix in cautious batches rather than all
 //                 shared rows in prod at once. Omit to process every shared
