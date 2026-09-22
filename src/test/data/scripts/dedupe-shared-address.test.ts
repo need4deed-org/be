@@ -565,4 +565,117 @@ describe("runDedupe (be#1028)", () => {
       id: In([addressX.id, addressY.id, ...newAddressIds]),
     });
   });
+
+  it("treats a row with a blank street but a real city as non-blank (be#1032 review)", async () => {
+    const cityOnlyAddress = await addressRepository().save(
+      new Address({ street: "", city: "Berlin", postcode }),
+    );
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [personCity1, personCity2] = await personRepository().save([
+      new Person({
+        firstName: "City-1",
+        email: `city-1-${suffix}@example.test`,
+        addressId: cityOnlyAddress.id,
+      }),
+      new Person({
+        firstName: "City-2",
+        email: `city-2-${suffix}@example.test`,
+        addressId: cityOnlyAddress.id,
+      }),
+    ]);
+
+    const result = await processGroup(
+      dataSource.manager,
+      cityOnlyAddress.id,
+      [personCity1.id, personCity2.id],
+      false,
+    );
+
+    expect(result.blank).toBe(false);
+    // No Volunteer/audit signal exists for either person, so nobody is a
+    // confident keeper — this must surface for manual attribution rather
+    // than being silently discarded as if the row had nothing real on it.
+    expect(result.keeperPersonId).toBeNull();
+
+    await personRepository().delete([personCity1.id, personCity2.id]);
+    await addressRepository().delete({ id: cityOnlyAddress.id });
+  });
+
+  it("does not abort remaining groups when one group's processing throws (be#1032 review)", async () => {
+    const addressOk = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const addressBad = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const personsOk = await personRepository().save([
+      new Person({
+        firstName: "Err-Ok-1",
+        email: `err-ok-1-${suffix}@example.test`,
+        addressId: addressOk.id,
+      }),
+      new Person({
+        firstName: "Err-Ok-2",
+        email: `err-ok-2-${suffix}@example.test`,
+        addressId: addressOk.id,
+      }),
+    ]);
+    const personsBad = await personRepository().save([
+      new Person({
+        firstName: "Err-Bad-1",
+        email: `err-bad-1-${suffix}@example.test`,
+        addressId: addressBad.id,
+      }),
+      new Person({
+        firstName: "Err-Bad-2",
+        email: `err-bad-2-${suffix}@example.test`,
+        addressId: addressBad.id,
+      }),
+    ]);
+
+    // Dry-run processes every group through the same `dataSource.manager`
+    // (see runDedupe), so a single narrow spy on this one lookup — thrown
+    // only for addressBad's id — simulates a concurrently-deleted Address
+    // for exactly one group without touching any other group's processing.
+    const addrRepo = dataSource.manager.getRepository(Address);
+    const originalFindOneByOrFail = addrRepo.findOneByOrFail.bind(addrRepo);
+    const findSpy = vi
+      .spyOn(addrRepo, "findOneByOrFail")
+      .mockImplementation(async (where) => {
+        if ((where as { id?: number })?.id === addressBad.id) {
+          throw new Error("simulated: Address concurrently deleted");
+        }
+        return originalFindOneByOrFail(where);
+      });
+
+    try {
+      const report = await runDedupe(dataSource, {
+        apply: false,
+        addressIds: [addressOk.id, addressBad.id],
+      });
+
+      expect(report.erroredGroups).toEqual([
+        {
+          addressId: addressBad.id,
+          error: "simulated: Address concurrently deleted",
+        },
+      ]);
+      const okGroup = report.groups.find((g) => g.addressId === addressOk.id);
+      expect(okGroup?.repointedPersonIds.sort()).toEqual(
+        personsOk.map((p) => p.id).sort(),
+      );
+      expect(report.groups.some((g) => g.addressId === addressBad.id)).toBe(
+        false,
+      );
+    } finally {
+      findSpy.mockRestore();
+    }
+
+    await personRepository().delete([
+      ...personsOk.map((p) => p.id),
+      ...personsBad.map((p) => p.id),
+    ]);
+    await addressRepository().delete({ id: In([addressOk.id, addressBad.id]) });
+  });
 });

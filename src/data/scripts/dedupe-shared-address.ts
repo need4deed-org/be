@@ -77,6 +77,11 @@ export interface DedupeReport {
   // would be, in a dry run) fully orphaned rather than guessed at — surfaced
   // here for manual review/attribution.
   needsManualAttribution: DedupeGroupResult[];
+  // Groups that threw while processing (e.g. the Address was concurrently
+  // deleted) — recorded and skipped rather than aborting the whole run, so
+  // one bad group in a large prod run doesn't prevent every other group from
+  // being attempted (be#1032 review).
+  erroredGroups: { addressId: number; error: string }[];
 }
 
 async function findSharedAddressGroups(
@@ -159,7 +164,13 @@ export async function processGroup(
   const address = await manager
     .getRepository(Address)
     .findOneByOrFail({ id: addressId });
-  const blank = !address.street || address.street.trim() === "";
+  // Blank means "nothing real to lose" — checks every data-bearing field,
+  // not just street, so a row with an empty street but a real city isn't
+  // silently discarded as if it had no data worth attributing (be#1032
+  // review).
+  const isBlankField = (value: string | null | undefined) =>
+    !value || value.trim() === "";
+  const blank = isBlankField(address.street) && isBlankField(address.city);
 
   let keeperPersonId: number | null = null;
   let keeperReason: string | null = null;
@@ -246,26 +257,37 @@ export async function runDedupe(
   // re-run through the same race window (be#1032 review). --address-ids
   // still lets an operator scope a run to a smaller batch on top of this.
   const results: DedupeGroupResult[] = [];
+  const erroredGroups: { addressId: number; error: string }[] = [];
   for (const group of groups) {
-    results.push(
-      apply
-        ? await ds.transaction((manager) =>
-            processGroup(manager, group.addressId, group.personIds, apply),
-          )
-        : await processGroup(
-            ds.manager,
-            group.addressId,
-            group.personIds,
-            apply,
-          ),
-    );
+    try {
+      results.push(
+        apply
+          ? await ds.transaction((manager) =>
+              processGroup(manager, group.addressId, group.personIds, apply),
+            )
+          : await processGroup(
+              ds.manager,
+              group.addressId,
+              group.personIds,
+              apply,
+            ),
+      );
+    } catch (err) {
+      // Don't let one bad group (e.g. its Address concurrently deleted)
+      // abort every group after it in the same run — record and move on
+      // (be#1032 review).
+      erroredGroups.push({
+        addressId: group.addressId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   const needsManualAttribution = results.filter(
     (group) => !group.blank && group.keeperPersonId === null,
   );
 
-  return { groups: results, needsManualAttribution };
+  return { groups: results, needsManualAttribution, erroredGroups };
 }
 
 function printReport(report: DedupeReport, apply: boolean): void {
@@ -305,17 +327,33 @@ function printReport(report: DedupeReport, apply: boolean): void {
   } else {
     logger.info("No rows need manual attribution.");
   }
+
+  if (report.erroredGroups.length) {
+    logger.info(
+      `${report.erroredGroups.length} group(s) errored and were skipped — re-run to retry them:`,
+    );
+    for (const { addressId, error } of report.erroredGroups) {
+      logger.info(`  Address ${addressId}: ${error}`);
+    }
+  }
 }
 
 async function main() {
   const { apply, addressIds } = parseArgs(process.argv.slice(2));
 
   await dataSource.initialize();
+  let report: DedupeReport;
   try {
-    const report = await runDedupe(dataSource, { apply, addressIds });
+    report = await runDedupe(dataSource, { apply, addressIds });
     printReport(report, apply);
   } finally {
     await dataSource.destroy();
+  }
+  // Exit non-zero if anything errored, even though the run as a whole
+  // completed — a silent 0 exit would let an operator miss that some groups
+  // still need a re-run (be#1032 review).
+  if (report.erroredGroups.length) {
+    process.exitCode = 1;
   }
 }
 
