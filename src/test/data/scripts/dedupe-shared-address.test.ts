@@ -1,5 +1,5 @@
 import { In } from "typeorm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -31,6 +31,24 @@ describe("dedupe-shared-address parseArgs", () => {
       apply: false,
       addressIds: [1, 2, 3],
     });
+  });
+
+  it("rejects --address-ids with no value instead of silently disabling the filter", () => {
+    expect(() => parseArgs(["--address-ids"])).toThrow(
+      "--address-ids requires a comma-separated list of ids",
+    );
+    expect(() => parseArgs(["--address-ids", "--apply"])).toThrow(
+      "--address-ids requires a comma-separated list of ids",
+    );
+  });
+
+  it("rejects a malformed --address-ids value instead of silently coercing it", () => {
+    expect(() => parseArgs(["--address-ids", "1,,3"])).toThrow(
+      "--address-ids must be a comma-separated list of positive integers",
+    );
+    expect(() => parseArgs(["--address-ids", "abc"])).toThrow(
+      "--address-ids must be a comma-separated list of positive integers",
+    );
   });
 });
 
@@ -306,6 +324,8 @@ describe("runDedupe (be#1028)", () => {
       { addressId: movedAwayAddress.id },
     );
 
+    const addressCountBefore = await addressRepository().count();
+
     const result = await processGroup(
       dataSource.manager,
       raceAddress.id,
@@ -315,6 +335,13 @@ describe("runDedupe (be#1028)", () => {
 
     expect(result.staleAddressPersonIds).toEqual([personMovedAway.id]);
     expect(result.repointedPersonIds).toEqual([personStillShared.id]);
+
+    // be#1032 review: the replacement Address created for personMovedAway
+    // before the guard caught the race must not be left behind as a
+    // permanent, untracked orphan. Net change should be exactly +1 (the one
+    // new Address personStillShared was actually repointed to) — not +2,
+    // which is what a leaked orphan from the stale attempt would produce.
+    expect(await addressRepository().count()).toBe(addressCountBefore + 1);
 
     const refreshedMovedAway = await personRepository().findOneByOrFail({
       id: personMovedAway.id,
@@ -333,6 +360,209 @@ describe("runDedupe (be#1028)", () => {
         movedAwayAddress.id,
         refreshedStillShared.addressId as number,
       ]),
+    });
+  });
+
+  it("does not credit a keeper who already moved off the shared row, and surfaces it for manual attribution instead (be#1032 review)", async () => {
+    const staleAddress = await addressRepository().save(
+      new Address({ street: "789 Stale Owner St", postcode }),
+    );
+    const elsewhereAddress = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [staleKeeper, otherPerson] = await personRepository().save([
+      new Person({
+        firstName: "Stale-Keeper",
+        email: `stale-keeper-${suffix}@example.test`,
+        addressId: staleAddress.id,
+      }),
+      new Person({
+        firstName: "Other",
+        email: `other-${suffix}@example.test`,
+        addressId: staleAddress.id,
+      }),
+    ]);
+    const staleDeal = await dataSource
+      .getRepository(Deal)
+      .save(new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }));
+    const staleVolunteer = await dataSource
+      .getRepository(Volunteer)
+      .save(new Volunteer({ dealId: staleDeal.id, personId: staleKeeper.id }));
+    const staleAuditLog = await dataSource
+      .getRepository(VolunteerAuditLog)
+      .save(
+        new VolunteerAuditLog({
+          volunteerId: staleVolunteer.id,
+          type: "contact_details_changed",
+          detail: "Contact details updated.",
+          occurredAt: new Date(),
+        }),
+      );
+
+    // staleKeeper has the strongest keeper signal, but has already moved off
+    // staleAddress by the time this group is processed (be#1032 review).
+    await personRepository().update(
+      { id: staleKeeper.id },
+      { addressId: elsewhereAddress.id },
+    );
+
+    const result = await processGroup(
+      dataSource.manager,
+      staleAddress.id,
+      [staleKeeper.id, otherPerson.id],
+      false,
+    );
+
+    expect(result.keeperPersonId).toBeNull();
+    expect(result.keeperReason).toBeNull();
+
+    await dataSource
+      .getRepository(VolunteerAuditLog)
+      .delete({ id: staleAuditLog.id });
+    await dataSource.getRepository(Volunteer).delete({ id: staleVolunteer.id });
+    await dataSource.getRepository(Deal).delete({ id: staleDeal.id });
+    await personRepository().delete([staleKeeper.id, otherPerson.id]);
+    await addressRepository().delete({
+      id: In([staleAddress.id, elsewhereAddress.id]),
+    });
+  });
+
+  it("breaks a tie on occurredAt deterministically by the more recently-inserted audit entry (be#1032 review)", async () => {
+    const tiedAddress = await addressRepository().save(
+      new Address({ street: "1 Tied St", postcode }),
+    );
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [earlierRowPerson, laterRowPerson] = await personRepository().save([
+      new Person({
+        firstName: "Tied-Earlier-Row",
+        email: `tied-earlier-${suffix}@example.test`,
+        addressId: tiedAddress.id,
+      }),
+      new Person({
+        firstName: "Tied-Later-Row",
+        email: `tied-later-${suffix}@example.test`,
+        addressId: tiedAddress.id,
+      }),
+    ]);
+    const tiedDeal = await dataSource
+      .getRepository(Deal)
+      .save(new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }));
+    const [earlierVolunteer, laterVolunteer] = await dataSource
+      .getRepository(Volunteer)
+      .save([
+        new Volunteer({ dealId: tiedDeal.id, personId: earlierRowPerson.id }),
+        new Volunteer({ dealId: tiedDeal.id, personId: laterRowPerson.id }),
+      ]);
+
+    const tiedTimestamp = new Date();
+    const [earlierAuditLog, laterAuditLog] = await dataSource
+      .getRepository(VolunteerAuditLog)
+      .save([
+        new VolunteerAuditLog({
+          volunteerId: earlierVolunteer.id,
+          type: "contact_details_changed",
+          detail: "Contact details updated.",
+          occurredAt: tiedTimestamp,
+        }),
+        new VolunteerAuditLog({
+          volunteerId: laterVolunteer.id,
+          type: "contact_details_changed",
+          detail: "Contact details updated.",
+          occurredAt: tiedTimestamp,
+        }),
+      ]);
+    // Inserted after earlierAuditLog, so it has the higher id — the
+    // deterministic tiebreaker.
+    expect(laterAuditLog.id).toBeGreaterThan(earlierAuditLog.id);
+
+    const result = await processGroup(
+      dataSource.manager,
+      tiedAddress.id,
+      [earlierRowPerson.id, laterRowPerson.id],
+      false,
+    );
+
+    expect(result.keeperPersonId).toBe(laterRowPerson.id);
+
+    await dataSource
+      .getRepository(VolunteerAuditLog)
+      .delete({ id: In([earlierAuditLog.id, laterAuditLog.id]) });
+    await dataSource
+      .getRepository(Volunteer)
+      .delete({ id: In([earlierVolunteer.id, laterVolunteer.id]) });
+    await dataSource.getRepository(Deal).delete({ id: tiedDeal.id });
+    await personRepository().delete([earlierRowPerson.id, laterRowPerson.id]);
+    await addressRepository().delete({ id: tiedAddress.id });
+  });
+
+  it("commits each group in its own transaction instead of one transaction for the whole run (be#1032 review)", async () => {
+    const addressX = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const addressY = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const personsX = await personRepository().save([
+      new Person({
+        firstName: "Txn-X-1",
+        email: `txn-x-1-${suffix}@example.test`,
+        addressId: addressX.id,
+      }),
+      new Person({
+        firstName: "Txn-X-2",
+        email: `txn-x-2-${suffix}@example.test`,
+        addressId: addressX.id,
+      }),
+    ]);
+    const personsY = await personRepository().save([
+      new Person({
+        firstName: "Txn-Y-1",
+        email: `txn-y-1-${suffix}@example.test`,
+        addressId: addressY.id,
+      }),
+      new Person({
+        firstName: "Txn-Y-2",
+        email: `txn-y-2-${suffix}@example.test`,
+        addressId: addressY.id,
+      }),
+    ]);
+
+    const txnSpy = vi.spyOn(dataSource, "transaction");
+    await runDedupe(dataSource, {
+      apply: true,
+      addressIds: [addressX.id, addressY.id],
+    });
+
+    // One transaction per group (addressX, addressY), not one for the
+    // entire run — a failure processing one group must not have the power
+    // to roll back another, already-correctly-guarded group. Asserted
+    // before mockRestore(), which clears recorded call history.
+    expect(txnSpy).toHaveBeenCalledTimes(2);
+    txnSpy.mockRestore();
+
+    const refreshedX = await personRepository().find({
+      where: personsX.map((p) => ({ id: p.id })),
+    });
+    for (const person of refreshedX) {
+      expect(person.addressId).not.toBe(addressX.id);
+    }
+
+    const newAddressIds = [
+      ...refreshedX.map((p) => p.addressId as number),
+      ...(
+        await personRepository().find({
+          where: personsY.map((p) => ({ id: p.id })),
+        })
+      ).map((p) => p.addressId as number),
+    ];
+    await personRepository().delete([
+      ...personsX.map((p) => p.id),
+      ...personsY.map((p) => p.id),
+    ]);
+    await addressRepository().delete({
+      id: In([addressX.id, addressY.id, ...newAddressIds]),
     });
   });
 });

@@ -30,10 +30,26 @@ export interface DedupeSharedAddressOptions {
 
 export function parseArgs(argv: string[]): DedupeSharedAddressOptions {
   const flagIndex = argv.indexOf("--address-ids");
-  const addressIds =
-    flagIndex !== -1 && argv[flagIndex + 1]
-      ? argv[flagIndex + 1].split(",").map(Number)
-      : undefined;
+  let addressIds: number[] | undefined;
+
+  if (flagIndex !== -1) {
+    const raw = argv[flagIndex + 1];
+    // A missing/flag-shaped value here (trailing flag, typo eating the
+    // value) must not silently fall back to "no filter" — that would run
+    // --apply against every shared row in prod instead of the cautious
+    // batch the operator asked for (be#1028/#1032 review).
+    if (!raw || raw.startsWith("--")) {
+      throw new Error(
+        "--address-ids requires a comma-separated list of ids, e.g. --address-ids 1,2,3",
+      );
+    }
+    addressIds = raw.split(",").map(Number);
+    if (addressIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+      throw new Error(
+        `--address-ids must be a comma-separated list of positive integers, got "${raw}"`,
+      );
+    }
+  }
 
   return { apply: argv.includes("--apply"), addressIds };
 }
@@ -110,7 +126,11 @@ async function findKeeperSignal(
       volunteerId: In(volunteers.map((v) => v.id)),
       type: "contact_details_changed",
     },
-    order: { occurredAt: "DESC" },
+    // id DESC as a tiebreaker: bulk-imported/same-request audit rows can tie
+    // on occurredAt, and without a deterministic secondary key a re-run
+    // (--apply after a reviewed dry-run) could silently pick a different
+    // keeper than the one reported (be#1032 review).
+    order: { occurredAt: "DESC", id: "DESC" },
   });
   if (!latest) {
     return null;
@@ -145,8 +165,20 @@ export async function processGroup(
   if (!blank) {
     const signal = await findKeeperSignal(manager, personIds);
     if (signal) {
-      keeperPersonId = signal.personId;
-      keeperReason = signal.reason;
+      // Re-check at write time: only trust this signal if the keeper still
+      // actually points at the shared Address being processed. If they've
+      // already moved off it (e.g. repointed by the live app in the window
+      // since the initial scan), nobody currently owns this row's real
+      // data — leave keeperPersonId null so it correctly surfaces in
+      // needsManualAttribution below instead of being silently excluded
+      // from that list (be#1032 review).
+      const keeperPerson = await manager
+        .getRepository(Person)
+        .findOneBy({ id: signal.personId });
+      if (keeperPerson?.addressId === addressId) {
+        keeperPersonId = signal.personId;
+        keeperReason = signal.reason;
+      }
     }
   }
 
@@ -178,6 +210,10 @@ export async function processGroup(
         repointedPersonIds.push(personId);
       } else {
         staleAddressPersonIds.push(personId);
+        // The repoint didn't happen, so this replacement was never linked
+        // to anyone — clean it up rather than leaving a permanently
+        // orphaned, untracked Address row behind (be#1032 review).
+        await manager.getRepository(Address).delete({ id: created.id });
       }
     }
   } else {
@@ -202,19 +238,27 @@ export async function runDedupe(
 ): Promise<DedupeReport> {
   const groups = await findSharedAddressGroups(ds, addressIds);
 
-  const process = async (manager: EntityManager) => {
-    const results: DedupeGroupResult[] = [];
-    for (const group of groups) {
-      results.push(
-        await processGroup(manager, group.addressId, group.personIds, apply),
-      );
-    }
-    return results;
-  };
-
-  const results = apply
-    ? await ds.transaction((manager) => process(manager))
-    : await process(ds.manager);
+  // Each group gets its own transaction rather than one transaction for the
+  // whole run: a failure partway through a large prod run (e.g. a
+  // concurrently-deleted Address) would otherwise roll back every
+  // already-processed, correctly-guarded group alongside it, forcing a full
+  // re-run through the same race window (be#1032 review). --address-ids
+  // still lets an operator scope a run to a smaller batch on top of this.
+  const results: DedupeGroupResult[] = [];
+  for (const group of groups) {
+    results.push(
+      apply
+        ? await ds.transaction((manager) =>
+            processGroup(manager, group.addressId, group.personIds, apply),
+          )
+        : await processGroup(
+            ds.manager,
+            group.addressId,
+            group.personIds,
+            apply,
+          ),
+    );
+  }
 
   const needsManualAttribution = results.filter(
     (group) => !group.blank && group.keeperPersonId === null,
