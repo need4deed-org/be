@@ -56,8 +56,6 @@ import {
 const noGenderAvatarUrl = "all_genders_avatar.png";
 
 let postcodeGetter: (value: string) => Promise<Postcode>;
-let dummyPerson: Person;
-const dummyPersonFilterParams = { email: "anna.doe@need4deed.org" };
 let otherLanguage: Language;
 const otherLanguageFilterParams = { isoCode: "zzz" };
 
@@ -229,6 +227,13 @@ async function getOrCreateAddress(
   return address;
 }
 
+// Always creates a fresh Person row for a personless caller, even though
+// this used to hand every one of them the same seeded "Anna" placeholder
+// (dummyPerson) — a Person row is owned by exactly one volunteer/agent
+// contact/organization, so reusing one let unrelated entities end up
+// pointing at the same row, and a later edit through a route keyed on that
+// Person's id (e.g. contact-detail patches) silently changed all of them
+// (be#1027, same pattern as be#1025's Address fix).
 export async function getOrCreatePerson(
   personData: PersonJSON,
   dataSource: DataSource,
@@ -239,13 +244,9 @@ export async function getOrCreatePerson(
   );
 
   if (!personData) {
-    if (!dummyPerson) {
-      dummyPerson = await personRepository.findOne({
-        where: { ...dummyPersonFilterParams },
-      });
-    }
-
-    return dummyPerson;
+    const person = new Person({ firstName: "Unknown" });
+    await personRepository.save(person);
+    return person;
   }
 
   const existingPerson = await personRepository.findOne({
