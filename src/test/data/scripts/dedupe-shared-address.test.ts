@@ -1,3 +1,4 @@
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
@@ -8,6 +9,7 @@ import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-lo
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   parseArgs,
+  processGroup,
   runDedupe,
 } from "../../../data/scripts/dedupe-shared-address";
 import { DealType } from "../../../data/types";
@@ -273,5 +275,64 @@ describe("runDedupe (be#1028)", () => {
       where: { addressId: addressRealNoSignal.id },
     });
     expect(remainingReferences).toBe(0);
+  });
+
+  it("does not overwrite a Person whose addressId already moved before the write lands (be#1028 review: TOCTOU)", async () => {
+    const raceAddress = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const movedAwayAddress = await addressRepository().save(
+      new Address({ street: "", postcode }),
+    );
+    const raceSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [personMovedAway, personStillShared] = await personRepository().save([
+      new Person({
+        firstName: "Race-Moved",
+        email: `race-moved-${raceSuffix}@example.test`,
+        addressId: raceAddress.id,
+      }),
+      new Person({
+        firstName: "Race-Shared",
+        email: `race-shared-${raceSuffix}@example.test`,
+        addressId: raceAddress.id,
+      }),
+    ]);
+
+    // Simulate a concurrent write (the live app, or another batched run)
+    // repointing personMovedAway off the shared row *after* the group scan
+    // already captured both ids below.
+    await personRepository().update(
+      { id: personMovedAway.id },
+      { addressId: movedAwayAddress.id },
+    );
+
+    const result = await processGroup(
+      dataSource.manager,
+      raceAddress.id,
+      [personMovedAway.id, personStillShared.id],
+      true,
+    );
+
+    expect(result.staleAddressPersonIds).toEqual([personMovedAway.id]);
+    expect(result.repointedPersonIds).toEqual([personStillShared.id]);
+
+    const refreshedMovedAway = await personRepository().findOneByOrFail({
+      id: personMovedAway.id,
+    });
+    expect(refreshedMovedAway.addressId).toBe(movedAwayAddress.id);
+
+    const refreshedStillShared = await personRepository().findOneByOrFail({
+      id: personStillShared.id,
+    });
+    expect(refreshedStillShared.addressId).not.toBe(raceAddress.id);
+
+    await personRepository().delete([personMovedAway.id, personStillShared.id]);
+    await addressRepository().delete({
+      id: In([
+        raceAddress.id,
+        movedAwayAddress.id,
+        refreshedStillShared.addressId as number,
+      ]),
+    });
   });
 });

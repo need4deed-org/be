@@ -46,6 +46,11 @@ export interface DedupeGroupResult {
   keeperPersonId: number | null;
   keeperReason: string | null;
   repointedPersonIds: number[];
+  // Persons this group planned to repoint, but whose addressId had already
+  // changed away from the shared row by the time --apply tried to write —
+  // e.g. the live app repointed them in between the initial scan and this
+  // write. Left untouched rather than overwritten; surfaced for re-run/review.
+  staleAddressPersonIds: number[];
 }
 
 export interface DedupeReport {
@@ -124,7 +129,7 @@ async function findKeeperSignal(
   };
 }
 
-async function processGroup(
+export async function processGroup(
   manager: EntityManager,
   addressId: number,
   personIds: number[],
@@ -145,10 +150,12 @@ async function processGroup(
     }
   }
 
-  const repointedPersonIds = personIds.filter((id) => id !== keeperPersonId);
+  const candidatePersonIds = personIds.filter((id) => id !== keeperPersonId);
+  const repointedPersonIds: number[] = [];
+  const staleAddressPersonIds: number[] = [];
 
   if (apply) {
-    for (const personId of repointedPersonIds) {
+    for (const personId of candidatePersonIds) {
       const created = await createAddress(
         {},
         { id: address.postcodeId },
@@ -160,10 +167,21 @@ async function processGroup(
             `(postcodeId=${address.postcodeId}).`,
         );
       }
-      await manager
+      // Re-check at write time: only repoint if this Person still points at
+      // the shared Address the initial scan found them on. Guards against a
+      // race with the live app (or an overlapping --address-ids run) moving
+      // them off it in between that scan and this write.
+      const updateResult = await manager
         .getRepository(Person)
-        .update({ id: personId }, { addressId: created.id });
+        .update({ id: personId, addressId }, { addressId: created.id });
+      if (updateResult.affected === 1) {
+        repointedPersonIds.push(personId);
+      } else {
+        staleAddressPersonIds.push(personId);
+      }
     }
+  } else {
+    repointedPersonIds.push(...candidatePersonIds);
   }
 
   return {
@@ -174,6 +192,7 @@ async function processGroup(
     keeperPersonId,
     keeperReason,
     repointedPersonIds,
+    staleAddressPersonIds,
   };
 }
 
@@ -219,6 +238,12 @@ function printReport(report: DedupeReport, apply: boolean): void {
           group.keeperReason ? ` (${group.keeperReason})` : ""
         }. ${apply ? "Repointed" : "Would repoint"}: [${group.repointedPersonIds.join(", ")}].`,
     );
+    if (group.staleAddressPersonIds.length) {
+      logger.info(
+        `  Skipped (address changed before this write could apply — re-run ` +
+          `to pick up): [${group.staleAddressPersonIds.join(", ")}].`,
+      );
+    }
   }
 
   if (report.needsManualAttribution.length) {
