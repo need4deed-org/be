@@ -150,6 +150,10 @@ export async function sendEmailIntroduction(
       .filter(Boolean)
       .join(", ");
   })();
+  // be#1050: RAC/shelter agents are often named after their street, so this
+  // reads as "for {opportunity} in {NGO}" in the subject rather than just
+  // naming the volunteer and opportunity with no NGO context.
+  const agentTitle = opportunity.agent?.title ?? "";
 
   const statmentOnCertificates = resolveStatmentOnCertificates(
     volunteer.statusCGC,
@@ -169,6 +173,7 @@ export async function sendEmailIntroduction(
     contactpersonEmail: contactPersonEmail,
     contactpersonPhone: contactPerson.phone ?? "",
     agentAddress,
+    agentTitle,
     statmentOnCertificates,
   });
 
