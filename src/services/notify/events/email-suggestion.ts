@@ -61,6 +61,11 @@ export async function sendEmailSuggestion(
     opportunityName,
     plz,
     opportunitySchedule,
+    // TODO(be#1042 review): remove once the live CDN suggestion.json is
+    // updated to use {{ opportunitySchedule }} instead of {{ schedule }} —
+    // until then, deploying this code first would leave the old placeholder
+    // unresolved and ValidatingEmailTransport would suspend every send.
+    schedule: opportunitySchedule,
   });
 
   await email.send({

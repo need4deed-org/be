@@ -88,6 +88,11 @@ export async function sendEmailNewAccompanying(
     accompaniedpersonName,
     accompaniedpersonPhone,
     appointmentComment,
+    // TODO(be#1042 review): remove once the live CDN confirmationaccompanying.json
+    // drops {{ appointmentaLanguage }} — until then, deploying this code
+    // first would leave that placeholder unresolved and
+    // ValidatingEmailTransport would suspend every send.
+    appointmentaLanguage: "",
   });
 
   await email.send({

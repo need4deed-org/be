@@ -40,17 +40,23 @@ export function resetIntroductionTemplateCache(): void {
 // APPLIED_N4D directly (VolunteerProfileDocument.tsx). Since neither
 // cgcNo nor cgcYes matched APPLIED_N4D, that was the common case and this
 // always rendered a blank statement for it (be#1042 review). Reads
-// statusCGC's own three real-world values instead: NO (nothing done),
-// APPLIED_N4D (N4D applied on the volunteer's behalf), YES (received).
-// UNDEFINED/ASKED_TO_APPLY/APPLIED_SELF are unused by any code path today
-// (grep confirms no writer), so they fall back to the "not yet applied"
-// case rather than silently producing no statement.
+// statusCGC's own three real, reachable values instead: NO (the volunteer
+// self-registration form's "Need to apply" answer), APPLIED_N4D (N4D
+// applied on the volunteer's behalf), YES (received).
+//
+// UNDEFINED — the column's own DB default (volunteer.entity.ts) — and
+// ASKED_TO_APPLY/APPLIED_SELF (unused by any writer today, confirmed by
+// grep) deliberately fall back to blank rather than asserting "we'll apply
+// immediately": UNDEFINED means the status was simply never set, and
+// APPLIED_SELF means the *volunteer* said they'd apply themselves, the
+// opposite of what that sentence claims (be#1043 review).
 function resolveStatmentOnCertificates(
   statusCGC: DocumentStatusType,
   statusVaccination: DocumentStatusType,
 ): string {
   const cgcReceived = statusCGC === DocumentStatusType.YES;
   const cgcApplied = statusCGC === DocumentStatusType.APPLIED_N4D;
+  const cgcNotYetApplied = statusCGC === DocumentStatusType.NO;
   const vaccinationYes = statusVaccination === DocumentStatusType.YES;
 
   if (cgcReceived && vaccinationYes) {
@@ -65,10 +71,13 @@ function resolveStatmentOnCertificates(
   if (cgcApplied && !vaccinationYes) {
     return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
   }
-  if (vaccinationYes) {
+  if (cgcNotYetApplied && vaccinationYes) {
     return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
   }
-  return "Das erweiterte Führungszeugnis beantragen wir sofort.";
+  if (cgcNotYetApplied) {
+    return "Das erweiterte Führungszeugnis beantragen wir sofort.";
+  }
+  return "";
 }
 
 export async function sendEmailIntroduction(
