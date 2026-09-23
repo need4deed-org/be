@@ -13,6 +13,7 @@ import {
   BadRequestError,
   ConflictError,
   InvalidOrganizationEmailError,
+  NotFoundError,
   PersonAlreadyRegisteredError,
   UnauthorizedError,
 } from "../../config";
@@ -129,9 +130,18 @@ export default async function userRoutes(
   );
 
   // Self-service account deletion (be#583). Soft delete only — sets
-  // isActive to false rather than removing the row. allowSelf lets an
-  // authenticated user act on their own id; admins bypass the self check
-  // per fastify.authenticate's own semantics, same as GET /:id above.
+  // isActive to false rather than removing the row.
+  //
+  // Deliberately does NOT use fastify.authenticate({ allowSelf: true }):
+  // that option's ADMIN bypass (documented, relied-on framework behavior —
+  // see CLAUDE.md) is appropriate for read/administrative routes, but this
+  // is a destructive, irreversible action with no reactivation path
+  // anywhere in the API. Reusing the bypass here would let any ADMIN
+  // deactivate an arbitrary account (including another admin's, or their
+  // own by mistake) by id, contradicting be#583's own acceptance criteria
+  // ("only the authenticated user's own account can be targeted") — so the
+  // self-check below applies to every caller, ADMIN included (be#1007
+  // review).
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
@@ -139,18 +149,28 @@ export default async function userRoutes(
         params: idParamSchema,
         response: responseSchema(""),
       },
-      onRequest: [fastify.authenticate({ allowSelf: true })],
+      onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
       const { id } = request.params;
-      const userRepository = fastify.db.userRepository;
-      const user = await userRepository.findOne({ where: { id } });
 
-      if (!user) {
-        return reply.status(404).send({ message: `User id:${id} not found.` });
+      if (request.authUser!.id !== id) {
+        throw new UnauthorizedError("Permission denied");
       }
 
-      await userRepository.update({ id }, { isActive: false });
+      // Single update + affected check instead of a separate findOne: one
+      // query instead of two, and it can't report a false-positive success
+      // if the row is removed between the check and the write (be#1007
+      // review) — request.authUser already confirms the row exists at the
+      // top of this request, so `affected === 0` here means a genuine
+      // concurrent removal, not the common case.
+      const result = await fastify.db.userRepository.update(
+        { id },
+        { isActive: false },
+      );
+      if (!result.affected) {
+        throw new NotFoundError(`User id:${id} not found.`);
+      }
 
       return reply
         .status(200)

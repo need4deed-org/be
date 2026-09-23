@@ -663,11 +663,11 @@ describe("DELETE /user/:id (be#583)", () => {
     }
   });
 
-  // A non-ADMIN caller can never hit this branch on their own id: allowSelf
-  // requires the caller's own account to already exist (authenticate() looks
-  // it up first). ADMIN bypasses the self check, so it's the only way to
-  // reach this route for an id that doesn't exist.
-  it("404s for a nonexistent id", async () => {
+  // This endpoint deliberately does not use fastify.authenticate's
+  // allowSelf ADMIN bypass (be#1007 review): it's a destructive action with
+  // no reactivation path, so even an ADMIN may only deactivate their own
+  // account here, never target another user's id.
+  it("rejects an ADMIN deactivating another account (no self-check bypass for this route)", async () => {
     const admin = await fastify.db.userRepository.save(
       new User({
         email: `admin-${suffix}@example.com`,
@@ -681,18 +681,26 @@ describe("DELETE /user/:id (be#583)", () => {
       email: admin.email,
       type: "access",
     });
-    const ghostId = 999_999_999;
+    const { user: other } = await makeUser(
+      `admin-target-${suffix}@example.com`,
+    );
 
     try {
       const res = await fastify.inject({
         method: "DELETE",
-        url: `/user/${ghostId}`,
+        url: `/user/${other.id}`,
         cookies: { access: adminToken },
       });
 
-      expect(res.statusCode).toBe(404);
+      expect(res.statusCode).toBe(403);
+
+      const untouched = await fastify.db.userRepository.findOneOrFail({
+        where: { id: other.id },
+      });
+      expect(untouched.isActive).toBe(true);
     } finally {
       await fastify.db.userRepository.delete({ id: admin.id });
+      await fastify.db.userRepository.delete({ id: other.id });
     }
   });
 });

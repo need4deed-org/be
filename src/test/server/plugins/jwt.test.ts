@@ -202,6 +202,27 @@ describe("X-API-Key authentication", () => {
     }
   });
 
+  it("rejects a deactivated user's still-valid JWT cookie (be#1007)", async () => {
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      ...coordinatorUser,
+      isActive: false,
+    } as any);
+
+    const accessToken = fastify.jwt.sign({
+      id: 42,
+      email: "coordinator@example.com",
+    });
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/trusted-domain",
+      cookies: { access: accessToken },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().message).toBe("Account is not active.");
+  });
+
   it("leaves the existing JWT-cookie flow unaffected when no header is sent", async () => {
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
       coordinatorUser as any,

@@ -74,15 +74,6 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthenticatedError("Invalid API key.");
         }
-        // isActive is checked here but deliberately not for the JWT-cookie
-        // path below: this is a new gate introduced for API keys, not a
-        // fix applied unevenly. Changing existing cookie-session behavior
-        // (an already-issued 15-min token for a since-deactivated user
-        // currently still authenticates until it expires) is out of scope
-        // for this change.
-        if (!user.isActive) {
-          throw new UnauthenticatedError("Account is not active.");
-        }
         logger.debug(`jwtPlugin:authenticated via api key: ${user.id}`);
       } else {
         try {
@@ -101,6 +92,17 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthorizedError("User not found.");
         }
+      }
+
+      // Checked once, after either auth path resolves `user`: a deactivated
+      // account (self-service deletion, be#583, or GDPR erasure) must stop
+      // authenticating immediately, not just once its already-issued 15-min
+      // access token happens to expire. Every request re-fetches `user`
+      // fresh (no session cache), so this takes effect on the very next
+      // request after deactivation. Previously only checked on the API-key
+      // path (be#1007 review).
+      if (!user.isActive) {
+        throw new UnauthenticatedError("Account is not active.");
       }
 
       // Expose the already-loaded user (carries personId + DB-authoritative
