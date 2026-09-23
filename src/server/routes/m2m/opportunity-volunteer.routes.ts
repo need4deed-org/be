@@ -262,13 +262,22 @@ export default async function m2mOpportunityVolunteerRoutes(
                 // it guards) must not be rolled back and resent just
                 // because the volunteer-facing email failed independently —
                 // that would duplicate the already-successful NGO email on
-                // the next status toggle.
+                // the next status toggle. There's no retry path for this
+                // send specifically (nothing re-triggers it), so failure
+                // must page a human via opsAlert rather than only log —
+                // otherwise a matched volunteer could silently never learn
+                // their appointment's details.
                 try {
                   await fastify.notify.emailAccompanyMatchVolunteer(ov);
                 } catch (volunteerSendErr) {
                   logger.error(
                     `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
                   );
+                  fastify.notify
+                    .opsAlert(
+                      `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
+                    )
+                    .catch(logger.error);
                 }
               } else {
                 const comm = await logEmailCommunication(

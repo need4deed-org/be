@@ -18,6 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
@@ -29,6 +30,10 @@ export function resetNewAccompanyingTemplateCache(): void {
 export async function sendEmailNewAccompanying(
   email: EmailTransport,
   opportunity: Opportunity,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(opportunity);
   const contactPersonEmail = contactPerson?.email;
@@ -53,9 +58,17 @@ export async function sendEmailNewAccompanying(
   // field_translation by the caller before this function runs (be#856) —
   // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
   // values (fe#1036 review thread).
+  const dealLanguageTitles = await resolveOrAlert(
+    errorTransport,
+    opportunity.deal?.dealLanguage ?? [],
+    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
+    [] as string[],
+    `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
+    DEAL_LANGUAGE_LABELS,
+  );
   const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
     accompanying?.languageToTranslate,
-    getLanguages(opportunity.deal?.dealLanguage ?? []).map((l) => l.title),
+    dealLanguageTitles,
   );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";

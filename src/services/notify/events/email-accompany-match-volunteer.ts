@@ -17,6 +17,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailAccompanyMatchVolunteerManifestUrl);
@@ -33,6 +34,10 @@ export function resetAccompanyMatchVolunteerTemplateCache(): void {
 export async function sendEmailAccompanyMatchVolunteer(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -53,9 +58,17 @@ export async function sendEmailAccompanyMatchVolunteer(
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
+  const dealLanguageTitles = await resolveOrAlert(
+    errorTransport,
+    opportunity?.deal?.dealLanguage ?? [],
+    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
+    [] as string[],
+    `sendEmailAccompanyMatchVolunteer, ov ${ov.id}`,
+    DEAL_LANGUAGE_LABELS,
+  );
   const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
     accompanying?.languageToTranslate,
-    getLanguages(opportunity?.deal?.dealLanguage ?? []).map((l) => l.title),
+    dealLanguageTitles,
   );
   const appointmentComment = opportunity?.info ?? "";
   const contactpersonName = contactPerson?.name ?? "";

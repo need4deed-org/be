@@ -159,13 +159,13 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailAccompanyMatch: (ov: OpportunityVolunteer) =>
       sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
     emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatchVolunteer(emailNotify, ov),
+      sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
     emailRegularUpdate: (opportunity: Opportunity) =>
       sendEmailRegularUpdate(emailNotify, opportunity),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>
-      sendEmailNewAccompanying(emailNotify, opportunity),
+      sendEmailNewAccompanying(emailNotify, opportunity, emailNotifyRaw),
     emailRegistration: (volunteer: RegistrationEmailRecipient) =>
       sendEmailRegistration(emailNotify, volunteer),
   });
