@@ -1,6 +1,6 @@
 import {
+  emailFromAccompanying,
   emailFromNotify,
-  emailFromVolunteer,
   emailSuggestionAccompanyingManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
@@ -69,7 +69,10 @@ export async function sendEmailSuggestionAccompanying(
 
   await email.send({
     to: volunteerEmail,
-    cc: emailFromVolunteer,
+    // Accompanying-specific reply address, not emailFromVolunteer — the
+    // template text tells the volunteer to reply to accompanying@, not
+    // volunteer@ (regular suggestions still use emailFromVolunteer).
+    cc: emailFromAccompanying,
     from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),
