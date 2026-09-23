@@ -1,5 +1,9 @@
 import { FastifyRequest } from "fastify";
-import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  OpportunityVolunteerStatusType,
+  UserRole,
+} from "need4deed-sdk";
 import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
 import { getCallerAgentIds } from "../data/get-caller-agent-ids";
@@ -9,23 +13,37 @@ import { getCallerAgentIds } from "../data/get-caller-agent-ids";
  * (masking-side only). Drives PII masking of persons, an opportunity's
  * accompanying details, and comments.
  *
- *   userId         the caller's user id (a comment they authored is unmasked)
- *   personIds      Person ids whose PII is visible
- *   opportunityIds Opportunities whose accompanying + comments are visible
- *   agentIds       Agents whose comments are visible (caller's memberships)
+ *   userId          the caller's user id (a comment they authored is unmasked)
+ *   role            the caller's role (a VOLUNTEER also gets agent titles masked)
+ *   personIds       Person ids whose PII is visible
+ *   opportunityIds  Opportunities whose accompanying + comments are visible
+ *   agentIds        Agents whose comments are visible (caller's memberships)
+ *   matchedAgentIds Agents (RACs) whose title + address are visible, but not
+ *                   their comments: those of the opportunities a VOLUNTEER
+ *                   is matched to (be#1039)
  *
  * Per role:
  *   USER      -> nothing
- *   VOLUNTEER -> own person; opportunities they're matched to
+ *   VOLUNTEER -> own person; opportunities they're matched to, and their agents
  *   AGENT     -> own person ∪ members of their agent(s) ∪ persons of volunteers
  *                on their opportunities; their agent(s); their opportunities
  */
 export interface CallerVisibility {
   userId: number;
+  role: UserRole;
   personIds: Set<number>;
   opportunityIds: Set<number>;
   agentIds: Set<number>;
+  matchedAgentIds: Set<number>;
 }
+
+// Match statuses that count as "matched" for a VOLUNTEER's visibility
+// (be#1039): a PENDING suggestion doesn't unlock the RAC/refugee details yet,
+// and a PAST engagement no longer does.
+export const VISIBLE_MATCH_STATUSES = [
+  OpportunityVolunteerStatusType.MATCHED,
+  OpportunityVolunteerStatusType.ACTIVE,
+];
 
 export async function resolveCallerVisibility(
   request: FastifyRequest,
@@ -33,11 +51,13 @@ export async function resolveCallerVisibility(
 ): Promise<CallerVisibility> {
   const visibility: CallerVisibility = {
     userId: user.id,
+    role: user.role,
     personIds: new Set<number>(),
     opportunityIds: new Set<number>(),
     agentIds: new Set<number>(),
+    matchedAgentIds: new Set<number>(),
   };
-  const { personIds, opportunityIds, agentIds } = visibility;
+  const { personIds, opportunityIds, agentIds, matchedAgentIds } = visibility;
   const personId = user.personId ?? undefined;
 
   // USER sees only reference data; a missing personId can't match anything.
@@ -48,16 +68,24 @@ export async function resolveCallerVisibility(
   personIds.add(personId); // VOLUNTEER + AGENT see their own person
 
   if (user.role === UserRole.VOLUNTEER) {
-    // Opportunities the caller is matched to (own person -> volunteer -> match).
-    const rows: { opportunity_id: number }[] =
+    // Opportunities the caller is matched to (own person -> volunteer ->
+    // match), and the agents (RACs) owning them.
+    const rows: { opportunity_id: number; agent_id: number | null }[] =
       await request.server.db.agentPersonRepository.manager.query(
-        `SELECT ov.opportunity_id
+        `SELECT ov.opportunity_id, o.agent_id
            FROM opportunity_volunteer ov
            JOIN volunteer v ON v.id = ov.volunteer_id
-          WHERE v.person_id = $1`,
-        [personId],
+           JOIN opportunity o ON o.id = ov.opportunity_id
+          WHERE v.person_id = $1
+            AND ov.status = ANY($2)`,
+        [personId, VISIBLE_MATCH_STATUSES],
       );
-    rows.forEach((r) => opportunityIds.add(Number(r.opportunity_id)));
+    rows.forEach((r) => {
+      opportunityIds.add(Number(r.opportunity_id));
+      if (r.agent_id !== null) {
+        matchedAgentIds.add(Number(r.agent_id));
+      }
+    });
     return visibility;
   }
 

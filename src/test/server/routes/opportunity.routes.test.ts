@@ -2180,3 +2180,206 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
     expect(found.lon).toBe(DISTRICT_LON);
   });
 });
+
+describe("GET /opportunity RAC masking + myMatchStatus for volunteers (be#1039)", () => {
+  let fastify: FastifyInstance;
+  let agentAddress: Address;
+  let agent: Agent;
+  let deal: Deal;
+  let opportunity: Opportunity;
+  const persons: Person[] = [];
+  const volunteers: Volunteer[] = [];
+  const volunteerDeals: Deal[] = [];
+  const cookies: Record<string, string> = {};
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const AGENT_TITLE = `Test RAC (be#1039) ${suffix}`;
+  const AGENT_STREET = `Geheimstraße ${suffix}`;
+
+  // Volunteer callers, keyed by their link to the opportunity (null = none).
+  const VOLUNTEER_LINKS: Record<string, OpportunityVolunteerStatusType | null> =
+    {
+      unlinked: null,
+      pending: OpportunityVolunteerStatusType.PENDING,
+      matched: OpportunityVolunteerStatusType.MATCHED,
+      active: OpportunityVolunteerStatusType.ACTIVE,
+      past: OpportunityVolunteerStatusType.PAST,
+    };
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    agentAddress = await getRepository(dataSource, Address).save(
+      new Address({
+        street: AGENT_STREET,
+        city: "Berlin",
+        postcodeId: postcode.id,
+      }),
+    );
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: AGENT_TITLE, addressId: agentAddress.id }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (be#1039) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    const addUser = async (key: string, role: UserRole): Promise<Person> => {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Test", lastName: `be1039-${key}` }),
+      );
+      persons.push(person);
+      await fastify.db.userRepository.save(
+        new User({
+          email: `be1039-${key}-${suffix}@test.need4deed.org`,
+          password: pwHash,
+          role,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      return person;
+    };
+
+    for (const [key, status] of Object.entries(VOLUNTEER_LINKS)) {
+      const person = await addUser(key, UserRole.VOLUNTEER);
+      const volunteerDeal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+      );
+      volunteerDeals.push(volunteerDeal);
+      const volunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ dealId: volunteerDeal.id, personId: person.id }),
+      );
+      volunteers.push(volunteer);
+      if (status) {
+        await fastify.db.opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({
+            opportunityId: opportunity.id,
+            volunteerId: volunteer.id,
+            status,
+          }),
+        );
+      }
+    }
+    await addUser("coordinator", UserRole.COORDINATOR);
+    const agentMember = await addUser("agent", UserRole.AGENT);
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: agentMember.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
+    for (const key of [
+      ...Object.keys(VOLUNTEER_LINKS),
+      "coordinator",
+      "agent",
+    ]) {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          email: `be1039-${key}-${suffix}@test.need4deed.org`,
+          password: PASSWORD,
+        },
+      });
+      cookies[key] = getCookie(res.cookies, accessCookieName);
+    }
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityVolunteerRepository.delete({
+      opportunityId: opportunity.id,
+    });
+    await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
+    for (const volunteer of volunteers) {
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    }
+    for (const volunteerDeal of volunteerDeals) {
+      await fastify.db.dealRepository.delete({ id: volunteerDeal.id });
+    }
+    for (const person of persons) {
+      await fastify.db.userRepository.delete({ personId: person.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: agentAddress.id });
+    await fastify.close();
+  });
+
+  const getOne = async (caller: string) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: cookies[caller] },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().data;
+  };
+
+  const getFromList = async (caller: string) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(opportunity.title)}`,
+      cookies: { [accessCookieName]: cookies[caller] },
+    });
+    expect(res.statusCode).toBe(200);
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === opportunity.id);
+    expect(found).toBeDefined();
+    return found;
+  };
+
+  it.each(["unlinked", "pending", "past"])(
+    "masks the RAC name and address for a %s volunteer",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).not.toContain(AGENT_TITLE);
+      expect(data.agentTitle).not.toContain(AGENT_TITLE);
+      expect(data.agent.address).not.toContain(AGENT_STREET);
+      expect(data.myMatchStatus).toBe(VOLUNTEER_LINKS[caller]);
+
+      expect((await getFromList(caller)).agentTitle).not.toContain(AGENT_TITLE);
+    },
+  );
+
+  it.each(["matched", "active"])(
+    "shows the RAC name and address to a %s volunteer",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).toBe(AGENT_TITLE);
+      expect(data.agentTitle).toBe(AGENT_TITLE);
+      expect(data.agent.address).toContain(AGENT_STREET);
+      expect(data.myMatchStatus).toBe(VOLUNTEER_LINKS[caller]);
+
+      expect((await getFromList(caller)).agentTitle).toBe(AGENT_TITLE);
+    },
+  );
+
+  it.each(["coordinator", "agent"])(
+    "leaves the RAC unmasked and omits myMatchStatus for a %s",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).toBe(AGENT_TITLE);
+      expect(data.agent.address).toContain(AGENT_STREET);
+      expect(data).not.toHaveProperty("myMatchStatus");
+    },
+  );
+});
