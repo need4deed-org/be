@@ -138,15 +138,17 @@ yarn test:db:down   # stop it and discard the data
 
 `yarn test:db:seed` seeds only from files checked into the repo — reference data from `public/data/*.json`, sample agents/opportunities/volunteers/events from `src/data/seeds/fixtures/*.json` — so reference-table ids (languages, skills, categories, …) are identical on every machine and in CI. Still, don't hardcode ids in tests; look rows up by a stable key (`isoCode`, `title`). Re-running `yarn test:db` against the same `db-test` works; `down` + `up` + `seed` gets you back to a pristine state. Set `DB_TEST_PORT` if 5433 is taken.
 
+The pre-push hook runs exactly this flow (`test:db:up` → `test:db:seed` → `test:db`) when Docker is available, leaving `db-test` running for the next push; without Docker it falls back to plain `yarn test` against the dev DB.
+
 ### Against the dev DB
 
-Plain `yarn test` (and the pre-push hook) uses whatever `DB_*` points at — by default the dev `db` on 5432. That DB needs migrations run, and on a genuinely fresh volume also `yarn seed` — most of the suite depends on seeded reference data, and skipping it causes widespread, unrelated-looking failures.
+Plain `yarn test` uses whatever `DB_*` points at — by default the dev `db` on 5432. That DB needs migrations run, and on a genuinely fresh volume also `yarn seed` — most of the suite depends on seeded reference data, and skipping it causes widespread, unrelated-looking failures.
 
 Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts` (or `yarn test:db src/test/...` against `db-test`).
 
 ### Serial vs parallel
 
-`yarn test:db` (and CI) runs test files in parallel (`--fileParallelism`) — about twice as fast; `db-test` allows 500 connections. Plain `yarn test` and the pre-push hook stay serial (`fileParallelism: false` in `vitest.config.ts`), because the dev `db` keeps Postgres's default 100 `max_connections`, which parallel files exhaust (be#996).
+`yarn test:db` (and CI) runs test files in parallel (`--fileParallelism`) — about twice as fast; `db-test` allows 500 connections. Plain `yarn test` stays serial (`fileParallelism: false` in `vitest.config.ts`), because the dev `db` keeps Postgres's default 100 `max_connections`, which parallel files exhaust (be#996).
 
 Parallel files share one database and commit real rows, so a test must only assert on rows it created itself (be#999):
 
