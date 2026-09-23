@@ -296,13 +296,22 @@ describe("runDedupe (be#1028)", () => {
   });
 
   it("does not overwrite a Person whose addressId already moved before the write lands (be#1028 review: TOCTOU)", async () => {
+    const raceSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    // A Postcode only this test uses: processGroup's replacement Address
+    // inherits the shared row's postcode, so counting Addresses on it
+    // measures exactly this test's writes — a whole-table count also picks
+    // up rows other test files insert concurrently (be#999).
+    const racePostcode = await dataSource
+      .getRepository(Postcode)
+      .save(new Postcode({ value: `race-${raceSuffix}` }));
+    const countRaceAddresses = () =>
+      addressRepository().count({ where: { postcodeId: racePostcode.id } });
     const raceAddress = await addressRepository().save(
-      new Address({ street: "", postcode }),
+      new Address({ street: "", postcode: racePostcode }),
     );
     const movedAwayAddress = await addressRepository().save(
-      new Address({ street: "", postcode }),
+      new Address({ street: "", postcode: racePostcode }),
     );
-    const raceSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const [personMovedAway, personStillShared] = await personRepository().save([
       new Person({
         firstName: "Race-Moved",
@@ -324,7 +333,7 @@ describe("runDedupe (be#1028)", () => {
       { addressId: movedAwayAddress.id },
     );
 
-    const addressCountBefore = await addressRepository().count();
+    const addressCountBefore = await countRaceAddresses();
 
     const result = await processGroup(
       dataSource.manager,
@@ -341,7 +350,7 @@ describe("runDedupe (be#1028)", () => {
     // permanent, untracked orphan. Net change should be exactly +1 (the one
     // new Address personStillShared was actually repointed to) — not +2,
     // which is what a leaked orphan from the stale attempt would produce.
-    expect(await addressRepository().count()).toBe(addressCountBefore + 1);
+    expect(await countRaceAddresses()).toBe(addressCountBefore + 1);
 
     const refreshedMovedAway = await personRepository().findOneByOrFail({
       id: personMovedAway.id,
@@ -361,6 +370,7 @@ describe("runDedupe (be#1028)", () => {
         refreshedStillShared.addressId as number,
       ]),
     });
+    await dataSource.getRepository(Postcode).delete({ id: racePostcode.id });
   });
 
   it("does not credit a keeper who already moved off the shared row, and surfaces it for manual attribution instead (be#1032 review)", async () => {

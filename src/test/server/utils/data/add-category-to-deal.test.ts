@@ -84,6 +84,15 @@ describe("getCategoryToDealHandler", () => {
       expect(result.categoryId).toBe(300);
     });
 
+    it("passes a null deal through without categorizing or tracking it (be#999)", () => {
+      const handler = getCategoryToDealHandler();
+
+      expect(handler.addCategoryToDeal(null)).toBeNull();
+      expect(handler.addCategoryToDeal(undefined)).toBeUndefined();
+      expect(mockedCategorize).not.toHaveBeenCalled();
+      expect(handler.updates).toEqual([]);
+    });
+
     it("returns the deal unchanged when categorize returns falsy", () => {
       const handler = getCategoryToDealHandler();
       const deal = makeDeal({}, []);

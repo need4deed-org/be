@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
+  dtoVolunteerOpportunityGetList,
   getOpportunityContact,
 } from "../../../services/dto/dto-opportunity";
 
@@ -432,5 +433,51 @@ describe("dtoOpportunityGet", () => {
 
     expect(result.appointmentDate).toBeNull();
     expect(result.appointmentTime).toBeNull();
+  });
+});
+
+// opportunity.deal_id is nullable; a deal-less opportunity must serialize
+// instead of throwing (be#999).
+describe("DTOs for a deal-less opportunity (be#999)", () => {
+  const dealless = {
+    id: 1,
+    title: "No deal",
+    type: "volunteering",
+    status: "opp-new",
+    createdAt: new Date("2026-01-01"),
+    districtId: 5,
+    accompanying: null,
+    deal: null,
+    comments: [],
+    opportunityVolunteer: [],
+  };
+  const empty = {
+    category: { id: null },
+    languages: [],
+    activities: [],
+    location: [],
+    availability: [],
+  };
+
+  it("dtoOpportunityGetList yields a null category and empty deal-derived lists", () => {
+    expect(dtoOpportunityGetList(dealless as any)).toMatchObject(empty);
+  });
+
+  it("dtoVolunteerOpportunityGetList yields a null category and empty deal-derived lists", () => {
+    expect(dtoVolunteerOpportunityGetList(dealless as any)).toMatchObject(
+      empty,
+    );
+  });
+
+  it("dtoOpportunityGet yields a null category and empty deal-derived lists, skills included", () => {
+    const detail = {
+      ...dealless,
+      agentId: 42,
+      agent: { id: 42, title: "Center X", district: { id: 1 } },
+    };
+    expect(dtoOpportunityGet(detail as any)).toMatchObject({
+      ...empty,
+      skills: [],
+    });
   });
 });

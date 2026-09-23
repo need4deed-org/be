@@ -14,6 +14,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -356,7 +357,9 @@ describe("PATCH /agent/:id organization details", () => {
         dataSource.getRepository(DistrictPostcode);
 
       const districtSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-      const numericSuffix = String(Date.now() % 10000).padStart(4, "0");
+      // Wide random suffix (be#864): `1${Date.now() % 10000}` landed on a
+      // real seeded Berlin postcode ~2% of runs (be#999).
+      const numericSuffix = randomNumericSuffix();
 
       postcodeA = await postcodeRepository.save(
         new Postcode({ value: `1${numericSuffix}` }),
