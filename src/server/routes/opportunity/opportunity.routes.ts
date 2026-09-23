@@ -88,6 +88,7 @@ import {
   writeOpportunityLegacy,
 } from "../../utils";
 import { addTranslatedFields } from "../../utils/data/for-routes";
+import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -284,11 +285,15 @@ export default async function opportunityRoutes(
           )
         : undefined;
 
-      const data = dtoOpportunityGet(
-        opportunityComments,
-        accompanyingDistrict,
-        districtCentroid,
-      );
+      const myMatchStatus = await getCallerMatchStatus(request, id);
+      const data = {
+        ...dtoOpportunityGet(
+          opportunityComments,
+          accompanyingDistrict,
+          districtCentroid,
+        ),
+        ...(myMatchStatus !== undefined && { myMatchStatus }),
+      };
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },

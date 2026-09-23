@@ -61,6 +61,13 @@ function maskAddress(address: Record<string, unknown>): void {
   maskAddressCoordinates(address);
 }
 
+// An agent (RAC) whose identity (title, address) the caller may see
+// unmasked: one they're a member of, or — for a VOLUNTEER — one owning an
+// opportunity they're matched to (be#1039).
+function isAgentVisible(agentId: number, ctx: CallerVisibility): boolean {
+  return ctx.agentIds.has(agentId) || ctx.matchedAgentIds.has(agentId);
+}
+
 // An entity whose comments/accompanying the caller may see unmasked.
 function isEntityVisible(
   entityType: EntityTableName,
@@ -137,7 +144,7 @@ function collectVisibleAddresses(
     }
   } else if (node instanceof Agent) {
     if (
-      ctx.agentIds.has(node.id) &&
+      isAgentVisible(node.id, ctx) &&
       node.address &&
       typeof node.address === "object"
     ) {
@@ -164,8 +171,9 @@ function collectVisibleAddresses(
  *
  * Masked: a Person not in `personIds` (and its Address, unless that Address
  * is also reachable from a visible Person/Agent elsewhere in the same
- * response — see `collectVisibleAddresses`); an Agent not in `agentIds` (and
- * its Address, same rule); a standalone Address reached some other way; an
+ * response — see `collectVisibleAddresses`); an Agent's Address when the
+ * agent isn't visible (see isAgentVisible, same shared-Address rule), plus
+ * its title for a VOLUNTEER caller (be#1039); a standalone Address reached some other way; an
  * Opportunity's accompanying when the opportunity isn't visible; a Comment
  * that isn't visible (see isCommentVisible).
  */
@@ -211,6 +219,13 @@ function walk(
       seen.add(node.address);
     }
   } else if (node instanceof Agent) {
+    // A RAC's name is PII to a volunteer until they're matched (be#1039).
+    // Scoped to VOLUNTEER: other non-privileged roles see agent titles as
+    // before. Unlike Address, the title lives on the Agent itself, so a shared
+    // instance always gets the same (per-agent) decision.
+    if (ctx.role === UserRole.VOLUNTEER && !isAgentVisible(node.id, ctx)) {
+      maskFields(node as unknown as Record<string, unknown>, ["title"]);
+    }
     // Claim the agent's own Address so the standalone-Address rule below
     // can't re-mask it when it's visible (via this agent, or some other
     // visible Person/Agent sharing the same Address).
