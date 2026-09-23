@@ -291,7 +291,9 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     await sendEmailSuggestion(
       email,
       ov({
-        volunteer: volunteer({
+        // The opportunity's own dealTimeslot, not the volunteer's — fixed
+        // in be#1042 to read the opportunity's schedule instead.
+        opportunity: opportunity({
           deal: { dealTimeslot: malformedDealTimeslot },
         }),
       }) as unknown as Parameters<typeof sendEmailSuggestion>[1],

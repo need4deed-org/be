@@ -1,7 +1,14 @@
 import { validate } from "class-validator";
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  FastifyContextConfig,
+  FastifyInstance,
+  FastifyPluginOptions,
+} from "fastify";
 import {
   ApiAgentMembershipSummary,
+  ApiCoordinatorInvitePost,
+  ApiCoordinatorInviteResponse,
+  ApiCoordinatorRegisterWithInvite,
   ApiUserGet,
   ApiUserPost,
   Lang,
@@ -10,13 +17,17 @@ import {
 } from "need4deed-sdk";
 import { FindOptionsWhere, ILike } from "typeorm";
 import {
+  AlreadyUsedTokenError,
   BadRequestError,
-  ConflictError,
   InvalidOrganizationEmailError,
   NotFoundError,
-  PersonAlreadyRegisteredError,
+  UnauthenticatedError,
   UnauthorizedError,
 } from "../../config";
+import {
+  COORDINATOR_INVITE_LIFESPAN_MS,
+  urlCoordinatorInvite,
+} from "../../config/constants";
 import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
@@ -25,22 +36,35 @@ import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
+  coordinatorInviteBodySchema,
+  coordinatorInviteResponseSchema,
   createUserBodySchema,
+  registerWithInviteBodySchema,
+  registerWithInviteQuerySchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
 } from "../schema/user.schema";
 import {
+  CoordinatorInvitePerson,
   ParamsId,
   QuerystringUserList,
   ReplyDataCount,
   ReplyMessage,
   RoutePrefix,
 } from "../types";
-import { getSkipTake, getUserWhere, isEmailDomainTrusted } from "../utils";
+import {
+  assertEmailAvailable,
+  getSkipTake,
+  getUserWhere,
+  resolvePersonByEmail,
+  validateAndSaveUser,
+  verifyTokenOfType,
+} from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
+import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -311,52 +335,41 @@ export default async function userRoutes(
         return reply.status(400).send({ message: "Invalid token format." });
       }
 
-      try {
-        const user = await userRepository.findOne({
-          where: { email },
-        });
+      const user = await userRepository.findOne({
+        where: { email },
+      });
 
-        if (!user) {
-          logger.warn("User not found for login attempt.");
-          return reply.status(400).send({ message: "Invalid token." });
-        }
-
-        // Only meaningful for VOLUNTEER: does the Person this account is
-        // linked to (possibly an existing one, via be#947's email-linking)
-        // already have a Volunteer profile — same email-first check
-        // documented in fe#956 (never resolved via userId/personId
-        // assumptions on their own, always the verified email's Person).
-        let hasVolunteerProfile: boolean | undefined;
-        if (user.role === UserRole.VOLUNTEER && user.personId) {
-          hasVolunteerProfile =
-            (await getVolunteerIdByPersonId(user.personId)) !== undefined;
-        }
-
-        const volunteerProfileFields =
-          hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
-
-        if (user.isActive) {
-          return reply.status(200).send({
-            message: "Email is already verified.",
-            verified: true,
-            ...volunteerProfileFields,
-          });
-        }
-
-        user.isActive = true;
-        await userRepository.save(user);
-
-        return reply.status(200).send({
-          message: "Email verified successfully.",
-          verified: true,
-          ...volunteerProfileFields,
-        });
-      } catch (error) {
-        logger.error(`Error verifying email: ${error}`);
-        return reply.status(500).send({
-          message: "Failed to verify email due to an internal error.",
-        });
+      if (!user) {
+        logger.warn("User not found for login attempt.");
+        throw new BadRequestError("Invalid token.");
       }
+
+      // Only meaningful for VOLUNTEER: does the Person this account is
+      // linked to (possibly an existing one, via be#947's email-linking)
+      // already have a Volunteer profile — same email-first check
+      // documented in fe#956 (never resolved via userId/personId
+      // assumptions on their own, always the verified email's Person).
+      let hasVolunteerProfile: boolean | undefined;
+      if (user.role === UserRole.VOLUNTEER && user.personId) {
+        hasVolunteerProfile =
+          (await getVolunteerIdByPersonId(user.personId)) !== undefined;
+      }
+
+      const volunteerProfileFields =
+        hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
+
+      if (user.isActive) {
+        throw new AlreadyUsedTokenError();
+      }
+
+      user.isActive = true;
+      await userRepository.save(user);
+
+      return reply.status(200).send({
+        message: "Email verified successfully.",
+        verified: true,
+        ...volunteerProfileFields,
+      });
     },
   );
 
@@ -386,14 +399,23 @@ export default async function userRoutes(
         // existing agent member already shares it, or it's on the trusted-domain
         // allowlist (so a brand-new org's first representative can register).
         // Volunteers and users self-register freely.
+        //
+        // A free/consumer domain (gmail.com, yahoo.com, ...) never qualifies
+        // via the existing-member shortcut — anyone can register an address
+        // there, so one agent already using it says nothing about this
+        // signup. Only an explicit TrustedDomain entry can clear the gate for
+        // those domains (be#1001).
         if (role === UserRole.AGENT) {
-          const domain = (email || "").split("@").pop();
-          const matchingAgent = await fastify.db.agentRepository.findOne({
-            where: {
-              agentPerson: { person: { email: ILike(`%@${domain}`) } },
-            },
-          });
-          if (!matchingAgent && !(await isEmailDomainTrusted(email))) {
+          const allowed = await isAgentDomainAllowed(email, (domain) =>
+            fastify.db.agentRepository
+              .findOne({
+                where: {
+                  agentPerson: { person: { email: ILike(`%@${domain}`) } },
+                },
+              })
+              .then((agent) => !!agent),
+          );
+          if (!allowed) {
             throw new InvalidOrganizationEmailError();
           }
         }
@@ -422,38 +444,11 @@ export default async function userRoutes(
         // No explicit person.id — look up an existing Person by email
         // (case-insensitively) before creating a new, disconnected one, e.g.
         // a Person that already exists via a legacy Volunteer row (be#923).
-        const existingPerson = await personRepository.findOne({
-          where: { email: ILike(email) },
-          relations: ["users"],
-        });
-        if (existingPerson) {
-          // Conservative default: a Person that already has a User (any
-          // role) is not re-registrable — point them at login instead of
-          // silently attaching a second account to the same Person.
-          if (existingPerson.users?.length) {
-            throw new PersonAlreadyRegisteredError();
-          }
-          request.resolvedPerson = existingPerson;
-          return;
-        }
-
-        // New person. Mirror the account email onto the person so the person
-        // record carries the same email the user registered with.
-        const newPerson = new Person(personData);
-        newPerson.email = email;
-        const errors = await validate(newPerson);
-        if (errors.length > 0) {
-          logger.error(
-            `New Person entity validation errors: ${JSON.stringify(errors)}`,
-          );
-          const messages = errors.flatMap((err) =>
-            Object.values(err.constraints || {}),
-          );
-          throw new BadRequestError(
-            `Validation failed for new person data: ${messages.join("; ")}`,
-          );
-        }
-        request.resolvedPerson = newPerson;
+        request.resolvedPerson = await resolvePersonByEmail(
+          personRepository,
+          email,
+          personData,
+        );
       },
     },
     async (request, reply) => {
@@ -462,9 +457,7 @@ export default async function userRoutes(
 
       // Surface the duplicate-email case as 409 up front (the DB unique
       // constraint remains the ultimate guard for the rare race).
-      if (await userRepository.findOneBy({ email })) {
-        throw new ConflictError("User with this email already exists.");
-      }
+      await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
         email,
@@ -479,28 +472,22 @@ export default async function userRoutes(
         person: request.resolvedPerson,
       });
 
-      // Validate the User entity using class-validator
-      const errors = await validate(newUser);
-      if (errors.length > 0) {
-        logger.error(
-          `User entity validation errors: ${JSON.stringify(errors)}`,
-        );
+      // Unexpected DB errors propagate to the global error handler.
+      const result = await validateAndSaveUser(userRepository, newUser);
+      if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: result.errors,
         });
       }
 
-      // Unexpected DB errors propagate to the global error handler.
-      const savedUser = await userRepository.save(newUser);
-
-      fastify.notify.emailVerification(savedUser).catch((err) => {
+      fastify.notify.emailVerification(result.user).catch((err) => {
         logger.error(
-          `Failed to send verification email for user ${savedUser.id}: ${err instanceof Error ? err.message : err}`,
+          `Failed to send verification email for user ${result.user.id}: ${err instanceof Error ? err.message : err}`,
         );
       });
 
-      return reply.status(201).send(savedUser);
+      return reply.status(201).send(result.user);
     },
   );
 
@@ -559,9 +546,7 @@ export default async function userRoutes(
       const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
 
-      if (await userRepository.findOneBy({ email })) {
-        throw new ConflictError("User with this email already exists.");
-      }
+      await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
         email,
@@ -573,19 +558,147 @@ export default async function userRoutes(
         person: request.resolvedPerson,
       });
 
-      const errors = await validate(newUser);
-      if (errors.length > 0) {
-        logger.error(
-          `User entity validation errors: ${JSON.stringify(errors)}`,
-        );
+      const result = await validateAndSaveUser(userRepository, newUser);
+      if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
-          errors: errors.flatMap((err) => Object.values(err.constraints || {})),
+          errors: result.errors,
         });
       }
 
-      const savedUser = await userRepository.save(newUser);
-      return reply.status(201).send(savedUser);
+      return reply.status(201).send(result.user);
+    },
+  );
+
+  // Admin-only: generate a coordinator invite link, so the admin never sets
+  // or sees the coordinator's password themselves (be#1002 epic). The
+  // upfront email check below is the same race-tolerant pattern as POST
+  // /user/admin above — a concurrent duplicate falls through to the global
+  // error handler rather than a clean 409, same trade-off made there.
+  fastify.post<{
+    Body: ApiCoordinatorInvitePost;
+    Reply: ApiCoordinatorInviteResponse | { message: string; errors?: any };
+  }>(
+    "/admin/coordinator-invite",
+    {
+      schema: {
+        body: coordinatorInviteBodySchema,
+        response: {
+          201: coordinatorInviteResponseSchema,
+          ...responseErrors,
+        },
+      },
+      onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
+    },
+    async (request, reply) => {
+      const { email, person } = request.body;
+
+      await assertEmailAvailable(fastify.db.userRepository, email);
+
+      const token = fastify.jwt.sign(
+        { email, person, type: "coordinator-invite" },
+        { expiresIn: `${COORDINATOR_INVITE_LIFESPAN_MS}` },
+      );
+      // Derived from the token's own exp claim rather than a second
+      // Date.now() call, so it can't drift from what the server actually
+      // enforces on consumption.
+      const { exp } = fastify.jwt.decode<{ exp: number }>(token)!;
+
+      return reply.status(201).send({
+        token,
+        link: `${urlCoordinatorInvite}?token=${encodeURIComponent(token)}`,
+        expiresAt: new Date(exp * 1000).toISOString(),
+      });
+    },
+  );
+
+  // Public: consume a coordinator invite link. Mirrors the authByVerifyToken
+  // preHandler pattern in volunteer/register.routes.ts — the caller is
+  // authorized by the invite JWT itself, not a session (be#1002 epic).
+  // Single-use is enforced the same way the email-uniqueness race is
+  // tolerated elsewhere in this file: once consumed, the User row for this
+  // email exists, so a token replay hits the same "already exists" check
+  // below (backed by the DB's unique constraint on User.email) rather than
+  // creating a second account. No separate used/consumedAt row needed.
+  fastify.post<{
+    Body: ApiCoordinatorRegisterWithInvite;
+    Querystring: { token: string };
+    Reply: User | { message: string; errors?: any };
+  }>(
+    "/register-with-invite",
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: {
+        querystring: registerWithInviteQuerySchema,
+        body: registerWithInviteBodySchema,
+        response: {
+          201: userResponseSchemaIncludePerson,
+          ...responseErrors,
+        },
+      },
+      preHandler: async (request) => {
+        const { token } = request.query as { token?: string };
+
+        const payload = await verifyTokenOfType<{
+          email: string;
+          person?: CoordinatorInvitePerson;
+        }>(
+          fastify,
+          token,
+          "coordinator-invite",
+          "Invalid or expired invite token.",
+          "Invalid invite token.",
+        );
+
+        if (!payload.person) {
+          throw new UnauthenticatedError("Invalid invite token.");
+        }
+
+        // Same email-first lookup as POST / (be#923) — an invited
+        // coordinator's email may already have a Person row (e.g. a prior
+        // Volunteer signup with no User yet); link to it instead of
+        // creating a disconnected duplicate. Shares request.resolvedPerson
+        // with POST / and POST /admin rather than a separate field.
+        // Checked before the User-uniqueness guard below, matching POST /'s
+        // ordering, so the same underlying "already registered" case
+        // surfaces the same error regardless of entry point (be#1011 review).
+        request.resolvedPerson = await resolvePersonByEmail(
+          fastify.db.personRepository,
+          payload.email,
+          payload.person,
+        );
+
+        await assertEmailAvailable(fastify.db.userRepository, payload.email);
+
+        request.coordinatorInvite = { email: payload.email };
+      },
+    },
+    async (request, reply) => {
+      const { email } = request.coordinatorInvite!;
+      const { password } = request.body;
+
+      const newUser = new User({
+        email,
+        password: await hashPassword(password),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        language: Lang.EN,
+        timezone: "CET",
+        person: request.resolvedPerson,
+      });
+
+      const result = await validateAndSaveUser(
+        fastify.db.userRepository,
+        newUser,
+      );
+      if (result.status === "error") {
+        return reply.status(400).send({
+          message: "Validation failed for newUser data",
+          errors: result.errors,
+        });
+      }
+
+      return reply.status(201).send(result.user);
     },
   );
 }

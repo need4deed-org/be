@@ -8,7 +8,7 @@ import { UserRole } from "need4deed-sdk";
 // This is deliberately broader than "who can create a post/reply" (that
 // rule is AGENT/COORDINATOR only, no ADMIN — see POST / and POST /:id/reply
 // in post.routes.ts) — do not reuse this for creation checks.
-export function isPostManagerRole(role: UserRole): boolean {
+export function isPostManagerRole(role: UserRole | undefined): boolean {
   return (
     role === UserRole.ADMIN ||
     role === UserRole.COORDINATOR ||

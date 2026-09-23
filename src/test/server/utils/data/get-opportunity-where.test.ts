@@ -1,6 +1,7 @@
 import { OpportunityType } from "need4deed-sdk";
 import {
   Between,
+  FindOptionsWhere,
   ILike,
   In,
   IsNull,
@@ -9,9 +10,19 @@ import {
   Not,
 } from "typeorm";
 import { describe, expect, it } from "vitest";
+import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import { QuerystringOpportunityFiltering } from "../../../../server/types";
 import { getOpportunityWhere } from "../../../../server/utils/data/get-opportunity-where";
 import { berlinDayBoundaries } from "../../../../services/jobs/german-holidays";
+
+// getOpportunityWhere only ever returns an array when filter.district is
+// set (be#1018) — every other test here passes no district, so this just
+// narrows the type back to the single-object shape for `.deal` access.
+function asSingle(
+  where: FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[],
+): FindOptionsWhere<Opportunity> {
+  return where as FindOptionsWhere<Opportunity>;
+}
 
 describe("getOpportunityWhere", () => {
   it("returns an empty object when neither filter nor appointment params are given", () => {
@@ -29,6 +40,14 @@ describe("getOpportunityWhere", () => {
       type: In(["regular"]),
       status: In(["opp-active"]),
       title: ILike("%tutoring%"),
+    });
+  });
+
+  // A literal "%" or "_" in a search term must match as text, not act as a
+  // SQL wildcard/single-char-match.
+  it("escapes LIKE metacharacters in filter.search", () => {
+    expect(getOpportunityWhere({ search: "50%_off" } as never)).toEqual({
+      title: ILike("%50\\%\\_off%"),
     });
   });
 
@@ -147,16 +166,113 @@ describe("getOpportunityWhere", () => {
       type: "",
       status: "",
       language: "1",
-      district: "2",
       activity: "3",
       skill: "4",
     });
 
-    expect(where.deal).toEqual({
+    expect(asSingle(where).deal).toEqual({
       dealLanguage: { language: { id: "1" } },
-      dealDistrict: { district: { id: "2" } },
       dealActivity: { activity: { id: "3" } },
       dealSkill: { skill: { id: "4" } },
+    });
+  });
+
+  // be#1018: deal.dealDistrict is an optional preference list that's empty
+  // for most opportunities, so filtering on it alone excluded ones that
+  // only had the reliable Opportunity.districtId set. The fix ORs both
+  // sources — which, living on different root relations, TypeORM can only
+  // express as an array of alternative FindOptionsWhere.
+  describe("district filter (be#1018)", () => {
+    it("ORs Opportunity.districtId against deal.dealDistrict", () => {
+      const where = getOpportunityWhere({
+        type: "",
+        status: "",
+        district: "2",
+      });
+
+      expect(where).toEqual([
+        { districtId: "2" },
+        { deal: { dealDistrict: { district: { id: "2" } } } },
+      ]);
+    });
+
+    it("ORs multiple district ids within each branch", () => {
+      const where = getOpportunityWhere({
+        type: "",
+        status: "",
+        district: ["2", "5"],
+      } as unknown as QuerystringOpportunityFiltering["filter"]);
+
+      expect(where).toEqual([
+        { districtId: In(["2", "5"]) },
+        { deal: { dealDistrict: { district: { id: In(["2", "5"]) } } } },
+      ]);
+    });
+
+    it("carries every other filter identically onto both OR branches", () => {
+      const where = getOpportunityWhere({
+        type: "",
+        status: "",
+        language: "1",
+        district: "2",
+        activity: "3",
+        skill: "4",
+      });
+
+      const otherDealConstraints = {
+        dealLanguage: { language: { id: "1" } },
+        dealActivity: { activity: { id: "3" } },
+        dealSkill: { skill: { id: "4" } },
+      };
+
+      expect(where).toEqual([
+        { districtId: "2", deal: otherDealConstraints },
+        {
+          deal: {
+            ...otherDealConstraints,
+            dealDistrict: { district: { id: "2" } },
+          },
+        },
+      ]);
+    });
+
+    // Arrays are truthy even when empty — `filter?.district` alone would
+    // otherwise treat `district: []` as "filter by district" and write an
+    // unsatisfiable `IN ()` into both OR branches instead of applying no
+    // district constraint.
+    it("treats an empty district array as no district filter", () => {
+      const where = getOpportunityWhere({
+        type: "",
+        status: "",
+        district: [],
+      } as unknown as QuerystringOpportunityFiltering["filter"]);
+
+      expect(where).toEqual({});
+    });
+  });
+
+  // be#1022 review: the "arrays are truthy even when empty" bug the district
+  // fix addressed applies to every other array-shaped filter in this file
+  // too — each goes through hasFilterValue instead of a bare `if (filter?.x)`.
+  describe("empty-array filter values are treated as no filter", () => {
+    it("filter.type: []", () => {
+      expect(getOpportunityWhere({ type: [] } as never)).toEqual({});
+    });
+
+    it("filter.status: []", () => {
+      expect(getOpportunityWhere({ status: [] } as never)).toEqual({});
+    });
+
+    it("filter.language: []", () => {
+      expect(getOpportunityWhere({ language: [] } as never)).toEqual({});
+    });
+
+    it("filter.activity: []", () => {
+      expect(getOpportunityWhere({ activity: [] } as never)).toEqual({});
+    });
+
+    it("filter.skill: []", () => {
+      expect(getOpportunityWhere({ skill: [] } as never)).toEqual({});
     });
   });
 
@@ -171,7 +287,7 @@ describe("getOpportunityWhere", () => {
       language: ["3", "4"],
     } as unknown as QuerystringOpportunityFiltering["filter"]);
 
-    expect(where.deal).toEqual({
+    expect(asSingle(where).deal).toEqual({
       dealLanguage: { language: { id: In(["3", "4"]) } },
     });
   });
@@ -179,7 +295,7 @@ describe("getOpportunityWhere", () => {
   it("applies only the language constraint when nothing else is selected", () => {
     const where = getOpportunityWhere({ type: "", status: "", language: "3" });
 
-    expect(where.deal).toEqual({
+    expect(asSingle(where).deal).toEqual({
       dealLanguage: { language: { id: "3" } },
     });
   });
@@ -195,7 +311,7 @@ describe("getOpportunityWhere", () => {
       status: "",
       activity: "3",
     });
-    expect(activityOnly.deal).toEqual({
+    expect(asSingle(activityOnly).deal).toEqual({
       dealActivity: { activity: { id: "3" } },
     });
 
@@ -205,7 +321,7 @@ describe("getOpportunityWhere", () => {
       activity: "3",
       language: "9",
     });
-    expect(activityPlusLanguage.deal).toEqual({
+    expect(asSingle(activityPlusLanguage).deal).toEqual({
       dealActivity: { activity: { id: "3" } },
       dealLanguage: { language: { id: "9" } },
     });

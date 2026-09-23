@@ -25,7 +25,7 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import { DUMMY_ADDRESS_TITLE } from "../../server/utils";
+import { AddressReusePlan } from "../../server/utils";
 import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
@@ -125,29 +125,39 @@ async function resolveLeadFrom(
 // always minting a fresh one — the Person attached here can be pre-existing
 // (email-linked, be#947), and may already own a real address from an earlier
 // flow (e.g. an opportunity/event submission, get-or-create-submitter-person).
-// Mirrors that same file's "Dummy" placeholder guard: the seeded placeholder
-// is shared across many Person rows, so it must never be patched in place.
-async function resolveAddress(
+//
+// Deliberately does NOT fetch/check the existing Address here at all — an
+// earlier version did (checking exclusive ownership, then fetching and
+// mutating the entity for a blind save much later), but writeVolunteerLegacy
+// runs after several more awaited round-trips, and both that ownership check
+// and the fetched postcode value could go stale in the gap (be#1031/#1033
+// review). Instead this just returns which existing Address to reuse and the
+// postcode it should end up with; writeVolunteerLegacy applies it via
+// patchOrReplaceAddress inside its own transaction, which re-checks exclusive
+// ownership fresh immediately before writing — collapsing the race window to
+// effectively nothing, and cloning into a fresh Address instead of patching
+// in place if the row became shared with another Person in the meantime
+// (be#1019).
+function resolveAddress(
   person: Person,
   postcode: Postcode,
-): Promise<Address> {
+): { address?: Address; addressReuse?: AddressReusePlan } {
   if (person.addressId) {
-    const addressRepository = getRepository(dataSource, Address);
-    const existing = await addressRepository.findOneBy({
-      id: person.addressId,
-    });
-    if (existing && existing.title !== DUMMY_ADDRESS_TITLE) {
-      existing.postcode = postcode;
-      return existing;
-    }
+    return {
+      addressReuse: { addressId: person.addressId, postcodeId: postcode.id },
+    };
   }
-  return new Address({ postcode });
+  return { address: new Address({ postcode }) };
 }
 
 export async function parserVolunteerSelfRegister(
   person: Person,
   body: VolunteerSelfRegisterBody,
-): Promise<{ volunteer: Volunteer; leads: LeadFrom[] }> {
+): Promise<{
+  volunteer: Volunteer;
+  leads: LeadFrom[];
+  addressReuse?: AddressReusePlan;
+}> {
   // Required: both Address.postcodeId and Deal.postcodeId are NOT NULL, and
   // a volunteer can't be matched to anything without a location.
   const postcode = await getPostcode(String(body.addressPostcode));
@@ -155,27 +165,28 @@ export async function parserVolunteerSelfRegister(
   // None of these depend on each other's result, only on the final
   // Deal/Volunteer construction below — resolve them concurrently instead of
   // paying for each round-trip in series.
-  const [
-    address,
-    dealActivity,
-    dealSkill,
-    dealDistrict,
-    dealLanguage,
-    dealTimeslot,
-  ] = await Promise.all([
-    resolveAddress(person, postcode),
-    resolveByIds(
-      optionIds(body.activities),
-      Activity,
-      DealActivity,
-      "activity",
-    ),
-    resolveByIds(optionIds(body.skills), Skill, DealSkill, "skill"),
-    resolveByIds(optionIds(body.locations), District, DealDistrict, "district"),
-    resolveDealLanguages(body.languages),
-    buildDealTimeslots(availabilityToTimeslots(body.availability), null),
-  ]);
-  person.address = address;
+  const [dealActivity, dealSkill, dealDistrict, dealLanguage, dealTimeslot] =
+    await Promise.all([
+      resolveByIds(
+        optionIds(body.activities),
+        Activity,
+        DealActivity,
+        "activity",
+      ),
+      resolveByIds(optionIds(body.skills), Skill, DealSkill, "skill"),
+      resolveByIds(
+        optionIds(body.locations),
+        District,
+        DealDistrict,
+        "district",
+      ),
+      resolveDealLanguages(body.languages),
+      buildDealTimeslots(availabilityToTimeslots(body.availability), null),
+    ]);
+  const { address, addressReuse } = resolveAddress(person, postcode);
+  if (address) {
+    person.address = address;
+  }
 
   const deal = new Deal({
     type: DealType.VOLUNTEER,
@@ -197,5 +208,5 @@ export async function parserVolunteerSelfRegister(
 
   const leads = await resolveLeadFrom(body.leadFrom);
 
-  return { volunteer, leads };
+  return { volunteer, leads, addressReuse };
 }

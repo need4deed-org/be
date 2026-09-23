@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
 import logger from "../../logger";
+import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
@@ -25,14 +26,27 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
 
         logger.info("scheduler: running daily scans");
 
+        // Run in this order, sequentially: their WHERE clauses can both
+        // match the same onetimer opportunity in the same tick (e.g. one
+        // stuck in SEARCHING past its date with a MATCHED volunteer), and
+        // running them concurrently let whichever transaction committed
+        // last silently win, leaving an unpredictable ACTIVE/PAST state
+        // (be#987 review).
         await runWithAdvisoryLock(
           () =>
-            runNamedCronJobs([
-              {
-                name: "scanExpiredOnetimers",
-                run: () => scanExpiredOnetimers(fastify),
-              },
-            ]),
+            runNamedCronJobs(
+              [
+                {
+                  name: "activateDueOnetimers",
+                  run: () => activateDueOnetimers(fastify),
+                },
+                {
+                  name: "scanExpiredOnetimers",
+                  run: () => scanExpiredOnetimers(fastify),
+                },
+              ],
+              { sequential: true },
+            ),
           SCHEDULER_LOCK_ID,
         );
       } catch (err) {

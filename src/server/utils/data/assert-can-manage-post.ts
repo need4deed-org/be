@@ -10,7 +10,7 @@ import { UnauthorizedError } from "../../../config/error/fastify";
 export function assertCanManagePost(params: {
   authorId: number;
   requestPersonId: number | undefined;
-  role: UserRole;
+  role: UserRole | undefined;
   action: "edit" | "delete";
   resource: "posts" | "replies";
 }): void {

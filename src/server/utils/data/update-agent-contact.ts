@@ -3,7 +3,7 @@ import { dataSource } from "../../../data/data-source";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
-import { createAddress, patchAddress } from "./for-routes";
+import { createAddress, patchOrReplaceAddress } from "./for-routes";
 
 /**
  * Updates an existing contact's Person fields and/or their role on this
@@ -14,8 +14,10 @@ import { createAddress, patchAddress } from "./for-routes";
  * Only the fields present in `input` are touched — undefined fields leave
  * the existing value alone (partial update), matching PATCH /person/:id's
  * behavior. Address is create-or-patch: an existing address is patched in
- * place, a person with none gets a new one created, mirroring the pattern
- * PATCH /agent/:id already uses for the agent's own address.
+ * place unless it's shared with another Person (patchOrReplaceAddress mints
+ * this contact its own row instead, see be#1019), a person with none gets a
+ * new one created, mirroring the pattern PATCH /agent/:id already uses for
+ * the agent's own address.
  */
 export async function updateAgentContact(
   membership: AgentPerson,
@@ -37,7 +39,8 @@ export async function updateAgentContact(
         : {};
 
       if (person.addressId) {
-        await patchAddress(
+        await patchOrReplaceAddress(
+          personId,
           { id: person.addressId, ...addressData },
           postcodeData,
           manager,

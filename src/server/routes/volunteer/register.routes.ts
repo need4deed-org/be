@@ -11,6 +11,7 @@ import {
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../../config";
+import logger from "../../../logger";
 import {
   parserVolunteerSelfRegister,
   VolunteerSelfRegisterBody,
@@ -20,7 +21,12 @@ import {
   responseErrors,
   volunteerRegisterBodySchema,
 } from "../../schema";
-import { updateLeads, writeVolunteerLegacy } from "../../utils";
+import {
+  notifyNewVolunteer,
+  updateLeads,
+  verifyTokenOfType,
+  writeVolunteerLegacy,
+} from "../../utils";
 
 // Same DB-conflict-classification pattern as write-agent-registration.ts's
 // classifyRegisterAgentConflict: the findOneBy check below is a fast path,
@@ -43,16 +49,13 @@ async function authByVerifyToken(
 ) {
   const { token } = request.query as { token?: string };
 
-  let payload: { id: number; email: string; type?: string };
-  try {
-    payload = await fastify.jwt.verify(token as string);
-  } catch {
-    throw new UnauthenticatedError("Invalid or expired registration token.");
-  }
-
-  if (payload.type !== "verify") {
-    throw new UnauthenticatedError("Invalid registration token.");
-  }
+  const payload = await verifyTokenOfType<{ id: number; email: string }>(
+    fastify,
+    token,
+    "verify",
+    "Invalid or expired registration token.",
+    "Invalid registration token.",
+  );
 
   const user = await fastify.db.userRepository.findOne({
     where: { id: payload.id },
@@ -122,14 +125,12 @@ export default async function volunteerRegisterRoutes(
         );
       }
 
-      const { volunteer, leads } = await parserVolunteerSelfRegister(
-        person,
-        request.body,
-      );
+      const { volunteer, leads, addressReuse } =
+        await parserVolunteerSelfRegister(person, request.body);
 
       let id: number;
       try {
-        id = await writeVolunteerLegacy(volunteer);
+        id = await writeVolunteerLegacy(volunteer, addressReuse);
       } catch (err) {
         if (isDuplicateVolunteerProfile(err)) {
           throw new BadRequestError(
@@ -139,7 +140,24 @@ export default async function volunteerRegisterRoutes(
         throw err;
       }
       if (leads.length) {
-        await updateLeads(leads);
+        updateLeads(leads).catch((error) => {
+          logger.warn(`Failed to update lead counts: ${error}`);
+        });
+      }
+
+      notifyNewVolunteer(fastify, {
+        id,
+        email: person.email,
+        phone: person.phone,
+        name: person.name,
+      });
+
+      if (person.email) {
+        fastify.notify
+          .emailRegistration({ email: person.email, name: person.name })
+          .catch((error) => {
+            logger.warn(`Registration confirmation email failed: ${error}`);
+          });
       }
 
       return reply.status(201).send({

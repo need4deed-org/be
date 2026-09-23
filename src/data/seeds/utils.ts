@@ -56,10 +56,6 @@ import {
 const noGenderAvatarUrl = "all_genders_avatar.png";
 
 let postcodeGetter: (value: string) => Promise<Postcode>;
-let dummyPerson: Person;
-const dummyPersonFilterParams = { email: "anna.doe@need4deed.org" };
-let dummyAddress: Address;
-const dummyAddressFilterParams = { title: "Dummy" };
 let otherLanguage: Language;
 const otherLanguageFilterParams = { isoCode: "zzz" };
 
@@ -202,6 +198,12 @@ export async function getPostcodeGetter(dataSource: DataSource) {
   };
 }
 
+// Always creates a fresh Address row, even when the postcode/street match an
+// existing one — an Address is owned by exactly one Person/Organization, so
+// reusing an existing row here (as this used to do, including the seeded
+// "Dummy" placeholder for missing addressData) let many entities end up
+// sharing one row, and a later edit to one of them silently changed the rest
+// (be#1019).
 async function getOrCreateAddress(
   addressData: AddressJSON,
   dataSource: DataSource,
@@ -216,32 +218,22 @@ async function getOrCreateAddress(
     Address,
   );
 
-  if (!addressData) {
-    if (!dummyAddress) {
-      dummyAddress = await addressRepository.findOne({
-        where: { ...dummyAddressFilterParams },
-      });
-    }
-
-    return dummyAddress;
-  }
-
-  const existingAddress = await addressRepository.findOne({
-    where: { postcodeId: postcode.id, street: "" },
-  });
-  if (existingAddress) {
-    return existingAddress;
-  }
-
   const address = new Address({
-    street: "", // Assuming street is not provided in the JSON
-    postcode: postcode,
+    street: addressData?.street ?? "",
+    postcode,
   });
 
   await addressRepository.save(address);
   return address;
 }
 
+// Always creates a fresh Person row for a personless caller, even though
+// this used to hand every one of them the same seeded "Anna" placeholder
+// (dummyPerson) — a Person row is owned by exactly one volunteer/agent
+// contact/organization, so reusing one let unrelated entities end up
+// pointing at the same row, and a later edit through a route keyed on that
+// Person's id (e.g. contact-detail patches) silently changed all of them
+// (be#1027, same pattern as be#1025's Address fix).
 export async function getOrCreatePerson(
   personData: PersonJSON,
   dataSource: DataSource,
@@ -252,13 +244,9 @@ export async function getOrCreatePerson(
   );
 
   if (!personData) {
-    if (!dummyPerson) {
-      dummyPerson = await personRepository.findOne({
-        where: { ...dummyPersonFilterParams },
-      });
-    }
-
-    return dummyPerson;
+    const person = new Person({ firstName: "Unknown" });
+    await personRepository.save(person);
+    return person;
   }
 
   const existingPerson = await personRepository.findOne({

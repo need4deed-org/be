@@ -1,8 +1,9 @@
-import type { JWT, TokenType } from "@fastify/jwt";
+import type { JWT } from "@fastify/jwt";
 import { UserRole } from "need4deed-sdk";
 import {
   emailVerificationManifestUrl,
   urlEmailVerification,
+  VERIFY_LIFESPAN_MS,
 } from "../../../config/constants";
 import type User from "../../../data/entity/user.entity";
 import logger from "../../../logger";
@@ -34,11 +35,14 @@ export async function sendEmailVerification(
     throw new Error("User email is required for verification");
   }
 
-  const token = jwt.sign({
-    id: user.id,
-    email: user.email,
-    type: "verify" as TokenType,
-  });
+  const token = jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    },
+    { expiresIn: `${VERIFY_LIFESPAN_MS}` },
+  );
   const roleParam =
     user.role === UserRole.AGENT || user.role === UserRole.VOLUNTEER
       ? `?role=${user.role}`

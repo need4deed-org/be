@@ -9,7 +9,7 @@ export default class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
   columnName(
     propertyName: string,
     customName: string | undefined,
-    embeddedPrefixes: string[],
+    _embeddedPrefixes: string[],
   ): string {
     if (customName) {
       return customName;

@@ -163,7 +163,7 @@ describe("dtoOpportunityAgent", () => {
       title: "Clinic X",
       districtId: "dist_1",
       district: { title: "Mitte" },
-      representative: { person: { address: { city: "Berlin" } } },
+      address: { city: "Berlin" },
     };
 
     const result = dtoOpportunityAgent(mockAgent as any);
@@ -178,6 +178,25 @@ describe("dtoOpportunityAgent", () => {
         title: { de: "Mitte", en: "Mitte" },
       },
     });
+  });
+
+  // Regression test for be#1017: the address must come from the agent's own
+  // address, never the representative's personal address.
+  it("sources the address from the agent's own address, not the representative's", () => {
+    const mockAgent = {
+      id: 7,
+      agentTypeId: 9,
+      agentType: { title: "Provider" },
+      title: "Clinic X",
+      districtId: "dist_1",
+      district: { title: "Mitte" },
+      address: undefined,
+      representative: { person: { address: { city: "Berlin" } } },
+    };
+
+    const result = dtoOpportunityAgent(mockAgent as any);
+
+    expect(result.address).toBeUndefined();
   });
 });
 
