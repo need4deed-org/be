@@ -4,19 +4,14 @@ import {
   emailSuggestionAccompanyingManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import {
-  formatAccompaniedPersonLanguage,
-  formatOnetimerDate,
-  formatOnetimerTime,
-  getLanguages,
-} from "../../dto/utils";
+import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
-import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
+import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionAccompanyingManifestUrl);
@@ -54,17 +49,11 @@ export async function sendEmailSuggestionAccompanying(
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
-  const dealLanguageTitles = await resolveOrAlert(
+  const accompaniedpersonLanguage = await resolveAccompaniedPersonLanguage(
     errorTransport,
-    opportunity?.deal?.dealLanguage ?? [],
-    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
-    [] as string[],
-    `sendEmailSuggestionAccompanying, ov ${ov.id}`,
-    DEAL_LANGUAGE_LABELS,
-  );
-  const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
     accompanying?.languageToTranslate,
-    dealLanguageTitles,
+    opportunity?.deal?.dealLanguage ?? [],
+    `sendEmailSuggestionAccompanying, ov ${ov.id}`,
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
