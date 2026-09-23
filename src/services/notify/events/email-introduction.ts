@@ -28,8 +28,11 @@ export function resetIntroductionTemplateCache(): void {
   loader.resetCache();
 }
 
-// German-only, matching introduction.json's certificateStatements block —
-// this template is no longer split by recipient locale (see be#838).
+// German-only — this template is no longer split by recipient locale (see
+// be#838). The six sentences below are the only copy of this wording; they
+// fill introduction.json's flat {{ statmentOnCertificates }} placeholder
+// (there is no separate certificateStatements block in that manifest, CDN
+// or fallback).
 //
 // Previously branched on statusCgcProcess (UPLOADED/MISSING) to detect
 // "already applied", but nothing in fe ever sets that field — the
