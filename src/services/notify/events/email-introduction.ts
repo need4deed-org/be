@@ -1,4 +1,4 @@
-import { DocumentStatusType, VolunteerStateCGCType } from "need4deed-sdk";
+import { DocumentStatusType } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -30,36 +30,42 @@ export function resetIntroductionTemplateCache(): void {
 
 // German-only, matching introduction.json's certificateStatements block —
 // this template is no longer split by recipient locale (see be#838).
+//
+// Previously branched on statusCgcProcess (UPLOADED/MISSING) to detect
+// "already applied", but nothing in fe ever sets that field — the
+// coordinator UI's CGC-application toggle instead writes statusCGC =
+// APPLIED_N4D directly (VolunteerProfileDocument.tsx). Since neither
+// cgcNo nor cgcYes matched APPLIED_N4D, that was the common case and this
+// always rendered a blank statement for it (be#1042 review). Reads
+// statusCGC's own three real-world values instead: NO (nothing done),
+// APPLIED_N4D (N4D applied on the volunteer's behalf), YES (received).
+// UNDEFINED/ASKED_TO_APPLY/APPLIED_SELF are unused by any code path today
+// (grep confirms no writer), so they fall back to the "not yet applied"
+// case rather than silently producing no statement.
 function resolveStatmentOnCertificates(
   statusCGC: DocumentStatusType,
-  statusCgcProcess: VolunteerStateCGCType | null | undefined,
   statusVaccination: DocumentStatusType,
 ): string {
-  const cgcNo = statusCGC === DocumentStatusType.NO;
-  const cgcYes = statusCGC === DocumentStatusType.YES;
-  const missing = statusCgcProcess === VolunteerStateCGCType.MISSING;
-  const uploaded = statusCgcProcess === VolunteerStateCGCType.UPLOADED;
+  const cgcReceived = statusCGC === DocumentStatusType.YES;
+  const cgcApplied = statusCGC === DocumentStatusType.APPLIED_N4D;
   const vaccinationYes = statusVaccination === DocumentStatusType.YES;
 
-  if (cgcNo && missing && vaccinationYes) {
-    return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
-  }
-  if (cgcNo && missing && !vaccinationYes) {
-    return "Das erweiterte Führungszeugnis beantragen wir sofort.";
-  }
-  if (cgcNo && uploaded && vaccinationYes) {
-    return "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor.";
-  }
-  if (cgcNo && uploaded && !vaccinationYes) {
-    return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
-  }
-  if (cgcYes && vaccinationYes) {
+  if (cgcReceived && vaccinationYes) {
     return "Das erweiterte Führungszeugnis sowie der Masernschutznachweis liegen vor.";
   }
-  if (cgcYes && !vaccinationYes) {
+  if (cgcReceived && !vaccinationYes) {
     return "Das erweiterte Führungszeugnis liegt vor.";
   }
-  return "";
+  if (cgcApplied && vaccinationYes) {
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor.";
+  }
+  if (cgcApplied && !vaccinationYes) {
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
+  }
+  if (vaccinationYes) {
+    return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
+  }
+  return "Das erweiterte Führungszeugnis beantragen wir sofort.";
 }
 
 export async function sendEmailIntroduction(
@@ -135,7 +141,6 @@ export async function sendEmailIntroduction(
 
   const statmentOnCertificates = resolveStatmentOnCertificates(
     volunteer.statusCGC,
-    volunteer.statusCgcProcess,
     volunteer.statusVaccination,
   );
 
