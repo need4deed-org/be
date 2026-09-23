@@ -5,6 +5,7 @@ import {
   OccasionalType,
   OptionItem,
   TimeSlot,
+  TranslatedIntoType,
 } from "need4deed-sdk";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
@@ -200,6 +201,46 @@ export function getCoordinates(postcode?: {
     latitude: postcode?.latitude ?? null,
     longitude: postcode?.longitude ?? null,
   };
+}
+
+// Matches fe's own labels for these values (public/locales/de/translations.json).
+const STANDALONE_LABELS: Record<TranslatedIntoType, string> = {
+  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
+  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
+  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
+};
+// The compact form of the target language(s), used only when there's an
+// actual source language to pair it with.
+const PAIR_TARGET_LABELS: Record<TranslatedIntoType, string> = {
+  [TranslatedIntoType.DEUTSCHE]: "Deutsch",
+  [TranslatedIntoType.ENGLISH_OK]: "Deutsch/Englisch",
+  [TranslatedIntoType.NO_TRANSLATION]: "",
+};
+
+// Combines the accompanied person's translation-target requirement
+// (languageToTranslate — which language(s) the interpreter must translate
+// *into*) with the deal's requested source language(s) into a single
+// "Target-Source" pair per language, e.g. "Deutsch-Arabisch" rather than
+// showing them as two disconnected values ("Nur Deutsch, Arabisch") that
+// read like unrelated facts instead of the interpretation pair a volunteer
+// needs to cover. Falls back to the standalone label ("Nur Deutsch") when no
+// source language is recorded, since a bare "Deutsch" alone would read as
+// an incomplete pair rather than "German only, source unspecified".
+export function formatAccompaniedPersonLanguage(
+  languageToTranslate: TranslatedIntoType | undefined,
+  dealLanguageTitles: string[],
+): string {
+  if (!languageToTranslate) {
+    return "";
+  }
+  if (
+    languageToTranslate === TranslatedIntoType.NO_TRANSLATION ||
+    dealLanguageTitles.length === 0
+  ) {
+    return STANDALONE_LABELS[languageToTranslate];
+  }
+  const target = PAIR_TARGET_LABELS[languageToTranslate];
+  return dealLanguageTitles.map((title) => `${target}-${title}`).join(", ");
 }
 
 export function getNameFields(name: string) {

@@ -1,4 +1,3 @@
-import { TranslatedIntoType } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -7,6 +6,7 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import { formatAccompaniedPersonLanguage, getLanguages } from "../../dto/utils";
 import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -16,18 +16,6 @@ import {
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
-
-// Matches fe's own labels for these values (public/locales/de/translations.json)
-// — German-only since this template is (be#838).
-const TRANSLATION_LABELS: Record<TranslatedIntoType, string> = {
-  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
-  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
-  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
-};
-
-function translationLabel(value: TranslatedIntoType | undefined): string {
-  return value ? (TRANSLATION_LABELS[value] ?? "") : "";
-}
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -68,19 +56,15 @@ export async function sendEmailNewAccompanying(
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  // accompaniedpersonLanguage: the translation requirement for the
-  // accompanied person (be#846). appointmentaLanguage: the deal's own
-  // requested languages — a distinct concept, German-translated via
-  // field_translation by the caller before this function runs (be#856).
-  const accompaniedpersonLanguage = translationLabel(
+  // Combines the translation-target requirement (be#846) with the deal's
+  // own requested source language(s) — German-translated via
+  // field_translation by the caller before this function runs (be#856) —
+  // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
+  // values (fe#1036 review thread).
+  const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
     accompanying?.languageToTranslate,
+    getLanguages(opportunity.deal?.dealLanguage ?? []).map((l) => l.title),
   );
-  const appointmentaLanguage = (opportunity.deal?.dealLanguage ?? [])
-    .map(
-      (dealLanguage) =>
-        dealLanguage.language.translation ?? dealLanguage.language.title,
-    )
-    .join(", ");
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
@@ -96,7 +80,6 @@ export async function sendEmailNewAccompanying(
     appointmentTitle,
     appointmentAddress,
     accompaniedpersonLanguage,
-    appointmentaLanguage,
     accompaniedpersonName,
     accompaniedpersonPhone,
     appointmentComment,
