@@ -37,7 +37,7 @@ export const REGULAR_UPDATE_BUILTIN: LocaleContent = {
 
 export const INTRODUCTION_BUILTIN: LocaleContent = {
   subject:
-    "Vorstellung — {{ volunteerName }} & {{ volunteeringopportunityName }}",
+    "Vorstellung-Vermittlung: {{ volunteerName }} für {{ volunteeringopportunityName }} in {{ agentTitle }}",
   text: `Hallo {{ contactpersonName }}, hallo {{ volunteerName }},\n \nwir möchten euch gerne für die Aktivität „{{ volunteeringopportunityName }}“ einander vorstellen. \n \n{{ volunteerName }} spricht {{ volunteerLanguage }}, hat folgende Fähigkeiten: {{ volunteerSkills }}, die für diese ehrenamtliche Tätigkeit nützlich sein können. \n{{ volunteerName }} ist an folgenden Tagen und zu folgenden Uhrzeiten verfügbar: {{ volSchedule }}.\n \n{{ statmentOnCertificates }}\n \nDie Kontaktdaten von {{ volunteerName }} sind:\n{{ volunteerName }}\n{{ volunteerEmail }}\n{{ volunteerPhone }}\n \nDie Kontaktdaten der Einrichtung sind:\n{{ contactpersonName }}\n{{ contactpersonEmail }}\n{{ contactpersonPhone }}\n{{ agentAddress }}\n \nEs wäre super, wenn Ihr einen Kennenlernentermin vereinbart, um alles in Detail zu besprechen. Bei Fragen könnt ihr euch gerne bei uns melden.\n \nViele Grüße\nNeed4Deed\ncontact@need4deed.org`,
 };
 
