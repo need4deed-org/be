@@ -78,6 +78,10 @@
     "test:coverage": "yarn test --coverage",
     "test:ui": "yarn test --ui",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:db:up": "docker compose -f test.docker-compose.yaml up -d --wait",
+    "test:db:down": "docker compose -f test.docker-compose.yaml down",
+    "test:db:seed": "DB_HOST=127.0.0.1 DB_PORT=${DB_TEST_PORT:-5433} DB_USER=postgres DB_PASSWORD=postgres DB_NAME=postgres DB_SCHEMA=public NODE_ENV=development RUN_MIGRATIONS=true ts-node src/data/seeds/run.ts",
+    "test:db": "DB_HOST=127.0.0.1 DB_PORT=${DB_TEST_PORT:-5433} DB_USER=postgres DB_PASSWORD=postgres DB_NAME=postgres DB_SCHEMA=public vitest run",
     "prepare": "husky",
     "what": "./get-json-field-value.sh package.json"
   },
