@@ -243,6 +243,30 @@ export function formatAccompaniedPersonLanguage(
   return dealLanguageTitles.map((title) => `${target}-${title}`).join(", ");
 }
 
+// Shared by every accompanying/event notify email that renders a single
+// onetimer.date — was independently duplicated across 5 files (fe#1036
+// review); a future timezone/format change only needs to happen here.
+export function formatOnetimerDate(date: Date | undefined): string {
+  return date
+    ? new Date(date).toLocaleDateString("de-DE", {
+        timeZone: "Europe/Berlin",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+    : "";
+}
+
+export function formatOnetimerTime(date: Date | undefined): string {
+  return date
+    ? new Date(date).toLocaleTimeString("de-DE", {
+        timeZone: "Europe/Berlin",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+}
+
 export function getNameFields(name: string) {
   const names = name.split(" ");
 

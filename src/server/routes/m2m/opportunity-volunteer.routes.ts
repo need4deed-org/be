@@ -200,6 +200,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                   "volunteer.deal.dealLanguage.language",
                   "volunteer.deal.dealSkill.skill",
                   "volunteer.deal.dealTimeslot.timeslot",
+                  "opportunity.deal.dealLanguage.language",
                   "opportunity.submittedByPerson",
                   "opportunity.submittedByPerson.users",
                   "opportunity.contactPerson",
@@ -216,10 +217,15 @@ export default async function m2mOpportunityVolunteerRoutes(
                 return;
               }
               // emailIntroduction/emailAccompanyMatch render the
-              // volunteer's language/skill titles — without this, they'd
-              // always be the raw (English) title rather than the German
-              // translation (be#849).
-              await addTranslatedFields([ov.volunteer], Lang.DE);
+              // volunteer's language/skill titles, and
+              // emailAccompanyMatchVolunteer the opportunity's own requested
+              // languages (fe#1036 review) — without this, they'd always be
+              // the raw (English) title rather than the German translation
+              // (be#849).
+              await addTranslatedFields(
+                [ov.volunteer, ov.opportunity],
+                Lang.DE,
+              );
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
               const commType = isAccompany
@@ -248,10 +254,21 @@ export default async function m2mOpportunityVolunteerRoutes(
                 );
                 try {
                   await fastify.notify.emailAccompanyMatch(ov);
-                  await fastify.notify.emailAccompanyMatchVolunteer(ov);
                 } catch (sendErr) {
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
+                }
+                // Separate try/catch: this dedup record (and the NGO email
+                // it guards) must not be rolled back and resent just
+                // because the volunteer-facing email failed independently —
+                // that would duplicate the already-successful NGO email on
+                // the next status toggle.
+                try {
+                  await fastify.notify.emailAccompanyMatchVolunteer(ov);
+                } catch (volunteerSendErr) {
+                  logger.error(
+                    `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
+                  );
                 }
               } else {
                 const comm = await logEmailCommunication(

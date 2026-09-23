@@ -4,6 +4,7 @@ import {
   emailSuggestionAccompanyingManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -41,21 +42,8 @@ export async function sendEmailSuggestionAccompanying(
   const appointmentTitle = opportunity?.title ?? "";
   const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
-  const appointmentDate = opportunity?.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
-  const appointmentTime = opportunity?.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleTimeString("de-DE", {
-        timeZone: "Europe/Berlin",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
+  const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {

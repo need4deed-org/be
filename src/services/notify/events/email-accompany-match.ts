@@ -5,7 +5,7 @@ import {
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
-import { getLanguages } from "../../dto/utils";
+import { formatOnetimerDate, getLanguages } from "../../dto/utils";
 import { ACCOMPANY_MATCH_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -84,14 +84,7 @@ export async function sendEmailAccompanyMatch(
   );
 
   const clientName = accompanying?.name ?? "";
-  const appointmentDate = opportunity.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
+  const appointmentDate = formatOnetimerDate(opportunity.onetimer?.date);
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
 

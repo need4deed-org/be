@@ -1,11 +1,16 @@
 import {
   emailAccompanyMatchVolunteerManifestUrl,
+  emailFromAccompanying,
   emailFromNotify,
-  emailFromVolunteer,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
-import { formatAccompaniedPersonLanguage, getLanguages } from "../../dto/utils";
+import {
+  formatAccompaniedPersonLanguage,
+  formatOnetimerDate,
+  formatOnetimerTime,
+  getLanguages,
+} from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -44,21 +49,8 @@ export async function sendEmailAccompanyMatchVolunteer(
   const appointmentTitle = opportunity?.title ?? "";
   const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
-  const appointmentDate = opportunity?.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
-  const appointmentTime = opportunity?.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleTimeString("de-DE", {
-        timeZone: "Europe/Berlin",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
+  const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
@@ -89,7 +81,9 @@ export async function sendEmailAccompanyMatchVolunteer(
 
   await email.send({
     to: volunteerEmail,
-    cc: emailFromVolunteer,
+    // Accompanying-specific inbox, consistent with every other accompanying
+    // email in this PR (not emailFromVolunteer).
+    cc: emailFromAccompanying,
     from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),

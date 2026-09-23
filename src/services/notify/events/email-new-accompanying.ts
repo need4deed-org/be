@@ -6,7 +6,12 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
-import { formatAccompaniedPersonLanguage, getLanguages } from "../../dto/utils";
+import {
+  formatAccompaniedPersonLanguage,
+  formatOnetimerDate,
+  formatOnetimerTime,
+  getLanguages,
+} from "../../dto/utils";
 import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -35,21 +40,8 @@ export async function sendEmailNewAccompanying(
 
   const accompanying = opportunity.accompanying;
   const contactpersonName = contactPerson.name;
-  const appointmentDate = opportunity.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
-  const appointmentTime = opportunity.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleTimeString("de-DE", {
-        timeZone: "Europe/Berlin",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const appointmentDate = formatOnetimerDate(opportunity.onetimer?.date);
+  const appointmentTime = formatOnetimerTime(opportunity.onetimer?.date);
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
