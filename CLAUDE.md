@@ -123,11 +123,30 @@ All route prefixes are defined in `RoutePrefix` in `src/server/types/enums.ts`. 
 
 ## Testing
 
-Tests live in `src/test/`, mirroring the `src/` structure. Vitest runs with `NODE_ENV=test` and skips migrations. Tests do **not** use mocked repositories — they hit a real database. Run `docker compose up db` or have Postgres available locally before running tests, then run migrations. On a genuinely fresh database (new volume, no prior seed data), also run `yarn seed` before testing — most of the suite depends on seeded reference data (languages, skills, categories, etc.) that an existing local dev database already has, and skipping it causes widespread, unrelated-looking failures.
+Tests live in `src/test/`, mirroring the `src/` structure. Vitest runs with `NODE_ENV=test` and skips migrations. Tests do **not** use mocked repositories — they hit a real database.
 
-Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts`
+### Recommended: the dedicated test DB
 
-Test files run serially against the shared database (`fileParallelism: false` in `vitest.config.ts`) — each file opens its own connection pool, and running them in parallel exhausted Postgres's `max_connections` and caused random cross-file failures (be#996). The full suite takes longer as a result; that's the intended trade-off over flaky runs.
+`test.docker-compose.yaml` defines `db-test`, a throwaway Postgres on port 5433 (data on tmpfs, so every start is empty), separate from the dev `db`:
+
+```bash
+yarn test:db:up     # start db-test
+yarn test:db:seed   # run migrations + seed it
+yarn test:db        # run the whole suite against it
+yarn test:db:down   # stop it and discard the data
+```
+
+`yarn test:db:seed` seeds only from files checked into the repo — reference data from `public/data/*.json`, sample agents/opportunities/volunteers/events from `src/data/seeds/fixtures/*.json` — so reference-table ids (languages, skills, categories, …) are identical on every machine and in CI. Still, don't hardcode ids in tests; look rows up by a stable key (`isoCode`, `title`). Re-running `yarn test:db` against the same `db-test` works; `down` + `up` + `seed` gets you back to a pristine state. Set `DB_TEST_PORT` if 5433 is taken.
+
+### Against the dev DB
+
+Plain `yarn test` (and the pre-push hook) uses whatever `DB_*` points at — by default the dev `db` on 5432. That DB needs migrations run, and on a genuinely fresh volume also `yarn seed` — most of the suite depends on seeded reference data, and skipping it causes widespread, unrelated-looking failures.
+
+Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts` (or `yarn test:db src/test/...` against `db-test`).
+
+### Why serial
+
+Test files run serially (`fileParallelism: false` in `vitest.config.ts`). Parallel runs originally exhausted Postgres's `max_connections` (be#996); even with that limit raised, parallel runs still fail intermittently — test files commit real rows to the same database, and some tests likely see rows another file is writing at the same time (being investigated as part of be#999). Serial is slower but deterministic.
 
 ---
 
@@ -135,7 +154,7 @@ Test files run serially against the shared database (`fileParallelism: false` in
 
 Copy `.env.example` to `.env` and fill in real values. Key variables:
 
-- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SCHEMA` — Postgres connection
+- `DB_HOST`, `DB_PORT` (default 5432), `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SCHEMA` — Postgres connection
 - `DB_SSL_CA_PATH` — optional; path to the CA certificate used to verify the Postgres server in `production`/`staging` (defaults to the baked-in AWS RDS bundle; TLS verification is always strict)
 - `JWT_SECRET` — required; server refuses to start without it
 - `NODE_ENV` — `development` | `test` | `production`
