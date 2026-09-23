@@ -15,6 +15,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { emailTransformer } from "../lib/email-transformer";
 import { verifyPassword } from "../utils";
 import Communication from "./communication.entity";
 import Person from "./person.entity";
@@ -31,7 +32,7 @@ export default class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true, transformer: emailTransformer })
   @IsNotEmpty()
   @IsEmail()
   email: string;

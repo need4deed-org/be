@@ -43,6 +43,29 @@ describe("smoke: auth flow", () => {
       );
       expect(accessCookieMeta?.httpOnly).toBe(true);
     });
+
+    // be#1013: User.email is stored lowercased and lookups normalize too.
+    it("accepts credentials whose email differs only by case/whitespace", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          email: TEST_EMAILS.admin.toUpperCase(),
+          password: "test_password",
+        },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
+  // be#1013: the lookup assertEmailAvailable relies on to 409 duplicates.
+  describe("User.email case-insensitive lookup", () => {
+    it("finds an existing User by a case-variant email", async () => {
+      const user = await app.db.userRepository.findOneBy({
+        email: ` ${TEST_EMAILS.admin.toUpperCase()} `,
+      });
+      expect(user?.email).toBe(TEST_EMAILS.admin);
+    });
   });
 
   describe("GET /user/me", () => {
