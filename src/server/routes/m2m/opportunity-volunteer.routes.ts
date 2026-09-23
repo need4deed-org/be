@@ -38,8 +38,10 @@ async function triggerEmailSuggestion(
       relations: [
         "volunteer.person",
         "volunteer.person.users",
-        "volunteer.deal.postcode",
-        "volunteer.deal.dealTimeslot.timeslot",
+        "opportunity.deal.postcode",
+        "opportunity.deal.dealTimeslot.timeslot",
+        "opportunity.accompanying.postcode",
+        "opportunity.onetimer",
         "opportunity.submittedByPerson",
         "opportunity.contactPerson",
       ],
@@ -68,7 +70,16 @@ async function triggerEmailSuggestion(
       },
     );
     try {
-      await fastify.notify.emailSuggestion(ov);
+      // ACCOMPANYING opportunities have a single confirmed appointment
+      // (onetimer), not a recurring dealTimeslot schedule — they go through
+      // their own template rather than emailSuggestion's {{ schedule }}.
+      const isAccompany =
+        ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
+      if (isAccompany) {
+        await fastify.notify.emailSuggestionAccompanying(ov);
+      } else {
+        await fastify.notify.emailSuggestion(ov);
+      }
       logger.debug(`emailSuggestion side-effect succeeded (ov ${id})`);
     } catch (sendErr) {
       await commRepo.remove(comm).catch(logger.error);
@@ -189,6 +200,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                   "volunteer.deal.dealLanguage.language",
                   "volunteer.deal.dealSkill.skill",
                   "volunteer.deal.dealTimeslot.timeslot",
+                  "opportunity.deal.dealLanguage.language",
                   "opportunity.submittedByPerson",
                   "opportunity.submittedByPerson.users",
                   "opportunity.contactPerson",
@@ -205,10 +217,15 @@ export default async function m2mOpportunityVolunteerRoutes(
                 return;
               }
               // emailIntroduction/emailAccompanyMatch render the
-              // volunteer's language/skill titles — without this, they'd
-              // always be the raw (English) title rather than the German
-              // translation (be#849).
-              await addTranslatedFields([ov.volunteer], Lang.DE);
+              // volunteer's language/skill titles, and
+              // emailAccompanyMatchVolunteer the opportunity's own requested
+              // languages (fe#1036 review) — without this, they'd always be
+              // the raw (English) title rather than the German translation
+              // (be#849).
+              await addTranslatedFields(
+                [ov.volunteer, ov.opportunity],
+                Lang.DE,
+              );
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
               const commType = isAccompany
@@ -240,6 +257,27 @@ export default async function m2mOpportunityVolunteerRoutes(
                 } catch (sendErr) {
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
+                }
+                // Separate try/catch: this dedup record (and the NGO email
+                // it guards) must not be rolled back and resent just
+                // because the volunteer-facing email failed independently —
+                // that would duplicate the already-successful NGO email on
+                // the next status toggle. There's no retry path for this
+                // send specifically (nothing re-triggers it), so failure
+                // must page a human via opsAlert rather than only log —
+                // otherwise a matched volunteer could silently never learn
+                // their appointment's details.
+                try {
+                  await fastify.notify.emailAccompanyMatchVolunteer(ov);
+                } catch (volunteerSendErr) {
+                  logger.error(
+                    `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
+                  );
+                  fastify.notify
+                    .opsAlert(
+                      `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
+                    )
+                    .catch(logger.error);
                 }
               } else {
                 const comm = await logEmailCommunication(

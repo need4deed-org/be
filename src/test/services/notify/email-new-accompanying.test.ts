@@ -82,11 +82,12 @@ describe("sendEmailNewAccompanying", () => {
     expect(msg.text).not.toContain("deutsche");
   });
 
-  // be#856: appointmentaLanguage previously aliased accompaniedpersonLanguage
-  // (the be#846 fix collapsed two distinct concepts into one to kill the
-  // duplicated-raw-enum bug). It must instead reflect the deal's own
-  // requested languages, independent of the translation-requirement label.
-  it("derives appointmentaLanguage from the deal's own dealLanguage entries, translated (be#856)", async () => {
+  // fe#1036 review: accompaniedpersonLanguage and appointmentaLanguage used
+  // to render as two disconnected values ("Nur Deutsch, Arabisch"). Combined
+  // into a single "Target-Source" pair per requested language instead, e.g.
+  // "Deutsch-Arabisch", so it reads as the interpretation pair a volunteer
+  // needs to cover rather than two unrelated facts.
+  it("combines languageToTranslate with the deal's own dealLanguage entries into target-source pairs", async () => {
     await sendEmailNewAccompanying(
       email,
       buildOpportunity({
@@ -101,15 +102,15 @@ describe("sendEmailNewAccompanying", () => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.text).toContain(
-      "Sprachen: Deutsch oder Englisch, Deutsch, English",
+      "Sprachen: Deutsch/Englisch-Deutsch, Deutsch/Englisch-English",
     );
   });
 
-  it("renders an empty appointmentaLanguage when the deal has no languages", async () => {
+  it("falls back to the standalone label when the deal has no languages", async () => {
     await sendEmailNewAccompanying(email, buildOpportunity({ deal: {} }));
 
     const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Sprachen: Deutsch oder Englisch, \n");
+    expect(msg.text).toContain("Sprachen: Deutsch oder Englisch\n");
   });
 
   it("renders an empty label when languageToTranslate is unset", async () => {
@@ -122,6 +123,6 @@ describe("sendEmailNewAccompanying", () => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.text).not.toContain("undefined");
-    expect(msg.text).toContain("Sprachen: , ");
+    expect(msg.text).toContain("Sprachen: \n");
   });
 });
