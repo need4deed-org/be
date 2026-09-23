@@ -9,16 +9,20 @@ import {
   DryRunEmailTransport,
   DryRunSlackTransport,
   EmailTransport,
+  RegistrationEmailRecipient,
   sendCommentTagged,
   sendEmailAccompanyMatch,
+  sendEmailAccompanyMatchVolunteer,
   sendEmailAccompanyNotFound,
   sendEmailIntroduction,
   sendEmailNewAccompanying,
   sendEmailNewRegular,
   sendEmailPostMatchCheckup,
+  sendEmailRegistration,
   sendEmailRegularUpdate,
   sendEmailStale,
   sendEmailSuggestion,
+  sendEmailSuggestionAccompanying,
   sendEmailVerification,
   sendOpsAlert,
   sendPasswordReset,
@@ -35,14 +39,17 @@ interface NotifyService {
   opsAlert(text: string): Promise<void>;
   commentTagged(input: CommentTaggedInput): Promise<void>;
   emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
+  emailSuggestionAccompanying(ov: OpportunityVolunteer): Promise<void>;
   emailStale(ov: OpportunityVolunteer): Promise<void>;
   emailIntroduction(ov: OpportunityVolunteer): Promise<void>;
   emailPostMatchCheckup(ov: OpportunityVolunteer): Promise<void>;
   emailAccompanyNotFound(opportunity: Opportunity): Promise<void>;
   emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
+  emailAccompanyMatchVolunteer(ov: OpportunityVolunteer): Promise<void>;
   emailRegularUpdate(opportunity: Opportunity): Promise<void>;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
+  emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
 }
 
 declare module "fastify" {
@@ -140,6 +147,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendCommentTagged({ slack }, input),
     emailSuggestion: (ov: OpportunityVolunteer) =>
       sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
+    emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
+      sendEmailSuggestionAccompanying(emailNotify, ov),
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(emailNotify, ov),
     emailIntroduction: (ov: OpportunityVolunteer) =>
       sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),
@@ -149,12 +158,16 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailAccompanyNotFound(emailNotify, opportunity),
     emailAccompanyMatch: (ov: OpportunityVolunteer) =>
       sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
+    emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
+      sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
     emailRegularUpdate: (opportunity: Opportunity) =>
       sendEmailRegularUpdate(emailNotify, opportunity),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>
-      sendEmailNewAccompanying(emailNotify, opportunity),
+      sendEmailNewAccompanying(emailNotify, opportunity, emailNotifyRaw),
+    emailRegistration: (volunteer: RegistrationEmailRecipient) =>
+      sendEmailRegistration(emailNotify, volunteer),
   });
 }
 

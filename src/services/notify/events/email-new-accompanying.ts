@@ -1,4 +1,3 @@
-import { TranslatedIntoType } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -7,27 +6,22 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import {
+  formatAccompaniedPersonLanguage,
+  formatOnetimerDate,
+  formatOnetimerTime,
+  getLanguages,
+} from "../../dto/utils";
 import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
-
-// Matches fe's own labels for these values (public/locales/de/translations.json)
-// — German-only since this template is (be#838).
-const TRANSLATION_LABELS: Record<TranslatedIntoType, string> = {
-  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
-  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
-  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
-};
-
-function translationLabel(value: TranslatedIntoType | undefined): string {
-  return value ? (TRANSLATION_LABELS[value] ?? "") : "";
-}
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -36,6 +30,10 @@ export function resetNewAccompanyingTemplateCache(): void {
 export async function sendEmailNewAccompanying(
   email: EmailTransport,
   opportunity: Opportunity,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(opportunity);
   const contactPersonEmail = contactPerson?.email;
@@ -47,40 +45,31 @@ export async function sendEmailNewAccompanying(
 
   const accompanying = opportunity.accompanying;
   const contactpersonName = contactPerson.name;
-  const appointmentDate = opportunity.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      })
-    : "";
-  const appointmentTime = opportunity.onetimer?.date
-    ? new Date(opportunity.onetimer.date).toLocaleTimeString("de-DE", {
-        timeZone: "Europe/Berlin",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const appointmentDate = formatOnetimerDate(opportunity.onetimer?.date);
+  const appointmentTime = formatOnetimerTime(opportunity.onetimer?.date);
   const appointmentDistrict =
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  // accompaniedpersonLanguage: the translation requirement for the
-  // accompanied person (be#846). appointmentaLanguage: the deal's own
-  // requested languages — a distinct concept, German-translated via
-  // field_translation by the caller before this function runs (be#856).
-  const accompaniedpersonLanguage = translationLabel(
-    accompanying?.languageToTranslate,
+  // Combines the translation-target requirement (be#846) with the deal's
+  // own requested source language(s) — German-translated via
+  // field_translation by the caller before this function runs (be#856) —
+  // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
+  // values (fe#1036 review thread).
+  const dealLanguageTitles = await resolveOrAlert(
+    errorTransport,
+    opportunity.deal?.dealLanguage ?? [],
+    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
+    [] as string[],
+    `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
+    DEAL_LANGUAGE_LABELS,
   );
-  const appointmentaLanguage = (opportunity.deal?.dealLanguage ?? [])
-    .map(
-      (dealLanguage) =>
-        dealLanguage.language.translation ?? dealLanguage.language.title,
-    )
-    .join(", ");
+  const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
+    accompanying?.languageToTranslate,
+    dealLanguageTitles,
+  );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";
@@ -96,10 +85,14 @@ export async function sendEmailNewAccompanying(
     appointmentTitle,
     appointmentAddress,
     accompaniedpersonLanguage,
-    appointmentaLanguage,
     accompaniedpersonName,
     accompaniedpersonPhone,
     appointmentComment,
+    // TODO(be#1042 review): remove once the live CDN confirmationaccompanying.json
+    // drops {{ appointmentaLanguage }} — until then, deploying this code
+    // first would leave that placeholder unresolved and
+    // ValidatingEmailTransport would suspend every send.
+    appointmentaLanguage: "",
   });
 
   await email.send({

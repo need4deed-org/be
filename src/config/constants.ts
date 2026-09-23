@@ -110,6 +110,12 @@ export const emailPasswordResetManifestUrl =
 // CDN manifests for outbound volunteer/opportunity emails.
 export const emailSuggestionManifestUrl =
   CDNBaseUrl + "/emails/suggestion.json";
+export const emailSuggestionAccompanyingManifestUrl =
+  CDNBaseUrl + "/emails/suggestionaccompanying.json";
+export const emailRegistrationManifestUrl =
+  CDNBaseUrl + "/emails/registration.json";
+export const emailAccompanyMatchVolunteerManifestUrl =
+  CDNBaseUrl + "/emails/accompanymatchvolunteer.json";
 export const emailStaleManifestUrl = CDNBaseUrl + "/emails/stale.json";
 export const emailIntroductionManifestUrl =
   CDNBaseUrl + "/emails/introduction.json";

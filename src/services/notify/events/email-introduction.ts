@@ -1,4 +1,4 @@
-import { DocumentStatusType, VolunteerStateCGCType } from "need4deed-sdk";
+import { DocumentStatusType } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -28,36 +28,54 @@ export function resetIntroductionTemplateCache(): void {
   loader.resetCache();
 }
 
-// German-only, matching introduction.json's certificateStatements block —
-// this template is no longer split by recipient locale (see be#838).
+// German-only — this template is no longer split by recipient locale (see
+// be#838). The six sentences below are the only copy of this wording; they
+// fill introduction.json's flat {{ statmentOnCertificates }} placeholder
+// (there is no separate certificateStatements block in that manifest, CDN
+// or fallback).
+//
+// Previously branched on statusCgcProcess (UPLOADED/MISSING) to detect
+// "already applied", but nothing in fe ever sets that field — the
+// coordinator UI's CGC-application toggle instead writes statusCGC =
+// APPLIED_N4D directly (VolunteerProfileDocument.tsx). Since neither
+// cgcNo nor cgcYes matched APPLIED_N4D, that was the common case and this
+// always rendered a blank statement for it (be#1042 review). Reads
+// statusCGC's own three real, reachable values instead: NO (the volunteer
+// self-registration form's "Need to apply" answer), APPLIED_N4D (N4D
+// applied on the volunteer's behalf), YES (received).
+//
+// UNDEFINED — the column's own DB default (volunteer.entity.ts) — and
+// ASKED_TO_APPLY/APPLIED_SELF (unused by any writer today, confirmed by
+// grep) deliberately fall back to blank rather than asserting "we'll apply
+// immediately": UNDEFINED means the status was simply never set, and
+// APPLIED_SELF means the *volunteer* said they'd apply themselves, the
+// opposite of what that sentence claims (be#1043 review).
 function resolveStatmentOnCertificates(
   statusCGC: DocumentStatusType,
-  statusCgcProcess: VolunteerStateCGCType | null | undefined,
   statusVaccination: DocumentStatusType,
 ): string {
-  const cgcNo = statusCGC === DocumentStatusType.NO;
-  const cgcYes = statusCGC === DocumentStatusType.YES;
-  const missing = statusCgcProcess === VolunteerStateCGCType.MISSING;
-  const uploaded = statusCgcProcess === VolunteerStateCGCType.UPLOADED;
+  const cgcReceived = statusCGC === DocumentStatusType.YES;
+  const cgcApplied = statusCGC === DocumentStatusType.APPLIED_N4D;
+  const cgcNotYetApplied = statusCGC === DocumentStatusType.NO;
   const vaccinationYes = statusVaccination === DocumentStatusType.YES;
 
-  if (cgcNo && missing && vaccinationYes) {
-    return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
-  }
-  if (cgcNo && missing && !vaccinationYes) {
-    return "Das erweiterte Führungszeugnis beantragen wir sofort.";
-  }
-  if (cgcNo && uploaded && vaccinationYes) {
-    return "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor.";
-  }
-  if (cgcNo && uploaded && !vaccinationYes) {
-    return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
-  }
-  if (cgcYes && vaccinationYes) {
+  if (cgcReceived && vaccinationYes) {
     return "Das erweiterte Führungszeugnis sowie der Masernschutznachweis liegen vor.";
   }
-  if (cgcYes && !vaccinationYes) {
+  if (cgcReceived && !vaccinationYes) {
     return "Das erweiterte Führungszeugnis liegt vor.";
+  }
+  if (cgcApplied && vaccinationYes) {
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt. Der Masernschutznachweis liegt vor.";
+  }
+  if (cgcApplied && !vaccinationYes) {
+    return "Das erweiterte Führungszeugnis haben wir bereits beantragt.";
+  }
+  if (cgcNotYetApplied && vaccinationYes) {
+    return "Das erweiterte Führungszeugnis beantragen wir sofort. Der Masernschutznachweis liegt vor.";
+  }
+  if (cgcNotYetApplied) {
+    return "Das erweiterte Führungszeugnis beantragen wir sofort.";
   }
   return "";
 }
@@ -135,7 +153,6 @@ export async function sendEmailIntroduction(
 
   const statmentOnCertificates = resolveStatmentOnCertificates(
     volunteer.statusCGC,
-    volunteer.statusCgcProcess,
     volunteer.statusVaccination,
   );
 
