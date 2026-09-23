@@ -60,6 +60,22 @@ import agentContactRoutes from "./contact.routes";
 import agentMembershipRoutes from "./membership.routes";
 import agentRegisterRoutes from "./register.routes";
 
+// A VOLUNTEER has no business on any /agent route (be#1039): an opportunity's
+// `agentId` would otherwise let them look up the RAC they aren't matched to
+// (operator, website, about, org email, or confirm its name via
+// `filter[search]`), bypassing the RAC masking on /opportunity. Their RAC,
+// once matched, comes with the opportunity itself. Public (token-gated)
+// registration routes are left to their own auth.
+async function denyVolunteer(request: FastifyRequest): Promise<void> {
+  const config = request.routeOptions.config as { public?: boolean };
+  if (
+    config?.public !== true &&
+    request.authUser?.role === UserRole.VOLUNTEER
+  ) {
+    throw new UnauthorizedError();
+  }
+}
+
 // Mirrors the role allowlist in contact.routes.ts: only these three roles may
 // reach the membership check. Cheap (no DB), so it runs before the
 // agent-existence check.
@@ -107,10 +123,11 @@ export default async function agentRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // GETs are open to any logged-in user (PII is masked per role in the
-  // preSerialization hooks below); writes are re-gated per-route: DELETE
+  // GETs are open to any logged-in user but a VOLUNTEER (PII is masked per
+  // role in the preSerialization hooks below); writes are re-gated per-route: DELETE
   // stays COORDINATOR-only, PATCH also allows an active AgentPerson member.
   fastify.addHook("onRequest", fastify.authenticate());
+  fastify.addHook("onRequest", denyVolunteer);
 
   fastify.register(agentRegisterRoutes, { prefix: RoutePrefix.REGISTER });
 

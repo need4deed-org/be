@@ -2373,6 +2373,34 @@ describe("GET /opportunity RAC masking + myMatchStatus for volunteers (be#1039)"
     },
   );
 
+  // Review of be#1040: the opportunity's agentId must not let a volunteer
+  // look the RAC up on the /agent routes instead.
+  it.each([
+    () => `/agent/${agent.id}`,
+    () => `/agent?filter[search]=${encodeURIComponent(AGENT_TITLE)}`,
+    () => `/agent/${agent.id}/opportunity-linked`,
+    () => `/agent/${agent.id}/volunteer-linked`,
+    () => `/agent/${agent.id}/communication`,
+  ])("403s a volunteer on the agent routes (%#)", async (url) => {
+    for (const caller of ["pending", "matched"]) {
+      const res = await fastify.inject({
+        method: "GET",
+        url: url(),
+        cookies: { [accessCookieName]: cookies[caller] },
+      });
+      expect(res.statusCode).toBe(403);
+    }
+  });
+
+  it("still lets an agent member read their own agent", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agent.id}`,
+      cookies: { [accessCookieName]: cookies.agent },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
   it.each(["coordinator", "agent"])(
     "leaves the RAC unmasked and omits myMatchStatus for a %s",
     async (caller) => {
