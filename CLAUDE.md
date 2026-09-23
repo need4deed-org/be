@@ -144,9 +144,15 @@ Plain `yarn test` (and the pre-push hook) uses whatever `DB_*` points at — by 
 
 Run a single test file: `yarn test -- src/test/services/dto/dto-person.test.ts` (or `yarn test:db src/test/...` against `db-test`).
 
-### Why serial
+### Serial vs parallel
 
-Test files run serially (`fileParallelism: false` in `vitest.config.ts`). Parallel runs originally exhausted Postgres's `max_connections` (be#996); even with that limit raised, parallel runs still fail intermittently — test files commit real rows to the same database, and some tests likely see rows another file is writing at the same time (being investigated as part of be#999). Serial is slower but deterministic.
+`yarn test:db` (and CI) runs test files in parallel (`--fileParallelism`) — about twice as fast; `db-test` allows 500 connections. Plain `yarn test` and the pre-push hook stay serial (`fileParallelism: false` in `vitest.config.ts`), because the dev `db` keeps Postgres's default 100 `max_connections`, which parallel files exhaust (be#996).
+
+Parallel files share one database and commit real rows, so a test must only assert on rows it created itself (be#999):
+
+- never assert on a whole-table count or an unfiltered list — scope the query to your own rows (your own postcode/agent/title suffix);
+- make "unique" fixture values really unique — use `randomNumericSuffix()` from `src/test/random.ts`, not `Date.now() % 10000` (collides with other files, and with real seeded Berlin postcodes);
+- expect other files' rows — including odd-but-valid ones (e.g. an opportunity with no deal) — to show up in any list you read.
 
 ---
 

@@ -32,6 +32,11 @@ afterEach(() => {
   process.env.JWT_SECRET = "test-secret-only-for-vitest";
 });
 
+// Each test re-imports the whole server after vi.resetModules() — ~1.5-3s
+// serially, past the default 5s under parallel runs (be#999). Scoped to
+// this file: vi.setConfig is reset between test files.
+vi.setConfig({ testTimeout: 20_000 });
+
 describe("swagger endpoint is restricted to non-production", () => {
   it("serves the swagger UI and spec when not in production", async () => {
     const fastify = await buildServer("development");
