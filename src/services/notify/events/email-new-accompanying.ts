@@ -6,19 +6,14 @@ import {
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
-import {
-  formatAccompaniedPersonLanguage,
-  formatOnetimerDate,
-  formatOnetimerTime,
-  getLanguages,
-} from "../../dto/utils";
+import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
-import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
+import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
@@ -58,17 +53,11 @@ export async function sendEmailNewAccompanying(
   // field_translation by the caller before this function runs (be#856) —
   // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
   // values (fe#1036 review thread).
-  const dealLanguageTitles = await resolveOrAlert(
+  const accompaniedpersonLanguage = await resolveAccompaniedPersonLanguage(
     errorTransport,
-    opportunity.deal?.dealLanguage ?? [],
-    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
-    [] as string[],
-    `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
-    DEAL_LANGUAGE_LABELS,
-  );
-  const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
     accompanying?.languageToTranslate,
-    dealLanguageTitles,
+    opportunity.deal?.dealLanguage ?? [],
+    `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
   );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
