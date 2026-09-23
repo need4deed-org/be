@@ -15,15 +15,19 @@ const MASKED = /^[a-z]\*\*\*$/;
 const ctx = (
   p: Partial<{
     userId: number;
+    role: UserRole;
     personIds: number[];
     opportunityIds: number[];
     agentIds: number[];
+    matchedAgentIds: number[];
   }> = {},
 ): CallerVisibility => ({
   userId: p.userId ?? 0,
+  role: p.role ?? UserRole.USER,
   personIds: new Set(p.personIds ?? []),
   opportunityIds: new Set(p.opportunityIds ?? []),
   agentIds: new Set(p.agentIds ?? []),
+  matchedAgentIds: new Set(p.matchedAgentIds ?? []),
 });
 
 const makePerson = (id: number): Person =>
@@ -185,6 +189,50 @@ describe("maskPii", () => {
     expect(agent.address.street).toBe("Haupt 3");
   });
 
+  describe("agent (RAC) title and address for a VOLUNTEER (be#1039)", () => {
+    const makeAgent = (): Agent =>
+      Object.assign(new Agent(), {
+        id: 5,
+        title: "Center",
+        address: makeAddress("Haupt 3"),
+        district: { id: 3, title: "Mitte" },
+      });
+
+    it("masks the title and address of an agent the volunteer isn't matched to", () => {
+      const agent = makeAgent();
+      maskPii(agent, ctx({ role: UserRole.VOLUNTEER, matchedAgentIds: [6] }));
+      expect(agent.title).toMatch(MASKED);
+      expect(agent.address.street).toMatch(MASKED);
+      // District isn't PII (the opportunity's own district is public).
+      expect(agent.district.title).toBe("Mitte");
+    });
+
+    it("leaves the title and address of an agent the volunteer is matched to", () => {
+      const agent = makeAgent();
+      maskPii(agent, ctx({ role: UserRole.VOLUNTEER, matchedAgentIds: [5] }));
+      expect(agent.title).toBe("Center");
+      expect(agent.address.street).toBe("Haupt 3");
+    });
+
+    it("masks the title the same way for every opportunity sharing one Agent instance", () => {
+      const agent = makeAgent();
+      const opportunities = [
+        { id: 1, agent },
+        { id: 2, agent },
+      ];
+      maskPii(opportunities, ctx({ role: UserRole.VOLUNTEER }));
+      expect(opportunities[0].agent.title).toMatch(MASKED);
+      expect(opportunities[1].agent.title).toBe(opportunities[0].agent.title);
+    });
+
+    it("keeps agent titles for other non-privileged roles", () => {
+      const agent = makeAgent();
+      maskPii(agent, ctx({ role: UserRole.AGENT, agentIds: [6] }));
+      expect(agent.title).toBe("Center");
+      expect(agent.address.street).toMatch(MASKED);
+    });
+  });
+
   it("leaves reference-like objects untouched and recurses to nested PII", () => {
     const graph = {
       id: 7,
@@ -264,6 +312,15 @@ describe("maskPii", () => {
       });
       maskPii(c, ctx({ userId: 1, agentIds: [3] }));
       expect(c.text).toBe("internal note about someone");
+    });
+
+    it("masks a comment on an agent the volunteer is only matched through (be#1039)", () => {
+      const c = makeComment({
+        entityType: EntityTableName.AGENT,
+        entityId: 5,
+      });
+      maskPii(c, ctx({ role: UserRole.VOLUNTEER, matchedAgentIds: [5] }));
+      expect(c.text).toMatch(MASKED);
     });
 
     it("defaults a missing author role to USER, so entity visibility decides", () => {

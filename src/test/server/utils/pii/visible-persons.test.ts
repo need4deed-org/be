@@ -1,5 +1,9 @@
 import type { FastifyRequest } from "fastify";
-import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  OpportunityVolunteerStatusType,
+  UserRole,
+} from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
 import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
@@ -52,10 +56,11 @@ describe("resolveCallerVisibility", () => {
   });
 
   describe("VOLUNTEER", () => {
-    it("sees own person and the opportunities they're matched to", async () => {
+    it("sees own person, the opportunities they're matched to, and those opportunities' agents", async () => {
       query.mockResolvedValueOnce([
-        { opportunity_id: 11 },
-        { opportunity_id: 12 },
+        { opportunity_id: 11, agent_id: 42 },
+        { opportunity_id: 12, agent_id: 42 },
+        { opportunity_id: 13, agent_id: null },
       ]);
 
       const v = await resolveCallerVisibility(
@@ -63,10 +68,20 @@ describe("resolveCallerVisibility", () => {
         makeUser(UserRole.VOLUNTEER, 7),
       );
 
+      expect(v.role).toBe(UserRole.VOLUNTEER);
       expect([...v.personIds]).toEqual([7]);
-      expect(sorted(v.opportunityIds)).toEqual([11, 12]);
+      expect(sorted(v.opportunityIds)).toEqual([11, 12, 13]);
+      expect([...v.matchedAgentIds]).toEqual([42]);
+      // Matched agents unlock title/address only, not the agents' comments.
       expect([...v.agentIds]).toEqual([]);
-      expect(query.mock.calls[0][1]).toEqual([7]); // matched by own person id
+      // Matched by own person id, counting only MATCHED/ACTIVE links (be#1039).
+      expect(query.mock.calls[0][1]).toEqual([
+        7,
+        [
+          OpportunityVolunteerStatusType.MATCHED,
+          OpportunityVolunteerStatusType.ACTIVE,
+        ],
+      ]);
       expect(find).not.toHaveBeenCalled();
     });
   });

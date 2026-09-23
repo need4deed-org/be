@@ -1195,6 +1195,12 @@
                 }
               },
               "required": ["date", "time"]
+            },
+            "myMatchStatus": {
+              "anyOf": [
+                { "$ref": "OpportunityVolunteerStatusType#" },
+                { "type": "null" }
+              ]
             }
           }
         }
