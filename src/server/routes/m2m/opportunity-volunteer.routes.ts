@@ -40,6 +40,7 @@ async function triggerEmailSuggestion(
         "volunteer.person.users",
         "opportunity.deal.postcode",
         "opportunity.deal.dealTimeslot.timeslot",
+        "opportunity.deal.dealLanguage.language",
         "opportunity.accompanying.postcode",
         "opportunity.onetimer",
         "opportunity.submittedByPerson",
@@ -49,6 +50,11 @@ async function triggerEmailSuggestion(
     if (!ov) {
       return;
     }
+    // emailSuggestionAccompanying renders the opportunity's requested
+    // language titles (accompaniedpersonLanguage) — without this, they'd
+    // be the raw (English) title rather than the German translation,
+    // same rationale as be#849's fix for emailIntroduction/emailAccompanyMatch.
+    await addTranslatedFields([ov.opportunity], Lang.DE);
     // Skip if FIRST_INQUIRY already sent (e.g. PENDING→DECLINED→PENDING).
     const alreadySent = await commRepo.findOne({
       where: {

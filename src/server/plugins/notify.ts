@@ -148,7 +148,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailSuggestion: (ov: OpportunityVolunteer) =>
       sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
     emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestionAccompanying(emailNotify, ov),
+      sendEmailSuggestionAccompanying(emailNotify, ov, emailNotifyRaw),
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(emailNotify, ov),
     emailIntroduction: (ov: OpportunityVolunteer) =>
       sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),

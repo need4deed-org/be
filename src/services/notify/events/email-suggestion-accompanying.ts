@@ -4,13 +4,19 @@ import {
   emailSuggestionAccompanyingManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
+import {
+  formatAccompaniedPersonLanguage,
+  formatOnetimerDate,
+  formatOnetimerTime,
+  getLanguages,
+} from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionAccompanyingManifestUrl);
@@ -27,6 +33,10 @@ export function resetSuggestionAccompanyingTemplateCache(): void {
 export async function sendEmailSuggestionAccompanying(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -44,6 +54,18 @@ export async function sendEmailSuggestionAccompanying(
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
+  const dealLanguageTitles = await resolveOrAlert(
+    errorTransport,
+    opportunity?.deal?.dealLanguage ?? [],
+    (dealLanguage) => getLanguages(dealLanguage).map((l) => l.title),
+    [] as string[],
+    `sendEmailSuggestionAccompanying, ov ${ov.id}`,
+    DEAL_LANGUAGE_LABELS,
+  );
+  const accompaniedpersonLanguage = formatAccompaniedPersonLanguage(
+    accompanying?.languageToTranslate,
+    dealLanguageTitles,
+  );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
@@ -53,6 +75,7 @@ export async function sendEmailSuggestionAccompanying(
     appointmentPlz,
     appointmentDate,
     appointmentTime,
+    accompaniedpersonLanguage,
   });
 
   await email.send({
