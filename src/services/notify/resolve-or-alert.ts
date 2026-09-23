@@ -20,6 +20,16 @@ export const DEAL_LANGUAGE_LABELS: ResolveOrAlertLabels = {
   rowsLabel: "dealLanguage rows",
 };
 
+// For email-suggestion.ts, which resolves the *opportunity's* dealTimeslot
+// (fe#1036/be schedule bug) — distinct from resolveScheduleOrAlert's
+// hardcoded "the volunteer's schedule" labels, which describe the unrelated
+// (and correct) volunteer.deal?.dealTimeslot usage in email-introduction.ts.
+export const OPPORTUNITY_SCHEDULE_LABELS: ResolveOrAlertLabels = {
+  dataLabel: "opportunity Timeslot data",
+  fieldLabel: "the opportunity's schedule",
+  rowsLabel: "opportunity dealTimeslot rows",
+};
+
 /**
  * Resolves a value via `formatter`, degrading to `fallback` and alerting
  * `errorEmailRecipient` instead of throwing when the underlying relation

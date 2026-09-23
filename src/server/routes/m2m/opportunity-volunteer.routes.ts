@@ -38,8 +38,10 @@ async function triggerEmailSuggestion(
       relations: [
         "volunteer.person",
         "volunteer.person.users",
-        "volunteer.deal.postcode",
-        "volunteer.deal.dealTimeslot.timeslot",
+        "opportunity.deal.postcode",
+        "opportunity.deal.dealTimeslot.timeslot",
+        "opportunity.accompanying.postcode",
+        "opportunity.onetimer",
         "opportunity.submittedByPerson",
         "opportunity.contactPerson",
       ],
@@ -68,7 +70,16 @@ async function triggerEmailSuggestion(
       },
     );
     try {
-      await fastify.notify.emailSuggestion(ov);
+      // ACCOMPANYING opportunities have a single confirmed appointment
+      // (onetimer), not a recurring dealTimeslot schedule — they go through
+      // their own template rather than emailSuggestion's {{ schedule }}.
+      const isAccompany =
+        ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
+      if (isAccompany) {
+        await fastify.notify.emailSuggestionAccompanying(ov);
+      } else {
+        await fastify.notify.emailSuggestion(ov);
+      }
       logger.debug(`emailSuggestion side-effect succeeded (ov ${id})`);
     } catch (sendErr) {
       await commRepo.remove(comm).catch(logger.error);
@@ -237,6 +248,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                 );
                 try {
                   await fastify.notify.emailAccompanyMatch(ov);
+                  await fastify.notify.emailAccompanyMatchVolunteer(ov);
                 } catch (sendErr) {
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;

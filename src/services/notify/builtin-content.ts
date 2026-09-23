@@ -49,7 +49,22 @@ export const ACCOMPANY_MATCH_BUILTIN: LocaleContent = {
 
 export const SUGGESTION_BUILTIN: LocaleContent = {
   subject: "Volunteering opportunity match — Need4Deed",
-  text: `Dear {{ volunteerName }},\n \nWe have an opportunity that may interest you: {{ opportunityName }}, in Berlin {{ plz }} taking place on {{ schedule }}. If you'd like to volunteer, please reply to volunteer@need4deed.org in the next 10 days.\n\nThe Need4Deed Team :)\nvolunteer@need4deed.org\n\nHallo {{ volunteerName }},\n\nWir haben eine Möglichkeit, die dich interessieren könnte: {{ opportunityName }}, in Berlin {{ plz }}, am {{ schedule }}.\nWenn du dich ehrenamtlich engagieren möchtest, antworte bitte innerhalb der nächsten 10 Tage an volunteer@need4deed.org.\n\nDas Need4Deed-Team :)\nvolunteer@need4deed.org`,
+  text: `Dear {{ volunteerName }},\n \nWe have an opportunity that may interest you: {{ opportunityName }}, in Berlin {{ plz }} taking place on {{ opportunitySchedule }}. If you'd like to volunteer, please reply to volunteer@need4deed.org in the next 10 days.\n\nThe Need4Deed Team :)\nvolunteer@need4deed.org\n\nHallo {{ volunteerName }},\n\nWir haben eine Möglichkeit, die dich interessieren könnte: {{ opportunityName }}, in Berlin {{ plz }}, am {{ opportunitySchedule }}.\nWenn du dich ehrenamtlich engagieren möchtest, antworte bitte innerhalb der nächsten 10 Tage an volunteer@need4deed.org.\n\nDas Need4Deed-Team :)\nvolunteer@need4deed.org`,
+};
+
+export const SUGGESTION_ACCOMPANYING_BUILTIN: LocaleContent = {
+  subject: "Accompanying opportunity match — Need4Deed",
+  text: `Dear {{ volunteerName }},\n \nWe have an accompanying opportunity that may interest you:\nTitle: {{ appointmentTitle }}\nAddress: {{ appointmentAddress }}, {{ appointmentPlz }}\nDate and time: {{ appointmentDate }} at {{ appointmentTime }}\n \nIf you'd like to volunteer, please reply to volunteer@need4deed.org in the next 10 days.\n\nThe Need4Deed Team :)\n\nHallo {{ volunteerName }},\n \nwir haben eine Begleitung, die dich interessieren könnte:\nTitel: {{ appointmentTitle }}\nAdresse: {{ appointmentAddress }}, {{ appointmentPlz }}\nDatum und Uhrzeit: {{ appointmentDate }} um {{ appointmentTime }}\n \nWenn du dich ehrenamtlich engagieren möchtest, antworte bitte innerhalb der nächsten 10 Tage an volunteer@need4deed.org.\n\nDas Need4Deed-Team :)\nvolunteer@need4deed.org`,
+};
+
+export const REGISTRATION_BUILTIN: LocaleContent = {
+  subject: "Danke für deine Registrierung bei Need4Deed",
+  text: `Dear {{ volunteerName }},\n \nThank you for registering to support refugees. We will give you a call in the next few days to check what could be a suitable opportunity for you.\n \nBest regards,\nNeed4Deed\n\nHallo {{ volunteerName }},\n \nvielen Dank für deine Registrierung, um Geflüchtete zu unterstützen. Wir rufen dich in den nächsten Tagen an, um zu besprechen, was für dich passen könnte.\n \nViele Grüße\nNeed4Deed`,
+};
+
+export const ACCOMPANY_MATCH_VOLUNTEER_BUILTIN: LocaleContent = {
+  subject: "Deine Begleitung am {{ appointmentDate }} — Need4Deed",
+  text: `Dear {{ volunteerName }},\n \nThank you for taking on this accompanying opportunity. Here are the details:\nTitle: {{ appointmentTitle }}\nDate and time: {{ appointmentDate }} at {{ appointmentTime }}\nAddress: {{ appointmentAddress }}, {{ appointmentPlz }}\nAccompanied person: {{ accompaniedpersonName }}, {{ accompaniedpersonPhone }}\nLanguages: {{ accompaniedpersonLanguage }}, {{ appointmentaLanguage }}\nAdditional information: {{ appointmentComment }}\n \nIf you have any questions, the contact at the organisation is:\n{{ contactpersonName }}\n{{ contactpersonEmail }}\n{{ contactpersonPhone }}\n \nThank you again for volunteering.\n\nThe Need4Deed Team :)\n\nHallo {{ volunteerName }},\n \nvielen Dank, dass du diese Begleitung übernimmst. Hier sind die Details:\nTitel: {{ appointmentTitle }}\nDatum und Uhrzeit: {{ appointmentDate }} um {{ appointmentTime }}\nAdresse: {{ appointmentAddress }}, {{ appointmentPlz }}\nBegleitete Person: {{ accompaniedpersonName }}, {{ accompaniedpersonPhone }}\nSprachen: {{ accompaniedpersonLanguage }}, {{ appointmentaLanguage }}\nZusätzliche Informationen: {{ appointmentComment }}\n \nBei Fragen ist der Kontakt bei der Einrichtung:\n{{ contactpersonName }}\n{{ contactpersonEmail }}\n{{ contactpersonPhone }}\n \nVielen Dank für dein Engagement.\n\nDas Need4Deed-Team :)`,
 };
 
 export const NEW_REGULAR_BUILTIN: LocaleContent = {

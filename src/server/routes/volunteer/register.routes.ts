@@ -152,6 +152,14 @@ export default async function volunteerRegisterRoutes(
         name: person.name,
       });
 
+      if (person.email) {
+        fastify.notify
+          .emailRegistration({ email: person.email, name: person.name })
+          .catch((error) => {
+            logger.warn(`Registration confirmation email failed: ${error}`);
+          });
+      }
+
       return reply.status(201).send({
         message: "Volunteer registration complete.",
         data: { id },

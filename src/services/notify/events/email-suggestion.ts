@@ -11,7 +11,10 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
-import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
+import {
+  OPPORTUNITY_SCHEDULE_LABELS,
+  resolveOrAlert,
+} from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionManifestUrl);
@@ -37,13 +40,19 @@ export async function sendEmailSuggestion(
 
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
-  const plz = ov.volunteer.deal?.postcode?.value ?? "";
-  const schedule = await resolveScheduleOrAlert(
+  // The opportunity's own location/schedule, not the volunteer's — this
+  // email describes where and when the *opportunity* takes place, so
+  // reading from ov.volunteer.deal here (as this used to) instead read back
+  // the volunteer's own postcode/general availability, unrelated to the
+  // specific opportunity being suggested (fe#1036 / be schedule bug).
+  const plz = ov.opportunity?.deal?.postcode?.value ?? "";
+  const opportunitySchedule = await resolveOrAlert(
     errorTransport,
-    ov.volunteer.deal?.dealTimeslot ?? [],
+    ov.opportunity?.deal?.dealTimeslot ?? [],
     formatScheduleBilingual,
     "wird noch abgestimmt/to be confirmed",
     `sendEmailSuggestion, ov ${ov.id}`,
+    OPPORTUNITY_SCHEDULE_LABELS,
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
@@ -51,7 +60,7 @@ export async function sendEmailSuggestion(
     volunteerName,
     opportunityName,
     plz,
-    schedule,
+    opportunitySchedule,
   });
 
   await email.send({
