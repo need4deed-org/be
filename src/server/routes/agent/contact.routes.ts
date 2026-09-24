@@ -100,7 +100,13 @@ export default function agentContactRoutes(
 
       await assertCanManageContacts(fastify, request, agentId);
 
-      const agentPerson = await createAgentContact(agentId, request.body);
+      // assertHasContactManagementRole above already guarantees this is one
+      // of COORDINATOR/AGENT/ADMIN.
+      const agentPerson = await createAgentContact(
+        agentId,
+        request.body,
+        request.authUser?.role as UserRole,
+      );
       agentPerson.agent = agent;
 
       return reply.status(201).send({
