@@ -40,6 +40,7 @@ async function triggerEmailSuggestion(
         "volunteer.person.users",
         "opportunity.deal.postcode",
         "opportunity.deal.dealTimeslot.timeslot",
+        "opportunity.deal.dealLanguage.language",
         "opportunity.accompanying.postcode",
         "opportunity.onetimer",
         "opportunity.submittedByPerson",
@@ -49,6 +50,11 @@ async function triggerEmailSuggestion(
     if (!ov) {
       return;
     }
+    // ACCOMPANYING opportunities have a single confirmed appointment
+    // (onetimer), not a recurring dealTimeslot schedule — they go through
+    // their own template rather than emailSuggestion's {{ schedule }}.
+    const isAccompany =
+      ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
     // Skip if FIRST_INQUIRY already sent (e.g. PENDING→DECLINED→PENDING).
     const alreadySent = await commRepo.findOne({
       where: {
@@ -70,12 +76,16 @@ async function triggerEmailSuggestion(
       },
     );
     try {
-      // ACCOMPANYING opportunities have a single confirmed appointment
-      // (onetimer), not a recurring dealTimeslot schedule — they go through
-      // their own template rather than emailSuggestion's {{ schedule }}.
-      const isAccompany =
-        ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
       if (isAccompany) {
+        // emailSuggestionAccompanying renders the opportunity's requested
+        // language titles (accompaniedpersonLanguage) — without this,
+        // they'd be the raw (English) title rather than the German
+        // translation, same rationale as be#849's fix for
+        // emailIntroduction/emailAccompanyMatch. Scoped to this branch
+        // only (be#1047 review): a translation-lookup failure here must
+        // not block the plain, non-accompanying suggestion email, which
+        // never reads dealLanguage at all.
+        await addTranslatedFields([ov.opportunity], Lang.DE);
         await fastify.notify.emailSuggestionAccompanying(ov);
       } else {
         await fastify.notify.emailSuggestion(ov);

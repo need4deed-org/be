@@ -8,6 +8,7 @@ import {
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
+import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -144,10 +145,27 @@ export function getOpportunityContact(
   };
 }
 
+// opportunity.deal_id is nullable, so a deal-less opportunity must still
+// serialize (empty lists, null category) instead of 500ing the whole list
+// endpoint it appears in (be#999).
+const EMPTY_DEAL = {
+  categoryId: null,
+  dealLanguage: [],
+  dealActivity: [],
+  dealSkill: [],
+  dealDistrict: [],
+  dealTimeslot: [],
+} as unknown as Deal;
+
+function dealOrEmpty(opportunity: Opportunity): Deal {
+  return opportunity.deal ?? EMPTY_DEAL;
+}
+
 export function dtoOpportunityGetList(
   opportunity: Opportunity,
   districtCentroid?: Centroid,
 ): ApiOpportunityGetList {
+  const deal = dealOrEmpty(opportunity);
   const { appointmentDate, appointmentTime } = formatAppointmentDateTime(
     opportunity.onetimer?.date,
   );
@@ -155,26 +173,26 @@ export function dtoOpportunityGetList(
   return {
     id: opportunity.id,
     title: opportunity.title,
-    category: { id: opportunity.deal.categoryId },
+    category: { id: deal.categoryId },
     district: { id: opportunity.district?.id ?? opportunity.districtId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
     numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
-    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+    languages: deal.dealLanguage.filter(Boolean).map((pl) => ({
       id: pl.language.id,
       title: pl.language.title,
       proficiency: pl.proficiency,
       purpose: pl.purpose,
     })),
-    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+    activities: deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
-    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+    location: deal.dealDistrict.filter(Boolean).map((ld) => ({
       id: ld.district.id,
     })),
-    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
+    availability: getAvailabilityTryCatch(deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
@@ -198,32 +216,33 @@ export function dtoOpportunityGetList(
 export function dtoVolunteerOpportunityGetList(
   opportunity: Opportunity,
 ): ApiVolunteerOpportunityGetList {
+  const deal = dealOrEmpty(opportunity);
   return {
     id: opportunity.id,
     title: opportunity.title,
     createdAt: opportunity.createdAt,
-    category: { id: opportunity.deal.categoryId },
+    category: { id: deal.categoryId },
     ...(opportunity.districtId
       ? { district: { id: opportunity.districtId } }
       : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
-    languages: opportunity.deal.dealLanguage.filter(Boolean).map((pl) => ({
+    languages: deal.dealLanguage.filter(Boolean).map((pl) => ({
       id: pl.language.id,
       title: pl.language.title,
       proficiency: pl.proficiency,
     })),
-    activities: opportunity.deal.dealActivity.filter(Boolean).map((pa) => ({
+    activities: deal.dealActivity.filter(Boolean).map((pa) => ({
       id: pa.activity.id,
     })),
-    location: opportunity.deal.dealDistrict.filter(Boolean).map((ld) => ({
+    location: deal.dealDistrict.filter(Boolean).map((ld) => ({
       id: ld.district.id,
     })),
-    availability: getAvailabilityTryCatch(opportunity.deal.dealTimeslot) ?? [],
+    availability: getAvailabilityTryCatch(deal.dealTimeslot) ?? [],
     accompanyingDetails: dtoOpportunityAccompanying(
       accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
-      opportunity.deal.dealLanguage,
+      deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
   } as ApiVolunteerOpportunityGetList;
@@ -234,6 +253,7 @@ export function dtoOpportunityGet(
   accompanyingDistrict?: District | null,
   districtCentroid?: Centroid,
 ): ApiOpportunityGet {
+  const deal = dealOrEmpty(opportunityComments);
   const eventStart =
     opportunityComments.type === OpportunityType.EVENTS
       ? opportunityComments.onetimer?.date
@@ -249,7 +269,7 @@ export function dtoOpportunityGet(
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
-    category: { id: opportunityComments.deal.categoryId },
+    category: { id: deal.categoryId },
     district: {
       id: opportunityComments.district?.id ?? opportunityComments.districtId,
     },
@@ -259,35 +279,28 @@ export function dtoOpportunityGet(
     agentId: opportunityComments.agentId,
     appointmentDate,
     appointmentTime,
-    languages: opportunityComments.deal.dealLanguage
-      .filter(Boolean)
-      .map((pl) => ({
-        id: pl.language.id,
-        title: pl.language.title,
-        proficiency: pl.proficiency,
-        purpose: pl.purpose,
-      })),
-    activities: opportunityComments.deal.dealActivity
-      .filter(Boolean)
-      .map((pa) => ({
-        id: pa.activity.id,
-      })),
-    skills: opportunityComments.deal.dealSkill.filter(Boolean).map((ps) => ({
+    languages: deal.dealLanguage.filter(Boolean).map((pl) => ({
+      id: pl.language.id,
+      title: pl.language.title,
+      proficiency: pl.proficiency,
+      purpose: pl.purpose,
+    })),
+    activities: deal.dealActivity.filter(Boolean).map((pa) => ({
+      id: pa.activity.id,
+    })),
+    skills: deal.dealSkill.filter(Boolean).map((ps) => ({
       id: ps.skill.id,
     })),
-    location: opportunityComments.deal.dealDistrict
-      .filter(Boolean)
-      .map((ld) => ({
-        id: ld.district.id,
-      })),
-    availability:
-      getAvailabilityTryCatch(opportunityComments.deal.dealTimeslot) ?? [],
+    location: deal.dealDistrict.filter(Boolean).map((ld) => ({
+      id: ld.district.id,
+    })),
+    availability: getAvailabilityTryCatch(deal.dealTimeslot) ?? [],
     contact: getOpportunityContact(opportunityComments),
     agent: dtoOpportunityAgent(opportunityComments.agent!),
     accompanyingDetails: dtoOpportunityAccompanying(
       accompanyingForType(opportunityComments)!,
       opportunityComments.onetimer?.date,
-      opportunityComments.deal.dealLanguage,
+      deal.dealLanguage,
       accompanyingDistrict,
     ),
     event: eventStart

@@ -1,3 +1,13 @@
 #!/bin/sh
 . "$(dirname "$0")/husky.sh"
-yarn test
+
+# Prefer the isolated, fixture-seeded db-test (parallel, never touches dev
+# data; same flow as CI). Without Docker, fall back to the dev DB (serial).
+# db-test is left running so the next push skips the start-up; re-seeding a
+# used db-test is a no-op. `yarn test:db:down` discards it. (be#999)
+if docker info >/dev/null 2>&1; then
+  yarn test:db:up && yarn test:db:seed && yarn test:db
+else
+  echo "pre-push: Docker not available — running tests against the dev DB"
+  yarn test
+fi

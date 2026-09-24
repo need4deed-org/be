@@ -88,6 +88,7 @@ import {
   writeOpportunityLegacy,
 } from "../../utils";
 import { addTranslatedFields } from "../../utils/data/for-routes";
+import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -284,11 +285,15 @@ export default async function opportunityRoutes(
           )
         : undefined;
 
-      const data = dtoOpportunityGet(
-        opportunityComments,
-        accompanyingDistrict,
-        districtCentroid,
-      );
+      const myMatchStatus = await getCallerMatchStatus(request, id);
+      const data = {
+        ...dtoOpportunityGet(
+          opportunityComments,
+          accompanyingDistrict,
+          districtCentroid,
+        ),
+        ...(myMatchStatus !== undefined && { myMatchStatus }),
+      };
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
@@ -511,7 +516,7 @@ export default async function opportunityRoutes(
         relations: ["address.postcode", "agentPerson"],
       });
       if (!agent) {
-        throw new NotFoundError(`Agent (id:${agentId}) not found.`);
+        throw new NotFoundError("The selected NGO could not be found.");
       }
 
       // This route derives the deal's postcode solely from the agent's
@@ -520,7 +525,7 @@ export default async function opportunityRoutes(
       // otherwise reach the DB as an unhandled constraint violation.
       if (!agent.address?.postcode?.value) {
         throw new BadRequestError(
-          `Agent (id:${agentId}) has no postcode on its address; set one before creating an opportunity for it.`,
+          "The selected NGO's address must include a postcode before creating an opportunity.",
         );
       }
 
@@ -812,7 +817,7 @@ export default async function opportunityRoutes(
           where: { id: agentLinkId },
         });
         if (!linkedAgent) {
-          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
+          throw new NotFoundError("The selected NGO could not be found.");
         }
       }
       const effectiveAgentId = agentLinkId ?? opportunity.agentId;

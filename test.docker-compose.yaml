@@ -1,0 +1,43 @@
+# Throwaway Postgres for the Vitest suite (be#999) — separate from the dev
+# `db` service so tests never depend on (or mutate) a contributor's dev data.
+#
+# Data lives on tmpfs: every `up` starts from an empty cluster, and
+# `yarn test:db:seed` rebuilds it from migrations + the checked-in fixtures
+# (public/data/*.json, src/data/seeds/fixtures/*.json), so reference-table ids
+# are identical on every machine and in CI.
+#
+#   yarn test:db:up     # start (port 5433)
+#   yarn test:db:seed   # migrate + seed
+#   yarn test:db        # run the suite against it
+#   yarn test:db:down   # stop and discard
+services:
+  db-test:
+    container_name: db-test
+    image: postgres:17.9
+    ports:
+      - ${DB_TEST_PORT:-5433}:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    # Durability is pointless for a disposable DB; turning it off makes the
+    # commit-heavy suite noticeably faster.
+    command:
+      [
+        "postgres",
+        "-c",
+        "fsync=off",
+        "-c",
+        "synchronous_commit=off",
+        "-c",
+        "full_page_writes=off",
+        "-c",
+        "max_connections=500",
+      ]
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

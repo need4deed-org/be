@@ -1,0 +1,41 @@
+name: test
+
+# Runs the Vitest suite against a throwaway Postgres seeded only from
+# checked-in fixtures (be#999) — the same `yarn test:db:*` flow as locally.
+
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Same compose file as local dev (not a job `services:` container) so
+      # CI gets the identical Postgres flags (fsync off, max_connections).
+      - name: Start test DB
+        run: yarn test:db:up
+
+      - name: Migrate and seed test DB
+        run: yarn test:db:seed
+
+      - name: Run tests
+        run: yarn test:db

@@ -366,6 +366,24 @@ describe("PATCH /opportunity/:id agent status update", () => {
     );
   });
 
+  // be#1045: the create-path equivalent of this error used to interpolate
+  // the raw agent id into the client-facing message.
+  it("does not expose the internal agent id when relinking to a nonexistent agent", async () => {
+    const missingAgentId = 2_147_483_647;
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { agent: { id: missingAgentId } },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      error: "NotFoundError",
+      message: "The selected NGO could not be found.",
+    });
+    expect(res.body).not.toContain(String(missingAgentId));
+  });
+
   it("lets an agent relink their opportunity's contact to a registered contact of their own agent (be#870)", async () => {
     const res = await fastify.inject({
       method: "PATCH",
@@ -2178,5 +2196,318 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
     expect(found).toBeDefined();
     expect(found.lat).toBe(DISTRICT_LAT);
     expect(found.lon).toBe(DISTRICT_LON);
+  });
+});
+
+describe("GET /opportunity RAC masking + myMatchStatus for volunteers (be#1039)", () => {
+  let fastify: FastifyInstance;
+  let agentAddress: Address;
+  let agent: Agent;
+  let deal: Deal;
+  let opportunity: Opportunity;
+  const persons: Person[] = [];
+  const volunteers: Volunteer[] = [];
+  const volunteerDeals: Deal[] = [];
+  const cookies: Record<string, string> = {};
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const AGENT_TITLE = `Test RAC (be#1039) ${suffix}`;
+  const AGENT_STREET = `Geheimstraße ${suffix}`;
+
+  // Volunteer callers, keyed by their link to the opportunity (null = none).
+  const VOLUNTEER_LINKS: Record<string, OpportunityVolunteerStatusType | null> =
+    {
+      unlinked: null,
+      pending: OpportunityVolunteerStatusType.PENDING,
+      matched: OpportunityVolunteerStatusType.MATCHED,
+      active: OpportunityVolunteerStatusType.ACTIVE,
+      past: OpportunityVolunteerStatusType.PAST,
+    };
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    agentAddress = await getRepository(dataSource, Address).save(
+      new Address({
+        street: AGENT_STREET,
+        city: "Berlin",
+        postcodeId: postcode.id,
+      }),
+    );
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: AGENT_TITLE, addressId: agentAddress.id }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (be#1039) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    const addUser = async (key: string, role: UserRole): Promise<Person> => {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Test", lastName: `be1039-${key}` }),
+      );
+      persons.push(person);
+      await fastify.db.userRepository.save(
+        new User({
+          email: `be1039-${key}-${suffix}@test.need4deed.org`,
+          password: pwHash,
+          role,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      return person;
+    };
+
+    for (const [key, status] of Object.entries(VOLUNTEER_LINKS)) {
+      const person = await addUser(key, UserRole.VOLUNTEER);
+      const volunteerDeal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+      );
+      volunteerDeals.push(volunteerDeal);
+      const volunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ dealId: volunteerDeal.id, personId: person.id }),
+      );
+      volunteers.push(volunteer);
+      if (status) {
+        await fastify.db.opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({
+            opportunityId: opportunity.id,
+            volunteerId: volunteer.id,
+            status,
+          }),
+        );
+      }
+    }
+    await addUser("coordinator", UserRole.COORDINATOR);
+    const agentMember = await addUser("agent", UserRole.AGENT);
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: agentMember.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
+    for (const key of [
+      ...Object.keys(VOLUNTEER_LINKS),
+      "coordinator",
+      "agent",
+    ]) {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          email: `be1039-${key}-${suffix}@test.need4deed.org`,
+          password: PASSWORD,
+        },
+      });
+      cookies[key] = getCookie(res.cookies, accessCookieName);
+    }
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityVolunteerRepository.delete({
+      opportunityId: opportunity.id,
+    });
+    await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
+    for (const volunteer of volunteers) {
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    }
+    for (const volunteerDeal of volunteerDeals) {
+      await fastify.db.dealRepository.delete({ id: volunteerDeal.id });
+    }
+    for (const person of persons) {
+      await fastify.db.userRepository.delete({ personId: person.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: agentAddress.id });
+    await fastify.close();
+  });
+
+  const getOne = async (caller: string) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: cookies[caller] },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().data;
+  };
+
+  const getFromList = async (caller: string) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(opportunity.title)}`,
+      cookies: { [accessCookieName]: cookies[caller] },
+    });
+    expect(res.statusCode).toBe(200);
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === opportunity.id);
+    expect(found).toBeDefined();
+    return found;
+  };
+
+  it.each(["unlinked", "pending", "past"])(
+    "masks the RAC name and address for a %s volunteer",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).not.toContain(AGENT_TITLE);
+      expect(data.agentTitle).not.toContain(AGENT_TITLE);
+      expect(data.agent.address).not.toContain(AGENT_STREET);
+      expect(data.myMatchStatus).toBe(VOLUNTEER_LINKS[caller]);
+
+      expect((await getFromList(caller)).agentTitle).not.toContain(AGENT_TITLE);
+    },
+  );
+
+  it.each(["matched", "active"])(
+    "shows the RAC name and address to a %s volunteer",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).toBe(AGENT_TITLE);
+      expect(data.agentTitle).toBe(AGENT_TITLE);
+      expect(data.agent.address).toContain(AGENT_STREET);
+      expect(data.myMatchStatus).toBe(VOLUNTEER_LINKS[caller]);
+
+      expect((await getFromList(caller)).agentTitle).toBe(AGENT_TITLE);
+    },
+  );
+
+  // Review of be#1040: the opportunity's agentId must not let a volunteer
+  // look the RAC up on the /agent routes instead.
+  it.each([
+    () => `/agent/${agent.id}`,
+    () => `/agent?filter[search]=${encodeURIComponent(AGENT_TITLE)}`,
+    () => `/agent/${agent.id}/opportunity-linked`,
+    () => `/agent/${agent.id}/volunteer-linked`,
+    () => `/agent/${agent.id}/communication`,
+  ])("403s a volunteer on the agent routes (%#)", async (url) => {
+    for (const caller of ["pending", "matched"]) {
+      const res = await fastify.inject({
+        method: "GET",
+        url: url(),
+        cookies: { [accessCookieName]: cookies[caller] },
+      });
+      expect(res.statusCode).toBe(403);
+    }
+  });
+
+  it("still lets an agent member read their own agent", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agent.id}`,
+      cookies: { [accessCookieName]: cookies.agent },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it.each(["coordinator", "agent"])(
+    "leaves the RAC unmasked and omits myMatchStatus for a %s",
+    async (caller) => {
+      const data = await getOne(caller);
+      expect(data.agent.name).toBe(AGENT_TITLE);
+      expect(data.agent.address).toContain(AGENT_STREET);
+      expect(data).not.toHaveProperty("myMatchStatus");
+    },
+  );
+});
+
+// opportunity.deal_id is nullable; a single deal-less opportunity used to 500
+// the whole coordinator list (null deal in addCategoryToDeal / the DTOs) —
+// surfaced by parallel test runs, where other files' deal-less fixtures leak
+// into an unfiltered list (be#999).
+describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
+  let fastify: FastifyInstance;
+  let opportunity: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const coordinatorEmail = `coordinator-no-deal-${suffix}@test.need4deed.org`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test No Deal ${suffix}`,
+        type: OpportunityType.REGULAR,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "NoDealCoordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: coordinatorEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorEmail, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.close();
+  });
+
+  it("lists it with a null category and empty deal-derived lists instead of 500ing", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(opportunity.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === opportunity.id);
+    expect(found).toBeDefined();
+    // OptionId is string|number, so a null category id serializes as "" —
+    // same as a deal whose categoryId is still null.
+    expect(found.category.id).toBeFalsy();
+    expect(found.languages).toEqual([]);
+    expect(found.activities).toEqual([]);
+    expect(found.location).toEqual([]);
+  });
+
+  it("serves it by id", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.skills).toEqual([]);
   });
 });

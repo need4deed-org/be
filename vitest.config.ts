@@ -14,7 +14,8 @@ export default defineConfig({
     // across ~98 files, causing random, file-order-dependent failures
     // (be#996) — a query on one file's pool intermittently fails while
     // another file's pool is mid-teardown. Serial execution is slower but
-    // deterministic.
+    // deterministic. `yarn test:db` (and CI) overrides this with
+    // --fileParallelism: its db-test instance allows 500 connections (be#999).
     fileParallelism: false,
     env: {
       JWT_SECRET: "test-secret-only-for-vitest",

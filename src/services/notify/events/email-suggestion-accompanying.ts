@@ -11,6 +11,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionAccompanyingManifestUrl);
@@ -27,6 +28,10 @@ export function resetSuggestionAccompanyingTemplateCache(): void {
 export async function sendEmailSuggestionAccompanying(
   email: EmailTransport,
   ov: OpportunityVolunteer,
+  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
+  // errorTransport (be#847) — defaults to `email` for callers that don't
+  // care about that distinction (e.g. tests with a single mock transport).
+  errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -44,6 +49,12 @@ export async function sendEmailSuggestionAccompanying(
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
+  const accompaniedpersonLanguage = await resolveAccompaniedPersonLanguage(
+    errorTransport,
+    accompanying?.languageToTranslate,
+    opportunity?.deal?.dealLanguage ?? [],
+    `sendEmailSuggestionAccompanying, ov ${ov.id}`,
+  );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
@@ -53,6 +64,7 @@ export async function sendEmailSuggestionAccompanying(
     appointmentPlz,
     appointmentDate,
     appointmentTime,
+    accompaniedpersonLanguage,
   });
 
   await email.send({
