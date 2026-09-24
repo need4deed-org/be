@@ -2411,3 +2411,85 @@ describe("GET /opportunity RAC masking + myMatchStatus for volunteers (be#1039)"
     },
   );
 });
+
+// opportunity.deal_id is nullable; a single deal-less opportunity used to 500
+// the whole coordinator list (null deal in addCategoryToDeal / the DTOs) —
+// surfaced by parallel test runs, where other files' deal-less fixtures leak
+// into an unfiltered list (be#999).
+describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
+  let fastify: FastifyInstance;
+  let opportunity: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const coordinatorEmail = `coordinator-no-deal-${suffix}@test.need4deed.org`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test No Deal ${suffix}`,
+        type: OpportunityType.REGULAR,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "NoDealCoordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: coordinatorEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorEmail, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.close();
+  });
+
+  it("lists it with a null category and empty deal-derived lists instead of 500ing", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(opportunity.title)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === opportunity.id);
+    expect(found).toBeDefined();
+    // OptionId is string|number, so a null category id serializes as "" —
+    // same as a deal whose categoryId is still null.
+    expect(found.category.id).toBeFalsy();
+    expect(found.languages).toEqual([]);
+    expect(found.activities).toEqual([]);
+    expect(found.location).toEqual([]);
+  });
+
+  it("serves it by id", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.skills).toEqual([]);
+  });
+});
