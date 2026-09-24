@@ -817,7 +817,7 @@ export default async function opportunityRoutes(
           where: { id: agentLinkId },
         });
         if (!linkedAgent) {
-          throw new NotFoundError(`Agent (id:${agentLinkId}) not found.`);
+          throw new NotFoundError("The selected NGO could not be found.");
         }
       }
       const effectiveAgentId = agentLinkId ?? opportunity.agentId;
