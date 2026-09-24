@@ -366,6 +366,24 @@ describe("PATCH /opportunity/:id agent status update", () => {
     );
   });
 
+  // be#1045: the create-path equivalent of this error used to interpolate
+  // the raw agent id into the client-facing message.
+  it("does not expose the internal agent id when relinking to a nonexistent agent", async () => {
+    const missingAgentId = 2_147_483_647;
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${ownOpportunity.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { agent: { id: missingAgentId } },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      error: "NotFoundError",
+      message: "The selected NGO could not be found.",
+    });
+    expect(res.body).not.toContain(String(missingAgentId));
+  });
+
   it("lets an agent relink their opportunity's contact to a registered contact of their own agent (be#870)", async () => {
     const res = await fastify.inject({
       method: "PATCH",
