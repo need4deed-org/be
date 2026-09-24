@@ -66,12 +66,16 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
       .save(new Agent({ title: `Second NGO ${suffix}` }));
     createdAgentIds.push(targetAgent.id);
 
-    const membership = await createAgentContact(targetAgent.id, {
-      firstName: "Liam",
-      lastName: "Whatever",
-      role: AgentRoleType.VOLUNTEER_COORDINATOR,
-      email,
-    });
+    const membership = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Liam",
+        lastName: "Whatever",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.COORDINATOR,
+    );
 
     expect(membership.personId).toBe(existingPerson.id);
     expect(membership.agentId).toBe(targetAgent.id);
@@ -79,10 +83,80 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
 
     // No duplicate Person was minted for this email — the User carries it
     // (Person.email is unset in this fixture, matching real agent data).
+    // Counts Person rows joined to a User with this email, not User rows
+    // (User.email is unique so that count could never expose a duplicate
+    // Person, be#1048 review).
     const personCount = await dataSource
-      .getRepository(User)
-      .count({ where: { email } });
+      .getRepository(Person)
+      .createQueryBuilder("person")
+      .innerJoin("person.users", "users", "users.email = :email", { email })
+      .getCount();
     expect(personCount).toBe(1);
+  });
+
+  it("does not treat % or _ in the email as SQL wildcards", async () => {
+    const email = `wild-${suffix}@example.com`;
+    await makeAgentUser(email);
+
+    const targetAgent = await dataSource
+      .getRepository(Agent)
+      .save(new Agent({ title: `Wildcard NGO ${suffix}` }));
+    createdAgentIds.push(targetAgent.id);
+
+    const membership = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Wild",
+        lastName: "Card",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        // Would match `email` above under ILIKE/LIKE ("wild-...@example.com")
+        // but must not under an exact match.
+        email: `wild%${suffix}@example.com`,
+      },
+      UserRole.COORDINATOR,
+    );
+
+    expect(membership.person.firstName).toBe("Wild");
+    createdPersonIds.push(membership.personId);
+  });
+
+  it("creates a PENDING membership when an AGENT (not coordinator/admin) links an existing user", async () => {
+    const email = `liam-agent-${suffix}@example.com`;
+    const existingPerson = await makeAgentUser(email);
+
+    const targetAgent = await dataSource
+      .getRepository(Agent)
+      .save(new Agent({ title: `Agent-linked NGO ${suffix}` }));
+    createdAgentIds.push(targetAgent.id);
+
+    const membership = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Liam",
+        lastName: "Whatever",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.AGENT,
+    );
+
+    expect(membership.personId).toBe(existingPerson.id);
+    expect(membership.status).toBe(AgentMembershipStatus.PENDING);
+
+    // A coordinator later approving the same link promotes it to ACTIVE
+    // instead of leaving it PENDING or creating a second membership row.
+    const approved = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Liam",
+        lastName: "Whatever",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.COORDINATOR,
+    );
+    expect(approved.id).toBe(membership.id);
+    expect(approved.status).toBe(AgentMembershipStatus.ACTIVE);
   });
 
   it("is idempotent for the same (agent, person, role)", async () => {
@@ -94,18 +168,26 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
       .save(new Agent({ title: `Repeat NGO ${suffix}` }));
     createdAgentIds.push(targetAgent.id);
 
-    const first = await createAgentContact(targetAgent.id, {
-      firstName: "Liam",
-      lastName: "Whatever",
-      role: AgentRoleType.VOLUNTEER_COORDINATOR,
-      email,
-    });
-    const second = await createAgentContact(targetAgent.id, {
-      firstName: "Liam",
-      lastName: "Whatever",
-      role: AgentRoleType.VOLUNTEER_COORDINATOR,
-      email,
-    });
+    const first = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Liam",
+        lastName: "Whatever",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.COORDINATOR,
+    );
+    const second = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Liam",
+        lastName: "Whatever",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.COORDINATOR,
+    );
 
     expect(second.id).toBe(first.id);
     const memberships = await dataSource.getRepository(AgentPerson).count({
@@ -136,12 +218,16 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
       .save(new Agent({ title: `Volunteer-only NGO ${suffix}` }));
     createdAgentIds.push(targetAgent.id);
 
-    const membership = await createAgentContact(targetAgent.id, {
-      firstName: "Vera",
-      lastName: "Volunteer",
-      role: AgentRoleType.VOLUNTEER_COORDINATOR,
-      email,
-    });
+    const membership = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "Vera",
+        lastName: "Volunteer",
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        email,
+      },
+      UserRole.COORDINATOR,
+    );
 
     expect(membership.personId).not.toBe(person.id);
     createdPersonIds.push(membership.personId);
@@ -153,11 +239,15 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
       .save(new Agent({ title: `No-email NGO ${suffix}` }));
     createdAgentIds.push(targetAgent.id);
 
-    const membership = await createAgentContact(targetAgent.id, {
-      firstName: "No",
-      lastName: "Email",
-      role: AgentRoleType.OTHER,
-    });
+    const membership = await createAgentContact(
+      targetAgent.id,
+      {
+        firstName: "No",
+        lastName: "Email",
+        role: AgentRoleType.OTHER,
+      },
+      UserRole.COORDINATOR,
+    );
 
     expect(membership.person.firstName).toBe("No");
     createdPersonIds.push(membership.personId);

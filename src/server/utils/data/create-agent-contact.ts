@@ -28,21 +28,32 @@ import { createAddress } from "./for-routes";
 // matched Person has any User at all, which is right for its own use case
 // (submitter tracking) but wrong here: granting a real NGO membership is a
 // higher-stakes action than that submitter-tracking link.
+//
+// Exact, case-insensitive match on a trimmed value (LOWER(...) = LOWER(...)),
+// not ILIKE: `email` is an unvalidated string reachable by any active AGENT
+// member (not just coordinators/admins), and ILIKE treats `%`/`_` as
+// wildcards, letting a crafted value enumerate or link other NGOs' users
+// (be#1048 review). Inner-joins only AGENT-role users, so a Person with no
+// User at all (e.g. a stale duplicate from before this feature existed)
+// can never match, and getOne() can't pick an unrelated userless Person over
+// the real AGENT-linked one (be#1048 review).
 async function findExistingAgentUserPerson(
   manager: EntityManager,
   email: string,
 ): Promise<Person | null> {
-  const person = await getRepository(manager, Person)
-    .createQueryBuilder("person")
-    .leftJoinAndSelect("person.users", "users")
-    .where("person.email ILIKE :email", { email })
-    .orWhere("users.email ILIKE :email", { email })
-    .getOne();
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
 
-  const hasAgentUser = person?.users?.some(
-    (user) => user.role === UserRole.AGENT,
-  );
-  return hasAgentUser ? person! : null;
+  return getRepository(manager, Person)
+    .createQueryBuilder("person")
+    .innerJoinAndSelect("person.users", "users", "users.role = :role", {
+      role: UserRole.AGENT,
+    })
+    .where("LOWER(person.email) = :email", { email: normalizedEmail })
+    .orWhere("LOWER(users.email) = :email", { email: normalizedEmail })
+    .getOne();
 }
 
 /**
@@ -51,11 +62,22 @@ async function findExistingAgentUserPerson(
  * which only ever links the *authenticated caller's own* person.
  *
  * If `input.email` matches an existing Person who already has an AGENT-role
- * User, links that existing Person with a new AgentPerson membership
- * (ACTIVE immediately — a coordinator/admin doing this deliberately is
- * itself the approval, same reasoning as joinAgent) instead of creating a
- * duplicate, disconnected Person (be#1048). Idempotent: an existing
- * membership for the same (agent, person, role) is returned as-is.
+ * User, links that existing Person with a new AgentPerson membership instead
+ * of creating a duplicate, disconnected Person (be#1048). `input`'s other
+ * fields (name, phone, address, …) are ignored in this case: the existing
+ * Person's own profile stays authoritative rather than being overwritten by
+ * whatever the caller happened to type for someone else's account
+ * (be#1048 review). Idempotent: an existing membership for the same (agent,
+ * person, role) is returned as-is, except a coordinator/admin promotes a
+ * PENDING one straight to ACTIVE (that's the same deliberate approval a
+ * fresh link from them would represent).
+ *
+ * A new membership is ACTIVE immediately only for a coordinator/admin
+ * caller — that action is itself the approval, same reasoning as joinAgent.
+ * An AGENT caller (an active member of *some* agent, but not necessarily
+ * this one or with this user's consent) instead creates a PENDING
+ * membership, moderated the same way as a self-service join request via
+ * GET/PATCH /agent/membership (be#1048 review).
  *
  * Otherwise (no email, or no matching AGENT-role Person), behavior is
  * unchanged: always creates a brand-new Person. Address is best-effort: if
@@ -68,8 +90,11 @@ async function findExistingAgentUserPerson(
 export async function createAgentContact(
   agentId: number,
   input: ApiAgentContactPost,
+  callerRole: UserRole,
 ): Promise<AgentPerson> {
   let result!: AgentPerson;
+  const canApprove =
+    callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
 
   await dataSource.manager.transaction(async (manager) => {
     const personRepository = getRepository(manager, Person);
@@ -83,16 +108,25 @@ export async function createAgentContact(
       const existingMembership = await agentPersonRepository.findOne({
         where: { agentId, personId: existingPerson.id, role: input.role },
       });
-      const agentPerson =
-        existingMembership ??
-        (await agentPersonRepository.save(
+      let agentPerson = existingMembership;
+      if (!agentPerson) {
+        agentPerson = await agentPersonRepository.save(
           new AgentPerson({
             agentId,
             personId: existingPerson.id,
             role: input.role,
-            status: AgentMembershipStatus.ACTIVE,
+            status: canApprove
+              ? AgentMembershipStatus.ACTIVE
+              : AgentMembershipStatus.PENDING,
           }),
-        ));
+        );
+      } else if (
+        canApprove &&
+        agentPerson.status === AgentMembershipStatus.PENDING
+      ) {
+        agentPerson.status = AgentMembershipStatus.ACTIVE;
+        agentPerson = await agentPersonRepository.save(agentPerson);
+      }
       agentPerson.person = existingPerson;
       result = agentPerson;
       return;
