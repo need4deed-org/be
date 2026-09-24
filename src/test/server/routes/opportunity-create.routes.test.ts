@@ -37,6 +37,97 @@ function getCookie(
   return cookie;
 }
 
+describe("POST /opportunity validates the NGO postcode", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Agent without postcode ${suffix}` }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `coordinator-postcode-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `coordinator-postcode-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  it("returns actionable guidance without exposing the internal agent id", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Test Opportunity ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: "BadRequestError",
+      message:
+        "The selected NGO's address must include a postcode before creating an opportunity.",
+    });
+    expect(res.body).not.toContain(String(agent.id));
+  });
+
+  it("does not expose the requested id when the NGO cannot be found", async () => {
+    const missingAgentId = 2_147_483_647;
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { agent_id: missingAgentId },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      error: "NotFoundError",
+      message: "The selected NGO could not be found.",
+    });
+    expect(res.body).not.toContain(String(missingAgentId));
+  });
+});
+
 // Regression test for be#774: POST /opportunity (dashboard create) resolves
 // activities/skills/languages by numeric option id, unlike POST
 // /opportunity/legacy which resolves free-text/ISO-code strings by title.
