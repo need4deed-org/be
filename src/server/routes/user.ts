@@ -154,14 +154,16 @@ export default async function userRoutes(
   );
 
   // Self-service account deletion (be#583). Soft delete only — sets
-  // isActive to false rather than removing the row.
+  // isActive to false (and stamps deactivatedAt) rather than removing the
+  // row.
   //
   // Deliberately does NOT use fastify.authenticate({ allowSelf: true }):
   // that option's ADMIN bypass (documented, relied-on framework behavior —
   // see CLAUDE.md) is appropriate for read/administrative routes, but this
   // is a destructive, irreversible action with no reactivation path
-  // anywhere in the API. Reusing the bypass here would let any ADMIN
-  // deactivate an arbitrary account (including another admin's, or their
+  // anywhere in the API (verify-email refuses deactivated accounts).
+  // Reusing the bypass here would let any ADMIN deactivate an arbitrary
+  // account (including another admin's, or their
   // own by mistake) by id, contradicting be#583's own acceptance criteria
   // ("only the authenticated user's own account can be targeted") — so the
   // self-check below applies to every caller, ADMIN included (be#1007
@@ -190,7 +192,7 @@ export default async function userRoutes(
       // concurrent removal, not the common case.
       const result = await fastify.db.userRepository.update(
         { id },
-        { isActive: false },
+        { isActive: false, deactivatedAt: new Date() },
       );
       if (!result.affected) {
         throw new NotFoundError(`User id:${id} not found.`);
@@ -321,7 +323,7 @@ export default async function userRoutes(
           .send({ message: "Token is required for email verification." });
       }
 
-      let decodedToken: { email: string };
+      let decodedToken: { email: string; type?: string };
       try {
         decodedToken = await fastify.jwt.verify(token);
       } catch (error) {
@@ -331,7 +333,10 @@ export default async function userRoutes(
 
       const email = decodedToken?.email;
 
-      if (!email) {
+      // Only an email-verification token may activate an account — an
+      // access/refresh/reset token carries the same email claim (be#1007
+      // review).
+      if (!email || decodedToken.type !== "verify") {
         return reply.status(400).send({ message: "Invalid token format." });
       }
 
@@ -360,6 +365,12 @@ export default async function userRoutes(
 
       if (user.isActive) {
         throw new AlreadyUsedTokenError();
+      }
+
+      // isActive: false also means "deactivated" — a still-valid verification
+      // link must not bring a deleted/erased account back (be#1007 review).
+      if (user.deactivatedAt) {
+        throw new BadRequestError("Account has been deactivated.");
       }
 
       user.isActive = true;

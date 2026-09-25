@@ -433,6 +433,60 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
       message: "Already used token.",
     });
   });
+
+  // be#1007 review: isActive: false also means "deactivated", so a
+  // still-valid verification link must not reactivate a deleted account.
+  it("refuses to reactivate a deactivated account via its verification token", async () => {
+    const user = await makeInactiveUser(
+      `deactivated-${suffix}@example.com`,
+      UserRole.VOLUNTEER,
+    );
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "verify",
+    });
+    await fastify.db.userRepository.update(
+      { id: user.id },
+      { deactivatedAt: new Date() },
+    );
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const reloaded = await fastify.db.userRepository.findOneOrFail({
+      where: { id: user.id },
+    });
+    expect(reloaded.isActive).toBe(false);
+  });
+
+  it("rejects a non-verify token type", async () => {
+    const user = await makeInactiveUser(
+      `wrong-token-type-${suffix}@example.com`,
+      UserRole.VOLUNTEER,
+    );
+    const token = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "reset",
+    });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const reloaded = await fastify.db.userRepository.findOneOrFail({
+      where: { id: user.id },
+    });
+    expect(reloaded.isActive).toBe(false);
+  });
 });
 
 // be#809: a person can hold more than one active AgentPerson membership (the
@@ -1075,6 +1129,7 @@ describe("DELETE /user/:id (be#583)", () => {
         where: { id: user.id },
       });
       expect(updated.isActive).toBe(false);
+      expect(updated.deactivatedAt).toBeInstanceOf(Date);
     } finally {
       await fastify.db.userRepository.delete({ id: user.id });
     }

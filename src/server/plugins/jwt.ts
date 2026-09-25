@@ -175,7 +175,10 @@ async function jwtPlugin(
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user?.id },
         });
-        if (user) {
+        // Same isActive gate as authenticate(): a deactivated account's
+        // unexpired access cookie must not count as authenticated here either
+        // (be#1007 review).
+        if (user?.isActive) {
           request.authUser = user;
         }
       } catch {

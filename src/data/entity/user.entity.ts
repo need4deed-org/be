@@ -46,6 +46,14 @@ export default class User {
   @IsBoolean()
   isActive: boolean;
 
+  // Set when the account is deactivated (self-service deletion, be#583, or
+  // GDPR erasure). Kept separate from isActive, which is also false for a
+  // never-verified account: verify-email must be able to tell the two apart
+  // so it can't reactivate a deleted account (be#1007 review).
+  @Column({ type: "timestamp", nullable: true })
+  @IsOptional()
+  deactivatedAt: Date | null;
+
   @Column({ type: "enum", enum: UserRole, default: UserRole.USER })
   @IsEnum(UserRole)
   role: UserRole;

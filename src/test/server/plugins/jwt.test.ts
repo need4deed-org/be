@@ -225,6 +225,35 @@ describe("X-API-Key authentication", () => {
     expect(response.json().message).toBe("Account is not active.");
   });
 
+  it("tryAuthenticate treats a deactivated user's still-valid JWT cookie as anonymous (be#1007)", async () => {
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      ...coordinatorUser,
+      isActive: false,
+    } as any);
+    const eventFindSpy = vi
+      .spyOn(fastify.db.eventRepository, "find")
+      .mockResolvedValue([]);
+
+    const accessToken = fastify.jwt.sign({
+      id: 42,
+      email: "coordinator@example.com",
+      role: UserRole.COORDINATOR,
+      type: "access",
+    });
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/event",
+      cookies: { access: accessToken },
+    });
+
+    expect(response.statusCode).toBe(200);
+    // Not privileged: only active events are queried.
+    expect(eventFindSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+  });
+
   it("be#1011: rejects an id-less token used as the access cookie instead of matching an arbitrary user", async () => {
     // Regression for a critical finding: TypeORM's findOne({where:{id:
     // undefined}}) drops the id key entirely rather than filtering by it,
