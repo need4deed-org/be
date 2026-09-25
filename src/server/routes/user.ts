@@ -15,11 +15,12 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { FindOptionsWhere, ILike } from "typeorm";
+import { FindOptionsWhere, ILike, Not } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
   InvalidOrganizationEmailError,
+  NotFoundError,
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../config";
@@ -32,7 +33,7 @@ import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
-import { responseSchema, userListQuerySchema } from "../schema";
+import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { responseErrors } from "../schema/responseErrors";
 import {
   coordinatorInviteBodySchema,
@@ -46,8 +47,10 @@ import {
 } from "../schema/user.schema";
 import {
   CoordinatorInvitePerson,
+  ParamsId,
   QuerystringUserList,
   ReplyDataCount,
+  ReplyMessage,
   RoutePrefix,
 } from "../types";
 import {
@@ -147,6 +150,71 @@ export default async function userRoutes(
         logger.error(`Error fetching user: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
+    },
+  );
+
+  // Self-service account deletion (be#583). Soft delete only — sets
+  // isActive to false (and stamps deactivatedAt) rather than removing the
+  // row.
+  //
+  // Deliberately does NOT use fastify.authenticate({ allowSelf: true }):
+  // that option's ADMIN bypass (documented, relied-on framework behavior —
+  // see CLAUDE.md) is appropriate for read/administrative routes, but this
+  // is a destructive, irreversible action with no reactivation path
+  // anywhere in the API (verify-email refuses deactivated accounts).
+  // Reusing the bypass here would let any ADMIN deactivate an arbitrary
+  // account (including another admin's, or their
+  // own by mistake) by id, contradicting be#583's own acceptance criteria
+  // ("only the authenticated user's own account can be targeted") — so the
+  // self-check below applies to every caller, ADMIN included (be#1007
+  // review).
+  fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema(""),
+      },
+      onRequest: [fastify.authenticate()],
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+
+      if (request.authUser!.id !== id) {
+        throw new UnauthorizedError("Permission denied");
+      }
+
+      // Nothing in the API can reactivate an account, so the last active
+      // ADMIN deactivating themselves would leave no one able to administer
+      // the platform without direct DB access (be#1007 review).
+      if (request.authUser!.role === UserRole.ADMIN) {
+        const otherActiveAdmins = await fastify.db.userRepository.count({
+          where: { role: UserRole.ADMIN, isActive: true, id: Not(id) },
+        });
+        if (otherActiveAdmins === 0) {
+          throw new BadRequestError(
+            "The last active admin account cannot be deactivated.",
+          );
+        }
+      }
+
+      // Single update + affected check instead of a separate findOne: one
+      // query instead of two, and it can't report a false-positive success
+      // if the row is removed between the check and the write (be#1007
+      // review) — request.authUser already confirms the row exists at the
+      // top of this request, so `affected === 0` here means a genuine
+      // concurrent removal, not the common case.
+      const result = await fastify.db.userRepository.update(
+        { id },
+        { isActive: false, deactivatedAt: new Date() },
+      );
+      if (!result.affected) {
+        throw new NotFoundError(`User id:${id} not found.`);
+      }
+
+      return reply
+        .status(200)
+        .send({ message: `Account id:${id} deactivated.` });
     },
   );
 
@@ -269,7 +337,7 @@ export default async function userRoutes(
           .send({ message: "Token is required for email verification." });
       }
 
-      let decodedToken: { email: string };
+      let decodedToken: { email: string; type?: string };
       try {
         decodedToken = await fastify.jwt.verify(token);
       } catch (error) {
@@ -279,7 +347,10 @@ export default async function userRoutes(
 
       const email = decodedToken?.email;
 
-      if (!email) {
+      // Only an email-verification token may activate an account — an
+      // access/refresh/reset token carries the same email claim (be#1007
+      // review).
+      if (!email || decodedToken.type !== "verify") {
         return reply.status(400).send({ message: "Invalid token format." });
       }
 
@@ -308,6 +379,12 @@ export default async function userRoutes(
 
       if (user.isActive) {
         throw new AlreadyUsedTokenError();
+      }
+
+      // isActive: false also means "deactivated" — a still-valid verification
+      // link must not bring a deleted/erased account back (be#1007 review).
+      if (user.deactivatedAt) {
+        throw new BadRequestError("Account has been deactivated.");
       }
 
       user.isActive = true;

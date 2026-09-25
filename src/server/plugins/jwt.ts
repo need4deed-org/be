@@ -74,15 +74,6 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthenticatedError("Invalid API key.");
         }
-        // isActive is checked here but deliberately not for the JWT-cookie
-        // path below: this is a new gate introduced for API keys, not a
-        // fix applied unevenly. Changing existing cookie-session behavior
-        // (an already-issued 15-min token for a since-deactivated user
-        // currently still authenticates until it expires) is out of scope
-        // for this change.
-        if (!user.isActive) {
-          throw new UnauthenticatedError("Account is not active.");
-        }
         logger.debug(`jwtPlugin:authenticated via api key: ${user.id}`);
       } else {
         try {
@@ -94,17 +85,20 @@ async function jwtPlugin(
         const userId = request.user?.id;
         logger.debug(`jwtPlugin:authenticated: ${userId}`);
 
-        // A token with no id (currently only the coordinator-invite type,
-        // be#1008 — it has no User row yet to carry one) must never reach
-        // the lookup below unconstrained: TypeORM's `where: { id: undefined }`
-        // drops the id key entirely instead of filtering by it, turning this
-        // into a WHERE-less query that returns an arbitrary — often the
-        // very first, e.g. an admin — user. This doesn't fix the pre-existing,
-        // separately-tracked gap that this cookie path never checks the
-        // token's `type` claim at all (see tryAuthenticate below): every
-        // token type before coordinator-invite always carried a real id, so
-        // that gap only ever authenticated the legitimate owner of the
-        // token, never an arbitrary account.
+        // Only a session ("access") token may authenticate here (be#908):
+        // verify/reset/refresh/coordinator-invite tokens are signed with the
+        // same secret, so without this check e.g. a password-reset link's
+        // token set as the access cookie would act as a full session — enough
+        // to hit DELETE /user/:id (be#1007 review).
+        //
+        // The id check stays as a second guard: TypeORM's
+        // `where: { id: undefined }` drops the id key entirely instead of
+        // filtering by it, turning the lookup below into a WHERE-less query
+        // that returns an arbitrary — often the very first, e.g. an admin —
+        // user (be#1011).
+        if ((request.user as { type?: string })?.type !== "access") {
+          throw new UnauthenticatedError("Authorization failed.");
+        }
         if (!userId) {
           throw new UnauthenticatedError("Authorization failed.");
         }
@@ -116,6 +110,17 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthorizedError("User not found.");
         }
+      }
+
+      // Checked once, after either auth path resolves `user`: a deactivated
+      // account (self-service deletion, be#583, or GDPR erasure) must stop
+      // authenticating immediately, not just once its already-issued 15-min
+      // access token happens to expire. Every request re-fetches `user`
+      // fresh (no session cache), so this takes effect on the very next
+      // request after deactivation. Previously only checked on the API-key
+      // path (be#1007 review).
+      if (!user.isActive) {
+        throw new UnauthenticatedError("Account is not active.");
       }
 
       // Expose the already-loaded user (carries personId + DB-authoritative
@@ -157,11 +162,9 @@ async function jwtPlugin(
   // Doesn't support the API-key path or role/allowSelf options: those only
   // make sense for a route that actually requires auth.
   //
-  // Checks the token's `type` claim (authenticate()'s cookie path doesn't —
-  // a pre-existing gap tracked separately, out of scope to fix here): a
-  // "verify"/"reset" token (be#... email-verification tokens are signed with
-  // no expiry at all) is otherwise a validly-signed, never-expiring
-  // credential that would silently grant permanent access here.
+  // Checks the token's `type` claim, same as authenticate() (be#908): a
+  // "verify"/"reset" token is otherwise a validly-signed credential that
+  // would silently grant access here.
   fastify.decorate("tryAuthenticate", function () {
     return async function (request: FastifyRequest) {
       try {
@@ -173,7 +176,10 @@ async function jwtPlugin(
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user?.id },
         });
-        if (user) {
+        // Same isActive gate as authenticate(): a deactivated account's
+        // unexpired access cookie must not count as authenticated here either
+        // (be#1007 review).
+        if (user?.isActive) {
           request.authUser = user;
         }
       } catch {

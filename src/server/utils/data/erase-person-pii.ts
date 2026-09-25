@@ -175,6 +175,7 @@ export async function erasePersonPii(
         { id: user.id },
         {
           isActive: false,
+          deactivatedAt: new Date(),
           // Same reasoning as firstName below: NOT NULL + unique, so it must
           // become a non-identifying-but-valid value, not null/empty.
           email: `deleted-user-${user.id}@erased.need4deed.org`,
