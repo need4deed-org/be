@@ -208,6 +208,7 @@ describe("POST /auth/password-change", () => {
     const checkPassword = vi.fn().mockResolvedValue(false);
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
+      isActive: true,
       checkPassword,
     } as any);
 
@@ -236,6 +237,7 @@ describe("POST /auth/password-change", () => {
     const checkPassword = vi.fn().mockResolvedValue(true);
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
+      isActive: true,
       checkPassword,
     } as any);
     const updateSpy = vi
@@ -515,6 +517,7 @@ describe("Rate limiting", () => {
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
       role: "volunteer",
+      isActive: true,
     } as any);
 
     for (let i = 0; i < 20; i++) {
