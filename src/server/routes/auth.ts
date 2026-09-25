@@ -1,6 +1,7 @@
 import { FastifyJWT } from "@fastify/jwt";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
 import {
   ACCESS_LIFESPAN_MS,
   accessCookieName,
@@ -119,14 +120,8 @@ async function authRoutes(
   );
 
   fastify.post<{
-    Body: {
-      refresh?: string;
-    };
-    Reply: {
-      message?: string;
-      access?: string;
-      errors?: any;
-    };
+    Body: ApiAuthRefreshPost;
+    Reply: ApiAuthRefreshResponse | { message: string; errors?: any };
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {
@@ -199,16 +194,23 @@ async function authRoutes(
           throw new Error("No token generated.");
         }
 
-        logger.debug(
-          `Generated new access token for user ID: ${id}: ${access}`,
-        );
+        const refresh = signRefreshToken(fastify, user);
+
+        if (!refresh) {
+          throw new Error("No token generated.");
+        }
 
         reply.setCookie(accessCookieName, access, {
           ...cookieOptions,
           expires: new Date(Date.now() + ACCESS_LIFESPAN_MS),
         });
 
-        return reply.status(200).send({ access });
+        reply.setCookie(refreshCookieName, refresh, {
+          ...cookieOptions,
+          expires: new Date(Date.now() + REFRESH_LIFESPAN_MS),
+        });
+
+        return reply.status(200).send({ access, refresh });
       } catch (error) {
         logger.error(`Authentication error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
