@@ -1,6 +1,7 @@
 import { FastifyJWT } from "@fastify/jwt";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
+import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
 import {
   ACCESS_LIFESPAN_MS,
   accessCookieName,
@@ -119,15 +120,8 @@ async function authRoutes(
   );
 
   fastify.post<{
-    Body: {
-      refresh?: string;
-    };
-    Reply: {
-      message?: string;
-      access?: string;
-      refresh?: string;
-      errors?: any;
-    };
+    Body: ApiAuthRefreshPost;
+    Reply: ApiAuthRefreshResponse | { message: string; errors?: any };
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {
