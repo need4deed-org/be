@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -1199,6 +1199,102 @@ describe("DELETE /user/:id (be#583)", () => {
     } finally {
       await fastify.db.userRepository.delete({ id: admin.id });
       await fastify.db.userRepository.delete({ id: other.id });
+    }
+  });
+
+  it("refuses a non-access token (e.g. a password-reset link's) as the session (be#908)", async () => {
+    const { user } = await makeUser(`reset-token-delete-${suffix}@example.com`);
+    const resetToken = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      type: "reset",
+    });
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${user.id}`,
+        cookies: { access: resetToken },
+      });
+
+      expect(res.statusCode).toBe(401);
+      const untouched = await fastify.db.userRepository.findOneOrFail({
+        where: { id: user.id },
+      });
+      expect(untouched.isActive).toBe(true);
+    } finally {
+      await fastify.db.userRepository.delete({ id: user.id });
+    }
+  });
+
+  async function makeAdmin(email: string) {
+    const admin = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.ADMIN,
+        isActive: true,
+      }),
+    );
+    return {
+      admin,
+      accessToken: fastify.jwt.sign({
+        id: admin.id,
+        email: admin.email,
+        role: admin.role,
+        type: "access",
+      }),
+    };
+  }
+
+  it("lets an ADMIN deactivate their own account while another admin remains active", async () => {
+    const { admin, accessToken } = await makeAdmin(
+      `admin-self-${suffix}@example.com`,
+    );
+    const { admin: other } = await makeAdmin(
+      `admin-remaining-${suffix}@example.com`,
+    );
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${admin.id}`,
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(200);
+    } finally {
+      await fastify.db.userRepository.delete({ id: admin.id });
+      await fastify.db.userRepository.delete({ id: other.id });
+    }
+  });
+
+  // The test DB is shared across parallel files (and seeded with admins),
+  // so "no other active admin" is simulated rather than arranged.
+  it("refuses to deactivate the last active admin", async () => {
+    const { admin, accessToken } = await makeAdmin(
+      `admin-last-${suffix}@example.com`,
+    );
+    const countSpy = vi
+      .spyOn(fastify.db.userRepository, "count")
+      .mockResolvedValue(0);
+
+    try {
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/user/${admin.id}`,
+        cookies: { access: accessToken },
+      });
+
+      expect(res.statusCode).toBe(400);
+      countSpy.mockRestore();
+      const untouched = await fastify.db.userRepository.findOneOrFail({
+        where: { id: admin.id },
+      });
+      expect(untouched.isActive).toBe(true);
+    } finally {
+      countSpy.mockRestore();
+      await fastify.db.userRepository.delete({ id: admin.id });
     }
   });
 });

@@ -15,7 +15,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { FindOptionsWhere, ILike } from "typeorm";
+import { FindOptionsWhere, ILike, Not } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
@@ -182,6 +182,20 @@ export default async function userRoutes(
 
       if (request.authUser!.id !== id) {
         throw new UnauthorizedError("Permission denied");
+      }
+
+      // Nothing in the API can reactivate an account, so the last active
+      // ADMIN deactivating themselves would leave no one able to administer
+      // the platform without direct DB access (be#1007 review).
+      if (request.authUser!.role === UserRole.ADMIN) {
+        const otherActiveAdmins = await fastify.db.userRepository.count({
+          where: { role: UserRole.ADMIN, isActive: true, id: Not(id) },
+        });
+        if (otherActiveAdmins === 0) {
+          throw new BadRequestError(
+            "The last active admin account cannot be deactivated.",
+          );
+        }
       }
 
       // Single update + affected check instead of a separate findOne: one

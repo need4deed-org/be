@@ -254,6 +254,31 @@ describe("X-API-Key authentication", () => {
     );
   });
 
+  it.each(["verify", "reset", "refresh"] as const)(
+    "be#908: rejects a %s token used as the access cookie",
+    async (type) => {
+      const findOneSpy = vi
+        .spyOn(fastify.db.userRepository, "findOne")
+        .mockResolvedValue(coordinatorUser as any);
+
+      const base = { id: 42, email: "coordinator@example.com" };
+      const token = fastify.jwt.sign(
+        type === "refresh"
+          ? { ...base, role: UserRole.COORDINATOR, type }
+          : { ...base, type },
+      );
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/trusted-domain",
+        cookies: { access: token },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(findOneSpy).not.toHaveBeenCalled();
+    },
+  );
+
   it("be#1011: rejects an id-less token used as the access cookie instead of matching an arbitrary user", async () => {
     // Regression for a critical finding: TypeORM's findOne({where:{id:
     // undefined}}) drops the id key entirely rather than filtering by it,
