@@ -45,21 +45,20 @@ export async function addAgentTypeServiceTranslations(
       ...(agentTypeIds.length
         ? [
             {
-              entityType: EntityTableName.AGENT_TYPE,
-              entityId: In(agentTypeIds),
+              agentTypeId: In(agentTypeIds),
             },
           ]
         : []),
-      ...(serviceIds.length
-        ? [{ entityType: EntityTableName.SERVICE, entityId: In(serviceIds) }]
-        : []),
+      ...(serviceIds.length ? [{ serviceId: In(serviceIds) }] : []),
     ],
     relations: ["language"],
   });
 
   const translationsByKey = new Map<string, OptionTitle>();
   for (const row of rows) {
-    const key = `${row.entityType}_${row.entityId}`;
+    const key = row.agentTypeId
+      ? `${EntityTableName.AGENT_TYPE}_${row.agentTypeId}`
+      : `${EntityTableName.SERVICE}_${row.serviceId}`;
     const entry = translationsByKey.get(key) ?? {};
     entry[row.language.isoCode as keyof OptionTitle] = row.translation;
     translationsByKey.set(key, entry);

@@ -581,26 +581,31 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     });
     expect(memberships).toHaveLength(0);
 
+    // Scoped to this test's own agent by title: other test files create
+    // agents in parallel, and findAndCount runs its count and page queries
+    // separately, so an unscoped list can differ by a concurrent insert
+    // (be#999).
+    const ownAgentOnly = `/agent?filter[search]=${encodeURIComponent(
+      `Bare Agent ${suffix}`,
+    )}`;
+
     const asAgent = await fastify.inject({
       method: "GET",
-      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
-      // (DESC by id) puts the just-created agent reliably on page 1 no matter
-      // how many other agents already exist in the DB.
-      url: "/agent?limit=120&sortOrder=new-old",
+      url: ownAgentOnly,
       cookies: { access: agentCookie },
     });
-    expect(
-      asAgent.json().data.some((a: { id: number }) => a.id === agentId),
-    ).toBe(false);
+    expect(asAgent.json().data).toEqual([]);
+    // Regression check: `count` must reflect the same filtered set as
+    // `data`, not the unfiltered total — the unclaimed agent is excluded
+    // from the where clause itself, not filtered in-memory after skip/take.
+    expect(asAgent.json().count).toBe(0);
 
     const asCoordinator = await fastify.inject({
       method: "GET",
-      // limit is capped at 120 by agentListQuerySchema; sortOrder=new-old
-      // (DESC by id) puts the just-created agent reliably on page 1 no matter
-      // how many other agents already exist in the DB.
-      url: "/agent?limit=120&sortOrder=new-old",
+      url: ownAgentOnly,
       cookies: { access: coordinatorCookie },
     });
+    expect(asCoordinator.json().count).toBe(1);
     const coordinatorEntry = asCoordinator
       .json()
       .data.find((a: { id: number }) => a.id === agentId);
@@ -609,12 +614,6 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     // `unclaimed`, or fast-json-stringify silently strips it from the wire
     // response even though dtoAgentGetList sets it (same bug class as be#575).
     expect(coordinatorEntry.unclaimed).toBe(true);
-
-    // Regression check: `count` must reflect the same filtered set as
-    // `data`, not the unfiltered total — the unclaimed agent just created
-    // is excluded from the where clause itself, not filtered in-memory
-    // after skip/take.
-    expect(asAgent.json().count).toBe(asAgent.json().data.length);
   });
 
   it("hides an unclaimed agent from GET /agent/:id for a non-privileged caller, but not a coordinator", async () => {
