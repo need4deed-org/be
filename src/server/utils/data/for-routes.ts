@@ -13,6 +13,7 @@ import {
   OptionItem,
   SortOrder,
   TranslatedIntoType,
+  TranslationOrigin,
   VolunteerStateTypeType,
 } from "need4deed-sdk";
 import {
@@ -21,6 +22,7 @@ import {
   EntityManager,
   FindOptionsWhere,
   In,
+  IsNull,
   Not,
   QueryFailedError,
   Repository,
@@ -49,6 +51,10 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
+import {
+  getTranslatedEntity,
+  isTranslatedEntityType,
+} from "../../../services/translation/registry";
 import { tryCatch } from "../../../services/utils";
 import { maskPii } from "../pii/mask";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -104,21 +110,25 @@ export async function getInstanceByTranslation<
 ): Promise<InstanceType<E> | null> {
   const repository = getRepository(dataSource, entity);
   let instance = await repository.findOneBy({ title: entityTitle });
-  if (!instance && entityType !== EntityTableName.NONE) {
+  if (!instance && isTranslatedEntityType(entityType)) {
     const fieldTranslationRepository = getRepository(
       dataSource,
       FieldTranslation,
     );
+    const { fk } = getTranslatedEntity(entityType);
 
+    // Only seeded reference titles are lookup keys; machine/human rows are
+    // translations of free text and must never resolve to an entity.
     const translation = await fieldTranslationRepository.findOne({
       where: {
-        entityType: entityType,
+        [fk]: Not(IsNull()),
         translation: entityTitle,
-      },
+        origin: TranslationOrigin.REFERENCE,
+      } as FindOptionsWhere<FieldTranslation>,
     });
     if (translation) {
       instance = await repository.findOneBy({
-        id: translation.entityId,
+        id: translation[fk] as number,
       });
     }
   }
@@ -162,8 +172,7 @@ export async function addTranslatedFields(
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
-            entityType: EntityTableName.LANGUAGE,
-            entityId: pl.language.id,
+            translatedLanguageId: pl.language.id,
           },
         });
         pl.language.translation = translation?.translation
@@ -174,8 +183,7 @@ export async function addTranslatedFields(
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
-            entityType: EntityTableName.ACTIVITY,
-            entityId: pa.activity.id,
+            activityId: pa.activity.id,
           },
         });
         pa.activity.translation = translation?.translation
@@ -186,8 +194,7 @@ export async function addTranslatedFields(
         const translation = await fieldTranslationRepository.findOne({
           where: {
             language,
-            entityType: EntityTableName.SKILL,
-            entityId: ps.skill.id,
+            skillId: ps.skill.id,
           },
         });
         ps.skill.translation = translation?.translation
@@ -264,14 +271,18 @@ export async function getOptions(
         EntityTableName.SERVICE,
       ].includes(itemType)
     ) {
-      const items = await fieldTranslationRepository.find({
+      const { fk } = getTranslatedEntity(itemType);
+      const rows = await fieldTranslationRepository.find({
         where: {
-          entityType: itemType,
-          entityId: In(options.map(({ itemId }) => itemId)),
+          [fk]: In(options.map(({ itemId }) => itemId)),
           fieldName: "title",
           languageId,
-        },
+        } as FindOptionsWhere<FieldTranslation>,
       });
+      const items = rows.map((row) => ({
+        translation: row.translation,
+        entityId: row[fk] as number,
+      }));
 
       // isoCode is the stable identifier for a LANGUAGE option — unlike
       // `title`, which is translated into whichever `language` was

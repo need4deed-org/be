@@ -20,6 +20,7 @@ import Deal from "../deal.entity";
 import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
+import Language from "../profile/language.entity";
 import Appreciation from "../volunteer/appreciation.entity";
 import Accompanying from "./accompanying.entity";
 import Agent from "./agent.entity";
@@ -133,6 +134,15 @@ export default class Opportunity {
   district?: District;
   @Column({ nullable: true })
   districtId?: number;
+
+  // Language title/info were typed in (be#1064). Set from ?language= on
+  // create and changed only by a coordinator correction; machine translation
+  // targets every other Lang. NULL (legacy rows) is treated as de.
+  @ManyToOne(() => Language, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "original_language_id" })
+  originalLanguage?: Language;
+  @Column({ nullable: true })
+  originalLanguageId?: number;
 
   @OneToMany(
     () => OpportunityVolunteer,

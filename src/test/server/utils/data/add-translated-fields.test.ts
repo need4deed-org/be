@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
-import { EntityTableName, Lang } from "need4deed-sdk";
+import { Lang } from "need4deed-sdk";
+import { IsNull, Not } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import Deal from "../../../../data/entity/deal.entity";
@@ -64,19 +65,19 @@ describe("addTranslatedFields", () => {
     const languageTranslation = await fieldTranslationRepository.findOneOrFail({
       where: {
         language: { id: germanLanguage.id },
-        entityType: EntityTableName.LANGUAGE,
+        translatedLanguageId: Not(IsNull()),
       },
     });
-    languageWithGermanTranslation = languageTranslation.entityId;
+    languageWithGermanTranslation = languageTranslation.translatedLanguageId!;
     germanLanguageTranslationText = languageTranslation.translation;
 
     const skillTranslation = await fieldTranslationRepository.findOneOrFail({
       where: {
         language: { id: germanLanguage.id },
-        entityType: EntityTableName.SKILL,
+        skillId: Not(IsNull()),
       },
     });
-    skillWithGermanTranslation = skillTranslation.entityId;
+    skillWithGermanTranslation = skillTranslation.skillId!;
     germanSkillTranslationText = skillTranslation.translation;
 
     const languageWithoutEnglish = await languageRepository
@@ -84,8 +85,8 @@ describe("addTranslatedFields", () => {
       .leftJoin(
         FieldTranslation,
         "ft",
-        "ft.entity_id = language.id AND ft.entity_type = :entityType AND ft.language_id = :englishId",
-        { entityType: EntityTableName.LANGUAGE, englishId: englishLanguage.id },
+        "ft.translated_language_id = language.id AND ft.language_id = :englishId",
+        { englishId: englishLanguage.id },
       )
       .where("ft.id IS NULL")
       .andWhere("language.id != :germanId", { germanId: germanLanguage.id })

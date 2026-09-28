@@ -1,4 +1,5 @@
 import { EntityTableName } from "need4deed-sdk";
+import type FieldTranslation from "../../data/entity/field_translation.entity";
 import LeadFrom from "../../data/entity/lead.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Activity from "../../data/entity/profile/activity.entity";
@@ -12,7 +13,7 @@ import { pascal2snake } from "../utils";
 interface TranslatedEntity {
   // FieldTranslation property holding the FK to this table (be#1066 replaced
   // the polymorphic entity_type/entity_id pair with one nullable FK per table).
-  fk: string;
+  fk: keyof FieldTranslation;
   entity: new () => { id: number };
   // field_name values a translation row of this table may carry.
   fields: readonly string[];
