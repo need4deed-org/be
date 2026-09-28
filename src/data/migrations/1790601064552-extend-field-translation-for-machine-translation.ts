@@ -12,6 +12,10 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  *    nullable (pending/failed rows have no text yet).
  * 3. opportunity.original_language_id: the language title/info were typed in.
  *
+ * Category translations seeded while need4deed-sdk had CATEGORY/COMMENT
+ * swapped (before sdk#143) are stored as 'comment'; they are relabelled as
+ * 'category' first, so they keep their translations.
+ *
  * Existing rows are all seeded reference data: origin/status defaults
  * ('reference'/'done') backfill them. Rows that cannot be mapped to an FK
  * (a type without a translated table, or a target row that no longer exists)
@@ -61,6 +65,12 @@ const UNIQUE_INDEXES: { name: string; column: string }[] = [
   { name: "UQ_field_translation_service", column: "service_id" },
   { name: "UQ_field_translation_lead_from", column: "lead_from_id" },
 ];
+
+// TypeORM's postgres driver returns UPDATE/DELETE ... RETURNING as
+// [rows, affectedCount].
+function rowCount(result: unknown[]): number {
+  return result[0] instanceof Array ? result[0].length : 0;
+}
 
 const OPPORTUNITY_ORIGINAL_LANGUAGE_FK = "FK_4374b3650e550a9b1a3e04c3a57";
 const OLD_UNIQUE_INDEX = "IDX_cd9cbf582b713498a61c626c2d";
@@ -123,6 +133,34 @@ export class ExtendFieldTranslationForMachineTranslation1790601064552
       `ALTER TABLE "opportunity" ADD "original_language_id" integer`,
     );
 
+    // --- repair: category translations stored as 'comment' ---
+    // need4deed-sdk had CATEGORY and COMMENT swapped until sdk#143
+    // (2026-07-08); category translations seeded before that carry
+    // entity_type 'comment' (prod: 12 title + 12 description rows). Nothing
+    // ever wrote field_translation rows for comments, so every 'comment' row
+    // is one of these. A correctly labelled duplicate wins; rows without a
+    // category are left to the unmapped cleanup below.
+    const duplicates: unknown[] = await queryRunner.query(
+      `DELETE FROM "field_translation" c
+       WHERE c."entity_type" = 'comment'
+         AND EXISTS (
+           SELECT 1 FROM "field_translation" k
+           WHERE k."entity_type" = 'category'
+             AND k."entity_id" = c."entity_id"
+             AND k."field_name" = c."field_name"
+             AND k."language_id" IS NOT DISTINCT FROM c."language_id")
+       RETURNING c."id"`,
+    );
+    const relabelled: unknown[] = await queryRunner.query(
+      `UPDATE "field_translation" c SET "entity_type" = 'category'
+       WHERE c."entity_type" = 'comment'
+         AND EXISTS (SELECT 1 FROM "category" t WHERE t."id" = c."entity_id")
+       RETURNING c."id"`,
+    );
+    console.warn(
+      `[extend-field-translation] relabelled ${rowCount(relabelled)} 'comment' row(s) as 'category', dropped ${rowCount(duplicates)} duplicate(s)`,
+    );
+
     // --- entity_type/entity_id -> one FK column per table ---
     for (const column of FK_COLUMNS) {
       await queryRunner.query(
@@ -144,16 +182,15 @@ export class ExtendFieldTranslationForMachineTranslation1790601064552
            AND NOT EXISTS (SELECT 1 FROM "${table}" t WHERE t."id" = ft."${column}")
          RETURNING ft."id"`,
       );
-      danglingCount += deleted[0] instanceof Array ? deleted[0].length : 0;
+      danglingCount += rowCount(deleted);
     }
     const unmapped: unknown[] = await queryRunner.query(
       `DELETE FROM "field_translation"
        WHERE num_nonnulls(${FK_COLUMN_LIST}) = 0
        RETURNING "id"`,
     );
-    const unmappedCount = unmapped[0] instanceof Array ? unmapped[0].length : 0;
     console.warn(
-      `[extend-field-translation] deleted ${danglingCount} row(s) pointing at a missing row, ${unmappedCount} row(s) of a type without a translated table`,
+      `[extend-field-translation] deleted ${danglingCount} row(s) pointing at a missing row, ${rowCount(unmapped)} row(s) of a type without a translated table`,
     );
 
     // --- drop the polymorphic pair ---
