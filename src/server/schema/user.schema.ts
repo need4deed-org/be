@@ -35,8 +35,9 @@ export const refreshAccessResponseSchema = {
   type: "object",
   properties: {
     access: { type: "string" },
+    refresh: { type: "string" },
   },
-  required: ["access"],
+  required: ["access", "refresh"],
 };
 
 export const userLoginSchema = {
