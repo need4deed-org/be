@@ -75,6 +75,12 @@ describe("validateEmailMessage", () => {
     ).toEqual(["text has an unresolved placeholder"]);
   });
 
+  it("flags an unresolved language placeholder ({{ key.en }})", () => {
+    expect(
+      validateEmailMessage({ ...validMessage, text: "Hi {{ kind.en }}" }),
+    ).toEqual(["text has an unresolved placeholder"]);
+  });
+
   it("flags an unresolved placeholder in html", () => {
     expect(
       validateEmailMessage({

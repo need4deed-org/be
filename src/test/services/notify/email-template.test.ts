@@ -4,6 +4,7 @@ import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   createManifestLoader,
   fillTemplate,
+  renderEmail,
   resolveContent,
   resolveFlatContent,
   resolveLocale,
@@ -128,6 +129,58 @@ describe("fillTemplate", () => {
   });
 });
 
+// ─── fillTemplate: localized values ─────────────────────────────────────────
+
+describe("fillTemplate with localized values", () => {
+  const kind = { en: "volunteer", de: "Freiwillige*r" };
+
+  it("picks the language given explicitly by {{ key.en }} / {{ key.de }}", () => {
+    const result = fillTemplate(
+      { subject: "s", text: "EN: {{ kind.en }}\nDE: {{kind.de}}" },
+      { kind },
+    );
+    expect(result.text).toBe("EN: volunteer\nDE: Freiwillige*r");
+  });
+
+  it("picks the content's locale for a plain {{ key }}", () => {
+    const result = fillTemplate({ subject: "{{ kind }}" }, { kind }, Lang.DE);
+    expect(result.subject).toBe("Freiwillige*r");
+  });
+
+  it("an explicit language wins over the content's locale", () => {
+    const result = fillTemplate(
+      { subject: "{{ kind.en }}" },
+      { kind },
+      Lang.DE,
+    );
+    expect(result.subject).toBe("volunteer");
+  });
+
+  it("leaves a plain {{ key }} unresolved when there's no locale", () => {
+    const result = fillTemplate({ subject: "{{ kind }}" }, { kind });
+    expect(result.subject).toBe("{{ kind }}");
+  });
+
+  it("leaves {{ key.xx }} unresolved for an unknown language", () => {
+    const result = fillTemplate({ subject: "{{ kind.fr }}" }, { kind });
+    expect(result.subject).toBe("{{ kind.fr }}");
+  });
+
+  it("leaves {{ key.en }} unresolved when the value is a plain string", () => {
+    const result = fillTemplate({ subject: "{{ name.en }}" }, { name: "Ann" });
+    expect(result.subject).toBe("{{ name.en }}");
+  });
+
+  it("still fills plain values regardless of locale", () => {
+    const result = fillTemplate(
+      { subject: "{{ name }}, {{ kind }}" },
+      { name: "Ann", kind },
+      Lang.EN,
+    );
+    expect(result.subject).toBe("Ann, volunteer");
+  });
+});
+
 // ─── resolveLocale ───────────────────────────────────────────────────────────
 
 describe("resolveLocale", () => {
@@ -219,6 +272,101 @@ describe("resolveFlatContent", () => {
   it("falls back to builtin when the manifest is unexpectedly locale-keyed", () => {
     const manifest = { [Lang.EN]: { subject: "en", text: "en body" } };
     expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
+  });
+});
+
+// ─── renderEmail ─────────────────────────────────────────────────────────────
+
+describe("renderEmail", () => {
+  const kind = { en: "volunteer", de: "Freiwillige*r" };
+  const perLocaleBuiltin: Record<Lang, LocaleContent> = {
+    [Lang.EN]: { subject: "builtin en", text: "EN {{ kind }}" },
+    [Lang.DE]: { subject: "builtin de", text: "DE {{ kind }}" },
+  };
+  const flatBuiltin: LocaleContent = {
+    subject: "builtin flat",
+    text: "EN {{ kind.en }} / DE {{ kind.de }}",
+  };
+
+  it("fills a per-locale manifest entry in its own language", () => {
+    const result = renderEmail(
+      {
+        en: { subject: "m en", text: "EN {{ kind }}" },
+        de: { subject: "m de", text: "DE {{ kind }}" },
+      },
+      perLocaleBuiltin,
+      { kind },
+      Lang.EN,
+    );
+    expect(result).toEqual({ subject: "m en", text: "EN volunteer" });
+  });
+
+  it("uses the language of the fallback entry, not the requested locale", () => {
+    // No "en" entry: resolveContent falls back to "de", so the value must too.
+    const result = renderEmail(
+      { de: { subject: "m de", text: "DE {{ kind }}" } },
+      perLocaleBuiltin,
+      { kind },
+      Lang.EN,
+    );
+    expect(result.text).toBe("DE Freiwillige*r");
+  });
+
+  it("fills a flat bilingual manifest by explicit languages", () => {
+    const result = renderEmail(
+      { subject: "m flat", text: "{{ kind.en }} / {{ kind.de }}" },
+      flatBuiltin,
+      { kind },
+    );
+    expect(result.text).toBe("volunteer / Freiwillige*r");
+  });
+
+  it("falls back to the flat builtin when the manifest leaves a language open", () => {
+    const result = renderEmail(
+      { subject: "m flat", text: "{{ kind }} / {{ kind }}" },
+      flatBuiltin,
+      { kind },
+    );
+    expect(result).toEqual({
+      subject: "builtin flat",
+      text: "EN volunteer / DE Freiwillige*r",
+    });
+  });
+
+  it("falls back to the per-locale builtin when a flat manifest leaves a language open", () => {
+    const result = renderEmail(
+      { subject: "m flat", text: "{{ kind }}" },
+      perLocaleBuiltin,
+      { kind },
+      Lang.DE,
+    );
+    expect(result).toEqual({
+      subject: "builtin de",
+      text: "DE Freiwillige*r",
+    });
+  });
+
+  it("falls back to the builtin when the manifest is null", () => {
+    const result = renderEmail(null, perLocaleBuiltin, { kind }, Lang.EN);
+    expect(result).toEqual({ subject: "builtin en", text: "EN volunteer" });
+  });
+
+  it("leaves placeholders unresolved when the builtin itself leaves a language open", () => {
+    const result = renderEmail(
+      null,
+      { subject: "s", text: "{{ kind }}" },
+      { kind },
+    );
+    expect(result.text).toBe("{{ kind }}");
+  });
+
+  it("keeps plain-string manifests working as before", () => {
+    const result = renderEmail(
+      { subject: "Hi {{ name }}", text: "Hello {{ name }}" },
+      flatBuiltin,
+      { name: "Ann" },
+    );
+    expect(result).toEqual({ subject: "Hi Ann", text: "Hello Ann" });
   });
 });
 
