@@ -12,8 +12,10 @@ export const TRUTHY = new Set([
   "true",
 ]);
 
+// cdn.need4deed.org (the cdn-proxy on the k3s cluster) replaced the retired
+// AWS CloudFront distribution at the 2026-09-24 cutover.
 export const CDNBaseUrl =
-  process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
+  process.env.CDN_BASE_URL || "https://cdn.need4deed.org";
 
 export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
 
