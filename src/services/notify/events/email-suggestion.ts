@@ -1,16 +1,13 @@
+import { Lang } from "need4deed-sdk";
 import {
   emailFromNotify,
   emailFromVolunteer,
   emailSuggestionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import { formatScheduleBilingual } from "../../dto/utils";
+import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { createManifestLoader, renderEmail } from "../email-template";
 import {
   OPPORTUNITY_SCHEDULE_LABELS,
   resolveOrAlert,
@@ -49,22 +46,22 @@ export async function sendEmailSuggestion(
   const opportunitySchedule = await resolveOrAlert(
     errorTransport,
     ov.opportunity?.deal?.dealTimeslot ?? [],
-    formatScheduleBilingual,
-    "wird noch abgestimmt/to be confirmed",
+    formatScheduleLocalized,
+    { [Lang.EN]: "to be confirmed", [Lang.DE]: "wird noch abgestimmt" },
     `sendEmailSuggestion, ov ${ov.id}`,
     OPPORTUNITY_SCHEDULE_LABELS,
   );
 
-  const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
+  const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
     volunteerName,
     opportunityName,
     plz,
     opportunitySchedule,
-    // TODO(be#1042 review): remove once the live CDN suggestion.json is
-    // updated to use {{ opportunitySchedule }} instead of {{ schedule }} —
-    // until then, deploying this code first would leave the old placeholder
-    // unresolved and ValidatingEmailTransport would suspend every send.
+    // TODO(be#1042 review): remove once the live CDN suggestion.json uses
+    // {{ opportunitySchedule.en }} / {{ opportunitySchedule.de }} instead of
+    // {{ schedule }} — until then its plain {{ schedule }} leaves the
+    // language open, so renderEmail() sends the builtin (be#1075) instead of
+    // the placeholder staying unresolved and the send being suspended.
     schedule: opportunitySchedule,
   });
 

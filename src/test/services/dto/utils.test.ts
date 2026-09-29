@@ -4,8 +4,8 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import { getNameFields } from "../../../services/dto";
 import {
-  formatScheduleBilingual,
   formatScheduleDe,
+  formatScheduleLocalized,
 } from "../../../services/dto/utils";
 
 describe("getNameFields", () => {
@@ -60,7 +60,7 @@ describe("getNameFields", () => {
   });
 });
 
-describe("formatScheduleDe / formatScheduleBilingual", () => {
+describe("formatScheduleDe / formatScheduleLocalized", () => {
   // getTimeSlotForDaytime() derives the hour range via Date#getHours(), which
   // reads the process's local timezone — pin it so these assertions don't
   // depend on where the test runs.
@@ -134,7 +134,7 @@ describe("formatScheduleDe / formatScheduleBilingual", () => {
     );
   });
 
-  it("should render a recurring weekly slot bilingually with a neutral hour range", () => {
+  it("should render a recurring weekly slot per language with a neutral hour range", () => {
     const dealTimeslot = [
       new DealTimeslot({
         timeslot: new Timeslot({
@@ -145,21 +145,23 @@ describe("formatScheduleDe / formatScheduleBilingual", () => {
       }),
     ];
 
-    expect(formatScheduleBilingual(dealTimeslot)).toBe(
-      "Montag/Monday, 08:00–11:00",
-    );
+    expect(formatScheduleLocalized(dealTimeslot)).toEqual({
+      en: "Monday, 08:00–11:00",
+      de: "Montag, 08:00–11:00",
+    });
   });
 
-  it("should render an occasional slot bilingually", () => {
+  it("should render an occasional slot per language", () => {
     const dealTimeslot = [
       new DealTimeslot({
         timeslot: new Timeslot({ occasional: OccasionalType.WEEKENDS }),
       }),
     ];
 
-    expect(formatScheduleBilingual(dealTimeslot)).toBe(
-      "am Wochenende/on weekends",
-    );
+    expect(formatScheduleLocalized(dealTimeslot)).toEqual({
+      en: "on weekends",
+      de: "am Wochenende",
+    });
   });
 
   it("should throw for a Timeslot with none of occasional/rrule/start", () => {

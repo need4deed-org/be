@@ -1,7 +1,10 @@
 import { TranslatedIntoType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
-import { sendEmailSuggestionAccompanying } from "../../../services/notify/events/email-suggestion-accompanying";
+import {
+  resetSuggestionAccompanyingTemplateCache,
+  sendEmailSuggestionAccompanying,
+} from "../../../services/notify/events/email-suggestion-accompanying";
 import type { EmailTransport } from "../../../services/notify/types";
 
 vi.mock("../../../data/utils", async (importOriginal) => {
@@ -14,6 +17,7 @@ const email: EmailTransport = { send };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetSuggestionAccompanyingTemplateCache();
   vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
 });
 
@@ -48,7 +52,7 @@ describe("sendEmailSuggestionAccompanying", () => {
     await sendEmailSuggestionAccompanying(email, buildOv());
 
     const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Language: Deutsch-Arabisch");
+    expect(msg.text).toContain("Language: German-Arabic");
     expect(msg.text).toContain("Sprache: Deutsch-Arabisch");
     expect(msg.text).not.toContain("{{");
   });
@@ -60,7 +64,35 @@ describe("sendEmailSuggestionAccompanying", () => {
     );
 
     const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Language: Nur Deutsch");
+    expect(msg.text).toContain("Language: Only German");
+    expect(msg.text).toContain("Sprache: Nur Deutsch");
+  });
+
+  it("falls back to the builtin when a flat manifest leaves the language open (be#1075)", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      subject: "CDN subject",
+      text: "Language: {{ accompaniedpersonLanguage }}",
+    });
+
+    await sendEmailSuggestionAccompanying(email, buildOv());
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.subject).toBe("Accompanying opportunity match — Need4Deed");
+    expect(msg.text).toContain("Language: German-Arabic");
+    expect(msg.text).toContain("Sprache: Deutsch-Arabisch");
+  });
+
+  it("uses a flat manifest that picks each part's language", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      subject: "CDN subject",
+      text: "EN {{ accompaniedpersonLanguage.en }} / DE {{ accompaniedpersonLanguage.de }}",
+    });
+
+    await sendEmailSuggestionAccompanying(email, buildOv());
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.subject).toBe("CDN subject");
+    expect(msg.text).toBe("EN German-Arabic / DE Deutsch-Arabisch");
   });
 
   it("renders appointment details from onetimer.date and accompanying.postcode", async () => {

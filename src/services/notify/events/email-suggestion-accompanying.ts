@@ -6,11 +6,7 @@ import {
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { createManifestLoader, renderEmail } from "../email-template";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
@@ -56,8 +52,7 @@ export async function sendEmailSuggestionAccompanying(
     `sendEmailSuggestionAccompanying, ov ${ov.id}`,
   );
 
-  const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
+  const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
     volunteerName,
     appointmentTitle,
     appointmentAddress,

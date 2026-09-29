@@ -1,3 +1,4 @@
+import { Lang } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
@@ -53,12 +54,14 @@ export async function sendEmailNewAccompanying(
   // field_translation by the caller before this function runs (be#856) —
   // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
   // values (fe#1036 review thread).
-  const accompaniedpersonLanguage = await resolveAccompaniedPersonLanguage(
-    errorTransport,
-    accompanying?.languageToTranslate,
-    opportunity.deal?.dealLanguage ?? [],
-    `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
-  );
+  // German-only email (RAC/contact-person workflow), so only the German one.
+  const { [Lang.DE]: accompaniedpersonLanguage } =
+    await resolveAccompaniedPersonLanguage(
+      errorTransport,
+      accompanying?.languageToTranslate,
+      opportunity.deal?.dealLanguage ?? [],
+      `sendEmailNewAccompanying, opportunity ${opportunity.id}`,
+    );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
   const appointmentComment = opportunity.info ?? "";

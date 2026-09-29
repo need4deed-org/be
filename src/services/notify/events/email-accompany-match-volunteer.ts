@@ -7,11 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { createManifestLoader, renderEmail } from "../email-template";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
@@ -64,8 +60,7 @@ export async function sendEmailAccompanyMatchVolunteer(
   const contactpersonEmail = contactPerson?.email ?? "";
   const contactpersonPhone = contactPerson?.phone ?? "";
 
-  const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
+  const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
     volunteerName,
     appointmentTitle,
     appointmentAddress,

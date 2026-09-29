@@ -30,6 +30,14 @@ export const OPPORTUNITY_SCHEDULE_LABELS: ResolveOrAlertLabels = {
   rowsLabel: "opportunity dealTimeslot rows",
 };
 
+// A per-language fallback ({ en, de }, be#1075) would otherwise read as
+// "[object Object]" in the alert.
+function formatFallback(fallback: unknown): string {
+  return typeof fallback === "object" && fallback !== null
+    ? JSON.stringify(fallback)
+    : String(fallback);
+}
+
 /**
  * Resolves a value via `formatter`, degrading to `fallback` and alerting
  * `errorEmailRecipient` instead of throwing when the underlying relation
@@ -70,7 +78,7 @@ export async function resolveOrAlert<T, R>(
       await errorTransport.send({
         to: errorEmailRecipient,
         subject: `[notify] malformed ${dataLabel} — ${context}`,
-        text: `A formatter threw while building an outbound email: ${message}\n\nThe email was still sent, with the fallback value "${fallback}" in place of ${fieldLabel}. Check this deal's ${rowsLabel}.`,
+        text: `A formatter threw while building an outbound email: ${message}\n\nThe email was still sent, with the fallback value "${formatFallback(fallback)}" in place of ${fieldLabel}. Check this deal's ${rowsLabel}.`,
       });
     } catch (alertError) {
       const alertMessage =
