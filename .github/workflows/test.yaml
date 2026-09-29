@@ -2,10 +2,17 @@ name: test
 
 # Runs the Vitest suite against a throwaway Postgres seeded only from
 # checked-in fixtures (be#999) — the same `yarn test:db:*` flow as locally.
+#
+# The suite runs in the merge queue (merge_group), once per merge into
+# develop, not on every push to a PR (be#1079). On pull_request the job is
+# skipped: a skipped job reports success, so the required `test` check lets
+# the PR enter the queue, where it runs for real on the queued merge commit.
 
 on:
   pull_request:
     branches: [develop]
+  # Only develop has a merge queue, so no branch filter is needed.
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +21,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
