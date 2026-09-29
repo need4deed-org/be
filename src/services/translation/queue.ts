@@ -4,70 +4,20 @@ import {
   TranslationOrigin,
   TranslationStatus,
 } from "need4deed-sdk";
-import { EntityManager, FindOptionsWhere, In } from "typeorm";
+import { EntityManager, FindOptionsWhere } from "typeorm";
 import FieldTranslation from "../../data/entity/field_translation.entity";
-import Language from "../../data/entity/profile/language.entity";
 import { sha256Hex } from "../../data/utils/hash-token";
-import { getTranslatedEntity, TranslationFk } from "./registry";
-
-// A row of a table whose text goes to machine translation.
-export interface TranslatableEntity {
-  id: number;
-  originalLanguageId?: number | null;
-}
+import { languageIds, originalLang, TranslatableEntity } from "./languages";
+import {
+  getMachineEntry,
+  getTranslatedEntity,
+  TranslationFk,
+} from "./registry";
 
 // The source text a translation was made from; a different hash means the
 // translation is outdated.
 export function sourceHashOf(text: string): string {
   return sha256Hex(text);
-}
-
-// Only machine-translated tables and their listed fields are accepted: PII
-// fields (e.g. infoConfidential) and reference tables never reach the queue.
-function machineEntry(entityType: EntityTableName, fieldNames: string[]) {
-  const entry = getTranslatedEntity(entityType);
-  if (!entry.machine) {
-    throw new Error(`${entityType} is not machine-translated`);
-  }
-  const allowed: readonly string[] = entry.fields;
-  const rejected = fieldNames.filter((field) => !allowed.includes(field));
-  if (rejected.length > 0) {
-    throw new Error(
-      `${entityType} fields not machine-translated: ${rejected.join(", ")}`,
-    );
-  }
-  return entry;
-}
-
-async function languageIds(
-  manager: EntityManager,
-): Promise<{ idOf: Record<Lang, number>; langOf: Map<number, Lang> }> {
-  const langs = Object.values(Lang);
-  const rows = await manager.find(Language, {
-    where: { isoCode: In(langs) },
-  });
-  const idOf = {} as Record<Lang, number>;
-  const langOf = new Map<number, Lang>();
-  for (const row of rows) {
-    idOf[row.isoCode as Lang] = row.id;
-    langOf.set(row.id, row.isoCode as Lang);
-  }
-  const missing = langs.filter((lang) => idOf[lang] === undefined);
-  if (missing.length > 0) {
-    throw new Error(`Language rows missing: ${missing.join(", ")}`);
-  }
-  return { idOf, langOf };
-}
-
-// NULL (rows from before be#1066) counts as German.
-function originalLang(
-  entity: TranslatableEntity,
-  langOf: Map<number, Lang>,
-): Lang {
-  return (
-    (entity.originalLanguageId && langOf.get(entity.originalLanguageId)) ||
-    Lang.DE
-  );
 }
 
 function rowsOf(
@@ -98,7 +48,7 @@ export async function enqueue(
   entity: TranslatableEntity,
   fields: Record<string, string | null | undefined>,
 ): Promise<void> {
-  const { fk } = machineEntry(entityType, Object.keys(fields));
+  const { fk } = getMachineEntry(entityType, Object.keys(fields));
   const { idOf, langOf } = await languageIds(manager);
   const original = originalLang(entity, langOf);
   const repository = manager.getRepository(FieldTranslation);
@@ -156,7 +106,7 @@ async function loadEntity(
   entityId: number,
   fieldNames: string[],
 ) {
-  const entry = machineEntry(entityType, fieldNames);
+  const entry = getMachineEntry(entityType, fieldNames);
   // The registry is generic over its tables; fields are read by name, and
   // machineEntry has already checked they belong to this table.
   const entity = (await manager.findOneBy(entry.entity, {

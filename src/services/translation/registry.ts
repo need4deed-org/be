@@ -97,3 +97,23 @@ export function getTranslatedEntity(entityType: EntityTableName) {
 export function getTranslationFkColumn(entityType: EntityTableName): string {
   return pascal2snake(getTranslatedEntity(entityType).fk, "lower");
 }
+
+// Only machine-translated tables and their listed fields are accepted: PII
+// fields (e.g. infoConfidential) and reference tables never reach the queue.
+export function getMachineEntry(
+  entityType: EntityTableName,
+  fieldNames: string[],
+) {
+  const entry = getTranslatedEntity(entityType);
+  if (!entry.machine) {
+    throw new Error(`${entityType} is not machine-translated`);
+  }
+  const allowed: readonly string[] = entry.fields;
+  const rejected = fieldNames.filter((field) => !allowed.includes(field));
+  if (rejected.length > 0) {
+    throw new Error(
+      `${entityType} fields not machine-translated: ${rejected.join(", ")}`,
+    );
+  }
+  return entry;
+}
