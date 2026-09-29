@@ -99,6 +99,11 @@ export const urlCoordinatorInvite =
   process.env.URL_COORDINATOR_INVITE ||
   "https://app.need4deed.org/register-with-invite";
 
+// The fe origin, for dashboard links in notify emails (be#1075). The bare
+// domain rather than app.need4deed.org, whose prefix may be reused — all
+// three domains are served by the same fe.
+export const urlApp = process.env.URL_APP || "https://need4deed.org";
+
 // CDN manifest (flat, bilingual subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";

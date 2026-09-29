@@ -1,7 +1,9 @@
 import { EntityTableName, Lang } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { urlApp } from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
+  buildTaggedLink,
   resetTaggedTemplateCache,
   sendEmailTagged,
   type EmailTaggedInput,
@@ -28,14 +30,42 @@ function input(over: Partial<EmailTaggedInput> = {}): EmailTaggedInput {
     recipient: { email: "cora@example.com", name: "Cora", language: "en" },
     authorName: "Alex",
     text: "@Cora please call the volunteer",
-    where: { kind: "comment", entityType: EntityTableName.VOLUNTEER },
-    link: {
-      [Lang.EN]: "https://app.example.org/en/dashboard/volunteers/7",
-      [Lang.DE]: "https://app.example.org/de/dashboard/volunteers/7",
+    where: {
+      kind: "comment",
+      entityType: EntityTableName.VOLUNTEER,
+      entityId: 7,
     },
     ...over,
   };
 }
+
+describe("buildTaggedLink", () => {
+  it.each([
+    [
+      { kind: "comment", entityType: EntityTableName.VOLUNTEER, entityId: 7 },
+      "dashboard/volunteers/7",
+    ],
+    [
+      { kind: "comment", entityType: EntityTableName.OPPORTUNITY, entityId: 8 },
+      "dashboard/opportunities/8",
+    ],
+    [
+      { kind: "comment", entityType: EntityTableName.AGENT, entityId: 9 },
+      "dashboard/agents/9",
+    ],
+    [
+      { kind: "comment", entityType: EntityTableName.LEAD, entityId: 1 },
+      "dashboard",
+    ],
+    [{ kind: "comment", entityType: EntityTableName.VOLUNTEER }, "dashboard"],
+    [{ kind: "post" }, "dashboard/posts"],
+  ] as const)("links %o to %s, per language", (where, path) => {
+    expect(buildTaggedLink(where)).toEqual({
+      [Lang.EN]: `${urlApp}/en/${path}`,
+      [Lang.DE]: `${urlApp}/de/${path}`,
+    });
+  });
+});
 
 describe("sendEmailTagged", () => {
   it("renders the English builtin for an English user", async () => {
@@ -48,9 +78,7 @@ describe("sendEmailTagged", () => {
     );
     expect(msg.text).toContain("Hi Cora,");
     expect(msg.text).toContain("@Cora please call the volunteer");
-    expect(msg.text).toContain(
-      "https://app.example.org/en/dashboard/volunteers/7",
-    );
+    expect(msg.text).toContain(`${urlApp}/en/dashboard/volunteers/7`);
     expect(validateEmailMessage(msg)).toEqual([]);
   });
 
@@ -67,9 +95,7 @@ describe("sendEmailTagged", () => {
       "Alex hat dich in einem Kommentar zu einer freiwilligen Person markiert — Need4Deed",
     );
     expect(msg.text).toContain("Hallo Cora,");
-    expect(msg.text).toContain(
-      "https://app.example.org/de/dashboard/volunteers/7",
-    );
+    expect(msg.text).toContain(`${urlApp}/de/dashboard/volunteers/7`);
   });
 
   it.each([
@@ -127,9 +153,7 @@ describe("sendEmailTagged", () => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("EN Alex");
-    expect(msg.text).toBe(
-      "a post https://app.example.org/en/dashboard/volunteers/7",
-    );
+    expect(msg.text).toBe(`a post ${urlApp}/en/dashboard/posts`);
   });
 
   it("HTML-escapes user text in an html body", async () => {

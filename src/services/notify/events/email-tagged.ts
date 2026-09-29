@@ -2,6 +2,7 @@ import { EntityTableName, Lang } from "need4deed-sdk";
 import {
   emailFromNotify,
   emailTaggedManifestUrl,
+  urlApp,
 } from "../../../config/constants";
 import { TAGGED_BUILTIN as BUILTIN } from "../builtin-content";
 import {
@@ -18,10 +19,10 @@ export function resetTaggedTemplateCache(): void {
   loader.resetCache();
 }
 
-// Where the tag was made — decides the {{ where }} wording.
+// Where the tag was made — decides the {{ where }} wording and the link.
 export type TaggedWhere =
   | { kind: "post" }
-  | { kind: "comment"; entityType?: EntityTableName };
+  | { kind: "comment"; entityType?: EntityTableName; entityId?: number };
 
 export interface EmailTaggedInput {
   recipient: { email: string; name?: string; language?: string };
@@ -29,9 +30,6 @@ export interface EmailTaggedInput {
   // The comment/post text the tag is in.
   text: string;
   where: TaggedWhere;
-  // Link to the card or the Posts page, per language (the fe route carries
-  // the language, e.g. /en/dashboard/...).
-  link: LocalizedValue;
 }
 
 const COMMENT_ON: Partial<Record<EntityTableName, LocalizedValue>> = {
@@ -59,6 +57,33 @@ const POST: LocalizedValue = {
 const SOMEONE: LocalizedValue = { [Lang.EN]: "Someone", [Lang.DE]: "Jemand" };
 const NO_NAME: LocalizedValue = { [Lang.EN]: "there", [Lang.DE]: "zusammen" };
 
+// fe dashboard routes of the cards a comment can sit on
+// (fe src/app/[lang]/dashboard/<path>/[id]).
+const CARD_PATH: Partial<Record<EntityTableName, string>> = {
+  [EntityTableName.VOLUNTEER]: "volunteers",
+  [EntityTableName.OPPORTUNITY]: "opportunities",
+  [EntityTableName.AGENT]: "agents",
+};
+
+// The card for a comment, the Posts page for a post (fe has no link to a
+// single post), the dashboard for anything else. Per language, since the fe
+// route starts with it.
+export function buildTaggedLink(where: TaggedWhere): LocalizedValue {
+  let path = "dashboard";
+  if (where.kind === "post") {
+    path = "dashboard/posts";
+  } else {
+    const card = where.entityType && CARD_PATH[where.entityType];
+    if (card && where.entityId) {
+      path = `dashboard/${card}/${where.entityId}`;
+    }
+  }
+  return {
+    [Lang.EN]: `${urlApp}/${Lang.EN}/${path}`,
+    [Lang.DE]: `${urlApp}/${Lang.DE}/${path}`,
+  };
+}
+
 function describeWhere(where: TaggedWhere): LocalizedValue {
   if (where.kind === "post") {
     return POST;
@@ -75,7 +100,7 @@ function neutralizeBraces(value: string): string {
 
 export async function sendEmailTagged(
   email: EmailTransport,
-  { recipient, authorName, text, where, link }: EmailTaggedInput,
+  { recipient, authorName, text, where }: EmailTaggedInput,
 ): Promise<void> {
   if (!recipient.email) {
     throw new Error("sendEmailTagged: missing recipient email");
@@ -95,7 +120,7 @@ export async function sendEmailTagged(
       authorName: authorName ? neutralizeBraces(authorName) : SOMEONE,
       tagText: neutralizeBraces(text),
       where: describeWhere(where),
-      link,
+      link: buildTaggedLink(where),
     },
     resolveLocale(recipient.language),
     { escapeHtmlValues: true },
