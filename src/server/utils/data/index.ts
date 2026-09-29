@@ -26,6 +26,7 @@ export * from "./is-trusted-domain";
 export * from "./mask-inactive-agent";
 export * from "./merge-into-where";
 export * from "./notify-new-volunteer";
+export * from "./notify-tagged-by-email";
 export * from "./resolve-person-by-email";
 export * from "./run-named-cron-jobs";
 export * from "./run-w-advisory-lock";
