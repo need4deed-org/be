@@ -4,12 +4,16 @@ import {
   emailTaggedManifestUrl,
   urlApp,
 } from "../../../config/constants";
-import { TAGGED_BUILTIN as BUILTIN } from "../builtin-content";
+import {
+  TAGGED_BUILTIN as BUILTIN,
+  type TaggedLabels,
+} from "../builtin-content";
 import {
   createManifestLoader,
   renderEmail,
   resolveLocale,
   type LocalizedValue,
+  type Manifest,
 } from "../email-template";
 import type { EmailTransport } from "../types";
 
@@ -32,30 +36,30 @@ export interface EmailTaggedInput {
   where: TaggedWhere;
 }
 
-const COMMENT_ON: Partial<Record<EntityTableName, LocalizedValue>> = {
-  [EntityTableName.VOLUNTEER]: {
-    [Lang.EN]: "a comment on a volunteer",
-    [Lang.DE]: "einem Kommentar zu einer freiwilligen Person",
-  },
-  [EntityTableName.OPPORTUNITY]: {
-    [Lang.EN]: "a comment on an opportunity",
-    [Lang.DE]: "einem Kommentar zu einem Gesuch",
-  },
-  [EntityTableName.AGENT]: {
-    [Lang.EN]: "a comment on an organisation",
-    [Lang.DE]: "einem Kommentar zu einer Einrichtung",
-  },
+const COMMENT_ON: Partial<Record<EntityTableName, keyof TaggedLabels>> = {
+  [EntityTableName.VOLUNTEER]: "commentOnVolunteer",
+  [EntityTableName.OPPORTUNITY]: "commentOnOpportunity",
+  [EntityTableName.AGENT]: "commentOnAgent",
 };
-const COMMENT: LocalizedValue = {
-  [Lang.EN]: "a comment",
-  [Lang.DE]: "einem Kommentar",
-};
-const POST: LocalizedValue = {
-  [Lang.EN]: "a post",
-  [Lang.DE]: "einem Beitrag",
-};
-const SOMEONE: LocalizedValue = { [Lang.EN]: "Someone", [Lang.DE]: "Jemand" };
-const NO_NAME: LocalizedValue = { [Lang.EN]: "there", [Lang.DE]: "zusammen" };
+
+// A label per language: the manifest entry's own "labels" override, key by
+// key, else the builtin's. renderEmail() then fills it in the language of
+// the entry it lands in, so an entry and its labels always agree.
+function resolveLabel(
+  manifest: Manifest | null,
+  key: keyof TaggedLabels,
+): LocalizedValue {
+  const pick = (lang: Lang): string => {
+    const entry = (manifest as Record<string, unknown> | null)?.[lang] as
+      | { labels?: Record<string, unknown> }
+      | undefined;
+    const override = entry?.labels?.[key];
+    return typeof override === "string" && override.trim()
+      ? override
+      : BUILTIN[lang].labels[key];
+  };
+  return { [Lang.EN]: pick(Lang.EN), [Lang.DE]: pick(Lang.DE) };
+}
 
 // fe dashboard routes of the cards a comment can sit on
 // (fe src/app/[lang]/dashboard/<path>/[id]).
@@ -84,18 +88,20 @@ export function buildTaggedLink(where: TaggedWhere): LocalizedValue {
   };
 }
 
-function describeWhere(where: TaggedWhere): LocalizedValue {
+function whereLabel(where: TaggedWhere): keyof TaggedLabels {
   if (where.kind === "post") {
-    return POST;
+    return "post";
   }
-  return (where.entityType && COMMENT_ON[where.entityType]) ?? COMMENT;
+  return (
+    (where.entityType ? COMMENT_ON[where.entityType] : undefined) ?? "comment"
+  );
 }
 
 // User-entered text must not read as a template placeholder: the rendered
 // email is checked for leftover {{ ... }} (ValidatingEmailTransport), and a
 // comment that literally contains one would get the send suspended.
 function neutralizeBraces(value: string): string {
-  return value.replace(/\{\{/g, "{​{").replace(/\}\}/g, "}​}");
+  return value.replace(/\{\{/g, "{\u200B{").replace(/\}\}/g, "}\u200B}");
 }
 
 export async function sendEmailTagged(
@@ -106,20 +112,23 @@ export async function sendEmailTagged(
     throw new Error("sendEmailTagged: missing recipient email");
   }
 
+  const manifest = await loader.load();
   const {
     subject,
     text: body,
     html,
   } = renderEmail(
-    await loader.load(),
+    manifest,
     BUILTIN,
     {
       recipientName: recipient.name
         ? neutralizeBraces(recipient.name)
-        : NO_NAME,
-      authorName: authorName ? neutralizeBraces(authorName) : SOMEONE,
+        : resolveLabel(manifest, "noName"),
+      authorName: authorName
+        ? neutralizeBraces(authorName)
+        : resolveLabel(manifest, "someone"),
       tagText: neutralizeBraces(text),
-      where: describeWhere(where),
+      where: resolveLabel(manifest, whereLabel(where)),
       link: buildTaggedLink(where),
     },
     resolveLocale(recipient.language),

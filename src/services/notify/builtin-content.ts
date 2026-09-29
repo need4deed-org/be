@@ -100,15 +100,51 @@ export const PASSWORD_RESET_BUILTIN: Record<Lang, LocaleContent> = {
   },
 };
 
+// Wording for the "you were tagged" email's per-language values; a manifest
+// entry can override any of them under "labels" (be#1075).
+export interface TaggedLabels {
+  commentOnVolunteer: string;
+  commentOnOpportunity: string;
+  commentOnAgent: string;
+  comment: string;
+  post: string;
+  // Author with no name.
+  someone: string;
+  // Greeting for a recipient with no name ("Hi there").
+  noName: string;
+}
+
 // {{ where }} and {{ link }} are per-language values; {{ tagText }},
-// {{ authorName }} and {{ recipientName }} are user content (be#1075).
-export const TAGGED_BUILTIN: Record<Lang, LocaleContent> = {
+// {{ authorName }} and {{ recipientName }} are user content, or a label
+// when the name is missing.
+export const TAGGED_BUILTIN: Record<
+  Lang,
+  LocaleContent & { labels: TaggedLabels }
+> = {
   [Lang.EN]: {
     subject: "{{ authorName }} tagged you in {{ where }} — Need4Deed",
     text: `Hi {{ recipientName }},\n\n{{ authorName }} tagged you in {{ where }} on the Need4Deed dashboard:\n\n{{ tagText }}\n\nOpen it here: {{ link }}\n\nThe Need4Deed Team`,
+    labels: {
+      commentOnVolunteer: "a comment on a volunteer",
+      commentOnOpportunity: "a comment on an opportunity",
+      commentOnAgent: "a comment on an organisation",
+      comment: "a comment",
+      post: "a post",
+      someone: "Someone",
+      noName: "there",
+    },
   },
   [Lang.DE]: {
     subject: "{{ authorName }} hat dich in {{ where }} markiert — Need4Deed",
     text: `Hallo {{ recipientName }},\n\n{{ authorName }} hat dich im Need4Deed-Dashboard in {{ where }} markiert:\n\n{{ tagText }}\n\nHier geht es direkt dorthin: {{ link }}\n\nViele Grüße\nNeed4Deed`,
+    labels: {
+      commentOnVolunteer: "einem Kommentar zu einer freiwilligen Person",
+      commentOnOpportunity: "einem Kommentar zu einem Gesuch",
+      commentOnAgent: "einem Kommentar zu einer Einrichtung",
+      comment: "einem Kommentar",
+      post: "einem Beitrag",
+      someone: "Jemand",
+      noName: "zusammen",
+    },
   },
 };

@@ -156,6 +156,46 @@ describe("sendEmailTagged", () => {
     expect(msg.text).toBe(`a post ${urlApp}/en/dashboard/posts`);
   });
 
+  it("takes labels from the manifest entry, key by key, else the builtin", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      en: {
+        subject: "{{ authorName }} / {{ where }}",
+        text: "Hi {{ recipientName }}",
+        labels: { commentOnVolunteer: "a note on a volunteer", someone: "" },
+      },
+    });
+
+    await sendEmailTagged(
+      email,
+      input({
+        authorName: undefined,
+        recipient: { email: "cora@example.com", language: "en" },
+      }),
+    );
+
+    const msg = send.mock.calls[0][0];
+    // Overridden label used; the empty "someone" override is ignored.
+    expect(msg.subject).toBe("Someone / a note on a volunteer");
+    // Not overridden: the builtin label.
+    expect(msg.text).toBe("Hi there");
+  });
+
+  it("uses the labels of the entry actually used, when the recipient's locale is missing", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      de: {
+        subject: "{{ where }}",
+        text: "{{ link }}",
+        labels: { post: "einem Pinnwand-Beitrag" },
+      },
+    });
+
+    await sendEmailTagged(email, input({ where: { kind: "post" } }));
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.subject).toBe("einem Pinnwand-Beitrag");
+    expect(msg.text).toBe(`${urlApp}/de/dashboard/posts`);
+  });
+
   it("HTML-escapes user text in an html body", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue({
       en: { subject: "s", html: "<p>{{ authorName }}: {{ tagText }}</p>" },
