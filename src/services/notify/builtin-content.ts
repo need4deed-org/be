@@ -3,7 +3,7 @@
 // for the requested locale. Kept in one file so editing copy doesn't require
 // hunting through every event file in ./events.
 //
-// Mirrors dev/files/cdn/emails/*.json (the live CDN content) exactly, so a
+// Mirrors dev/cdn/emails/*.json (the live CDN content) exactly, so a
 // fallback looks the same as the real thing. Most of these are flat — a
 // single body used regardless of recipient — either because they're
 // German-only (RAC/contact-person workflow) or because they bilingually
@@ -11,8 +11,9 @@
 // the recipient's language can't be reliably known; see be#830/#838).
 // In the bilingual ones, a translatable value picks the language of its part
 // with {{ key.en }} / {{ key.de }} (be#1075).
-// PASSWORD_RESET_BUILTIN is the one exception still split per locale, since
-// no flat manifest was provided for it.
+// PASSWORD_RESET_BUILTIN and TAGGED_BUILTIN are split per locale instead:
+// no flat manifest was provided for the former, and the latter goes to a
+// dashboard user whose language is known.
 import { Lang } from "need4deed-sdk";
 import type { LocaleContent } from "./email-template";
 
@@ -96,5 +97,18 @@ export const PASSWORD_RESET_BUILTIN: Record<Lang, LocaleContent> = {
     subject: "Passwort zurücksetzen",
     text: `Es wurde ein Zurücksetzen des Passworts für dein Konto angefordert. Um dein Passwort zurückzusetzen, folge diesem Link:\n{{resetUrl}}\n\nFalls du dies nicht angefordert hast, ignoriere diese E-Mail bitte.`,
     html: `<p>Es wurde ein Zurücksetzen des Passworts für dein Konto angefordert.</p>\n<p><a href="{{resetUrl}}">Passwort zurücksetzen</a></p>\n<p>Falls du dies nicht angefordert hast, ignoriere diese E-Mail bitte.</p>`,
+  },
+};
+
+// {{ where }} and {{ link }} are per-language values; {{ tagText }},
+// {{ authorName }} and {{ recipientName }} are user content (be#1075).
+export const TAGGED_BUILTIN: Record<Lang, LocaleContent> = {
+  [Lang.EN]: {
+    subject: "{{ authorName }} tagged you in {{ where }} — Need4Deed",
+    text: `Hi {{ recipientName }},\n\n{{ authorName }} tagged you in {{ where }} on the Need4Deed dashboard:\n\n{{ tagText }}\n\nOpen it here: {{ link }}\n\nThe Need4Deed Team`,
+  },
+  [Lang.DE]: {
+    subject: "{{ authorName }} hat dich in {{ where }} markiert — Need4Deed",
+    text: `Hallo {{ recipientName }},\n\n{{ authorName }} hat dich im Need4Deed-Dashboard in {{ where }} markiert:\n\n{{ tagText }}\n\nHier geht es direkt dorthin: {{ link }}\n\nViele Grüße\nNeed4Deed`,
   },
 };

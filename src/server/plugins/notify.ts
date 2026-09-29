@@ -8,6 +8,7 @@ import {
   CommentTaggedInput,
   DryRunEmailTransport,
   DryRunSlackTransport,
+  EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
   sendCommentTagged,
@@ -23,6 +24,7 @@ import {
   sendEmailStale,
   sendEmailSuggestion,
   sendEmailSuggestionAccompanying,
+  sendEmailTagged,
   sendEmailVerification,
   sendOpsAlert,
   sendPasswordReset,
@@ -50,6 +52,7 @@ interface NotifyService {
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
+  emailTagged(input: EmailTaggedInput): Promise<void>;
 }
 
 declare module "fastify" {
@@ -168,6 +171,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailNewAccompanying(emailNotify, opportunity, emailNotifyRaw),
     emailRegistration: (volunteer: RegistrationEmailRecipient) =>
       sendEmailRegistration(emailNotify, volunteer),
+    emailTagged: (input: EmailTaggedInput) =>
+      sendEmailTagged(emailNotify, input),
   });
 }
 

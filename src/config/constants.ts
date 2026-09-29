@@ -130,6 +130,8 @@ export const emailNewRegularManifestUrl =
   CDNBaseUrl + "/emails/confirmation.json";
 export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
+// Per-locale (en/de) manifest for the "you were tagged" email (be#1075).
+export const emailTaggedManifestUrl = CDNBaseUrl + "/emails/tagged.json";
 
 export const emailFromVolunteer =
   process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";

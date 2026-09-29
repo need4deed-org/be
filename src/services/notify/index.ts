@@ -22,3 +22,4 @@ export * from "./events/email-accompany-match";
 export * from "./events/email-regular-update";
 export * from "./events/email-new-regular";
 export * from "./events/email-new-accompanying";
+export * from "./events/email-tagged";

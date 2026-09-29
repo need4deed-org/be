@@ -43,6 +43,18 @@ function isLang(value: string): value is Lang {
 
 type FillResult = { subject: string; html?: string; text?: string };
 
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
 // Shared by fillTemplate() and renderEmail(): also reports the placeholders
 // that point at a LocalizedValue but can't tell which language to use, so
 // renderEmail() can fall back to the builtin instead of sending them.
@@ -50,9 +62,10 @@ function fill(
   content: LocaleContent,
   vars: TemplateVars,
   locale: Lang | undefined,
+  escapeHtmlValues = false,
 ): { result: FillResult; ambiguous: string[] } {
   const ambiguous: string[] = [];
-  const fillOne = (s: string): string =>
+  const fillOne = (s: string, escape = false): string =>
     s.replace(PLACEHOLDER_RE, (match, key: string, lang?: string) => {
       const value = key in vars ? vars[key] : undefined;
       let resolved: string | number | null | undefined;
@@ -71,13 +84,15 @@ function fill(
         logger.warn(`email template: unresolved placeholder ${match}`);
         return match;
       }
-      return String(resolved);
+      return escape ? escapeHtml(String(resolved)) : String(resolved);
     });
 
   return {
     result: {
       subject: fillOne(content.subject),
-      ...(content.html !== undefined ? { html: fillOne(content.html) } : {}),
+      ...(content.html !== undefined
+        ? { html: fillOne(content.html, escapeHtmlValues) }
+        : {}),
       ...(content.text !== undefined ? { text: fillOne(content.text) } : {}),
     },
     ambiguous,
@@ -193,12 +208,16 @@ function isFlatBuiltin(
  * A manifest that leaves the language of a LocalizedValue open (a plain
  * `{{ key }}` in a flat body) is treated like an invalid manifest: the
  * builtin is rendered instead, which is kept correct in code.
+ *
+ * `escapeHtmlValues`: HTML-escape every value substituted into the html
+ * body — for emails carrying user-entered text (e.g. a tag's comment).
  */
 export function renderEmail(
   manifest: Manifest | null,
   builtin: LocaleContent | Record<Lang, LocaleContent>,
   vars: TemplateVars,
   locale: Lang = DEFAULT_LOCALE,
+  { escapeHtmlValues = false }: { escapeHtmlValues?: boolean } = {},
 ): FillResult {
   const pickBuiltin = (): { content: LocaleContent; lang?: Lang } =>
     isFlatBuiltin(builtin)
@@ -209,7 +228,12 @@ export function renderEmail(
     ? { content: resolveFlatContent(manifest, builtin) }
     : pickContent(manifest, locale, builtin);
 
-  const { result, ambiguous } = fill(picked.content, vars, picked.lang);
+  const { result, ambiguous } = fill(
+    picked.content,
+    vars,
+    picked.lang,
+    escapeHtmlValues,
+  );
   if (ambiguous.length === 0) {
     return result;
   }
@@ -218,14 +242,34 @@ export function renderEmail(
   if (fallback.content === picked.content) {
     // The builtin itself is ambiguous — leave the placeholders unresolved so
     // ValidatingEmailTransport suspends the send and reports it.
-    return fillTemplate(picked.content, vars, picked.lang);
+    logger.warn(
+      `email builtin: no language for placeholder(s) ${formatKeys(ambiguous)}`,
+    );
+    return result;
   }
   logger.warn(
-    `email manifest: no language for placeholder(s) ${ambiguous
-      .map((k) => `{{${k}}}`)
-      .join(", ")}, falling back to builtin`,
+    `email manifest: no language for placeholder(s) ${formatKeys(
+      ambiguous,
+    )}, falling back to builtin`,
   );
-  return fillTemplate(fallback.content, vars, fallback.lang);
+  const fromBuiltin = fill(
+    fallback.content,
+    vars,
+    fallback.lang,
+    escapeHtmlValues,
+  );
+  if (fromBuiltin.ambiguous.length > 0) {
+    logger.warn(
+      `email builtin: no language for placeholder(s) ${formatKeys(
+        fromBuiltin.ambiguous,
+      )}`,
+    );
+  }
+  return fromBuiltin.result;
+}
+
+function formatKeys(keys: string[]): string {
+  return keys.map((k) => `{{${k}}}`).join(", ");
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

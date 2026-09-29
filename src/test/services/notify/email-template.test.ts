@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   createManifestLoader,
+  escapeHtml,
   fillTemplate,
   renderEmail,
   resolveContent,
@@ -360,6 +361,28 @@ describe("renderEmail", () => {
     expect(result.text).toBe("{{ kind }}");
   });
 
+  it("HTML-escapes values in the html body only, when asked", () => {
+    const content = {
+      subject: "{{ name }}",
+      text: "{{ name }}",
+      html: "<p>{{ name }}</p>",
+    };
+    const vars = { name: "<b>A & B</b>" };
+    expect(renderEmail(content, flatBuiltin, vars)).toEqual({
+      ...{ subject: "<b>A & B</b>", text: "<b>A & B</b>" },
+      html: "<p><b>A & B</b></p>",
+    });
+    expect(
+      renderEmail(content, flatBuiltin, vars, Lang.DE, {
+        escapeHtmlValues: true,
+      }),
+    ).toEqual({
+      subject: "<b>A & B</b>",
+      text: "<b>A & B</b>",
+      html: "<p>&lt;b&gt;A &amp; B&lt;/b&gt;</p>",
+    });
+  });
+
   it("keeps plain-string manifests working as before", () => {
     const result = renderEmail(
       { subject: "Hi {{ name }}", text: "Hello {{ name }}" },
@@ -367,6 +390,16 @@ describe("renderEmail", () => {
       { name: "Ann" },
     );
     expect(result).toEqual({ subject: "Hi Ann", text: "Hello Ann" });
+  });
+});
+
+// ─── escapeHtml ──────────────────────────────────────────────────────────────
+
+describe("escapeHtml", () => {
+  it("escapes the five HTML-special characters", () => {
+    expect(escapeHtml(`<a href="x">'&'</a>`)).toBe(
+      "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;",
+    );
   });
 });
 
