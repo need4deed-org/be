@@ -8,7 +8,7 @@ export * from "./transports/validating";
 export * from "./validate-email-message";
 export * from "./events/email-verification";
 export * from "./events/ops-alert";
-export * from "./events/comment-tagged";
+export * from "./events/tagged";
 export * from "./events/email-password-reset";
 export * from "./events/email-suggestion";
 export * from "./events/email-suggestion-accompanying";

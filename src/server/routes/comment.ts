@@ -227,10 +227,11 @@ export default async function commentRoutes(
         }
 
         // Notify on Slack when the new comment tags people. Fire-and-forget:
-        // commentTagged swallows its own errors and no-ops when the comments
+        // notify.tagged swallows its own errors and no-ops when the comments
         // Slack webhook is not configured, so it never affects the response.
         if (taggedPersonIds && taggedPersonIds.length > 0) {
-          fastify.notify.commentTagged({
+          fastify.notify.tagged({
+            kind: "comment",
             authorName: reloaded.user.person?.name ?? "Someone",
             taggedNames: (reloaded.commentPerson ?? [])
               .map((cp) => cp.person?.name)
@@ -439,11 +440,9 @@ export default async function commentRoutes(
         where: { commentId: id, personId },
       });
       if (!cp) {
-        return reply
-          .status(404)
-          .send({
-            message: `No tag found for comment id:${id} on your person.`,
-          });
+        return reply.status(404).send({
+          message: `No tag found for comment id:${id} on your person.`,
+        });
       }
 
       cp.readAt = new Date();
