@@ -5,7 +5,7 @@ import type { EmailMessage } from "./types";
 // (e.g. the word "undefined") — that's fillTemplate's job at the source,
 // where it can tell an actual nullish variable apart from a user having
 // legitimately typed that word into free-text content.
-const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+\s*\}\}/;
+const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+(?:\.\w+)?\s*\}\}/;
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim();

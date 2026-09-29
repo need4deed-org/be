@@ -20,6 +20,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../config/error/fastify";
+import Person from "../../data/entity/person.entity";
 import Post from "../../data/entity/post.entity";
 import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
@@ -50,11 +51,50 @@ import {
   getRootPostWhere,
 } from "../utils/data/get-post-where";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
+import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
+
+// Roles that can see posts (isPostManagerRole), so the only ones emailed
+// about a tag in one.
+const POST_READER_ROLES = [
+  UserRole.AGENT,
+  UserRole.COORDINATOR,
+  UserRole.ADMIN,
+];
+
+// Slack + email for the persons newly tagged in a post (be#1075), by the
+// requester (`taggerUserId`/`tagger`), who on an edit may not be the post's
+// author. Fire-and-forget: tagged() swallows its own errors and no-ops
+// without a Slack webhook; notifyTaggedByEmail() never rejects. Neither
+// affects the response.
+function notifyPostTags(
+  fastify: FastifyInstance,
+  post: Post,
+  added: Person[],
+  taggerUserId: number,
+  tagger: Person | null | undefined,
+): void {
+  if (added.length === 0) {
+    return;
+  }
+  fastify.notify.tagged({
+    kind: "post",
+    authorName: tagger?.name ?? "Someone",
+    taggedNames: added.map((p) => p.name).filter(Boolean),
+    text: post.text,
+  });
+  void notifyTaggedByEmail(fastify, {
+    personIds: added.map((p) => p.id),
+    author: { userId: taggerUserId, personId: tagger?.id, name: tagger?.name },
+    allowedRoles: POST_READER_ROLES,
+    text: post.text,
+    where: { kind: "post" },
+  });
+}
 
 export default async function postRoutes(
   fastify: FastifyInstance,
@@ -252,6 +292,14 @@ export default async function postRoutes(
       if (!full) {
         throw new NotFoundError("Post not found.");
       }
+      // The requester is the author here (authorId is their person).
+      notifyPostTags(
+        fastify,
+        full,
+        full.taggedPersons ?? [],
+        request.authUser!.id,
+        full.author,
+      );
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -300,6 +348,8 @@ export default async function postRoutes(
       });
 
       const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
+      // Tags before this edit — only the ones it adds get notified.
+      const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
 
       if (text !== null && text !== undefined) {
         post.text = text;
@@ -334,6 +384,22 @@ export default async function postRoutes(
         attachBookmarkData(fastify, [updated], request.authUser?.personId),
       ]);
       updated.replyCount = replyCount;
+
+      const added = (updated.taggedPersons ?? []).filter(
+        (p) => !previousTaggedIds.includes(p.id),
+      );
+      if (added.length > 0) {
+        const taggerPersonId = request.authUser?.personId;
+        const tagger =
+          taggerPersonId === post.authorId
+            ? post.author
+            : taggerPersonId
+              ? await fastify.db.personRepository
+                  .findOneBy({ id: taggerPersonId })
+                  .catch(() => null)
+              : null;
+        notifyPostTags(fastify, updated, added, request.authUser!.id, tagger);
+      }
       return reply
         .status(200)
         .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });

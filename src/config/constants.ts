@@ -12,8 +12,10 @@ export const TRUTHY = new Set([
   "true",
 ]);
 
+// cdn.need4deed.org (the cdn-proxy on the k3s cluster) replaced the retired
+// AWS CloudFront distribution at the 2026-09-24 cutover.
 export const CDNBaseUrl =
-  process.env.CDN_BASE_URL || "https://d2nwrdddg8skub.cloudfront.net";
+  process.env.CDN_BASE_URL || "https://cdn.need4deed.org";
 
 export const selfUrl = process.env.SELF_URL || "http://vmpub:5000";
 
@@ -99,6 +101,11 @@ export const urlCoordinatorInvite =
   process.env.URL_COORDINATOR_INVITE ||
   "https://app.need4deed.org/register-with-invite";
 
+// The fe origin, for dashboard links in notify emails (be#1075). The bare
+// domain rather than app.need4deed.org, whose prefix may be reused — all
+// three domains are served by the same fe.
+export const urlApp = process.env.URL_APP || "https://need4deed.org";
+
 // CDN manifest (flat, bilingual subject + html/text) for the verification email.
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
@@ -130,6 +137,8 @@ export const emailNewRegularManifestUrl =
   CDNBaseUrl + "/emails/confirmation.json";
 export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
+// Per-locale (en/de) manifest for the "you were tagged" email (be#1075).
+export const emailTaggedManifestUrl = CDNBaseUrl + "/emails/tagged.json";
 
 export const emailFromVolunteer =
   process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";

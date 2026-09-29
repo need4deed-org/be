@@ -5,12 +5,11 @@ import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import {
-  CommentTaggedInput,
   DryRunEmailTransport,
   DryRunSlackTransport,
+  EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
-  sendCommentTagged,
   sendEmailAccompanyMatch,
   sendEmailAccompanyMatchVolunteer,
   sendEmailAccompanyNotFound,
@@ -23,13 +22,16 @@ import {
   sendEmailStale,
   sendEmailSuggestion,
   sendEmailSuggestionAccompanying,
+  sendEmailTagged,
   sendEmailVerification,
   sendOpsAlert,
   sendPasswordReset,
+  sendTagged,
   SlackChannel,
   SlackTransport,
   SlackWebhookTransport,
   SmtpEmailTransport,
+  TaggedInput,
   ValidatingEmailTransport,
 } from "../../services/notify";
 
@@ -37,7 +39,7 @@ interface NotifyService {
   emailVerification(user: User): Promise<void>;
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
-  commentTagged(input: CommentTaggedInput): Promise<void>;
+  tagged(input: TaggedInput): Promise<void>;
   emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
   emailSuggestionAccompanying(ov: OpportunityVolunteer): Promise<void>;
   emailStale(ov: OpportunityVolunteer): Promise<void>;
@@ -50,6 +52,7 @@ interface NotifyService {
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
+  emailTagged(input: EmailTaggedInput): Promise<void>;
 }
 
 declare module "fastify" {
@@ -143,8 +146,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
     passwordReset: (user: User) =>
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
-    commentTagged: (input: CommentTaggedInput) =>
-      sendCommentTagged({ slack }, input),
+    tagged: (input: TaggedInput) => sendTagged({ slack }, input),
     emailSuggestion: (ov: OpportunityVolunteer) =>
       sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
     emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
@@ -168,6 +170,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailNewAccompanying(emailNotify, opportunity, emailNotifyRaw),
     emailRegistration: (volunteer: RegistrationEmailRecipient) =>
       sendEmailRegistration(emailNotify, volunteer),
+    emailTagged: (input: EmailTaggedInput) =>
+      sendEmailTagged(emailNotify, input),
   });
 }
 

@@ -1,6 +1,7 @@
 import {
   ApiAvailability,
   ByDay,
+  Lang,
   Occasionally,
   OccasionalType,
   OptionItem,
@@ -143,14 +144,14 @@ export function formatScheduleDe(dealTimeslot: DealTimeslot[]): string {
   });
 }
 
-const DAY_LABELS_BILINGUAL: Record<ByDay, string> = {
-  [ByDay.MO]: "Montag/Monday",
-  [ByDay.TU]: "Dienstag/Tuesday",
-  [ByDay.WE]: "Mittwoch/Wednesday",
-  [ByDay.TH]: "Donnerstag/Thursday",
-  [ByDay.FR]: "Freitag/Friday",
-  [ByDay.SA]: "Samstag/Saturday",
-  [ByDay.SU]: "Sonntag/Sunday",
+const DAY_LABELS_EN: Record<ByDay, string> = {
+  [ByDay.MO]: "Monday",
+  [ByDay.TU]: "Tuesday",
+  [ByDay.WE]: "Wednesday",
+  [ByDay.TH]: "Thursday",
+  [ByDay.FR]: "Friday",
+  [ByDay.SA]: "Saturday",
+  [ByDay.SU]: "Sunday",
 };
 
 const TIME_SLOT_LABELS_NEUTRAL: Record<TimeSlot, string> = {
@@ -160,19 +161,35 @@ const TIME_SLOT_LABELS_NEUTRAL: Record<TimeSlot, string> = {
   [TimeSlot.evening]: "17:00–20:00",
 };
 
-const OCCASIONAL_LABELS_BILINGUAL: Record<OccasionalType, string> = {
-  [OccasionalType.WEEKDAYS]: "wochentags/on weekdays",
-  [OccasionalType.WEEKENDS]: "am Wochenende/on weekends",
+const OCCASIONAL_LABELS_EN: Record<OccasionalType, string> = {
+  [OccasionalType.WEEKDAYS]: "on weekdays",
+  [OccasionalType.WEEKENDS]: "on weekends",
 };
 
-// For manifests that mix English and German in one flat body sharing a single
-// placeholder across both language halves (e.g. suggestion.json) — see be#933.
-export function formatScheduleBilingual(dealTimeslot: DealTimeslot[]): string {
-  return formatSchedule(dealTimeslot, {
-    day: DAY_LABELS_BILINGUAL,
-    timeSlot: TIME_SLOT_LABELS_NEUTRAL,
-    occasional: OCCASIONAL_LABELS_BILINGUAL,
-  });
+const OCCASIONAL_LABELS_DE_SHORT: Record<OccasionalType, string> = {
+  [OccasionalType.WEEKDAYS]: "wochentags",
+  [OccasionalType.WEEKENDS]: "am Wochenende",
+};
+
+// For volunteer-facing manifests that carry an English and a German part
+// (e.g. suggestion.json): one schedule per language, each part picking its
+// own via {{ opportunitySchedule.en }} / {{ opportunitySchedule.de }}
+// (be#1075) — was one "Montag/Monday" string shared by both parts (be#933).
+export function formatScheduleLocalized(
+  dealTimeslot: DealTimeslot[],
+): Record<Lang, string> {
+  return {
+    [Lang.EN]: formatSchedule(dealTimeslot, {
+      day: DAY_LABELS_EN,
+      timeSlot: TIME_SLOT_LABELS_NEUTRAL,
+      occasional: OCCASIONAL_LABELS_EN,
+    }),
+    [Lang.DE]: formatSchedule(dealTimeslot, {
+      day: DAY_LABELS_DE,
+      timeSlot: TIME_SLOT_LABELS_NEUTRAL,
+      occasional: OCCASIONAL_LABELS_DE_SHORT,
+    }),
+  };
 }
 
 export function getLanguages(dealLanguage: DealLanguage[]) {
@@ -203,18 +220,32 @@ export function getCoordinates(postcode?: {
   };
 }
 
-// Matches fe's own labels for these values (public/locales/de/translations.json).
-const STANDALONE_LABELS: Record<TranslatedIntoType, string> = {
-  [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
-  [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
-  [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
+// Match fe's own labels for these values (public/locales/{de,en}/translations.json).
+const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
+  [Lang.DE]: {
+    [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
+    [TranslatedIntoType.ENGLISH_OK]: "Deutsch oder Englisch",
+    [TranslatedIntoType.NO_TRANSLATION]: "Keine Sprachmittlung (Wegbegleitung)",
+  },
+  [Lang.EN]: {
+    [TranslatedIntoType.DEUTSCHE]: "Only German",
+    [TranslatedIntoType.ENGLISH_OK]: "German or English",
+    [TranslatedIntoType.NO_TRANSLATION]: "No translation",
+  },
 };
 // The compact form of the target language(s), used only when there's an
 // actual source language to pair it with.
-const PAIR_TARGET_LABELS: Record<TranslatedIntoType, string> = {
-  [TranslatedIntoType.DEUTSCHE]: "Deutsch",
-  [TranslatedIntoType.ENGLISH_OK]: "Deutsch/Englisch",
-  [TranslatedIntoType.NO_TRANSLATION]: "",
+const PAIR_TARGET_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
+  [Lang.DE]: {
+    [TranslatedIntoType.DEUTSCHE]: "Deutsch",
+    [TranslatedIntoType.ENGLISH_OK]: "Deutsch/Englisch",
+    [TranslatedIntoType.NO_TRANSLATION]: "",
+  },
+  [Lang.EN]: {
+    [TranslatedIntoType.DEUTSCHE]: "German",
+    [TranslatedIntoType.ENGLISH_OK]: "German/English",
+    [TranslatedIntoType.NO_TRANSLATION]: "",
+  },
 };
 
 // Combines the accompanied person's translation-target requirement
@@ -226,9 +257,11 @@ const PAIR_TARGET_LABELS: Record<TranslatedIntoType, string> = {
 // needs to cover. Falls back to the standalone label ("Nur Deutsch") when no
 // source language is recorded, since a bare "Deutsch" alone would read as
 // an incomplete pair rather than "German only, source unspecified".
+// `dealLanguageTitles` must already be in `lang`.
 export function formatAccompaniedPersonLanguage(
   languageToTranslate: TranslatedIntoType | undefined,
   dealLanguageTitles: string[],
+  lang: Lang = Lang.DE,
 ): string {
   if (!languageToTranslate) {
     return "";
@@ -237,9 +270,9 @@ export function formatAccompaniedPersonLanguage(
     languageToTranslate === TranslatedIntoType.NO_TRANSLATION ||
     dealLanguageTitles.length === 0
   ) {
-    return STANDALONE_LABELS[languageToTranslate];
+    return STANDALONE_LABELS[lang][languageToTranslate];
   }
-  const target = PAIR_TARGET_LABELS[languageToTranslate];
+  const target = PAIR_TARGET_LABELS[lang][languageToTranslate];
   return dealLanguageTitles.map((title) => `${target}-${title}`).join(", ");
 }
 

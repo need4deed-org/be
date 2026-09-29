@@ -287,7 +287,7 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     expect(message.text ?? "").not.toContain("undefined");
   });
 
-  it("sendEmailSuggestion still sends, with a bilingual fallback schedule and an alert to ERROR_EMAIL", async () => {
+  it("sendEmailSuggestion still sends, with a per-language fallback schedule and an alert to ERROR_EMAIL", async () => {
     await sendEmailSuggestion(
       email,
       ov({
@@ -303,10 +303,10 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     const [alert, message] = send.mock.calls.map(([msg]) => msg);
     expect(alert.to).toBe(errorEmailRecipient);
     expect(alert.subject).toContain("sendEmailSuggestion");
-    expect(message.text ?? "").toContain(
-      "wird noch abgestimmt/to be confirmed",
-    );
+    expect(message.text ?? "").toContain("taking place on to be confirmed.");
+    expect(message.text ?? "").toContain("am wird noch abgestimmt.");
     expect(message.text ?? "").not.toContain("undefined");
+    expect(alert.text).toContain('"en":"to be confirmed"');
   });
 
   it("sends the alert through errorTransport (not email) when the two differ", async () => {

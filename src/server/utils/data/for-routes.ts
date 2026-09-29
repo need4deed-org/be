@@ -29,7 +29,7 @@ import {
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 import { BadRequestError, NotFoundError } from "../../../config";
-import { defaultPageSize } from "../../../config/constants";
+import { CDNBaseUrl, defaultPageSize } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -956,7 +956,7 @@ export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {
 }
 
 export function getDocumentUrl(_s3Key: string): string {
-  return `${process.env.MOCK_VOLUNTEER_DOC_S3_UPLOAD_URL}/volunteer/1/doc/download?url=${encodeURIComponent("https://d2nwrdddg8skub.cloudfront.net/dev/test_pdf.pdf")}`;
+  return `${process.env.MOCK_VOLUNTEER_DOC_S3_UPLOAD_URL}/volunteer/1/doc/download?url=${encodeURIComponent(`${CDNBaseUrl}/dev/test_pdf.pdf`)}`;
 }
 
 export async function getVolunteerDocuments(
