@@ -13,6 +13,7 @@ import notifyPlugin from "./plugins/notify";
 import rateLimitPlugin from "./plugins/rate-limit";
 import schedulerDailyPlugin from "./plugins/scheduler-daily";
 import schedulerHourlyPlugin from "./plugins/scheduler-hourly";
+import translationPlugin from "./plugins/translation";
 import typeormPlugin from "./plugins/typeorm";
 import activityLogRoutes from "./routes/activity-log.routes";
 import agentRoutes from "./routes/agent/agent.routes";
@@ -195,6 +196,7 @@ export async function createServer(): Promise<FastifyInstance> {
   await fastifyInstance.register(notifyPlugin);
   await fastifyInstance.register(schedulerHourlyPlugin);
   await fastifyInstance.register(schedulerDailyPlugin);
+  await fastifyInstance.register(translationPlugin);
   await fastifyInstance.register(healthRoutes, {
     prefix: RoutePrefix.HEALTH_CHECK,
   });
