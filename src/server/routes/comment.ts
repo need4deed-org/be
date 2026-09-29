@@ -5,10 +5,51 @@ import { In } from "typeorm";
 import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import CommentPerson from "../../data/entity/m2m/comment-person";
+import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
-import { syncCommentTags } from "../utils";
+import { notifyTaggedByEmail, syncCommentTags } from "../utils";
+
+// Roles that can read comments, so the only ones emailed about a tag in one.
+const COMMENT_READER_ROLES = [UserRole.COORDINATOR, UserRole.ADMIN];
+
+// Slack + email for the persons newly tagged in a comment (be#1075), by
+// `tagger` — the requester, who on an edit may be an admin rather than the
+// comment's author. Fire-and-forget: tagged() swallows its own errors and
+// no-ops without a Slack webhook; notifyTaggedByEmail() never rejects.
+// Neither affects the response. `comment` needs commentPerson.person loaded.
+function notifyCommentTags(
+  fastify: FastifyInstance,
+  comment: Comment,
+  personIds: number[],
+  tagger: User,
+): void {
+  if (personIds.length === 0) {
+    return;
+  }
+  const authorName = tagger.person?.name;
+  fastify.notify.tagged({
+    kind: "comment",
+    authorName: authorName ?? "Someone",
+    taggedNames: (comment.commentPerson ?? [])
+      .filter((cp) => personIds.includes(cp.personId))
+      .map((cp) => cp.person?.name)
+      .filter((n): n is string => Boolean(n)),
+    text: comment.text,
+  });
+  void notifyTaggedByEmail(fastify, {
+    personIds,
+    author: { userId: tagger.id, personId: tagger.personId, name: authorName },
+    allowedRoles: COMMENT_READER_ROLES,
+    text: comment.text,
+    where: {
+      kind: "comment",
+      entityType: comment.entityType,
+      entityId: comment.entityId,
+    },
+  });
+}
 
 export default async function commentRoutes(
   fastify: FastifyInstance,
@@ -226,19 +267,13 @@ export default async function commentRoutes(
           throw new Error(`Failed to reload comment after create`);
         }
 
-        // Notify on Slack when the new comment tags people. Fire-and-forget:
-        // notify.tagged swallows its own errors and no-ops when the comments
-        // Slack webhook is not configured, so it never affects the response.
-        if (taggedPersonIds && taggedPersonIds.length > 0) {
-          fastify.notify.tagged({
-            kind: "comment",
-            authorName: reloaded.user.person?.name ?? "Someone",
-            taggedNames: (reloaded.commentPerson ?? [])
-              .map((cp) => cp.person?.name)
-              .filter((n): n is string => Boolean(n)),
-            text: reloaded.text,
-          });
-        }
+        // The requester is the comment's author here (user set from the token).
+        notifyCommentTags(
+          fastify,
+          reloaded,
+          (reloaded.commentPerson ?? []).map((cp) => cp.personId),
+          reloaded.user,
+        );
 
         return reply.status(201).send({
           message: "Successfully created a new comment",
@@ -316,6 +351,8 @@ export default async function commentRoutes(
         // Only creator or admin can edit
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user.id },
+          // person: the tagger's name in tag notifications (be#1075).
+          relations: ["person"],
         });
 
         if (!user) {
@@ -348,6 +385,8 @@ export default async function commentRoutes(
           });
         }
 
+        // Tags before this edit — only the ones it adds get notified.
+        let previousPersonIds: number[] = [];
         const reloaded = await commentRepository.manager.transaction(
           async (manager) => {
             await manager.getRepository(Comment).save(comment);
@@ -355,17 +394,39 @@ export default async function commentRoutes(
             // undefined leaves existing comment_person rows untouched, which
             // matches PATCH semantics (only update fields the caller provided).
             if (taggedPersonIds !== undefined) {
+              previousPersonIds = (
+                await manager
+                  .getRepository(CommentPerson)
+                  .find({ where: { commentId: id }, select: ["personId"] })
+              ).map((cp) => cp.personId);
               await syncCommentTags(id, taggedPersonIds, manager);
             }
             return manager.getRepository(Comment).findOne({
               where: { id },
-              relations: ["user", "user.person", "language", "commentPerson"],
+              relations: [
+                "user",
+                "user.person",
+                "language",
+                "commentPerson",
+                "commentPerson.person",
+              ],
             });
           },
         );
 
         if (!reloaded) {
           throw new Error(`Failed to reload comment after update`);
+        }
+
+        if (taggedPersonIds !== undefined) {
+          notifyCommentTags(
+            fastify,
+            reloaded,
+            (reloaded.commentPerson ?? [])
+              .map((cp) => cp.personId)
+              .filter((personId) => !previousPersonIds.includes(personId)),
+            user,
+          );
         }
 
         return {
