@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
   AgentMembershipStatus,
   ApiAgentCreateResponse,
+  ApiAgentGetList,
   ApiAgentPatch,
   ApiAgentRegisterNew,
   SortOrder,
@@ -15,10 +16,12 @@ import {
 import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getRepository } from "../../../data/utils";
+import { getDistrictCentroids } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
   dtoAgentGet,
   dtoAgentGetList,
+  getAgentDistrictIdNeedingCentroid,
   parseAgentPatch,
 } from "../../../services";
 import {
@@ -52,7 +55,7 @@ import {
   updateAgentServices,
 } from "../../utils";
 import { createAgent } from "../../utils/data/write-agent-registration";
-import { makePiiSerialization } from "../../utils/pii/pre-serialization";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
 import agentVolunteerRoutes from "./agent-volunteer.routes";
@@ -151,9 +154,7 @@ export default async function agentRoutes(
 
   fastify.get<{
     Querystring: QuerystringAgentGetList;
-    // Handler sends entities; the DTO (ApiAgentGetList) runs in the
-    // preSerialization hook, so the send is typed as the entity.
-    Reply: ReplyDataCount<Agent[]>;
+    Reply: ReplyDataCount<ApiAgentGetList[]>;
   }>(
     "/",
     {
@@ -161,7 +162,6 @@ export default async function agentRoutes(
         querystring: agentListQuerySchema,
         response: responseSchema("ApiAgentGetList#", true),
       },
-      preSerialization: makePiiSerialization(dtoAgentGetList),
     },
     async (request, reply) => {
       logger.debug(`GET /agent: request.query:${Object.keys(request.query)}`);
@@ -211,10 +211,42 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
-      // DTO (dtoAgentGetList) runs in the preSerialization hook after PII masking.
+      // dtoAgentGetList takes a handler-computed district-centroid arg
+      // (be#1083), so mask inline (rather than via the makePiiSerialization
+      // hook) before serializing — masking first means a caller without
+      // visibility into an agent gets its district centroid, never its own
+      // (nulled) postcode coordinates.
+      await maskForCaller(request, agentsDistrict);
+
+      // Map-pin centroid fallback, batched for just the agents that aren't
+      // geocoded — see GET /opportunity for why this isn't an eager relation.
+      const neededDistrictIds = new Map(
+        agentsDistrict.map((agent) => [
+          agent.id,
+          getAgentDistrictIdNeedingCentroid(agent),
+        ]),
+      );
+      const districtCentroids = await getDistrictCentroids([
+        ...new Set(
+          [...neededDistrictIds.values()].filter(
+            (id): id is number => id !== undefined,
+          ),
+        ),
+      ]);
+
+      const data = agentsDistrict.map((agent) => {
+        const districtId = neededDistrictIds.get(agent.id);
+        return dtoAgentGetList(
+          agent,
+          districtId !== undefined
+            ? districtCentroids.get(districtId)
+            : undefined,
+        );
+      });
+
       return reply.status(200).send({
         message: `Agents page:${page || 1} fetched successfully`,
-        data: agentsDistrict,
+        data,
         count,
       });
     },
@@ -249,14 +281,16 @@ export default async function agentRoutes(
     },
   );
 
-  fastify.get<{ Params: ParamsId; Reply: ReplyData<Agent> }>(
+  fastify.get<{
+    Params: ParamsId;
+    Reply: ReplyData<ReturnType<typeof dtoAgentGet>>;
+  }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
         response: responseSchema("ApiAgentGet#"),
       },
-      preSerialization: makePiiSerialization(dtoAgentGet),
     },
     async (request, reply) => {
       const { id } = request.params;
@@ -288,10 +322,22 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
-      // DTO (dtoAgentGet) runs in the preSerialization hook after PII masking.
+      // dtoAgentGet takes a handler-computed district-centroid arg (be#1083),
+      // so mask inline (rather than via the makePiiSerialization hook) before
+      // serializing, same as GET /agent above.
+      await maskForCaller(request, agentComments);
+
+      const districtIdNeedingCentroid =
+        getAgentDistrictIdNeedingCentroid(agentComments);
+      const districtCentroid = districtIdNeedingCentroid
+        ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
+            districtIdNeedingCentroid,
+          )
+        : undefined;
+
       return reply.status(200).send({
         message: `Agent (id:${id}) fetched successfully`,
-        data: agentComments,
+        data: dtoAgentGet(agentComments, districtCentroid),
       });
     },
   );

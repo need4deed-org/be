@@ -1420,6 +1420,12 @@
         },
         "unclaimed": {
           "type": "boolean"
+        },
+        "lat": {
+          "type": ["number", "null"]
+        },
+        "lon": {
+          "type": ["number", "null"]
         }
       }
     },
@@ -1436,7 +1442,9 @@
         "numOpportunities",
         "email",
         "volunteerSearch",
-        "unclaimed"
+        "unclaimed",
+        "lat",
+        "lon"
       ]
     },
     "AgentProps": {
@@ -1568,6 +1576,8 @@
         "email",
         "volunteerSearch",
         "unclaimed",
+        "lat",
+        "lon",
         "createdAt",
         "statusEngagement",
         "agentDetails",

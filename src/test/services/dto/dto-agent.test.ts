@@ -6,6 +6,7 @@ import {
   dtoAgentGetList,
   dtoAgentOpportunity,
   dtoOpportunityAgent,
+  getAgentDistrictIdNeedingCentroid,
 } from "../../../services";
 
 // Mocking the external dependencies used in your functions
@@ -287,6 +288,8 @@ describe("dtoAgentGetList", () => {
         title: { de: "Mitte" },
       },
       volunteerSearch: "agent-searching",
+      lat: null,
+      lon: null,
     });
   });
 
@@ -332,6 +335,65 @@ describe("dtoAgentGetList", () => {
         de: "Mehrere Soziale Leistungen",
       },
     });
+  });
+
+  describe("map-pin lat/lon (be#1083)", () => {
+    const geocoded = {
+      ...mockAgentBase,
+      address: { postcode: { latitude: 52.5, longitude: 13.4 } },
+    } as any;
+    const notGeocoded = {
+      ...mockAgentBase,
+      address: { postcode: { latitude: null, longitude: null } },
+    } as any;
+
+    it("uses the agent's geocoded postcode, ignoring any district centroid", () => {
+      const result = dtoAgentGetList(geocoded, {
+        latitude: 1,
+        longitude: 2,
+      });
+      expect(result.lat).toBe(52.5);
+      expect(result.lon).toBe(13.4);
+    });
+
+    it("falls back to the handler-supplied district centroid when not geocoded", () => {
+      const result = dtoAgentGetList(notGeocoded, {
+        latitude: 52.4,
+        longitude: 13.3,
+      });
+      expect(result.lat).toBe(52.4);
+      expect(result.lon).toBe(13.3);
+    });
+
+    it("returns null lat/lon when neither is available", () => {
+      const result = dtoAgentGetList(notGeocoded);
+      expect(result.lat).toBeNull();
+      expect(result.lon).toBeNull();
+    });
+
+    it("carries the coordinates onto dtoAgentGet", () => {
+      const result = dtoAgentGet(
+        { ...notGeocoded, comments: [] },
+        {
+          latitude: 52.4,
+          longitude: 13.3,
+        },
+      );
+      expect(result.lat).toBe(52.4);
+      expect(result.lon).toBe(13.3);
+    });
+  });
+
+  it("asks for a district centroid only when the agent isn't geocoded", () => {
+    expect(
+      getAgentDistrictIdNeedingCentroid({
+        ...mockAgentBase,
+        address: { postcode: { latitude: 52.5, longitude: 13.4 } },
+      } as any),
+    ).toBeUndefined();
+    expect(getAgentDistrictIdNeedingCentroid({ ...mockAgentBase } as any)).toBe(
+      201,
+    );
   });
 });
 

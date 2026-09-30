@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -679,5 +680,178 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     });
     expect(second.statusCode).toBe(409);
     expect(second.json()).toMatchObject({ conflict: "title" });
+  });
+});
+
+describe("GET /agent map-pin lat/lon (be#1083)", () => {
+  let fastify: FastifyInstance;
+  let district: District;
+  let districtPostcode: Postcode;
+  let mapping: DistrictPostcode;
+  let agentPostcode: Postcode;
+  let agentAddress: Address;
+  let geocodedAgent: Agent;
+  let ungeocodedAgent: Agent;
+  const personIds: number[] = [];
+  const cookies: Record<string, string> = {};
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const numericSuffix = randomNumericSuffix();
+  const TITLE_PREFIX = `Test Agent map-pin ${suffix}`;
+  // Deliberately different from the district centroid so the two outcomes
+  // are unambiguous.
+  const AGENT_LAT = 52.52;
+  const AGENT_LON = 13.405;
+  const DISTRICT_LAT = 52.4;
+  const DISTRICT_LON = 13.3;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    district = await dataSource
+      .getRepository(District)
+      .save(new District({ title: `Test Agent Map-pin District ${suffix}` }));
+    districtPostcode = await dataSource.getRepository(Postcode).save(
+      new Postcode({
+        value: `1${numericSuffix}`,
+        latitude: DISTRICT_LAT,
+        longitude: DISTRICT_LON,
+      }),
+    );
+    mapping = await dataSource.getRepository(DistrictPostcode).save(
+      new DistrictPostcode({
+        postcodeId: districtPostcode.id,
+        districtId: district.id,
+      }),
+    );
+    agentPostcode = await dataSource.getRepository(Postcode).save(
+      new Postcode({
+        value: `2${numericSuffix}`,
+        latitude: AGENT_LAT,
+        longitude: AGENT_LON,
+      }),
+    );
+    agentAddress = await dataSource
+      .getRepository(Address)
+      .save(new Address({ postcodeId: agentPostcode.id }));
+
+    geocodedAgent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `${TITLE_PREFIX} geocoded`,
+        addressId: agentAddress.id,
+        districtId: district.id,
+      }),
+    );
+    ungeocodedAgent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `${TITLE_PREFIX} ungeocoded`,
+        districtId: district.id,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    // USER has no visibility into any agent, so mask.ts nulls the agent's
+    // postcode coordinates for this caller.
+    for (const [label, role] of [
+      ["MapPinCoordinator", UserRole.COORDINATOR],
+      ["MapPinUser", UserRole.USER],
+    ] as const) {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Test", lastName: label }),
+      );
+      personIds.push(person.id);
+      const email = `${label.toLowerCase()}-${suffix}@test.need4deed.org`;
+      await fastify.db.userRepository.save(
+        new User({
+          email,
+          password: pwHash,
+          role,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      cookies[role] = getCookie(res.cookies, accessCookieName);
+    }
+  });
+
+  afterAll(async () => {
+    for (const personId of personIds) {
+      await fastify.db.userRepository.delete({ personId });
+      await fastify.db.personRepository.delete({ id: personId });
+    }
+    await fastify.db.agentRepository.delete({ id: geocodedAgent.id });
+    await fastify.db.agentRepository.delete({ id: ungeocodedAgent.id });
+    await dataSource.getRepository(Address).delete({ id: agentAddress.id });
+    await dataSource.getRepository(DistrictPostcode).delete({ id: mapping.id });
+    await dataSource.getRepository(District).delete({ id: district.id });
+    await dataSource
+      .getRepository(Postcode)
+      .delete({ id: In([agentPostcode.id, districtPostcode.id]) });
+    await fastify.close();
+  });
+
+  async function getList(role: UserRole) {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent?filter[search]=${encodeURIComponent(TITLE_PREFIX)}`,
+      cookies: { [accessCookieName]: cookies[role] },
+    });
+    expect(res.statusCode).toBe(200);
+    const data: { id: number; lat: number | null; lon: number | null }[] =
+      res.json().data;
+    return (id: number) => data.find((a) => a.id === id);
+  }
+
+  it("serializes a geocoded agent's own coordinates for a caller who can see it", async () => {
+    const find = await getList(UserRole.COORDINATOR);
+    expect(find(geocodedAgent.id)).toMatchObject({
+      lat: AGENT_LAT,
+      lon: AGENT_LON,
+    });
+  });
+
+  it("falls back to the district centroid for an agent that isn't geocoded", async () => {
+    const find = await getList(UserRole.COORDINATOR);
+    expect(find(ungeocodedAgent.id)).toMatchObject({
+      lat: DISTRICT_LAT,
+      lon: DISTRICT_LON,
+    });
+  });
+
+  it("falls back to the district centroid once the agent's address is masked", async () => {
+    const find = await getList(UserRole.USER);
+    expect(find(geocodedAgent.id)).toMatchObject({
+      lat: DISTRICT_LAT,
+      lon: DISTRICT_LON,
+    });
+  });
+
+  it("serializes lat/lon on GET /agent/:id, masked the same way", async () => {
+    const get = (role: UserRole) =>
+      fastify.inject({
+        method: "GET",
+        url: `/agent/${geocodedAgent.id}`,
+        cookies: { [accessCookieName]: cookies[role] },
+      });
+
+    const coordinator = await get(UserRole.COORDINATOR);
+    expect(coordinator.statusCode).toBe(200);
+    expect(coordinator.json().data).toMatchObject({
+      lat: AGENT_LAT,
+      lon: AGENT_LON,
+    });
+
+    const user = await get(UserRole.USER);
+    expect(user.statusCode).toBe(200);
+    expect(user.json().data).toMatchObject({
+      lat: DISTRICT_LAT,
+      lon: DISTRICT_LON,
+    });
   });
 });
