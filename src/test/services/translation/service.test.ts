@@ -93,6 +93,12 @@ describe("TranslationService.translateField", () => {
         kind: "bad_response",
       }).service.translateField("Kinderbetreuung", Lang.EN),
     ).toEqual({ status: "failed", code: "bad_response" });
+    expect(
+      await serviceAnswering({
+        status: "error",
+        kind: "misconfigured",
+      }).service.translateField("Kinderbetreuung", Lang.EN),
+    ).toEqual({ status: "retry", reason: "misconfigured" });
   });
 
   it("loads the glossary once per hour", async () => {
@@ -136,6 +142,26 @@ describe("createTranslationProvider", () => {
     expect(
       createTranslationProvider(
         { ...withToken, provider: "fake" },
+        allowNetwork,
+      ),
+    ).toBeInstanceOf(FakeProvider);
+  });
+
+  it("never falls back to the fake provider while the worker is enabled", () => {
+    // Review finding 4: "[en] <text>" would be stored as real translations.
+    const allowNetwork = { allowNetwork: true };
+    expect(() =>
+      createTranslationProvider(
+        getTranslationConfig({ TRANSLATION_ENABLED: "true" }),
+        allowNetwork,
+      ),
+    ).toThrow(/TRANSLATION_ENABLED needs INFOMANIAK_AI_PRODUCT_ID/);
+    expect(
+      createTranslationProvider(
+        getTranslationConfig({
+          TRANSLATION_ENABLED: "true",
+          TRANSLATION_PROVIDER: "fake",
+        }),
         allowNetwork,
       ),
     ).toBeInstanceOf(FakeProvider);

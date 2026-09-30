@@ -30,9 +30,13 @@ export type ProviderResult =
     }
   | {
       status: "error";
-      // rate_limited / unavailable: transient, retried on a later run.
-      // bad_response: the provider answered but not with a usable result.
-      kind: "rate_limited" | "unavailable" | "bad_response";
+      // rate_limited: our own request rate; misconfigured: credentials,
+      // product or model rejected (401/403/404). Neither is the text's
+      // fault: the worker ends the run and the row keeps its attempts.
+      // unavailable: provider outage (5xx, network, timeout), retried on a
+      // later run and counted. bad_response: an answer that isn't a
+      // usable translation of this text.
+      kind: "rate_limited" | "misconfigured" | "unavailable" | "bad_response";
     };
 
 export interface TranslationProvider {

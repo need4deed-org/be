@@ -129,6 +129,20 @@ describe("InfomaniakProvider", () => {
     });
   });
 
+  it("reports rejected credentials, product or model as misconfigured", async () => {
+    // Review finding 3: these used to count as bad_response and fail rows for good.
+    const error = vi.spyOn(logger, "error");
+    for (const status of [401, 403, 404]) {
+      fetchMock.mockResolvedValueOnce(errorStatus(status));
+      expect(await provider.translate(request)).toEqual({
+        status: "error",
+        kind: "misconfigured",
+      });
+    }
+    expect(error).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(error.mock.calls)).not.toContain("secret-token");
+  });
+
   it("treats anything but {text: string} as a bad response", async () => {
     for (const content of ["not json", { translation: "x" }, { text: 42 }]) {
       fetchMock.mockResolvedValueOnce(completion(content));

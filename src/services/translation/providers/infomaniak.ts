@@ -93,6 +93,13 @@ export class InfomaniakProvider implements TranslationProvider {
       if (response.status === 429) {
         return { status: "error", kind: "rate_limited" };
       }
+      if ([401, 403, 404].includes(response.status)) {
+        logger.error(
+          { provider: this.name, status: response.status },
+          "translation: provider rejected the credentials, product or model — check INFOMANIAK_AI_*",
+        );
+        return { status: "error", kind: "misconfigured" };
+      }
       return {
         status: "error",
         kind: response.status >= 500 ? "unavailable" : "bad_response",

@@ -22,8 +22,10 @@ export interface BatchStats {
   retried: number;
   // Source edited during the call: result discarded, re-translated later.
   stale: number;
-  skipped: number;
+  // Pending rows with no source text left, deleted.
+  removed: number;
   rateLimited: boolean;
+  misconfigured: boolean;
   promptTokens: number;
   completionTokens: number;
   failures: Partial<Record<TranslationErrorCode, number>>;
@@ -60,8 +62,9 @@ export async function runTranslationBatch(
     failed: 0,
     retried: 0,
     stale: 0,
-    skipped: 0,
+    removed: 0,
     rateLimited: false,
+    misconfigured: false,
     promptTokens: 0,
     completionTokens: 0,
     failures: {},
@@ -91,7 +94,20 @@ export async function runTranslationBatch(
     const source = await sourceTextOf(manager, row);
     const lang = row.language?.isoCode as Lang | undefined;
     if (!source || !lang) {
-      stats.skipped++;
+      // Nothing to translate (text emptied or removed without enqueue):
+      // drop the row, or it would stay the oldest due row and block the
+      // queue. enqueue recreates it if text comes back.
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(FieldTranslation)
+        .where("id = :id AND source_hash = :hash AND status = :pending", {
+          id: row.id,
+          hash: row.sourceHash,
+          pending: TranslationStatus.PENDING,
+        })
+        .execute();
+      stats.removed++;
       continue;
     }
 
@@ -143,6 +159,16 @@ export async function runTranslationBatch(
       } else {
         stats.stale++;
       }
+    } else if (result.reason !== "unavailable") {
+      // Rate limit or rejected credentials: not this row's fault. Leave it
+      // as it is and end the run; the next run tries again.
+      stats.retried++;
+      if (result.reason === "rate_limited") {
+        stats.rateLimited = true;
+      } else {
+        stats.misconfigured = true;
+      }
+      break;
     } else {
       const attempts = row.attempts + 1;
       const exhausted = attempts >= config.maxAttempts;
@@ -161,10 +187,6 @@ export async function runTranslationBatch(
           (stats.failures.provider_unavailable ?? 0) + 1;
       } else {
         stats.retried++;
-      }
-      if (result.reason === "rate_limited") {
-        stats.rateLimited = true;
-        break;
       }
     }
   }

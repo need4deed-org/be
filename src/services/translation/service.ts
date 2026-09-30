@@ -22,9 +22,12 @@ export type FieldTranslationResult =
   // Not worth retrying: the provider's answer was unusable or failed
   // validation (outputs vary, but the same input tends to fail the same way).
   | { status: "failed"; code: TranslationErrorCode }
-  // Transient: try again on a later run, and stop the current run early
-  // when rate limited.
-  | { status: "retry"; reason: "rate_limited" | "unavailable" };
+  // Transient: try again on a later run. rate_limited and misconfigured also
+  // end the current run and don't count as an attempt of this row.
+  | {
+      status: "retry";
+      reason: "rate_limited" | "misconfigured" | "unavailable";
+    };
 
 const GLOSSARY_TTL_MS = 60 * 60 * 1000;
 
@@ -89,19 +92,27 @@ export class TranslationService {
 
 /**
  * TRANSLATION_PROVIDER picks the engine explicitly. Without it: Infomaniak
- * when its product id and token are set, otherwise the fake one. Under
- * NODE_ENV=test it's always the fake one (allowNetwork defaults to false), so
- * tests never touch the network.
+ * when its product id and token are set. The fake one is chosen
+ * automatically only while the worker is disabled: with the worker on, its
+ * "[en] <text>" outputs would be stored and served as real translations, so
+ * missing credentials stop startup unless TRANSLATION_PROVIDER=fake is set
+ * on purpose. Under NODE_ENV=test it's always the fake one (allowNetwork
+ * defaults to false), so tests never touch the network.
  */
 export function createTranslationProvider(
   config: TranslationConfig,
   { allowNetwork = !isTest }: { allowNetwork?: boolean } = {},
 ): TranslationProvider {
-  const choice =
-    config.provider ??
-    (config.productId && config.token ? "infomaniak" : "fake");
-
-  if (choice === "fake" || !allowNetwork) {
+  if (!allowNetwork || config.provider === "fake") {
+    return new FakeProvider();
+  }
+  const hasCredentials = Boolean(config.productId && config.token);
+  if (!config.provider && !hasCredentials) {
+    if (config.enabled) {
+      throw new Error(
+        "TRANSLATION_ENABLED needs INFOMANIAK_AI_PRODUCT_ID and INFOMANIAK_AI_TOKEN (or TRANSLATION_PROVIDER=fake on purpose)",
+      );
+    }
     return new FakeProvider();
   }
   if (!config.productId || !config.token) {

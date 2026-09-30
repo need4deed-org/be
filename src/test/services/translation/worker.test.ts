@@ -173,6 +173,51 @@ describe("runTranslationBatch", () => {
 
     expect(stats).toMatchObject({ picked: 2, retried: 1, rateLimited: true });
     expect(provider.requests).toHaveLength(1);
+    // Review finding 5: our own rate limit doesn't use up the row's attempts.
+    expect(await reload(first.row.id)).toMatchObject({
+      status: TranslationStatus.PENDING,
+      attempts: 0,
+    });
+  });
+
+  it("ends the run on rejected credentials without failing rows", async () => {
+    // Review finding 3: an expired token must not fail the queue for good.
+    const first = await queued();
+    const second = await queued();
+    const { service, provider } = worker(() => ({
+      status: "error",
+      kind: "misconfigured",
+    }));
+
+    const stats = await runTranslationBatch(manager(), service, config, {
+      rowIds: [first.row.id, second.row.id],
+      ...noSleep,
+    });
+
+    expect(stats).toMatchObject({ misconfigured: true, failed: 0 });
+    expect(provider.requests).toHaveLength(1);
+    expect(await reload(first.row.id)).toMatchObject({
+      status: TranslationStatus.PENDING,
+      attempts: 0,
+    });
+  });
+
+  it("removes a pending row whose source text is gone", async () => {
+    // Review finding 6: such rows stayed the oldest due and blocked the queue.
+    const { row, opportunity } = await queued();
+    await manager().update(Opportunity, opportunity.id, { title: "" });
+    const { service, provider } = worker();
+
+    const stats = await runTranslationBatch(manager(), service, config, {
+      rowIds: [row.id],
+      ...noSleep,
+    });
+
+    expect(stats).toMatchObject({ picked: 1, removed: 1 });
+    expect(provider.requests).toHaveLength(0);
+    expect(
+      await manager().findOneBy(FieldTranslation, { id: row.id }),
+    ).toBeNull();
   });
 
   it("discards a result when the source is edited during the call", async () => {

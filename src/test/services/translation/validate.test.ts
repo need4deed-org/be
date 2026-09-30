@@ -93,6 +93,50 @@ describe("validateTranslation", () => {
     ).toEqual(ok);
   });
 
+  it("accepts dates and numbers copied with leading zeros", () => {
+    // Review finding 1: "01" was not recognised as the day 1.
+    expectCode(
+      "Treffen ab 01.10.2026 im Hof, Raum 05",
+      "Meeting from 01.10.2026 in the yard, room 05",
+      Lang.EN,
+    ).toEqual({ status: "ok" });
+  });
+
+  it("accepts thousands separators in either notation", () => {
+    // Review finding 2: "1.000" -> "1,000" was rejected.
+    const ok = { status: "ok" };
+    expectCode(
+      "Budget: 1.000 Euro pro Jahr",
+      "Budget: 1,000 euros per year",
+      Lang.EN,
+    ).toEqual(ok);
+    expectCode(
+      "Spenden bis 1.050 Euro möglich",
+      "Donations of up to 1,050 euros possible",
+      Lang.EN,
+    ).toEqual(ok);
+    expectCode(
+      "Etwa 10 000 Menschen im Kiez",
+      "About 10,000 people in the neighbourhood",
+      Lang.EN,
+    ).toEqual(ok);
+    expectCode(
+      "Etwa 10 000 Menschen im Kiez",
+      "About 10000 people in the neighbourhood",
+      Lang.EN,
+    ).toEqual(ok);
+  });
+
+  it("still rejects a changed amount", () => {
+    expectCode(
+      "Budget: 1.000 Euro pro Jahr",
+      "Budget: 100 euros per year",
+      Lang.EN,
+    ).toMatchObject({
+      code: "token_missing",
+    });
+  });
+
   it("treats a longer identical output as untranslated, a short one as fine", () => {
     const text = "Hausaufgabenhilfe für Kinder jeden Montag";
     expectCode(text, text, Lang.EN).toMatchObject({ code: "untranslated" });
