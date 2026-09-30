@@ -127,6 +127,50 @@ describe("validateTranslation", () => {
     ).toEqual(ok);
   });
 
+  it("accepts a separator the model adds or drops", () => {
+    // Quick-review finding 1: only source-side separators were handled.
+    const ok = { status: "ok" };
+    expectCode(
+      "Budget: 5000 Euro pro Jahr",
+      "Budget: 5,000 euros per year",
+      Lang.EN,
+    ).toEqual(ok);
+    expectCode(
+      "Budget: 5.000 Euro pro Jahr",
+      "Budget: 5000 euros per year",
+      Lang.EN,
+    ).toEqual(ok);
+  });
+
+  it("keeps space-separated numbers apart unless the output joins them", () => {
+    // Quick-review finding 2: "3 100" was read as 3100.
+    const ok = { status: "ok" };
+    expectCode(
+      "Raum 3 100 Plätze frei",
+      "Room 3, 100 places free",
+      Lang.EN,
+    ).toEqual(ok);
+    expectCode(
+      "Raum 3 100 Plätze frei",
+      "Room 3 100 places free",
+      Lang.EN,
+    ).toEqual(ok);
+    // ...but a space-grouped amount may come back without any separator.
+    expectCode(
+      "Etwa 10 000 Menschen im Kiez",
+      "About 10000 people in the neighbourhood",
+      Lang.EN,
+    ).toEqual(ok);
+    // A lost part is still caught.
+    expectCode(
+      "Raum 3 100 Plätze frei",
+      "Room 3, places free",
+      Lang.EN,
+    ).toMatchObject({
+      code: "token_missing",
+    });
+  });
+
   it("still rejects a changed amount", () => {
     expectCode(
       "Budget: 1.000 Euro pro Jahr",

@@ -23,8 +23,17 @@ const URL = /https?:\/\/[^\s)]+/g;
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
 const TIME = /\b(\d{1,2})[.:](\d{2})\b/g;
-// Thousands grouping: "1.000" (German), "1,000" (English), "10 000".
-const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0 ]\d{3})+\b/g;
+// Thousands grouping: "1.000" (German), "1,000" (English). A plain space
+// is ambiguous ("Raum 3 100 Plätze" is two numbers), so SPACE_GROUPED is
+// only read as one number when the output has it that way.
+const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
+const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
+
+// "1.000" and "1,000" both become "1000", on either side, so a separator
+// the model adds, drops or swaps doesn't count as a changed number.
+function collapseGrouping(text: string): string {
+  return text.replace(GROUPED_NUMBER, (grouped) => grouped.replace(/\D/g, ""));
+}
 const NUMBER = /\d+/g;
 
 // Numbers the model may write out ("1 Person" -> "One person").
@@ -51,18 +60,6 @@ function trimTrailingPunctuation(token: string): string {
 // matches in "A1" (language level) and "01" (a copied date), not in "15".
 function hasNumber(text: string, digits: string): boolean {
   return new RegExp(`(^|\\D)0*${digits}($|\\D)`).test(text);
-}
-
-// "1.000" may come back as "1,000", "1 000" or "1000".
-function groupedNumberPresent(output: string, grouped: string): boolean {
-  const digits = grouped.replace(/\D/g, "");
-  const groups: string[] = [];
-  for (let end = digits.length; end > 0; end -= 3) {
-    groups.unshift(digits.slice(Math.max(0, end - 3), end));
-  }
-  return new RegExp(`(^|\\D)${groups.join("[.,\\u00a0 ]?")}($|\\D)`).test(
-    output,
-  );
 }
 
 function hasWord(text: string, word: string): boolean {
@@ -129,20 +126,19 @@ function tokensPreserved(source: string, output: string): boolean {
   if (!datesPreserved) {
     return false;
   }
-  for (const [grouped] of rest.matchAll(GROUPED_NUMBER)) {
-    if (!groupedNumberPresent(output, grouped)) {
-      return false;
-    }
-  }
-  rest = rest.replace(GROUPED_NUMBER, " ");
   for (const [, hour, minutes] of rest.matchAll(TIME)) {
     if (!timePresent(output, Number(hour), minutes)) {
       return false;
     }
   }
-  rest = rest.replace(TIME, " ");
+  const numbersOutput = collapseGrouping(output);
+  rest = collapseGrouping(rest.replace(TIME, " ")).replace(
+    SPACE_GROUPED,
+    (grouped) =>
+      hasNumber(numbersOutput, grouped.replace(/\D/g, "")) ? " " : grouped,
+  );
   for (const [number] of rest.matchAll(NUMBER)) {
-    if (!numberPresent(output, Number(number))) {
+    if (!numberPresent(numbersOutput, Number(number))) {
       return false;
     }
   }
