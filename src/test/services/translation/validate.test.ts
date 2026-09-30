@@ -93,6 +93,47 @@ describe("validateTranslation", () => {
     ).toEqual(ok);
   });
 
+  it("allows 12-hour notation for times only, not for other numbers", () => {
+    // Full-review finding 1: any number > 12 also passed as number - 12.
+    expectCode(
+      "Für 20 Euro im Monat",
+      "For 8 euros a month",
+      Lang.EN,
+    ).toMatchObject({
+      code: "token_missing",
+    });
+    expectCode(
+      "100 Plätze sind frei",
+      "88 seats are available",
+      Lang.EN,
+    ).toMatchObject({
+      code: "token_missing",
+    });
+    const ok = { status: "ok" };
+    expectCode(
+      "Treffen ab 16 Uhr im Garten",
+      "Meeting from 4 PM in the garden",
+      Lang.EN,
+    ).toEqual(ok);
+    // English sources: "4:30 PM" / "5 PM" come back in 24-hour German notation.
+    expectCode(
+      "Meeting at 4:30 PM in the garden",
+      "Treffen um 16:30 im Garten",
+      Lang.DE,
+    ).toEqual(ok);
+    expectCode(
+      "Meeting at 5 PM in the garden",
+      "Treffen um 17 Uhr im Garten",
+      Lang.DE,
+    ).toEqual(ok);
+    // "am" at the start of a word isn't a time.
+    expectCode(
+      "We need 5 amazing volunteers",
+      "Wir brauchen 5 tolle Freiwillige",
+      Lang.DE,
+    ).toEqual(ok);
+  });
+
   it("accepts dates and numbers copied with leading zeros", () => {
     // Review finding 1: "01" was not recognised as the day 1.
     expectCode(

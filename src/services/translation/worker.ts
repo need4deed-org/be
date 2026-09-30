@@ -97,7 +97,7 @@ export async function runTranslationBatch(
       // Nothing to translate (text emptied or removed without enqueue):
       // drop the row, or it would stay the oldest due row and block the
       // queue. enqueue recreates it if text comes back.
-      await manager
+      const { affected } = await manager
         .createQueryBuilder()
         .delete()
         .from(FieldTranslation)
@@ -107,7 +107,11 @@ export async function runTranslationBatch(
           pending: TranslationStatus.PENDING,
         })
         .execute();
-      stats.removed++;
+      if (affected) {
+        stats.removed++;
+      } else {
+        stats.stale++;
+      }
       continue;
     }
 
@@ -172,7 +176,7 @@ export async function runTranslationBatch(
     } else {
       const attempts = row.attempts + 1;
       const exhausted = attempts >= config.maxAttempts;
-      await guarded({
+      const { affected } = await guarded({
         attempts,
         ...(exhausted
           ? {
@@ -181,7 +185,9 @@ export async function runTranslationBatch(
             }
           : {}),
       });
-      if (exhausted) {
+      if (!affected) {
+        stats.stale++;
+      } else if (exhausted) {
         stats.failed++;
         stats.failures.provider_unavailable =
           (stats.failures.provider_unavailable ?? 0) + 1;

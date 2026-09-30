@@ -129,6 +129,22 @@ describe("InfomaniakProvider", () => {
     });
   });
 
+  it("retries passing 4xx errors, fails the others", async () => {
+    // Full-review finding 3: 408/409/425 used to fail rows for good.
+    for (const status of [408, 409, 425]) {
+      fetchMock.mockResolvedValueOnce(errorStatus(status));
+      expect(await provider.translate(request)).toMatchObject({
+        kind: "unavailable",
+      });
+    }
+    for (const status of [400, 413, 422]) {
+      fetchMock.mockResolvedValueOnce(errorStatus(status));
+      expect(await provider.translate(request)).toMatchObject({
+        kind: "bad_response",
+      });
+    }
+  });
+
   it("reports rejected credentials, product or model as misconfigured", async () => {
     // Review finding 3: these used to count as bad_response and fail rows for good.
     const error = vi.spyOn(logger, "error");

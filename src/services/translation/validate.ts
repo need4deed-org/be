@@ -22,7 +22,14 @@ const URL = /https?:\/\/[^\s)]+/g;
 // German numbers start with 0 or +; anything else (e.g. 2026-09-29) isn't one.
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-const TIME = /\b(\d{1,2})[.:](\d{2})\b/g;
+// Times, with an optional English am/pm ("4:30 PM"), and full hours without
+// minutes in either language ("17 Uhr", "5 PM").
+const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
+const TIME = new RegExp(
+  `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
+  "gi",
+);
+const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
 // Thousands grouping: "1.000" (German), "1,000" (English). A plain space
 // is ambiguous ("Raum 3 100 Plätze" is two numbers), so SPACE_GROUPED is
 // only read as one number when the output has it that way.
@@ -66,7 +73,20 @@ function hasWord(text: string, word: string): boolean {
   return new RegExp(`(^|[^\\p{L}\\d])${word}($|[^\\p{L}\\d])`, "iu").test(text);
 }
 
+// 0-23, from "4" + "pm" = 16, "12 am" = 0; hours without am/pm as they are.
+function hour24(hour: number, meridiem?: string): number {
+  const m = meridiem?.toLowerCase().replace(/\./g, "");
+  if (m === "pm" && hour < 12) {
+    return hour + 12;
+  }
+  if (m === "am" && hour === 12) {
+    return 0;
+  }
+  return hour;
+}
+
 // Hours may switch between 24- and 12-hour notation ("16:30" -> "4:30 PM").
+// Only for times: a plain number must keep its exact value.
 function hourVariants(hour: number): string[] {
   return hour > 12 ? [String(hour), String(hour - 12)] : [String(hour)];
 }
@@ -84,7 +104,7 @@ function timePresent(output: string, hour: number, minutes: string): boolean {
 
 function numberPresent(output: string, value: number): boolean {
   return (
-    hourVariants(value).some((n) => hasNumber(output, n)) ||
+    hasNumber(output, String(value)) ||
     (NUMBER_WORDS[value] ?? []).some((word) => hasWord(output, word))
   );
 }
@@ -126,13 +146,19 @@ function tokensPreserved(source: string, output: string): boolean {
   if (!datesPreserved) {
     return false;
   }
-  for (const [, hour, minutes] of rest.matchAll(TIME)) {
-    if (!timePresent(output, Number(hour), minutes)) {
+  for (const [, hour, minutes, meridiem] of rest.matchAll(TIME)) {
+    if (!timePresent(output, hour24(Number(hour), meridiem), minutes)) {
+      return false;
+    }
+  }
+  rest = rest.replace(TIME, " ");
+  for (const [, hour, meridiem] of rest.matchAll(FULL_HOUR)) {
+    if (!timePresent(output, hour24(Number(hour), meridiem), "00")) {
       return false;
     }
   }
   const numbersOutput = collapseGrouping(output);
-  rest = collapseGrouping(rest.replace(TIME, " ")).replace(
+  rest = collapseGrouping(rest.replace(FULL_HOUR, " ")).replace(
     SPACE_GROUPED,
     (grouped) =>
       hasNumber(numbersOutput, grouped.replace(/\D/g, "")) ? " " : grouped,

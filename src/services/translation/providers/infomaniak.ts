@@ -10,6 +10,8 @@ import {
   TranslationRequest,
 } from "../types";
 
+const TRANSIENT_4XX = [408, 409, 425];
+
 export interface InfomaniakProviderConfig {
   productId: string;
   token: string;
@@ -100,9 +102,14 @@ export class InfomaniakProvider implements TranslationProvider {
         );
         return { status: "error", kind: "misconfigured" };
       }
+      // 5xx and the passing 4xx (request timeout, conflict, too early) are
+      // outages; any other 4xx is about this request and won't improve.
       return {
         status: "error",
-        kind: response.status >= 500 ? "unavailable" : "bad_response",
+        kind:
+          response.status >= 500 || TRANSIENT_4XX.includes(response.status)
+            ? "unavailable"
+            : "bad_response",
       };
     }
 

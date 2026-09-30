@@ -256,6 +256,28 @@ describe("runTranslationBatch", () => {
     expect((await reload(row.id)).translation).toBe(`[en] ${edited}`);
   });
 
+  it("counts an outage during a source edit as stale, not as a retry", async () => {
+    // Full-review finding 2: the guarded write changes nothing then.
+    const { row, opportunity } = await queued();
+    const edited = `${opportunity.title} am Montag`;
+    const { service } = worker(async () => {
+      await manager().update(Opportunity, opportunity.id, { title: edited });
+      await enqueue(manager(), OPP, opportunity, { title: edited });
+      return { status: "error", kind: "unavailable" };
+    });
+
+    const stats = await runTranslationBatch(manager(), service, config, {
+      rowIds: [row.id],
+      ...noSleep,
+    });
+
+    expect(stats).toMatchObject({ stale: 1, retried: 0, failed: 0 });
+    expect(await reload(row.id)).toMatchObject({
+      attempts: 0,
+      sourceHash: sourceHashOf(edited),
+    });
+  });
+
   it("spaces calls to stay under the rate limit", async () => {
     const rows = [await queued(), await queued(), await queued()];
     let clock = 0;

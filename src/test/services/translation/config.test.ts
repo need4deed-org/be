@@ -58,6 +58,21 @@ describe("FakeProvider", () => {
     expect(provider.requests).toEqual([request]);
   });
 
+  it("keeps only the last 100 requests", async () => {
+    // Full-review finding 4: the log grew for the life of the process.
+    const provider = new FakeProvider();
+    for (let i = 0; i < 150; i++) {
+      await provider.translate({
+        text: `t${i}`,
+        targetLang: Lang.EN,
+        glossary: [],
+      });
+    }
+    expect(provider.requests).toHaveLength(100);
+    expect(provider.requests.at(-1)?.text).toBe("t149");
+    expect(provider.requests[0].text).toBe("t50");
+  });
+
   it("lets a test choose the outcome", async () => {
     const provider = new FakeProvider(() => ({
       status: "error",
