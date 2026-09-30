@@ -59,6 +59,16 @@ describe("syncAgentDistrictFromPostcode", () => {
     expect(result.districtId).toBe(9);
   });
 
+  it("accepts a bare postcode id (be#1059 create path)", async () => {
+    const district = makeDistrict({ id: 8 });
+    mockedGetDistrictFromPostcode.mockResolvedValue(district as any);
+
+    const result = await syncAgentDistrictFromPostcode(makeAgent(), 3);
+
+    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(3);
+    expect(result.districtId).toBe(8);
+  });
+
   it("falls back to agent.address?.postcode when no postcode argument is given", async () => {
     const district = makeDistrict({ id: 2 });
     const postcode = { id: 4 } as any;

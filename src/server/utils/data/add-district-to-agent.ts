@@ -27,17 +27,17 @@ export function getDistrictToAgentHandler(isRepresentative = false) {
 
 // Unlike addDistrictToAgent (read-time, fills in a district only when one
 // isn't set yet), this always overwrites district from the given postcode.
-// Used on write (PATCH /agent/:id) so district can't independently drift
-// from postcode — a client-supplied districtId is never trusted; district is
-// derived, not settable (be#827).
+// Used on write (PATCH /agent/:id, and agent create — be#1059) so district
+// can't independently drift from postcode — a client-supplied districtId is
+// never trusted; district is derived, not settable (be#827).
 //
-// Takes postcode explicitly (falling back to agent.address?.postcode if
+// Takes postcode (entity or id) explicitly (falling back to agent.address?.postcode if
 // omitted) rather than requiring the caller to attach a loaded `address`
 // relation onto `agent` first — mutating that relation before a save() risks
 // TypeORM treating it as a related entity to persist.
 export async function syncAgentDistrictFromPostcode(
   agent: Agent,
-  postcode?: Voidable<Postcode>,
+  postcode?: Voidable<Postcode | number>,
 ): Promise<Agent> {
   const district = await getDistrictFromPostcode(
     postcode ?? agent.address?.postcode,

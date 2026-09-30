@@ -12,6 +12,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
+import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
 import { getAgentByAddress } from "./get-agent-by-postcode";
 import { isAgentDomainAllowed } from "./is-agent-domain-allowed";
@@ -88,17 +89,20 @@ async function createBareAgent(
         )
       : null;
 
-  const agent = await manager.getRepository(Agent).save(
-    new Agent({
-      title: input.title,
-      agentTypeId: input.typeId ?? undefined,
-      info: input.info ?? undefined,
-      website: input.website ?? undefined,
-      districtId: input.districtId ?? undefined,
-      addressId: address?.id,
-      unclaimed,
-    }),
-  );
+  const newAgent = new Agent({
+    title: input.title,
+    agentTypeId: input.typeId ?? undefined,
+    info: input.info ?? undefined,
+    website: input.website ?? undefined,
+    addressId: address?.id,
+    unclaimed,
+  });
+  // District is derived from the postcode, never taken from the client — the
+  // same rule PATCH /agent/:id enforces (be#827, be#1059).
+  if (address) {
+    await syncAgentDistrictFromPostcode(newAgent, address.postcodeId);
+  }
+  const agent = await manager.getRepository(Agent).save(newAgent);
 
   if (input.serviceIds?.length) {
     await manager

@@ -53,6 +53,10 @@ export const registerSearchResponseSchema = {
 // (which also collects `phone`, written onto the registrant's own Person)
 // and the coordinator/admin bare-create below (which has no Person to
 // attach a phone to).
+//
+// No `districtId`: district is derived from addressPostcode, never
+// client-settable (be#1059, mirroring parseAgentPatch / be#827). AJV's
+// `removeAdditional` strips it if an older client still sends it.
 const agentCreateBaseSchema = {
   type: "object",
   required: ["title"],
@@ -68,7 +72,6 @@ const agentCreateBaseSchema = {
     },
     addressStreet: { type: "string" },
     addressPostcode: { type: "string" },
-    districtId: { type: "integer", minimum: 1 },
     languages: {
       type: "array",
       items: { type: "integer", minimum: 1 },
