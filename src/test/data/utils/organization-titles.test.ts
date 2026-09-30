@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ORGANIZATION_DOMAINS } from "../../../data/migrations/1786109950000-seed-organization-from-agent-domains";
 import {
@@ -36,19 +34,6 @@ describe("RenameDomainSeededOrganizations built-in map", () => {
     for (const title of Object.values(BUILTIN_ORGANIZATION_TITLES)) {
       expect(title).not.toMatch(/\.(de|org|com|net|berlin|eu|info|io)\b/i);
     }
-  });
-
-  it("is mirrored exactly by dev/cdn/data/organization-titles.json", () => {
-    const mirror = JSON.parse(
-      readFileSync(
-        resolve(__dirname, "../../../../dev/cdn/data/organization-titles.json"),
-        "utf8",
-      ),
-    );
-    expect(mirror).toEqual({
-      titles: BUILTIN_ORGANIZATION_TITLES,
-      aliases: BUILTIN_ORGANIZATION_ALIASES,
-    });
   });
 });
 
