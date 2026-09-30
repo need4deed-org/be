@@ -91,34 +91,25 @@ export class TranslationService {
 }
 
 /**
- * TRANSLATION_PROVIDER picks the engine explicitly. Without it: Infomaniak
- * when its product id and token are set. The fake one is chosen
- * automatically only while the worker is disabled: with the worker on, its
- * "[en] <text>" outputs would be stored and served as real translations, so
- * missing credentials stop startup unless TRANSLATION_PROVIDER=fake is set
- * on purpose. Under NODE_ENV=test it's always the fake one (allowNetwork
- * defaults to false), so tests never touch the network.
+ * The engine for the worker, or undefined for a dry run.
+ *
+ * TRANSLATION_PROVIDER=fake (or NODE_ENV=test, where allowNetwork defaults
+ * to false) gives the fake one; Infomaniak credentials give Infomaniak.
+ * Without credentials there is no provider at all: never the fake one by
+ * accident, whose "[<lang>] <text>" would be stored and served as real
+ * translations. The worker then does a dry run: nothing is sent or
+ * written, rows stay pending and readers get the original texts. Missing
+ * translation settings never stop the server.
  */
 export function createTranslationProvider(
   config: TranslationConfig,
   { allowNetwork = !isTest }: { allowNetwork?: boolean } = {},
-): TranslationProvider {
+): TranslationProvider | undefined {
   if (!allowNetwork || config.provider === "fake") {
     return new FakeProvider();
   }
-  const hasCredentials = Boolean(config.productId && config.token);
-  if (!config.provider && !hasCredentials) {
-    if (config.enabled) {
-      throw new Error(
-        "TRANSLATION_ENABLED needs INFOMANIAK_AI_PRODUCT_ID and INFOMANIAK_AI_TOKEN (or TRANSLATION_PROVIDER=fake on purpose)",
-      );
-    }
-    return new FakeProvider();
-  }
   if (!config.productId || !config.token) {
-    throw new Error(
-      "TRANSLATION_PROVIDER=infomaniak needs INFOMANIAK_AI_PRODUCT_ID and INFOMANIAK_AI_TOKEN",
-    );
+    return undefined;
   }
   return new InfomaniakProvider({
     productId: config.productId,

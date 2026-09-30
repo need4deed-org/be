@@ -131,14 +131,11 @@ describe("createTranslationProvider", () => {
     expect(createTranslationProvider(withToken)).toBeInstanceOf(FakeProvider);
   });
 
-  it("picks Infomaniak when configured, the fake provider otherwise", () => {
+  it("picks Infomaniak when configured, the fake one only on request", () => {
     const allowNetwork = { allowNetwork: true };
     expect(createTranslationProvider(withToken, allowNetwork)).toBeInstanceOf(
       InfomaniakProvider,
     );
-    expect(
-      createTranslationProvider(getTranslationConfig({}), allowNetwork),
-    ).toBeInstanceOf(FakeProvider);
     expect(
       createTranslationProvider(
         { ...withToken, provider: "fake" },
@@ -147,33 +144,19 @@ describe("createTranslationProvider", () => {
     ).toBeInstanceOf(FakeProvider);
   });
 
-  it("never falls back to the fake provider while the worker is enabled", () => {
-    // Review finding 4: "[en] <text>" would be stored as real translations.
+  it("has no provider without credentials: a dry run, never an error", () => {
+    // Review finding 4: never the fake one by accident. Missing settings
+    // never stop the server either: the worker just does a dry run.
     const allowNetwork = { allowNetwork: true };
-    expect(() =>
-      createTranslationProvider(
-        getTranslationConfig({ TRANSLATION_ENABLED: "true" }),
-        allowNetwork,
-      ),
-    ).toThrow(/TRANSLATION_ENABLED needs INFOMANIAK_AI_PRODUCT_ID/);
-    expect(
-      createTranslationProvider(
-        getTranslationConfig({
-          TRANSLATION_ENABLED: "true",
-          TRANSLATION_PROVIDER: "fake",
-        }),
-        allowNetwork,
-      ),
-    ).toBeInstanceOf(FakeProvider);
-  });
-
-  it("refuses an explicit Infomaniak choice without credentials", () => {
-    expect(() =>
-      createTranslationProvider(
-        getTranslationConfig({ TRANSLATION_PROVIDER: "infomaniak" }),
-        { allowNetwork: true },
-      ),
-    ).toThrow(/INFOMANIAK_AI_PRODUCT_ID/);
+    for (const env of [
+      {},
+      { TRANSLATION_ENABLED: "true" },
+      { TRANSLATION_ENABLED: "true", TRANSLATION_PROVIDER: "infomaniak" },
+    ]) {
+      expect(
+        createTranslationProvider(getTranslationConfig(env), allowNetwork),
+      ).toBeUndefined();
+    }
   });
 });
 

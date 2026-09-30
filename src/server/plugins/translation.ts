@@ -50,10 +50,17 @@ declare module "fastify" {
  */
 async function translationPlugin(fastify: FastifyInstance): Promise<void> {
   const config = getTranslationConfig();
-  const service = new TranslationService(createTranslationProvider(config));
+  const provider = createTranslationProvider(config);
+  const service = provider && new TranslationService(provider);
 
   const runBatch = async (options?: BatchOptions) => {
     if (!config.enabled) {
+      return undefined;
+    }
+    if (!service) {
+      logger.debug(
+        "translation: dry run — no provider configured; rows stay pending, originals are served",
+      );
       return undefined;
     }
     let stats: BatchStats | undefined;
@@ -77,16 +84,25 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
   });
 
   logger.info(
-    { enabled: config.enabled, provider: service.provider.name },
+    { enabled: config.enabled, provider: provider?.name ?? "none (dry run)" },
     "translation: plugin ready",
   );
   if (!config.enabled) {
     return;
   }
-  if (!cron.validate(config.cronSchedule)) {
-    throw new Error(
-      `CRON_SCHEDULE_TRANSLATION is not a valid cron expression: ${config.cronSchedule}`,
+  if (!service) {
+    logger.warn(
+      "translation: TRANSLATION_ENABLED without INFOMANIAK_AI_PRODUCT_ID/INFOMANIAK_AI_TOKEN — dry run, originals are served",
     );
+  }
+  // Translation settings never stop the server: a bad schedule only leaves
+  // the worker off.
+  if (!cron.validate(config.cronSchedule)) {
+    logger.error(
+      { schedule: config.cronSchedule },
+      "translation: CRON_SCHEDULE_TRANSLATION is not a valid cron expression — worker not scheduled",
+    );
+    return;
   }
 
   const task = cron.schedule(

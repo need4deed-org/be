@@ -10,7 +10,9 @@ import { dataSource } from "../../../data/data-source";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Language from "../../../data/entity/profile/language.entity";
+import logger from "../../../logger";
 import { createServer } from "../../../server";
+import * as service from "../../../services/translation/service";
 import { randomNumericSuffix } from "../../random";
 
 const TRANSLATION_SCHEDULE = "* * * * *";
@@ -119,12 +121,58 @@ describe("translation plugin", () => {
     expect(stop).toHaveBeenCalled();
   });
 
-  it("refuses an invalid schedule", async () => {
-    await expect(
-      start({
-        TRANSLATION_ENABLED: "true",
-        CRON_SCHEDULE_TRANSLATION: "every minute",
+  it("keeps the server running on an invalid schedule, without the worker", async () => {
+    const schedule = vi.spyOn(cron, "schedule");
+    const error = vi.spyOn(logger, "error");
+
+    const server = await start({
+      TRANSLATION_ENABLED: "true",
+      CRON_SCHEDULE_TRANSLATION: "every minute",
+    });
+
+    expect(server.translation).toBeDefined();
+    expect(schedule.mock.calls.map(([expression]) => expression)).not.toContain(
+      "every minute",
+    );
+    expect(JSON.stringify(error.mock.calls)).toContain(
+      "CRON_SCHEDULE_TRANSLATION",
+    );
+  });
+
+  it("does a dry run without a provider: nothing sent, rows stay pending", async () => {
+    vi.spyOn(service, "createTranslationProvider").mockReturnValue(undefined);
+    const warn = vi.spyOn(logger, "warn");
+    const server = await start({ TRANSLATION_ENABLED: "true" });
+
+    const de = await dataSource.manager.findOneByOrFail(Language, {
+      isoCode: "de",
+    });
+    const opportunity = await dataSource.manager.save(
+      new Opportunity({
+        title: `Kinderbetreuung ${randomNumericSuffix()}`,
+        type: OpportunityType.REGULAR,
+        originalLanguageId: de.id,
       }),
-    ).rejects.toThrow(/CRON_SCHEDULE_TRANSLATION/);
+    );
+    created.push(opportunity.id);
+    await server.translation.enqueue(
+      dataSource.manager,
+      EntityTableName.OPPORTUNITY,
+      opportunity,
+      { title: opportunity.title },
+    );
+    const row = await dataSource.manager.findOneByOrFail(FieldTranslation, {
+      opportunityId: opportunity.id,
+    });
+
+    expect(
+      await server.translation.runBatch({ rowIds: [row.id] }),
+    ).toBeUndefined();
+    expect(
+      await dataSource.manager.findOneByOrFail(FieldTranslation, {
+        id: row.id,
+      }),
+    ).toMatchObject({ status: TranslationStatus.PENDING, translation: null });
+    expect(JSON.stringify(warn.mock.calls)).toContain("dry run");
   });
 });
