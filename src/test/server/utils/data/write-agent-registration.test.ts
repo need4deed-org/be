@@ -365,6 +365,23 @@ describe("createAgent", () => {
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
 
+  it("be#1059: derives districtId from a postcode given without a street (no Address created)", async () => {
+    getDistrictFromPostcodeMock.mockResolvedValueOnce({ id: 7 });
+
+    await createAgent({
+      title: "Bare Agent HERO",
+      addressPostcode: "12681",
+      districtId: 1,
+    });
+
+    expect(createAddressMock).not.toHaveBeenCalled();
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith({
+      value: "12681",
+    });
+    expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
+    expect(agentSave.mock.calls[0][0].districtId).toBe(7);
+  });
+
   it("be#1059: leaves districtId unset (not the client value) when no Address resolves", async () => {
     await createAgent({ title: "Bare Agent HERO", districtId: 1 });
 
