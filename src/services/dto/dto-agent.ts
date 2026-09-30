@@ -12,10 +12,11 @@ import Comment from "../../data/entity/comment.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import { Centroid } from "../../data/utils/get-district";
 import { serializeAddress } from "./dto-address";
 import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
-import { getAvailability, getLanguages } from "./utils";
+import { getAvailability, getCoordinates, getLanguages } from "./utils";
 
 // Prefers the real en/de field_translation rows resolved by
 // addAgentTypeServiceTranslations onto `ref.translations`; falls back to the
@@ -44,7 +45,44 @@ export function dtoSerializeAgentMembership(
   };
 }
 
-export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
+// Map-pin coordinates for the Agents page map tab (be#1083): the agent's own
+// geocoded address, falling back to its district's centroid — same sources
+// as the opportunity map pin (resolveMapPin, dto-opportunity.ts), minus the
+// status gating: every listed agent is map-eligible. Reads the (already
+// PII-masked, where applicable) entity graph, so a caller without visibility
+// into the agent gets the district centroid, never the agent's own postcode.
+//
+// Exported so the route handler can batch-fetch centroids
+// (getDistrictCentroids) for just the agents that need one, rather than an
+// eager district-postcodes relation on the paginated list query.
+export function getAgentDistrictIdNeedingCentroid(
+  agent: Agent,
+): number | undefined {
+  const { latitude, longitude } = getCoordinates(agent.address?.postcode);
+  if (latitude !== null && longitude !== null) {
+    return undefined;
+  }
+  return agent.district?.id ?? agent.districtId ?? undefined;
+}
+
+function getAgentCoordinates(
+  agent: Agent,
+  districtCentroid?: Centroid,
+): { lat: number | null; lon: number | null } {
+  const { latitude, longitude } = getCoordinates(agent.address?.postcode);
+  if (latitude !== null && longitude !== null) {
+    return { lat: latitude, lon: longitude };
+  }
+  return {
+    lat: districtCentroid?.latitude ?? null,
+    lon: districtCentroid?.longitude ?? null,
+  };
+}
+
+export function dtoAgentGetList(
+  agent: Agent,
+  districtCentroid?: Centroid,
+): ApiAgentGetList {
   return {
     id: agent.id,
     title: agent.title,
@@ -57,6 +95,7 @@ export function dtoAgentGetList(agent: Agent): ApiAgentGetList {
       agent.representative?.person?.email || agent.organization?.email || "",
     district: { id: agent.districtId, title: { de: agent?.district?.title } },
     unclaimed: agent.unclaimed,
+    ...getAgentCoordinates(agent, districtCentroid),
   };
 }
 
@@ -70,9 +109,10 @@ type ApiAgentGetExtended = Omit<ApiAgentGet, "agentDetails"> & {
 
 export function dtoAgentGet(
   agent: Agent & { comments: Comment[] },
+  districtCentroid?: Centroid,
 ): ApiAgentGetExtended {
   return {
-    ...dtoAgentGetList(agent),
+    ...dtoAgentGetList(agent, districtCentroid),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
     operator: agent?.organization?.title,
