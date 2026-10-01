@@ -3,6 +3,7 @@ import {
   ApiOpportunityGet,
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
+  Lang,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
@@ -210,6 +211,10 @@ export function dtoOpportunityGetList(
       .map((ov) => ov.volunteer?.person?.name)
       .filter((name): name is string => Boolean(name)),
     ...getOpportunityCoordinates(opportunity, districtCentroid),
+    // The language title/info were typed in (be#1068); NULL (rows from
+    // before be#1066) counts as German. Needs the originalLanguage relation.
+    originalLanguage:
+      (opportunity.originalLanguage?.isoCode as Lang | undefined) ?? Lang.DE,
   } as ApiOpportunityGetList;
 }
 
@@ -266,6 +271,10 @@ export function dtoOpportunityGet(
   return {
     id: opportunityComments.id,
     title: opportunityComments.title,
+    // See dtoOpportunityGetList (be#1068).
+    originalLanguage:
+      (opportunityComments.originalLanguage?.isoCode as Lang | undefined) ??
+      Lang.DE,
     volunteerType: opportunityComments.type,
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,

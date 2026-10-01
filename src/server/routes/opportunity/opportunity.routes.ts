@@ -52,6 +52,7 @@ import { assertValidMainCommunicationLanguages } from "../../../services/dto/par
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
+  langQuerySchema,
   opportunityCreateBodySchema,
   opportunityCreateResponseSchema,
   opportunityListQuerySchema,
@@ -90,6 +91,10 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -180,11 +185,16 @@ export default async function opportunityRoutes(
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
 
-  fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
+  fastify.get<{
+    Params: ParamsId;
+    Querystring: { language?: string };
+    Replay: ReplyData<ApiOpportunityGet>;
+  }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("ApiOpportunityGet#"),
       },
     },
@@ -205,6 +215,7 @@ export default async function opportunityRoutes(
         "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -270,6 +281,14 @@ export default async function opportunityRoutes(
         const opportunityRepository = fastify.db.opportunityRepository;
         await opportunityRepository.save(opportunityUpdates);
       }
+
+      // After the saves above (the overlay must never reach the database)
+      // and before masking (so masking isn't undone), be#1068.
+      await translateOpportunities(
+        fastify,
+        [opportunityComments],
+        requestLanguage(request.query),
+      );
 
       // dtoOpportunityGet takes handler-computed args, so mask inline (rather
       // than via the makePiiSerialization hook) before serializing.
@@ -373,6 +392,7 @@ export default async function opportunityRoutes(
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -442,6 +462,14 @@ export default async function opportunityRoutes(
       }
       logger.debug(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+      );
+
+      // After the saves above (the overlay must never reach the database)
+      // and before masking (so masking isn't undone), be#1068.
+      await translateOpportunities(
+        fastify,
+        opportunitiesCategoryDistrict,
+        requestLanguage(request.query),
       );
 
       // dtoOpportunityGetList takes a handler-computed district-centroid arg
