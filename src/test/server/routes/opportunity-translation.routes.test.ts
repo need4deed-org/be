@@ -2,20 +2,29 @@ import { FastifyInstance } from "fastify";
 import {
   EntityTableName,
   Lang,
+  OpportunityStatusType,
   OpportunityType,
+  OpportunityVolunteerStatusType,
   TranslationStatus,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Deal from "../../../data/entity/deal.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import District from "../../../data/entity/location/district.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import Post from "../../../data/entity/post.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import User from "../../../data/entity/user.entity";
+import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { enqueue } from "../../../services/translation/queue";
@@ -221,6 +230,155 @@ describe("opportunity routes in the requested language", () => {
       expect(entry).toMatchObject({
         title: `Childcare list ${suffix}`,
         originalLanguage: "de",
+      });
+    });
+  });
+
+  describe("routes embedding opportunities", () => {
+    const english = {
+      title: `Childcare ${suffix}`,
+      info: "We need volunteers",
+    };
+
+    it("GET /volunteer/opportunity: translates and still filters", async () => {
+      // `language` used to be spread into the column filter (be#1068).
+      const opportunity = await germanOpportunity(english);
+
+      const res = await get(
+        `/volunteer/opportunity?type=regular&status=${OpportunityStatusType.NEW}&agentId=${agent.id}&language=en`,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const entry = res
+        .json()
+        .data.find((o: { id: number }) => o.id === opportunity.id);
+      expect(entry?.title).toBe(english.title);
+    });
+
+    it("GET /agent/:id/opportunity-linked: translates", async () => {
+      const opportunity = await germanOpportunity(english);
+
+      const res = await get(
+        `/agent/${agent.id}/opportunity-linked?language=en`,
+      );
+
+      expect(res.statusCode).toBe(200);
+      const entry = res
+        .json()
+        .data.find((o: { id: number }) => o.id === opportunity.id);
+      expect(entry?.title).toBe(english.title);
+    });
+
+    describe("/volunteer/:id/opportunity-linked", () => {
+      let volunteer: Volunteer;
+      let match: OpportunityVolunteer;
+      let opportunity: Opportunity;
+
+      beforeAll(async () => {
+        opportunity = await germanOpportunity(english);
+        const postcode = await dataSource.manager.findOneOrFail(Postcode, {
+          where: {},
+        });
+        const volunteerPerson = await dataSource.manager.save(
+          new Person({
+            firstName: "Translation",
+            lastName: `Volunteer ${suffix}`,
+          }),
+        );
+        const deal = await dataSource.manager.save(
+          new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+        );
+        volunteer = await dataSource.manager.save(
+          new Volunteer({ dealId: deal.id, personId: volunteerPerson.id }),
+        );
+        match = await dataSource.manager.save(
+          new OpportunityVolunteer({
+            opportunityId: opportunity.id,
+            volunteerId: volunteer.id,
+            status: OpportunityVolunteerStatusType.PENDING,
+          }),
+        );
+      });
+
+      afterAll(async () => {
+        await dataSource.manager.delete(OpportunityVolunteer, { id: match.id });
+        await dataSource.manager.delete(VolunteerAuditLog, {
+          volunteerId: volunteer.id,
+        });
+        await dataSource.manager.delete(Volunteer, { id: volunteer.id });
+      });
+
+      it("GET translates the linked opportunity", async () => {
+        const res = await get(
+          `/volunteer/${volunteer.id}/opportunity-linked?language=en`,
+        );
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data[0].title).toBe(english.title);
+      });
+
+      it("PATCH translates the response but logs the original title", async () => {
+        const res = await fastify.inject({
+          method: "PATCH",
+          url: `/volunteer/${volunteer.id}/opportunity-linked/${match.id}?language=en`,
+          cookies: { [accessCookieName]: cookie },
+          payload: { status: OpportunityVolunteerStatusType.MATCHED },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.title).toBe(english.title);
+        const log = await dataSource.manager.findOneByOrFail(
+          VolunteerAuditLog,
+          {
+            volunteerId: volunteer.id,
+          },
+        );
+        expect(log.detail).toContain(opportunity.title);
+        expect(log.detail).not.toContain(english.title);
+      });
+    });
+
+    it("GET /post: translates linked opportunity titles", async () => {
+      const opportunity = await germanOpportunity(english);
+      const text = `Post about childcare ${suffix}`;
+      const post = await dataSource.manager.save(
+        new Post({
+          text,
+          authorId: person.id,
+          linkedOpportunities: [opportunity],
+        }),
+      );
+
+      try {
+        const res = await get(
+          `/post?search=${encodeURIComponent(text)}&language=en`,
+        );
+
+        expect(res.statusCode).toBe(200);
+        const entry = res
+          .json()
+          .data.find((p: { id: number }) => p.id === post.id);
+        expect(entry?.linkedOpportunities?.[0]?.title).toBe(english.title);
+      } finally {
+        await dataSource.manager.delete(Post, { id: post.id });
+      }
+    });
+
+    it("public GET /opportunity/legacy: translates title and info", async () => {
+      const opportunity = await germanOpportunity(english);
+
+      const res = await fastify.inject({
+        method: "GET",
+        url: "/opportunity/legacy?language=en",
+      });
+
+      expect(res.statusCode).toBe(200);
+      const entry = res
+        .json()
+        .find((o: { id: number }) => o.id === opportunity.id);
+      expect(entry).toMatchObject({
+        title: english.title,
+        vo_information: english.info,
       });
     });
   });
