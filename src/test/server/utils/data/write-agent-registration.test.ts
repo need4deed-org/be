@@ -25,6 +25,12 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
   createAddress: (...args: unknown[]) => createAddressMock(...args),
 }));
 
+const getDistrictFromPostcodeMock = vi.fn();
+vi.mock("../../../../data/utils/get-district", () => ({
+  getDistrictFromPostcode: (...args: unknown[]) =>
+    getDistrictFromPostcodeMock(...args),
+}));
+
 const isEmailDomainTrustedMock = vi.fn();
 vi.mock("../../../../server/utils/data/is-trusted-domain", () => ({
   isEmailDomainTrusted: (...args: unknown[]) =>
@@ -92,6 +98,9 @@ beforeEach(() => {
   // Default: domain not on the trusted allowlist (member-match decides).
   isEmailDomainTrustedMock.mockResolvedValue(false);
 
+  // Default: the agent's postcode maps to no district.
+  getDistrictFromPostcodeMock.mockResolvedValue(null);
+
   agentSave.mockImplementation(async (a: any) => ({ ...a, id: 33 }));
   agentPersonSave.mockImplementation(async (ap: any) => ({ ...ap, id: 44 }));
   agentLanguageSave.mockImplementation(async (rows: any[]) => rows);
@@ -139,6 +148,43 @@ describe("createAgentForPerson", () => {
       txnManager,
     );
     expect(agentSave.mock.calls[0][0].addressId).toBe(99);
+  });
+
+  // be#1059: district is derived from the postcode on create, same as on
+  // PATCH (be#827) — a client-supplied districtId is never trusted.
+  it("derives districtId from the resolved Address's postcode, ignoring a client-supplied districtId", async () => {
+    createAddressMock.mockResolvedValueOnce({ id: 99, postcodeId: 3 });
+    getDistrictFromPostcodeMock.mockResolvedValueOnce({ id: 7 });
+
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+      districtId: 1,
+    });
+
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(agentSave.mock.calls[0][0].districtId).toBe(7);
+  });
+
+  it("leaves districtId unset (not the client value) when no Address resolves", async () => {
+    await createAgentForPerson(11, { title: "Centre HERO", districtId: 1 });
+
+    expect(getDistrictFromPostcodeMock).not.toHaveBeenCalled();
+    expect(agentSave.mock.calls[0][0].districtId).toBeUndefined();
+  });
+
+  it("leaves districtId unset when the postcode maps to no district", async () => {
+    createAddressMock.mockResolvedValueOnce({ id: 99, postcodeId: 3 });
+
+    await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+      districtId: 1,
+    });
+
+    expect(agentSave.mock.calls[0][0].districtId).toBeUndefined();
   });
 
   it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {
@@ -302,6 +348,44 @@ describe("createAgent", () => {
     expect(err).toBeInstanceOf(AgentAddressConflictError);
     expect(err.agentId).toBe(77);
     expect(agentSave).not.toHaveBeenCalled();
+  });
+
+  it("be#1059: derives districtId from the resolved Address's postcode, ignoring a client-supplied districtId", async () => {
+    createAddressMock.mockResolvedValueOnce({ id: 99, postcodeId: 3 });
+    getDistrictFromPostcodeMock.mockResolvedValueOnce({ id: 7 });
+
+    await createAgent({
+      title: "Bare Agent HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+      districtId: 1,
+    });
+
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(agentSave.mock.calls[0][0].districtId).toBe(7);
+  });
+
+  it("be#1059: derives districtId from a postcode given without a street (no Address created)", async () => {
+    getDistrictFromPostcodeMock.mockResolvedValueOnce({ id: 7 });
+
+    await createAgent({
+      title: "Bare Agent HERO",
+      addressPostcode: "12681",
+      districtId: 1,
+    });
+
+    expect(createAddressMock).not.toHaveBeenCalled();
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith({
+      value: "12681",
+    });
+    expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
+    expect(agentSave.mock.calls[0][0].districtId).toBe(7);
+  });
+
+  it("be#1059: leaves districtId unset (not the client value) when no Address resolves", async () => {
+    await createAgent({ title: "Bare Agent HERO", districtId: 1 });
+
+    expect(agentSave.mock.calls[0][0].districtId).toBeUndefined();
   });
 
   it("inserts AgentLanguage and AgentService rows when given", async () => {
