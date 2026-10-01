@@ -29,15 +29,15 @@ export async function parseOpportunityLegacy(
     title: body.title,
     type,
     numberVolunteers: body.volunteers_number,
-    info: body.vo_information,
+    // An accompanying description is about one person's appointment: it is
+    // stored in infoConfidential only (be#1092); `info` is what public and
+    // machine-translated paths read.
+    info:
+      type === OpportunityType.ACCOMPANYING ? undefined : body.vo_information,
     ...(body.accomp_translation
       ? { translationType: body.accomp_translation as TranslatedIntoType }
       : {}),
-    // Mirror the patch path (parser-opportunity-patch-data.ts), which writes
-    // the description into both info and infoConfidential together — the
-    // ACCOMPANYING display reads infoConfidential (be#859), so creation must
-    // keep them in sync too, not just leave infoConfidential to whatever
-    // (currently always null) accomp_information carries.
+    // The ACCOMPANYING display reads infoConfidential (be#859).
     infoConfidential:
       type === OpportunityType.ACCOMPANYING
         ? body.vo_information
