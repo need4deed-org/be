@@ -6,7 +6,8 @@
 // removed. Domains that map to the same title are one operator and get
 // merged into a single organization. A list of titles means several
 // operators share the domain: the seeded row becomes the first one, the
-// others are added as organizations of their own.
+// others are added as organizations of their own. A domain that was never
+// seeded (e.g. "www.berlin.de") adds its operator(s) as new organizations.
 //
 // Loaded from the CDN (${CDN_BASE_URL}/data/organization-titles.json, a
 // flat { domain: title | title[] | null } object), so names can be corrected without a
@@ -328,6 +329,7 @@ export const BUILTIN_ORGANIZATION_TITLES: OrganizationTitleMap = {
     "Stadtkümmerei GmbH",
     "Gesellschaft für integrierte Stadtentwicklung mbH",
   ],
+  "www.berlin.de": "Senatsverwaltung für Bildung, Jugend und Familie",
   "xenion.org": "XENION Psychosoziale Hilfen für politisch Verfolgte e.V.",
   "xochicuicatl.de": "Xochicuicatl e.V.",
   "yaarberlin.de": "YAAR e.V.",
@@ -346,14 +348,6 @@ export const PRIMARY_ORGANIZATION_DOMAINS = [
   "pad-berlin.de",
   "tamaja.de",
   "unionhilfswerk.de",
-];
-
-// Operators that weren't in the domain seed at all; inserted if missing.
-export const NEW_ORGANIZATIONS: { title: string; website: string }[] = [
-  {
-    title: "Senatsverwaltung für Bildung, Jugend und Familie",
-    website: "www.berlin.de",
-  },
 ];
 
 function isTitleMap(value: unknown): value is OrganizationTitleMap {

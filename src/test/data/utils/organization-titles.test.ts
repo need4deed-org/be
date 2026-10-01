@@ -9,10 +9,17 @@ import {
 // be#1061: the built-in map has to decide every seeded domain (rename, merge
 // or remove), and must never produce a title that still looks like a domain.
 describe("built-in organization title map", () => {
-  it("covers exactly the seeded domains", () => {
-    expect(Object.keys(BUILTIN_ORGANIZATION_TITLES).sort()).toEqual(
-      [...ORGANIZATION_DOMAINS].sort(),
+  it("covers every seeded domain", () => {
+    expect(Object.keys(BUILTIN_ORGANIZATION_TITLES)).toEqual(
+      expect.arrayContaining(ORGANIZATION_DOMAINS),
     );
+  });
+
+  it("adds operators for domains that were never seeded", () => {
+    const unseeded = Object.keys(BUILTIN_ORGANIZATION_TITLES).filter(
+      (d) => !ORGANIZATION_DOMAINS.includes(d),
+    );
+    expect(unseeded).toEqual(["www.berlin.de"]);
   });
 
   it("has no domain-shaped titles", () => {

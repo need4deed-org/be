@@ -1,9 +1,9 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 import {
   loadOrganizationTitleMap,
-  NEW_ORGANIZATIONS,
   PRIMARY_ORGANIZATION_DOMAINS,
 } from "../utils/organization-titles";
+import { ORGANIZATION_DOMAINS } from "./1786109950000-seed-organization-from-agent-domains";
 
 // be#1061: SeedOrganizationFromAgentDomains1786109950000 seeded operator
 // (Träger) titles verbatim from email domains (e.g. "drk-berlin.de"), which
@@ -19,7 +19,8 @@ import {
 //   - several titles (operators sharing the domain): the row is handled as
 //     above for the first, the others are inserted with the domain as
 //     `website`; agents on the row stay with the first operator
-// Then operators missing from the seed are inserted.
+//   - domain that was never seeded (e.g. "www.berlin.de") and has no row:
+//     its operator(s) are inserted with the domain as `website`
 //
 // Raw SQL only, no entities.
 export class RenameDomainSeededOrganizations1790769607004
@@ -49,6 +50,9 @@ export class RenameDomainSeededOrganizations1790769607004
       // so every operator sharing the domain ends up existing.
       extra.push(...others.map((t) => ({ title: t, website: domain })));
       if (!row) {
+        if (title !== null && !ORGANIZATION_DOMAINS.includes(domain)) {
+          extra.push({ title, website: domain });
+        }
         continue;
       }
 
@@ -90,7 +94,7 @@ export class RenameDomainSeededOrganizations1790769607004
       counts.renamed += 1;
     }
 
-    for (const { title, website } of [...extra, ...NEW_ORGANIZATIONS]) {
+    for (const { title, website } of extra) {
       await queryRunner.query(
         `INSERT INTO "organization" ("title", "website") VALUES ($1, $2)
          ON CONFLICT ("title") DO NOTHING`,
@@ -116,6 +120,10 @@ export class RenameDomainSeededOrganizations1790769607004
       }
       const [title, ...others] = Array.isArray(entry) ? entry : [entry];
       extra.push(...others);
+      if (!ORGANIZATION_DOMAINS.includes(domain)) {
+        extra.push(title);
+        continue;
+      }
       await queryRunner.query(
         `UPDATE "organization" SET "title" = $1
          WHERE "title" = $2
@@ -124,7 +132,7 @@ export class RenameDomainSeededOrganizations1790769607004
         [domain, title],
       );
     }
-    for (const title of [...extra, ...NEW_ORGANIZATIONS.map((o) => o.title)]) {
+    for (const title of extra) {
       await queryRunner.query(
         `DELETE FROM "organization" o WHERE o."title" = $1
            AND NOT EXISTS (SELECT 1 FROM "agent" a WHERE a."organization_id" = o."id")`,
