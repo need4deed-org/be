@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer } from "../../../server";
 import * as activateDueOnetimers from "../../../services/jobs/activate-due-onetimers";
+import * as germanHolidays from "../../../services/jobs/german-holidays";
 import * as scanAccompanyNotFound from "../../../services/jobs/scan-accompany-not-found";
 import * as scanExpiredOnetimers from "../../../services/jobs/scan-expired-onetimers";
 import * as scanPostMatchCheckup from "../../../services/jobs/scan-post-match-checkup";
@@ -43,6 +44,10 @@ describe("cron schedulers", () => {
   ];
 
   beforeAll(async () => {
+    // Never a holiday here: otherwise the holiday check alone would skip the
+    // hourly scans, and the test couldn't tell whether CRON_EMAILS_RETIRED
+    // does its job.
+    vi.spyOn(germanHolidays, "isGermanPublicHoliday").mockReturnValue(false);
     const schedule = vi.spyOn(cron, "schedule");
     fastify = await createServer();
     await fastify.ready();
