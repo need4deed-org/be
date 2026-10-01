@@ -32,7 +32,7 @@ describe("parseOpportunityLegacy", () => {
     expect(opportunity.infoConfidential).toBe("Please bring a translator.");
   });
 
-  it("leaves infoConfidential sourced from accomp_information for non-ACCOMPANYING types", async () => {
+  it("leaves infoConfidential unset for non-ACCOMPANYING types (be#1092)", async () => {
     const body = {
       ...baseBody,
       opportunity_type: "regular",
@@ -43,8 +43,6 @@ describe("parseOpportunityLegacy", () => {
 
     expect(opportunity.type).toBe(OpportunityType.REGULAR);
     expect(opportunity.info).toBe("Please bring a translator.");
-    expect(opportunity.infoConfidential).toBe(
-      "should not be used as description",
-    );
+    expect(opportunity.infoConfidential).toBeUndefined();
   });
 });

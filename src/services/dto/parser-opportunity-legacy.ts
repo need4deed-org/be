@@ -37,11 +37,10 @@ export async function parseOpportunityLegacy(
     ...(body.accomp_translation
       ? { translationType: body.accomp_translation as TranslatedIntoType }
       : {}),
-    // The ACCOMPANYING display reads infoConfidential (be#859).
+    // The ACCOMPANYING display reads infoConfidential (be#859); no other
+    // type uses it (be#1092).
     infoConfidential:
-      type === OpportunityType.ACCOMPANYING
-        ? body.vo_information
-        : body.accomp_information,
+      type === OpportunityType.ACCOMPANYING ? body.vo_information : undefined,
     districtId: district?.id,
   });
 }

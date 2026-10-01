@@ -2607,6 +2607,7 @@ describe("GET /opportunity/:id accompanying description visibility (be#1092)", (
     }
     await addUser("user", UserRole.USER);
     await addUser("coordinator", UserRole.COORDINATOR);
+    await addUser("admin", UserRole.ADMIN);
     const agentMember = await addUser("agent", UserRole.AGENT);
     await fastify.db.agentPersonRepository.save(
       new AgentPerson({
@@ -2620,6 +2621,7 @@ describe("GET /opportunity/:id accompanying description visibility (be#1092)", (
       ...Object.keys(VOLUNTEER_LINKS),
       "user",
       "coordinator",
+      "admin",
       "agent",
     ]) {
       const res = await fastify.inject({
@@ -2665,7 +2667,7 @@ describe("GET /opportunity/:id accompanying description visibility (be#1092)", (
     return res.json().data.description;
   };
 
-  it.each(["matched", "active", "coordinator", "agent"])(
+  it.each(["matched", "active", "coordinator", "admin", "agent"])(
     "shows an accompanying description to %s",
     async (key) => {
       expect(await descriptionFor(key, accompanying.id)).toBe(DESCRIPTION);
@@ -2811,15 +2813,44 @@ describe("accompanying description storage (be#1092)", () => {
     });
   });
 
-  it("PATCH keeps a regular opportunity's description in info", async () => {
-    const opportunity = await save({ type: OpportunityType.REGULAR });
+  it("PATCH keeps a regular opportunity's description in info only", async () => {
+    const opportunity = await save({
+      type: OpportunityType.REGULAR,
+      infoConfidential: "Old copy",
+    });
 
     const res = await patch(opportunity.id, {
       description: "Volunteering text",
     });
 
     expect(res.statusCode).toBe(204);
-    expect((await stored(opportunity.id)).info).toBe("Volunteering text");
+    expect(await stored(opportunity.id)).toMatchObject({
+      info: "Volunteering text",
+      infoConfidential: null,
+    });
+  });
+
+  it("PATCH from accompanying moves the existing description into info", async () => {
+    // Its own accompanying row: the type change deletes it.
+    const ownRow = await fastify.db.accompanyingRepository.save(
+      new Accompanying({ name: "Storage Test", address: "Storage Street 2" }),
+    );
+    const opportunity = await save({
+      type: OpportunityType.ACCOMPANYING,
+      accompanyingId: ownRow.id,
+      infoConfidential: "Former appointment text",
+    });
+
+    const res = await patch(opportunity.id, {
+      opportunity_type: OpportunityType.REGULAR,
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(await stored(opportunity.id)).toMatchObject({
+      type: OpportunityType.REGULAR,
+      info: "Former appointment text",
+      infoConfidential: null,
+    });
   });
 
   it("creation stores an accompanying description in info_confidential only", async () => {
@@ -2844,5 +2875,6 @@ describe("accompanying description storage (be#1092)", () => {
     } as OpportunityLegacyFormData);
 
     expect(opportunity.info).toBe("Created volunteering text");
+    expect(opportunity.infoConfidential).toBeUndefined();
   });
 });

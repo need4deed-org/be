@@ -48,6 +48,21 @@ describe("MoveAccompanyingInfoToConfidential migration", () => {
       info: "Regular text",
       infoConfidential: null,
     },
+    regularCopy: {
+      type: OpportunityType.REGULAR,
+      info: "Regular text",
+      infoConfidential: "Regular text ",
+    },
+    eventsBlankCopy: {
+      type: OpportunityType.EVENTS,
+      info: "Event text",
+      infoConfidential: " ",
+    },
+    regularLeftover: {
+      type: OpportunityType.REGULAR,
+      info: null,
+      infoConfidential: "Leftover text",
+    },
   };
 
   beforeAll(async () => {
@@ -100,6 +115,27 @@ describe("MoveAccompanyingInfoToConfidential migration", () => {
     });
   });
 
+  it("clears other types' blank or duplicate info_confidential", () => {
+    expect(after.regularCopy).toEqual({
+      info: "Regular text",
+      infoConfidential: null,
+    });
+    expect(after.eventsBlankCopy).toEqual({
+      info: "Event text",
+      infoConfidential: null,
+    });
+  });
+
+  it("leaves other types' leftover info_confidential alone and logs its id", () => {
+    expect(after.regularLeftover).toEqual({
+      info: null,
+      infoConfidential: "Leftover text",
+    });
+    const [, loggedIds] = warn.mock.calls[0];
+    expect(loggedIds).toContain(ids.regularLeftover);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("Leftover text");
+  });
+
   it("leaves differing rows alone and logs only their ids", () => {
     expect(after.differing).toEqual({
       info: "Public text",
@@ -110,7 +146,7 @@ describe("MoveAccompanyingInfoToConfidential migration", () => {
     expect(JSON.stringify(warn.mock.calls)).not.toContain("Public text");
   });
 
-  it("does not touch other opportunity types", () => {
+  it("does not touch other types' info", () => {
     expect(after.regular).toEqual({
       info: "Regular text",
       infoConfidential: null,

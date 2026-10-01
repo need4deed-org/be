@@ -807,18 +807,30 @@ export default async function opportunityRoutes(
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
 
       // be#1092: an accompanying opportunity's description lives in
-      // info_confidential only; `info` is what the public/translated paths
-      // read. Also covers a type change to accompanying without a new
-      // description: the existing text moves over instead of staying public.
-      if (effectiveType === OpportunityType.ACCOMPANYING && opportunityObj) {
-        if (
-          opportunityObj.infoConfidential === undefined &&
-          !opportunity.infoConfidential &&
-          opportunity.info
-        ) {
-          opportunityObj.infoConfidential = opportunity.info;
+      // info_confidential only; every other type's in `info`, which is what
+      // the public/translated paths read. On a type change without a new
+      // description, the existing text moves to the column the new type reads.
+      if (opportunityObj) {
+        if (effectiveType === OpportunityType.ACCOMPANYING) {
+          if (
+            opportunityObj.infoConfidential === undefined &&
+            !opportunity.infoConfidential &&
+            opportunity.info
+          ) {
+            opportunityObj.infoConfidential = opportunity.info;
+          }
+          opportunityObj.info = null;
+        } else {
+          if (
+            opportunityObj.info === undefined &&
+            opportunity.type === OpportunityType.ACCOMPANYING &&
+            !opportunity.info &&
+            opportunity.infoConfidential
+          ) {
+            opportunityObj.info = opportunity.infoConfidential;
+          }
+          opportunityObj.infoConfidential = null;
         }
-        (opportunityObj as { info?: string | null }).info = null;
       }
 
       if (

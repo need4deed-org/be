@@ -42,6 +42,7 @@ async function triggerEmailSuggestion(
         "opportunity.deal.dealTimeslot.timeslot",
         "opportunity.deal.dealLanguage.language",
         "opportunity.accompanying.postcode",
+        "opportunity.district",
         "opportunity.onetimer",
         "opportunity.submittedByPerson",
         "opportunity.contactPerson",

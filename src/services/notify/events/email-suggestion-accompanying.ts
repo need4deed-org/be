@@ -41,7 +41,10 @@ export async function sendEmailSuggestionAccompanying(
   const accompanying = opportunity?.accompanying;
 
   const appointmentTitle = opportunity?.title ?? "";
-  const appointmentAddress = accompanying?.address ?? "";
+  // Sent to volunteers who are only suggested, not matched: the area, never
+  // the street address, which only matched volunteers see (be#1092, as in
+  // the masking of GET /opportunity/:id).
+  const appointmentAddress = opportunity?.district?.title ?? "Berlin";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
