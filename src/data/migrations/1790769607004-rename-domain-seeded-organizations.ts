@@ -1,5 +1,6 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 import {
+  BUILTIN_ORGANIZATION_TITLES,
   loadOrganizationTitleMap,
   PRIMARY_ORGANIZATION_DOMAINS,
 } from "../utils/organization-titles";
@@ -107,37 +108,48 @@ export class RenameDomainSeededOrganizations1790769607004
     );
   }
 
-  // Lossy: restores the domain title of each surviving renamed row (via the
-  // domain kept in `website`, falling back to the map) and drops the inserted
-  // operators nobody uses. Merged and removed rows aren't recreated, and
-  // agents unlinked from a removed operator stay unlinked.
+  // Lossy, and deliberately without the CDN map — it may have changed since
+  // up() ran. Merged and removed rows aren't recreated, and agents unlinked
+  // from a removed operator stay unlinked.
+  //   1. Drops the operators up() inserted (shared-domain extras and never-
+  //      seeded domains), matched on title *and* website so a same-named
+  //      row staff created isn't touched, and only while no agent uses them.
+  //      These pairs come from the built-in map; any extra a CDN map added
+  //      is left in place.
+  //   2. Renames every row whose `website` is a seeded domain back to that
+  //      domain — up() kept each renamed row's domain there. One row per
+  //      domain (the oldest); rows without a website, e.g. ones staff
+  //      created, are left alone.
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const titles = await loadOrganizationTitleMap();
-    const extra: string[] = [];
-    for (const [domain, entry] of Object.entries(titles)) {
+    for (const [domain, entry] of Object.entries(BUILTIN_ORGANIZATION_TITLES)) {
       if (entry === null) {
         continue;
       }
       const [title, ...others] = Array.isArray(entry) ? entry : [entry];
-      extra.push(...others);
-      if (!ORGANIZATION_DOMAINS.includes(domain)) {
-        extra.push(title);
-        continue;
+      const inserted = ORGANIZATION_DOMAINS.includes(domain)
+        ? others
+        : [title, ...others];
+      for (const t of inserted) {
+        await queryRunner.query(
+          `DELETE FROM "organization" o
+           WHERE o."title" = $1 AND o."website" = $2
+             AND NOT EXISTS (SELECT 1 FROM "agent" a WHERE a."organization_id" = o."id")`,
+          [t, domain],
+        );
       }
-      await queryRunner.query(
-        `UPDATE "organization" SET "title" = $1
-         WHERE "title" = $2
-           AND NOT EXISTS (SELECT 1 FROM "organization" WHERE "title" = $1)
-           AND ("website" IS NULL OR "website" = $1)`,
-        [domain, title],
-      );
     }
-    for (const title of extra) {
-      await queryRunner.query(
-        `DELETE FROM "organization" o WHERE o."title" = $1
-           AND NOT EXISTS (SELECT 1 FROM "agent" a WHERE a."organization_id" = o."id")`,
-        [title],
-      );
-    }
+
+    await queryRunner.query(
+      `UPDATE "organization" o SET "title" = r."website"
+       FROM (
+         SELECT DISTINCT ON ("website") "id", "website"
+         FROM "organization"
+         WHERE "website" = ANY($1) AND "title" <> "website"
+         ORDER BY "website", "id"
+       ) r
+       WHERE o."id" = r."id"
+         AND NOT EXISTS (SELECT 1 FROM "organization" o2 WHERE o2."title" = r."website")`,
+      [ORGANIZATION_DOMAINS],
+    );
   }
 }
