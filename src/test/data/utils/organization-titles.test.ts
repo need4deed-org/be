@@ -1,48 +1,38 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ORGANIZATION_DOMAINS } from "../../../data/migrations/1786109950000-seed-organization-from-agent-domains";
 import {
-  BUILTIN_ORGANIZATION_ALIASES,
   BUILTIN_ORGANIZATION_TITLES,
   loadOrganizationTitleMap,
+  PRIMARY_ORGANIZATION_DOMAINS,
 } from "../../../data/utils/organization-titles";
 
-// be#1061: the built-in rename map has to cover exactly what was seeded, and
-// must never produce a title that collides (title is unique) or still looks
-// like a domain.
-describe("RenameDomainSeededOrganizations built-in map", () => {
-  const renamedDomains = Object.keys(BUILTIN_ORGANIZATION_TITLES);
-  const aliases = Object.keys(BUILTIN_ORGANIZATION_ALIASES);
-
-  it("covers every seeded domain exactly once, as a rename or an alias", () => {
-    expect([...renamedDomains, ...aliases].sort()).toEqual(
+// be#1061: the built-in map has to decide every seeded domain (rename, merge
+// or remove), and must never produce a title that still looks like a domain.
+describe("built-in organization title map", () => {
+  it("covers exactly the seeded domains", () => {
+    expect(Object.keys(BUILTIN_ORGANIZATION_TITLES).sort()).toEqual(
       [...ORGANIZATION_DOMAINS].sort(),
     );
   });
 
-  it("merges each alias into a domain that is itself renamed", () => {
-    for (const canonical of Object.values(BUILTIN_ORGANIZATION_ALIASES)) {
-      expect(renamedDomains).toContain(canonical);
-    }
-  });
-
-  it("has unique titles", () => {
-    const titles = Object.values(BUILTIN_ORGANIZATION_TITLES);
-    expect(new Set(titles).size).toBe(titles.length);
-  });
-
   it("has no domain-shaped titles", () => {
-    for (const title of Object.values(BUILTIN_ORGANIZATION_TITLES)) {
-      expect(title).not.toMatch(/\.(de|org|com|net|berlin|eu|info|io)\b/i);
+    for (const title of Object.values(BUILTIN_ORGANIZATION_TITLES).flat()) {
+      // Lowercase only, so a name like "WIR.DE Aktive Nachbarn UG" passes.
+      expect(title ?? "").not.toMatch(/\.(de|org|com|net|berlin|eu|info|io)\b/);
     }
+  });
+
+  it("only lists primary domains that are kept, one per merged title", () => {
+    const primaryTitles = PRIMARY_ORGANIZATION_DOMAINS.map(
+      (d) => BUILTIN_ORGANIZATION_TITLES[d],
+    );
+    expect(primaryTitles).not.toContain(null);
+    expect(primaryTitles).not.toContain(undefined);
+    expect(new Set(primaryTitles).size).toBe(primaryTitles.length);
   });
 });
 
 describe("loadOrganizationTitleMap", () => {
-  const builtin = {
-    titles: BUILTIN_ORGANIZATION_TITLES,
-    aliases: BUILTIN_ORGANIZATION_ALIASES,
-  };
-
   function mockFetch(impl: () => Promise<unknown>) {
     vi.spyOn(globalThis, "fetch").mockImplementation(impl as typeof fetch);
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -54,25 +44,29 @@ describe("loadOrganizationTitleMap", () => {
 
   it("overrides the built-in map per key with the CDN entries", async () => {
     mockFetch(async () =>
-      Response.json({
-        titles: { "drk-berlin.de": "DRK Landesverband Berlin" },
-        aliases: { "drk.de": "drk-berlin.de" },
-      }),
+      Response.json({ "drk-berlin.de": "DRK Berlin", "ib.de": null }),
     );
 
     const map = await loadOrganizationTitleMap("https://cdn.test/x.json");
 
-    expect(map.titles["drk-berlin.de"]).toBe("DRK Landesverband Berlin");
-    expect(map.titles["johanniter.de"]).toBe("Johanniter-Unfall-Hilfe");
-    expect(map.aliases["drk.de"]).toBe("drk-berlin.de");
-    expect(map.aliases["city54hotel.de"]).toBe("city54.de");
+    expect(map["drk-berlin.de"]).toBe("DRK Berlin");
+    expect(map["ib.de"]).toBeNull();
+    expect(map["johanniter.de"]).toBe("Johanniter-Unfall-Hilfe e.V.");
+  });
+
+  it("accepts a list of titles for a domain shared by several operators", async () => {
+    mockFetch(async () => Response.json({ "ib.de": ["IB e.V.", "IB GmbH"] }));
+
+    const map = await loadOrganizationTitleMap("https://cdn.test/x.json");
+
+    expect(map["ib.de"]).toEqual(["IB e.V.", "IB GmbH"]);
   });
 
   it("falls back to the built-in map on a non-2xx response", async () => {
     mockFetch(async () => new Response("nope", { status: 404 }));
 
-    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toEqual(
-      builtin,
+    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toBe(
+      BUILTIN_ORGANIZATION_TITLES,
     );
   });
 
@@ -81,16 +75,16 @@ describe("loadOrganizationTitleMap", () => {
       throw new Error("timeout");
     });
 
-    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toEqual(
-      builtin,
+    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toBe(
+      BUILTIN_ORGANIZATION_TITLES,
     );
   });
 
   it("falls back to the built-in map on a malformed body", async () => {
-    mockFetch(async () => Response.json({ titles: { "ib.de": "" } }));
+    mockFetch(async () => Response.json({ "ib.de": "", "jsd.de": [] }));
 
-    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toEqual(
-      builtin,
+    expect(await loadOrganizationTitleMap("https://cdn.test/x.json")).toBe(
+      BUILTIN_ORGANIZATION_TITLES,
     );
   });
 });

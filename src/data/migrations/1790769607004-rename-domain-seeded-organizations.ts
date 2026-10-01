@@ -1,21 +1,25 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
-import { loadOrganizationTitleMap } from "../utils/organization-titles";
+import {
+  loadOrganizationTitleMap,
+  NEW_ORGANIZATIONS,
+  PRIMARY_ORGANIZATION_DOMAINS,
+} from "../utils/organization-titles";
 
 // be#1061: SeedOrganizationFromAgentDomains1786109950000 seeded operator
 // (Träger) titles verbatim from email domains (e.g. "drk-berlin.de"), which
-// is what the Operator picker shows. This renames them to human-readable
-// names — staff still fix any remaining naming via PATCH /organization/:id.
-// The domain -> title map comes from the CDN with a built-in fallback, see
-// ../utils/organization-titles.
-//
-// Only rows whose title is still the raw domain are touched, so anything
-// staff already renamed is left alone. A rename is skipped (and logged) if
-// another organization already has the target title (title is unique).
-// The domain moves into `website` when that's empty, so it isn't lost.
-//
-// A few seeded domains are the same organization twice (a typo, an alias
-// domain). Those are merged first: agents pointing at the alias are moved to
-// the canonical row, and the alias row is deleted.
+// is what the Operator picker shows. This applies the reviewed domain ->
+// title map (CDN with a built-in fallback, see ../utils/organization-titles)
+// to every row whose title is still its raw domain — anything staff already
+// renamed via PATCH /organization/:id is left alone:
+//   - title null: not an operator; agents pointing at it lose the operator
+//     (organization_id -> NULL, the FK has no cascade) and the row is deleted
+//   - title already taken (another domain of the same operator, or a row
+//     staff created): merged — agents move to that row, this one is deleted
+//   - otherwise: renamed, with the domain moved into `website` if empty
+//   - several titles (operators sharing the domain): the row is handled as
+//     above for the first, the others are inserted with the domain as
+//     `website`; agents on the row stay with the first operator
+// Then operators missing from the seed are inserted.
 //
 // Raw SQL only, no entities.
 export class RenameDomainSeededOrganizations1790769607004
@@ -24,84 +28,107 @@ export class RenameDomainSeededOrganizations1790769607004
   name = "RenameDomainSeededOrganizations1790769607004";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const { titles, aliases } = await loadOrganizationTitleMap();
+    const titles = await loadOrganizationTitleMap();
+    const domains = [
+      ...PRIMARY_ORGANIZATION_DOMAINS.filter((d) => d in titles),
+      ...Object.keys(titles).filter(
+        (d) => !PRIMARY_ORGANIZATION_DOMAINS.includes(d),
+      ),
+    ];
 
-    for (const [alias, canonical] of Object.entries(aliases)) {
-      const [aliasRow]: { id: number }[] = await queryRunner.query(
-        `SELECT "id" FROM "organization" WHERE "title" = $1`,
-        [alias],
-      );
-      if (!aliasRow) {
-        continue;
-      }
-      // The canonical row may still carry its domain or already be renamed.
-      const [canonicalRow]: { id: number }[] = await queryRunner.query(
-        `SELECT "id" FROM "organization" WHERE "title" IN ($1, $2) ORDER BY "id" LIMIT 1`,
-        [canonical, titles[canonical] ?? canonical],
-      );
-      if (canonicalRow) {
-        await queryRunner.query(
-          `UPDATE "agent" SET "organization_id" = $1 WHERE "organization_id" = $2`,
-          [canonicalRow.id, aliasRow.id],
-        );
-        await queryRunner.query(`DELETE FROM "organization" WHERE "id" = $1`, [
-          aliasRow.id,
-        ]);
-      } else {
-        // No canonical row: the alias row becomes it.
-        await queryRunner.query(
-          `UPDATE "organization" SET "title" = $1 WHERE "id" = $2`,
-          [canonical, aliasRow.id],
-        );
-      }
-    }
-
-    const entries = Object.entries(titles);
-    let renamed = 0;
-    const skipped: string[] = [];
-    for (const [domain, title] of entries) {
-      const rows: { id: number }[] = await queryRunner.query(
-        `UPDATE "organization"
-         SET "title" = $2, "website" = COALESCE(NULLIF("website", ''), $1)
-         WHERE "title" = $1
-           AND NOT EXISTS (SELECT 1 FROM "organization" WHERE "title" = $2)
-         RETURNING "id"`,
-        [domain, title],
-      );
-      if (rows.length) {
-        renamed += 1;
-        continue;
-      }
-      const [stillDomain]: { id: number }[] = await queryRunner.query(
+    const counts = { renamed: 0, merged: 0, removed: 0, unlinkedAgents: 0 };
+    const extra: { title: string; website: string }[] = [];
+    for (const domain of domains) {
+      const entry = titles[domain];
+      const [title, ...others] = Array.isArray(entry) ? entry : [entry];
+      const [row]: { id: number }[] = await queryRunner.query(
         `SELECT "id" FROM "organization" WHERE "title" = $1`,
         [domain],
       );
-      if (stillDomain) {
-        skipped.push(domain);
+      // Added even when the seeded row is gone (already handled by staff),
+      // so every operator sharing the domain ends up existing.
+      extra.push(...others.map((t) => ({ title: t, website: domain })));
+      if (!row) {
+        continue;
       }
+
+      if (title === null) {
+        const [, unlinked]: [unknown, number] = await queryRunner.query(
+          `UPDATE "agent" SET "organization_id" = NULL WHERE "organization_id" = $1`,
+          [row.id],
+        );
+        await queryRunner.query(`DELETE FROM "organization" WHERE "id" = $1`, [
+          row.id,
+        ]);
+        counts.removed += 1;
+        counts.unlinkedAgents += unlinked;
+        continue;
+      }
+
+      const [target]: { id: number }[] = await queryRunner.query(
+        `SELECT "id" FROM "organization" WHERE "title" = $1`,
+        [title],
+      );
+      if (target) {
+        await queryRunner.query(
+          `UPDATE "agent" SET "organization_id" = $1 WHERE "organization_id" = $2`,
+          [target.id, row.id],
+        );
+        await queryRunner.query(`DELETE FROM "organization" WHERE "id" = $1`, [
+          row.id,
+        ]);
+        counts.merged += 1;
+        continue;
+      }
+
+      await queryRunner.query(
+        `UPDATE "organization"
+         SET "title" = $2, "website" = COALESCE(NULLIF("website", ''), $1)
+         WHERE "id" = $3`,
+        [domain, title, row.id],
+      );
+      counts.renamed += 1;
+    }
+
+    for (const { title, website } of [...extra, ...NEW_ORGANIZATIONS]) {
+      await queryRunner.query(
+        `INSERT INTO "organization" ("title", "website") VALUES ($1, $2)
+         ON CONFLICT ("title") DO NOTHING`,
+        [title, website],
+      );
     }
 
     console.warn(
-      `[rename-domain-seeded-organizations] renamed ${renamed} of ${entries.length} candidates`,
+      `[rename-domain-seeded-organizations] renamed ${counts.renamed}, merged ${counts.merged}, removed ${counts.removed} (unlinked ${counts.unlinkedAgents} agent(s)) of ${domains.length} candidates`,
     );
-    if (skipped.length) {
-      console.warn(
-        `[rename-domain-seeded-organizations] skipped (target title already taken): ${skipped.join(", ")}`,
-      );
-    }
   }
 
-  // Restores the domain titles of rows that still carry the mapped title.
-  // Uses the same (CDN or built-in) map as up(). Merged alias rows aren't
-  // recreated, and `website` is left as is.
+  // Lossy: restores the domain title of each surviving renamed row (via the
+  // domain kept in `website`, falling back to the map) and drops the inserted
+  // operators nobody uses. Merged and removed rows aren't recreated, and
+  // agents unlinked from a removed operator stay unlinked.
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const { titles } = await loadOrganizationTitleMap();
-    for (const [domain, title] of Object.entries(titles)) {
+    const titles = await loadOrganizationTitleMap();
+    const extra: string[] = [];
+    for (const [domain, entry] of Object.entries(titles)) {
+      if (entry === null) {
+        continue;
+      }
+      const [title, ...others] = Array.isArray(entry) ? entry : [entry];
+      extra.push(...others);
       await queryRunner.query(
         `UPDATE "organization" SET "title" = $1
          WHERE "title" = $2
-           AND NOT EXISTS (SELECT 1 FROM "organization" WHERE "title" = $1)`,
+           AND NOT EXISTS (SELECT 1 FROM "organization" WHERE "title" = $1)
+           AND ("website" IS NULL OR "website" = $1)`,
         [domain, title],
+      );
+    }
+    for (const title of [...extra, ...NEW_ORGANIZATIONS.map((o) => o.title)]) {
+      await queryRunner.query(
+        `DELETE FROM "organization" o WHERE o."title" = $1
+           AND NOT EXISTS (SELECT 1 FROM "agent" a WHERE a."organization_id" = o."id")`,
+        [title],
       );
     }
   }
