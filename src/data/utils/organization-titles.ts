@@ -352,8 +352,7 @@ export const PRIMARY_ORGANIZATION_DOMAINS = [
 export const NEW_ORGANIZATIONS: { title: string; website: string }[] = [
   {
     title: "Senatsverwaltung für Bildung, Jugend und Familie",
-    website:
-      "https://www.berlin.de/sen/bildung/unterstuetzung/beratungszentren-sibuz/pankow/",
+    website: "www.berlin.de",
   },
 ];
 
