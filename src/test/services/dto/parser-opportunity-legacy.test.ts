@@ -15,7 +15,9 @@ const baseBody = {
 } as unknown as OpportunityLegacyFormData;
 
 describe("parseOpportunityLegacy", () => {
-  it("mirrors the description into both info and infoConfidential for ACCOMPANYING type", async () => {
+  // be#1092: an accompanying description is stored in infoConfidential
+  // only; `info` is what public and machine-translated paths read.
+  it("stores an ACCOMPANYING description in infoConfidential only", async () => {
     const body = {
       ...baseBody,
       opportunity_type: "accompanying",
@@ -26,7 +28,7 @@ describe("parseOpportunityLegacy", () => {
     const opportunity = await parseOpportunityLegacy(body);
 
     expect(opportunity.type).toBe(OpportunityType.ACCOMPANYING);
-    expect(opportunity.info).toBe("Please bring a translator.");
+    expect(opportunity.info).toBeUndefined();
     expect(opportunity.infoConfidential).toBe("Please bring a translator.");
   });
 
