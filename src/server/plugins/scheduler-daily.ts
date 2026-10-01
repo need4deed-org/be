@@ -4,7 +4,7 @@ import cron from "node-cron";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
-import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
+import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
@@ -19,11 +19,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
     CRON_SCHEDULE_DAILY,
     async () => {
       try {
-        if (isCronMuted()) {
-          logger.info("scheduler: skipping daily scans — cron muted");
-          return;
-        }
-
         logger.info("scheduler: running daily scans");
 
         // Run in this order, sequentially: their WHERE clauses can both

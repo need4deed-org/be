@@ -10,11 +10,17 @@ import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-fo
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
-import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
+import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
 // across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240701;
+
+// Cron-triggered outbound emails are retired (be#1077): these four scans do
+// nothing but email volunteers and contacts, so the hourly run is skipped
+// entirely and writes no Communication rows. be#1088 brings them back as
+// Slack posts to #cron-notifications for coordinators instead.
+export const CRON_EMAILS_RETIRED = true;
 
 // Hourly on the hour, 08:00–19:00 Berlin time, weekdays only, by default.
 const CRON_SCHEDULE_HOURLY =
@@ -26,8 +32,10 @@ async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
     CRON_SCHEDULE_HOURLY,
     async () => {
       try {
-        if (isCronMuted()) {
-          logger.info("scheduler: skipping hourly scans — cron muted");
+        if (CRON_EMAILS_RETIRED) {
+          logger.info(
+            "scheduler: skipping hourly email scans — cron-triggered emails retired (be#1088)",
+          );
           return;
         }
 

@@ -46,7 +46,7 @@ declare module "fastify" {
  * the corrections are always available: queuing sends nothing anywhere.
  * The worker, the only part that calls a provider, runs on
  * CRON_SCHEDULE_TRANSLATION and only when TRANSLATION_ENABLED is set. It
- * has its own switch, not the notify schedulers' isCronMuted() (be#1077).
+ * has its own switch, independent of the notify schedulers (be#1077).
  */
 async function translationPlugin(fastify: FastifyInstance): Promise<void> {
   const config = getTranslationConfig();
