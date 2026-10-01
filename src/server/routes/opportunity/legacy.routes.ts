@@ -286,16 +286,9 @@ export default async function opportunityLegacyRoutes(
             };
           }
 
-          const { address, name, phone, email, languageToTranslate } =
-            accompanying;
-
-          // Build accomp_information from available contact fields
-          const infoParts = [
-            name && name !== "unknown" ? `Name: ${name}` : null,
-            address ? `Address: ${address}` : null,
-            phone ? `Phone: ${phone}` : null,
-            email ? `Email: ${email}` : null,
-          ].filter(Boolean);
+          // This route is public: the accompanied person's name, address,
+          // phone and email are never part of it (be#1092).
+          const { languageToTranslate } = accompanying;
 
           // Treat the epoch sentinel date as "no date set". Compare by
           // timestamp (not string equality) since onetimerDate is a real
@@ -307,8 +300,7 @@ export default async function opportunityLegacyRoutes(
               : onetimerDate;
 
           return {
-            accomp_information:
-              infoParts.length > 0 ? infoParts.join(", ") : null,
+            accomp_information: null,
             accomp_translation: languageToTranslate ?? null,
             accomp_datetime,
           };
@@ -340,7 +332,12 @@ export default async function opportunityLegacyRoutes(
           return {
             id: raw.id,
             title: raw.title,
-            vo_information: raw.info ?? null,
+            // An accompanying opportunity's description is about one
+            // person's appointment: never on this public route (be#1092).
+            vo_information:
+              raw.type === OpportunityType.ACCOMPANYING
+                ? null
+                : (raw.info ?? null),
             accomp_information,
             accomp_translation,
             accomp_datetime,
