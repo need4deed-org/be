@@ -55,7 +55,10 @@ export async function sendEmailAccompanyMatchVolunteer(
     opportunity?.deal?.dealLanguage ?? [],
     `sendEmailAccompanyMatchVolunteer, ov ${ov.id}`,
   );
-  const appointmentComment = opportunity?.info ?? "";
+  // An accompanying description is stored in infoConfidential (be#1092);
+  // `info` only for rows written before that.
+  const appointmentComment =
+    opportunity?.infoConfidential || opportunity?.info || "";
   const contactpersonName = contactPerson?.name ?? "";
   const contactpersonEmail = contactPerson?.email ?? "";
   const contactpersonPhone = contactPerson?.phone ?? "";
