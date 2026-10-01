@@ -90,6 +90,7 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
@@ -294,6 +295,15 @@ export default async function opportunityRoutes(
         ),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
+      if (
+        !canSeeOpportunityDescription(
+          opportunityComments.type,
+          request.authUser?.role,
+          myMatchStatus,
+        )
+      ) {
+        data.description = "";
+      }
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },

@@ -2511,3 +2511,173 @@ describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
     expect(res.json().data.skills).toEqual([]);
   });
 });
+
+// be#1092: an accompanying opportunity's description is about one person's
+// appointment; only coordinators/admins, the owning agent and volunteers
+// matched to it (MATCHED/ACTIVE) may read it.
+describe("GET /opportunity/:id accompanying description visibility (be#1092)", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let accompanying: Opportunity;
+  let regular: Opportunity;
+  const persons: Person[] = [];
+  const volunteers: Volunteer[] = [];
+  const deals: Deal[] = [];
+  const cookies: Record<string, string> = {};
+  const suffix = randomNumericSuffix();
+  const DESCRIPTION = `Appointment details ${suffix}`;
+
+  const VOLUNTEER_LINKS: Record<string, OpportunityVolunteerStatusType | null> =
+    {
+      unlinked: null,
+      pending: OpportunityVolunteerStatusType.PENDING,
+      matched: OpportunityVolunteerStatusType.MATCHED,
+      active: OpportunityVolunteerStatusType.ACTIVE,
+      past: OpportunityVolunteerStatusType.PAST,
+    };
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test RAC (be#1092) ${suffix}` }),
+    );
+    accompanying = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Accompanying (be#1092) ${suffix}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        info: DESCRIPTION,
+        infoConfidential: DESCRIPTION,
+      }),
+    );
+    regular = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Regular (be#1092) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        info: DESCRIPTION,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    const addUser = async (key: string, role: UserRole): Promise<Person> => {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Test", lastName: `be1092-${key}` }),
+      );
+      persons.push(person);
+      await fastify.db.userRepository.save(
+        new User({
+          email: `be1092-${key}-${suffix}@test.need4deed.org`,
+          password: pwHash,
+          role,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      return person;
+    };
+
+    for (const [key, status] of Object.entries(VOLUNTEER_LINKS)) {
+      const person = await addUser(key, UserRole.VOLUNTEER);
+      const deal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+      );
+      deals.push(deal);
+      const volunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ dealId: deal.id, personId: person.id }),
+      );
+      volunteers.push(volunteer);
+      if (status) {
+        await fastify.db.opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({
+            opportunityId: accompanying.id,
+            volunteerId: volunteer.id,
+            status,
+          }),
+        );
+      }
+    }
+    await addUser("user", UserRole.USER);
+    await addUser("coordinator", UserRole.COORDINATOR);
+    const agentMember = await addUser("agent", UserRole.AGENT);
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: agentMember.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
+    for (const key of [
+      ...Object.keys(VOLUNTEER_LINKS),
+      "user",
+      "coordinator",
+      "agent",
+    ]) {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          email: `be1092-${key}-${suffix}@test.need4deed.org`,
+          password: PASSWORD,
+        },
+      });
+      cookies[key] = getCookie(res.cookies, accessCookieName);
+    }
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityVolunteerRepository.delete({
+      opportunityId: accompanying.id,
+    });
+    await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
+    for (const volunteer of volunteers) {
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    }
+    for (const deal of deals) {
+      await fastify.db.dealRepository.delete({ id: deal.id });
+    }
+    await fastify.db.opportunityRepository.delete({ id: accompanying.id });
+    await fastify.db.opportunityRepository.delete({ id: regular.id });
+    for (const person of persons) {
+      await fastify.db.userRepository.delete({ personId: person.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  const descriptionFor = async (key: string, opportunityId: number) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunityId}`,
+      cookies: { [accessCookieName]: cookies[key] },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().data.description;
+  };
+
+  it.each(["matched", "active", "coordinator", "agent"])(
+    "shows an accompanying description to %s",
+    async (key) => {
+      expect(await descriptionFor(key, accompanying.id)).toBe(DESCRIPTION);
+    },
+  );
+
+  it.each(["unlinked", "pending", "past", "user"])(
+    "blanks an accompanying description for %s",
+    async (key) => {
+      expect(await descriptionFor(key, accompanying.id)).toBe("");
+    },
+  );
+
+  it("leaves other opportunity types' descriptions alone", async () => {
+    expect(await descriptionFor("unlinked", regular.id)).toBe(DESCRIPTION);
+  });
+});
