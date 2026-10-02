@@ -64,7 +64,10 @@ export async function sendEmailNewAccompanying(
     );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
-  const appointmentComment = opportunity.info ?? "";
+  // An accompanying description is stored in infoConfidential (be#1092);
+  // `info` only for rows written before that.
+  const appointmentComment =
+    opportunity.infoConfidential || opportunity.info || "";
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {

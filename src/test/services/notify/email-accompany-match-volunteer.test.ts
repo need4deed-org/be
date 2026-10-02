@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
 });
 
-function buildOv() {
+function buildOv(opportunityOver: Record<string, unknown> = {}) {
   return {
     id: 1,
     volunteerId: 1,
@@ -44,6 +44,7 @@ function buildOv() {
           { language: { title: "Arabic", translation: "Arabisch" } },
         ],
       },
+      ...opportunityOver,
     },
   } as unknown as Parameters<typeof sendEmailAccompanyMatchVolunteer>[1];
 }
@@ -56,5 +57,39 @@ describe("sendEmailAccompanyMatchVolunteer", () => {
     expect(msg.text).toContain("Languages: German/English-Arabic");
     expect(msg.text).toContain("Sprachen: Deutsch/Englisch-Arabisch");
     expect(msg.text).not.toContain("{{");
+  });
+
+  // be#1092: the appointment comment comes from infoConfidential, with
+  // `info` only as a fallback for rows written before the hotfix.
+  it("uses infoConfidential as the appointment comment", async () => {
+    await sendEmailAccompanyMatchVolunteer(
+      email,
+      buildOv({ info: null, infoConfidential: "Confidential details" }),
+    );
+
+    expect(send.mock.calls[0][0].text).toContain("Confidential details");
+  });
+
+  it("prefers infoConfidential over info", async () => {
+    await sendEmailAccompanyMatchVolunteer(
+      email,
+      buildOv({
+        info: "Old public text",
+        infoConfidential: "Confidential details",
+      }),
+    );
+
+    const text = send.mock.calls[0][0].text;
+    expect(text).toContain("Confidential details");
+    expect(text).not.toContain("Old public text");
+  });
+
+  it("falls back to info for rows not yet migrated", async () => {
+    await sendEmailAccompanyMatchVolunteer(
+      email,
+      buildOv({ info: "Legacy details", infoConfidential: null }),
+    );
+
+    expect(send.mock.calls[0][0].text).toContain("Legacy details");
   });
 });

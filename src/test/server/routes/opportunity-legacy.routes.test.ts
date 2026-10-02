@@ -95,6 +95,112 @@ describe("GET /opportunity/legacy", () => {
   });
 });
 
+// be#1092: the public listing never carries an accompanying opportunity's
+// contact details or description.
+describe("GET /opportunity/legacy hides accompanying details", () => {
+  let fastify: FastifyInstance;
+  let agent: Agent;
+  let deal: Deal;
+  let accompanying: Accompanying;
+  let accompanyingOpportunity: Opportunity;
+  let regularOpportunity: Opportunity;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Test Agent (legacy-accompanying) ${suffix}` }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    accompanying = await fastify.db.accompanyingRepository.save(
+      new Accompanying({
+        address: "Hidden Street 2",
+        name: "Hidden Person Name",
+        phone: "+497654321",
+        email: "hidden@example.com",
+      }),
+    );
+    accompanyingOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Accompanying (legacy) ${suffix}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        dealId: deal.id,
+        accompanyingId: accompanying.id,
+        info: "Hidden appointment description",
+        infoConfidential: "Hidden appointment description",
+      }),
+    );
+    regularOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Regular (legacy) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+        info: "Public volunteering description",
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityRepository.delete({
+      id: accompanyingOpportunity.id,
+    });
+    await fastify.db.opportunityRepository.delete({
+      id: regularOpportunity.id,
+    });
+    await fastify.db.accompanyingRepository.delete({ id: accompanying.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  it("returns no contact details and no description for an accompanying opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/legacy",
+    });
+
+    expect(res.statusCode).toBe(200);
+    const entry = res
+      .json()
+      .find((e: { id: number }) => e.id === accompanyingOpportunity.id);
+    expect(entry).toBeDefined();
+    expect(entry.accomp_information).toBeNull();
+    expect(entry.vo_information).toBeNull();
+    const body = JSON.stringify(entry);
+    for (const secret of [
+      "Hidden Person Name",
+      "Hidden Street 2",
+      "+497654321",
+      "hidden@example.com",
+      "Hidden appointment description",
+    ]) {
+      expect(body).not.toContain(secret);
+    }
+  });
+
+  it("still returns a regular opportunity's description", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/legacy",
+    });
+
+    const entry = res
+      .json()
+      .find((e: { id: number }) => e.id === regularOpportunity.id);
+    expect(entry?.vo_information).toBe("Public volunteering description");
+  });
+});
+
 // Regression test for be#926 review: findOrCreateAgent's new-agent branch
 // built an Agent with only title/addressId set, so addDistrictToOpportunity's
 // agent-based resolution (agent.districtId, then agent.address.postcode)

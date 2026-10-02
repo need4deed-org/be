@@ -90,6 +90,7 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
@@ -294,6 +295,15 @@ export default async function opportunityRoutes(
         ),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
+      if (
+        !canSeeOpportunityDescription(
+          opportunityComments.type,
+          request.authUser?.role,
+          myMatchStatus,
+        )
+      ) {
+        data.description = "";
+      }
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
@@ -795,6 +805,33 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+
+      // be#1092: an accompanying opportunity's description lives in
+      // info_confidential only; every other type's in `info`, which is what
+      // the public/translated paths read. On a type change without a new
+      // description, the existing text moves to the column the new type reads.
+      if (opportunityObj) {
+        if (effectiveType === OpportunityType.ACCOMPANYING) {
+          if (
+            opportunityObj.infoConfidential === undefined &&
+            !opportunity.infoConfidential &&
+            opportunity.info
+          ) {
+            opportunityObj.infoConfidential = opportunity.info;
+          }
+          opportunityObj.info = null;
+        } else {
+          if (
+            opportunityObj.info === undefined &&
+            opportunity.type === OpportunityType.ACCOMPANYING &&
+            !opportunity.info &&
+            opportunity.infoConfidential
+          ) {
+            opportunityObj.info = opportunity.infoConfidential;
+          }
+          opportunityObj.infoConfidential = null;
+        }
+      }
 
       if (
         effectiveType === OpportunityType.EVENTS &&

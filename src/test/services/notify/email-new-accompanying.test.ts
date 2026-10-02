@@ -125,4 +125,41 @@ describe("sendEmailNewAccompanying", () => {
     expect(msg.text).not.toContain("undefined");
     expect(msg.text).toContain("Sprachen: \n");
   });
+
+  // be#1092: the appointment comment comes from infoConfidential, with
+  // `info` only as a fallback for rows written before the hotfix.
+  it("uses infoConfidential as the appointment comment", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        info: null,
+        infoConfidential: "Confidential details",
+      }),
+    );
+
+    expect(send.mock.calls[0][0].text).toContain("Confidential details");
+  });
+
+  it("prefers infoConfidential over info", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({
+        info: "Old public text",
+        infoConfidential: "Confidential details",
+      }),
+    );
+
+    const text = send.mock.calls[0][0].text;
+    expect(text).toContain("Confidential details");
+    expect(text).not.toContain("Old public text");
+  });
+
+  it("falls back to info for rows not yet migrated", async () => {
+    await sendEmailNewAccompanying(
+      email,
+      buildOpportunity({ info: "Legacy details", infoConfidential: null }),
+    );
+
+    expect(send.mock.calls[0][0].text).toContain("Legacy details");
+  });
 });
