@@ -528,6 +528,8 @@ export default async function opportunityRoutes(
     "/",
     {
       schema: {
+        // The language the text is entered in (be#1068).
+        querystring: langQuerySchema,
         body: opportunityCreateBodySchema,
         response: opportunityCreateResponseSchema,
       },
@@ -724,6 +726,7 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },

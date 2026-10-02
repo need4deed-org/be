@@ -25,7 +25,12 @@ import Post from "../../data/entity/post.entity";
 import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
 import { dtoPostReply } from "../../services/dto/dto-post-reply";
-import { idParamSchema, postListQuerySchema, responseSchema } from "../schema";
+import {
+  idParamSchema,
+  langQuerySchema,
+  postListQuerySchema,
+  responseSchema,
+} from "../schema";
 import {
   ParamsId,
   QuerystringPostList,
@@ -257,6 +262,8 @@ export default async function postRoutes(
     "/",
     {
       schema: {
+        // Linked opportunity titles in the response (be#1068).
+        querystring: langQuerySchema,
         body: { $ref: "ApiPostPost#" },
         response: responseSchema({
           dataSchemaRef: "ApiPostGet#",
@@ -340,6 +347,7 @@ export default async function postRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiPostPatch#" },
         response: responseSchema("ApiPostGet#"),
       },

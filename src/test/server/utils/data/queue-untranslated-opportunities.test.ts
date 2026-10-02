@@ -1,4 +1,9 @@
-import { EntityTableName, Lang, OpportunityType } from "need4deed-sdk";
+import {
+  EntityTableName,
+  Lang,
+  OpportunityStatusType,
+  OpportunityType,
+} from "need4deed-sdk";
 import { QueryRunner } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../../data/data-source";
@@ -107,6 +112,34 @@ describe("queueUntranslatedOpportunities", () => {
     expect(firstRun).toBeGreaterThanOrEqual(3);
     expect(await fieldsOf(opportunity.nothing.id)).toEqual([]);
     expect(secondRun).toBe(0);
+  });
+
+  it("queues searching opportunities first", async () => {
+    const savepoint = `searching_${suffix}`;
+    await queryRunner.query(`SAVEPOINT ${savepoint}`);
+    // Every other untranslated opportunity in the database is queued
+    // already (beforeAll), so these two are the only candidates.
+    const inactive = await queryRunner.manager.save(
+      new Opportunity({
+        title: `Backfill inactive ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.INACTIVE,
+      }),
+    );
+    const searching = await queryRunner.manager.save(
+      new Opportunity({
+        title: `Backfill searching ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.SEARCHING,
+      }),
+    );
+
+    expect(await queueUntranslatedOpportunities(queryRunner.manager, 1)).toBe(
+      1,
+    );
+    expect(await fieldsOf(searching.id)).toHaveLength(1);
+    expect(await fieldsOf(inactive.id)).toEqual([]);
+    await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
   });
 
   it("queues at most `limit` opportunities", async () => {

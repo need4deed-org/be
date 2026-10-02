@@ -1,5 +1,10 @@
 import { FastifyInstance } from "fastify";
-import { EntityTableName, Lang, OpportunityType } from "need4deed-sdk";
+import {
+  EntityTableName,
+  Lang,
+  OpportunityStatusType,
+  OpportunityType,
+} from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -89,7 +94,7 @@ const BACKFILL_LIMIT = 100;
  * Queues opportunities that have text to translate but no translation rows
  * yet — those written before be#1068 (be#1068 backfill). Idempotent: once
  * queued, an opportunity has rows and is never picked again. At most `limit`
- * per call; returns how many were queued.
+ * per call, searching ones first; returns how many were queued.
  */
 export async function queueUntranslatedOpportunities(
   manager: EntityManager,
@@ -107,7 +112,10 @@ export async function queueUntranslatedOpportunities(
       "(btrim(o.title) <> '' OR (o.type IN (:...types) AND btrim(coalesce(o.info, '')) <> ''))",
       { types: TRANSLATED_INFO_TYPES },
     )
-    .orderBy("o.id")
+    // Opportunities volunteers can see first, then the rest by age.
+    .orderBy("o.status = :searching", "DESC")
+    .addOrderBy("o.id")
+    .setParameter("searching", OpportunityStatusType.SEARCHING)
     .limit(limit)
     .getMany();
   for (const opportunity of opportunities) {

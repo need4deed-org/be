@@ -240,6 +240,29 @@ describe("opportunity writes queue translations", () => {
     });
   });
 
+  it("documents ?language= on the write routes", async () => {
+    const { paths } = (
+      await fastify.inject({ method: "GET", url: "/swagger/json" })
+    ).json();
+    const languageParam = (path: string, method: string) =>
+      (paths[path] ?? paths[path.replace(/\/$/, "")])?.[
+        method
+      ]?.parameters?.find(
+        (p: { in: string; name: string }) =>
+          p.in === "query" && p.name === "language",
+      );
+
+    for (const [path, method] of [
+      ["/opportunity/", "post"],
+      ["/opportunity/legacy/", "post"],
+      ["/opportunity/{id}", "patch"],
+      ["/post/", "post"],
+      ["/post/{id}", "patch"],
+    ]) {
+      expect(languageParam(path, method), `${method} ${path}`).toBeDefined();
+    }
+  });
+
   it("never queues an accompanying opportunity's info", async () => {
     const opportunity = await saved({
       type: OpportunityType.ACCOMPANYING,

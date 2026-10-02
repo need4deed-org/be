@@ -25,6 +25,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { langQuerySchema } from "../../schema";
 import {
   getAgentByAddress,
   getDistrictToOpportunityHandler,
@@ -108,7 +109,11 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    { config: { public: true } as FastifyContextConfig },
+    {
+      config: { public: true } as FastifyContextConfig,
+      // The language the text is entered in (be#1068).
+      schema: { querystring: langQuerySchema },
+    },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,
