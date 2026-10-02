@@ -25,9 +25,6 @@ const sortOrderProps = {
   },
 };
 
-// Opportunity-list-only: which field `sortOrder` applies to. Not part of
-// `sortOrderProps` since sorting by start date is meaningless for
-// agent/volunteer/user lists that also reuse that shared prop set.
 const sortByProps = {
   sortBy: {
     type: "string",
@@ -42,9 +39,6 @@ export const opportunityListQuerySchema = {
     ...sortOrderProps,
     ...sortByProps,
     ...langProp,
-    // Calendar view (be#889): filter by Opportunity.onetimer.date range,
-    // top-level (not nested in `filter`) since they're specific to this
-    // list endpoint, matching `sortBy`.
     appointmentDateFrom: { type: "string" },
     appointmentDateTo: { type: "string" },
     hasAppointmentDate: { type: "boolean" },
@@ -97,9 +91,6 @@ export const volunteerListQuerySchema = {
     ...paginationProps,
     ...langProp,
     ...sortOrderProps,
-    // Selects which relations the list loads: "table" loads only what the
-    // table view renders (languages + locations); "card" (default) loads all
-    // collections. Lets the table view skip activities/skills/availability.
     listType: { type: "string", enum: ["card", "table"] },
     filter: {
       type: "object",
@@ -166,10 +157,6 @@ export const userListQuerySchema = {
   additionalProperties: false,
 };
 
-// Field names/types here must mirror need4deed-sdk's ApiPostListQuery (which
-// QuerystringPostList aliases, see endpoint-handlers.ts) — this AJV schema
-// isn't derived from that type, so a future SDK field addition/rename won't
-// surface here on its own; update both by hand together.
 export const postListQuerySchema = {
   type: "object",
   properties: {

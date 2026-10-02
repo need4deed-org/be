@@ -26,21 +26,10 @@ export type OpportunityAppointmentFilter = Pick<
   | "excludeAccompanying"
 >;
 
-// Arrays are truthy even when empty, so a plain `if (filter?.x)` check
-// treats `x: []` as "filter requested" — and normalizeStringArrayInput's
-// In([]) compiles to an always-false 0=1, silently zeroing every result
-// instead of applying no filter at all. Every array-shaped filter value in
-// this file goes through this check instead of a bare truthiness one
-// (be#1018's district fix was the first instance of this bug class here).
 function hasFilterValue(value: string | string[] | undefined): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
 
-// appointmentDateFrom/To are Berlin calendar days ("2026-06-30"), not UTC
-// ones — this is a Berlin-based product and Opportunity.onetimer.date is
-// filtered the same way elsewhere (berlinDayBoundaries, used by
-// scanAccompanyNotFound). Parsing with `new Date(value)` would instead
-// anchor the range to UTC midnight, shifting it by Berlin's UTC offset.
 function parseAppointmentDate(value: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) {
@@ -79,8 +68,6 @@ function getAppointmentDateWhere(
     } as FindOptionsWhere<Opportunity>;
   }
 
-  // A range already implies "has an appointment date" — this flag only
-  // matters on its own.
   if (hasAppointmentDate) {
     return { onetimerId: Not(IsNull()) } as FindOptionsWhere<Opportunity>;
   }
@@ -94,9 +81,6 @@ function getTypeWhere(
 ): FindOptionsWhere<Opportunity> {
   if (hasFilterValue(filter?.type)) {
     const types = Array.isArray(filter.type) ? filter.type : [filter.type];
-    // Combine rather than defer: an explicit type list that happens to
-    // include "accompanying" still gets it stripped when excludeAccompanying
-    // is also set, so the flag's name isn't silently contradicted.
     const filtered = excludeAccompanying
       ? types.filter((type) => type !== OpportunityType.ACCOMPANYING)
       : types;
@@ -112,16 +96,6 @@ function getTypeWhere(
     : {};
 }
 
-// language, activity and skill all constrain the same `deal` relation, so
-// they must accumulate onto one shared `deal` key rather than each writing
-// their own top-level spread — two spreads with the same key have the
-// second replace the first, silently dropping the earlier constraint.
-// Mirrors get-volunteer-where.ts's identical dealFilter.
-//
-// district is deliberately NOT included here (see getOpportunityWhere):
-// `deal.dealDistrict` is an optional preference list that's empty for most
-// opportunities, so filtering on it alone excludes ones that only have the
-// reliable `Opportunity.districtId` set (be#1018).
 function getDealWhere(
   filter: QuerystringOpportunityFiltering["filter"],
 ): Record<string, unknown> {
@@ -144,8 +118,6 @@ function getDealWhere(
   return dealFilter;
 }
 
-// SECURITY (#666): filters run on unmasked DB columns, so a non-privileged
-// caller can infer PII masked in the response by probing which rows match.
 export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   appointment?: OpportunityAppointmentFilter,
@@ -170,11 +142,6 @@ export function getOpportunityWhere(
 
   if (hasFilterValue(filter?.district)) {
     const districtIds = normalizeStringArrayInput(filter!.district!);
-    // Two independent, differently-shaped sources can place an opportunity
-    // in a district: its own reliable `districtId` FK, or the optional
-    // `deal.dealDistrict` preference list (be#1018). They live on different
-    // root relations, so expressing "either" requires TypeORM's array-of-
-    // FindOptionsWhere OR — nesting them under one key isn't possible.
     return [
       { ...base, districtId: districtIds },
       {

@@ -70,20 +70,17 @@ declare module "fastify" {
     tryAuthenticate(): onRequestHookHandler;
   }
   interface FastifyRequest {
-    resolvedPerson?: Person; // Optional resolved person for account creation
-    personId?: number; // Optional foreign key ID for the Person entity
+    resolvedPerson?: Person;
+    personId?: number;
     agents?: Agent[];
-    registrant?: User; // Verified user resolved from the querystring token on POST /agent/register
-    coordinatorInvite?: { email: string }; // Verified invite email resolved from the querystring token on POST /user/register-with-invite; person details are attached via resolvedPerson (shared with POST /user and POST /user/admin)
-    authUser?: User; // The user loaded by authenticate() (personId + DB-authoritative role)
-    callerAgentIds?: number[]; // Resolved once per request, shared by the ownership check and the PII masking hook
+    registrant?: User;
+    coordinatorInvite?: { email: string };
+    authUser?: User;
+    callerAgentIds?: number[];
   }
 }
 
 declare module "@fastify/jwt" {
-  // It's crucial to extend the original FastifyJWT interface here
-  // so that your custom 'payload' and 'user' types merge correctly
-  // with the types that @fastify/jwt already defines (like jwtSign and jwtVerify methods on reply/request).
   type TokenType =
     | "access"
     | "refresh"
@@ -91,20 +88,6 @@ declare module "@fastify/jwt" {
     | "reset"
     | "coordinator-invite";
   interface FastifyJWT {
-    // Payload type when signing a token (`reply.jwtSign(payload)`). A
-    // discriminated union rather than one shape with everything optional —
-    // access/refresh/verify/reset tokens always have a User row to carry an
-    // id for; a coordinator-invite token doesn't (no User exists yet) but
-    // carries the admin-entered person details instead, consumed by
-    // POST /user/register-with-invite to create the Person record (be#1008).
-    // Loosening `id` to optional on every type to fit the one new case would
-    // have silently dropped that guarantee for the other four.
-    //
-    // `role` is required (not optional) on the access/refresh branch, and
-    // `type` is required everywhere — be#1023/#1024: a refresh-issued access
-    // token once silently dropped `role` because the type here allowed it
-    // to. Verify/reset tokens are keyed off `id` alone (a fresh DB lookup
-    // provides the current role), so they don't carry one.
     payload:
       | {
           id: number;
@@ -122,13 +105,12 @@ declare module "@fastify/jwt" {
           type: "coordinator-invite";
           person: CoordinatorInvitePerson;
         };
-    // User type that will be attached to `request.user` after `request.jwtVerify()`
     user: {
       id: number;
       email: string;
       role: UserRole;
-      iat: number; // issued at (timestamp)
-      exp: number; // expiration (timestamp)
+      iat: number;
+      exp: number;
     };
   }
 }

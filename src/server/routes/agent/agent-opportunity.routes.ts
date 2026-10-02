@@ -18,8 +18,6 @@ export default async function agentOpportunityRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    // Handler sends entities; the DTO (ApiAgentOpportunity) runs in the
-    // preSerialization hook after PII masking.
     Reply: ReplyData<Opportunity[]>;
   }>(
     "/",
@@ -48,15 +46,7 @@ export default async function agentOpportunityRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      // An INACTIVE agent's opportunities shouldn't read as live, actionable
-      // data (be#885) — mask title + linked-volunteer identity for everyone
-      // except coordinator/admin. Runs on the entity graph, ahead of the
-      // preSerialization hook's PII masking + DTO transform, same as that
-      // hook's own masking order.
       if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
-        // .filter(Boolean): the findOne above joins several sibling
-        // one-to-many relations in one query, which can hydrate nulls into
-        // a collection like agent.opportunity.
         for (const opportunity of (agent.opportunity ?? []).filter(Boolean)) {
           maskFields(opportunity as unknown as Record<string, unknown>, [
             "title",
@@ -65,8 +55,6 @@ export default async function agentOpportunityRoutes(
         }
       }
 
-      // DTO (dtoAgentOpportunity) runs in the preSerialization hook after PII
-      // masking of the nested volunteer persons.
       return reply.status(200).send({
         message: `Opportunities of the agent (id:${id})`,
         data: agent.opportunity,

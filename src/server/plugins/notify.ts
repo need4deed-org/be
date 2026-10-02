@@ -61,8 +61,6 @@ declare module "fastify" {
   }
 }
 
-/** Resolve dry-run flag for a given transport key (e.g. "EMAIL", "SLACK").
- *  Priority: per-transport env > global env > default (!isProd). */
 function isDryRun(transportKey: string): boolean {
   const perTransport = process.env[`NOTIFY_${transportKey}_DRY_RUN`];
   if (perTransport !== undefined) {
@@ -85,17 +83,11 @@ function buildVerifyEmailTransport(): EmailTransport {
     password: process.env.SMTP_PASS ?? "",
   });
   const deliverable = isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
-  // Error reports bypass dry-run (always the raw `smtp`, never `deliverable`)
-  // — an invalid-content alert must actually reach someone regardless of
-  // environment, it's not end-user-facing content.
   return new ValidatingEmailTransport(deliverable, smtp, errorEmailRecipient);
 }
 
 function buildNotifyEmailTransport(): {
   deliverable: EmailTransport;
-  // The raw, un-dry-run-wrapped SMTP client — for alerts that must actually
-  // reach someone regardless of environment, same rationale as
-  // ValidatingEmailTransport's errorTransport just below (be#847).
   raw: EmailTransport;
 } {
   const smtp = new SmtpEmailTransport({

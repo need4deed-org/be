@@ -136,12 +136,6 @@ async function sendNewOpportunityEmail(
   }
 }
 
-// Shared by the REGULAR and EVENTS transition-out-of-ACCOMPANYING branches
-// below (be#780) — an opportunity leaving ACCOMPANYING has no further use
-// for its old Accompanying row, which still holds refugee PII (name/phone/
-// email/address/language) that must not survive the type change. `onetimer`
-// is only cleared alongside it for REGULAR, since EVENTS keeps reusing
-// `onetimer` for the event's own date/time.
 async function clearStaleAccompanying(
   manager: EntityManager,
   opportunity: Opportunity,
@@ -163,9 +157,6 @@ export default async function opportunityRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // GETs open to any logged-in user (PII masked per role); writes stay
-  // COORDINATOR-only (re-gated per-route), except PATCH /:id which also lets
-  // an AGENT update the `statusOpportunity` of their own agent's opportunity.
   fastify.addHook("onRequest", fastify.authenticate());
 
   await fastify.register(opportunityLegacyRoutes, {
@@ -242,12 +233,6 @@ export default async function opportunityRoutes(
         await agentRepository.save(districtUpdates);
       }
 
-      // Resolved once here (rather than inside addDistrictToOpportunity) so
-      // it can be reused below for accompanyingDetails.appointmentDistrict
-      // without a second identical DB lookup. Gated on the current type
-      // (like accompanyingForType in dto-opportunity.ts, be#780) so a stale
-      // accompanying row on a non-ACCOMPANYING opportunity doesn't trigger a
-      // lookup whose result would be discarded anyway.
       const accompanyingDistrict =
         opportunityComments.type === OpportunityType.ACCOMPANYING &&
         opportunityComments.accompanying?.postcode
@@ -271,13 +256,8 @@ export default async function opportunityRoutes(
         await opportunityRepository.save(opportunityUpdates);
       }
 
-      // dtoOpportunityGet takes handler-computed args, so mask inline (rather
-      // than via the makePiiSerialization hook) before serializing.
       await maskForCaller(request, opportunityComments);
 
-      // Map-pin centroid fallback (be#662), only queried when actually
-      // needed (map-eligible status, agent not geocoded) — see the list
-      // route above for why this isn't an eager relation.
       const districtIdNeedingCentroid =
         getOpportunityDistrictIdNeedingCentroid(opportunityComments);
       const districtCentroid = districtIdNeedingCentroid
@@ -335,15 +315,12 @@ export default async function opportunityRoutes(
       const where = getOpportunityWhere(request.query.filter, request.query);
       const message = `Opportunities page:${request.query.page}.`;
 
-      //  NGOs see only their own agent's opportunities
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(
           request,
           request.authUser.personId,
         );
 
-        // An agent with no shelter must see nothing, so return here rather than
-        // skipping the filter, which would show everything.
         if (agentIds.length === 0) {
           return reply.status(200).send({
             message,
@@ -351,11 +328,6 @@ export default async function opportunityRoutes(
             count: 0,
           });
         }
-        // NGOs are scoped to their own agents, so this overwrites any agent
-        // condition. `where` may be an array (district filter ORs across
-        // two relations, be#1018) — mergeIntoWhere applies the scope to
-        // every branch, since a scoped caller must not see other agents'
-        // opportunities via an un-scoped branch.
         mergeIntoWhere(where, { agent: { id: In(agentIds) } });
       }
 
@@ -377,19 +349,6 @@ export default async function opportunityRoutes(
 
       const opportunityRepository = fastify.db.opportunityRepository;
 
-      // Sorting by start date (be#746) needs NULLS LAST regardless of
-      // direction — opportunities with no onetimer (REGULAR type, or an
-      // ACCOMPANYING/EVENTS one with no date set yet) always sort last, so
-      // they don't crowd out real dates at the top of a "soonest first"
-      // list. `find()`'s plain `order` option can't express that (Postgres
-      // defaults DESC to NULLS FIRST), so this path uses the query builder,
-      // with its own `leftJoinAndSelect` on `onetimer` (excluded from the
-      // `relations` passed to `setFindOptions` to avoid joining it twice)
-      // so the same alias both hydrates the entity and drives ORDER BY.
-      // Pagination (skip/take) alongside the other one-to-many joins forces
-      // TypeORM to wrap the query in a DISTINCT subquery, and any column
-      // referenced in ORDER BY must be part of that subquery's projection —
-      // `leftJoinAndSelect` (unlike plain `leftJoin`) satisfies that.
       const [opportunities, count] =
         request.query.sortBy === OpportunitySortField.START_DATE
           ? await opportunityRepository
@@ -444,19 +403,8 @@ export default async function opportunityRoutes(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
-      // dtoOpportunityGetList takes a handler-computed district-centroid arg
-      // (be#662), so mask inline (rather than via the makePiiSerialization
-      // hook) before serializing, same as GET /opportunity/:id below.
       await maskForCaller(request, opportunitiesCategoryDistrict);
 
-      // Map-pin centroid fallback (be#662): a targeted, batched lookup for
-      // just the opportunities that actually need one (map-eligible status,
-      // agent not geocoded — getOpportunityDistrictIdNeedingCentroid keeps
-      // that gating in one place, shared with the DTO), rather than an
-      // eager `district.districtPostcode.postcode` relation on this
-      // (paginated) query — a district can have dozens of postcodes, which
-      // would multiply result rows on every page even though most
-      // opportunities' agents are already geocoded and never need it.
       const neededDistrictIds = new Map(
         opportunitiesCategoryDistrict.map((opportunity) => [
           opportunity.id,
@@ -489,9 +437,6 @@ export default async function opportunityRoutes(
     },
   );
 
-  // Create an opportunity with its satellites (deal + m2m, accompanying). Unlike
-  // POST /opportunity/legacy, the owning agent and submitter are given in the
-  // body / caller — no address/email guessing.
   fastify.post<{
     Body: OpportunityFormDataWithAgentSubmitter;
     Reply: ReplyData<{ id: number }>;
@@ -504,8 +449,6 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      // GETs are open to any logged-in user (parent onRequest hook); creating an
-      // opportunity is COORDINATOR/AGENT (ADMIN bypasses).
       const role = request.authUser?.role;
       if (
         role !== UserRole.COORDINATOR &&
@@ -529,18 +472,12 @@ export default async function opportunityRoutes(
         throw new NotFoundError("The selected NGO could not be found.");
       }
 
-      // This route derives the deal's postcode solely from the agent's
-      // address (the form has no rac_plz fallback, unlike the legacy route).
-      // deal.postcode_id is NOT NULL, so a missing postcode here would
-      // otherwise reach the DB as an unhandled constraint violation.
       if (!agent.address?.postcode?.value) {
         throw new BadRequestError(
           "The selected NGO's address must include a postcode before creating an opportunity.",
         );
       }
 
-      // An AGENT may only create opportunities for an agent they belong to;
-      // COORDINATOR/ADMIN may create for any agent.
       if (role === UserRole.AGENT) {
         const personId = request.authUser?.personId;
         const membership = personId
@@ -557,10 +494,6 @@ export default async function opportunityRoutes(
         }
       }
 
-      // Only parseOpportunityLegacy/accompanyingParserOpportunity read the
-      // legacy-shaped fields (title, accomp_*, etc.), which this form still
-      // carries; the deal itself is resolved by numeric option id below
-      // (dealParserOpportunityCreate), not through the legacy title lookup.
       const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
       opportunity.deal = await dealParserOpportunityCreate(
@@ -584,17 +517,8 @@ export default async function opportunityRoutes(
       }
 
       opportunity.agentId = agentId;
-      // Submitter: the explicit body value, else the authenticated caller.
       opportunity.submittedByPersonId =
         body.submitted_by_id ?? request.authUser?.personId;
-      // Snapshot the contact at creation time (be#833): if this is left null,
-      // getOpportunityContact falls back at *read* time to agent.representative,
-      // which drifts every time the agent's contact list changes — so an
-      // unrelated request years later can silently reattribute this
-      // opportunity to whoever was just added. Freeze it now to whoever is
-      // actually the submitter's agent membership, or the agent's current
-      // representative if the submitter isn't one (e.g. a coordinator
-      // creating on the agent's behalf).
       opportunity.contactPersonId = agent.agentPerson?.some(
         (ap) =>
           ap.personId === opportunity.submittedByPersonId &&
@@ -603,9 +527,6 @@ export default async function opportunityRoutes(
         ? opportunity.submittedByPersonId
         : agent.representative?.personId;
 
-      // `agent` was fetched with relations/address.postcode already loaded
-      // above; assign it here (not just agentId) so addDistrictToOpportunity
-      // can resolve REGULAR/EVENTS districts from it at creation time.
       opportunity.agent = agent;
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
@@ -659,10 +580,6 @@ export default async function opportunityRoutes(
                 "district",
               ],
               async (opp) => {
-                // The email's appointment-language field is the deal's own
-                // requested languages, German-translated via field_translation
-                // (be#856) — not the accompanying.languageToTranslate label
-                // used elsewhere in the same email.
                 await addTranslatedFields([opp], Lang.DE);
                 await fastify.notify.emailNewAccompanying(opp);
               },
@@ -697,12 +614,6 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      // COORDINATOR/ADMIN may edit the full patch surface, including
-      // reassigning the opportunity to a different agent. An AGENT may edit
-      // any field of an opportunity belonging to an agent they're a member of
-      // (checked below, once the opportunity's agentId is known), except
-      // reassigning it to a *different* agent — that stays coordinator-only,
-      // matching the fe "Transfer" action (be#870).
       const role = request.authUser?.role;
       if (
         role !== UserRole.COORDINATOR &&
@@ -738,11 +649,6 @@ export default async function opportunityRoutes(
           );
         }
 
-        // Only block an actual reassignment to a *different* agent — an
-        // agent editing their own agent's name/address/district with no `id`
-        // (or the same id) is a legitimate self-edit, not a relink (see
-        // parser-opportunity-patch-data.ts's agentBody.id === undefined
-        // branch, and be#871 review).
         const body = request.body as Record<string, unknown>;
         const agentBody = body.agent as { id?: number } | undefined;
         if (
@@ -806,10 +712,6 @@ export default async function opportunityRoutes(
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
 
-      // be#1092: an accompanying opportunity's description lives in
-      // info_confidential only; every other type's in `info`, which is what
-      // the public/translated paths read. On a type change without a new
-      // description, the existing text moves to the column the new type reads.
       if (opportunityObj) {
         if (effectiveType === OpportunityType.ACCOMPANYING) {
           if (
@@ -844,11 +746,6 @@ export default async function opportunityRoutes(
         }
       }
 
-      // Resolved and validated up front (rather than inside the
-      // agentLinkId!==undefined block below) so the status-cascade transaction
-      // below can target whichever agent will actually own this opportunity
-      // once the request is applied — not the one it's being relinked away
-      // from (be#862 review).
       if (agentLinkId !== undefined) {
         const linkedAgent = await fastify.db.agentRepository.findOne({
           where: { id: agentLinkId },
@@ -859,10 +756,6 @@ export default async function opportunityRoutes(
       }
       const effectiveAgentId = agentLinkId ?? opportunity.agentId;
 
-      // Also validated up front, same reasoning as agentLinkId above:
-      // effectiveAgentId already resolves to the *new* agent when this
-      // request also relinks `agent.id`, so a payload that relinks both in
-      // one go validates the contact against the new agent, not the old one.
       if (contactLinkId !== undefined) {
         const agentContactMembership =
           await fastify.db.agentPersonRepository.findOneBy({
@@ -877,11 +770,6 @@ export default async function opportunityRoutes(
         }
       }
 
-      // The opportunity patch, the be#862 search-status cascade, the agent
-      // relink, and the contact relink all share one transaction — each used
-      // to be a separate statement issued independently, so a failure partway
-      // through could leave some of these applied and others lost (be#868
-      // review).
       await dataSource.manager.transaction(async (manager) => {
         if (opportunityObj) {
           const success = await patchEntity(
@@ -894,11 +782,6 @@ export default async function opportunityRoutes(
             throw new Error("Patching opportunity failed.");
           }
 
-          // An opportunity moving to a status that implies searching means
-          // its agent is searching too (be#862) — cascaded here, atomically,
-          // rather than as a second independent PATCH from the frontend.
-          // agentId is nullable (e.g. orphaned legacy rows) — skip the
-          // cascade rather than failing the whole status patch over it.
           if (
             effectiveAgentId &&
             opportunityObj.status &&
@@ -909,12 +792,6 @@ export default async function opportunityRoutes(
         }
 
         if (agentLinkId !== undefined) {
-          // The opportunity's existing contact (if any) belongs to the *old*
-          // agent and has no guaranteed relationship to the new one — clear
-          // it rather than leave a stale cross-agent reference. If the
-          // request also carries `contact.id`, the contactLinkId branch
-          // below sets the real (validated-against-the-new-agent) value
-          // right after this.
           const contactReset: Partial<Opportunity> =
             contactLinkId === undefined ? { contactPersonId: null } : {};
           const success = await patchEntity(
@@ -941,9 +818,6 @@ export default async function opportunityRoutes(
         }
 
         if (contactLinkId !== undefined) {
-          // Evaluated after the agent relink above so a payload that resets
-          // contactPersonId to null (contactReset, above) doesn't clobber the
-          // real value being set here.
           const success = await patchEntity(
             Opportunity,
             { contactPersonId: contactLinkId } as Partial<Opportunity>,
@@ -956,10 +830,6 @@ export default async function opportunityRoutes(
         }
       });
 
-      // Skipped when the opportunity is moving away from ACCOMPANYING —
-      // otherwise `accompanyingDetails` sent alongside a type change would
-      // write refugee PII into the Accompanying row moments before the
-      // clearing block below deletes it (be#780 review).
       if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
         const appointmentPostcodeValue =
           request.body.accompanyingDetails?.appointmentPostcode;
@@ -984,7 +854,6 @@ export default async function opportunityRoutes(
               "Patching accompanying failed while patching opportunity.",
             );
           }
-          // Only create a new accompanying record if type is being changed to accompanying and no accompanying record exists yet.
         } else if (
           request.body.opportunity_type === OpportunityType.ACCOMPANYING
         ) {
@@ -1007,12 +876,6 @@ export default async function opportunityRoutes(
         }
       }
 
-      // Single-occurrence start date/time, shared by ACCOMPANYING and EVENTS
-      // via `onetimer` (see be#746) — owned 1:1 by the opportunity. Resolved
-      // from whichever source matches the *resulting* type, so a payload that
-      // (incorrectly) carries both `accompanyingDetails` and `event` — or
-      // either alongside an unrelated type change — can't write a onetimer
-      // that doesn't belong to this opportunity's new type.
       const resolvedOnetimerDate =
         effectiveType === OpportunityType.EVENTS
           ? request.body.event?.date && request.body.event?.time
@@ -1053,8 +916,6 @@ export default async function opportunityRoutes(
         );
       }
 
-      // This clearing was silently dropped when #816 refactored EVENTS off
-      // the old blanked-out-Accompanying-row hack (be#780).
       if (
         effectiveType === OpportunityType.EVENTS &&
         opportunity.type !== OpportunityType.EVENTS &&
@@ -1126,12 +987,6 @@ export default async function opportunityRoutes(
     },
   );
 
-  // COORDINATOR-only, hard delete. OpportunityVolunteer (+ its ActivityLog),
-  // Communication, and Appreciation rows all cascade via FK. Comment rows are
-  // polymorphic (entityType/entityId, no real FK) so they're cleaned up
-  // explicitly here; Deal and Accompanying are exclusively owned by one
-  // opportunity each (minted fresh at creation), so they're deleted alongside
-  // rather than left as permanent orphans.
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
@@ -1152,10 +1007,6 @@ export default async function opportunityRoutes(
 
       const { dealId, accompanyingId, onetimerId } = opportunity;
 
-      // OpportunityVolunteer rows cascade at the DB level, which bypasses
-      // TypeORM's @AfterRemove hook (it never loads/removes those entities
-      // via the entity manager) — so each linked volunteer's statusMatch
-      // must be recomputed explicitly, or it's left stale indefinitely.
       const linkedVolunteerIds = (
         await fastify.db.opportunityVolunteerRepository.find({
           where: { opportunityId: id },

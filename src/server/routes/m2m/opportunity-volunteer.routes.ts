@@ -18,11 +18,6 @@ import { ParamsId, ReplyMessage } from "../../types";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
-// Sends the FIRST_INQUIRY "suggest" email for an OV that is (now) PENDING.
-// Called both right after creation (POST, which can create straight into
-// PENDING) and on a status transition into PENDING via PATCH (e.g. a
-// PENDING→DECLINED→PENDING re-toggle). Fire-and-forget: callers invoke this
-// without awaiting so a DB/send hiccup never affects the HTTP response.
 async function triggerEmailSuggestion(
   fastify: FastifyInstance,
   id: number,
@@ -51,12 +46,8 @@ async function triggerEmailSuggestion(
     if (!ov) {
       return;
     }
-    // ACCOMPANYING opportunities have a single confirmed appointment
-    // (onetimer), not a recurring dealTimeslot schedule — they go through
-    // their own template rather than emailSuggestion's {{ schedule }}.
     const isAccompany =
       ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-    // Skip if FIRST_INQUIRY already sent (e.g. PENDING→DECLINED→PENDING).
     const alreadySent = await commRepo.findOne({
       where: {
         volunteerId: ov.volunteerId,
@@ -67,7 +58,6 @@ async function triggerEmailSuggestion(
     if (alreadySent) {
       return;
     }
-    // Log before send; remove the dedup record on failure so the next toggle can retry.
     const comm = await logEmailCommunication(
       commRepo,
       CommunicationType.FIRST_INQUIRY,
@@ -78,14 +68,6 @@ async function triggerEmailSuggestion(
     );
     try {
       if (isAccompany) {
-        // emailSuggestionAccompanying renders the opportunity's requested
-        // language titles (accompaniedpersonLanguage) — without this,
-        // they'd be the raw (English) title rather than the German
-        // translation, same rationale as be#849's fix for
-        // emailIntroduction/emailAccompanyMatch. Scoped to this branch
-        // only (be#1047 review): a translation-lookup failure here must
-        // not block the plain, non-accompanying suggestion email, which
-        // never reads dealLanguage at all.
         await addTranslatedFields([ov.opportunity], Lang.DE);
         await fastify.notify.emailSuggestionAccompanying(ov);
       } else {
@@ -127,9 +109,6 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       const { opportunityId, volunteerId } = request.body;
 
-      // Surface the duplicate-pair case as 409 up front (the DB unique
-      // constraint on (opportunityId, volunteerId) remains the ultimate
-      // guard for the rare race).
       if (
         await opportunityVolunteerRepository.findOneBy({
           opportunityId,
@@ -201,8 +180,6 @@ export default async function m2mOpportunityVolunteerRoutes(
         } else if (nextStatus === OpportunityVolunteerStatusType.MATCHED) {
           (async () => {
             try {
-              // findOne inside the IIFE: handler returns 204 immediately;
-              // a DB hiccup here doesn't affect the HTTP response.
               const ov = await opportunityVolunteerRepository.findOne({
                 where: { id },
                 relations: [
@@ -227,12 +204,6 @@ export default async function m2mOpportunityVolunteerRoutes(
               if (!ov) {
                 return;
               }
-              // emailIntroduction/emailAccompanyMatch render the
-              // volunteer's language/skill titles, and
-              // emailAccompanyMatchVolunteer the opportunity's own requested
-              // languages (fe#1036 review) — without this, they'd always be
-              // the raw (English) title rather than the German translation
-              // (be#849).
               await addTranslatedFields(
                 [ov.volunteer, ov.opportunity],
                 Lang.DE,
@@ -242,7 +213,6 @@ export default async function m2mOpportunityVolunteerRoutes(
               const commType = isAccompany
                 ? CommunicationType.ACCOMPANYING_MATCHED
                 : CommunicationType.MATCHED;
-              // Skip if a match email was already sent for this pair.
               const alreadySent = await commRepo.findOne({
                 where: {
                   volunteerId: ov.volunteerId,
@@ -254,7 +224,6 @@ export default async function m2mOpportunityVolunteerRoutes(
                 return;
               }
               if (isAccompany) {
-                // Log before send; remove the dedup record on failure so the next toggle can retry.
                 const comm = await logEmailCommunication(
                   commRepo,
                   CommunicationType.ACCOMPANYING_MATCHED,
@@ -269,15 +238,6 @@ export default async function m2mOpportunityVolunteerRoutes(
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
                 }
-                // Separate try/catch: this dedup record (and the NGO email
-                // it guards) must not be rolled back and resent just
-                // because the volunteer-facing email failed independently —
-                // that would duplicate the already-successful NGO email on
-                // the next status toggle. There's no retry path for this
-                // send specifically (nothing re-triggers it), so failure
-                // must page a human via opsAlert rather than only log —
-                // otherwise a matched volunteer could silently never learn
-                // their appointment's details.
                 try {
                   await fastify.notify.emailAccompanyMatchVolunteer(ov);
                 } catch (volunteerSendErr) {

@@ -12,16 +12,12 @@ import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
-// Unique integer key for this app's advisory lock — prevents duplicate runs
-// across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240701;
 
-// Hourly on the hour, 08:00–19:00 Berlin time, weekdays only, by default.
 const CRON_SCHEDULE_HOURLY =
   process.env.CRON_SCHEDULE_HOURLY || "0 8-19 * * 1-5";
 
 async function schedulerHourlyPlugin(fastify: FastifyInstance): Promise<void> {
-  // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
     CRON_SCHEDULE_HOURLY,
     async () => {

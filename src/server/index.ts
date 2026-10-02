@@ -86,7 +86,6 @@ export async function createServer(): Promise<FastifyInstance> {
     },
   });
 
-  // Register external schemas first so they're available for $ref resolution
   await fastifyInstance.addSchema({
     $id: "entity-types",
     ...entityTypesSchema,
@@ -128,7 +127,6 @@ export async function createServer(): Promise<FastifyInstance> {
       return;
     }
 
-    // If it's one of our custom errors, use its status code
     if (error instanceof BaseError) {
       return reply.status(error.statusCode).send({
         error: error.constructor.name,
@@ -137,7 +135,6 @@ export async function createServer(): Promise<FastifyInstance> {
       });
     }
 
-    // Handle schema errors
     if (error.validation) {
       return reply.status(400).send({ message: "Validation failed." });
     }
@@ -146,7 +143,6 @@ export async function createServer(): Promise<FastifyInstance> {
       return reply.status(400).send({ message: "There's nothing to update." });
     }
 
-    // Handle generic TypeORM / Unexpected errors
     return reply.status(500).send({ message: "Something went wrong." });
   });
 

@@ -21,11 +21,6 @@ import {
   updateAgentContact,
 } from "../../utils";
 
-// Mirrors the role allowlist on PATCH /opportunity/:id: only these three
-// roles may reach the membership check, regardless of whether a stray
-// AgentPerson row exists for some other role. Cheap (no DB), so it runs
-// before the agent-existence check — an unauthenticated/wrong-role caller
-// shouldn't get a DB round trip just to be told "no".
 function assertHasContactManagementRole(request: FastifyRequest): void {
   const role = request.authUser?.role;
   if (
@@ -37,11 +32,6 @@ function assertHasContactManagementRole(request: FastifyRequest): void {
   }
 }
 
-// Coordinator/admin may act on any agent; an AGENT must be an active member
-// of this specific agent. Run this *after* the 404 check for the agent
-// itself, so a non-member probing a nonexistent agent id still gets 404
-// (matching the rest of the API) rather than a 403 that leaks nothing about
-// existence but changes already-established error-code semantics.
 async function assertCanManageContacts(
   fastify: FastifyInstance,
   request: FastifyRequest,
@@ -67,11 +57,6 @@ async function assertCanManageContacts(
   }
 }
 
-// POST /agent/:id/contact — an NGO adding another contact person to their own
-// profile. PATCH /agent/:id/contact/:membershipId — updating one. Both are
-// distinct from PATCH /person/:id, which is strictly self-only, and from
-// POST /agent/register, which only ever links the authenticated caller's own
-// person.
 export default function agentContactRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -100,8 +85,6 @@ export default function agentContactRoutes(
 
       await assertCanManageContacts(fastify, request, agentId);
 
-      // assertHasContactManagementRole above already guarantees this is one
-      // of COORDINATOR/AGENT/ADMIN.
       const agentPerson = await createAgentContact(
         agentId,
         request.body,

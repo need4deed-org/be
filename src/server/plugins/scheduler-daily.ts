@@ -6,15 +6,11 @@ import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
-// Unique integer key for this app's advisory lock — prevents duplicate runs
-// across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240707;
 
-// Daily at the 6AM hour Berlin time, by default.
 const CRON_SCHEDULE_DAILY = process.env.CRON_SCHEDULE_DAILY || "0 6 * * *";
 
 async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
-  // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
     CRON_SCHEDULE_DAILY,
     async () => {
@@ -26,12 +22,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
 
         logger.info("scheduler: running daily scans");
 
-        // Run in this order, sequentially: their WHERE clauses can both
-        // match the same onetimer opportunity in the same tick (e.g. one
-        // stuck in SEARCHING past its date with a MATCHED volunteer), and
-        // running them concurrently let whichever transaction committed
-        // last silently win, leaving an unpredictable ACTIVE/PAST state
-        // (be#987 review).
         await runWithAdvisoryLock(
           () =>
             runNamedCronJobs(
