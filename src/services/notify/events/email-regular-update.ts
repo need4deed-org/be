@@ -39,9 +39,6 @@ export async function sendEmailRegularUpdate(
     volunteeringopportunityName,
   });
 
-  // TODO(be#961): temporary — remove once the cron-email rendering issue is
-  // confirmed fixed. Logs the rendered email body, so it must not stay past
-  // that.
   logger.debug(
     { opportunityId: opportunity.id, subject, text, html },
     "attempting to send regular-update cron email",

@@ -92,9 +92,6 @@ function formatSchedule(
             labels.occasional[daytime as OccasionalType] ?? String(daytime)
           );
         }
-        // `day === null` (as opposed to undefined, which is the genuine
-        // one-off-slot case below) means getByDay() couldn't find a BYDAY in
-        // a weekly rrule — malformed data, not a date string to fall back to.
         if (day === null) {
           throw new Error(
             "Timeslot has a weekly rrule with no recognizable BYDAY",
@@ -106,7 +103,6 @@ function formatSchedule(
             labels.timeSlot[daytime as TimeSlot] ?? String(daytime);
           return `${dayLabel}, ${timeLabel}`;
         }
-        // one-off slot: daytime is already a localized date/time string
         return String(daytime);
       })
       .join(", ") ?? ""
@@ -135,7 +131,6 @@ const OCCASIONAL_LABELS_DE: Record<OccasionalType, string> = {
   [OccasionalType.WEEKENDS]: "gelegentlich, am Wochenende",
 };
 
-// German-only, matching this codebase's other notify-email content (see be#838).
 export function formatScheduleDe(dealTimeslot: DealTimeslot[]): string {
   return formatSchedule(dealTimeslot, {
     day: DAY_LABELS_DE,
@@ -171,10 +166,6 @@ const OCCASIONAL_LABELS_DE_SHORT: Record<OccasionalType, string> = {
   [OccasionalType.WEEKENDS]: "am Wochenende",
 };
 
-// For volunteer-facing manifests that carry an English and a German part
-// (e.g. suggestion.json): one schedule per language, each part picking its
-// own via {{ opportunitySchedule.en }} / {{ opportunitySchedule.de }}
-// (be#1075) — was one "Montag/Monday" string shared by both parts (be#933).
 export function formatScheduleLocalized(
   dealTimeslot: DealTimeslot[],
 ): Record<Lang, string> {
@@ -220,7 +211,6 @@ export function getCoordinates(postcode?: {
   };
 }
 
-// Match fe's own labels for these values (public/locales/{de,en}/translations.json).
 const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   [Lang.DE]: {
     [TranslatedIntoType.DEUTSCHE]: "Nur Deutsch",
@@ -233,8 +223,7 @@ const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
     [TranslatedIntoType.NO_TRANSLATION]: "No translation",
   },
 };
-// The compact form of the target language(s), used only when there's an
-// actual source language to pair it with.
+
 const PAIR_TARGET_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   [Lang.DE]: {
     [TranslatedIntoType.DEUTSCHE]: "Deutsch",
@@ -248,16 +237,6 @@ const PAIR_TARGET_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   },
 };
 
-// Combines the accompanied person's translation-target requirement
-// (languageToTranslate — which language(s) the interpreter must translate
-// *into*) with the deal's requested source language(s) into a single
-// "Target-Source" pair per language, e.g. "Deutsch-Arabisch" rather than
-// showing them as two disconnected values ("Nur Deutsch, Arabisch") that
-// read like unrelated facts instead of the interpretation pair a volunteer
-// needs to cover. Falls back to the standalone label ("Nur Deutsch") when no
-// source language is recorded, since a bare "Deutsch" alone would read as
-// an incomplete pair rather than "German only, source unspecified".
-// `dealLanguageTitles` must already be in `lang`.
 export function formatAccompaniedPersonLanguage(
   languageToTranslate: TranslatedIntoType | undefined,
   dealLanguageTitles: string[],
@@ -276,9 +255,6 @@ export function formatAccompaniedPersonLanguage(
   return dealLanguageTitles.map((title) => `${target}-${title}`).join(", ");
 }
 
-// Shared by every accompanying/event notify email that renders a single
-// onetimer.date — was independently duplicated across 5 files (fe#1036
-// review); a future timezone/format change only needs to happen here.
 export function formatOnetimerDate(date: Date | undefined): string {
   return date
     ? new Date(date).toLocaleDateString("de-DE", {

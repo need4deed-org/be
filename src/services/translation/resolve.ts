@@ -5,14 +5,6 @@ import { languageIds, originalLang, TranslatableEntity } from "./languages";
 import { sourceHashOf } from "./queue";
 import { getMachineEntry } from "./registry";
 
-/**
- * Shows `entities` in `lang` (be#1064 decision 5): for each entity whose
- * original language differs, overlays the listed fields in place with their
- * done translation (machine or human). Anything else keeps the original:
- * pending, failed or missing translations, and translations of an older
- * version of the text. Runs before the DTO, so response shapes don't change;
- * one query for all entities, and it never calls the provider.
- */
 export async function resolve<E extends TranslatableEntity>(
   manager: EntityManager,
   entityType: EntityTableName,

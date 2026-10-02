@@ -63,9 +63,6 @@ export function addWorkingDays(from: Date, days: number): Date {
   return result;
 }
 
-// Returns a Date n calendar months before now, clamping the day to the last
-// day of the target month to avoid setMonth overflow (e.g. Apr 30 - 2 months
-// should be Feb 28, not Mar 2).
 export function monthsAgo(n: number): Date {
   const now = new Date();
   const targetMonth = now.getMonth() - n;
@@ -83,9 +80,6 @@ export function berlinToday(): Date {
   return new Date(y, m - 1, d);
 }
 
-// Returns UTC timestamps for the start and end of the given Berlin calendar day.
-// Necessary because Node.js `new Date(y, m, d)` uses the process-local timezone
-// (UTC on AWS), so it would not correctly represent Berlin midnight.
 export function berlinDayBoundaries(berlinDate: Date): {
   startOfDay: Date;
   endOfDay: Date;
@@ -93,12 +87,6 @@ export function berlinDayBoundaries(berlinDate: Date): {
   const y = berlinDate.getFullYear();
   const m = berlinDate.getMonth();
   const d = berlinDate.getDate();
-  // Sample the Berlin UTC offset at noon on the target day.
-  // DST transitions happen at 02:00 in Europe, so noon is always post-transition.
-  // We use formatToParts (not toLocaleString + new Date()) because toLocaleString
-  // + new Date() parsing is implementation-defined and produces wrong offsets on
-  // non-UTC developer machines. formatToParts extracts numeric field values
-  // independently of the process local timezone.
   const noonUTC = new Date(Date.UTC(y, m, d, 12));
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Berlin",
@@ -112,8 +100,6 @@ export function berlinDayBoundaries(berlinDate: Date): {
   }).formatToParts(noonUTC);
   const get = (type: string) =>
     parseInt(parts.find((p) => p.type === type)!.value, 10);
-  // Treating the Berlin wall-clock values as UTC gives us a timestamp we can
-  // subtract from noonUTC to obtain the Berlin UTC offset in milliseconds.
   const berlinNoonAsUTC = Date.UTC(
     get("year"),
     get("month") - 1,

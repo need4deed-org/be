@@ -23,7 +23,6 @@ export function resetTaggedTemplateCache(): void {
   loader.resetCache();
 }
 
-// Where the tag was made — decides the {{ where }} wording and the link.
 export type TaggedWhere =
   | { kind: "post" }
   | { kind: "comment"; entityType?: EntityTableName; entityId?: number };
@@ -31,7 +30,6 @@ export type TaggedWhere =
 export interface EmailTaggedInput {
   recipient: { email: string; name?: string; language?: string };
   authorName?: string;
-  // The comment/post text the tag is in.
   text: string;
   where: TaggedWhere;
 }
@@ -42,9 +40,6 @@ const COMMENT_ON: Partial<Record<EntityTableName, keyof TaggedLabels>> = {
   [EntityTableName.AGENT]: "commentOnAgent",
 };
 
-// A label per language: the manifest entry's own "labels" override, key by
-// key, else the builtin's. renderEmail() then fills it in the language of
-// the entry it lands in, so an entry and its labels always agree.
 function resolveLabel(
   manifest: Manifest | null,
   key: keyof TaggedLabels,
@@ -61,17 +56,12 @@ function resolveLabel(
   return { [Lang.EN]: pick(Lang.EN), [Lang.DE]: pick(Lang.DE) };
 }
 
-// fe dashboard routes of the cards a comment can sit on
-// (fe src/app/[lang]/dashboard/<path>/[id]).
 const CARD_PATH: Partial<Record<EntityTableName, string>> = {
   [EntityTableName.VOLUNTEER]: "volunteers",
   [EntityTableName.OPPORTUNITY]: "opportunities",
   [EntityTableName.AGENT]: "agents",
 };
 
-// The card for a comment, the Posts page for a post (fe has no link to a
-// single post), the dashboard for anything else. Per language, since the fe
-// route starts with it.
 export function buildTaggedLink(where: TaggedWhere): LocalizedValue {
   let path = "dashboard";
   if (where.kind === "post") {
@@ -97,9 +87,6 @@ function whereLabel(where: TaggedWhere): keyof TaggedLabels {
   );
 }
 
-// User-entered text must not read as a template placeholder: the rendered
-// email is checked for leftover {{ ... }} (ValidatingEmailTransport), and a
-// comment that literally contains one would get the send suspended.
 function neutralizeBraces(value: string): string {
   return value.replace(/\{\{/g, "{\u200B{").replace(/\}\}/g, "}\u200B}");
 }

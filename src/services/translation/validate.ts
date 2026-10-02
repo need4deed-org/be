@@ -7,9 +7,6 @@ export type ValidationResult =
   | { status: "ok" }
   | { status: "invalid"; code: TranslationErrorCode };
 
-// Thresholds from the be#1065 spike, re-calibrated for this similarity
-// measure on the spike's recorded outputs: cross-language translations of
-// >= 12 words reached at most 0.45, same-language rewrites started at 0.77.
 export const SAME_LANGUAGE_MIN_WORDS = 12;
 export const SAME_LANGUAGE_MAX_SIMILARITY = 0.6;
 const LENGTH_RATIO_MIN = 0.5;
@@ -19,31 +16,25 @@ const UNTRANSLATED_MIN_WORDS = 4;
 
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const URL = /https?:\/\/[^\s)]+/g;
-// German numbers start with 0 or +; anything else (e.g. 2026-09-29) isn't one.
+
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-// Times, with an optional English am/pm ("4:30 PM"), and full hours without
-// minutes in either language ("17 Uhr", "5 PM").
+
 const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
 const TIME = new RegExp(
   `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
   "gi",
 );
 const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
-// Thousands grouping: "1.000" (German), "1,000" (English). A plain space
-// is ambiguous ("Raum 3 100 Plätze" is two numbers), so SPACE_GROUPED is
-// only read as one number when the output has it that way.
+
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
 const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
 
-// "1.000" and "1,000" both become "1000", on either side, so a separator
-// the model adds, drops or swaps doesn't count as a changed number.
 function collapseGrouping(text: string): string {
   return text.replace(GROUPED_NUMBER, (grouped) => grouped.replace(/\D/g, ""));
 }
 const NUMBER = /\d+/g;
 
-// Numbers the model may write out ("1 Person" -> "One person").
 const NUMBER_WORDS: Record<number, string[]> = {
   1: ["one", "ein", "eine", "einen", "einer"],
   2: ["two", "zwei"],
@@ -63,8 +54,6 @@ function trimTrailingPunctuation(token: string): string {
   return token.replace(/[.,;:!?]+$/, "");
 }
 
-// A number counts as present unless it's part of a longer number: "1"
-// matches in "A1" (language level) and "01" (a copied date), not in "15".
 function hasNumber(text: string, digits: string): boolean {
   return new RegExp(`(^|\\D)0*${digits}($|\\D)`).test(text);
 }
@@ -73,7 +62,6 @@ function hasWord(text: string, word: string): boolean {
   return new RegExp(`(^|[^\\p{L}\\d])${word}($|[^\\p{L}\\d])`, "iu").test(text);
 }
 
-// 0-23, from "4" + "pm" = 16, "12 am" = 0; hours without am/pm as they are.
 function hour24(hour: number, meridiem?: string): number {
   const m = meridiem?.toLowerCase().replace(/\./g, "");
   if (m === "pm" && hour < 12) {
@@ -85,8 +73,6 @@ function hour24(hour: number, meridiem?: string): number {
   return hour;
 }
 
-// Hours may switch between 24- and 12-hour notation ("16:30" -> "4:30 PM").
-// Only for times: a plain number must keep its exact value.
 function hourVariants(hour: number): string[] {
   return hour > 12 ? [String(hour), String(hour - 12)] : [String(hour)];
 }
@@ -109,9 +95,6 @@ function numberPresent(output: string, value: number): boolean {
   );
 }
 
-// Contact details must survive verbatim; numbers and times must keep their
-// values but may change notation. Dates only need their day, since the
-// month may be written out ("14.10." -> "October 14").
 function tokensPreserved(source: string, output: string): boolean {
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
@@ -132,9 +115,7 @@ function tokensPreserved(source: string, output: string): boolean {
     }
   }
 
-  // Everything below works on what's left once those are taken out.
   let rest = source.replace(EMAIL, " ").replace(URL, " ").replace(PHONE, " ");
-  // "15.30." at the end of a sentence is a time, not a date.
   let datesPreserved = true;
   rest = rest.replace(DATE, (match, day: string, month: string) => {
     if (Number(month) < 1 || Number(month) > 12) {
@@ -171,12 +152,6 @@ function tokensPreserved(source: string, output: string): boolean {
   return true;
 }
 
-/**
- * Checks a machine translation before it is stored (be#1067). Anything
- * invalid is stored as `failed` with the code, and readers serve the
- * original. The source is known to be in a different language than
- * `targetLang`: the caller never asks for the original language.
- */
 export function validateTranslation(
   source: string,
   output: string,

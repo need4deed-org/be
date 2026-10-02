@@ -34,9 +34,6 @@ export async function sendEmailPostMatchCheckup(
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, { volunteerName });
 
-  // TODO(be#961): temporary — remove once the cron-email rendering issue is
-  // confirmed fixed. Logs the rendered email body, so it must not stay past
-  // that.
   logger.debug(
     { ovId: ov.id, subject, text, html },
     "attempting to send post-match-checkup cron email",

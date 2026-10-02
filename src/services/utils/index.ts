@@ -6,14 +6,6 @@ type Success<T> = readonly [T, null];
 type Failure<E = Error> = readonly [null, E];
 type Result<T, E = Error> = Success<T> | Failure<E>;
 
-/**
- * Wraps an asynchronous Promise and converts its outcome into a Result<T, E> type.
- * A successful Promise resolves to [value, null].
- * A rejected Promise is caught and resolves to [null, error].
- *
- * @param promise The Promise to execute.
- * @returns A Promise that resolves to a Result tuple.
- */
 export async function tryCatch<T, E = Error>(
   promise: Promise<T>,
 ): Promise<Result<T, E>> {
@@ -25,23 +17,6 @@ export async function tryCatch<T, E = Error>(
   }
 }
 
-/**
- * A higher-order function that wraps a synchronous function in a try/catch block.
- * * If the wrapped function executes successfully, it returns the result.
- * If it throws an error, the error is passed to the provided logger
- * and the function returns `null`.
- *
- * @template T - A function type that represents the function being wrapped.
- * * @param {T} fn - The synchronous function to be executed safely.
- * @param {(err: unknown) => void} logger - A callback function to handle or log errors.
- * * @returns {(...args: Parameters<T>) => (ReturnType<T> | null)}
- * A new function that accepts the same arguments as `fn` and returns its result or `null`.
- * * @example
- * const parseData = (json: string) => JSON.parse(json);
- * const safeParse = tryCatchFn(parseData, console.error);
- * * const result = safeParse('{"valid": "json"}'); // Returns { valid: "json" }
- * const badResult = safeParse('invalid-json');   // Logs error and returns null
- */
 export const tryCatchFn =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   <T extends (...args: any[]) => ReturnType<T>>(
@@ -57,17 +32,6 @@ export const tryCatchFn =
       }
     };
 
-/**
- * Extracts the HTTP status code from an error object.
- * * If the error is an instance of `BaseError` and contains a valid numeric
- * status code, that code is returned. Otherwise, it defaults to 500.
- *
- * @param {BaseError | Error} error - The error object to inspect.
- * @returns {number} The extracted HTTP status code or 500 if not found.
- * * @example
- * const code = getErrorStatusCode(new BaseError("Not Found", 404)); // returns 404
- * const defaultCode = getErrorStatusCode(new Error("Generic error")); // returns 500
- */
 export function getErrorStatusCode(error: BaseError | Error): number {
   if (error && error instanceof BaseError) {
     const statusCode = error.statusCode;
@@ -75,7 +39,7 @@ export function getErrorStatusCode(error: BaseError | Error): number {
       return statusCode;
     }
   }
-  return 500; // Default to Internal Server Error
+  return 500;
 }
 
 export function isObject(item) {
@@ -92,7 +56,6 @@ export function deepMerge(target, source) {
   if (isObject(source)) {
     Object.keys(source).forEach((key) => {
       if (isObject(source[key])) {
-        // Only recurse if BOTH are objects
         if (key in target && isObject(target[key])) {
           output[key] = deepMerge(target[key], source[key]);
         } else {
@@ -159,9 +122,6 @@ export const formatTime = (date: Date): string => {
   return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
 };
 
-// Single source of truth for deriving an appointmentDate/appointmentTime pair
-// from a onetimer date — used both for ApiOpportunityGetList's top-level
-// fields and ApiOpportunityAccompanyingDetails', so the two can't drift.
 export const formatAppointmentDateTime = (
   date?: Date,
 ): { appointmentDate: string | null; appointmentTime: string | null } => ({
