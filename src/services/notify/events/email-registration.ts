@@ -22,9 +22,6 @@ export interface RegistrationEmailRecipient {
   name: string;
 }
 
-// Sent right after a volunteer completes self-registration (fe's "become a
-// volunteer" form) — confirms receipt and sets expectations for the
-// follow-up call, distinct from the earlier email-verification step.
 export async function sendEmailRegistration(
   email: EmailTransport,
   volunteer: RegistrationEmailRecipient,

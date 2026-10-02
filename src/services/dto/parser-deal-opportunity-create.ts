@@ -17,10 +17,6 @@ import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
 import { buildDealTimeslots } from "./build-deal-timeslots";
 
-// Numeric ids from GET /option/* only — de-duped, non-positive/NaN entries
-// dropped (a stray bad id shouldn't 500 the whole create). Exported: shared
-// with parser-volunteer-self-register (be#943), the other id-based deal
-// parser (as opposed to the title-based legacy dealParser).
 export function toIds(ids: number[] | undefined | null): number[] {
   return [...new Set((ids || []).map(Number))].filter(
     (id) => Number.isFinite(id) && id > 0,
@@ -47,11 +43,6 @@ export async function resolveByIds<
   return instances.map((instance) => new m2mEntity({ [key]: instance }));
 }
 
-// Deal parser for POST /opportunity (the dashboard create form). Unlike
-// dealParserOpportunity (POST /opportunity/legacy), which resolves free-text/
-// ISO-code strings by title lookup, this form is a typed SPA form backed by
-// GET /option/activity|skill|language — activities/skills/languages/districts
-// arrive as numeric option ids, so they're resolved by id instead.
 export async function dealParserOpportunityCreate(
   formData: OpportunityFormDataWithAgentSubmitter,
   postcodeValue: string,

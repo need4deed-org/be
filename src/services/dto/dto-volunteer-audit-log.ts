@@ -10,8 +10,6 @@ export function dtoVolunteerAuditLog(
   return {
     id: entry.id,
     volunteerId: entry.volunteerId,
-    // Cast justified by the compile-time sync assertion on
-    // VolunteerAuditLogType in the entity file (be#984).
     type: entry.type as SdkVolunteerAuditLogType,
     detail: entry.detail,
     actorUserId: entry.actorUserId ?? null,

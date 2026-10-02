@@ -22,13 +22,9 @@ export async function dealParserOpportunity(
   formData: OpportunityLegacyFormData,
   postcodeValue?: string,
 ): Promise<Deal> {
-  // postcode: explicit value (e.g. the owning agent's, for POST /opportunity)
-  // wins, else the form's rac_plz. Skip when neither is present so we don't mint
-  // a bogus "undefined" postcode.
   const code = postcodeValue ?? formData.rac_plz;
   const postcode = code ? await getPostcode(String(code)) : null;
 
-  // activities
   const dealActivity: DealActivity[] = [];
   const opportunityActivities = (formData.activities || []) as string[];
   for (const opportunityActivity of opportunityActivities) {
@@ -43,7 +39,6 @@ export async function dealParserOpportunity(
     }
   }
 
-  // skills
   const dealSkill: DealSkill[] = [];
   const opportunitySkills = (formData.skills || []) as string[];
   for (const opportunitySkill of opportunitySkills) {
@@ -58,7 +53,6 @@ export async function dealParserOpportunity(
     }
   }
 
-  // languages
   const dealLanguage: DealLanguage[] = [];
 
   const opportunityLanguages: ApiLanguage[] = (await Promise.all(
@@ -84,13 +78,11 @@ export async function dealParserOpportunity(
     }
   }
 
-  // time
   const dealTimeslot = await buildDealTimeslots(
     formData.timeslots,
     formData.onetime_date_time,
   );
 
-  // districts
   const dealDistrict: DealDistrict[] = [];
   const volunteerDistricts = (formData.berlin_locations || []) as string[];
   for (const volunteerDistrict of volunteerDistricts) {
@@ -106,7 +98,6 @@ export async function dealParserOpportunity(
     }
   }
 
-  // deal
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
     type,

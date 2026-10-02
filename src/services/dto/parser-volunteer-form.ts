@@ -13,11 +13,9 @@ export async function volunteerFormParser(
     throw new Error("No form data provided");
   }
 
-  // postcode & address
   const postcode = await getPostcode(String(formData.postcode));
   const address = new Address({ postcode });
 
-  // person
   const person = new Person({
     ...getNameFields(formData.fullName),
     email: formData.email,
@@ -25,10 +23,8 @@ export async function volunteerFormParser(
     address,
   });
 
-  // deal
   const deal = await dealParser(formData);
 
-  // volunteer
   const infoAbout = formData.comments || "";
   const statusVaccination = formData.measlesVaccination;
   const statusCGC = formData.goodConductCertificate;

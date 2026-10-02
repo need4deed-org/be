@@ -1,9 +1,3 @@
-// Similarity of two texts in [0, 1]: 1 - levenshtein / max(length), on
-// characters. Used by the same-language guard (validate.ts): a "translation"
-// that stays this close to its input was most likely already in the target
-// language and got reworded instead of translated (be#1065). Quadratic in
-// time but O(min(length)) in memory; fields are at most a few thousand
-// characters.
 export function similarity(a: string, b: string): number {
   if (a === b) {
     return 1;

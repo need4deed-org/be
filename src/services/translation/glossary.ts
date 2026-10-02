@@ -5,7 +5,6 @@ import { getRepository } from "../../data/utils";
 import { translatedEntities } from "./registry";
 import { GlossaryEntry } from "./types";
 
-// Domain terms the reference data doesn't cover (from the be#1065 spike).
 export const DOMAIN_TERMS: readonly GlossaryEntry[] = [
   { de: "Aufnahmeeinrichtung", en: "reception facility" },
   { de: "Gemeinschaftsunterkunft", en: "shared accommodation" },
@@ -32,11 +31,6 @@ export const DOMAIN_TERMS: readonly GlossaryEntry[] = [
 
 const MIN_TERM_LENGTH = 3;
 
-/**
- * en/de pairs of every seeded reference title (skills, activities, languages,
- * agent types, …), one entry per source row. Read from field_translation, so
- * it follows whatever reference data the environment has.
- */
 export async function loadReferenceGlossary(): Promise<GlossaryEntry[]> {
   const rows = await getRepository(dataSource, FieldTranslation).find({
     where: { origin: TranslationOrigin.REFERENCE, fieldName: "title" },
@@ -61,8 +55,6 @@ export async function loadReferenceGlossary(): Promise<GlossaryEntry[]> {
   );
 }
 
-// Only the entries whose German or English term occurs in the text, so the
-// prompt stays short (be#1065: a per-request glossary).
 export function glossaryFor(
   text: string,
   entries: readonly GlossaryEntry[],

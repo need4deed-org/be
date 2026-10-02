@@ -3,12 +3,6 @@ import type { EmailMessage, EmailTransport } from "../types";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
-/**
- * Transactional email via Brevo's REST API
- * (https://developers.brevo.com/reference/sendtransacemail). The sender must be
- * a Brevo-verified sender/domain. Uses global fetch (Node 18+), so no SDK
- * dependency is needed.
- */
 export class BrevoEmailTransport implements EmailTransport {
   constructor(private readonly apiKey: string) {}
 

@@ -46,9 +46,6 @@ export async function sendEmailAccompanyNotFound(
     clientName,
   });
 
-  // TODO(be#961): temporary — remove once the cron-email rendering issue is
-  // confirmed fixed. Logs the rendered email body, so it must not stay past
-  // that.
   logger.debug(
     { opportunityId: opportunity.id, subject, text, html },
     "attempting to send accompany-not-found cron email",
