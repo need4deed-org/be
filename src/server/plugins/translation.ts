@@ -20,6 +20,7 @@ import {
   runTranslationBatch,
 } from "../../services/translation/worker";
 import { runWithAdvisoryLock } from "../utils";
+import { queueUntranslatedOpportunities } from "../utils/data/translate-opportunities";
 
 // Unique integer key for the translation worker's advisory lock, separate
 // from the notify schedulers' (20240701, 20240707).
@@ -65,6 +66,17 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
     }
     let stats: BatchStats | undefined;
     await runWithAdvisoryLock(async () => {
+      // Backfill (be#1068): a scheduled run first queues a few opportunities
+      // written before translation existed. A run for given rows doesn't.
+      if (!options?.rowIds) {
+        const queued = await queueUntranslatedOpportunities(dataSource.manager);
+        if (queued > 0) {
+          logger.info(
+            { queued },
+            "translation: queued untranslated opportunities",
+          );
+        }
+      }
       stats = await runTranslationBatch(
         dataSource.manager,
         service,

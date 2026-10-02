@@ -52,6 +52,7 @@ import { assertValidMainCommunicationLanguages } from "../../../services/dto/par
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
+  langQuerySchema,
   opportunityCreateBodySchema,
   opportunityCreateResponseSchema,
   opportunityListQuerySchema,
@@ -90,6 +91,12 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import {
+  queueOpportunityTranslation,
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
+import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
@@ -179,11 +186,16 @@ export default async function opportunityRoutes(
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
 
-  fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
+  fastify.get<{
+    Params: ParamsId;
+    Querystring: { language?: string };
+    Replay: ReplyData<ApiOpportunityGet>;
+  }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("ApiOpportunityGet#"),
       },
     },
@@ -204,6 +216,7 @@ export default async function opportunityRoutes(
         "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -270,6 +283,14 @@ export default async function opportunityRoutes(
         await opportunityRepository.save(opportunityUpdates);
       }
 
+      // After the saves above (the overlay must never reach the database)
+      // and before masking (so masking isn't undone), be#1068.
+      await translateOpportunities(
+        fastify,
+        [opportunityComments],
+        requestLanguage(request.query),
+      );
+
       // dtoOpportunityGet takes handler-computed args, so mask inline (rather
       // than via the makePiiSerialization hook) before serializing.
       await maskForCaller(request, opportunityComments);
@@ -294,6 +315,15 @@ export default async function opportunityRoutes(
         ),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
+      if (
+        !canSeeOpportunityDescription(
+          opportunityComments.type,
+          request.authUser?.role,
+          myMatchStatus,
+        )
+      ) {
+        data.description = "";
+      }
 
       return reply.status(200).send({ message: `Opportunity id:${id}`, data });
     },
@@ -363,6 +393,7 @@ export default async function opportunityRoutes(
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -434,6 +465,14 @@ export default async function opportunityRoutes(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
 
+      // After the saves above (the overlay must never reach the database)
+      // and before masking (so masking isn't undone), be#1068.
+      await translateOpportunities(
+        fastify,
+        opportunitiesCategoryDistrict,
+        requestLanguage(request.query),
+      );
+
       // dtoOpportunityGetList takes a handler-computed district-centroid arg
       // (be#662), so mask inline (rather than via the makePiiSerialization
       // hook) before serializing, same as GET /opportunity/:id below.
@@ -489,6 +528,8 @@ export default async function opportunityRoutes(
     "/",
     {
       schema: {
+        // The language the text is entered in (be#1068).
+        querystring: langQuerySchema,
         body: opportunityCreateBodySchema,
         response: opportunityCreateResponseSchema,
       },
@@ -600,7 +641,10 @@ export default async function opportunityRoutes(
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.query),
+      );
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
@@ -682,6 +726,7 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
@@ -796,6 +841,33 @@ export default async function opportunityRoutes(
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
 
+      // be#1092: an accompanying opportunity's description lives in
+      // info_confidential only; every other type's in `info`, which is what
+      // the public/translated paths read. On a type change without a new
+      // description, the existing text moves to the column the new type reads.
+      if (opportunityObj) {
+        if (effectiveType === OpportunityType.ACCOMPANYING) {
+          if (
+            opportunityObj.infoConfidential === undefined &&
+            !opportunity.infoConfidential &&
+            opportunity.info
+          ) {
+            opportunityObj.infoConfidential = opportunity.info;
+          }
+          opportunityObj.info = null;
+        } else {
+          if (
+            opportunityObj.info === undefined &&
+            opportunity.type === OpportunityType.ACCOMPANYING &&
+            !opportunity.info &&
+            opportunity.infoConfidential
+          ) {
+            opportunityObj.info = opportunity.infoConfidential;
+          }
+          opportunityObj.infoConfidential = null;
+        }
+      }
+
       if (
         effectiveType === OpportunityType.EVENTS &&
         opportunity.type !== OpportunityType.EVENTS
@@ -856,6 +928,18 @@ export default async function opportunityRoutes(
           if (!success) {
             throw new Error("Patching opportunity failed.");
           }
+          // Every PATCH counts as an edit of the original text for now
+          // (be#1068); unchanged text is left alone by its hash.
+          await queueOpportunityTranslation(manager, {
+            id: opportunity.id,
+            originalLanguageId: opportunity.originalLanguageId,
+            type: effectiveType,
+            title: opportunityObj.title ?? opportunity.title,
+            info:
+              opportunityObj.info !== undefined
+                ? opportunityObj.info
+                : opportunity.info,
+          });
 
           // An opportunity moving to a status that implies searching means
           // its agent is searching too (be#862) — cascaded here, atomically,

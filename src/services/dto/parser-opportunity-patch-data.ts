@@ -68,8 +68,10 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
         title: body.title,
         status: body.statusOpportunity,
         numberVolunteers: body.numberVolunteers,
-        info: body.description,
-        infoConfidential: body.description,
+        // The PATCH handler keeps only the column the opportunity's type
+        // reads (be#1092), so both may end up null.
+        info: body.description as string | null | undefined,
+        infoConfidential: body.description as string | null | undefined,
         type: body.opportunity_type,
       },
       agent:

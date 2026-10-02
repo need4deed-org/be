@@ -1077,7 +1077,8 @@
         },
         "lon": {
           "type": ["number", "null"]
-        }
+        },
+        "originalLanguage": { "$ref": "Lang#" }
       },
       "required": [
         "id",

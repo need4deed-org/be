@@ -113,7 +113,7 @@ All route prefixes are defined in `RoutePrefix` in `src/server/types/enums.ts`. 
 - **Never edit existing migration files** — always generate a new one
 - **Never add entity columns without a migration**
 - **Never duplicate SDK types** — import from `need4deed-sdk`
-- **Never merge into `main`** — it's for production deploys only; target `develop`
+- **Trunk-based:** `develop` is the only long-lived branch; target it. Prod releases go through `infra` (`release-prod`), not a branch here
 - **Never log `req.body`** wholesale — may contain personal data
 - **Migration file names must use kebab-case** — e.g. `add-postcode-to-accompanying`, never PascalCase
 - Branch naming: `<issue-number>-short-description` (e.g. `502-add-postcode-to-accompanying`)

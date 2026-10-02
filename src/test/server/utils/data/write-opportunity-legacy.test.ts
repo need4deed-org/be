@@ -14,6 +14,12 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
   setAgentSearching: (...args: unknown[]) => setAgentSearchingMock(...args),
 }));
 
+// The translation queue has its own tests; here it only must not need a DB.
+vi.mock("../../../../server/utils/data/translate-opportunities", () => ({
+  languageIdOf: vi.fn(async () => 1),
+  queueOpportunityTranslation: vi.fn(),
+}));
+
 const txnManager: any = {
   getRepository: () => ({ save: vi.fn().mockResolvedValue(undefined) }),
 };

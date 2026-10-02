@@ -25,6 +25,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { langQuerySchema } from "../../schema";
 import {
   getAgentByAddress,
   getDistrictToOpportunityHandler,
@@ -35,6 +36,10 @@ import {
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 
 function parseContactPerson(formData: OpportunityLegacyFormData): Person {
   const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
@@ -104,7 +109,11 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    { config: { public: true } as FastifyContextConfig },
+    {
+      config: { public: true } as FastifyContextConfig,
+      // The language the text is entered in (be#1068).
+      schema: { querystring: langQuerySchema },
+    },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,
@@ -151,7 +160,10 @@ export default async function opportunityLegacyRoutes(
         }
       }
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.query),
+      );
 
       // Durable backup of the submitter's contact as a piped <|> comment, in
       // addition to the Person-based contact set above. Best-effort: never
@@ -206,7 +218,7 @@ export default async function opportunityLegacyRoutes(
   fastify.get<{ Reply: OpportunityLegacyResponse[] }>(
     "/",
     { config: { public: true } as FastifyContextConfig },
-    async (_request, reply) => {
+    async (request, reply) => {
       function parseOpportunityLegacyResponse(
         rawList: Opportunity[],
       ): OpportunityLegacyResponse[] {
@@ -286,16 +298,9 @@ export default async function opportunityLegacyRoutes(
             };
           }
 
-          const { address, name, phone, email, languageToTranslate } =
-            accompanying;
-
-          // Build accomp_information from available contact fields
-          const infoParts = [
-            name && name !== "unknown" ? `Name: ${name}` : null,
-            address ? `Address: ${address}` : null,
-            phone ? `Phone: ${phone}` : null,
-            email ? `Email: ${email}` : null,
-          ].filter(Boolean);
+          // This route is public: the accompanied person's name, address,
+          // phone and email are never part of it (be#1092).
+          const { languageToTranslate } = accompanying;
 
           // Treat the epoch sentinel date as "no date set". Compare by
           // timestamp (not string equality) since onetimerDate is a real
@@ -307,8 +312,7 @@ export default async function opportunityLegacyRoutes(
               : onetimerDate;
 
           return {
-            accomp_information:
-              infoParts.length > 0 ? infoParts.join(", ") : null,
+            accomp_information: null,
             accomp_translation: languageToTranslate ?? null,
             accomp_datetime,
           };
@@ -340,7 +344,12 @@ export default async function opportunityLegacyRoutes(
           return {
             id: raw.id,
             title: raw.title,
-            vo_information: raw.info ?? null,
+            // An accompanying opportunity's description is about one
+            // person's appointment: never on this public route (be#1092).
+            vo_information:
+              raw.type === OpportunityType.ACCOMPANYING
+                ? null
+                : (raw.info ?? null),
             accomp_information,
             accomp_translation,
             accomp_datetime,
@@ -384,6 +393,13 @@ export default async function opportunityLegacyRoutes(
           "onetimer",
         ],
       });
+      // Public website cards in ?language= (be#1068): title for every type,
+      // info only where a translation exists (regular/events).
+      await translateOpportunities(
+        fastify,
+        opportunities,
+        requestLanguage(request.query),
+      );
       return reply
         .status(200)
         .send(parseOpportunityLegacyResponse(opportunities));

@@ -22,7 +22,7 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 //
 // Idempotent: ON CONFLICT (title) DO NOTHING — title is unique on Organization.
 // Self-contained: raw SQL + a hardcoded literal list, no entities/app helpers.
-const ORGANIZATION_DOMAINS = [
+export const ORGANIZATION_DOMAINS = [
   "adas-berlin.de",
   "afghanistankomitee.de",
   "agens-berlin.de",
