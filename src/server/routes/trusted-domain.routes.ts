@@ -28,8 +28,6 @@ export default async function trustedDomainRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // The trusted-domain allowlist gates agent self-registration, so managing it
-  // is COORDINATOR/ADMIN only (ADMIN bypasses the role check).
   fastify.addHook(
     "onRequest",
     fastify.authenticate({ role: UserRole.COORDINATOR }),
@@ -68,8 +66,6 @@ export default async function trustedDomainRoutes(
       const domain = normalize(request.body.domain);
       const repo = fastify.db.trustedDomainRepository;
 
-      // Surface the duplicate up front as 409; the unique index is the ultimate
-      // guard for the rare race.
       if (await repo.findOneBy({ domain })) {
         throw new ConflictError(`Domain "${domain}" is already trusted.`);
       }

@@ -110,9 +110,6 @@ export default function volunteerOpportunityVolunteerRoutes(
       opportunityVolunteerRepository.merge(opportunity, request.body);
       await opportunityVolunteerRepository.save(opportunity, { reload: true });
 
-      // Volunteer audit trail (be#919) — only when the status actually
-      // changed; this route also merges other future fields someday, which
-      // shouldn't spuriously log a "status changed" entry.
       if (
         request.body.status !== undefined &&
         request.body.status !== previousStatus

@@ -1,4 +1,3 @@
-// Schema for an existing person (only ID is strictly required for linking)
 export const existingPersonSchema = {
   type: "object",
   required: ["id"],
@@ -10,10 +9,9 @@ export const existingPersonSchema = {
     phone: { type: "string", readOnly: true },
     address: { type: "string", readOnly: true },
   },
-  additionalProperties: true, // Allow other properties but they will be ignored by preHandler
+  additionalProperties: true,
 };
 
-// Schema for creating a new person (firstName and lastName are mandatory)
 export const newPersonSchema = {
   type: "object",
   required: ["firstName", "lastName"],
@@ -25,7 +23,7 @@ export const newPersonSchema = {
     phone: { type: ["string", "null"], minLength: 7, maxLength: 20 },
     address: { type: ["string", "null"] },
   },
-  additionalProperties: false, // Disallow extra properties for new person creation
+  additionalProperties: false,
 };
 
 export const personResponseSchema = {

@@ -1,11 +1,5 @@
 import { responseErrors } from "./responseErrors";
 
-// Body for POST /opportunity (SDK OpportunityFormDataWithAgentSubmitter): the
-// dashboard's typed create-opportunity form. Unlike /opportunity/legacy,
-// activities/skills/languages/districts are numeric option ids (from
-// GET /option/*), not title/ISO-code strings. The form is loosely typed
-// (voidable), so additional properties are allowed; agent_id presence is
-// enforced in the handler.
 export const opportunityCreateBodySchema = {
   type: "object",
   additionalProperties: true,
