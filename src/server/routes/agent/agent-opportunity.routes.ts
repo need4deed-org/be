@@ -2,13 +2,17 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { NotFoundError } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoAgentOpportunity } from "../../../services";
-import { idParamSchema, responseSchema } from "../../schema";
+import { idParamSchema, langQuerySchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
 import {
   assertAgentVisible,
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 import { maskFields } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
@@ -26,6 +30,7 @@ export default async function agentOpportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("ApiAgentOpportunity#", true, false),
       },
       preSerialization: makePiiSerialization(dtoAgentOpportunity),
@@ -47,6 +52,14 @@ export default async function agentOpportunityRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
       assertAgentVisible(agent, request.authUser?.role);
+
+      // Before the inactive-agent title mask below and the hook's PII
+      // masking, so neither is undone (be#1068).
+      await translateOpportunities(
+        fastify,
+        (agent.opportunity ?? []).filter(Boolean),
+        requestLanguage(request.query),
+      );
 
       // An INACTIVE agent's opportunities shouldn't read as live, actionable
       // data (be#885) — mask title + linked-volunteer identity for everyone
