@@ -116,18 +116,33 @@ function buildNotifyEmailTransport(): {
   };
 }
 
+// A Slack incoming webhook is tied to one channel, so each channel has its
+// own variable.
+const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
+  ops: "SLACK_OPS_WEBHOOK_URL",
+  comments: "SLACK_COMMENTS_WEBHOOK_URL",
+  // #cron-notifications (C0C3A594KHT), be#1088.
+  cron: "SLACK_CRON_WEBHOOK_URL",
+};
+
+export function slackWebhookUrls(
+  env: Record<string, string | undefined> = process.env,
+): Partial<Record<SlackChannel, string>> {
+  const urls: Partial<Record<SlackChannel, string>> = {};
+  for (const [channel, name] of Object.entries(SLACK_WEBHOOK_ENV)) {
+    if (env[name]) {
+      urls[channel as SlackChannel] = env[name];
+    }
+  }
+  return urls;
+}
+
 function buildSlackTransport(): SlackTransport | undefined {
   if (isDryRun("SLACK")) {
     return new DryRunSlackTransport();
   }
 
-  const urls: Partial<Record<SlackChannel, string>> = {};
-  if (process.env.SLACK_OPS_WEBHOOK_URL) {
-    urls.ops = process.env.SLACK_OPS_WEBHOOK_URL;
-  }
-  if (process.env.SLACK_COMMENTS_WEBHOOK_URL) {
-    urls.comments = process.env.SLACK_COMMENTS_WEBHOOK_URL;
-  }
+  const urls = slackWebhookUrls();
   if (Object.keys(urls).length === 0) {
     return undefined;
   }
