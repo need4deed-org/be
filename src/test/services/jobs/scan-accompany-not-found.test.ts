@@ -33,7 +33,7 @@ describe("scanAccompanyNotFound", () => {
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    fastify.notify.emailAccompanyNotFound = vi
+    fastify.cronNotify.emailAccompanyNotFound = vi
       .fn()
       .mockResolvedValue(undefined);
 
@@ -108,7 +108,7 @@ describe("scanAccompanyNotFound", () => {
     await scanAccompanyNotFound(fastify);
 
     const calls = (
-      fastify.notify.emailAccompanyNotFound as ReturnType<typeof vi.fn>
+      fastify.cronNotify.emailAccompanyNotFound as ReturnType<typeof vi.fn>
     ).mock.calls;
     const calledIds = calls.map(([opp]: [Opportunity]) => opp.id);
 

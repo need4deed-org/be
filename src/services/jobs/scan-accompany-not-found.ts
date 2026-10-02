@@ -74,7 +74,7 @@ export async function scanAccompanyNotFound(
         { opportunityId: opp.id },
       );
       try {
-        await fastify.notify.emailAccompanyNotFound(opp);
+        await fastify.cronNotify.emailAccompanyNotFound(opp);
       } catch (sendErr) {
         await fastify.db.communicationRepository
           .remove(comm)

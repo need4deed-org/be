@@ -49,7 +49,7 @@ export async function scanPostMatchCheckup(
         { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
       );
       try {
-        await fastify.notify.emailPostMatchCheckup(ov);
+        await fastify.cronNotify.emailPostMatchCheckup(ov);
       } catch (sendErr) {
         await fastify.db.communicationRepository
           .remove(comm)

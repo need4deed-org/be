@@ -4,6 +4,7 @@ import { errorEmailRecipient, isProd, TRUTHY } from "../../config/constants";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
+import logger from "../../logger";
 import {
   DryRunEmailTransport,
   DryRunSlackTransport,
@@ -28,6 +29,7 @@ import {
   sendPasswordReset,
   sendTagged,
   SlackChannel,
+  SlackEmailTransport,
   SlackTransport,
   SlackWebhookTransport,
   SmtpEmailTransport,
@@ -42,22 +44,28 @@ interface NotifyService {
   tagged(input: TaggedInput): Promise<void>;
   emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
   emailSuggestionAccompanying(ov: OpportunityVolunteer): Promise<void>;
-  emailStale(ov: OpportunityVolunteer): Promise<void>;
   emailIntroduction(ov: OpportunityVolunteer): Promise<void>;
-  emailPostMatchCheckup(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyNotFound(opportunity: Opportunity): Promise<void>;
   emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
   emailAccompanyMatchVolunteer(ov: OpportunityVolunteer): Promise<void>;
-  emailRegularUpdate(opportunity: Opportunity): Promise<void>;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
   emailTagged(input: EmailTaggedInput): Promise<void>;
 }
 
+// The cron jobs' emails (be#1088): posted to Slack #cron-notifications for
+// coordinators, never sent.
+interface CronNotifyService {
+  emailStale(ov: OpportunityVolunteer): Promise<void>;
+  emailPostMatchCheckup(ov: OpportunityVolunteer): Promise<void>;
+  emailAccompanyNotFound(opportunity: Opportunity): Promise<void>;
+  emailRegularUpdate(opportunity: Opportunity): Promise<void>;
+}
+
 declare module "fastify" {
   interface FastifyInstance {
     notify: NotifyService;
+    cronNotify: CronNotifyService;
   }
 }
 
@@ -149,6 +157,24 @@ function buildSlackTransport(): SlackTransport | undefined {
   return new SlackWebhookTransport(urls);
 }
 
+/**
+ * Where the cron jobs' emails go (be#1088): Slack #cron-notifications, or
+ * nowhere — never to the recipients. Without SLACK_CRON_WEBHOOK_URL (e.g.
+ * locally) they're dropped, with one warning at startup.
+ */
+export function buildCronEmailTransport(
+  slack: SlackTransport | undefined,
+  env: Record<string, string | undefined> = process.env,
+): EmailTransport {
+  if (slack && (isDryRun("SLACK") || slackWebhookUrls(env).cron)) {
+    return new SlackEmailTransport(slack);
+  }
+  logger.warn(
+    "notify: SLACK_CRON_WEBHOOK_URL unset — the cron jobs' emails are neither posted nor sent (be#1088)",
+  );
+  return { send: async () => {} };
+}
+
 async function notifyPlugin(fastify: FastifyInstance) {
   const emailVerify = buildVerifyEmailTransport();
   const { deliverable: emailNotify, raw: emailNotifyRaw } =
@@ -166,19 +192,12 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
     emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
       sendEmailSuggestionAccompanying(emailNotify, ov, emailNotifyRaw),
-    emailStale: (ov: OpportunityVolunteer) => sendEmailStale(emailNotify, ov),
     emailIntroduction: (ov: OpportunityVolunteer) =>
       sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),
-    emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
-      sendEmailPostMatchCheckup(emailNotify, ov),
-    emailAccompanyNotFound: (opportunity: Opportunity) =>
-      sendEmailAccompanyNotFound(emailNotify, opportunity),
     emailAccompanyMatch: (ov: OpportunityVolunteer) =>
       sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
     emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
       sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
-    emailRegularUpdate: (opportunity: Opportunity) =>
-      sendEmailRegularUpdate(emailNotify, opportunity),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>
@@ -187,6 +206,17 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailRegistration(emailNotify, volunteer),
     emailTagged: (input: EmailTaggedInput) =>
       sendEmailTagged(emailNotify, input),
+  });
+
+  const cronEmail = buildCronEmailTransport(slack);
+  fastify.decorate("cronNotify", {
+    emailStale: (ov: OpportunityVolunteer) => sendEmailStale(cronEmail, ov),
+    emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
+      sendEmailPostMatchCheckup(cronEmail, ov),
+    emailAccompanyNotFound: (opportunity: Opportunity) =>
+      sendEmailAccompanyNotFound(cronEmail, opportunity),
+    emailRegularUpdate: (opportunity: Opportunity) =>
+      sendEmailRegularUpdate(cronEmail, opportunity),
   });
 }
 

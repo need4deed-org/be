@@ -53,7 +53,7 @@ export async function scanRegularUpdate(
         { opportunityId: opp.id },
       );
       try {
-        await fastify.notify.emailRegularUpdate(opp);
+        await fastify.cronNotify.emailRegularUpdate(opp);
       } catch (sendErr) {
         await fastify.db.communicationRepository
           .remove(comm)

@@ -49,7 +49,7 @@ export async function scanStalePending(
         { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
       );
       try {
-        await fastify.notify.emailStale(ov);
+        await fastify.cronNotify.emailStale(ov);
       } catch (sendErr) {
         await fastify.db.communicationRepository
           .remove(comm)
