@@ -364,6 +364,56 @@ describe("opportunity routes in the requested language", () => {
       }
     });
 
+    it("POST /post: translates linked opportunity titles in the response", async () => {
+      const opportunity = await germanOpportunity(english);
+
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/post?language=en",
+        cookies: { [accessCookieName]: cookie },
+        payload: {
+          text: `New post ${suffix}`,
+          linkedOpportunityIds: [opportunity.id],
+        },
+      });
+
+      try {
+        expect(res.statusCode).toBeLessThan(300);
+        expect(res.json().data.linkedOpportunities[0].title).toBe(
+          english.title,
+        );
+        const stored = await dataSource.manager.findOneByOrFail(Opportunity, {
+          id: opportunity.id,
+        });
+        expect(stored.title).toBe(opportunity.title);
+      } finally {
+        await dataSource.manager.delete(Post, { id: res.json().data.id });
+      }
+    });
+
+    it("PATCH /post/:id: translates linked opportunity titles in the response", async () => {
+      const opportunity = await germanOpportunity(english);
+      const post = await dataSource.manager.save(
+        new Post({ text: `Patched post ${suffix}`, authorId: person.id }),
+      );
+
+      try {
+        const res = await fastify.inject({
+          method: "PATCH",
+          url: `/post/${post.id}?language=en`,
+          cookies: { [accessCookieName]: cookie },
+          payload: { linkedOpportunityIds: [opportunity.id] },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.linkedOpportunities[0].title).toBe(
+          english.title,
+        );
+      } finally {
+        await dataSource.manager.delete(Post, { id: post.id });
+      }
+    });
+
     it("public GET /opportunity/legacy: translates title and info", async () => {
       const opportunity = await germanOpportunity(english);
 
