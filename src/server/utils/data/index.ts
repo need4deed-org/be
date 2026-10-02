@@ -7,7 +7,6 @@ export * from "./assert-agent-owns-opportunity";
 export * from "./assert-agent-visible";
 export * from "./assert-email-available";
 export * from "./create-agent-contact";
-export * from "./cron-guard";
 export * from "./erase-person-pii";
 export * from "./for-routes";
 export * from "./get-agent-by-postcode";
