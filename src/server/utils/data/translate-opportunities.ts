@@ -81,3 +81,39 @@ export async function queueOpportunityTranslation(
       : null,
   });
 }
+
+// Opportunities queued per worker run by the backfill, so a run stays short.
+const BACKFILL_LIMIT = 100;
+
+/**
+ * Queues opportunities that have text to translate but no translation rows
+ * yet — those written before be#1068 (be#1068 backfill). Idempotent: once
+ * queued, an opportunity has rows and is never picked again. At most `limit`
+ * per call; returns how many were queued.
+ */
+export async function queueUntranslatedOpportunities(
+  manager: EntityManager,
+  limit = BACKFILL_LIMIT,
+): Promise<number> {
+  const opportunities = await manager
+    .createQueryBuilder(Opportunity, "o")
+    .select(["o.id", "o.title", "o.info", "o.type", "o.originalLanguageId"])
+    .where(
+      "NOT EXISTS (SELECT 1 FROM field_translation ft WHERE ft.opportunity_id = o.id)",
+    )
+    // Only rows that will get translation rows, or the same ones would be
+    // picked on every run.
+    .andWhere(
+      "(btrim(o.title) <> '' OR (o.type IN (:...types) AND btrim(coalesce(o.info, '')) <> ''))",
+      { types: TRANSLATED_INFO_TYPES },
+    )
+    .orderBy("o.id")
+    .limit(limit)
+    .getMany();
+  for (const opportunity of opportunities) {
+    await manager.transaction((transactionalManager) =>
+      queueOpportunityTranslation(transactionalManager, opportunity),
+    );
+  }
+  return opportunities.length;
+}
