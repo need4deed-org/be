@@ -155,7 +155,10 @@ export default async function opportunityLegacyRoutes(
         }
       }
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.query),
+      );
 
       // Durable backup of the submitter's contact as a piped <|> comment, in
       // addition to the Person-based contact set above. Best-effort: never

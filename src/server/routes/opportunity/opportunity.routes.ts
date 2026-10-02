@@ -92,6 +92,7 @@ import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import {
+  queueOpportunityTranslation,
   requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
@@ -638,7 +639,10 @@ export default async function opportunityRoutes(
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.query),
+      );
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
@@ -921,6 +925,18 @@ export default async function opportunityRoutes(
           if (!success) {
             throw new Error("Patching opportunity failed.");
           }
+          // Every PATCH counts as an edit of the original text for now
+          // (be#1068); unchanged text is left alone by its hash.
+          await queueOpportunityTranslation(manager, {
+            id: opportunity.id,
+            originalLanguageId: opportunity.originalLanguageId,
+            type: effectiveType,
+            title: opportunityObj.title ?? opportunity.title,
+            info:
+              opportunityObj.info !== undefined
+                ? opportunityObj.info
+                : opportunity.info,
+          });
 
           // An opportunity moving to a status that implies searching means
           // its agent is searching too (be#862) — cascaded here, atomically,
