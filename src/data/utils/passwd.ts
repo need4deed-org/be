@@ -1,13 +1,8 @@
 import * as bcrypt from "bcrypt";
 import logger from "../../logger";
 
-/**
- * Hashes a plain-text password using bcrypt.
- * @param password The plain-text password to hash.
- * @returns A promise that resolves to the hashed password.
- */
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 10; // 10 rounds is a good default for bcrypt
+  const saltRounds = 10;
 
   try {
     const salt = await bcrypt.genSalt(saltRounds);
@@ -19,12 +14,6 @@ export async function hashPassword(password: string): Promise<string> {
   }
 }
 
-/**
- * Compares a plain-text password with a hashed password.
- * @param plainTextPassword The password provided by the user during login.
- * @param hashedPassword The hash retrieved from the database.
- * @returns A promise that resolves to true if the passwords match, false otherwise.
- */
 export async function verifyPassword(
   plainTextPassword: string,
   hashedPassword: string,
