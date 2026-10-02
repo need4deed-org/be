@@ -5,9 +5,6 @@ import { dataSource } from "../data-source";
 import ApiKey from "../entity/api-key.entity";
 import { getRepository } from "../utils";
 
-// Revokes a direct (non-login) API key by label. See be#875.
-// Usage: yarn revoke-api-key --label <bot-label>
-
 export interface RevokeApiKeyOptions {
   label: string;
 }

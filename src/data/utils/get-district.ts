@@ -11,17 +11,6 @@ export interface Centroid {
   longitude: number | null;
 }
 
-// Map-pin fallback (be#662) for opportunities whose agent has no geocoded
-// address: the arithmetic mean of each district's own geocoded postcodes. A
-// district's postcodes span at most a few km in Berlin/Potsdam, so a plain
-// lat/lon average is an adequate approximation of a "centroid" — no need for
-// a proper geodesic/projected calculation at this scale.
-//
-// A targeted query for just the district ids that actually need a fallback,
-// rather than an eager `district.districtPostcode.postcode` relation on the
-// main (paginated) opportunity query — a district can have dozens of
-// postcodes, which would multiply result rows on every page even when the
-// centroid is never used (most opportunities' agents are already geocoded).
 export async function getDistrictCentroids(
   districtIds: number[],
 ): Promise<Map<number, Centroid>> {
@@ -89,10 +78,6 @@ export async function getDistrictFromPostcode(
       dataSource,
       DistrictPostcode,
     );
-    // A postcode can map to more than one district (DistrictPostcode is a
-    // genuine m2m). Order deterministically so the same postcode always
-    // resolves to the same district rather than whatever row Postgres
-    // happens to return first (be#827).
     const districtPostcode = await districtPostcodeRepository.findOne({
       where: { postcodeId: postcodeId },
       relations: ["district"],
