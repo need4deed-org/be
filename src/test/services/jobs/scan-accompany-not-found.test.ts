@@ -115,4 +115,27 @@ describe("scanAccompanyNotFound", () => {
     expect(calledIds).toContain(oppInWindow.id);
     expect(calledIds).not.toContain(oppOutOfWindow.id);
   });
+
+  // be#1088: posted to Slack, nothing recorded in Communication, so nothing
+  // skips the opportunity on a later run of the same day either.
+  it("records no Communication row and posts again on a second run", async () => {
+    const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
+      typeof vi.fn
+    >;
+    posted.mockClear();
+
+    await scanAccompanyNotFound(fastify);
+    await scanAccompanyNotFound(fastify);
+
+    expect(
+      posted.mock.calls.filter(
+        ([opp]: [Opportunity]) => opp.id === oppInWindow.id,
+      ),
+    ).toHaveLength(2);
+    expect(
+      await fastify.db.communicationRepository.countBy({
+        opportunityId: oppInWindow.id,
+      }),
+    ).toBe(0);
+  });
 });

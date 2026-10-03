@@ -1,16 +1,11 @@
 import { FastifyInstance } from "fastify";
 import {
-  CommunicationType,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import { Between, In } from "typeorm";
 import logger from "../../logger";
-import {
-  buildLastSentMap,
-  logEmailCommunication,
-} from "../../server/utils/data/log-email-communication";
 import {
   addWorkingDays,
   berlinDayBoundaries,
@@ -51,36 +46,12 @@ export async function scanAccompanyNotFound(
       ),
   );
 
-  if (!candidates.length) {
-    return;
-  }
-
-  const lastSentMap = await buildLastSentMap(
-    fastify.db.communicationRepository,
-    candidates.map((c) => c.id),
-    CommunicationType.ACCOMPANYING_NOT_FOUND,
-  );
-
+  // Posted to Slack for coordinators (be#1088): nothing is recorded in
+  // Communication; the target day moves with each working day, so each
+  // opportunity comes up on one run.
   for (const opp of candidates) {
     try {
-      const lastSent = lastSentMap.get(opp.id);
-      if (lastSent && lastSent > opp.updatedAt) {
-        continue;
-      }
-
-      const comm = await logEmailCommunication(
-        fastify.db.communicationRepository,
-        CommunicationType.ACCOMPANYING_NOT_FOUND,
-        { opportunityId: opp.id },
-      );
-      try {
-        await fastify.cronNotify.emailAccompanyNotFound(opp);
-      } catch (sendErr) {
-        await fastify.db.communicationRepository
-          .remove(comm)
-          .catch(logger.error);
-        throw sendErr;
-      }
+      await fastify.cronNotify.emailAccompanyNotFound(opp);
     } catch (err) {
       logger.error(`scanAccompanyNotFound: opp ${opp.id} failed: ${err}`);
     }
