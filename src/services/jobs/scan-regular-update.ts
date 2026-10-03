@@ -1,21 +1,15 @@
 import { FastifyInstance } from "fastify";
-import {
-  CommunicationType,
-  OpportunityStatusType,
-  OpportunityType,
-} from "need4deed-sdk";
-import { In, LessThan } from "typeorm";
+import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
+import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
 import logger from "../../logger";
-import {
-  buildLastSentMap,
-  logEmailCommunication,
-} from "../../server/utils/data/log-email-communication";
-import { monthsAgo } from "./german-holidays";
+import { crossedMonthsAgo } from "./german-holidays";
 
 export async function scanRegularUpdate(
   fastify: FastifyInstance,
+  now: Date = new Date(),
 ): Promise<void> {
-  const twoMonthsAgo = monthsAgo(2);
+  // Rows that reached 2 months without an update since yesterday's run.
+  const { from, to } = crossedMonthsAgo(2, now);
 
   const opps = await fastify.db.opportunityRepository.find({
     where: {
@@ -25,41 +19,16 @@ export async function scanRegularUpdate(
         OpportunityStatusType.SEARCHING,
         OpportunityStatusType.ACTIVE,
       ]),
-      updatedAt: LessThan(twoMonthsAgo),
+      updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
     },
     relations: ["contactPerson", "contactPerson.users"],
   });
 
-  if (!opps.length) {
-    return;
-  }
-
-  const lastSentMap = await buildLastSentMap(
-    fastify.db.communicationRepository,
-    opps.map((o) => o.id),
-    CommunicationType.OPPORTUNITY_UPDATED,
-  );
-
+  // Posted to Slack for coordinators (be#1088): nothing is recorded in
+  // Communication, the daily window keeps each opportunity to one post.
   for (const opp of opps) {
     try {
-      const lastSent = lastSentMap.get(opp.id);
-      if (lastSent && lastSent > opp.updatedAt) {
-        continue;
-      }
-
-      const comm = await logEmailCommunication(
-        fastify.db.communicationRepository,
-        CommunicationType.OPPORTUNITY_UPDATED,
-        { opportunityId: opp.id },
-      );
-      try {
-        await fastify.notify.emailRegularUpdate(opp);
-      } catch (sendErr) {
-        await fastify.db.communicationRepository
-          .remove(comm)
-          .catch(logger.error);
-        throw sendErr;
-      }
+      await fastify.cronNotify.emailRegularUpdate(opp);
     } catch (err) {
       logger.error(`scanRegularUpdate: opp ${opp.id} failed: ${err}`);
     }
