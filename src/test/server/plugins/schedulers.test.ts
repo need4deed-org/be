@@ -19,14 +19,13 @@ import * as scanRegularUpdate from "../../../services/jobs/scan-regular-update";
 import * as scanStalePending from "../../../services/jobs/scan-stale-pending";
 
 const DAILY = "0 6 * * *";
-const HOURLY = "0 8-19 * * 1-5";
 
 // createServer re-initialises the DB connection: slower than the 5 s default.
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 // be#1077: the daily onetimer status jobs always run. be#1088: the email
-// scans, which now post to Slack, run daily after them; the hourly
-// scheduler runs nothing.
+// scans, which now post to Slack, run daily after them; there is no hourly
+// scheduler any more.
 describe("cron schedulers", () => {
   let fastify: FastifyInstance;
   const callbacks = new Map<string, () => Promise<void>>();
@@ -56,10 +55,6 @@ describe("cron schedulers", () => {
   };
 
   beforeAll(async () => {
-    // Never a holiday here: otherwise the holiday check alone would skip the
-    // hourly scans, and the test couldn't tell whether CRON_EMAILS_RETIRED
-    // does its job.
-    vi.spyOn(germanHolidays, "isGermanPublicHoliday").mockReturnValue(false);
     const schedule = vi.spyOn(cron, "schedule");
     fastify = await createServer();
     await fastify.ready();
@@ -109,13 +104,8 @@ describe("cron schedulers", () => {
     expect(daily.activateDueOnetimers).toHaveBeenCalledTimes(1);
   });
 
-  it("runs none of the email scans hourly", async () => {
-    expect(callbacks.has(HOURLY)).toBe(true);
-
-    await callbacks.get(HOURLY)?.();
-
-    for (const scan of Object.values(scans)) {
-      expect(scan).not.toHaveBeenCalled();
-    }
+  it("schedules nothing but the daily jobs", () => {
+    // The translation worker is off in tests, so it schedules nothing here.
+    expect([...callbacks.keys()]).toEqual([DAILY]);
   });
 });
