@@ -1,61 +1,33 @@
 import { FastifyInstance } from "fastify";
 import {
-  CommunicationType,
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { LessThan } from "typeorm";
+import { And, LessThan, MoreThanOrEqual } from "typeorm";
 import logger from "../../logger";
-import {
-  buildSentPairSet,
-  logEmailCommunication,
-} from "../../server/utils/data/log-email-communication";
-import { monthsAgo } from "./german-holidays";
+import { crossedMonthsAgo } from "./german-holidays";
 
 export async function scanStalePending(
   fastify: FastifyInstance,
+  now: Date = new Date(),
 ): Promise<void> {
-  const twoMonthsAgo = monthsAgo(2);
+  // Rows that reached 2 months without an update since yesterday's run.
+  const { from, to } = crossedMonthsAgo(2, now);
 
   const ovs = await fastify.db.opportunityVolunteerRepository.find({
     where: {
       status: OpportunityVolunteerStatusType.PENDING,
-      updatedAt: LessThan(twoMonthsAgo),
+      updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
       volunteer: { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
     },
     relations: ["volunteer.person", "volunteer.person.users"],
   });
 
-  if (!ovs.length) {
-    return;
-  }
-
-  const alreadySentSet = await buildSentPairSet(
-    fastify.db.communicationRepository,
-    ovs.map((ov) => ov.volunteerId),
-    ovs.map((ov) => ov.opportunityId),
-    CommunicationType.STATUS_UPDATE,
-  );
-
+  // Posted to Slack for coordinators (be#1088): nothing is recorded in
+  // Communication, the daily window keeps each match to one post.
   for (const ov of ovs) {
     try {
-      if (alreadySentSet.has(`${ov.volunteerId}-${ov.opportunityId}`)) {
-        continue;
-      }
-
-      const comm = await logEmailCommunication(
-        fastify.db.communicationRepository,
-        CommunicationType.STATUS_UPDATE,
-        { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
-      );
-      try {
-        await fastify.notify.emailStale(ov);
-      } catch (sendErr) {
-        await fastify.db.communicationRepository
-          .remove(comm)
-          .catch(logger.error);
-        throw sendErr;
-      }
+      await fastify.cronNotify.emailStale(ov);
     } catch (err) {
       logger.error(`scanStalePending: ov ${ov.id} failed: ${err}`);
     }

@@ -3,7 +3,12 @@ import fp from "fastify-plugin";
 import cron from "node-cron";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
+import { berlinToday, isWorkingDay } from "../../services/jobs/german-holidays";
+import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
+import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
+import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
+import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 // Unique integer key for this app's advisory lock — prevents duplicate runs
@@ -39,6 +44,33 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "scanExpiredOnetimers",
                   run: () => scanExpiredOnetimers(fastify),
                 },
+                // The cron jobs' emails, posted to Slack #cron-notifications
+                // (be#1088), after the status jobs above. Each scan takes
+                // only what crossed its threshold since yesterday's run, so
+                // every row is posted once.
+                {
+                  name: "scanStalePending",
+                  run: () => scanStalePending(fastify),
+                },
+                {
+                  name: "scanPostMatchCheckup",
+                  run: () => scanPostMatchCheckup(fastify),
+                },
+                {
+                  name: "scanRegularUpdate",
+                  run: () => scanRegularUpdate(fastify),
+                },
+                // Working days only: each takes the appointments 4 working
+                // days ahead together with the weekend or holidays after
+                // them, so a run on a non-working day would repeat them.
+                ...(isWorkingDay(berlinToday())
+                  ? [
+                      {
+                        name: "scanAccompanyNotFound",
+                        run: () => scanAccompanyNotFound(fastify),
+                      },
+                    ]
+                  : []),
               ],
               { sequential: true },
             ),
