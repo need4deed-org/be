@@ -50,9 +50,9 @@ export class ValidatingEmailTransport implements EmailTransport {
       return;
     }
 
-    const to = Array.isArray(msg.to) ? msg.to.join(", ") : msg.to;
+    // No recipient or subject here: the report below carries them.
     logger.error(
-      `[notify] suspended invalid outbound email (to: ${to}): ${problems.join("; ")}`,
+      `[notify] suspended invalid outbound email: ${problems.join("; ")}`,
     );
 
     await this.errorTransport.send({
