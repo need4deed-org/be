@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
-import { errorEmailRecipient, isProd, TRUTHY } from "../../config/constants";
+import { errorEmailRecipient, TRUTHY } from "../../config/constants";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
@@ -36,6 +36,7 @@ import {
   TaggedInput,
   ValidatingEmailTransport,
 } from "../../services/notify";
+import { Env, firstEnvValue } from "../utils";
 
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
@@ -69,20 +70,22 @@ declare module "fastify" {
   }
 }
 
-/** Resolve dry-run flag for a given transport key (e.g. "EMAIL", "SLACK").
- *  Priority: per-transport env > global env > default (!isProd). */
-function isDryRun(transportKey: string): boolean {
-  const perTransport = process.env[`NOTIFY_${transportKey}_DRY_RUN`];
-  if (perTransport !== undefined) {
-    return TRUTHY.has(perTransport);
-  }
+/** The variables that switch a transport (e.g. "EMAIL", "SLACK") to a dry
+ *  run, most specific first. */
+export function dryRunEnvNames(transportKey: string): string[] {
+  return [`NOTIFY_${transportKey}_DRY_RUN`, "NOTIFY_DRY_RUN"];
+}
 
-  const global = process.env.NOTIFY_DRY_RUN;
-  if (global !== undefined) {
-    return TRUTHY.has(global);
-  }
-
-  return !isProd;
+/** Whether a transport runs dry in `env`: the first of its variables that
+ *  is set decides; without any, everywhere but production. */
+export function isDryRun(
+  transportKey: string,
+  env: Env = process.env,
+): boolean {
+  const value = firstEnvValue(env, dryRunEnvNames(transportKey));
+  return value === undefined
+    ? env.NODE_ENV !== "production"
+    : TRUTHY.has(value);
 }
 
 function buildVerifyEmailTransport(): EmailTransport {
@@ -134,7 +137,7 @@ const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
 };
 
 export function slackWebhookUrls(
-  env: Record<string, string | undefined> = process.env,
+  env: Env = process.env,
 ): Partial<Record<SlackChannel, string>> {
   const urls: Partial<Record<SlackChannel, string>> = {};
   for (const [channel, name] of Object.entries(SLACK_WEBHOOK_ENV)) {
@@ -164,9 +167,9 @@ function buildSlackTransport(): SlackTransport | undefined {
  */
 export function buildCronEmailTransport(
   slack: SlackTransport | undefined,
-  env: Record<string, string | undefined> = process.env,
+  env: Env = process.env,
 ): EmailTransport {
-  if (slack && (isDryRun("SLACK") || slackWebhookUrls(env).cron)) {
+  if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).cron)) {
     return new SlackEmailTransport(slack);
   }
   logger.warn(

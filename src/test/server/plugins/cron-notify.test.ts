@@ -119,32 +119,31 @@ describe("fastify.cronNotify", () => {
 
 describe("buildCronEmailTransport", () => {
   it("posts through Slack when the cron webhook is set", () => {
-    const slack = { send: vi.fn() };
     expect(
-      buildCronEmailTransport(slack, { SLACK_CRON_WEBHOOK_URL: CRON_WEBHOOK }),
+      buildCronEmailTransport(
+        { send: vi.fn() },
+        { NOTIFY_SLACK_DRY_RUN: "false", SLACK_CRON_WEBHOOK_URL: CRON_WEBHOOK },
+      ),
     ).toBeInstanceOf(SlackEmailTransport);
   });
 
   it("posts through the dry-run Slack transport in a dry run", () => {
-    process.env.NOTIFY_SLACK_DRY_RUN = "true";
-    try {
-      expect(
-        buildCronEmailTransport(new DryRunSlackTransport(), {}),
-      ).toBeInstanceOf(SlackEmailTransport);
-    } finally {
-      delete process.env.NOTIFY_SLACK_DRY_RUN;
-    }
+    expect(
+      buildCronEmailTransport(new DryRunSlackTransport(), {
+        NOTIFY_SLACK_DRY_RUN: "true",
+      }),
+    ).toBeInstanceOf(SlackEmailTransport);
   });
 
   it.each([
     ["no Slack at all", undefined],
     ["Slack without the cron webhook", { send: vi.fn() }],
   ])("with %s, warns once and drops the emails", async (_, slack) => {
-    process.env.NOTIFY_SLACK_DRY_RUN = "false";
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
     try {
       // Another channel's webhook doesn't count.
       const transport = buildCronEmailTransport(slack, {
+        NOTIFY_SLACK_DRY_RUN: "false",
         SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
       });
       await transport.send({ to: "a@example.com", subject: "s", text: "t" });
@@ -155,7 +154,6 @@ describe("buildCronEmailTransport", () => {
       }
     } finally {
       warn.mockRestore();
-      delete process.env.NOTIFY_SLACK_DRY_RUN;
     }
   });
 });
