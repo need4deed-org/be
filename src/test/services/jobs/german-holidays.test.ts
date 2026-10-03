@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addWorkingDays,
+  appointmentsDue,
+  berlinDayBoundaries,
   berlinToday,
   crossedMonthsAgo,
   isGermanPublicHoliday,
@@ -197,5 +199,45 @@ describe("crossedMonthsAgo", () => {
     // Apr 29 and 30, 2027 both clamp to Feb 28.
     const range = crossedMonthsAgo(2, new Date(2027, 3, 30, 6));
     expect(range.from).toEqual(range.to);
+  });
+});
+
+// be#1088: the accompaniment check runs on working days; each run takes the
+// target day and the weekend or holidays after it.
+describe("appointmentsDue", () => {
+  const berlinMidnight = (y: number, m: number, day: number) =>
+    berlinDayBoundaries(new Date(y, m, day)).startOfDay;
+
+  it("takes a weekend with the Friday before it", () => {
+    // Monday Oct 5, 2026: 4 working days ahead is Friday Oct 9.
+    expect(appointmentsDue(new Date(2026, 9, 5), 4)).toEqual({
+      from: berlinMidnight(2026, 9, 9),
+      to: berlinMidnight(2026, 9, 12),
+    });
+  });
+
+  it("takes a weekday holiday with the working day before it", () => {
+    // Friday Dec 18, 2026: 4 working days ahead is Thursday Dec 24; Fri 25
+    // (Christmas) and the weekend go with it, up to Monday Dec 28.
+    expect(appointmentsDue(new Date(2026, 11, 18), 4)).toEqual({
+      from: berlinMidnight(2026, 11, 24),
+      to: berlinMidnight(2026, 11, 28),
+    });
+  });
+
+  it("covers every calendar day once across consecutive working days", () => {
+    let day = new Date(2027, 0, 1);
+    let previous: { from: Date; to: Date } | undefined;
+    while (day.getFullYear() < 2029) {
+      if (isWorkingDay(day)) {
+        const range = appointmentsDue(day, 4);
+        expect(range.from.getTime()).toBeLessThan(range.to.getTime());
+        if (previous) {
+          expect(range.from).toEqual(previous.to);
+        }
+        previous = range;
+      }
+      day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    }
   });
 });

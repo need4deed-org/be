@@ -145,3 +145,22 @@ export function crossedMonthsAgo(
 ): { from: Date; to: Date } {
   return { from: monthsAgo(n, addDays(now, -1)), to: monthsAgo(n, now) };
 }
+
+/**
+ * The appointment times [from, to) a working day's run takes when checking
+ * for accompaniments still without a volunteer (be#1088): the day
+ * `workingDaysAhead` working days ahead, plus the weekend or holidays right
+ * after it, up to the next working day (Berlin time). Consecutive working
+ * days' ranges cover every calendar day once, and a weekend or holiday
+ * appointment gets as much notice as the working day before it.
+ */
+export function appointmentsDue(
+  today: Date,
+  workingDaysAhead: number,
+): { from: Date; to: Date } {
+  const target = addWorkingDays(today, workingDaysAhead);
+  return {
+    from: berlinDayBoundaries(target).startOfDay,
+    to: berlinDayBoundaries(addWorkingDays(target, 1)).startOfDay,
+  };
+}

@@ -60,9 +60,9 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "scanRegularUpdate",
                   run: () => scanRegularUpdate(fastify),
                 },
-                // Its target is today + 4 working days: on a weekend or a
-                // holiday that is the day the previous working day already
-                // took.
+                // Working days only: each takes the appointments 4 working
+                // days ahead together with the weekend or holidays after
+                // them, so a run on a non-working day would repeat them.
                 ...(isWorkingDay(berlinToday())
                   ? [
                       {

@@ -138,4 +138,65 @@ describe("scanAccompanyNotFound", () => {
       }),
     ).toBe(0);
   });
+
+  // be#1088 (b): a weekend appointment goes with the working day before it.
+  it("on Monday Oct 5, takes Friday to Sunday, leaving Monday for Tuesday", async () => {
+    const at = (day: number, hour: number) =>
+      new Date(
+        berlinDayBoundaries(new Date(2026, 9, day)).startOfDay.getTime() +
+          hour * 60 * 60 * 1000,
+      );
+    const appointments: Record<string, Date> = {
+      thursday: at(8, 10),
+      friday: at(9, 10),
+      saturday: at(10, 10),
+      sunday: at(11, 23),
+      monday: at(12, 9),
+    };
+    const created: Record<string, Opportunity> = {};
+    const onetimers: number[] = [];
+    try {
+      for (const [day, date] of Object.entries(appointments)) {
+        const onetimer = await fastify.db.onetimerRepository.save(
+          new Onetimer({ date }),
+        );
+        onetimers.push(onetimer.id);
+        created[day] = await fastify.db.opportunityRepository.save(
+          new Opportunity({
+            title: `Weekend check ${day} ${Date.now()}`,
+            type: OpportunityType.ACCOMPANYING,
+            status: OpportunityStatusType.SEARCHING,
+            agentId: agent.id,
+            onetimerId: onetimer.id,
+          }),
+        );
+      }
+      const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
+        typeof vi.fn
+      >;
+      const postedOn = async (today: Date) => {
+        posted.mockClear();
+        await scanAccompanyNotFound(fastify, today);
+        return posted.mock.calls.map(([opp]: [Opportunity]) => opp.id);
+      };
+
+      const monday = await postedOn(new Date(2026, 9, 5));
+      const tuesday = await postedOn(new Date(2026, 9, 6));
+
+      for (const day of ["friday", "saturday", "sunday"]) {
+        expect(monday).toContain(created[day].id);
+        expect(tuesday).not.toContain(created[day].id);
+      }
+      expect(monday).not.toContain(created.thursday.id);
+      expect(monday).not.toContain(created.monday.id);
+      expect(tuesday).toContain(created.monday.id);
+    } finally {
+      for (const opportunity of Object.values(created)) {
+        await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+      }
+      for (const id of onetimers) {
+        await fastify.db.onetimerRepository.delete({ id });
+      }
+    }
+  });
 });
