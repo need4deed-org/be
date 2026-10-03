@@ -3,19 +3,21 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { LessThan } from "typeorm";
+import { And, LessThan, MoreThanOrEqual } from "typeorm";
 import logger from "../../logger";
-import { monthsAgo } from "./german-holidays";
+import { crossedMonthsAgo } from "./german-holidays";
 
 export async function scanPostMatchCheckup(
   fastify: FastifyInstance,
+  now: Date = new Date(),
 ): Promise<void> {
-  const twoMonthsAgo = monthsAgo(2);
+  // Rows that reached 2 months without an update since yesterday's run.
+  const { from, to } = crossedMonthsAgo(2, now);
 
   const ovs = await fastify.db.opportunityVolunteerRepository.find({
     where: {
       status: OpportunityVolunteerStatusType.MATCHED,
-      updatedAt: LessThan(twoMonthsAgo),
+      updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
       volunteer: { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
     },
     relations: ["volunteer.person", "volunteer.person.users"],

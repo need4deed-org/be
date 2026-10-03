@@ -1,13 +1,15 @@
 import { FastifyInstance } from "fastify";
 import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
-import { In, LessThan } from "typeorm";
+import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
 import logger from "../../logger";
-import { monthsAgo } from "./german-holidays";
+import { crossedMonthsAgo } from "./german-holidays";
 
 export async function scanRegularUpdate(
   fastify: FastifyInstance,
+  now: Date = new Date(),
 ): Promise<void> {
-  const twoMonthsAgo = monthsAgo(2);
+  // Rows that reached 2 months without an update since yesterday's run.
+  const { from, to } = crossedMonthsAgo(2, now);
 
   const opps = await fastify.db.opportunityRepository.find({
     where: {
@@ -17,7 +19,7 @@ export async function scanRegularUpdate(
         OpportunityStatusType.SEARCHING,
         OpportunityStatusType.ACTIVE,
       ]),
-      updatedAt: LessThan(twoMonthsAgo),
+      updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
     },
     relations: ["contactPerson", "contactPerson.users"],
   });

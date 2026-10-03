@@ -15,14 +15,19 @@ import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { createServer } from "../../../server";
-import { monthsAgo } from "../../../services/jobs/german-holidays";
+import { crossedMonthsAgo } from "../../../services/jobs/german-holidays";
 import { scanPostMatchCheckup } from "../../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../../services/jobs/scan-stale-pending";
 import { randomNumericSuffix } from "../../random";
 
-// Just past the 2-month threshold.
-const PAST_THRESHOLD = new Date(monthsAgo(2).getTime() - 12 * 60 * 60 * 1000);
+// A fixed run, so the window doesn't depend on today: the run on Oct 3
+// takes [Aug 2, Aug 3), the next day's [Aug 3, Aug 4).
+const NOW = new Date(2026, 9, 3, 6);
+const NEXT_DAY = new Date(2026, 9, 4, 6);
+const { from: FROM, to: TO } = crossedMonthsAgo(2, NOW);
+const shift = (date: Date, ms: number) => new Date(date.getTime() + ms);
+const HOUR = 60 * 60 * 1000;
 
 // be#1088: the "2 months" scans post through fastify.cronNotify (Slack) and
 // record nothing in Communication.
@@ -34,9 +39,16 @@ describe("2-month scans", () => {
   let volunteer: Volunteer;
   const deals: number[] = [];
   let regular: Opportunity;
-  // No matches: saving a match updates its opportunity afterwards
-  // (updateOpportunityMatching, not awaited), undoing the backdate.
-  let unmatched: Opportunity;
+  // Opportunities without matches at the window's edges: saving a match
+  // updates its opportunity afterwards (updateOpportunityMatching, not
+  // awaited), which would undo the backdate.
+  const edges: Record<string, Opportunity> = {};
+  const EDGES: Record<string, Date> = {
+    atFrom: FROM,
+    beforeTo: shift(TO, -1),
+    atTo: TO,
+    beforeFrom: shift(FROM, -1),
+  };
   let pending: OpportunityVolunteer;
   let matched: OpportunityVolunteer;
   let matchedOpportunity: Opportunity;
@@ -44,10 +56,11 @@ describe("2-month scans", () => {
   const backdate = <T extends { id: number }>(
     repository: Repository<T>,
     id: number,
+    updatedAt: Date,
   ) =>
     repository.query(
       `UPDATE "${repository.metadata.tableName}" SET "updated_at" = $1 WHERE "id" = $2`,
-      [PAST_THRESHOLD, id],
+      [updatedAt, id],
     );
 
   const communicationsOf = (where: {
@@ -101,7 +114,14 @@ describe("2-month scans", () => {
       );
     regular = await opportunity("Regular (2-month scans)");
     matchedOpportunity = await opportunity("Matched (2-month scans)");
-    unmatched = await opportunity("Unmatched (2-month scans)");
+    for (const [edge, updatedAt] of Object.entries(EDGES)) {
+      edges[edge] = await opportunity(`Edge ${edge} (2-month scans)`);
+      await backdate(
+        fastify.db.opportunityRepository,
+        edges[edge].id,
+        updatedAt,
+      );
+    }
 
     pending = await fastify.db.opportunityVolunteerRepository.save(
       new OpportunityVolunteer({
@@ -117,9 +137,17 @@ describe("2-month scans", () => {
         status: OpportunityVolunteerStatusType.MATCHED,
       }),
     );
-    await backdate(fastify.db.opportunityVolunteerRepository, pending.id);
-    await backdate(fastify.db.opportunityVolunteerRepository, matched.id);
-    await backdate(fastify.db.opportunityRepository, unmatched.id);
+    const inWindow = shift(FROM, HOUR);
+    await backdate(
+      fastify.db.opportunityVolunteerRepository,
+      pending.id,
+      inWindow,
+    );
+    await backdate(
+      fastify.db.opportunityVolunteerRepository,
+      matched.id,
+      inWindow,
+    );
   });
 
   afterAll(async () => {
@@ -127,7 +155,9 @@ describe("2-month scans", () => {
       volunteerId: volunteer.id,
     });
     await fastify.db.opportunityRepository.delete({ id: regular.id });
-    await fastify.db.opportunityRepository.delete({ id: unmatched.id });
+    for (const opportunity of Object.values(edges)) {
+      await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    }
     await fastify.db.opportunityRepository.delete({
       id: matchedOpportunity.id,
     });
@@ -140,15 +170,22 @@ describe("2-month scans", () => {
     await fastify.close();
   });
 
-  const postedIds = (name: "emailStale" | "emailPostMatchCheckup") =>
-    (fastify.cronNotify[name] as ReturnType<typeof vi.fn>).mock.calls.map(
-      ([ov]: [OpportunityVolunteer]) => ov.id,
-    );
+  const posted = (
+    name: "emailStale" | "emailPostMatchCheckup" | "emailRegularUpdate",
+  ) => {
+    const mock = fastify.cronNotify[name] as ReturnType<typeof vi.fn>;
+    const ids = mock.mock.calls.map(([row]: [{ id: number }]) => row.id);
+    mock.mockClear();
+    return ids;
+  };
 
-  it("scanStalePending posts a stale pending match, recording nothing", async () => {
-    await scanStalePending(fastify);
+  it("scanStalePending posts a stale pending match once, recording nothing", async () => {
+    await scanStalePending(fastify, NOW);
+    expect(posted("emailStale")).toContain(pending.id);
 
-    expect(postedIds("emailStale")).toContain(pending.id);
+    await scanStalePending(fastify, NEXT_DAY);
+    expect(posted("emailStale")).not.toContain(pending.id);
+
     expect(
       await communicationsOf({
         opportunityId: regular.id,
@@ -157,10 +194,13 @@ describe("2-month scans", () => {
     ).toBe(0);
   });
 
-  it("scanPostMatchCheckup posts a match due a checkup, recording nothing", async () => {
-    await scanPostMatchCheckup(fastify);
+  it("scanPostMatchCheckup posts a match due a checkup once, recording nothing", async () => {
+    await scanPostMatchCheckup(fastify, NOW);
+    expect(posted("emailPostMatchCheckup")).toContain(matched.id);
 
-    expect(postedIds("emailPostMatchCheckup")).toContain(matched.id);
+    await scanPostMatchCheckup(fastify, NEXT_DAY);
+    expect(posted("emailPostMatchCheckup")).not.toContain(matched.id);
+
     expect(
       await communicationsOf({
         opportunityId: matchedOpportunity.id,
@@ -169,13 +209,19 @@ describe("2-month scans", () => {
     ).toBe(0);
   });
 
-  it("scanRegularUpdate posts a regular opportunity due an update, recording nothing", async () => {
-    await scanRegularUpdate(fastify);
+  it("takes [from, to): the start included, the end left for the next day", async () => {
+    await scanRegularUpdate(fastify, NOW);
+    const today = posted("emailRegularUpdate");
+    await scanRegularUpdate(fastify, NEXT_DAY);
+    const nextDay = posted("emailRegularUpdate");
 
-    const posted = (
-      fastify.cronNotify.emailRegularUpdate as ReturnType<typeof vi.fn>
-    ).mock.calls.map(([opp]: [Opportunity]) => opp.id);
-    expect(posted).toContain(unmatched.id);
-    expect(await communicationsOf({ opportunityId: unmatched.id })).toBe(0);
+    expect(today).toContain(edges.atFrom.id);
+    expect(today).toContain(edges.beforeTo.id);
+    expect(today).not.toContain(edges.atTo.id);
+    expect(today).not.toContain(edges.beforeFrom.id);
+    expect(nextDay).toContain(edges.atTo.id);
+    expect(nextDay).not.toContain(edges.atFrom.id);
+    expect(nextDay).not.toContain(edges.beforeTo.id);
+    expect(await communicationsOf({ opportunityId: edges.atFrom.id })).toBe(0);
   });
 });
