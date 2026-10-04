@@ -17,10 +17,12 @@ const OPPORTUNITY_FIELDS = [
   ...translatedEntities[EntityTableName.OPPORTUNITY].fields,
 ];
 
-// ?language= (en | de), German when missing or unknown, like the event and
-// volunteer routes.
-export function requestLanguage(query: unknown): Lang {
-  const language = (query as { language?: unknown } | undefined)?.language;
+// The `language` of a request's query (?language=, the response language) or
+// body (a create form's, the language its text is entered in): en | de,
+// German when missing or unknown, like the event and volunteer routes.
+export function requestLanguage(queryOrBody: unknown): Lang {
+  const language = (queryOrBody as { language?: unknown } | undefined)
+    ?.language;
   return getLanguageCode(language as string) || Lang.DE;
 }
 
