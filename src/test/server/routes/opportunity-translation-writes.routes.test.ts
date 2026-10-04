@@ -12,6 +12,7 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
+import Address from "../../../data/entity/location/address.entity";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -33,6 +34,7 @@ describe("opportunity writes queue translations", () => {
   let fastify: FastifyInstance;
   let cookie: string;
   let agent: Agent;
+  let address: Address;
   let person: Person;
   let postcodeValue: string;
   const suffix = randomNumericSuffix();
@@ -82,25 +84,48 @@ describe("opportunity writes queue translations", () => {
       payload,
     });
 
-  const postLegacy = (query: string, title: string) =>
-    fastify.inject({
-      method: "POST",
-      url: `/opportunity/legacy${query}`,
-      payload: {
-        title,
-        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
-        vo_information: "Volunteering text",
-        volunteers_number: 1,
-        category: "",
-        category_id: "",
-        language: "en",
-        languages: [],
-        activities: [],
-        skills: [],
-        rac_address: `Teststrasse-${suffix} 1`,
-        rac_plz: postcodeValue,
-      },
-    });
+  // The public form and the dashboard form: the body's `language` is the
+  // one the text is entered in (be#1104).
+  const forms = {
+    "POST /opportunity/legacy": (title: string, language?: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/opportunity/legacy?language=en",
+        payload: {
+          title,
+          opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+          vo_information: "Volunteering text",
+          volunteers_number: 1,
+          category: "",
+          category_id: "",
+          ...(language !== undefined && { language }),
+          languages: [],
+          activities: [],
+          skills: [],
+          rac_address: `Teststrasse-${suffix} 1`,
+          rac_plz: postcodeValue,
+        },
+      }),
+    "POST /opportunity": (title: string, language?: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/opportunity/?language=en",
+        cookies: { [accessCookieName]: cookie },
+        payload: {
+          title,
+          agent_id: agent.id,
+          opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+          vo_information: "Volunteering text",
+          volunteers_number: 1,
+          category: "",
+          category_id: "",
+          ...(language !== undefined && { language }),
+          languageIds: [],
+          activityIds: [],
+          skillIds: [],
+        },
+      }),
+  };
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -113,8 +138,19 @@ describe("opportunity writes queue translations", () => {
     postcodeValue = (
       await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
     ).value;
+    // POST /opportunity needs the NGO's address to have a postcode.
+    address = await dataSource.manager.save(
+      new Address({
+        postcodeId: (
+          await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
+        ).id,
+      }),
+    );
     agent = await fastify.db.agentRepository.save(
-      new Agent({ title: `Translation writes agent ${suffix}` }),
+      new Agent({
+        title: `Translation writes agent ${suffix}`,
+        addressId: address.id,
+      }),
     );
     person = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Translation writes" }),
@@ -153,20 +189,23 @@ describe("opportunity writes queue translations", () => {
     await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
+    await dataSource.manager.delete(Address, { id: address.id });
     await fastify.close();
   });
 
-  describe("POST /opportunity/legacy", () => {
-    async function create(query: string) {
-      const title = `Created ${suffix}-${query || "none"}`;
-      const res = await postLegacy(query, title);
-      expect(res.statusCode).toBe(200);
+  describe.each(Object.keys(forms) as (keyof typeof forms)[])("%s", (form) => {
+    async function create(language?: string) {
+      const res = await forms[form](
+        `Created ${suffix}-${form}-${language ?? "none"}`,
+        language,
+      );
+      expect(res.statusCode).toBeLessThan(300);
       const opportunity =
         await fastify.db.opportunityRepository.findOneByOrFail({
           id: res.json().data.id,
         });
       created.push(opportunity.id);
-      if (opportunity.agentId) {
+      if (opportunity.agentId && opportunity.agentId !== agent.id) {
         createdAgents.push(opportunity.agentId);
       }
       if (opportunity.dealId) {
@@ -175,8 +214,8 @@ describe("opportunity writes queue translations", () => {
       return opportunity;
     }
 
-    it("takes the original language from ?language= and queues the other one", async () => {
-      const opportunity = await create("?language=en");
+    it("takes the original language from the body and queues the other one", async () => {
+      const opportunity = await create("en");
 
       expect(opportunity.originalLanguageId).toBe(ids[Lang.EN]);
       const rows = await rowsOf(opportunity.id);
@@ -188,8 +227,9 @@ describe("opportunity writes queue translations", () => {
       ]);
     });
 
-    it("defaults to German without ?language=", async () => {
-      const opportunity = await create("");
+    // The request's ?language=en is ignored: it's the body that counts.
+    it("takes German from the body over ?language=en", async () => {
+      const opportunity = await create("de");
 
       expect(opportunity.originalLanguageId).toBe(ids[Lang.DE]);
       const rows = await rowsOf(opportunity.id);
@@ -197,6 +237,14 @@ describe("opportunity writes queue translations", () => {
         ids[Lang.EN],
         ids[Lang.EN],
       ]);
+    });
+
+    it.each([
+      ["no language", undefined],
+      ["an unknown one", "fr"],
+    ])("defaults to German with %s", async (_, language) => {
+      const opportunity = await create(language);
+      expect(opportunity.originalLanguageId).toBe(ids[Lang.DE]);
     });
   });
 
@@ -240,7 +288,9 @@ describe("opportunity writes queue translations", () => {
     });
   });
 
-  it("documents ?language= on the write routes", async () => {
+  // ?language= picks a response language: the post routes take it; the
+  // opportunity writes don't (their language is in the body, be#1104).
+  it("documents ?language= only where a route reads it", async () => {
     const { paths } = (
       await fastify.inject({ method: "GET", url: "/swagger/json" })
     ).json();
@@ -253,13 +303,17 @@ describe("opportunity writes queue translations", () => {
       );
 
     for (const [path, method] of [
-      ["/opportunity/", "post"],
-      ["/opportunity/legacy/", "post"],
-      ["/opportunity/{id}", "patch"],
       ["/post/", "post"],
       ["/post/{id}", "patch"],
     ]) {
       expect(languageParam(path, method), `${method} ${path}`).toBeDefined();
+    }
+    for (const [path, method] of [
+      ["/opportunity/", "post"],
+      ["/opportunity/legacy/", "post"],
+      ["/opportunity/{id}", "patch"],
+    ]) {
+      expect(languageParam(path, method), `${method} ${path}`).toBeUndefined();
     }
   });
 
