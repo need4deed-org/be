@@ -54,6 +54,7 @@ import Appreciation from "./entity/volunteer/appreciation.entity";
 import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
+import { OpportunityVolunteerSubscriber } from "./subscribers/opportunity-volunteer.subscriber";
 import { getLoggingForDataSource, getSslForDataSource } from "./utils";
 
 export const dataSource = new DataSource({
@@ -124,7 +125,7 @@ export const dataSource = new DataSource({
   ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],
   migrationsTableName: "be_migrations",
-  subscribers: [],
+  subscribers: [OpportunityVolunteerSubscriber],
   namingStrategy: new SnakeCaseNamingStrategy(),
   logging: getLoggingForDataSource(process.env.NODE_ENV),
   logger: "advanced-console",

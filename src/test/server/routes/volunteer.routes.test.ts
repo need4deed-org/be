@@ -101,10 +101,8 @@ describe("DELETE /volunteer/:id", () => {
         status: OpportunityVolunteerStatusType.MATCHED,
       }),
     );
-    // Set deterministically rather than relying on OpportunityVolunteer's
-    // fire-and-forget @AfterInsert hook (updateOpportunityMatching isn't
-    // awaited there), so the "before" state for the recompute assertion
-    // below isn't a race.
+    // Set explicitly so the "before" state for the recompute assertion below
+    // doesn't depend on what OpportunityVolunteerSubscriber computed on insert.
     await fastify.db.opportunityRepository.update(
       { id: opportunity.id },
       { statusMatch: OpportunityMatchStatusType.MATCHED },
