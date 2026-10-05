@@ -19,6 +19,7 @@ import { crossedMonthsAgo } from "../../../services/jobs/german-holidays";
 import { scanPostMatchCheckup } from "../../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../../services/jobs/scan-stale-pending";
+import { sendEmailRegularUpdate } from "../../../services/notify/events/email-regular-update";
 import { randomNumericSuffix } from "../../random";
 
 // A fixed run, so the window doesn't depend on today: the run on Oct 3
@@ -223,5 +224,31 @@ describe("2-month scans", () => {
     expect(nextDay).not.toContain(edges.atFrom.id);
     expect(nextDay).not.toContain(edges.beforeTo.id);
     expect(await communicationsOf({ opportunityId: edges.atFrom.id })).toBe(0);
+  });
+
+  // be#982: an opportunity comes up on one run only, so a post that fails —
+  // here the real event, for a contact person without an email — alerts ops.
+  it("alerts ops when a regular update can't be posted, and goes on", async () => {
+    const send = vi.fn();
+    (
+      fastify.cronNotify.emailRegularUpdate as ReturnType<typeof vi.fn>
+    ).mockImplementationOnce((opp: Opportunity) =>
+      sendEmailRegularUpdate({ send }, opp),
+    );
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
+    try {
+      await scanRegularUpdate(fastify, NOW);
+      const [failed, ...others] = posted("emailRegularUpdate");
+
+      expect(send).not.toHaveBeenCalled();
+      expect(opsAlert).toHaveBeenCalledTimes(1);
+      expect(opsAlert.mock.calls[0][0]).toContain(`opportunity ${failed}`);
+      expect(opsAlert.mock.calls[0][0]).toContain("missing contact email");
+      expect(others.length).toBeGreaterThan(0);
+    } finally {
+      opsAlert.mockRestore();
+    }
   });
 });
