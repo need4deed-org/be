@@ -45,16 +45,19 @@ describe("update*Matching save failures", () => {
         status: OpportunityVolunteerStatusType.PENDING,
       }),
     );
-    // Stale, so the recompute has something to save.
+    // Stale, so the recompute has something to save. *-past rather than e.g.
+    // no-matches: the backfill-status-match test runs the migration in an open
+    // transaction over the shared DB and skips *-past rows, so it never holds
+    // these rows' locks (CI runs test files in parallel).
     await manager.update(
       Volunteer,
       { id: volunteers[0].id },
-      { statusMatch: VolunteerStateMatchType.NO_MATCHES },
+      { statusMatch: VolunteerStateMatchType.PAST },
     );
     await manager.update(
       Opportunity,
       { id: opportunities[0].id },
-      { statusMatch: OpportunityMatchStatusType.NO_MATCHES },
+      { statusMatch: OpportunityMatchStatusType.PAST },
     );
   });
 
@@ -75,6 +78,9 @@ describe("update*Matching save failures", () => {
     holder = dataSource.createQueryRunner();
     await holder.connect();
     await holder.startTransaction();
+    // Fail fast with a clear error, not a test timeout, if anything else
+    // holds the row.
+    await holder.query("SET LOCAL lock_timeout = '2s'");
     await holder.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [
       id,
     ]);
@@ -91,7 +97,7 @@ describe("update*Matching save failures", () => {
       statusMatch: async (id: number) =>
         (await dataSource.manager.findOneByOrFail(Volunteer, { id }))
           .statusMatch,
-      stale: VolunteerStateMatchType.NO_MATCHES,
+      stale: VolunteerStateMatchType.PAST,
     },
     {
       name: "opportunity",
@@ -101,7 +107,7 @@ describe("update*Matching save failures", () => {
       statusMatch: async (id: number) =>
         (await dataSource.manager.findOneByOrFail(Opportunity, { id }))
           .statusMatch,
-      stale: OpportunityMatchStatusType.NO_MATCHES,
+      stale: OpportunityMatchStatusType.PAST,
     },
   ];
 
