@@ -16,6 +16,6 @@ export async function reportCronFailure(
   const reason = err instanceof Error ? err.message : String(err);
   logger.error(`${job}: ${item} failed: ${reason}`);
   await fastify.notify.opsAlert(
-    `Cron ${job}: ${item} not posted to #cron-notifications — ${reason}. Fix the data and follow up by hand.`,
+    `Cron ${job}: ${item} not posted to #cron-notifications: ${reason}. Follow up by hand.`,
   );
 }
