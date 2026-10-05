@@ -5,16 +5,23 @@ import {
 import { EntityManager } from "typeorm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../../data/entity/m2m/opportunity-volunteer";
+import VolunteerAuditLog from "../../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
 import { syncVolunteerEngagement } from "../../../../server/utils/data/sync-volunteer-engagement";
 
 const exists = vi.fn();
 const update = vi.fn();
-const manager = { exists, update } as unknown as EntityManager;
+const findOne = vi.fn();
+const save = vi.fn();
+const manager = { exists, update, findOne, save } as unknown as EntityManager;
 
 beforeEach(() => {
   vi.clearAllMocks();
   update.mockResolvedValue({ affected: 1 });
+  findOne.mockResolvedValue({
+    id: 7,
+    statusEngagement: VolunteerStateEngagementType.UNRESPONSIVE,
+  });
 });
 
 describe("syncVolunteerEngagement", () => {
@@ -35,6 +42,29 @@ describe("syncVolunteerEngagement", () => {
         dateReturn: null,
       },
     );
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(
+      VolunteerAuditLog,
+      expect.objectContaining({
+        volunteerId: 7,
+        type: "availability_changed",
+        detail: `Status changed from ${VolunteerStateEngagementType.UNRESPONSIVE} to ${VolunteerStateEngagementType.ACTIVE}.`,
+        actorUserId: undefined,
+      }),
+    );
+  });
+
+  it("writes no audit row when the volunteer was already Active", async () => {
+    exists.mockResolvedValue(true);
+    findOne.mockResolvedValue({
+      id: 7,
+      statusEngagement: VolunteerStateEngagementType.ACTIVE,
+    });
+
+    await syncVolunteerEngagement(manager, 7);
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("moves Active to Available when no match is active, without touching other statuses", async () => {
@@ -50,5 +80,22 @@ describe("syncVolunteerEngagement", () => {
       { id: 7, statusEngagement: VolunteerStateEngagementType.ACTIVE },
       { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
     );
+    expect(save).toHaveBeenCalledWith(
+      VolunteerAuditLog,
+      expect.objectContaining({
+        volunteerId: 7,
+        type: "availability_changed",
+        detail: `Status changed from ${VolunteerStateEngagementType.ACTIVE} to ${VolunteerStateEngagementType.AVAILABLE}.`,
+      }),
+    );
+  });
+
+  it("writes no audit row when the volunteer wasn't Active", async () => {
+    exists.mockResolvedValue(false);
+    update.mockResolvedValue({ affected: 0 });
+
+    await syncVolunteerEngagement(manager, 7);
+
+    expect(save).not.toHaveBeenCalled();
   });
 });
