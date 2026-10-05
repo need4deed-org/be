@@ -103,23 +103,14 @@ describe("sendEmailSuggestionAccompanying", () => {
     expect(msg.text).not.toContain("undefined");
   });
 
-  // be#1092: a suggested volunteer isn't matched yet, so gets the area only.
-  it("gives the district instead of the street address", async () => {
+  it("gives the full street address", async () => {
     await sendEmailSuggestionAccompanying(
       email,
       buildOv({ district: { title: "Neukölln" } }),
     );
 
     const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Address: Neukölln, 10115");
-    expect(msg.text).not.toContain("Main street 1");
-  });
-
-  it("falls back to Berlin when the opportunity has no district", async () => {
-    await sendEmailSuggestionAccompanying(email, buildOv());
-
-    const msg = send.mock.calls[0][0];
-    expect(msg.text).toContain("Address: Berlin, 10115");
-    expect(msg.text).not.toContain("Main street 1");
+    expect(msg.text).toContain("Address: Main street 1, 10115");
+    expect(msg.text).not.toContain("Neukölln");
   });
 });

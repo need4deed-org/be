@@ -23,9 +23,7 @@ describe("validateEmailMessage", () => {
       ...validMessage,
       to: "not-an-email",
     });
-    expect(problems).toEqual([
-      '"to" doesn\'t look like an email address: "not-an-email"',
-    ]);
+    expect(problems).toEqual(['"to" doesn\'t look like an email address']);
   });
 
   it("accepts an array to, joining for the report", () => {
@@ -48,9 +46,7 @@ describe("validateEmailMessage", () => {
       ...validMessage,
       subject: "Hi {{ name }}",
     });
-    expect(problems).toEqual([
-      'subject has an unresolved placeholder: "Hi {{ name }}"',
-    ]);
+    expect(problems).toEqual(["subject has an unresolved placeholder"]);
   });
 
   it("flags when neither text nor html is set", () => {

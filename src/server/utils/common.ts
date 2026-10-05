@@ -231,3 +231,11 @@ export function getVolunteerNotificationText(
 export function getOpportunityNotificationText(title: string): string {
   return `New opportunity arrived: "${title}" at ${formatBerlinTimestamp()}`;
 }
+
+// Environment variables, as process.env holds them.
+export type Env = Record<string, string | undefined>;
+
+/** The value of the first of `names` that is set in `env`. */
+export function firstEnvValue(env: Env, names: string[]): string | undefined {
+  return names.map((name) => env[name]).find((value) => value !== undefined);
+}

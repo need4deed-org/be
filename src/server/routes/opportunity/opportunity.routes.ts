@@ -528,8 +528,6 @@ export default async function opportunityRoutes(
     "/",
     {
       schema: {
-        // The language the text is entered in (be#1068).
-        querystring: langQuerySchema,
         body: opportunityCreateBodySchema,
         response: opportunityCreateResponseSchema,
       },
@@ -641,9 +639,10 @@ export default async function opportunityRoutes(
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
+      // The form's language is the one its text is entered in (be#1104).
       const id = await writeOpportunityLegacy(
         opportunity,
-        requestLanguage(request.query),
+        requestLanguage(request.body),
       );
 
       fastify.notify.opsAlert(
@@ -726,7 +725,6 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
-        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },

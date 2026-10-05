@@ -48,6 +48,11 @@ export function isGermanPublicHoliday(date: Date): boolean {
   return holidays.some((h) => sameDay(h, date));
 }
 
+export function isWorkingDay(date: Date): boolean {
+  const dow = date.getDay();
+  return dow !== 0 && dow !== 6 && !isGermanPublicHoliday(date);
+}
+
 export function addWorkingDays(from: Date, days: number): Date {
   let result = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const direction = days < 0 ? -1 : 1;
@@ -55,8 +60,7 @@ export function addWorkingDays(from: Date, days: number): Date {
   let added = 0;
   while (added < remaining) {
     result = addDays(result, direction);
-    const dow = result.getDay();
-    if (dow !== 0 && dow !== 6 && !isGermanPublicHoliday(result)) {
+    if (isWorkingDay(result)) {
       added++;
     }
   }
@@ -66,8 +70,7 @@ export function addWorkingDays(from: Date, days: number): Date {
 // Returns a Date n calendar months before now, clamping the day to the last
 // day of the target month to avoid setMonth overflow (e.g. Apr 30 - 2 months
 // should be Feb 28, not Mar 2).
-export function monthsAgo(n: number): Date {
-  const now = new Date();
+export function monthsAgo(n: number, now: Date = new Date()): Date {
   const targetMonth = now.getMonth() - n;
   const y = now.getFullYear() + Math.floor(targetMonth / 12);
   const m = ((targetMonth % 12) + 12) % 12;
@@ -126,5 +129,38 @@ export function berlinDayBoundaries(berlinDate: Date): {
   return {
     startOfDay: new Date(Date.UTC(y, m, d, 0) - berlinOffsetMs),
     endOfDay: new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - berlinOffsetMs),
+  };
+}
+
+/**
+ * The `updatedAt` range [from, to) a daily run takes for an n-month threshold
+ * (be#1088): rows that crossed it since the previous day's run. Consecutive
+ * days' ranges meet exactly, so a row is taken on one run only. Where the
+ * month-end clamp gives two days the same threshold (Apr 29 and 30 → Feb 28),
+ * the second day's range is empty rather than overlapping.
+ */
+export function crossedMonthsAgo(
+  n: number,
+  now: Date = new Date(),
+): { from: Date; to: Date } {
+  return { from: monthsAgo(n, addDays(now, -1)), to: monthsAgo(n, now) };
+}
+
+/**
+ * The appointment times [from, to) a working day's run takes when checking
+ * for accompaniments still without a volunteer (be#1088): the day
+ * `workingDaysAhead` working days ahead, plus the weekend or holidays right
+ * after it, up to the next working day (Berlin time). Consecutive working
+ * days' ranges cover every calendar day once, and a weekend or holiday
+ * appointment gets as much notice as the working day before it.
+ */
+export function appointmentsDue(
+  today: Date,
+  workingDaysAhead: number,
+): { from: Date; to: Date } {
+  const target = addWorkingDays(today, workingDaysAhead);
+  return {
+    from: berlinDayBoundaries(target).startOfDay,
+    to: berlinDayBoundaries(addWorkingDays(target, 1)).startOfDay,
   };
 }
