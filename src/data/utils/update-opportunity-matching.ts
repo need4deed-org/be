@@ -9,11 +9,15 @@ import { getRepository } from "./get-repository";
 // Pass the caller's EntityManager when running inside a transaction (e.g.
 // from OpportunityVolunteerSubscriber), so the recompute sees the uncommitted
 // link rows; otherwise it reads committed data via the global dataSource.
+// With a manager, a failed save throws instead of being logged: in Postgres it
+// has already aborted the caller's transaction, so swallowing it would let the
+// caller's COMMIT silently roll back (be#1106).
 export async function updateOpportunityMatching(
   id: number,
-  manager: EntityManager = dataSource.manager,
+  manager?: EntityManager,
 ): Promise<void> {
-  const opportunityRepository = getRepository(manager, Opportunity);
+  const entityManager = manager ?? dataSource.manager;
+  const opportunityRepository = getRepository(entityManager, Opportunity);
   const opportunity = await opportunityRepository.findOneBy({ id });
   if (!opportunity) {
     return dataSource.logger.log(
@@ -23,7 +27,7 @@ export async function updateOpportunityMatching(
   }
 
   const opportunityVolunteerRepository = getRepository(
-    manager,
+    entityManager,
     OpportunityVolunteer,
   );
   const volunteersLinked = await opportunityVolunteerRepository.find({
@@ -36,9 +40,15 @@ export async function updateOpportunityMatching(
   );
 
   if (statusMatch !== opportunity.statusMatch) {
-    const [, error] = await tryCatch(
-      opportunityRepository.save(Object.assign(opportunity, { statusMatch })),
+    const save = opportunityRepository.save(
+      Object.assign(opportunity, { statusMatch }),
     );
+    if (manager) {
+      await save;
+      return;
+    }
+
+    const [, error] = await tryCatch(save);
 
     if (error) {
       dataSource.logger.log(
