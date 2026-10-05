@@ -1,8 +1,8 @@
 import { FastifyInstance } from "fastify";
 import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
-import logger from "../../logger";
 import { crossedMonthsAgo } from "./german-holidays";
+import { reportCronFailure } from "./report-cron-failure";
 
 export async function scanRegularUpdate(
   fastify: FastifyInstance,
@@ -30,7 +30,12 @@ export async function scanRegularUpdate(
     try {
       await fastify.cronNotify.emailRegularUpdate(opp);
     } catch (err) {
-      logger.error(`scanRegularUpdate: opp ${opp.id} failed: ${err}`);
+      await reportCronFailure(
+        fastify,
+        "scanRegularUpdate",
+        `opportunity ${opp.id}`,
+        err,
+      );
     }
   }
 }
