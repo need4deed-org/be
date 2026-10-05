@@ -27,6 +27,7 @@ import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
+import RefreshSession from "../../data/entity/refresh-session.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
@@ -62,6 +63,7 @@ declare module "fastify" {
       postRepository: Repository<Post>;
       postReactionRepository: Repository<PostReaction>;
       postBookmarkRepository: Repository<PostBookmark>;
+      refreshSessionRepository: Repository<RefreshSession>;
       trustedDomainRepository: Repository<TrustedDomain>;
       volunteerAuditLogRepository: Repository<VolunteerAuditLog>;
     };

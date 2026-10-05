@@ -25,6 +25,7 @@ import Organization from "../../data/entity/organization.entity";
 import Person from "../../data/entity/person.entity";
 import Post from "../../data/entity/post.entity";
 import Language from "../../data/entity/profile/language.entity";
+import RefreshSession from "../../data/entity/refresh-session.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import Appreciation from "../../data/entity/volunteer/appreciation.entity";
@@ -71,6 +72,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       postRepository: dataSource.getRepository(Post),
       postReactionRepository: dataSource.getRepository(PostReaction),
       postBookmarkRepository: dataSource.getRepository(PostBookmark),
+      refreshSessionRepository: dataSource.getRepository(RefreshSession),
       trustedDomainRepository: dataSource.getRepository(TrustedDomain),
       volunteerAuditLogRepository: dataSource.getRepository(VolunteerAuditLog),
     });
