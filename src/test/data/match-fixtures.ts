@@ -24,3 +24,28 @@ export function createOpportunity(manager: EntityManager, title: string) {
     new Opportunity({ title, type: OpportunityType.REGULAR }),
   );
 }
+
+// Committed fixtures created via createVolunteer/createOpportunity, removed
+// in afterAll. Tolerates partially-created fixtures (failed beforeAll).
+export async function deleteFixtures(
+  manager: EntityManager,
+  volunteers: Volunteer[],
+  opportunities: Opportunity[],
+) {
+  const volunteerIds = volunteers.map(({ id }) => id);
+  const opportunityIds = opportunities.map(({ id }) => id);
+  if (volunteerIds.length) {
+    await manager.delete(Volunteer, volunteerIds);
+    await manager.delete(
+      Deal,
+      volunteers.map(({ dealId }) => dealId),
+    );
+    await manager.delete(
+      Person,
+      volunteers.map(({ personId }) => personId),
+    );
+  }
+  if (opportunityIds.length) {
+    await manager.delete(Opportunity, opportunityIds);
+  }
+}

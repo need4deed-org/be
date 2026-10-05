@@ -14,13 +14,15 @@ import {
   it,
 } from "vitest";
 import { dataSource } from "../../../data/data-source";
-import Deal from "../../../data/entity/deal.entity";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { randomNumericSuffix } from "../../random";
-import { createOpportunity, createVolunteer } from "../match-fixtures";
+import {
+  createOpportunity,
+  createVolunteer,
+  deleteFixtures,
+} from "../match-fixtures";
 
 // be#1106. Everything runs inside one uncommitted transaction: the recompute
 // must see rows the transaction itself wrote, which the old fire-and-forget
@@ -92,6 +94,28 @@ describe("OpportunityVolunteerSubscriber", () => {
     ]);
   });
 
+  it("recomputes and locks old and new parents when a link moves", async () => {
+    const other = await createOpportunity(
+      queryRunner.manager,
+      `Subscriber other ${suffix}`,
+    );
+    const ov = await link(OpportunityVolunteerStatusType.MATCHED);
+    ov.opportunityId = other.id;
+    await queryRunner.manager.save(ov);
+
+    expect(await statuses()).toEqual([
+      VolunteerStateMatchType.MATCHED,
+      OpportunityMatchStatusType.NEEDS_REMATCH,
+    ]);
+    expect(
+      (
+        await queryRunner.manager.findOneByOrFail(Opportunity, {
+          id: other.id,
+        })
+      ).statusMatch,
+    ).toBe(OpportunityMatchStatusType.MATCHED);
+  });
+
   it("recomputes both sides on remove", async () => {
     const ov = await link(OpportunityVolunteerStatusType.MATCHED);
     await queryRunner.manager.remove(ov);
@@ -110,54 +134,58 @@ describe("OpportunityVolunteerSubscriber", () => {
 // link → Postgres deadlock error.
 describe("OpportunityVolunteerSubscriber lock ordering", () => {
   const suffix = randomNumericSuffix();
-  let volunteers: Volunteer[];
-  let opportunity: Opportunity;
-  let links: OpportunityVolunteer[];
+  const volunteers: Volunteer[] = [];
+  const opportunities: Opportunity[] = [];
+  let link: OpportunityVolunteer;
 
   beforeAll(async () => {
     if (!dataSource.isInitialized) {
       await dataSource.initialize();
     }
     const manager = dataSource.manager;
-    volunteers = [
-      await createVolunteer(manager),
-      await createVolunteer(manager),
-    ];
-    opportunity = await createOpportunity(manager, `Locking ${suffix}`);
-    links = [];
-    for (const volunteer of volunteers) {
-      links.push(
-        await manager.save(
-          new OpportunityVolunteer({
-            volunteerId: volunteer.id,
-            opportunityId: opportunity.id,
-            status: OpportunityVolunteerStatusType.PENDING,
-          }),
-        ),
-      );
-    }
+    volunteers.push(await createVolunteer(manager));
+    opportunities.push(await createOpportunity(manager, `Locking ${suffix}`));
+    link = await manager.save(
+      new OpportunityVolunteer({
+        volunteerId: volunteers[0].id,
+        opportunityId: opportunities[0].id,
+        status: OpportunityVolunteerStatusType.PENDING,
+      }),
+    );
   });
 
   afterAll(async () => {
-    const manager = dataSource.manager;
-    await manager.delete(
-      OpportunityVolunteer,
-      links.map(({ id }) => id),
-    );
-    await manager.delete(Opportunity, opportunity.id);
-    for (const { id, dealId, personId } of volunteers) {
-      await manager.delete(Volunteer, id);
-      await manager.delete(Deal, dealId);
-      await manager.delete(Person, personId);
-    }
+    // Links go with their volunteer/opportunity (ON DELETE CASCADE).
+    await deleteFixtures(dataSource.manager, volunteers, opportunities);
   });
 
+  // Resolves once the backend is waiting on a lock held by another one.
+  const waitUntilBlocked = async (pid: number) => {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [{ blocked }] = await dataSource.query(
+        "SELECT cardinality(pg_blocking_pids($1)) > 0 AS blocked",
+        [pid],
+      );
+      if (blocked) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`backend ${pid} never blocked`);
+  };
+
   it("serialises on the opportunity instead of deadlocking", async () => {
+    const opportunity = opportunities[0];
     const cron = dataSource.createQueryRunner();
     const coordinator = dataSource.createQueryRunner();
+    let coordinatorSave: Promise<void> | undefined;
     await cron.connect();
     await coordinator.connect();
     try {
+      const [{ pid }] = await coordinator.query(
+        "SELECT pg_backend_pid() AS pid",
+      );
+
       await cron.startTransaction();
       // Like applyOnetimerTransition: the opportunity row first.
       await cron.manager.update(
@@ -167,28 +195,30 @@ describe("OpportunityVolunteerSubscriber lock ordering", () => {
       );
 
       await coordinator.startTransaction();
-      const coordinatorSave = coordinator.manager
+      coordinatorSave = coordinator.manager
         .save(
-          Object.assign(new OpportunityVolunteer(), links[0], {
+          Object.assign(new OpportunityVolunteer(), link, {
             status: OpportunityVolunteerStatusType.MATCHED,
           }),
         )
         .then(() => coordinator.commitTransaction());
 
-      // Let the coordinator's save reach its lock wait.
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await waitUntilBlocked(pid);
 
       await cron.manager.save(
-        Object.assign(new OpportunityVolunteer(), links[0], {
+        Object.assign(new OpportunityVolunteer(), link, {
           status: OpportunityVolunteerStatusType.ACTIVE,
         }),
       );
       await cron.commitTransaction();
       await coordinatorSave;
     } finally {
+      // The cron first: an open cron transaction would keep the coordinator's
+      // save waiting on its locks.
       if (cron.isTransactionActive) {
         await cron.rollbackTransaction();
       }
+      await Promise.allSettled([coordinatorSave]);
       if (coordinator.isTransactionActive) {
         await coordinator.rollbackTransaction();
       }
@@ -196,14 +226,14 @@ describe("OpportunityVolunteerSubscriber lock ordering", () => {
       await coordinator.release();
     }
 
-    const saved = await dataSource.manager.findBy(OpportunityVolunteer, {
-      opportunityId: opportunity.id,
-    });
-    expect(Object.fromEntries(saved.map((l) => [l.id, l.status]))).toEqual({
-      // The coordinator's save waited for the cron, so it wrote last.
-      [links[0].id]: OpportunityVolunteerStatusType.MATCHED,
-      [links[1].id]: OpportunityVolunteerStatusType.PENDING,
-    });
+    // The coordinator's save waited for the cron, so it wrote last.
+    expect(
+      (
+        await dataSource.manager.findOneByOrFail(OpportunityVolunteer, {
+          id: link.id,
+        })
+      ).status,
+    ).toBe(OpportunityVolunteerStatusType.MATCHED);
     expect(
       (
         await dataSource.manager.findOneByOrFail(Opportunity, {
