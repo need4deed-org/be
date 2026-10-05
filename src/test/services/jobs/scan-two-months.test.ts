@@ -40,8 +40,8 @@ describe("2-month scans", () => {
   const deals: number[] = [];
   let regular: Opportunity;
   // Opportunities without matches at the window's edges: saving a match
-  // updates its opportunity afterwards (updateOpportunityMatching, not
-  // awaited), which would undo the backdate.
+  // updates its opportunity (OpportunityVolunteerSubscriber), which would
+  // undo the backdate.
   const edges: Record<string, Opportunity> = {};
   const EDGES: Record<string, Date> = {
     atFrom: FROM,

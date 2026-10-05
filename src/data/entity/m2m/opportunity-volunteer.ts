@@ -1,9 +1,6 @@
 import { IsEnum } from "class-validator";
 import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import {
-  AfterInsert,
-  AfterRemove,
-  AfterUpdate,
   Column,
   CreateDateColumn,
   Entity,
@@ -67,31 +64,4 @@ export default class OpportunityVolunteer {
 
   @OneToMany(() => ActivityLog, (log) => log.opportunityVolunteer)
   activityLogs: ActivityLog[];
-
-  @AfterInsert()
-  async afterInsertHook() {
-    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
-      "../../utils"
-    );
-    updateVolunteerMatching(this.volunteerId);
-    updateOpportunityMatching(this.opportunityId);
-  }
-
-  @AfterUpdate()
-  async afterUpdateHook() {
-    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
-      "../../utils"
-    );
-    updateVolunteerMatching(this.volunteerId);
-    updateOpportunityMatching(this.opportunityId);
-  }
-
-  @AfterRemove()
-  async afterRemoveHook() {
-    const { updateVolunteerMatching, updateOpportunityMatching } = await import(
-      "../../utils"
-    );
-    updateVolunteerMatching(this.volunteerId);
-    updateOpportunityMatching(this.opportunityId);
-  }
 }

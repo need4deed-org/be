@@ -35,7 +35,14 @@ export async function applyOnetimerTransition(
         opportunity.status = opportunityStatus;
         await manager.save(Opportunity, opportunity);
 
-        for (const { volunteer, status } of volunteerUpdates) {
+        // By volunteerId, so concurrent multi-link writers lock volunteers
+        // in the same order (see OpportunityVolunteerSubscriber).
+        const ordered = [...volunteerUpdates].sort(
+          (a, b) =>
+            a.volunteer.volunteerId - b.volunteer.volunteerId ||
+            a.volunteer.id - b.volunteer.id,
+        );
+        for (const { volunteer, status } of ordered) {
           volunteer.status = status;
           await manager.save(OpportunityVolunteer, volunteer);
         }
