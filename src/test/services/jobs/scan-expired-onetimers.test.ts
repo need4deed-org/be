@@ -20,6 +20,8 @@ vi.mock("../../../logger", () => ({
 
 const getMany = vi.fn();
 const managerSave = vi.fn();
+const managerExists = vi.fn();
+const managerUpdate = vi.fn();
 
 const qbMock = {
   leftJoinAndSelect: vi.fn().mockReturnThis(),
@@ -35,6 +37,8 @@ const transaction = vi.fn(
   async (cb: (manager: EntityManager) => Promise<void>) =>
     cb({
       save: (...args: unknown[]) => managerSave(...args),
+      exists: (...args: unknown[]) => managerExists(...args),
+      update: (...args: unknown[]) => managerUpdate(...args),
     } as unknown as EntityManager),
 );
 
@@ -63,9 +67,13 @@ beforeEach(() => {
   transaction.mockImplementation(async (cb) =>
     cb({
       save: (...args: unknown[]) => managerSave(...args),
+      exists: (...args: unknown[]) => managerExists(...args),
+      update: (...args: unknown[]) => managerUpdate(...args),
     } as unknown as EntityManager),
   );
   managerSave.mockImplementation(async (_entity: unknown, obj: unknown) => obj);
+  managerExists.mockResolvedValue(false);
+  managerUpdate.mockResolvedValue({ affected: 0 });
 });
 
 describe("scanExpiredOnetimers", () => {
@@ -247,5 +255,22 @@ describe("scanExpiredOnetimers", () => {
     expect(opportunity.opportunityVolunteer[0].status).toBe(
       OpportunityVolunteerStatusType.MATCHED,
     );
+  });
+  it("syncs each affected volunteer's engagement status in the same transaction", async () => {
+    const opportunity = buildOpportunity(30, [
+      { id: 1, volunteerId: 5, status: OpportunityVolunteerStatusType.ACTIVE },
+      { id: 2, volunteerId: 6, status: OpportunityVolunteerStatusType.ACTIVE },
+    ]);
+    getMany.mockResolvedValue([opportunity]);
+
+    await scanExpiredOnetimers(fastify);
+
+    expect(managerExists).toHaveBeenCalledWith(OpportunityVolunteer, {
+      where: { volunteerId: 5, status: OpportunityVolunteerStatusType.ACTIVE },
+    });
+    expect(managerExists).toHaveBeenCalledWith(OpportunityVolunteer, {
+      where: { volunteerId: 6, status: OpportunityVolunteerStatusType.ACTIVE },
+    });
+    expect(managerUpdate).toHaveBeenCalledTimes(2);
   });
 });
