@@ -45,6 +45,7 @@ import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
 import Service from "./entity/profile/service.entity";
 import Skill from "./entity/profile/skill.entity";
+import RefreshSession from "./entity/refresh-session.entity";
 import StatisticsEvent from "./entity/statistics-event.entity";
 import Testimonial from "./entity/testimonial.entity";
 import Timeslot from "./entity/time/timeslot.entity";
@@ -113,6 +114,7 @@ export const dataSource = new DataSource({
     PostBookmark,
     PostReaction,
     Option,
+    RefreshSession,
     Service,
     Skill,
     Testimonial,
