@@ -5,8 +5,8 @@ import {
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
 import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
-import logger from "../../logger";
 import { appointmentsDue, berlinToday } from "./german-holidays";
+import { reportCronFailure } from "./report-cron-failure";
 
 export async function scanAccompanyNotFound(
   fastify: FastifyInstance,
@@ -51,7 +51,12 @@ export async function scanAccompanyNotFound(
     try {
       await fastify.cronNotify.emailAccompanyNotFound(opp);
     } catch (err) {
-      logger.error(`scanAccompanyNotFound: opp ${opp.id} failed: ${err}`);
+      await reportCronFailure(
+        fastify,
+        "scanAccompanyNotFound",
+        `opportunity ${opp.id}`,
+        err,
+      );
     }
   }
 }

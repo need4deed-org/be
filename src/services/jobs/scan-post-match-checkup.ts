@@ -4,8 +4,8 @@ import {
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
 import { And, LessThan, MoreThanOrEqual } from "typeorm";
-import logger from "../../logger";
 import { crossedMonthsAgo } from "./german-holidays";
+import { reportCronFailure } from "./report-cron-failure";
 
 export async function scanPostMatchCheckup(
   fastify: FastifyInstance,
@@ -29,7 +29,12 @@ export async function scanPostMatchCheckup(
     try {
       await fastify.cronNotify.emailPostMatchCheckup(ov);
     } catch (err) {
-      logger.error(`scanPostMatchCheckup: ov ${ov.id} failed: ${err}`);
+      await reportCronFailure(
+        fastify,
+        "scanPostMatchCheckup",
+        `match ${ov.id}`,
+        err,
+      );
     }
   }
 }
