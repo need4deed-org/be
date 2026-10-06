@@ -20,6 +20,7 @@ import {
   createAgentContact,
   updateAgentContact,
 } from "../../utils";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 // Mirrors the role allowlist on PATCH /opportunity/:id: only these three
 // roles may reach the membership check, regardless of whether a stray
@@ -108,6 +109,11 @@ export default function agentContactRoutes(
         request.authUser?.role as UserRole,
       );
       agentPerson.agent = agent;
+      // A linked existing AGENT user (by email) gets a PENDING membership the
+      // caller isn't entitled to see through yet — mask before echoing it
+      // back, or this endpoint becomes an email -> contact-details probe
+      // (be#975).
+      await maskForCaller(request, agentPerson);
 
       return reply.status(201).send({
         message: `Contact added to agent (id:${agentId}).`,
@@ -154,8 +160,26 @@ export default function agentContactRoutes(
         );
       }
 
+      // A PENDING membership may link an existing AGENT user of another NGO
+      // by email (POST above) — without this, any member could then
+      // overwrite that user's own profile. Only a coordinator/admin edits a
+      // non-ACTIVE contact (be#975).
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.ADMIN &&
+        membership.status !== AgentMembershipStatus.ACTIVE
+      ) {
+        throw new UnauthorizedError(
+          "Only active contacts of this agent can be edited.",
+        );
+      }
+
       const updated = await updateAgentContact(membership, request.body);
       updated.agent = agent;
+      // The membership may be PENDING/INACTIVE, whose person isn't visible to
+      // an AGENT caller (be#975).
+      await maskForCaller(request, updated);
 
       return reply.status(200).send({
         message: `Contact (membershipId:${membershipId}) updated.`,
