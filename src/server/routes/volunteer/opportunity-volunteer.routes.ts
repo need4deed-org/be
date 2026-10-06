@@ -10,6 +10,7 @@ import {
   updateOpportunityMatching,
   updateVolunteerMatching,
 } from "../../../data/utils";
+import logger from "../../../logger";
 import { volunteerOpportunityVolunteerDTO } from "../../../services";
 import {
   idmM2mIdParamSchema,
@@ -173,15 +174,21 @@ export default function volunteerOpportunityVolunteerRoutes(
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
-      await opportunityVolunteerRepository.delete({ id: m2mId });
-      await logMatchChange(opportunityVolunteerRepository.manager, {
-        volunteerId: opportunity.volunteerId,
-        opportunityId: opportunity.opportunityId,
-        from: opportunity.status,
-        actorUserId: request.authUser?.id,
+      const { affected } = await opportunityVolunteerRepository.delete({
+        id: m2mId,
       });
       await updateVolunteerMatching(opportunity.volunteerId);
       await updateOpportunityMatching(opportunity.opportunityId);
+      // Only the request that actually removed the row logs it; a log failure
+      // must not fail a removal that already happened.
+      if (affected) {
+        await logMatchChange(opportunityVolunteerRepository.manager, {
+          volunteerId: opportunity.volunteerId,
+          opportunityId: opportunity.opportunityId,
+          from: opportunity.status,
+          actorUserId: request.authUser?.id,
+        }).catch((err) => logger.error(`match removal log failed: ${err}`));
+      }
 
       return reply.status(200).send({
         message: msg200(opportunity.opportunityId, volunteerId, "deleted"),

@@ -436,16 +436,20 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       await assertCanChangeMatch(request, m2mInstance, "remove");
 
-      await opportunityVolunteerRepository.delete({ id });
-      await logMatchChange(opportunityVolunteerRepository.manager, {
-        volunteerId: m2mInstance.volunteerId,
-        opportunityId: m2mInstance.opportunityId,
-        from: m2mInstance.status,
-        actorUserId: request.authUser?.id,
-      });
+      const { affected } = await opportunityVolunteerRepository.delete({ id });
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
       await syncEngagement(fastify, m2mInstance.volunteerId, "remove");
+      // Only the request that actually removed the row logs it; a log failure
+      // must not fail a removal that already happened.
+      if (affected) {
+        await logMatchChange(opportunityVolunteerRepository.manager, {
+          volunteerId: m2mInstance.volunteerId,
+          opportunityId: m2mInstance.opportunityId,
+          from: m2mInstance.status,
+          actorUserId: request.authUser?.id,
+        }).catch((err) => logger.error(`match removal log failed: ${err}`));
+      }
 
       return reply.status(204).send();
     },
