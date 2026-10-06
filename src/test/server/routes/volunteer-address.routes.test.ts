@@ -375,6 +375,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     const res = await patch({
       id: person.id,
       firstName: person.firstName,
+      email: person.email,
       phone: "0307654321",
       address: { id: 0, street: "", city: "" },
     });
@@ -391,6 +392,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     const res = await patch({
       id: person.id,
       firstName: person.firstName,
+      email: person.email,
       phone: "0300000000",
       address: { street: "Somewhere 1", postcode: { code: "00000" } },
     });
