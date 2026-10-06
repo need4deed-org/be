@@ -121,7 +121,7 @@ export default function volunteerOpportunityVolunteerRoutes(
         data: { actorUserId: request.authUser?.id },
       });
 
-      // After the save, whose audit-log entry keeps the original title (be#1068).
+      // After the save, whose audit-log entry keeps the original title.
       await translateOpportunities(
         fastify,
         [opportunity.opportunity].filter(Boolean),

@@ -318,7 +318,7 @@ describe("volunteer activity audit log (be#919)", () => {
           type: "opportunity_status_changed",
         },
       });
-      // The fixture's own insert adds a "Linked to" entry (be#1121).
+      // The fixture's own insert adds a "Linked to" entry.
       const changes = entries.filter((e) => e.detail.includes("changed from"));
       expect(changes).toHaveLength(1);
       expect(changes[0].detail).toContain(

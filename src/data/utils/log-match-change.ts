@@ -12,7 +12,7 @@ type MatchChange = {
   actorUserId?: number;
 };
 
-// One volunteer activity-log entry per match step (be#1121).
+// One volunteer activity-log entry per match step.
 export async function logMatchChange(
   manager: EntityManager,
   { volunteerId, opportunityId, from, to, actorUserId }: MatchChange,
