@@ -30,9 +30,8 @@ import { createAddress } from "./for-routes";
 // higher-stakes action than that submitter-tracking link.
 //
 // Exact, case-insensitive match on a trimmed value (LOWER(...) = LOWER(...)),
-// not ILIKE: `email` is an unvalidated string reachable by any active AGENT
-// member (not just coordinators/admins), and ILIKE treats `%`/`_` as
-// wildcards, letting a crafted value enumerate or link other NGOs' users
+// not ILIKE: `email` is an unvalidated string, and ILIKE treats `%`/`_` as
+// wildcards, letting a crafted value match or link unintended users
 // (be#1048 review). Inner-joins only AGENT-role users, so a Person with no
 // User at all (e.g. a stale duplicate from before this feature existed)
 // can never match, and getOne() can't pick an unrelated userless Person over
@@ -61,23 +60,22 @@ async function findExistingAgentUserPerson(
  * distinct from the self-registration flow (write-agent-registration.ts),
  * which only ever links the *authenticated caller's own* person.
  *
- * If `input.email` matches an existing Person who already has an AGENT-role
- * User, links that existing Person with a new AgentPerson membership instead
- * of creating a duplicate, disconnected Person (be#1048). `input`'s other
- * fields (name, phone, address, …) are ignored in this case: the existing
- * Person's own profile stays authoritative rather than being overwritten by
- * whatever the caller happened to type for someone else's account
- * (be#1048 review). Idempotent: an existing membership for the same (agent,
- * person, role) is returned as-is, except a coordinator/admin promotes a
- * PENDING one straight to ACTIVE (that's the same deliberate approval a
- * fresh link from them would represent).
+ * For a coordinator/admin caller, if `input.email` matches an existing
+ * Person who already has an AGENT-role User, links that existing Person with
+ * a new ACTIVE AgentPerson membership instead of creating a duplicate,
+ * disconnected Person (be#1048). `input`'s other fields (name, phone,
+ * address, …) are ignored in this case: the existing Person's own profile
+ * stays authoritative rather than being overwritten by whatever the caller
+ * happened to type for someone else's account (be#1048 review). Idempotent:
+ * an existing membership for the same (agent, person, role) is returned
+ * as-is, promoted to ACTIVE if it was PENDING (that's the same deliberate
+ * approval a fresh link represents).
  *
- * A new membership is ACTIVE immediately only for a coordinator/admin
- * caller — that action is itself the approval, same reasoning as joinAgent.
- * An AGENT caller (an active member of *some* agent, but not necessarily
- * this one or with this user's consent) instead creates a PENDING
- * membership, moderated the same way as a self-service join request via
- * GET/PATCH /agent/membership (be#1048 review).
+ * An AGENT caller never links: any response difference between "linked an
+ * existing account" and "created a new contact" — and the linked row then
+ * showing up in GET /agent/:id — would tell any NGO member whether an email
+ * belongs to a registered AGENT user (be#975). They always get a new Person,
+ * as before be#1048; a coordinator can link the real account later.
  *
  * Otherwise (no email, or no matching AGENT-role Person), behavior is
  * unchanged: always creates a brand-new Person. Address is best-effort: if
@@ -93,37 +91,32 @@ export async function createAgentContact(
   callerRole: UserRole,
 ): Promise<AgentPerson> {
   let result!: AgentPerson;
-  const canApprove =
+  const canLinkExisting =
     callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
 
   await dataSource.manager.transaction(async (manager) => {
     const personRepository = getRepository(manager, Person);
     const agentPersonRepository = getRepository(manager, AgentPerson);
 
-    const existingPerson = input.email
-      ? await findExistingAgentUserPerson(manager, input.email)
-      : null;
+    const existingPerson =
+      canLinkExisting && input.email
+        ? await findExistingAgentUserPerson(manager, input.email)
+        : null;
 
     if (existingPerson) {
-      const existingMembership = await agentPersonRepository.findOne({
+      let agentPerson = await agentPersonRepository.findOne({
         where: { agentId, personId: existingPerson.id, role: input.role },
       });
-      let agentPerson = existingMembership;
       if (!agentPerson) {
         agentPerson = await agentPersonRepository.save(
           new AgentPerson({
             agentId,
             personId: existingPerson.id,
             role: input.role,
-            status: canApprove
-              ? AgentMembershipStatus.ACTIVE
-              : AgentMembershipStatus.PENDING,
+            status: AgentMembershipStatus.ACTIVE,
           }),
         );
-      } else if (
-        canApprove &&
-        agentPerson.status === AgentMembershipStatus.PENDING
-      ) {
+      } else if (agentPerson.status === AgentMembershipStatus.PENDING) {
         agentPerson.status = AgentMembershipStatus.ACTIVE;
         agentPerson = await agentPersonRepository.save(agentPerson);
       }
