@@ -110,6 +110,11 @@ const AGENT_SETTABLE_STATUSES = new Set([
   OpportunityVolunteerStatusType.ACTIVE,
   OpportunityVolunteerStatusType.PAST,
 ]);
+// A match a coordinator already made: an NGO can't skip the matching step.
+const AGENT_CHANGEABLE_STATUSES = new Set([
+  OpportunityVolunteerStatusType.MATCHED,
+  OpportunityVolunteerStatusType.ACTIVE,
+]);
 
 function assertCoordinator(request: FastifyRequest): void {
   const role = request.authUser?.role;
@@ -131,7 +136,9 @@ async function assertCanChangeMatch(
   }
   const isAllowed =
     change === "remove" ||
-    (change !== undefined && AGENT_SETTABLE_STATUSES.has(change));
+    (change !== undefined &&
+      AGENT_SETTABLE_STATUSES.has(change) &&
+      AGENT_CHANGEABLE_STATUSES.has(ov.status));
   if (!isAllowed) {
     throw new UnauthorizedError("Permission denied");
   }
@@ -142,14 +149,27 @@ async function assertCanChangeMatch(
   );
 }
 
+// Same rule as before the backend took this over: a match becoming Active sets
+// Active; Past or removal only takes back an Active no other match supports.
 async function syncEngagement(
   fastify: FastifyInstance,
   volunteerId: number,
+  change: OpportunityVolunteerStatusType | "remove",
 ): Promise<void> {
+  const mode =
+    change === OpportunityVolunteerStatusType.ACTIVE
+      ? "follow"
+      : change === OpportunityVolunteerStatusType.PAST || change === "remove"
+        ? "release"
+        : undefined;
+  if (!mode) {
+    return;
+  }
   try {
     await syncVolunteerEngagement(
       fastify.db.opportunityVolunteerRepository.manager,
       volunteerId,
+      mode,
     );
   } catch (err) {
     logger.error(`engagement sync failed (volunteer ${volunteerId}): ${err}`);
@@ -254,7 +274,11 @@ export default async function m2mOpportunityVolunteerRoutes(
       });
 
       if (nextStatus && nextStatus !== prevStatus) {
-        await syncEngagement(fastify, opportunityVolunteer.volunteerId);
+        await syncEngagement(
+          fastify,
+          opportunityVolunteer.volunteerId,
+          nextStatus,
+        );
         const commRepo = fastify.db.communicationRepository;
 
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {
@@ -411,7 +435,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       await opportunityVolunteerRepository.delete({ id });
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
-      await syncEngagement(fastify, m2mInstance.volunteerId);
+      await syncEngagement(fastify, m2mInstance.volunteerId, "remove");
 
       return reply.status(204).send();
     },

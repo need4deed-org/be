@@ -25,6 +25,27 @@ beforeEach(() => {
 });
 
 describe("syncVolunteerEngagement", () => {
+  it("release mode leaves everything alone while another match is active", async () => {
+    exists.mockResolvedValue(true);
+
+    await syncVolunteerEngagement(manager, 7, "release");
+
+    expect(update).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("release mode takes back Active once no match is active", async () => {
+    exists.mockResolvedValue(false);
+
+    await syncVolunteerEngagement(manager, 7, "release");
+
+    expect(update).toHaveBeenCalledWith(
+      Volunteer,
+      { id: 7, statusEngagement: VolunteerStateEngagementType.ACTIVE },
+      { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
+    );
+  });
+
   it("sets Active (and clears the return date) when the volunteer has an active match", async () => {
     exists.mockResolvedValue(true);
 

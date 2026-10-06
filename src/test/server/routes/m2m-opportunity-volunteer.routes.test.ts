@@ -357,6 +357,25 @@ describe("NGO member changing a match on their own opportunity", () => {
       cookies: { [accessCookieName]: cookie },
     });
 
+  it("403s when the NGO member skips matching (Pending straight to Active)", async () => {
+    await fastify.db.opportunityVolunteerRepository.update(
+      { id: opportunityVolunteer.id },
+      { status: OpportunityVolunteerStatusType.PENDING },
+    );
+    try {
+      const res = await patchStatus(
+        OpportunityVolunteerStatusType.ACTIVE,
+        memberCookie,
+      );
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.opportunityVolunteerRepository.update(
+        { id: opportunityVolunteer.id },
+        { status: OpportunityVolunteerStatusType.MATCHED },
+      );
+    }
+  });
+
   it("403s when the NGO member sets a status other than Active or Past", async () => {
     const res = await patchStatus(
       OpportunityVolunteerStatusType.PENDING,
