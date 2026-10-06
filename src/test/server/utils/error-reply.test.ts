@@ -11,6 +11,7 @@ describe("getErrorReply()", () => {
       statusCode: 403,
       body: { error: "UnauthorizedError", message: "Permission denied." },
     });
+    expect(getErrorReply(new BadRequestError("bad")).statusCode).toBe(400);
   });
 
   it("maps TypeORM EntityNotFoundError to 404", () => {
@@ -51,11 +52,17 @@ describe("getErrorReply()", () => {
     });
   });
 
+  it("reports TypeORM UpdateValuesMissingError as 400", () => {
+    expect(getErrorReply(withProps("UpdateValuesMissingError", {}))).toEqual({
+      statusCode: 400,
+      body: { message: "There's nothing to update." },
+    });
+  });
+
   it("hides unexpected errors behind a generic 500", () => {
     expect(getErrorReply(new TypeError("x is undefined"))).toEqual({
       statusCode: 500,
       body: { message: "Something went wrong." },
     });
-    expect(getErrorReply(new BadRequestError("bad")).statusCode).toBe(400);
   });
 });
