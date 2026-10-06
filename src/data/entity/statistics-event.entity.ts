@@ -9,8 +9,7 @@ import {
 import District from "./location/district.entity";
 
 // Append-only and anonymous (no person or volunteer id): one row per counted
-// event, e.g. a ticked "where did you hear about us" answer. Read by the
-// statistics endpoint, bucketed by occurred_at.
+// event, e.g. a ticked "where did you hear about us" answer.
 @Entity()
 @Index(["metric", "occurredAt"])
 export default class StatisticsEvent {
