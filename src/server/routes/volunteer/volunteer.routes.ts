@@ -383,13 +383,32 @@ export default async function volunteerRoutes(
         personData = { ...personData, id: volunteer.personId };
       }
       // The address is always the volunteer's own (looked up, never the body's
-      // id); without one yet, a new one is created below.
-      let addressData = patchedAddressData;
-      if (addressData) {
+      // id); without one yet, a new one is created below. Decided before any
+      // write, so an unusable address can't leave a half-saved request.
+      let addressData: Partial<Address> | undefined;
+      if (patchedAddressData || postcodeData) {
         const ownPerson = await fastify.db.personRepository.findOneBy({
           id: volunteer.personId,
         });
-        addressData = { ...addressData, id: ownPerson?.addressId ?? undefined };
+        addressData = {
+          ...patchedAddressData,
+          id: ownPerson?.addressId ?? undefined,
+        };
+        if (!addressData.id) {
+          const hasContent =
+            !!addressData.street || !!postcodeData?.id || !!postcodeData?.value;
+          const postcodeKnown =
+            !!postcodeData?.id ||
+            (!!postcodeData?.value &&
+              (await fastify.db.postcodeRepository.existsBy({
+                value: postcodeData.value,
+              })));
+          if (!hasContent) {
+            addressData = undefined;
+          } else if (!postcodeKnown) {
+            throw new BadRequestError("Address not saved: unknown postcode.");
+          }
+        }
       }
 
       // Captured before any writes, for the audit-trail diff below (be#919)
@@ -406,7 +425,7 @@ export default async function volunteerRoutes(
         });
       }
       let hasContactChange = false;
-      if ((personData && personData.id) || (addressData && addressData.id)) {
+      if ((personData && personData.id) || addressData) {
         const prevPerson = await fastify.db.personRepository.findOne({
           where: { id: (personData?.id ?? volunteer.personId) as number },
           relations: ["address"],
@@ -464,7 +483,7 @@ export default async function volunteerRoutes(
           }
         } else if (addressData) {
           const { id: _id, ...newAddress } = addressData;
-          const address = await createAddress(newAddress, postcodeData);
+          const address = await createAddress(newAddress, postcodeData ?? {});
           if (!address) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }

@@ -303,3 +303,103 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
     expect(untouched.street).toBe("B's Real Street");
   });
 });
+
+describe("PATCH /volunteer/:id for a volunteer without an address", () => {
+  let fastify: FastifyInstance;
+  let person: Person;
+  let deal: Deal;
+  let volunteer: Volunteer;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  const patch = (person: Record<string, unknown>) =>
+    fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { person },
+    });
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    person = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "NoAddress",
+        lastName: "Volunteer",
+        email: `no-address-${suffix}@example.com`,
+        phone: "0301234567",
+      }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: person.id }),
+    );
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const email = `coordinator-no-address-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.personRepository.delete({ id: person.id });
+    await fastify.close();
+  });
+
+  it("saves a phone change alongside an empty address, creating no address", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      phone: "0307654321",
+      address: { id: 0, street: "", city: "" },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(refreshed.phone).toBe("0307654321");
+    expect(refreshed.addressId).toBeNull();
+  });
+
+  it("400s for an unknown postcode before writing anything", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      phone: "0300000000",
+      address: { street: "Somewhere 1", postcode: { code: "00000" } },
+    });
+    expect(res.statusCode).toBe(400);
+
+    const refreshed = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(refreshed.phone).toBe("0307654321");
+    expect(refreshed.addressId).toBeNull();
+  });
+});
