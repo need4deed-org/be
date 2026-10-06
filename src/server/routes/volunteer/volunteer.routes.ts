@@ -9,7 +9,7 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import { BaseError, NotFoundError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -529,6 +529,9 @@ export default async function volunteerRoutes(
           }
         }
       } catch (error) {
+        if (error instanceof BaseError) {
+          throw error;
+        }
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }

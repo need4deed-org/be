@@ -5,7 +5,6 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import qs from "qs";
 import { isProd, pluginTimeout, selfUrl } from "../config/constants";
-import { BaseError } from "../config/error/base";
 import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
@@ -43,6 +42,7 @@ import volunteerApiIdSchema from "./schema/volunteer-api-id.json";
 import volunteerApiOpportunitySchema from "./schema/volunteer-api-opportunity.json";
 import volunteerApiSchema from "./schema/volunteer-api.json";
 import { RoutePrefix } from "./types";
+import { getErrorReply } from "./utils/error-reply";
 
 const decodeTrustProxyEnv = (
   value: string | undefined,
@@ -127,26 +127,8 @@ export async function createServer(): Promise<FastifyInstance> {
       return;
     }
 
-    // If it's one of our custom errors, use its status code
-    if (error instanceof BaseError) {
-      return reply.status(error.statusCode).send({
-        error: error.constructor.name,
-        message: error.message,
-        ...error.details,
-      });
-    }
-
-    // Handle schema errors
-    if (error.validation) {
-      return reply.status(400).send({ message: "Validation failed." });
-    }
-
-    if (error.name === "UpdateValuesMissingError") {
-      return reply.status(400).send({ message: "There's nothing to update." });
-    }
-
-    // Handle generic TypeORM / Unexpected errors
-    return reply.status(500).send({ message: "Something went wrong." });
+    const { statusCode, body } = getErrorReply(error);
+    return reply.status(statusCode).send(body);
   });
 
   await fastifyInstance.register(typeormPlugin);
