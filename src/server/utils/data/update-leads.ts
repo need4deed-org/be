@@ -17,9 +17,8 @@ export async function updateLeads(leads: LeadFrom[]): Promise<void> {
   }
   // Statistics only: a failure must not fail the registration it belongs to.
   const occurredAt = new Date();
-  await dataSource
-    .getRepository(StatisticsEvent)
-    .save(
+  try {
+    await dataSource.getRepository(StatisticsEvent).save(
       leads.map(
         (lead) =>
           new StatisticsEvent({
@@ -28,6 +27,8 @@ export async function updateLeads(leads: LeadFrom[]): Promise<void> {
             valueKey: String(lead.id),
           }),
       ),
-    )
-    .catch((error) => logger.error(`lead-from statistics not saved: ${error}`));
+    );
+  } catch (error) {
+    logger.error(`lead-from statistics not saved: ${error}`);
+  }
 }
