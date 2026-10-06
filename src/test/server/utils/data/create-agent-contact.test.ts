@@ -154,7 +154,9 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
 
     const targetAgent = await dataSource
       .getRepository(Agent)
-      .save(new Agent({ title: `Pending-link NGO ${suffix}` }));
+      .save(
+        new Agent({ title: `Pending-link NGO ${suffix}`, unclaimed: true }),
+      );
     createdAgentIds.push(targetAgent.id);
 
     // e.g. a link an AGENT created before be#975.
@@ -179,6 +181,12 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
     );
     expect(approved.id).toBe(pending.id);
     expect(approved.status).toBe(AgentMembershipStatus.ACTIVE);
+
+    // Activating the first member claims a coordinator-created NGO.
+    const claimed = await dataSource
+      .getRepository(Agent)
+      .findOneByOrFail({ id: targetAgent.id });
+    expect(claimed.unclaimed).toBe(false);
   });
 
   it("is idempotent for the same (agent, person, role)", async () => {

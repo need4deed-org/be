@@ -14,6 +14,7 @@ import {
   responseErrors,
 } from "../../schema";
 import { ParamsId } from "../../types";
+import { claimAgent } from "../../utils/data/claim-agent";
 
 // Moderation of agent memberships. COORDINATOR/ADMIN only — re-gated here since
 // the parent /agent onRequest hook was relaxed to logged-in for the GET PII
@@ -77,12 +78,8 @@ export default async function agentMembershipRoutes(
 
       membership.status = request.body.status;
       await repo.save(membership);
-      // Approving the first member of a coordinator-created NGO claims it.
       if (membership.status === AgentMembershipStatus.ACTIVE) {
-        await fastify.db.agentRepository.update(
-          { id: membership.agentId, unclaimed: true },
-          { unclaimed: false },
-        );
+        await claimAgent(membership.agentId);
       }
       logger.debug(
         `agent-membership: ${request.params.id} -> ${request.body.status}`,
