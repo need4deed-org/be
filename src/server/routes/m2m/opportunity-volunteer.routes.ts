@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
   CommunicationType,
   Lang,
@@ -6,7 +6,11 @@ import {
   ProfileVolunteeringType,
   UserRole,
 } from "need4deed-sdk";
-import { ConflictError, NotFoundError } from "../../../config";
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import {
   updateOpportunityMatching,
@@ -15,8 +19,10 @@ import {
 import logger from "../../../logger";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
+import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { syncVolunteerEngagement } from "../../utils/data/sync-volunteer-engagement";
 
 // Sends the FIRST_INQUIRY "suggest" email for an OV that is (now) PENDING.
 // Called both right after creation (POST, which can create straight into
@@ -100,14 +106,61 @@ async function triggerEmailSuggestion(
   }
 }
 
+const AGENT_SETTABLE_STATUSES = new Set([
+  OpportunityVolunteerStatusType.ACTIVE,
+  OpportunityVolunteerStatusType.PAST,
+]);
+
+function assertCoordinator(request: FastifyRequest): void {
+  const role = request.authUser?.role;
+  if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+    throw new UnauthorizedError("Permission denied");
+  }
+}
+
+// An NGO member may mark a match on their own opportunity Active or Past, or
+// remove it; matching itself stays with coordinators.
+async function assertCanChangeMatch(
+  request: FastifyRequest,
+  ov: OpportunityVolunteer,
+  change: OpportunityVolunteerStatusType | "remove" | undefined,
+): Promise<void> {
+  if (request.authUser?.role !== UserRole.AGENT) {
+    assertCoordinator(request);
+    return;
+  }
+  const isAllowed =
+    change === "remove" ||
+    (change !== undefined && AGENT_SETTABLE_STATUSES.has(change));
+  if (!isAllowed) {
+    throw new UnauthorizedError("Permission denied");
+  }
+  await assertAgentOwnsOpportunity(
+    request,
+    ov.opportunityId,
+    ov.opportunity?.agentId,
+  );
+}
+
+async function syncEngagement(
+  fastify: FastifyInstance,
+  volunteerId: number,
+): Promise<void> {
+  try {
+    await syncVolunteerEngagement(
+      fastify.db.opportunityVolunteerRepository.manager,
+      volunteerId,
+    );
+  } catch (err) {
+    logger.error(`engagement sync failed (volunteer ${volunteerId}): ${err}`);
+  }
+}
+
 export default async function m2mOpportunityVolunteerRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
+  fastify.addHook("onRequest", fastify.authenticate());
 
   fastify.post<{
     Body: Omit<OpportunityVolunteer, "opportunity" | "volunteer">;
@@ -121,6 +174,8 @@ export default async function m2mOpportunityVolunteerRoutes(
       },
     },
     async (request, reply) => {
+      assertCoordinator(request);
+
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
 
@@ -177,6 +232,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       const opportunityVolunteer = await opportunityVolunteerRepository.findOne(
         {
           where: { id },
+          relations: { opportunity: true },
         },
       );
 
@@ -187,12 +243,18 @@ export default async function m2mOpportunityVolunteerRoutes(
       const prevStatus = opportunityVolunteer.status;
       const nextStatus = request.body.status;
 
-      opportunityVolunteerRepository.merge(opportunityVolunteer, request.body);
+      await assertCanChangeMatch(request, opportunityVolunteer, nextStatus);
+
+      // Only the status: the body schema also allows ids, which an NGO caller must not move.
+      opportunityVolunteerRepository.merge(opportunityVolunteer, {
+        status: nextStatus,
+      });
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         reload: true,
       });
 
       if (nextStatus && nextStatus !== prevStatus) {
+        await syncEngagement(fastify, opportunityVolunteer.volunteerId);
         const commRepo = fastify.db.communicationRepository;
 
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {
@@ -337,15 +399,19 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       const m2mInstance = await opportunityVolunteerRepository.findOne({
         where: { id },
+        relations: { opportunity: true },
       });
 
       if (!m2mInstance) {
         throw new NotFoundError(`There's no M2M relation id:${id}`);
       }
 
+      await assertCanChangeMatch(request, m2mInstance, "remove");
+
       await opportunityVolunteerRepository.delete({ id });
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
+      await syncEngagement(fastify, m2mInstance.volunteerId);
 
       return reply.status(204).send();
     },
