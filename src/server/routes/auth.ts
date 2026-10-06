@@ -26,6 +26,7 @@ import {
 import { ReplyMessage, RoutePrefix } from "../types";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
+import { refreshRateLimitKey } from "../utils/refresh-rate-limit-key";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -125,7 +126,15 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: "1 minute",
+          // After body parsing, so a token sent in the body counts too.
+          hook: "preHandler",
+          keyGenerator: refreshRateLimitKey,
+        },
+      },
       schema: {
         body: refreshAccessSchema,
         response: {
