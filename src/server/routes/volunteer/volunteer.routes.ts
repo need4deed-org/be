@@ -529,8 +529,9 @@ export default async function volunteerRoutes(
           }
         }
       } catch (error) {
+        // The global error handler picks the status (BaseError, 404, 409, ...).
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
+        throw error;
       }
 
       if (auditLogEntries.length) {
