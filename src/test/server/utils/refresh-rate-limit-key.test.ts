@@ -3,30 +3,49 @@ import { describe, expect, it } from "vitest";
 import { refreshCookieName } from "../../../config/constants";
 import { refreshRateLimitKey } from "../../../server/utils/refresh-rate-limit-key";
 
+const verify = (token: string) => {
+  const match = token.match(/^valid-(\d+)/);
+  if (!match) {
+    throw new Error("invalid");
+  }
+  return { id: Number(match[1]) };
+};
+
 const request = (props: Partial<FastifyRequest>) =>
-  ({ ip: "10.0.0.1", ...props }) as FastifyRequest;
+  ({
+    ip: "10.0.0.1",
+    server: { jwt: { verify } },
+    ...props,
+  }) as unknown as FastifyRequest;
+
+const withCookie = (token: string) =>
+  request({ cookies: { [refreshCookieName]: token } });
 
 describe("refreshRateLimitKey()", () => {
-  it("gives two sessions behind the same IP different keys", () => {
-    const a = refreshRateLimitKey(
-      request({ cookies: { [refreshCookieName]: "token-a" } }),
-    );
-    const b = refreshRateLimitKey(
-      request({ cookies: { [refreshCookieName]: "token-b" } }),
-    );
-    expect(a).not.toBe(b);
-    expect(a).not.toContain("token-a");
+  it("keys two users behind the same IP separately", () => {
+    expect(refreshRateLimitKey(withCookie("valid-1"))).toBe("refresh-user:1");
+    expect(refreshRateLimitKey(withCookie("valid-2"))).toBe("refresh-user:2");
   });
 
-  it("keys a body token like the same cookie token", () => {
-    expect(refreshRateLimitKey(request({ body: { refresh: "token-a" } }))).toBe(
-      refreshRateLimitKey(
-        request({ cookies: { [refreshCookieName]: "token-a" } }),
-      ),
+  it("keeps one user's key across rotated tokens", () => {
+    expect(refreshRateLimitKey(withCookie("valid-1-old"))).toBe(
+      refreshRateLimitKey(withCookie("valid-1-new")),
     );
   });
 
-  it("falls back to the IP without a token", () => {
+  it("reads a body token like a cookie token", () => {
+    expect(refreshRateLimitKey(request({ body: { refresh: "valid-3" } }))).toBe(
+      "refresh-user:3",
+    );
+  });
+
+  it("puts made-up tokens and missing tokens in the IP bucket", () => {
+    expect(refreshRateLimitKey(withCookie("garbage-a"))).toBe(
+      "refresh-ip:10.0.0.1",
+    );
+    expect(refreshRateLimitKey(withCookie("garbage-b"))).toBe(
+      "refresh-ip:10.0.0.1",
+    );
     expect(refreshRateLimitKey(request({ cookies: {} }))).toBe(
       "refresh-ip:10.0.0.1",
     );
