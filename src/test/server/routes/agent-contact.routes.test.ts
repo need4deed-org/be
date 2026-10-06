@@ -11,10 +11,10 @@ import { createServer } from "../../../server";
 
 const PASSWORD = "test_password";
 
-// be#975: POST/PATCH /agent/:id/contact echoed the contact Person unmasked.
-// Since be#1048, POST links an existing AGENT user by email (as a PENDING
-// membership), so a member of one NGO could probe another NGO user's contact
-// details by email — and then overwrite them via PATCH.
+// be#975: POST/PATCH /agent/:id/contact echoed the contact Person unmasked,
+// and since be#1048 POST linked an existing AGENT user by email (as a PENDING
+// membership) — so a member of one NGO could probe another NGO user's
+// existence and contact details by email, then overwrite them via PATCH.
 describe("/agent/:id/contact PII", () => {
   let fastify: FastifyInstance;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -118,7 +118,7 @@ describe("/agent/:id/contact PII", () => {
     await fastify.close();
   });
 
-  it("POST masks an existing AGENT user linked by email, and PATCH can't edit them", async () => {
+  it("POST by an AGENT with another NGO user's email doesn't reveal or link that user", async () => {
     const res = await fastify.inject({
       method: "POST",
       url: `/agent/${agentId}/contact`,
@@ -132,15 +132,29 @@ describe("/agent/:id/contact PII", () => {
     });
     expect(res.statusCode).toBe(201);
     const { data } = res.json();
-    expect(data.status).toBe(AgentMembershipStatus.PENDING);
-    expect(data.person.id).toBe(victimPerson.id);
-    expect(data.person.firstName).not.toBe("Victim");
-    expect(data.person.lastName).not.toBe(victimPerson.lastName);
-    expect(data.person.phone).not.toBe(victimPerson.phone);
+    createdPersonIds.push(data.person.id);
+    // Indistinguishable from an unknown email: a new ACTIVE contact echoing
+    // what the caller typed.
+    expect(data.status).toBe(AgentMembershipStatus.ACTIVE);
+    expect(data.person.id).not.toBe(victimPerson.id);
+    expect(data.person.firstName).toBe("Anything");
+    expect(data.person.phone).toBeNull();
+  });
+
+  it("PATCH by an AGENT can't edit a non-ACTIVE contact; a coordinator can, unmasked", async () => {
+    // e.g. an AGENT-made link to another NGO's user from before be#975.
+    const pending = await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId,
+        personId: victimPerson.id,
+        role: AgentRoleType.SOCIAL_WORKER,
+        status: AgentMembershipStatus.PENDING,
+      }),
+    );
 
     const patchAsMember = await fastify.inject({
       method: "PATCH",
-      url: `/agent/${agentId}/contact/${data.id}`,
+      url: `/agent/${agentId}/contact/${pending.id}`,
       cookies: { [accessCookieName]: memberCookie },
       payload: { firstName: "Hijacked" },
     });
@@ -150,10 +164,9 @@ describe("/agent/:id/contact PII", () => {
     });
     expect(reloaded.firstName).toBe("Victim");
 
-    // A coordinator still sees and edits it unmasked.
     const patchAsCoordinator = await fastify.inject({
       method: "PATCH",
-      url: `/agent/${agentId}/contact/${data.id}`,
+      url: `/agent/${agentId}/contact/${pending.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
       payload: {},
     });
@@ -162,7 +175,7 @@ describe("/agent/:id/contact PII", () => {
       victimPerson.phone,
     );
 
-    await fastify.db.agentPersonRepository.delete({ id: data.id });
+    await fastify.db.agentPersonRepository.delete({ id: pending.id });
   });
 
   it("POST/PATCH still echo a contact the member just created unmasked", async () => {
