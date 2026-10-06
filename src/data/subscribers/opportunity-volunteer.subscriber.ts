@@ -53,15 +53,24 @@ export class OpportunityVolunteerSubscriber
     return lockParents(event, parentIds(event.databaseEntity, event.entity));
   }
 
-  afterInsert(event: InsertEvent<OpportunityVolunteer>) {
-    return recompute(event.manager, parentIds(event.entity));
+  async afterInsert(event: InsertEvent<OpportunityVolunteer>) {
+    await recompute(event.manager, parentIds(event.entity));
+    await logChange(event, undefined, event.entity);
   }
 
-  afterUpdate(event: UpdateEvent<OpportunityVolunteer>) {
-    return recompute(
+  async afterUpdate(event: UpdateEvent<OpportunityVolunteer>) {
+    await recompute(
       event.manager,
       parentIds(event.databaseEntity, event.entity ?? undefined),
     );
+    // Without the previous row (bulk update()) the change can't be described.
+    if (event.databaseEntity) {
+      await logChange(
+        event,
+        event.databaseEntity,
+        event.entity as Partial<OpportunityVolunteer> | undefined,
+      );
+    }
   }
 
   afterRemove(event: RemoveEvent<OpportunityVolunteer>) {
@@ -136,4 +145,30 @@ async function recompute(
   for (const id of opportunityIds) {
     await updateOpportunityMatching(id, manager);
   }
+}
+
+// Writes the volunteer activity-log entry for a created link or a status
+// change. Routes pass the acting user as the save's `data.actorUserId`.
+async function logChange(
+  {
+    manager,
+    queryRunner,
+  }: { manager: EntityManager; queryRunner: QueryRunner },
+  before: Partial<OpportunityVolunteer> | undefined,
+  after: Partial<OpportunityVolunteer> | undefined,
+): Promise<void> {
+  const volunteerId = after?.volunteerId ?? before?.volunteerId;
+  const opportunityId = after?.opportunityId ?? before?.opportunityId;
+  if (!volunteerId || !opportunityId || after?.status === undefined) {
+    return;
+  }
+  const { logMatchChange } = await import("../utils");
+  await logMatchChange(manager, {
+    volunteerId,
+    opportunityId,
+    from: before?.status,
+    to: after.status,
+    actorUserId: (queryRunner.data as { actorUserId?: number } | undefined)
+      ?.actorUserId,
+  });
 }

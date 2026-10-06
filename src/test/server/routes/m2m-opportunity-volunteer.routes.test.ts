@@ -225,6 +225,7 @@ describe("NGO member changing a match on their own opportunity", () => {
   let opportunityVolunteer: OpportunityVolunteer;
   let memberPerson: Person;
   let volunteerUserPerson: Person;
+  let memberUserId: number;
   let memberCookie: string;
   let volunteerCookie: string;
 
@@ -294,7 +295,7 @@ describe("NGO member changing a match on their own opportunity", () => {
     const pwHash = await hashPassword(PASSWORD);
     const memberEmail = `agent-m2m-member-${suffix}@test.need4deed.org`;
     const volunteerEmail = `volunteer-m2m-member-${suffix}@test.need4deed.org`;
-    await fastify.db.userRepository.save(
+    const memberUser = await fastify.db.userRepository.save(
       new User({
         email: memberEmail,
         password: pwHash,
@@ -321,6 +322,7 @@ describe("NGO member changing a match on their own opportunity", () => {
       });
       return getCookie(res.cookies, accessCookieName);
     };
+    memberUserId = memberUser.id;
     memberCookie = await login(memberEmail);
     volunteerCookie = await login(volunteerEmail);
   });
@@ -403,6 +405,15 @@ describe("NGO member changing a match on their own opportunity", () => {
       id: opportunityVolunteer.id,
     });
     expect(ov?.status).toBe(OpportunityVolunteerStatusType.ACTIVE);
+
+    const changes = await fastify.db.volunteerAuditLogRepository.find({
+      where: { volunteerId: volunteer.id, type: "opportunity_status_changed" },
+    });
+    const activated = changes.find((e) =>
+      e.detail.includes(`to ${OpportunityVolunteerStatusType.ACTIVE}`),
+    );
+    expect(activated?.detail).toContain(opportunity.title);
+    expect(activated?.actorUserId).toBe(memberUserId);
     const updated = await fastify.db.volunteerRepository.findOneBy({
       id: volunteer.id,
     });
@@ -436,5 +447,13 @@ describe("NGO member changing a match on their own opportunity", () => {
         id: opportunityVolunteer.id,
       }),
     ).toBeNull();
+
+    const entries = await fastify.db.volunteerAuditLogRepository.find({
+      where: { volunteerId: volunteer.id, type: "opportunity_status_changed" },
+      order: { id: "ASC" },
+    });
+    expect(entries[0].detail).toContain("Linked to opportunity");
+    expect(entries.at(-1)?.detail).toContain("Removed from opportunity");
+    expect(entries.at(-1)?.actorUserId).toBe(memberUserId);
   });
 });

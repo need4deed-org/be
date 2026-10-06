@@ -13,6 +13,7 @@ import {
 } from "../../../config";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import {
+  logMatchChange,
   updateOpportunityMatching,
   updateVolunteerMatching,
 } from "../../../data/utils";
@@ -216,7 +217,9 @@ export default async function m2mOpportunityVolunteerRoutes(
       }
 
       const opportunityVolunteer = new OpportunityVolunteer(request.body);
-      await opportunityVolunteerRepository.save(opportunityVolunteer);
+      await opportunityVolunteerRepository.save(opportunityVolunteer, {
+        data: { actorUserId: request.authUser?.id },
+      });
 
       if (
         opportunityVolunteer.status === OpportunityVolunteerStatusType.PENDING
@@ -271,6 +274,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       });
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         reload: true,
+        data: { actorUserId: request.authUser?.id },
       });
 
       if (nextStatus && nextStatus !== prevStatus) {
@@ -433,6 +437,12 @@ export default async function m2mOpportunityVolunteerRoutes(
       await assertCanChangeMatch(request, m2mInstance, "remove");
 
       await opportunityVolunteerRepository.delete({ id });
+      await logMatchChange(opportunityVolunteerRepository.manager, {
+        volunteerId: m2mInstance.volunteerId,
+        opportunityId: m2mInstance.opportunityId,
+        from: m2mInstance.status,
+        actorUserId: request.authUser?.id,
+      });
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
       await syncEngagement(fastify, m2mInstance.volunteerId, "remove");
