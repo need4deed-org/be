@@ -49,6 +49,14 @@ describe("updateLeads", () => {
     expect(events[0].occurredAt).toBeInstanceOf(Date);
   });
 
+  it("doesn't fail when the statistics event can't be saved", async () => {
+    eventSave.mockRejectedValueOnce(new Error("no table"));
+
+    await expect(
+      updateLeads([{ id: 1, count: 0, title: "a" }]),
+    ).resolves.toBeUndefined();
+  });
+
   it("records nothing when no answer was ticked", async () => {
     await updateLeads([]);
     expect(eventSave).not.toHaveBeenCalled();
