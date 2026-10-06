@@ -5,7 +5,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
-import { BaseError, NotFoundError, UnauthorizedError } from "../../../config";
+import { BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
@@ -275,31 +275,17 @@ export async function joinAgent(
   const repo = dataSource.getRepository(AgentPerson);
   const agentRepo = dataSource.getRepository(Agent);
 
-  // A coordinator-created agent (fe#911) is marked `unclaimed` until a real
-  // registration claims it — that claim must go through a future,
-  // explicitly-reviewed flow, not this auto-approve-on-domain-match JOIN.
-  // Excluding it from the /search picker isn't enough on its own: this route
-  // takes agentId directly from the client, so anyone who already has (or
-  // guesses) the id could otherwise join straight past that picker. Gating on
-  // this flag rather than "zero AgentPerson rows" matters: pre-existing
-  // legacy agents (created via POST /opportunity/legacy with no rac_email)
-  // can also have zero AgentPerson rows and must remain joinable.
   const agent = await agentRepo.findOne({ where: { id: agentId } });
   if (!agent) {
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
-  if (agent.unclaimed) {
-    throw new UnauthorizedError(
-      "This agent has not been claimed yet and cannot be joined directly.",
-    );
-  }
-  // An INACTIVE agent (be#885) isn't offered by the /search picker either,
-  // for the same reason: a new registrant shouldn't be routed toward an NGO
-  // that's been marked inactive. Same bypass risk as unclaimed above — this
-  // route takes agentId directly from the client, so the /search exclusion
-  // alone doesn't stop a direct join.
-  if (agent.engagementStatus === AgentEngagementStatusType.INACTIVE) {
-    throw new UnauthorizedError("This agent is inactive and cannot be joined.");
+  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved by
+  // email domain: the join waits for a coordinator, who then claims it.
+  if (
+    agent.unclaimed ||
+    agent.engagementStatus === AgentEngagementStatusType.INACTIVE
+  ) {
+    status = AgentMembershipStatus.PENDING;
   }
 
   const existing = await repo.findOne({

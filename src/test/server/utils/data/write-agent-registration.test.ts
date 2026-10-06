@@ -476,36 +476,28 @@ describe("joinAgent", () => {
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
   });
 
-  // fe#911: a coordinator-created agent is marked `unclaimed` until a real
-  // registration claims it. Excluding it from the /search picker isn't
-  // enough on its own — this is the endpoint that actually grants access, and
-  // it takes agentId directly from the client — so it must refuse to link
-  // anyone to an agent nobody has ever joined yet.
-  it("rejects joining an unclaimed (coordinator-created) agent", async () => {
-    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: true });
+  // A coordinator-created (unclaimed) or inactive NGO is joinable, but never
+  // auto-approved: the membership waits for a coordinator.
+  it.each([
+    ["unclaimed", { id: 33, unclaimed: true }],
+    [
+      "inactive",
+      {
+        id: 33,
+        unclaimed: false,
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+      },
+    ],
+  ])("makes joining an %s agent a pending request", async (_label, agent) => {
+    agentRepoFindOne.mockResolvedValueOnce(agent);
+    agentPersonRepoFindOne.mockResolvedValueOnce(null);
 
-    await expect(
-      joinAgent(11, 33, AgentMembershipStatus.PENDING),
-    ).rejects.toThrow(
-      "This agent has not been claimed yet and cannot be joined directly.",
-    );
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
-  });
+    const result = await joinAgent(11, 33, AgentMembershipStatus.ACTIVE);
 
-  // be#885: excluding an INACTIVE agent from the /search picker isn't enough
-  // on its own either, for the same reason as unclaimed above — this route
-  // takes agentId directly from the client.
-  it("rejects joining an INACTIVE agent", async () => {
-    agentRepoFindOne.mockResolvedValueOnce({
-      id: 33,
-      unclaimed: false,
-      engagementStatus: AgentEngagementStatusType.INACTIVE,
+    expect(agentPersonRepoSave.mock.calls[0][0]).toMatchObject({
+      status: AgentMembershipStatus.PENDING,
     });
-
-    await expect(
-      joinAgent(11, 33, AgentMembershipStatus.PENDING),
-    ).rejects.toThrow("This agent is inactive and cannot be joined.");
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+    expect(result.membershipStatus).toBe(AgentMembershipStatus.PENDING);
   });
 
   // A legacy agent (e.g. created via POST /opportunity/legacy with no

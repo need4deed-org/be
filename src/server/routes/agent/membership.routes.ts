@@ -77,6 +77,13 @@ export default async function agentMembershipRoutes(
 
       membership.status = request.body.status;
       await repo.save(membership);
+      // Approving the first member of a coordinator-created NGO claims it.
+      if (membership.status === AgentMembershipStatus.ACTIVE) {
+        await fastify.db.agentRepository.update(
+          { id: membership.agentId, unclaimed: true },
+          { unclaimed: false },
+        );
+      }
       logger.debug(
         `agent-membership: ${request.params.id} -> ${request.body.status}`,
       );
