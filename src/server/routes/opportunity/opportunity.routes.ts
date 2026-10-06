@@ -730,12 +730,8 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      // COORDINATOR/ADMIN may edit the full patch surface, including
-      // reassigning the opportunity to a different agent. An AGENT may edit
-      // any field of an opportunity belonging to an agent they're a member of
-      // (checked below, once the opportunity's agentId is known), except
-      // reassigning it to a *different* agent — that stays coordinator-only,
-      // matching the fe "Transfer" action (be#870).
+      // Coordinators/admins may change anything. An AGENT may edit their own
+      // NGO's opportunity and move it only to another NGO they belong to.
       const role = request.authUser?.role;
       if (
         role !== UserRole.COORDINATOR &&
