@@ -771,19 +771,17 @@ export default async function opportunityRoutes(
           );
         }
 
-        // Only block an actual reassignment to a *different* agent — an
-        // agent editing their own agent's name/address/district with no `id`
-        // (or the same id) is a legitimate self-edit, not a relink (see
-        // parser-opportunity-patch-data.ts's agentBody.id === undefined
-        // branch, and be#871 review).
+        // No `id` (or the same id) is a self-edit, not a relink. Moving the
+        // opportunity is allowed only to another NGO the caller belongs to.
         const body = request.body as Record<string, unknown>;
         const agentBody = body.agent as { id?: number } | undefined;
         if (
           agentBody?.id !== undefined &&
-          agentBody.id !== opportunity.agentId
+          agentBody.id !== opportunity.agentId &&
+          !(await getCallerAgentIds(request, personId)).includes(agentBody.id)
         ) {
           throw new UnauthorizedError(
-            "Agents cannot reassign an opportunity to a different agent.",
+            "Agents can only move an opportunity to another NGO they belong to.",
           );
         }
       }

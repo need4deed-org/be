@@ -307,6 +307,36 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(unchanged.agentId).toBe(ownAgent.id);
   });
 
+  it("lets an agent move an opportunity to another NGO they also belong to", async () => {
+    const membership = await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: otherAgent.id,
+        personId: agentPerson.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/opportunity/${ownOpportunity.id}`,
+        cookies: { [accessCookieName]: agentCookie },
+        payload: { agent: { id: otherAgent.id } },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const moved = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: ownOpportunity.id,
+      });
+      expect(moved.agentId).toBe(otherAgent.id);
+    } finally {
+      await fastify.db.opportunityRepository.update(
+        { id: ownOpportunity.id },
+        { agentId: ownAgent.id },
+      );
+      await fastify.db.agentPersonRepository.delete({ id: membership.id });
+    }
+  });
+
   // agentBody.id === undefined is parser-opportunity-patch-data.ts's
   // self-edit-agent path (sets Agent.title from agentBody.name) — not a
   // relink, so it must not be blocked by the agent.agentId !== opportunity's
