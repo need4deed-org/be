@@ -258,6 +258,34 @@ describe("POST /user — links existing Person by email instead of duplicating (
     createdUserIds.push(res.json().id);
     createdPersonIds.push(res.json().person.id);
   });
+
+  it("be#983: rejects linking to an existing Person by id and leaves that Person untouched", async () => {
+    // An email-less Person (e.g. GDPR-erased) — the old by-id path would have
+    // attached the new login to it and backfilled the attacker's email.
+    const targetPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Erased", lastName: "Person" }),
+    );
+    createdPersonIds.push(targetPerson.id);
+    const email = `person-id-claim-${suffix}@example.com`;
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email,
+        password: "test_password",
+        role: UserRole.VOLUNTEER,
+        person: { id: targetPerson.id },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(await fastify.db.userRepository.countBy({ email })).toBe(0);
+    const reloaded = await fastify.db.personRepository.findOneByOrFail({
+      id: targetPerson.id,
+    });
+    expect(reloaded.email).toBeFalsy();
+  });
 });
 
 // be#943: POST /user/verify-email now also reports whether a VOLUNTEER's
