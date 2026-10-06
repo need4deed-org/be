@@ -268,7 +268,11 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
           email: personA.email,
           // personA's client supplies personB's own address id — a request
           // this route never validated ownership of for non-self callers.
-          address: { id: addressOwnedByB.id, street: "Hijacked Street" },
+          address: {
+            id: addressOwnedByB.id,
+            street: "Hijacked Street",
+            postcode: { code: postcode.value },
+          },
         },
       },
     });
@@ -281,9 +285,15 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
       id: personB.id,
     });
 
-    // personA never gets pointed at personB's address.
+    // personA never gets pointed at personB's address; the body's id is
+    // ignored and personA, who had none, gets a new one from the submitted fields.
     expect(refreshedA.addressId).not.toBe(addressOwnedByB.id);
     expect(refreshedA.addressId).not.toBeNull();
+    const created = await addressRepository.findOneByOrFail({
+      id: refreshedA.addressId as number,
+    });
+    expect(created.street).toBe("Hijacked Street");
+    expect(created.postcodeId).toBe(postcode.id);
 
     // personB's address is completely untouched.
     expect(refreshedB.addressId).toBe(addressOwnedByB.id);

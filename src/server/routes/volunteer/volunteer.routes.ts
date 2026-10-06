@@ -9,7 +9,11 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -41,6 +45,7 @@ import {
 } from "../../types";
 import {
   buildEraseSummaryMessage,
+  createAddress,
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
@@ -374,19 +379,17 @@ export default async function volunteerRoutes(
       // (already-existing) Address, dropping the address patch entirely
       // otherwise rather than trusting the body's id.
       let personData = patchedPersonData;
+      if (isSelf && personData) {
+        personData = { ...personData, id: volunteer.personId };
+      }
+      // The address is always the volunteer's own (looked up, never the body's
+      // id); without one yet, a new one is created below.
       let addressData = patchedAddressData;
-      if (isSelf) {
-        if (personData) {
-          personData = { ...personData, id: volunteer.personId };
-        }
-        if (addressData) {
-          const ownPerson = await fastify.db.personRepository.findOneBy({
-            id: volunteer.personId,
-          });
-          addressData = ownPerson?.addressId
-            ? { ...addressData, id: ownPerson.addressId }
-            : undefined;
-        }
+      if (addressData) {
+        const ownPerson = await fastify.db.personRepository.findOneBy({
+          id: volunteer.personId,
+        });
+        addressData = { ...addressData, id: ownPerson?.addressId ?? undefined };
       }
 
       // Captured before any writes, for the audit-trail diff below (be#919)
@@ -448,9 +451,9 @@ export default async function volunteerRoutes(
           }
         }
 
-        if (addressData && addressData.id) {
+        if (addressData?.id) {
           const success = await patchOrReplaceAddress(
-            personData?.id ?? volunteer.personId,
+            volunteer.personId,
             addressData as Partial<Address> & { id: number },
             postcodeData,
           );
@@ -459,6 +462,16 @@ export default async function volunteerRoutes(
               message: `Address (id=${addressData.id}) not updated.`,
             });
           }
+        } else if (addressData) {
+          const { id: _id, ...newAddress } = addressData;
+          const address = await createAddress(newAddress, postcodeData);
+          if (!address) {
+            throw new BadRequestError("Address not saved: unknown postcode.");
+          }
+          await fastify.db.personRepository.update(
+            { id: volunteer.personId },
+            { addressId: address.id },
+          );
         }
 
         if (languages) {
