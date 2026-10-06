@@ -6,6 +6,7 @@ import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
 import { assertAgentVisible } from "../../utils";
+import { getCallerAgentIds } from "../../utils/data/get-caller-agent-ids";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentCommunicationRoutes(
@@ -34,6 +35,18 @@ export default function agentCommunicationRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
       assertAgentVisible(agent, request.authUser?.role);
+
+      // NGO users see their own NGO's log (read-only tracker), nobody else's.
+      const role = request.authUser?.role;
+      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+        const agentIds =
+          role === UserRole.AGENT
+            ? await getCallerAgentIds(request, request.authUser?.personId)
+            : [];
+        if (!agentIds.includes(id)) {
+          throw new NotFoundError(`Agent (id:${id}) not found.`);
+        }
+      }
 
       const communicationRepository = fastify.db.communicationRepository;
       const [communications, count] =

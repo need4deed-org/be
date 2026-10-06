@@ -15,7 +15,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { FindOptionsWhere, ILike, Not } from "typeorm";
+import { FindOptionsWhere, ILike, In, Not } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
@@ -87,9 +87,25 @@ export default async function userRoutes(
       const [skip, take] = getSkipTake({ page, limit });
       const direction = sortOrder === SortOrder.OldToNew ? "ASC" : "DESC";
 
+      // Others only see staff accounts (to tag a coordinator), not every
+      // volunteer's and NGO user's email.
+      const callerRole = request.authUser?.role;
+      const isPrivileged =
+        callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
+      const staffRoles = [UserRole.COORDINATOR, UserRole.ADMIN];
+      if (!isPrivileged && role && !staffRoles.includes(role)) {
+        return reply
+          .status(200)
+          .send({ message: "List of users page:1", data: [], count: 0 });
+      }
+      const where = getUserWhere(search, role) as FindOptionsWhere<User>;
+      if (!isPrivileged && !role) {
+        where.role = In(staffRoles);
+      }
+
       const userRepository = fastify.db.userRepository;
       const [users, count] = await userRepository.findAndCount({
-        where: getUserWhere(search, role) as FindOptionsWhere<User>,
+        where,
         relations: ["person"],
         skip,
         take,

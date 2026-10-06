@@ -2,7 +2,7 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
-import { BadRequestError } from "../../config";
+import { BadRequestError, UnauthorizedError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import CommentPerson from "../../data/entity/m2m/comment-person";
 import User from "../../data/entity/user.entity";
@@ -99,6 +99,19 @@ export default async function commentRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
+      // Comments are coordinator-only; others may only fetch the ones tagging
+      // them (notification badge).
+      const role = request.authUser?.role;
+      const isPrivileged =
+        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      if (
+        !isPrivileged &&
+        (request.query.taggedPersonId === undefined ||
+          request.query.taggedPersonId !== request.authUser?.personId)
+      ) {
+        throw new UnauthorizedError("Permission denied");
+      }
+
       try {
         const { userId, entityId, entityType, taggedPersonId } = request.query;
 
@@ -186,7 +199,13 @@ export default async function commentRoutes(
           relations: ["user", "user.person", "language", "commentPerson"],
         });
 
-        if (!comment) {
+        const role = request.authUser?.role;
+        const isPrivileged =
+          role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+        const tagsCaller = comment?.commentPerson?.some(
+          (tag) => tag.personId === request.authUser?.personId,
+        );
+        if (!comment || (!isPrivileged && !tagsCaller)) {
           return reply
             .status(404)
             .send({ message: `Comment id:${id} not found.` });
