@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import LeadFrom from "../../../data/entity/lead.entity";
+import StatisticsEvent from "../../../data/entity/statistics-event.entity";
 import { updateLeads } from "../../../server/utils/data/update-leads";
 
 const leadFromSave = vi.fn();
+const eventSave = vi.fn();
 
 vi.mock("../../../data/data-source", () => ({
   dataSource: {
-    getRepository: () => ({ save: leadFromSave }),
+    getRepository: (entity: unknown) =>
+      entity === StatisticsEvent ? { save: eventSave } : { save: leadFromSave },
   },
 }));
 
@@ -28,6 +31,27 @@ describe("updateLeads", () => {
     expect(leadFromSave).toHaveBeenCalledWith(leads);
     expect(leads[0].count).toBe(1);
     expect(leads[1].count).toBe(6);
+  });
+
+  it("records one lead-from statistics event per answer", async () => {
+    const leads: LeadFrom[] = [
+      { id: 1, count: 0, title: "a" },
+      { id: 2, count: 0, title: "b" },
+    ];
+
+    await updateLeads(leads);
+
+    const events = eventSave.mock.calls[0][0] as StatisticsEvent[];
+    expect(events.map((e) => [e.metric, e.valueKey])).toEqual([
+      ["lead-from", "1"],
+      ["lead-from", "2"],
+    ]);
+    expect(events[0].occurredAt).toBeInstanceOf(Date);
+  });
+
+  it("records nothing when no answer was ticked", async () => {
+    await updateLeads([]);
+    expect(eventSave).not.toHaveBeenCalled();
   });
 
   it("propagates repository errors", async () => {
