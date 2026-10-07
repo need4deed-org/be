@@ -18,6 +18,7 @@ import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -370,45 +371,48 @@ export default async function volunteerRoutes(
         volunteerData = Object.keys(filtered).length ? filtered : undefined;
       }
 
-      // personData/addressData/postcodeData carry ids straight from the
-      // request body (be#965 review) — a self-edit must never trust those:
-      // patchEntity falls back to `data.id` when patching, so an
-      // unauthorized body-supplied id would let a volunteer overwrite any
-      // other person's or address's row. For isSelf, force personData.id to
-      // the caller's own Person, and addressData.id to that Person's own
-      // (already-existing) Address, dropping the address patch entirely
-      // otherwise rather than trusting the body's id.
-      let personData = patchedPersonData;
-      if (isSelf && personData) {
-        personData = { ...personData, id: volunteer.personId };
-      }
-      // The address is always the volunteer's own (looked up, never the body's
-      // id); without one yet, a new one is created below. Decided before any
-      // write, so an unusable address can't leave a half-saved request.
+      // The person and address are always the volunteer's own, never ids from
+      // the body (patchEntity would otherwise write whatever row they name).
+      const personData = patchedPersonData
+        ? { ...patchedPersonData, id: volunteer.personId }
+        : undefined;
+      const ownPerson = await fastify.db.personRepository.findOne({
+        where: { id: volunteer.personId },
+        relations: ["address"],
+      });
+
+      // Decided before any write, so an unusable address can't leave a
+      // half-saved request: empty strings count as not sent, a sent postcode
+      // must exist, and a new address needs one.
+      const addressFields = Object.fromEntries(
+        Object.entries(patchedAddressData ?? {}).filter(
+          ([key, value]) => key !== "id" && value !== "",
+        ),
+      ) as Partial<Address>;
+      const sendsPostcode = Boolean(postcodeData?.id || postcodeData?.value);
       let addressData: Partial<Address> | undefined;
-      if (patchedAddressData || postcodeData) {
-        const ownPerson = await fastify.db.personRepository.findOneBy({
-          id: volunteer.personId,
-        });
-        addressData = {
-          ...patchedAddressData,
-          id: ownPerson?.addressId ?? undefined,
-        };
-        if (!addressData.id) {
-          const hasContent =
-            !!addressData.street || !!postcodeData?.id || !!postcodeData?.value;
-          const postcodeKnown =
-            !!postcodeData?.id ||
-            (!!postcodeData?.value &&
-              (await fastify.db.postcodeRepository.existsBy({
-                value: postcodeData.value,
-              })));
-          if (!hasContent) {
-            addressData = undefined;
-          } else if (!postcodeKnown) {
+      let resolvedPostcode: Partial<Postcode> | undefined;
+      if (Object.keys(addressFields).length || sendsPostcode) {
+        if (sendsPostcode) {
+          const postcode = await fastify.db.postcodeRepository.findOneBy(
+            postcodeData?.id
+              ? { id: Number(postcodeData.id) }
+              : { value: postcodeData?.value },
+          );
+          if (!postcode) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
+          resolvedPostcode = { id: postcode.id };
         }
+        if (!ownPerson?.addressId && !resolvedPostcode) {
+          throw new BadRequestError(
+            "Address not saved: a postcode is required.",
+          );
+        }
+        addressData = {
+          ...addressFields,
+          id: ownPerson?.addressId ?? undefined,
+        };
       }
 
       // Captured before any writes, for the audit-trail diff below (be#919)
@@ -425,24 +429,21 @@ export default async function volunteerRoutes(
         });
       }
       let hasContactChange = false;
-      if ((personData && personData.id) || addressData) {
-        const prevPerson = await fastify.db.personRepository.findOne({
-          where: { id: (personData?.id ?? volunteer.personId) as number },
-          relations: ["address"],
-        });
-        if (personData) {
-          hasContactChange ||= Object.entries(personData).some(
-            ([key, value]) =>
-              key !== "id" && prevPerson?.[key as keyof Person] !== value,
-          );
-        }
-        if (addressData) {
-          hasContactChange ||= Object.entries(addressData).some(
+      if (personData) {
+        hasContactChange ||= Object.entries(personData).some(
+          ([key, value]) =>
+            key !== "id" && ownPerson?.[key as keyof Person] !== value,
+        );
+      }
+      if (addressData) {
+        hasContactChange ||=
+          Object.entries(addressData).some(
             ([key, value]) =>
               key !== "id" &&
-              prevPerson?.address?.[key as keyof Address] !== value,
-          );
-        }
+              ownPerson?.address?.[key as keyof Address] !== value,
+          ) ||
+          (resolvedPostcode !== undefined &&
+            resolvedPostcode.id !== ownPerson?.address?.postcodeId);
       }
       if (hasContactChange) {
         auditLogEntries.push({
@@ -461,7 +462,7 @@ export default async function volunteerRoutes(
           }
         }
 
-        if (personData && personData.id) {
+        if (personData) {
           const success = await patchEntity(Person, personData);
           if (!success) {
             return reply.status(400).send({
@@ -474,7 +475,7 @@ export default async function volunteerRoutes(
           const success = await patchOrReplaceAddress(
             volunteer.personId,
             addressData as Partial<Address> & { id: number },
-            postcodeData,
+            resolvedPostcode ?? {},
           );
           if (!success) {
             return reply.status(400).send({
@@ -483,7 +484,10 @@ export default async function volunteerRoutes(
           }
         } else if (addressData) {
           const { id: _id, ...newAddress } = addressData;
-          const address = await createAddress(newAddress, postcodeData ?? {});
+          const address = await createAddress(
+            newAddress,
+            resolvedPostcode ?? {},
+          );
           if (!address) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
