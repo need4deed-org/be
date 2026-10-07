@@ -1,6 +1,24 @@
-import { Repository } from "typeorm";
+import { IsNull, Repository } from "typeorm";
 import { ConflictError } from "../../../config";
 import User from "../../../data/entity/user.entity";
+
+// What to do when the only User holding the email is a pending one (see
+// isPendingUser):
+// - "reject": treat it like any other User — 409;
+// - "allow": treat the email as available, but leave the row alone (for a
+//   caller that doesn't create the User itself, e.g. generating an invite);
+// - "reclaim": delete the pending row so the caller can create a new User
+//   for the email (be#1012).
+export type PendingUserPolicy = "reject" | "allow" | "reclaim";
+
+// A User that registered but never verified its email: inactive, but not
+// deactivated (self-service deletion / GDPR erasure stamp deactivatedAt,
+// be#1007). Nobody has proven control of the mailbox, so it must not hold
+// the email forever — anyone can self-register any email via public
+// POST /user (be#1012).
+export function isPendingUser(user: User): boolean {
+  return !user.isActive && !user.deactivatedAt;
+}
 
 // Shared "no User already owns this email" guard used by every
 // User-creation route (POST /user, POST /user/admin,
@@ -13,8 +31,29 @@ import User from "../../../data/entity/user.entity";
 export async function assertEmailAvailable(
   userRepository: Repository<User>,
   email: string,
+  pending: PendingUserPolicy = "reject",
 ): Promise<void> {
-  if (await userRepository.findOneBy({ email })) {
+  const existing = await userRepository.findOneBy({ email });
+  if (!existing) {
+    return;
+  }
+  if (pending === "reject" || !isPendingUser(existing)) {
+    throw new ConflictError("User with this email already exists.");
+  }
+  if (pending === "allow") {
+    return;
+  }
+
+  // Deleted, not overwritten: the new User gets a new id, so a verification
+  // link issued to the pending one can't activate its replacement. The
+  // pending condition is repeated so a row verified since the read above
+  // is never deleted.
+  const { affected } = await userRepository.delete({
+    id: existing.id,
+    isActive: false,
+    deactivatedAt: IsNull(),
+  });
+  if (!affected) {
     throw new ConflictError("User with this email already exists.");
   }
 }
