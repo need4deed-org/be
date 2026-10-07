@@ -1,34 +1,28 @@
+import { In } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import LeadFrom from "../../../data/entity/lead.entity";
-import StatisticsEvent from "../../../data/entity/statistics-event.entity";
+import StatisticsEvent, {
+  LEAD_FROM_METRIC,
+} from "../../../data/entity/statistics-event.entity";
 import logger from "../../../logger";
 
+// The per-option counter (all-time totals) and one statistics event per answer
+// (the timeline) are written together; this is bookkeeping only, so a failure
+// is logged and never fails the registration it belongs to.
 export async function updateLeads(leads: LeadFrom[]): Promise<void> {
-  const leadFromRepository = dataSource.getRepository(LeadFrom);
-  for (const lead of leads) {
-    lead.count += 1;
-  }
-  await leadFromRepository.save(leads);
-
-  // Per-answer events give the "heard about us" statistics a timeline; the
-  // counters above stay as the all-time totals.
-  if (!leads.length) {
+  const ids = [...new Set(leads.map((lead) => lead.id))];
+  if (!ids.length) {
     return;
   }
-  // Statistics only: a failure must not fail the registration it belongs to.
-  const occurredAt = new Date();
   try {
-    await dataSource.getRepository(StatisticsEvent).save(
-      leads.map(
-        (lead) =>
-          new StatisticsEvent({
-            metric: "lead-from",
-            occurredAt,
-            valueKey: String(lead.id),
-          }),
-      ),
-    );
+    await dataSource.transaction(async (manager) => {
+      await manager.increment(LeadFrom, { id: In(ids) }, "count", 1);
+      await manager.insert(
+        StatisticsEvent,
+        ids.map((id) => ({ metric: LEAD_FROM_METRIC, valueKey: String(id) })),
+      );
+    });
   } catch (error) {
-    logger.error(`lead-from statistics not saved: ${error}`);
+    logger.error(`"heard about us" answers not counted: ${error}`);
   }
 }

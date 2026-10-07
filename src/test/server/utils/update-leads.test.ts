@@ -1,72 +1,64 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { In } from "typeorm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { dataSource } from "../../../data/data-source";
 import LeadFrom from "../../../data/entity/lead.entity";
-import StatisticsEvent from "../../../data/entity/statistics-event.entity";
+import StatisticsEvent, {
+  LEAD_FROM_METRIC,
+} from "../../../data/entity/statistics-event.entity";
 import { updateLeads } from "../../../server/utils/data/update-leads";
-
-const leadFromSave = vi.fn();
-const eventSave = vi.fn();
-
-vi.mock("../../../data/data-source", () => ({
-  dataSource: {
-    getRepository: (entity: unknown) =>
-      entity === StatisticsEvent ? { save: eventSave } : { save: leadFromSave },
-  },
-}));
+import { randomNumericSuffix } from "../../random";
 
 describe("updateLeads", () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
+  let first: LeadFrom;
+  let second: LeadFrom;
+
+  const events = () =>
+    dataSource.getRepository(StatisticsEvent).findBy({
+      metric: LEAD_FROM_METRIC,
+      valueKey: In([String(first.id), String(second.id)]),
+    });
+
+  beforeAll(async () => {
+    if (!dataSource.isInitialized) {
+      await dataSource.initialize();
+    }
+    const suffix = randomNumericSuffix();
+    const repo = dataSource.getRepository(LeadFrom);
+    first = await repo.save(
+      new LeadFrom({ title: `Lead A ${suffix}`, count: 3 }),
+    );
+    second = await repo.save(
+      new LeadFrom({ title: `Lead B ${suffix}`, count: 0 }),
+    );
   });
 
-  it("increments each lead.count and calls repository.save with the same array", async () => {
-    const leads: LeadFrom[] = [
-      { id: 1, count: 0, title: "a" },
-      { id: 2, count: 5, title: "b" },
-    ];
-
-    leadFromSave.mockResolvedValueOnce(leads);
-
-    await updateLeads(leads);
-
-    expect(leadFromSave).toHaveBeenCalledWith(leads);
-    expect(leads[0].count).toBe(1);
-    expect(leads[1].count).toBe(6);
+  afterAll(async () => {
+    const ids = [String(first.id), String(second.id)];
+    await dataSource
+      .getRepository(StatisticsEvent)
+      .delete({ metric: LEAD_FROM_METRIC, valueKey: In(ids) });
+    await dataSource
+      .getRepository(LeadFrom)
+      .delete({ id: In([first.id, second.id]) });
   });
 
-  it("records one lead-from statistics event per answer", async () => {
-    const leads: LeadFrom[] = [
-      { id: 1, count: 0, title: "a" },
-      { id: 2, count: 0, title: "b" },
-    ];
+  it("counts each answer once and records one event per answer", async () => {
+    await updateLeads([first, first, second]);
 
-    await updateLeads(leads);
+    const repo = dataSource.getRepository(LeadFrom);
+    expect((await repo.findOneByOrFail({ id: first.id })).count).toBe(4);
+    expect((await repo.findOneByOrFail({ id: second.id })).count).toBe(1);
 
-    const events = eventSave.mock.calls[0][0] as StatisticsEvent[];
-    expect(events.map((e) => [e.metric, e.valueKey])).toEqual([
-      ["lead-from", "1"],
-      ["lead-from", "2"],
-    ]);
-    expect(events[0].occurredAt).toBeInstanceOf(Date);
+    const recorded = await events();
+    expect(recorded.map((e) => e.valueKey).sort()).toEqual(
+      [String(first.id), String(second.id)].sort(),
+    );
+    expect(recorded.every((e) => e.occurredAt instanceof Date)).toBe(true);
   });
 
-  it("doesn't fail when the statistics event can't be saved", async () => {
-    eventSave.mockRejectedValueOnce(new Error("no table"));
-
-    await expect(
-      updateLeads([{ id: 1, count: 0, title: "a" }]),
-    ).resolves.toBeUndefined();
-  });
-
-  it("records nothing when no answer was ticked", async () => {
-    await updateLeads([]);
-    expect(eventSave).not.toHaveBeenCalled();
-  });
-
-  it("propagates repository errors", async () => {
-    const leads: LeadFrom[] = [{ id: 3, count: 2, title: "c" }];
-    leadFromSave.mockRejectedValueOnce(new Error("save failed"));
-
-    await expect(updateLeads(leads)).rejects.toThrow("save failed");
-    expect(leads[0].count).toBe(3); // mutation happens before save
+  it("does nothing for no answers", async () => {
+    const before = (await events()).length;
+    await expect(updateLeads([])).resolves.toBeUndefined();
+    expect((await events()).length).toBe(before);
   });
 });

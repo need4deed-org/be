@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -7,6 +8,8 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import District from "./location/district.entity";
+
+export const LEAD_FROM_METRIC = "lead-from";
 
 // Append-only and anonymous (no person or volunteer id): one row per counted
 // event, e.g. a ticked "where did you hear about us" answer.
@@ -25,7 +28,8 @@ export default class StatisticsEvent {
   @Column({ type: "varchar" })
   metric: string;
 
-  @Column({ type: "timestamp" })
+  // Set by the database, like the created_at columns other metrics bucket on.
+  @CreateDateColumn()
   occurredAt: Date;
 
   // What was counted, e.g. the lead_from option id or a match status.
@@ -36,6 +40,7 @@ export default class StatisticsEvent {
   @JoinColumn({ name: "district_id" })
   district?: District;
 
+  @Index()
   @Column({ nullable: true })
   districtId?: number;
 
