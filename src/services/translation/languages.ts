@@ -2,7 +2,6 @@ import { Lang } from "need4deed-sdk";
 import { EntityManager, In } from "typeorm";
 import Language from "../../data/entity/profile/language.entity";
 
-// A row of a table whose text goes to machine translation.
 export interface TranslatableEntity {
   id: number;
   originalLanguageId?: number | null;
@@ -28,7 +27,6 @@ export async function languageIds(
   return { idOf, langOf };
 }
 
-// NULL (rows from before be#1066) counts as German.
 export function originalLang(
   entity: TranslatableEntity,
   langOf: Map<number, Lang>,

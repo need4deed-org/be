@@ -11,9 +11,6 @@ import Agent from "../opportunity/agent.entity";
 import Person from "../person.entity";
 
 @Entity()
-// Three-column unique: a person may legitimately hold multiple roles at one
-// agent (the dev DB has exactly this case), so the constraint is on the
-// full triple, not (agentId, personId) alone.
 @Index(["agentId", "personId", "role"], { unique: true })
 export default class AgentPerson {
   constructor(agentPerson?: Partial<AgentPerson>) {
@@ -32,9 +29,6 @@ export default class AgentPerson {
   })
   role: AgentRoleType;
 
-  // Self-registration joins land ACTIVE when the registrant's email domain
-  // matches an existing member of the agent, otherwise PENDING until an
-  // ADMIN/COORDINATOR approves. Pre-existing memberships default to ACTIVE.
   @Column({
     type: "enum",
     enum: AgentMembershipStatus,

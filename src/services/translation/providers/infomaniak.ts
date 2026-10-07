@@ -25,12 +25,6 @@ interface ChatCompletion {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-/**
- * Infomaniak AI Tools, OpenAI-compatible chat completions (be#1065). One
- * field per call, temperature 0 (outputs still vary), strict json_schema
- * output. Logs status codes and token counts only, never text: request
- * and response bodies carry user-entered content.
- */
 export class InfomaniakProvider implements TranslationProvider {
   readonly name = "infomaniak";
 
@@ -79,7 +73,6 @@ export class InfomaniakProvider implements TranslationProvider {
         },
       );
     } catch (err) {
-      // Timeout or network failure.
       logger.warn(
         { provider: this.name, error: (err as Error).name },
         "translation: provider request failed",
@@ -102,8 +95,6 @@ export class InfomaniakProvider implements TranslationProvider {
         );
         return { status: "error", kind: "misconfigured" };
       }
-      // 5xx and the passing 4xx (request timeout, conflict, too early) are
-      // outages; any other 4xx is about this request and won't improve.
       return {
         status: "error",
         kind:

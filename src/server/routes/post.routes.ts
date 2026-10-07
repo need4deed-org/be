@@ -67,19 +67,12 @@ import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
 
-// Roles that can see posts (isPostManagerRole), so the only ones emailed
-// about a tag in one.
 const POST_READER_ROLES = [
   UserRole.AGENT,
   UserRole.COORDINATOR,
   UserRole.ADMIN,
 ];
 
-// Slack + email for the persons newly tagged in a post (be#1075), by the
-// requester (`taggerUserId`/`tagger`), who on an edit may not be the post's
-// author. Fire-and-forget: tagged() swallows its own errors and no-ops
-// without a Slack webhook; notifyTaggedByEmail() never rejects. Neither
-// affects the response.
 function notifyPostTags(
   fastify: FastifyInstance,
   post: Post,
@@ -105,8 +98,6 @@ function notifyPostTags(
   });
 }
 
-// Posts show the titles of their linked opportunities; serve them in
-// ?language= like the opportunity routes do (be#1068).
 async function translateLinkedOpportunities(
   fastify: FastifyInstance,
   posts: Post[],
@@ -123,9 +114,6 @@ export default async function postRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  //
-  // GET /post
-  //
   fastify.get<{
     Querystring: QuerystringPostList;
     Reply: ReplyDataCount<ApiPostGet[]>;
@@ -157,19 +145,7 @@ export default async function postRoutes(
       let orderedPosts: Post[];
       let count: number;
 
-      // `authorId !== undefined`, not `!authorId` / truthiness: 0 is never a
-      // real person id (PrimaryGeneratedColumn starts at 1, and the schema
-      // now enforces minimum: 1 besides), but falsy-checking it here would
-      // silently treat authorId: 0 as "no filter".
       if (!search) {
-        // Plain listing, optionally filtered by authorId: buildPostQuery's
-        // leftJoinAndSelect + getManyAndCount already paginates correctly
-        // despite the to-many joins — TypeORM wraps this in its own
-        // distinct-primary-key subquery whenever relations are joined
-        // alongside skip/take (see the same pattern, and the comment
-        // explaining why, in opportunity.routes.ts). authorId adds no join
-        // (it's a plain column on post), so it never needs the heavier
-        // search path below — just an extra andWhere.
         const qb = buildPostQuery(fastify)
           .where("post.parentId IS NULL")
           .orderBy("post.createdAt", "DESC")
@@ -181,24 +157,6 @@ export default async function postRoutes(
         }
         [orderedPosts, count] = await qb.getManyAndCount();
       } else {
-        // Search (with authorId optionally AND-combined):
-        // buildMatchingPostIdsQuery only ever plain-leftJoins (for
-        // filtering, not hydration) and runs via getRawMany, so none of
-        // TypeORM's automatic pagination handling applies here — GROUP BY
-        // collapses any to-many-join fan-out before LIMIT/OFFSET applies,
-        // and COUNT(*) OVER() gets the total alongside the page in the same
-        // query (a window function, computed over the full pre-LIMIT result
-        // set, not just the page). Full posts are then hydrated separately
-        // via buildPostQuery, keyed by the fixed page of ids.
-        //
-        // .limit()/.offset(), not .skip()/.take(): TypeORM's skip/take are
-        // meant for getMany()/getManyAndCount() — on a raw, manually-grouped
-        // query like this one, skip/take silently produce NO LIMIT/OFFSET at
-        // all the moment any join is present, since TypeORM can't run that
-        // automatic rewrite outside getMany(). Traced via .getSql() while
-        // writing the fan-out regression test above. limit/offset always
-        // emit a literal LIMIT/OFFSET, which is exactly right here since
-        // GROUP BY has already made each row one distinct post.
         const idsQb = buildMatchingPostIdsQuery(fastify, filter)
           .select("post.id", "id")
           .addSelect("COUNT(*) OVER()", "totalCount")
@@ -213,10 +171,6 @@ export default async function postRoutes(
         }>();
         const ids = idRows.map((row) => row.id);
 
-        // COUNT(*) OVER() only appears on rows that are actually returned —
-        // if the requested page is past the last match (idRows is empty),
-        // fall back to a direct count so pagination metadata stays correct
-        // instead of collapsing to 0.
         count = idRows.length
           ? Number(idRows[0].totalCount)
           : Number(
@@ -236,8 +190,6 @@ export default async function postRoutes(
         orderedPosts = ids
           .map((id) => postsById.get(id))
           .filter((post): post is Post => post !== undefined);
-        // A post deleted between the ids query and hydration would leave
-        // `count` inconsistent with `data.length` — keep them in sync.
         count -= ids.length - orderedPosts.length;
       }
 
@@ -245,7 +197,6 @@ export default async function postRoutes(
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
       ]);
-      // Linked opportunities' titles in ?language= (be#1068).
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
         message: "Posts.",
@@ -255,14 +206,10 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // POST /post
-  //
   fastify.post<{ Body: ApiPostPost; Reply: ReplyData<ApiPostGet> }>(
     "/",
     {
       schema: {
-        // Linked opportunity titles in the response (be#1068).
         querystring: langQuerySchema,
         body: { $ref: "ApiPostPost#" },
         response: responseSchema({
@@ -319,7 +266,6 @@ export default async function postRoutes(
       if (!full) {
         throw new NotFoundError("Post not found.");
       }
-      // The requester is the author here (authorId is their person).
       notifyPostTags(
         fastify,
         full,
@@ -327,7 +273,6 @@ export default async function postRoutes(
         request.authUser!.id,
         full.author,
       );
-      // After the save and the tag notifications (original titles).
       await translateLinkedOpportunities(fastify, [full], request.query);
       return reply
         .status(201)
@@ -335,9 +280,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // PATCH /post/:id
-  //
   fastify.patch<{
     Params: ParamsId;
     Body: ApiPostPatch;
@@ -378,7 +320,6 @@ export default async function postRoutes(
       });
 
       const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
-      // Tags before this edit — only the ones it adds get notified.
       const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
 
       if (text !== null && text !== undefined) {
@@ -404,10 +345,6 @@ export default async function postRoutes(
       }
 
       const updated = await fastify.db.postRepository.save(post);
-      // A lightweight count, not a full buildPostQuery() re-fetch — author/
-      // taggedPersons/linkedOpportunities are already loaded on `updated`.
-      // Runs alongside attachReactionData/attachBookmarkData — none of the
-      // three depend on each other's result.
       const [replyCount] = await Promise.all([
         fastify.db.postRepository.count({ where: { rootId: updated.id } }),
         attachReactionData(fastify, [updated], request.authUser?.personId),
@@ -430,7 +367,6 @@ export default async function postRoutes(
               : null;
         notifyPostTags(fastify, updated, added, request.authUser!.id, tagger);
       }
-      // After the save and the tag notifications (original titles).
       await translateLinkedOpportunities(fastify, [updated], request.query);
       return reply
         .status(200)
@@ -438,9 +374,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // DELETE /post/:id
-  //
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
@@ -473,9 +406,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // POST /post/:id/bookmark
-  //
   fastify.post<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id/bookmark",
     {
@@ -499,9 +429,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // DELETE /post/:id/bookmark
-  //
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id/bookmark",
     {
@@ -524,9 +451,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // GET /post/:id/reply
-  //
   fastify.get<{
     Params: ParamsId;
     Reply: ReplyData<ApiPostReplyGet[]>;
@@ -548,17 +472,9 @@ export default async function postRoutes(
       const role = request.authUser?.role;
 
       if (!isPostManagerRole(role)) {
-        // Matches GET /post's own convention: an empty list rather than a
-        // 404, so a disallowed role can't distinguish a nonexistent post
-        // from one it just isn't allowed to see.
         return reply.status(200).send({ message: "Replies.", data: [] });
       }
 
-      // Full thread, unpaginated (see need4deed-org/sdk#219) — depth-1 and
-      // depth-2 replies share the same rootId, so this is a flat list; the
-      // client groups depth-2 replies under their parent via parentReplyId.
-      // Run alongside the existence check rather than after it — neither
-      // depends on the other's result.
       const [, replies] = await Promise.all([
         getRootPostOrThrow(fastify, id),
         fastify.db.postRepository.find({
@@ -576,9 +492,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // POST /post/:id/reply
-  //
   fastify.post<{
     Params: ParamsId;
     Body: ApiPostReplyPost;
@@ -665,9 +578,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // PATCH /post/reply/:id
-  //
   fastify.patch<{
     Params: ParamsId;
     Body: ApiPostReplyPatch;
@@ -720,9 +630,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // DELETE /post/reply/:id
-  //
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/reply/:id",
     {
@@ -755,9 +662,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // POST /post/:id/reaction
-  //
   fastify.post<{
     Params: ParamsId;
     Body: ApiPostReactionPost;
@@ -786,12 +690,6 @@ export default async function postRoutes(
     },
   );
 
-  //
-  // DELETE /:id/reaction and /reply/:id/reaction — deletePostReaction has no
-  // root/reply distinction at all (a reaction's postId is just a row in the
-  // shared table either way), so the same handler is registered at both
-  // paths rather than duplicated.
-  //
   const deleteReactionOptions = {
     schema: {
       params: idParamSchema,
@@ -824,9 +722,6 @@ export default async function postRoutes(
     deleteReactionHandler,
   );
 
-  //
-  // POST /post/reply/:id/reaction
-  //
   fastify.post<{
     Params: ParamsId;
     Body: ApiPostReactionPost;

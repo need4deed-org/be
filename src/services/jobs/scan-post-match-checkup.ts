@@ -11,7 +11,6 @@ export async function scanPostMatchCheckup(
   fastify: FastifyInstance,
   now: Date = new Date(),
 ): Promise<void> {
-  // Rows that reached 2 months without an update since yesterday's run.
   const { from, to } = crossedMonthsAgo(2, now);
 
   const ovs = await fastify.db.opportunityVolunteerRepository.find({
@@ -23,8 +22,6 @@ export async function scanPostMatchCheckup(
     relations: ["volunteer.person", "volunteer.person.users"],
   });
 
-  // Posted to Slack for coordinators (be#1088): nothing is recorded in
-  // Communication, the daily window keeps each match to one post.
   for (const ov of ovs) {
     try {
       await fastify.cronNotify.emailPostMatchCheckup(ov);

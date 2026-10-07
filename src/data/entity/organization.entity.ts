@@ -41,7 +41,7 @@ export default class Organization {
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  @Length(7, 20) // Example phone length validation
+  @Length(7, 20)
   phone?: string;
 
   @Column({ nullable: true })
@@ -61,9 +61,6 @@ export default class Organization {
   @JoinColumn({ name: "address_id" })
   address?: Address;
 
-  // Nullable (be#843): a bulk-imported organization (e.g. seeded from a known
-  // domain list) may not have a known address yet — that's a legitimate
-  // "not yet known" state, not an error condition.
   @Column({ nullable: true })
   addressId?: number;
 
@@ -73,8 +70,6 @@ export default class Organization {
   @JoinColumn({ name: "person_id" })
   person?: Person;
 
-  // Nullable (be#843): same reasoning as addressId — a bulk-imported
-  // organization may not have an assigned primary contact yet.
   @Column({ nullable: true })
   personId?: number;
 }

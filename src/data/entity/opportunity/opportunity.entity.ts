@@ -101,8 +101,6 @@ export default class Opportunity {
   @Column({ nullable: true })
   accompanyingId?: number;
 
-  // Single-occurrence start date/time, shared by ACCOMPANYING (appointment)
-  // and EVENTS (event start) types — see be#746.
   @ManyToOne(() => Onetimer, (onetimer) => onetimer.opportunity, {
     nullable: true,
   })
@@ -135,9 +133,6 @@ export default class Opportunity {
   @Column({ nullable: true })
   districtId?: number;
 
-  // Language title/info were typed in (be#1064). Set from ?language= on
-  // create and changed only by a coordinator correction; machine translation
-  // targets every other Lang. NULL (legacy rows) is treated as de.
   @ManyToOne(() => Language, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "original_language_id" })
   originalLanguage?: Language;

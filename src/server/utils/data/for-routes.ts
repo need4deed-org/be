@@ -117,8 +117,6 @@ export async function getInstanceByTranslation<
     );
     const { fk } = getTranslatedEntity(entityType);
 
-    // Only seeded reference titles are lookup keys; machine/human rows are
-    // translations of free text and must never resolve to an entity.
     const translation = await fieldTranslationRepository.findOne({
       where: {
         [fk]: Not(IsNull()),
@@ -140,9 +138,6 @@ export async function getInstanceByTranslation<
   return null;
 }
 
-// Volunteer and Opportunity both structurally satisfy this shape, so either
-// can be passed directly — a Volunteer's own deal, or an Opportunity's
-// posting-side deal, use the same field_translation lookup (be#856).
 export async function addTranslatedFields(
   entities: { id: number; deal?: Deal }[],
   isoCode: Lang,
@@ -164,10 +159,6 @@ export async function addTranslatedFields(
   logger.info("Translating deal fields");
   for (const entity of entities) {
     try {
-      // `?? []` guards below: this is also called from notify paths (be#849,
-      // be#856) with only a subset of deal relations loaded — e.g. no
-      // dealActivity — so it must not assume every caller eager-loaded all
-      // three, only whichever ones it actually needs translated.
       for (const pl of entity.deal?.dealLanguage ?? []) {
         const translation = await fieldTranslationRepository.findOne({
           where: {
@@ -284,10 +275,6 @@ export async function getOptions(
         entityId: row[fk] as number,
       }));
 
-      // isoCode is the stable identifier for a LANGUAGE option — unlike
-      // `title`, which is translated into whichever `language` was
-      // requested. Consumers (e.g. restricting a picker to German/English)
-      // need to match on this rather than a locale-dependent title.
       if (itemType === EntityTableName.LANGUAGE) {
         const languages = await languageRepository.findBy({
           id: In(items.map(({ entityId }) => entityId)),
@@ -365,9 +352,6 @@ export async function patchEntity<E extends { id: number }>(
     });
 }
 
-// An opportunity looking for volunteers implies its agent is looking for
-// volunteers too (be#862). Kept as a set (rather than e.g. "!== INACTIVE/PAST")
-// so a future status added to the SDK doesn't silently start cascading.
 const AGENT_SEARCH_CASCADE_STATUSES = new Set<OpportunityStatusType>([
   OpportunityStatusType.NEW,
   OpportunityStatusType.ACTIVE,
@@ -415,11 +399,6 @@ export async function patchAddress(
   return Boolean(await patchEntity(Address, address, undefined, manager));
 }
 
-/**
- * Create and persist a new Address from the given data, resolving the postcode
- * string to a Postcode by value. Returns `null` when no postcode can be
- * resolved, since an Address cannot exist without one (NOT NULL).
- */
 export async function createAddress(
   addressData: Partial<Address>,
   postcodeData: Partial<Postcode>,
@@ -444,15 +423,6 @@ export async function createAddress(
   return await addressRepository.save(address);
 }
 
-/**
- * Whether `addressId` is exclusively owned by `personId` — i.e. safe to
- * patch in place. An Address becomes shared not just via the seeded "Dummy"
- * placeholder but via any row multiple Person rows happen to point at (see
- * be#1019/#1025), so this checks the actual reference count rather than a
- * title convention. Checks for any *other* Person referencing the address,
- * not just the total count — a count-only check would also pass for an
- * address some other single Person exclusively owns.
- */
 export async function isAddressExclusivelyOwned(
   personId: number,
   addressId: number,
@@ -464,14 +434,6 @@ export async function isAddressExclusivelyOwned(
   return otherOwners === 0;
 }
 
-/**
- * Patch an Address by id — unless it's shared with another Person, in which
- * case patching in place would silently change every other Person still
- * pointing at it (be#1019). When shared, clones the current row (with this
- * patch's changes applied) into a new Address exclusively owned by
- * `personId`, and repoints `personId` at it instead; the shared row is left
- * untouched for everyone else still on it.
- */
 export async function patchOrReplaceAddress(
   personId: number,
   addressData: Partial<Address> & { id: number },
@@ -517,14 +479,6 @@ export async function patchOrReplaceAddress(
   return true;
 }
 
-/**
- * Sync the agent's `agentLanguage` join rows to match `languages`: remove the
- * de-selected rows and insert the newly selected ones (rows that are unchanged
- * are left untouched). Language `id`s come from the SDK as `OptionById`.
- *
- * Runs on the given `manager` so the caller can wrap it in a transaction; pass
- * the transactional EntityManager to make it atomic with surrounding writes.
- */
 export async function updateAgentLanguages(
   agentId: number,
   languages: OptionById[],
@@ -553,14 +507,6 @@ export async function updateAgentLanguages(
   }
 }
 
-/**
- * Sync the agent's `agentService` join rows to match `serviceIds`: remove the
- * de-selected rows and insert the newly selected ones (rows that are unchanged
- * are left untouched). Mirrors updateAgentLanguages above.
- *
- * Runs on the given `manager` so the caller can wrap it in a transaction; pass
- * the transactional EntityManager to make it atomic with surrounding writes.
- */
 export async function updateAgentServices(
   agentId: number,
   serviceIds: number[],
@@ -601,32 +547,22 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
     }
   > = {
     DealLanguage: {
-      // m2m hangs directly off the deal (the root), so no nested relation
-      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "language", "languageId"],
       relations: [],
     },
     DealActivity: {
-      // m2m hangs directly off the deal (the root), so no nested relation
-      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "activity", "activityId"],
       relations: [],
     },
     DealSkill: {
-      // m2m hangs directly off the deal (the root), so no nested relation
-      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "skill", "skillId"],
       relations: [],
     },
     DealDistrict: {
-      // m2m hangs directly off the deal (the root), so no nested relation
-      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "district", "districtId"],
       relations: [],
     },
     DealTimeslot: {
-      // m2m hangs directly off the deal (the root), so no nested relation
-      // needs loading to resolve the host id.
       idFieldNames: ["deal", "dealId", "timeslot", "timeslotId"],
       relations: [],
     },
@@ -683,15 +619,6 @@ export async function getOrCreateTimeslot(
   return timeslot;
 }
 
-// The single-occurrence start date/time for ACCOMPANYING/EVENTS
-// opportunities (see be#746). Unlike `getOrCreateTimeslot`, a `Onetimer` is
-// owned 1:1 by its opportunity rather than deduplicated by value, so this
-// updates the opportunity's existing row in place or creates a new one.
-// Accepts an optional manager so the caller can wrap this + the opportunity's
-// onetimerId link-update in a single transaction.
-// Returns only `id`/`date` on the update path (the caller only ever needs
-// the id) rather than a full `Onetimer` — avoids faking the rest of the
-// entity's shape just to satisfy the return type.
 export async function upsertOnetimer(
   existingOnetimerId: number | undefined,
   date: Date,
@@ -742,8 +669,6 @@ export async function updateOptionList<
         m2mEntity,
       );
 
-      // When the m2m hangs directly off the root (e.g. DealActivity off Deal),
-      // the host *is* the root; otherwise resolve through the nested relation.
       const hostIdValue = host === rootEntity ? root.id : root[host].id;
 
       const where = {
@@ -756,8 +681,6 @@ export async function updateOptionList<
         await m2mRepository.delete(currentList.map(({ id }) => id));
       }
 
-      // De-dupe incoming ids so a repeated selection can't violate a
-      // (host, item) unique constraint (e.g. deal_activity) on re-insert.
       const seen = new Set<L["id"]>();
       const uniqueList = list.filter((item) => {
         if (seen.has(item.id)) {
@@ -771,7 +694,7 @@ export async function updateOptionList<
         const newItem = new m2mEntity({
           [hostId]: hostIdValue,
           [listItemId]: item.id,
-          ...(listName === "language" // TODO: tech debt here
+          ...(listName === "language"
             ? {
                 proficiency: (item as unknown as { proficiency: string })
                   .proficiency,
@@ -817,10 +740,6 @@ export async function fetchVolunteerById(
   const timedEvents = await getTimedEvents(volunteer);
   const comments = await getVolunteerComments(volunteer);
 
-  // Mask PII the caller may not see before the serializer reads it. Comments are
-  // loaded separately (they aren't part of the volunteer graph), so they must be
-  // masked too — otherwise comment authors' Person PII leaks to non-privileged
-  // callers.
   if (maskContext) {
     maskPii(volunteer, maskContext);
     maskPii(comments, maskContext);
@@ -879,16 +798,13 @@ export function parseQueryParams(rawQuery: InputQuery) {
     [key: string]: unknown;
   } = {};
 
-  // 1. Reconstruct the nested 'filter' object
   for (const key in rawQuery) {
     if (key.startsWith("filter[")) {
-      // Extracts the inner key, e.g., "district" from "filter[district][0]"
       const match = key.match(/filter\[(\w+)\]/);
       if (match) {
         const filterKey = match[1];
         const value = rawQuery[key];
 
-        // Check for array-like keys (e.g., "filter[district][0]")
         if (
           key.match(/\[\d+\]$/) ||
           [
@@ -899,21 +815,17 @@ export function parseQueryParams(rawQuery: InputQuery) {
             "statusType",
           ].includes(filterKey)
         ) {
-          // Extract the index and ensure the value is added to an array
           if (!filter[filterKey]) {
             filter[filterKey] = [];
           }
-          // This is simple for demonstration; a robust parser should handle indices
           (filter[filterKey] as unknown[]).push(value);
         } else {
-          // Handle simple filter properties (search, accompanying, german)
           filter[filterKey] = value;
         }
       }
     }
   }
 
-  // 2. Type Conversion and Final Structure
   return {
     limit: parseInt(rawQuery.limit as string, 10) || defaultPageSize,
     page: parseInt(rawQuery.page as string, 10) || 1,
@@ -924,10 +836,8 @@ export function parseQueryParams(rawQuery: InputQuery) {
         ? VolunteerStateTypeType.ACCOMPANYING
         : undefined,
       german: getPositive(filter.german as string),
-      // Simple string properties
       search: filter.search,
 
-      // Array properties
       district: filter.district as string[],
       languages: filter.language as string[],
       statusType: filter.statusType as string[],
@@ -940,7 +850,7 @@ export function parseQueryParams(rawQuery: InputQuery) {
 }
 
 function getPositive(arg: string): boolean {
-  return (arg ?? false) !== false && arg !== "0"; // makes "" positive while "0" negative
+  return (arg ?? false) !== false && arg !== "0";
 }
 
 export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {

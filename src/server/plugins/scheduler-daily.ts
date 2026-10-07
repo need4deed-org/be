@@ -11,27 +11,17 @@ import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
-// Unique integer key for this app's advisory lock — prevents duplicate runs
-// across multiple ECS instances.
 const SCHEDULER_LOCK_ID = 20240707;
 
-// Daily at the 6AM hour Berlin time, by default.
 const CRON_SCHEDULE_DAILY = process.env.CRON_SCHEDULE_DAILY || "0 6 * * *";
 
 async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
-  // node-cron handles DST automatically when timezone is set.
   const task = cron.schedule(
     CRON_SCHEDULE_DAILY,
     async () => {
       try {
         logger.info("scheduler: running daily scans");
 
-        // Run in this order, sequentially: their WHERE clauses can both
-        // match the same onetimer opportunity in the same tick (e.g. one
-        // stuck in SEARCHING past its date with a MATCHED volunteer), and
-        // running them concurrently let whichever transaction committed
-        // last silently win, leaving an unpredictable ACTIVE/PAST state
-        // (be#987 review).
         await runWithAdvisoryLock(
           () =>
             runNamedCronJobs(
@@ -44,10 +34,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "scanExpiredOnetimers",
                   run: () => scanExpiredOnetimers(fastify),
                 },
-                // The cron jobs' emails, posted to Slack #cron-notifications
-                // (be#1088), after the status jobs above. Each scan takes
-                // only what crossed its threshold since yesterday's run, so
-                // every row is posted once.
                 {
                   name: "scanStalePending",
                   run: () => scanStalePending(fastify),
@@ -60,9 +46,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "scanRegularUpdate",
                   run: () => scanRegularUpdate(fastify),
                 },
-                // Working days only: each takes the appointments 4 working
-                // days ahead together with the weekend or holidays after
-                // them, so a run on a non-working day would repeat them.
                 ...(isWorkingDay(berlinToday())
                   ? [
                       {

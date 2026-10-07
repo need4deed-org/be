@@ -34,15 +34,15 @@ export async function removeData(dataSource: DataSource): Promise<void> {
 
   logger.info("Attempting to remove existing data from the database...");
   await dataSource.query(`
-    DO $$ 
-    DECLARE 
+    DO $$
+    DECLARE
         r RECORD;
     BEGIN
         -- Filter out the migrations table to avoid breaking TypeORM's history
         FOR r IN (
-            SELECT tablename 
-            FROM pg_tables 
-            WHERE schemaname = 'public' 
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
             AND tablename NOT IN ('be_migrations', 'typeorm_metadata', 'config') -- Exclude migrations and config tables
         ) LOOP
             EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
