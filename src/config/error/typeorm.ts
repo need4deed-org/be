@@ -2,7 +2,7 @@ import { BaseError } from "./base";
 
 export class DatabaseError extends BaseError {
   public readonly detail?: string;
-  public readonly code?: string; // SQL State code
+  public readonly code?: string;
 
   constructor(
     message: string,
@@ -27,7 +27,6 @@ export class EntityNotFoundError extends DatabaseError {
 
 export class ConflictError extends DatabaseError {
   constructor(detail: string) {
-    // Used for Unique Constraint violations (SQL State 23505)
     super("Conflict: Resource already exists", 409, detail);
   }
 }

@@ -13,9 +13,6 @@ export default async function organizationRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // GET is open to any logged-in user — it's just a dropdown of organization
-  // names (e.g. for the agent "operator" picker, be#843), no PII. Writes stay
-  // COORDINATOR-only, gated per-route below.
   fastify.addHook("onRequest", fastify.authenticate());
 
   fastify.get<{ Reply: ReplyData<ApiOrganizationGetList[]> }>(

@@ -9,8 +9,6 @@ export async function getLanguageTitle(isoCode: string): Promise<string> {
   return language?.title;
 }
 
-// Reference data is fixed and never mutated within a request, so this reads
-// via the plain dataSource rather than needing to be transaction-aware.
 export async function getLanguageIdByIsoCode(isoCode: string): Promise<number> {
   const languageRepository = getRepository(dataSource, Language);
   const language = await languageRepository.findOneBy({ isoCode });

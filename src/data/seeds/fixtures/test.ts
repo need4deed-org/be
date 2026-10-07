@@ -121,7 +121,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     return;
   }
 
-  // --- reference lookups ---
   const postcodeRepo = getRepository(dataSource, Postcode);
   const languageRepo = getRepository(dataSource, Language);
   const activityRepo = getRepository(dataSource, Activity);
@@ -162,7 +161,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
       timeslotRepo.findOneByOrFail({ info: "TU-afternoon" }),
     ]);
 
-  // --- users ---
   const pwHash = await hashPassword("test_password");
 
   const adminPerson = new Person({ firstName: "Test", lastName: "Admin" });
@@ -219,11 +217,9 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     userVolunteerUser,
   ]);
 
-  // reload persons with their generated IDs (cascaded by User save)
   const personAgentContact = userAgentUser.person;
   const personVol1 = userVolunteerUser.person;
 
-  // --- agents ---
   const addressRepo = getRepository(dataSource, Address);
   const orgRepo = getRepository(dataSource, Organization);
   const agentRepo = getRepository(dataSource, Agent);
@@ -231,7 +227,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
   const agentPostcodeRepo = getRepository(dataSource, AgentPostcode);
   const personRepo = getRepository(dataSource, Person);
 
-  // Agent 1
   const address1 = await addressRepo.save(
     new Address({ title: "Test RAB HQ", postcodeId: pc10115.id }),
   );
@@ -256,7 +251,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     new AgentPostcode({ agentId: agent1.id, postcodeId: pc10115.id }),
   );
 
-  // Agent 2
   const agent2ContactPerson = await personRepo.save(
     new Person({ firstName: "Test", lastName: "Agent2Contact" }),
   );
@@ -284,7 +278,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     new AgentPostcode({ agentId: agent2.id, postcodeId: pc12043.id }),
   );
 
-  // --- volunteers ---
   const volunteerRepo = getRepository(dataSource, Volunteer);
 
   const deal1 = await makeDeal(dataSource, DealType.VOLUNTEER, pc10115.id, {
@@ -339,7 +332,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     new Volunteer({ person: personVol3, deal: deal3 }),
   );
 
-  // --- opportunities ---
   const opportunityRepo = getRepository(dataSource, Opportunity);
   const accompanyingRepo = getRepository(dataSource, Accompanying);
   const onetimerRepo = getRepository(dataSource, Onetimer);
@@ -439,7 +431,6 @@ export async function seedTestFixtures(dataSource: DataSource): Promise<void> {
     }),
   );
 
-  // --- matches ---
   const ovRepo = getRepository(dataSource, OpportunityVolunteer);
   await ovRepo.save(
     new OpportunityVolunteer({

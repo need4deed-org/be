@@ -6,20 +6,20 @@ import { EntityManager } from "typeorm";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { logMatchChangeSafely } from "../../../data/utils/log-match-change";
 
-// "Active" engagement follows the volunteer's matches (same rule as fe#1123):
-// Active while any match is active, back to Available once none is. A status a
-// coordinator set by hand is only replaced when a match becomes active.
-// Each actual change gets an availability_changed audit row with no actor,
-// like the one PATCH /volunteer writes for a coordinator's change (be#919).
 export async function syncVolunteerEngagement(
   manager: EntityManager,
   volunteerId: number,
+  mode: "follow" | "release" = "follow",
 ): Promise<void> {
   const hasActiveMatch = await manager.exists(OpportunityVolunteer, {
     where: { volunteerId, status: OpportunityVolunteerStatusType.ACTIVE },
   });
 
+  if (hasActiveMatch && mode === "release") {
+    return;
+  }
   if (hasActiveMatch) {
     const previous = await manager.findOne(Volunteer, {
       select: { id: true, statusEngagement: true },
@@ -77,4 +77,60 @@ async function logEngagementChange(
       occurredAt: new Date(),
     }),
   );
+}
+
+export async function syncEngagementForMatchChange(
+  manager: EntityManager,
+  volunteerId: number,
+  from: OpportunityVolunteerStatusType | undefined,
+  to: OpportunityVolunteerStatusType | undefined,
+): Promise<void> {
+  const isActive = OpportunityVolunteerStatusType.ACTIVE;
+  if (to === isActive && from !== isActive) {
+    await syncVolunteerEngagement(manager, volunteerId, "follow");
+  } else if (from === isActive && to !== isActive) {
+    await syncVolunteerEngagement(manager, volunteerId, "release");
+  }
+}
+
+// Deletes a match, releases engagement and logs the removal in one transaction,
+// with the volunteer row locked like OpportunityVolunteerSubscriber does. The
+// status comes from the delete itself, so a concurrent change can't make it stale.
+export async function deleteMatch(
+  manager: EntityManager,
+  match: Pick<OpportunityVolunteer, "id" | "volunteerId" | "opportunityId">,
+  actorUserId?: number,
+): Promise<boolean> {
+  return manager.transaction(async (tx) => {
+    await tx
+      .createQueryBuilder(Volunteer, "volunteer")
+      .select("volunteer.id")
+      .where("volunteer.id = :id", { id: match.volunteerId })
+      .setLock("for_no_key_update")
+      .getRawOne();
+    const { raw } = await tx
+      .createQueryBuilder()
+      .delete()
+      .from(OpportunityVolunteer)
+      .where("id = :id", { id: match.id })
+      .returning(["status"])
+      .execute();
+    const deleted = (raw as { status: OpportunityVolunteerStatusType }[])[0];
+    if (!deleted) {
+      return false;
+    }
+    await syncEngagementForMatchChange(
+      tx,
+      match.volunteerId,
+      deleted.status,
+      undefined,
+    );
+    await logMatchChangeSafely(tx, {
+      volunteerId: match.volunteerId,
+      opportunityId: match.opportunityId,
+      from: deleted.status,
+      actorUserId,
+    });
+    return true;
+  });
 }

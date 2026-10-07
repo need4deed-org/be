@@ -28,20 +28,11 @@ import {
   writeVolunteerLegacy,
 } from "../../utils";
 
-// Same DB-conflict-classification pattern as write-agent-registration.ts's
-// classifyRegisterAgentConflict: the findOneBy check below is a fast path,
-// not the guarantee — two concurrent submissions can both pass it before
-// either commits, so the actual guarantee is the unique constraint added on
-// volunteer.person_id (be#950 migration), and this catches its violation.
 function isDuplicateVolunteerProfile(err: unknown): boolean {
   const e = err as { code?: string; detail?: string };
   return e?.code === "23505" && !!e.detail?.includes("person_id");
 }
 
-// Same pattern as agent/register.routes.ts's authByVerifyToken: authorizes via
-// the email-verification JWT carried in the querystring (not a cookie/
-// Bearer), not a logged-in session — the caller has only just verified their
-// email, no session exists yet.
 async function authByVerifyToken(
   fastify: FastifyInstance,
   request: FastifyRequest,

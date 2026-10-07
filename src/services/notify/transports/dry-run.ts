@@ -34,8 +34,6 @@ export class DryRunEmailTransport implements EmailTransport {
       cc: undefined,
       subject: `${prefix} ${msg.subject}`,
     };
-    // Counts only: addresses and subjects are personal data. The redirected
-    // email itself shows them in its subject prefix.
     logger.info(
       `[notify:dry-run] redirecting email to ${DRY_RUN_RECIPIENT} — ${count(msg.to)} recipient(s), ${count(msg.cc)} cc`,
     );
@@ -45,7 +43,6 @@ export class DryRunEmailTransport implements EmailTransport {
 
 export class DryRunSlackTransport implements SlackTransport {
   async send(msg: SlackMessage): Promise<void> {
-    // The channel only: Slack texts can name people.
     logger.info(`[notify:dry-run] slack suppressed — channel: ${msg.channel}`);
   }
 }

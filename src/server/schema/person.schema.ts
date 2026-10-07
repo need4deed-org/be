@@ -1,19 +1,17 @@
-// Schema for an existing person (only ID is strictly required for linking)
 export const existingPersonSchema = {
   type: "object",
   required: ["id"],
   properties: {
     id: { type: "number", minimum: 1 },
-    firstName: { type: "string", readOnly: true }, // Indicate these are not for creation/update
+    firstName: { type: "string", readOnly: true },
     lastName: { type: "string", readOnly: true },
     email: { type: "string", readOnly: true },
     phone: { type: "string", readOnly: true },
     address: { type: "string", readOnly: true },
   },
-  additionalProperties: true, // Allow other properties but they will be ignored by preHandler
+  additionalProperties: true,
 };
 
-// Schema for creating a new person (firstName and lastName are mandatory)
 export const newPersonSchema = {
   type: "object",
   required: ["firstName", "lastName"],
@@ -21,11 +19,11 @@ export const newPersonSchema = {
     firstName: { type: "string", minLength: 1 },
     middleName: { type: ["string", "null"] },
     lastName: { type: "string", minLength: 1 },
-    email: { type: ["string", "null"], format: "email" }, // Basic email format check
+    email: { type: ["string", "null"], format: "email" },
     phone: { type: ["string", "null"], minLength: 7, maxLength: 20 },
     address: { type: ["string", "null"] },
   },
-  additionalProperties: false, // Disallow extra properties for new person creation
+  additionalProperties: false,
 };
 
 export const personResponseSchema = {
@@ -38,7 +36,7 @@ export const personResponseSchema = {
     email: { type: ["string", "null"] },
     phone: { type: ["string", "null"] },
     address: { type: ["string", "null"] },
-    createdAt: { type: "string", format: "date-time" }, // Assuming ISO 8601 string
+    createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", format: "date-time" },
   },
   required: ["id", "firstName", "lastName", "createdAt", "updatedAt"],

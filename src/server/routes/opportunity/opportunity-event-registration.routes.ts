@@ -8,11 +8,6 @@ import {
   opportunityEventRegistrationListResponseSchema,
 } from "../../schema";
 
-// Only these roles may view an event's registrations at all. An AGENT is
-// further scoped below to opportunities belonging to their own agent — the
-// registrant's name/email/phone is PII, and be/CLAUDE.md only calls out
-// COORDINATOR as PII-safe, so AGENT access is deliberately ownership-scoped
-// rather than blanket (see be#879 discussion).
 function assertHasRegistrationsRole(request: FastifyRequest): void {
   const role = request.authUser?.role;
   if (
@@ -50,8 +45,6 @@ async function assertCanViewRegistrations(
   }
 }
 
-// Shared by both handlers below so the role gate, 404, and ownership check
-// can't drift apart between the JSON list and the CSV export.
 async function getAuthorizedRegistrations(
   fastify: FastifyInstance,
   request: FastifyRequest,
@@ -74,10 +67,6 @@ async function getAuthorizedRegistrations(
 }
 
 function csvCell(value: string): string {
-  // Neutralize formula injection (OWASP CSV injection): fullName/message
-  // come from the public, unauthenticated POST /event-registration form, and
-  // a leading =, +, -, or @ is interpreted as a live formula by Excel/Sheets
-  // once a coordinator/agent opens this export.
   const guarded = /^[=+\-@]/.test(value) ? `'${value}` : value;
   return /["\r\n,]/.test(guarded)
     ? `"${guarded.replace(/"/g, '""')}"`
