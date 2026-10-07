@@ -1,6 +1,3 @@
-// Schemas for the /trusted-domain CRUD (COORDINATOR/ADMIN). The allowlist of
-// known RAC email domains used by agent self-registration.
-
 const trustedDomainSchema = {
   type: "object",
   required: ["id", "domain"],
@@ -29,8 +26,6 @@ export const trustedDomainItemResponseSchema = {
   },
 };
 
-// A bare hostname: labels of letters/digits/hyphens separated by dots, with a
-// 2+ letter TLD. Rejects emails, schemes, paths and leading "@".
 const DOMAIN_PATTERN =
   "^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$";
 

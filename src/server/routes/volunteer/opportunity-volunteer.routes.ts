@@ -5,7 +5,6 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
-import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import {
   updateOpportunityMatching,
   updateVolunteerMatching,
@@ -18,6 +17,7 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
+import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 import {
   requestLanguage,
   translateOpportunities,
@@ -67,7 +67,6 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      // Before PII masking, after any save of these entities (be#1068).
       await translateOpportunities(
         fastify,
         opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
@@ -115,31 +114,13 @@ export default function volunteerOpportunityVolunteerRoutes(
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
-      const previousStatus = opportunity.status;
-
       opportunityVolunteerRepository.merge(opportunity, request.body);
-      await opportunityVolunteerRepository.save(opportunity, { reload: true });
+      await opportunityVolunteerRepository.save(opportunity, {
+        reload: true,
+        data: { actorUserId: request.authUser?.id },
+      });
 
-      // Volunteer audit trail (be#919) — only when the status actually
-      // changed; this route also merges other future fields someday, which
-      // shouldn't spuriously log a "status changed" entry.
-      if (
-        request.body.status !== undefined &&
-        request.body.status !== previousStatus
-      ) {
-        await fastify.db.volunteerAuditLogRepository.save(
-          new VolunteerAuditLog({
-            volunteerId,
-            type: "opportunity_status_changed",
-            detail: `Opportunity "${opportunity.opportunity.title}" status changed from ${previousStatus} to ${request.body.status}.`,
-            actorUserId: request.authUser?.id,
-            occurredAt: new Date(),
-          }),
-        );
-      }
-
-      // After the save and the audit-log entry above, which keep the
-      // original title (be#1068).
+      // After the save, whose audit-log entry keeps the original title.
       await translateOpportunities(
         fastify,
         [opportunity.opportunity].filter(Boolean),
@@ -191,7 +172,11 @@ export default function volunteerOpportunityVolunteerRoutes(
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
-      await opportunityVolunteerRepository.delete({ id: m2mId });
+      await deleteMatch(
+        opportunityVolunteerRepository.manager,
+        opportunity,
+        request.authUser?.id,
+      );
       await updateVolunteerMatching(opportunity.volunteerId);
       await updateOpportunityMatching(opportunity.opportunityId);
 

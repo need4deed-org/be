@@ -30,9 +30,6 @@ import {
   verifyTokenOfType,
 } from "../../utils";
 
-// Authorizes the registration routes via the email-verification JWT carried in
-// the querystring (not a cookie/Bearer). Resolves the verified user and attaches
-// it as request.registrant. Throws typed errors so the status code is correct.
 async function authByVerifyToken(
   fastify: FastifyInstance,
   request: FastifyRequest,
@@ -68,9 +65,6 @@ export default async function agentRegisterRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // GET /agent/register/search?token=&street= — minimal agent lookup for the
-  // self-registration picker, so a registrant can JOIN their org instead of
-  // creating a duplicate. Token-gated (not the COORDINATOR-only GET /agent).
   fastify.get<{
     Querystring: { token: string; street?: string };
   }>(
@@ -90,26 +84,6 @@ export default async function agentRegisterRoutes(
         return reply.status(200).send({ message: "No query", data: [] });
       }
 
-      // No membership/domain scoping here — matching is purely on
-      // agent.address.street (or agent.title when there's no address).
-      // Whether a picked agent auto-approves (ACTIVE) or needs review
-      // (PENDING) is decided later, at JOIN time, by resolveJoinStatus.
-      //
-      // Filtered in SQL rather than fetched-then-filtered in JS (be#902) —
-      // this route backs a per-keystroke autocomplete, so excluded agents no
-      // longer pay for an address join, a full row transfer, and entity
-      // hydration just to be discarded afterward. (No index on unclaimed/
-      // engagementStatus yet, so this doesn't avoid a sequential scan at the
-      // Postgres level — see be#980 if the agent table grows enough to matter.)
-      //
-      // Gating on this flag rather than "zero AgentPerson rows" matters: a
-      // legacy agent (created via POST /opportunity/legacy with no
-      // rac_email) can also have zero AgentPerson rows and must stay
-      // findable through this picker.
-      // An INACTIVE agent (be#885) is excluded too — a new registrant
-      // shouldn't be routed toward an NGO that's been marked inactive. This
-      // stays a fresh query on every request, so flipping the status back to
-      // ACTIVE immediately makes it findable again on the next search.
       const candidates = await fastify.db.agentRepository
         .createQueryBuilder("agent")
         .leftJoinAndSelect("agent.address", "address")
@@ -132,8 +106,6 @@ export default async function agentRegisterRoutes(
   fastify.post<{ Body: ApiAgentRegister; Querystring: { token: string } }>(
     "/",
     {
-      // Public to the cookie/Bearer authenticate hook — authorized via the
-      // verify JWT in the querystring (preHandler below).
       config: { public: true } as FastifyContextConfig,
       schema: {
         querystring: registerAgentQuerySchema,
@@ -161,7 +133,6 @@ export default async function agentRegisterRoutes(
 
       const body = request.body;
 
-      // joinAgent/createAgentForPerson throw typed BaseError subclasses
       const result =
         "agentId" in body
           ? await joinAgent(

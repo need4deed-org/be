@@ -23,8 +23,5 @@ export default class Service {
   @OneToMany(() => AgentService, (agentService) => agentService.service)
   agentService: AgentService[];
 
-  // Populated by getOptionTitleTranslations before serialization — see
-  // AgentType.translations for why this differs from Skill/Language's
-  // single resolved `translation: string`.
   translations?: OptionTitle;
 }

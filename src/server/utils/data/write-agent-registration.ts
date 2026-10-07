@@ -23,11 +23,6 @@ export interface RegisterAgentResult {
   membershipStatus: AgentMembershipStatus;
 }
 
-/**
- * Raised by createAgentForPerson when the street+postcode already match an
- * existing agent (via the same getAgentByAddress picker POST /opportunity/legacy
- * uses). The route maps it to a 409 + agentId so the client can offer JOIN.
- */
 export class AgentAddressConflictError extends BaseError {
   constructor(public readonly agentId: number) {
     super("An agent at this address already exists.", 409, true, {
@@ -37,12 +32,6 @@ export class AgentAddressConflictError extends BaseError {
   }
 }
 
-/**
- * Raised by createAgent (coordinator/admin bare-create, fe#911) on a
- * unique-title violation. Mirrors AgentAddressConflictError's response shape
- * so the route can let it propagate to the global error handler instead of
- * hand-building the 409 body itself.
- */
 export class AgentTitleConflictError extends BaseError {
   constructor(public readonly agentId?: number) {
     super("An agent with this title already exists.", 409, true, {
@@ -52,10 +41,6 @@ export class AgentTitleConflictError extends BaseError {
   }
 }
 
-// Dedup: if the street+postcode already resolve to an existing agent (same
-// picker POST /opportunity/legacy uses), don't mint a duplicate — surface it
-// so the caller can offer JOIN (self-registration) or just point at the
-// existing agent (coordinator create) instead.
 async function assertNoAddressConflict(
   addressStreet?: string,
   addressPostcode?: string,
@@ -72,10 +57,6 @@ async function assertNoAddressConflict(
   }
 }
 
-// The Agent + Address + AgentService + AgentLanguage rows shared by both the
-// self-registration CREATE path and the coordinator-created (personless)
-// path — everything except the AgentPerson membership itself, which only the
-// former needs.
 async function createBareAgent(
   input: ApiAgentRegisterNew,
   manager: EntityManager,
@@ -98,10 +79,6 @@ async function createBareAgent(
     addressId: address?.id,
     unclaimed,
   });
-  // District is derived from the postcode, never taken from the client — the
-  // same rule PATCH /agent/:id enforces (be#827, be#1059). A postcode with
-  // no street (allowed by the coordinator create form) creates no Address,
-  // but still determines the district.
   if (address || input.addressPostcode) {
     await syncAgentDistrictFromPostcode(
       newAgent,
@@ -133,18 +110,6 @@ async function createBareAgent(
   return agent;
 }
 
-/**
- * CREATE path: a verified user creates a brand-new agent and becomes its first
- * VOLUNTEER_COORDINATOR. The creator owns the record, so the membership is
- * ACTIVE immediately. Persisted in one transaction:
- *   1. Agent (with optional Address resolved from street + postcode)
- *   2. AgentPerson linking the registrant's Person as VOLUNTEER_COORDINATOR
- *   3. AgentLanguage rows for the selected language ids
- *
- * The user + person already exist (created via POST /user + email verification);
- * this only writes agent-side records. A unique-title violation bubbles up for
- * the route to convert into a 409 + join suggestion.
- */
 type AgentRegisterInput = ApiAgentRegisterNew & { phone?: string };
 
 export async function createAgentForPerson(
@@ -192,13 +157,6 @@ export async function createAgentForPerson(
   return result;
 }
 
-/**
- * COORDINATOR/ADMIN create path (fe#911, be side): an Agent with no linked
- * Person/User at all — for adding an NGO the coordinator already has details
- * for, before it has self-registered. Shares createBareAgent with
- * createAgentForPerson; the only difference is there's no AgentPerson
- * membership (and thus no phone-on-Person write) to add.
- */
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
@@ -224,17 +182,6 @@ export async function createAgent(
   return { agentId };
 }
 
-/**
- * Resolve whether a join may be auto-approved. Mirrors the POST /opportunity/legacy
- * authorization: the registrant's email domain must already belong to the agent
- * (i.e. an existing member shares the domain). Registrant emails are already
- * restricted to allowlisted RAC domains, so a domain match is a strong "same
- * org" signal. No match -> PENDING, surfaced to an ADMIN/COORDINATOR.
- *
- * Per member the match uses Person.email, falling back to the linked User
- * email(s) when the Person has none (Person.email is often unset, but the User
- * always has one).
- */
 export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
@@ -273,11 +220,6 @@ export async function resolveJoinStatus(
   return allowed ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
-/**
- * JOIN path: link a verified user's Person to an existing agent. Idempotent —
- * an existing link for the same (agent, person, role) is returned as-is rather
- * than duplicated. Status is decided by the caller via resolveJoinStatus.
- */
 export async function joinAgent(
   personId: number,
   agentId: number,
@@ -308,11 +250,6 @@ export async function joinAgent(
   return { agentId, membershipStatus: existing?.status ?? status };
 }
 
-/**
- * Maps a Postgres unique-violation on agent.title to a small shape the route
- * can use to return a 409 + the existing agent id (so the client can offer to
- * JOIN instead of minting a duplicate), without leaking the raw error.
- */
 export function classifyRegisterAgentConflict(err: unknown): "title" | null {
   const e = err as { code?: string; detail?: string };
   if (e?.code !== "23505" || !e.detail) {

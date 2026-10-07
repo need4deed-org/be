@@ -12,8 +12,6 @@ export async function scanAccompanyNotFound(
   fastify: FastifyInstance,
   today: Date = berlinToday(),
 ): Promise<void> {
-  // Appointments 4 working days ahead, with the weekend or holidays after
-  // that day (be#1088).
   const { from, to } = appointmentsDue(today, 4);
 
   const opps = await fastify.db.opportunityRepository.find({
@@ -44,9 +42,6 @@ export async function scanAccompanyNotFound(
       ),
   );
 
-  // Posted to Slack for coordinators (be#1088): nothing is recorded in
-  // Communication; the target day moves with each working day, so each
-  // opportunity comes up on one run.
   for (const opp of candidates) {
     try {
       await fastify.cronNotify.emailAccompanyNotFound(opp);

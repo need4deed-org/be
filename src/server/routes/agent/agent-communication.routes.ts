@@ -6,6 +6,7 @@ import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
 import { assertAgentVisible } from "../../utils";
+import { assertAgentMemberOrStaff } from "../../utils/data/assert-agent-member-or-staff";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentCommunicationRoutes(
@@ -14,8 +15,6 @@ export default function agentCommunicationRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    // Handler sends entities; the DTO (ApiCommunicationGet) runs in the
-    // preSerialization hook.
     Reply: ReplyDataCount<Communication[]>;
   }>(
     `/`,
@@ -35,13 +34,14 @@ export default function agentCommunicationRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
+      await assertAgentMemberOrStaff(request, id);
+
       const communicationRepository = fastify.db.communicationRepository;
       const [communications, count] =
         await communicationRepository.findAndCount({
           where: { agentId: id },
         });
 
-      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) communications fetched successfully`,
         data: communications,

@@ -22,8 +22,6 @@ import {
 import { runWithAdvisoryLock } from "../utils";
 import { queueUntranslatedOpportunities } from "../utils/data/translate-opportunities";
 
-// Unique integer key for the translation worker's advisory lock, separate
-// from the notify schedulers' (20240701, 20240707).
 const TRANSLATION_LOCK_ID = 20260929;
 
 interface TranslationApi {
@@ -31,8 +29,6 @@ interface TranslationApi {
   setHuman: typeof setHuman;
   setOriginalLanguage: typeof setOriginalLanguage;
   resolve: typeof resolve;
-  // One worker run under the advisory lock; undefined when disabled or when
-  // another instance holds the lock.
   runBatch(options?: BatchOptions): Promise<BatchStats | undefined>;
 }
 
@@ -42,13 +38,6 @@ declare module "fastify" {
   }
 }
 
-/**
- * Machine translation of user-entered text (be#1064). enqueue/resolve and
- * the corrections are always available: queuing sends nothing anywhere.
- * The worker, the only part that calls a provider, runs on
- * CRON_SCHEDULE_TRANSLATION and only when TRANSLATION_ENABLED is set. It
- * has its own switch, independent of the notify schedulers (be#1077).
- */
 async function translationPlugin(fastify: FastifyInstance): Promise<void> {
   const config = getTranslationConfig();
   const provider = createTranslationProvider(config);
@@ -66,8 +55,6 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
     }
     let stats: BatchStats | undefined;
     await runWithAdvisoryLock(async () => {
-      // Backfill (be#1068): a scheduled run first queues a few opportunities
-      // written before translation existed. A run for given rows doesn't.
       if (!options?.rowIds) {
         const queued = await queueUntranslatedOpportunities(dataSource.manager);
         if (queued > 0) {
@@ -107,8 +94,6 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
       "translation: TRANSLATION_ENABLED without INFOMANIAK_AI_PRODUCT_ID/INFOMANIAK_AI_TOKEN — dry run, originals are served",
     );
   }
-  // Translation settings never stop the server: a bad schedule only leaves
-  // the worker off.
   if (!cron.validate(config.cronSchedule)) {
     logger.error(
       { schedule: config.cronSchedule },
@@ -123,7 +108,6 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
       try {
         await runBatch();
       } catch (err) {
-        // Name and message only: a query error's parameters may carry text.
         logger.error(
           { error: (err as Error).name, message: (err as Error).message },
           "translation: worker run failed",
