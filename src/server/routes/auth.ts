@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
+import { BadRequestError } from "../../config";
 import {
   ACCESS_LIFESPAN_MS,
   accessCookieName,
@@ -147,13 +148,11 @@ async function authRoutes(
     async (request, reply) => {
       // verify if refresh token is provided and valid
       if (!getRefreshToken(request)) {
-        return reply
-          .status(400)
-          .send({ message: "Refresh token is required." });
+        throw new BadRequestError("Refresh token is required.");
       }
       const decoded = getRefreshPayload(request);
       if (!decoded) {
-        return reply.status(400).send({ message: "Invalid refresh token." });
+        throw new BadRequestError("Invalid refresh token.");
       }
       const id = decoded.id;
 
