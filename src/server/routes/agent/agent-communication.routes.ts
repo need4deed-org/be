@@ -36,7 +36,6 @@ export default function agentCommunicationRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      // NGO users see their own NGO's log (read-only tracker), nobody else's.
       await assertAgentMemberOrStaff(request, id);
 
       const communicationRepository = fastify.db.communicationRepository;

@@ -10,8 +10,6 @@ import { idParamSchema } from "../../schema";
 import { ParamsId } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 
-// Staff: any match. NGO users: matches on their own opportunities. A volunteer
-// may only read their own match's log.
 async function assertCanAccessMatchLog(
   fastify: FastifyInstance,
   request: FastifyRequest,
@@ -22,7 +20,6 @@ async function assertCanAccessMatchLog(
   const isStaff = role === UserRole.COORDINATOR || role === UserRole.ADMIN;
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
-    // Staff need only the existence check; others need the owner ids.
     ...(isStaff
       ? {}
       : {

@@ -3,8 +3,6 @@ import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 
-// Staff may read any NGO's data, NGO users only their own NGOs' (active
-// memberships). 404 otherwise, like the other agent sub-routes.
 export async function assertAgentMemberOrStaff(
   request: FastifyRequest,
   agentId: number,

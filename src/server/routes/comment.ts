@@ -99,8 +99,7 @@ export default async function commentRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      // Comments are coordinator-only. Others get an empty list (not a 403):
-      // the notification badge asks for every role.
+      // Non-staff get an empty list, not a 403: the notification badge asks for every role.
       const role = request.authUser?.role;
       if (!role || !COMMENT_READER_ROLES.includes(role)) {
         return reply
