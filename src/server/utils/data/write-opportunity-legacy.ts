@@ -1,4 +1,4 @@
-import { OpportunityStatusType } from "need4deed-sdk";
+import { Lang, OpportunityStatusType } from "need4deed-sdk";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
@@ -10,9 +10,14 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { impliesAgentSearching, setAgentSearching } from "./for-routes";
+import {
+  languageIdOf,
+  queueOpportunityTranslation,
+} from "./translate-opportunities";
 
 export async function writeOpportunityLegacy(
   opportunity: Opportunity,
+  originalLanguage: Lang = Lang.DE,
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
     const opportunityRepository =
@@ -35,8 +40,6 @@ export async function writeOpportunityLegacy(
 
     await dealRepository.save(opportunity.deal);
 
-    // Deal m2m relations (activities, skills, languages, timeslots, districts)
-    // — saved after the deal so dealId exists
     for (const dealActivity of opportunity.deal.dealActivity) {
       dealActivity.dealId = opportunity.deal.id;
     }
@@ -70,14 +73,13 @@ export async function writeOpportunityLegacy(
       await onetimerRepository.save(opportunity.onetimer);
     }
 
+    opportunity.originalLanguageId = await languageIdOf(
+      transactionalEntityManager,
+      originalLanguage,
+    );
     await opportunityRepository.save(opportunity);
+    await queueOpportunityTranslation(transactionalEntityManager, opportunity);
 
-    // opportunity.status is normally left undefined at this point (the
-    // create form has no field to set it, so it's the entity's DB-level
-    // default) — fall back to that same default explicitly rather than
-    // assuming "creation always implies searching", so this stays correct if
-    // that default, or a future caller passing an explicit status, changes
-    // (be#862 / be#868 review).
     if (
       opportunity.agentId &&
       impliesAgentSearching(opportunity.status ?? OpportunityStatusType.NEW)

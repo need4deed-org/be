@@ -15,7 +15,10 @@ import { createServer } from "../../../server";
 import * as service from "../../../services/translation/service";
 import { randomNumericSuffix } from "../../random";
 
-const TRANSLATION_SCHEDULE = "* * * * *";
+// Never fires while a test runs: a scheduled run would hold the worker's
+// lock (a run for given rows would then be skipped) and translate every
+// pending row in the shared database.
+const TRANSLATION_SCHEDULE = "0 0 1 1 *";
 
 // Every test starts and closes a full server (createServer), which
 // re-initialises the DB connection: slower than the 5 s default, as in
@@ -27,7 +30,11 @@ describe("translation plugin", () => {
   const created: number[] = [];
 
   async function start(env: Record<string, string> = {}) {
-    Object.assign(process.env, env);
+    Object.assign(
+      process.env,
+      { CRON_SCHEDULE_TRANSLATION: TRANSLATION_SCHEDULE },
+      env,
+    );
     fastify = await createServer();
     await fastify.ready();
     return fastify;

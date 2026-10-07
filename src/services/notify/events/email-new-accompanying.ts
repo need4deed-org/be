@@ -26,9 +26,6 @@ export function resetNewAccompanyingTemplateCache(): void {
 export async function sendEmailNewAccompanying(
   email: EmailTransport,
   opportunity: Opportunity,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(opportunity);
@@ -49,12 +46,6 @@ export async function sendEmailNewAccompanying(
   const clientName = accompanying?.name ?? "";
   const appointmentTitle = opportunity.title;
   const appointmentAddress = accompanying?.address ?? "";
-  // Combines the translation-target requirement (be#846) with the deal's
-  // own requested source language(s) — German-translated via
-  // field_translation by the caller before this function runs (be#856) —
-  // into a single "Deutsch-Arabisch"-style pair instead of two disconnected
-  // values (fe#1036 review thread).
-  // German-only email (RAC/contact-person workflow), so only the German one.
   const { [Lang.DE]: accompaniedpersonLanguage } =
     await resolveAccompaniedPersonLanguage(
       errorTransport,
@@ -64,8 +55,6 @@ export async function sendEmailNewAccompanying(
     );
   const accompaniedpersonName = accompanying?.name ?? "";
   const accompaniedpersonPhone = accompanying?.phone ?? "";
-  // An accompanying description is stored in infoConfidential (be#1092);
-  // `info` only for rows written before that.
   const appointmentComment =
     opportunity.infoConfidential || opportunity.info || "";
 
@@ -83,10 +72,6 @@ export async function sendEmailNewAccompanying(
     accompaniedpersonName,
     accompaniedpersonPhone,
     appointmentComment,
-    // TODO(be#1042 review): remove once the live CDN confirmationaccompanying.json
-    // drops {{ appointmentaLanguage }} — until then, deploying this code
-    // first would leave that placeholder unresolved and
-    // ValidatingEmailTransport would suspend every send.
     appointmentaLanguage: "",
   });
 

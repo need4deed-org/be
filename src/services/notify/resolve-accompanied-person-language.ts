@@ -4,17 +4,6 @@ import { formatAccompaniedPersonLanguage, getLanguages } from "../dto/utils";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "./resolve-or-alert";
 import type { EmailTransport } from "./types";
 
-// Shared by every accompanying email that renders the accompanied person's
-// translation-target requirement combined with the deal's requested
-// language(s) into a single "Target-Source" pair (e.g. "Deutsch-Arabisch")
-// — was independently duplicated across email-new-accompanying.ts,
-// email-accompany-match-volunteer.ts and email-suggestion-accompanying.ts
-// (be#1047 review); a future change to the resolution/fallback logic only
-// needs to happen here.
-//
-// Returns the pair in both languages (be#1075): the German one from the
-// field_translation the caller loads beforehand (be#856), the English one
-// from the language's raw title, which is English.
 export async function resolveAccompaniedPersonLanguage(
   errorTransport: EmailTransport,
   languageToTranslate: TranslatedIntoType | undefined,

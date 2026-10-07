@@ -1,27 +1,18 @@
 import { FastifyInstance } from "fastify";
 import {
-  CommunicationType,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
-import { Between, In } from "typeorm";
-import logger from "../../logger";
-import {
-  buildLastSentMap,
-  logEmailCommunication,
-} from "../../server/utils/data/log-email-communication";
-import {
-  addWorkingDays,
-  berlinDayBoundaries,
-  berlinToday,
-} from "./german-holidays";
+import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
+import { appointmentsDue, berlinToday } from "./german-holidays";
+import { reportCronFailure } from "./report-cron-failure";
 
 export async function scanAccompanyNotFound(
   fastify: FastifyInstance,
+  today: Date = berlinToday(),
 ): Promise<void> {
-  const targetDay = addWorkingDays(berlinToday(), 4);
-  const { startOfDay, endOfDay } = berlinDayBoundaries(targetDay);
+  const { from, to } = appointmentsDue(today, 4);
 
   const opps = await fastify.db.opportunityRepository.find({
     where: {
@@ -31,7 +22,7 @@ export async function scanAccompanyNotFound(
         OpportunityStatusType.SEARCHING,
         OpportunityStatusType.ACTIVE,
       ]),
-      onetimer: { date: Between(startOfDay, endOfDay) },
+      onetimer: { date: And(MoreThanOrEqual(from), LessThan(to)) },
     },
     relations: [
       "accompanying",
@@ -51,38 +42,16 @@ export async function scanAccompanyNotFound(
       ),
   );
 
-  if (!candidates.length) {
-    return;
-  }
-
-  const lastSentMap = await buildLastSentMap(
-    fastify.db.communicationRepository,
-    candidates.map((c) => c.id),
-    CommunicationType.ACCOMPANYING_NOT_FOUND,
-  );
-
   for (const opp of candidates) {
     try {
-      const lastSent = lastSentMap.get(opp.id);
-      if (lastSent && lastSent > opp.updatedAt) {
-        continue;
-      }
-
-      const comm = await logEmailCommunication(
-        fastify.db.communicationRepository,
-        CommunicationType.ACCOMPANYING_NOT_FOUND,
-        { opportunityId: opp.id },
-      );
-      try {
-        await fastify.notify.emailAccompanyNotFound(opp);
-      } catch (sendErr) {
-        await fastify.db.communicationRepository
-          .remove(comm)
-          .catch(logger.error);
-        throw sendErr;
-      }
+      await fastify.cronNotify.emailAccompanyNotFound(opp);
     } catch (err) {
-      logger.error(`scanAccompanyNotFound: opp ${opp.id} failed: ${err}`);
+      await reportCronFailure(
+        fastify,
+        "scanAccompanyNotFound",
+        `opportunity ${opp.id}`,
+        err,
+      );
     }
   }
 }

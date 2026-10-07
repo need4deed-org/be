@@ -40,7 +40,6 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
     }
     logger.info("TypeORM Data Source has been initialized!");
 
-    // Decorate the Fastify instance with repositories
     fastify.decorate("db", {
       apiKeyRepository: dataSource.getRepository(ApiKey),
       userRepository: dataSource.getRepository(User),
@@ -75,7 +74,6 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       volunteerAuditLogRepository: dataSource.getRepository(VolunteerAuditLog),
     });
 
-    // TODO: add validation of others
     if (!fastify.db.userRepository || !fastify.db.personRepository) {
       logger.error(
         "ERROR: Repositories were not correctly initialized on fastify.db",
@@ -83,7 +81,6 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       throw new Error("Database repositories failed to initialize.");
     }
 
-    // Close connection when Fastify closes
     fastify.addHook("onClose", async () => {
       if (dataSource.isInitialized) {
         await dataSource.destroy();
@@ -92,7 +89,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
     });
   } catch (err) {
     logger.error(`Error during TypeORM Data Source initialization: ${err}`);
-    throw err; // prevent server from starting without DB
+    throw err;
   }
 };
 

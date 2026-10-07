@@ -18,9 +18,6 @@ function assertDistinctLanguages(languages: string[]): void {
   }
 }
 
-// Resolves each distinct submitted language once, up front — shared by
-// create and update so neither issues a separate lookup per translation
-// (or a duplicate one for whichever language is reused elsewhere).
 async function resolveLanguageIds(
   languages: string[],
 ): Promise<Map<string, number>> {
@@ -31,12 +28,6 @@ async function resolveLanguageIds(
   return languageIds;
 }
 
-// An entry in `translations` is always a full representation of that
-// language's content, never a field-by-field patch — so replacing an
-// existing row must explicitly clear any optional field the caller omitted.
-// `?? null` (not left as undefined) matters here: TypeORM's save() skips
-// undefined properties, so leaving these as undefined on an update would
-// silently keep the old value instead of clearing it (be#905 review).
 function translationFields(
   t: ApiEventN4DTranslationInput,
 ): Partial<EventTranslation> {
@@ -55,8 +46,6 @@ function translationFields(
   };
 }
 
-// POST /event (be#904): one EventN4D row (structural fields) + one
-// EventTranslation row per submitted language, in a transaction.
 export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
   const languages = input.translations.map((t) => t.language);
   assertDistinctLanguages(languages);
@@ -64,8 +53,6 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
     throw new BadRequestError("dateEnd must be after date.");
   }
 
-  // The event's own languageId reuses whichever id the first translation
-  // resolves to, rather than looking it up a second time.
   const languageIds = await resolveLanguageIds(languages);
 
   return dataSource.manager.transaction(async (manager) => {
@@ -74,8 +61,6 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
 
     const event = await eventRepository.save(
       new EventN4D({
-        // Matches the entity's own column default (false) — a created event
-        // starts as a draft unless the coordinator explicitly publishes it.
         isActive: input.active ?? false,
         date: new Date(input.date),
         dateEnd: input.dateEnd ? new Date(input.dateEnd) : undefined,
@@ -86,8 +71,6 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
         followupLink: input.followUpLink,
         address: input.address,
         hostName: input.hostName,
-        // The language it was originally authored in — the first submitted
-        // translation, by convention.
         languageId: languageIds.get(input.translations[0].language),
       }),
     );
@@ -107,15 +90,6 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
   });
 }
 
-// PATCH /event/:id (be#905): structural fields are a plain partial update
-// (omitted = unchanged; explicit null clears a nullable one — date/type/
-// linkRSVP/address/active reject null at the schema level since they're
-// required columns). translations is an upsert per (event, language): an
-// included entry replaces that language's row entirely if one exists,
-// otherwise inserts a new one; languages not mentioned are left untouched.
-// A unique (eventn4dId, languageId) DB constraint backs this — a concurrent
-// PATCH race on the same event+language surfaces as a conflict rather than
-// silently duplicating the row.
 export async function updateEvent(
   id: number,
   input: ApiEventN4DPatch,
@@ -147,10 +121,6 @@ export async function updateEvent(
     Object.assign(event, {
       isActive: input.active,
       date: input.date ? new Date(input.date) : undefined,
-      // Only rewritten when the caller actually touched it — effectiveDateEnd
-      // falls back to the existing value otherwise, and assigning that
-      // unchanged value would defeat TypeORM's undefined-skips-the-column
-      // behavior on save(), issuing a needless UPDATE of this column.
       dateEnd: input.dateEnd !== undefined ? effectiveDateEnd : undefined,
       type: input.type,
       pic: input.pic,

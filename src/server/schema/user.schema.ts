@@ -1,8 +1,5 @@
 import { existingPersonSchema, newPersonSchema } from "./person.schema";
 
-// Matches the SDK ApiUserPost contract: email, password, role (UserRole),
-// optional language (Lang, defaults to "en"), person. (isActive is
-// server-controlled; timezone uses the entity default.)
 export const createUserBodySchema = {
   type: "object",
   required: ["email", "password", "role", "person"],
@@ -10,15 +7,9 @@ export const createUserBodySchema = {
     email: { type: "string", format: "email" },
     password: { type: "string", minLength: 8, maxLength: 50 },
     role: { $ref: "UserRole#" },
-    // Optional: defaults to "en" when omitted (allOf keeps the Lang enum while
-    // allowing a sibling default, which a bare $ref would ignore in draft-07).
     language: { allOf: [{ $ref: "Lang#" }], default: "en" },
     person: {
-      oneOf: [
-        // The 'person' property must match one of these schemas
-        existingPersonSchema,
-        newPersonSchema,
-      ],
+      oneOf: [existingPersonSchema, newPersonSchema],
     },
   },
   additionalProperties: false,
@@ -156,7 +147,6 @@ export const resetPasswordSchema = {
   required: ["token", "newPassword"],
 };
 
-// Matches the SDK ApiCoordinatorInvitePost contract.
 export const coordinatorInviteBodySchema = {
   type: "object",
   required: ["email", "person"],
@@ -176,7 +166,6 @@ export const coordinatorInviteBodySchema = {
   additionalProperties: false,
 };
 
-// Matches the SDK ApiCoordinatorInviteResponse contract.
 export const coordinatorInviteResponseSchema = {
   type: "object",
   properties: {
@@ -193,7 +182,6 @@ export const registerWithInviteQuerySchema = {
   required: ["token"],
 };
 
-// Matches the SDK ApiCoordinatorRegisterWithInvite contract.
 export const registerWithInviteBodySchema = {
   type: "object",
   properties: { password: { type: "string", minLength: 8, maxLength: 50 } },

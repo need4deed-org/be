@@ -9,8 +9,6 @@ export function serializeUserToMeDTO(
 ): ApiUserGet {
   return {
     id: user.id,
-    // personId is nullable (person-less users); emit undefined so the
-    // serializer omits it rather than coercing null to 0.
     personId: user.personId ?? undefined,
     email: user.email,
     isActive: user.isActive,

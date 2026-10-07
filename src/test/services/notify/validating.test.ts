@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import logger from "../../../logger";
 import { ValidatingEmailTransport } from "../../../services/notify/transports/validating";
 import type { EmailTransport } from "../../../services/notify/types";
 
@@ -47,9 +48,8 @@ describe("ValidatingEmailTransport", () => {
     expect(report.to).toBe("dev@need4deed.org");
     expect(report.from).toBe("notify@need4deed.org");
     expect(report.subject).toBe("[Suspended invalid email] Date: {{ date }}");
-    expect(report.text).toContain(
-      'subject has an unresolved placeholder: "Date: {{ date }}"',
-    );
+    expect(report.text).toContain("subject has an unresolved placeholder");
+    expect(report.text).toContain("Subject: Date: {{ date }}");
     expect(report.text).toContain("To: person@example.com");
     expect(report.text).toContain("Cc: cc@example.com");
     expect(report.text).toContain("some body");
@@ -63,5 +63,28 @@ describe("ValidatingEmailTransport", () => {
     const report = vi.mocked(errorTransport.send).mock.calls[0][0];
     expect(report.subject).toBe("[Suspended invalid email] (no subject)");
     expect(report.text).toContain("subject is blank");
+  });
+
+  // be#1102: the log names the problems, not the recipient or the subject;
+  // the report to the error inbox carries those.
+  it("logs a suspended email without its address or subject", async () => {
+    const error = vi.spyOn(logger, "error").mockImplementation(() => logger);
+    try {
+      const { transport } = buildTransports();
+
+      await transport.send({
+        to: "vera-at-example.com",
+        subject: "Begleitung für {{ clientName }}",
+        text: "x",
+      });
+
+      const logged = JSON.stringify(error.mock.calls);
+      expect(logged).toContain("doesn't look like an email address");
+      expect(logged).toContain("subject has an unresolved placeholder");
+      expect(logged).not.toContain("vera-at-example.com");
+      expect(logged).not.toContain("Begleitung");
+    } finally {
+      error.mockRestore();
+    }
   });
 });

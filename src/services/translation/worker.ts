@@ -9,7 +9,6 @@ import { TranslationService } from "./service";
 import { TranslationErrorCode } from "./types";
 
 export interface BatchOptions {
-  // Only these field_translation rows (tests, manual re-runs).
   rowIds?: number[];
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -20,9 +19,7 @@ export interface BatchStats {
   done: number;
   failed: number;
   retried: number;
-  // Source edited during the call: result discarded, re-translated later.
   stale: number;
-  // Pending rows with no source text left, deleted.
   removed: number;
   rateLimited: boolean;
   misconfigured: boolean;
@@ -38,18 +35,6 @@ const MACHINE_ENTRIES = Object.values(translatedEntities).filter(
 const sleepFor = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * One worker run (be#1067). Picks due pending machine rows, oldest first,
- * at most one minute's worth at TRANSLATION_MAX_RPM, and translates them one
- * field per call.
- *
- * - No row locks while the provider is called (design A): each result is
- *   written only if the row still has the source hash it was picked with,
- *   so an edit during the call discards the stale result.
- * - Transient errors retry on later runs after a backoff of 2^attempts
- *   minutes (design B); a 429 ends the run.
- * - Logs counts and codes only, never text.
- */
 export async function runTranslationBatch(
   manager: EntityManager,
   service: TranslationService,
@@ -94,9 +79,6 @@ export async function runTranslationBatch(
     const source = await sourceTextOf(manager, row);
     const lang = row.language?.isoCode as Lang | undefined;
     if (!source || !lang) {
-      // Nothing to translate (text emptied or removed without enqueue):
-      // drop the row, or it would stay the oldest due row and block the
-      // queue. enqueue recreates it if text comes back.
       const { affected } = await manager
         .createQueryBuilder()
         .delete()
@@ -124,7 +106,6 @@ export async function runTranslationBatch(
     lastCall = now();
 
     const result = await service.translateField(source, lang);
-    // Written only while the row still waits for this very source text.
     const guarded = (set: Partial<Record<keyof FieldTranslation, unknown>>) =>
       manager
         .createQueryBuilder()
@@ -164,8 +145,6 @@ export async function runTranslationBatch(
         stats.stale++;
       }
     } else if (result.reason !== "unavailable") {
-      // Rate limit or rejected credentials: not this row's fault. Leave it
-      // as it is and end the run; the next run tries again.
       stats.retried++;
       if (result.reason === "rate_limited") {
         stats.rateLimited = true;
@@ -203,7 +182,6 @@ export async function runTranslationBatch(
   return stats;
 }
 
-// The source row's current text, or undefined when it's gone or empty.
 async function sourceTextOf(
   manager: EntityManager,
   row: FieldTranslation,

@@ -2,8 +2,6 @@ import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import { getPostcode } from "../../data/utils";
 
-// Parses a datetime string as Europe/Berlin time when no timezone is specified.
-// Uses the Intl API so DST transitions (CET⇔CEST) are handled automatically.
 export function parseAccompDatetime(value: string | undefined): Date {
   if (!value) {
     return new Date(NaN);

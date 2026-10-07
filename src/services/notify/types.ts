@@ -7,7 +7,7 @@ export interface EmailMessage {
   from?: string;
 }
 
-export type SlackChannel = "ops" | "comments";
+export type SlackChannel = "ops" | "comments" | "cron";
 
 export interface SlackMessage {
   channel: SlackChannel;

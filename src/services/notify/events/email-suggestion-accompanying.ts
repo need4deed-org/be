@@ -16,17 +16,9 @@ export function resetSuggestionAccompanyingTemplateCache(): void {
   loader.resetCache();
 }
 
-// Counterpart to sendEmailSuggestion for ACCOMPANYING opportunities. Unlike a
-// regular opportunity's recurring dealTimeslot, an accompanying opportunity
-// has a single confirmed appointment (Opportunity.onetimer.date) set at
-// creation — so this reads that instead of a schedule, same formatting
-// convention as email-new-accompanying.ts/email-accompany-match.ts.
 export async function sendEmailSuggestionAccompanying(
   email: EmailTransport,
   ov: OpportunityVolunteer,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
@@ -41,10 +33,7 @@ export async function sendEmailSuggestionAccompanying(
   const accompanying = opportunity?.accompanying;
 
   const appointmentTitle = opportunity?.title ?? "";
-  // Sent to volunteers who are only suggested, not matched: the area, never
-  // the street address, which only matched volunteers see (be#1092, as in
-  // the masking of GET /opportunity/:id).
-  const appointmentAddress = opportunity?.district?.title ?? "Berlin";
+  const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);
@@ -67,9 +56,6 @@ export async function sendEmailSuggestionAccompanying(
 
   await email.send({
     to: volunteerEmail,
-    // Accompanying-specific reply address, not emailFromVolunteer — the
-    // template text tells the volunteer to reply to accompanying@, not
-    // volunteer@ (regular suggestions still use emailFromVolunteer).
     cc: emailFromAccompanying,
     from: emailFromNotify,
     subject,
