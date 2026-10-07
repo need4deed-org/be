@@ -77,10 +77,12 @@ export default async function agentMembershipRoutes(
       }
 
       membership.status = request.body.status;
-      await repo.save(membership);
-      if (membership.status === AgentMembershipStatus.ACTIVE) {
-        await claimAgent(membership.agentId);
-      }
+      await repo.manager.transaction(async (manager) => {
+        await manager.save(membership);
+        if (membership.status === AgentMembershipStatus.ACTIVE) {
+          await claimAgent(membership.agentId, manager);
+        }
+      });
       logger.debug(
         `agent-membership: ${request.params.id} -> ${request.body.status}`,
       );

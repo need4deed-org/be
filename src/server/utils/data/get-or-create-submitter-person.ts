@@ -1,9 +1,14 @@
-import { AgentRoleType, OpportunityLegacyFormData } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentRoleType,
+  OpportunityLegacyFormData,
+} from "need4deed-sdk";
 import { DataSource, EntityManager, ILike } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
@@ -219,11 +224,18 @@ export async function getOrCreateSubmitterPerson(
     where: { agentId, personId: person.id },
   });
   if (!existingLink) {
+    // This public form must not claim a coordinator-created NGO: the link
+    // waits for a coordinator, whose approval claims it.
+    const agent = await getRepository(manager, Agent).findOne({
+      select: { id: true, unclaimed: true },
+      where: { id: agentId },
+    });
     await agentPersonRepository.save(
       new AgentPerson({
         agentId,
         personId: person.id,
         role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        ...(agent?.unclaimed ? { status: AgentMembershipStatus.PENDING } : {}),
       }),
     );
   }

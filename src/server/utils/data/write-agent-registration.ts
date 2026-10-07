@@ -239,6 +239,19 @@ export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
 ): Promise<AgentMembershipStatus> {
+  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved:
+  // the join waits for a coordinator, who then claims it.
+  const agent = await dataSource.getRepository(Agent).findOne({
+    select: { id: true, unclaimed: true, engagementStatus: true },
+    where: { id: agentId },
+  });
+  if (
+    agent?.unclaimed ||
+    agent?.engagementStatus === AgentEngagementStatusType.INACTIVE
+  ) {
+    return AgentMembershipStatus.PENDING;
+  }
+
   const allowed = await isAgentDomainAllowed(
     registrantEmail,
     async (domain) => {
@@ -279,15 +292,6 @@ export async function joinAgent(
   if (!agent) {
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
-  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved by
-  // email domain: the join waits for a coordinator, who then claims it.
-  if (
-    agent.unclaimed ||
-    agent.engagementStatus === AgentEngagementStatusType.INACTIVE
-  ) {
-    status = AgentMembershipStatus.PENDING;
-  }
-
   const existing = await repo.findOne({
     where: { agentId, personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
   });

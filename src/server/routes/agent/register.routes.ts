@@ -102,10 +102,9 @@ export default async function agentRegisterRoutes(
       // engagementStatus yet, so this doesn't avoid a sequential scan at the
       // Postgres level — see be#980 if the agent table grows enough to matter.)
       //
-      // A coordinator-created agent (fe#911) is `unclaimed` — it isn't
-      // claimable through self-registration's JOIN (which auto-approves on an
-      // email-domain match with zero coordinator review); exclude it here so
-      // it can only be linked through a future, explicitly-reviewed flow.
+      // A coordinator-created agent (fe#911) is `unclaimed` and isn't offered
+      // here; a JOIN to it (reached via an address/title conflict) only
+      // creates a pending request a coordinator reviews (resolveJoinStatus).
       // Gating on this flag rather than "zero AgentPerson rows" matters: a
       // legacy agent (created via POST /opportunity/legacy with no
       // rac_email) can also have zero AgentPerson rows and must stay
@@ -166,9 +165,8 @@ export default async function agentRegisterRoutes(
       const body = request.body;
 
       // joinAgent/createAgentForPerson throw typed BaseError subclasses
-      // (UnauthorizedError, NotFoundError, AgentAddressConflictError,
-      // AgentTitleConflictError) — let them propagate to the global error
-      // handler rather than translating them here.
+      // (NotFoundError, AgentAddressConflictError, AgentTitleConflictError);
+      // they propagate to the global error handler.
       const result =
         "agentId" in body
           ? await joinAgent(

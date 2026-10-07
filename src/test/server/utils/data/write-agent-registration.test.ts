@@ -404,6 +404,33 @@ describe("createAgent", () => {
 });
 
 describe("resolveJoinStatus", () => {
+  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved,
+  // and the members lookup is skipped.
+  it.each([
+    ["unclaimed", { id: 33, unclaimed: true }],
+    [
+      "inactive",
+      {
+        id: 33,
+        unclaimed: false,
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+      },
+    ],
+  ])(
+    "returns PENDING for an %s agent, even on a domain match",
+    async (_l, agent) => {
+      agentRepoFindOne.mockResolvedValueOnce(agent);
+      agentPersonRepoFind.mockResolvedValueOnce([
+        { person: { email: "existing@center.de", users: [] } },
+      ]);
+
+      const status = await resolveJoinStatus(33, "newcomer@center.de");
+
+      expect(status).toBe(AgentMembershipStatus.PENDING);
+      expect(agentPersonRepoFind).not.toHaveBeenCalled();
+    },
+  );
+
   it("returns ACTIVE when a member's Person.email shares the registrant's domain", async () => {
     agentPersonRepoFind.mockResolvedValueOnce([
       { person: { email: "existing@center.de", users: [] } },
@@ -474,30 +501,6 @@ describe("joinAgent", () => {
 
     expect(err).toBeInstanceOf(NotFoundError);
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
-  });
-
-  // A coordinator-created (unclaimed) or inactive NGO is joinable, but never
-  // auto-approved: the membership waits for a coordinator.
-  it.each([
-    ["unclaimed", { id: 33, unclaimed: true }],
-    [
-      "inactive",
-      {
-        id: 33,
-        unclaimed: false,
-        engagementStatus: AgentEngagementStatusType.INACTIVE,
-      },
-    ],
-  ])("makes joining an %s agent a pending request", async (_label, agent) => {
-    agentRepoFindOne.mockResolvedValueOnce(agent);
-    agentPersonRepoFindOne.mockResolvedValueOnce(null);
-
-    const result = await joinAgent(11, 33, AgentMembershipStatus.ACTIVE);
-
-    expect(agentPersonRepoSave.mock.calls[0][0]).toMatchObject({
-      status: AgentMembershipStatus.PENDING,
-    });
-    expect(result.membershipStatus).toBe(AgentMembershipStatus.PENDING);
   });
 
   // A legacy agent (e.g. created via POST /opportunity/legacy with no
