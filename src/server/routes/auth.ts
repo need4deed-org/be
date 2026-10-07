@@ -1,4 +1,3 @@
-import { FastifyJWT } from "@fastify/jwt";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
@@ -26,7 +25,11 @@ import {
 import { ReplyMessage, RoutePrefix } from "../types";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
-import { refreshRateLimitKey } from "../utils/refresh-rate-limit-key";
+import {
+  getRefreshPayload,
+  getRefreshToken,
+  refreshRateLimitKey,
+} from "../utils/refresh-token";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -130,8 +133,6 @@ async function authRoutes(
         rateLimit: {
           max: 20,
           timeWindow: "1 minute",
-          // After body parsing, so a token sent in the body counts too.
-          hook: "preHandler",
           keyGenerator: refreshRateLimitKey,
         },
       },
@@ -145,40 +146,16 @@ async function authRoutes(
     },
     async (request, reply) => {
       // verify if refresh token is provided and valid
-      let id: number;
-      let token: string;
-
-      if (request.body?.refresh) {
-        token = request.body.refresh;
-      } else if (request.cookies && request.cookies[refreshCookieName]) {
-        token = request.cookies[refreshCookieName];
-      }
-
-      if (!token) {
+      if (!getRefreshToken(request)) {
         return reply
           .status(400)
           .send({ message: "Refresh token is required." });
       }
-
-      try {
-        const decoded = (await fastify.jwt.verify(
-          token,
-        )) as FastifyJWT["payload"] & {
-          id: number;
-        };
-        if (
-          !decoded ||
-          !(decoded.id && decoded.email) ||
-          decoded.type !== "refresh"
-        ) {
-          return reply.status(400).send({ message: "Invalid refresh token." });
-        }
-
-        id = decoded.id;
-      } catch (error) {
-        logger.error(`JWT verification failed: ${error.message}`);
+      const decoded = getRefreshPayload(request);
+      if (!decoded) {
         return reply.status(400).send({ message: "Invalid refresh token." });
       }
+      const id = decoded.id;
 
       try {
         const userRepository = fastify.db.userRepository;
