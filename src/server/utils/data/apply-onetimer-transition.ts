@@ -14,10 +14,6 @@ interface VolunteerStatusUpdate {
   status: OpportunityVolunteerStatusType;
 }
 
-// Shared by activateDueOnetimers and scanExpiredOnetimers: saves the
-// opportunity, the given volunteers and their engagement status in one
-// transaction, so a save failure can't leave the opportunity in a new status
-// while a volunteer is left stuck in its old one (be#988).
 export async function applyOnetimerTransition(
   fastify: FastifyInstance,
   opportunity: Opportunity,
@@ -36,8 +32,6 @@ export async function applyOnetimerTransition(
         opportunity.status = opportunityStatus;
         await manager.save(Opportunity, opportunity);
 
-        // By volunteerId, so concurrent multi-link writers lock volunteers
-        // in the same order (see OpportunityVolunteerSubscriber).
         const ordered = [...volunteerUpdates].sort(
           (a, b) =>
             a.volunteer.volunteerId - b.volunteer.volunteerId ||
@@ -57,11 +51,6 @@ export async function applyOnetimerTransition(
       },
     );
   } catch (err) {
-    // A save partway through the loop above can leave earlier entities'
-    // in-memory status mutated even though the transaction as a whole
-    // rolled back (be#987 review) — restore them so a caller that reads
-    // these fields afterward doesn't see a status that was never
-    // actually persisted.
     opportunity.status = originalOpportunityStatus;
     volunteerUpdates.forEach(({ volunteer }, i) => {
       volunteer.status = originalVolunteerStatuses[i];

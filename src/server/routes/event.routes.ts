@@ -31,12 +31,6 @@ export default async function eventRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // GET /event — public list of events (be#903). Anonymous/non-privileged
-  // callers see only active events; a logged-in coordinator/admin sees
-  // everything, since the dashboard needs to manage drafts/deactivated
-  // events too. tryAuthenticate() (not authenticate()) is what makes a
-  // single public route able to vary by caller: it best-effort resolves
-  // request.authUser from a cookie if one is present, but never requires it.
   fastify.get<{
     Querystring: QuerystringEventGetList;
     Reply: ReplyDataCount<ApiEventN4DGetList[]>;
@@ -71,8 +65,6 @@ export default async function eventRoutes(
     },
   );
 
-  // POST /event — coordinator create (be#904). Structural fields + one
-  // EventTranslation row per submitted language.
   fastify.post<{
     Body: ApiEventN4DCreate;
     Reply: ReplyData<ApiEventN4DGet>;
@@ -96,10 +88,6 @@ export default async function eventRoutes(
         throw new NotFoundError(`Event (id:${created.id}) not found.`);
       }
 
-      // isPrivileged: true (this route is COORDINATOR-gated) means
-      // dtoEventN4DGet's null branch is unreachable here — it only returns
-      // null for a non-privileged caller. Echoes back in whichever language
-      // was submitted first.
       const data = dtoEventN4DGet(
         event,
         request.body.translations[0].language,
@@ -110,9 +98,6 @@ export default async function eventRoutes(
     },
   );
 
-  // PATCH /event/:id — coordinator update (be#905). Structural fields are a
-  // plain partial update; translations is an upsert per (event, language) —
-  // see write-event.ts's updateEvent for the exact semantics.
   fastify.patch<{
     Params: ParamsId;
     Body: ApiEventN4DPatch;
@@ -133,13 +118,6 @@ export default async function eventRoutes(
     },
   );
 
-  // DELETE /event/:id — coordinator delete (be#906). A real row delete
-  // (cascades to EventTranslation via the entity's onDelete: "CASCADE"),
-  // not a soft-deactivate — PATCH /event/:id { active: false } already
-  // covers "hide without losing data", so DELETE stays a distinct,
-  // standard-REST "remove it" rather than a second way to do the same
-  // thing. Matches the DELETE /agent/:id convention (200 + message, not
-  // 204 — this repo's PATCH/DELETE conventions differ).
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {

@@ -11,7 +11,6 @@ export default async function activityLogRoutes(
 ) {
   fastify.addHook("onRequest", fastify.authenticate());
 
-  // PATCH /activity-log/:id — COORDINATOR only (ADMIN bypasses)
   fastify.patch<{ Params: ParamsId; Body: ApiActivityLogPatch }>(
     "/:id",
     {
@@ -53,7 +52,6 @@ export default async function activityLogRoutes(
     },
   );
 
-  // DELETE /activity-log/:id — COORDINATOR only (ADMIN bypasses)
   fastify.delete<{ Params: ParamsId }>(
     "/:id",
     {

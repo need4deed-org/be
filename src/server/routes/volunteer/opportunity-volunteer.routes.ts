@@ -67,7 +67,6 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      // Before PII masking, after any save of these entities (be#1068).
       await translateOpportunities(
         fastify,
         opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
@@ -120,9 +119,6 @@ export default function volunteerOpportunityVolunteerRoutes(
       opportunityVolunteerRepository.merge(opportunity, request.body);
       await opportunityVolunteerRepository.save(opportunity, { reload: true });
 
-      // Volunteer audit trail (be#919) — only when the status actually
-      // changed; this route also merges other future fields someday, which
-      // shouldn't spuriously log a "status changed" entry.
       if (
         request.body.status !== undefined &&
         request.body.status !== previousStatus
@@ -138,8 +134,6 @@ export default function volunteerOpportunityVolunteerRoutes(
         );
       }
 
-      // After the save and the audit-log entry above, which keep the
-      // original title (be#1068).
       await translateOpportunities(
         fastify,
         [opportunity.opportunity].filter(Boolean),
