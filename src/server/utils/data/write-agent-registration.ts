@@ -239,8 +239,6 @@ export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
 ): Promise<AgentMembershipStatus> {
-  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved:
-  // the join waits for a coordinator, who then claims it.
   const agent = await dataSource.getRepository(Agent).findOne({
     select: { id: true, unclaimed: true, engagementStatus: true },
     where: { id: agentId },

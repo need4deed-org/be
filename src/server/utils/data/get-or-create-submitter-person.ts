@@ -224,8 +224,7 @@ export async function getOrCreateSubmitterPerson(
     where: { agentId, personId: person.id },
   });
   if (!existingLink) {
-    // This public form must not claim a coordinator-created NGO: the link
-    // waits for a coordinator, whose approval claims it.
+    // A public form must never claim (and so reveal) a hidden NGO.
     const agent = await getRepository(manager, Agent).findOne({
       select: { id: true, unclaimed: true },
       where: { id: agentId },
