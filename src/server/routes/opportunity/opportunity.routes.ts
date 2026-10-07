@@ -730,8 +730,6 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      // Coordinators/admins may change anything. An AGENT may edit their own
-      // NGO's opportunity and move it only to another NGO they belong to.
       const role = request.authUser?.role;
       if (
         role !== UserRole.COORDINATOR &&
@@ -763,8 +761,6 @@ export default async function opportunityRoutes(
           );
         }
 
-        // No `id` (or the same id) is a self-edit, not a relink. Moving the
-        // opportunity is allowed only to another NGO the caller belongs to.
         const body = request.body as Record<string, unknown>;
         const agentBody = body.agent as { id?: number } | undefined;
         if (
@@ -944,9 +940,7 @@ export default async function opportunityRoutes(
         }
 
         if (agentLinkId !== undefined) {
-          // The old contact belongs to the old agent. Without a new
-          // `contact.id`, an NGO user moving it becomes the contact (they are a
-          // member of the new NGO); otherwise it is cleared.
+          // The old contact belongs to the old NGO; an NGO user moving it takes over.
           const contactReset: Partial<Opportunity> =
             contactLinkId !== undefined
               ? {}
