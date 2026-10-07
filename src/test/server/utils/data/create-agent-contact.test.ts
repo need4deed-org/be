@@ -120,7 +120,7 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
     createdPersonIds.push(membership.personId);
   });
 
-  it("creates a PENDING membership when an AGENT (not coordinator/admin) links an existing user", async () => {
+  it("never links an existing user for an AGENT caller (be#975)", async () => {
     const email = `liam-agent-${suffix}@example.com`;
     const existingPerson = await makeAgentUser(email);
 
@@ -132,19 +132,41 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
     const membership = await createAgentContact(
       targetAgent.id,
       {
-        firstName: "Liam",
-        lastName: "Whatever",
+        firstName: "Typed",
+        lastName: "ByAgent",
         role: AgentRoleType.VOLUNTEER_COORDINATOR,
         email,
       },
       UserRole.AGENT,
     );
+    createdPersonIds.push(membership.personId);
 
-    expect(membership.personId).toBe(existingPerson.id);
-    expect(membership.status).toBe(AgentMembershipStatus.PENDING);
+    // Same outcome as an unknown email: a new ACTIVE Person built from the
+    // input, so the caller can't tell the email belongs to an AGENT user.
+    expect(membership.personId).not.toBe(existingPerson.id);
+    expect(membership.status).toBe(AgentMembershipStatus.ACTIVE);
+    expect(membership.person.firstName).toBe("Typed");
+  });
 
-    // A coordinator later approving the same link promotes it to ACTIVE
-    // instead of leaving it PENDING or creating a second membership row.
+  it("promotes a PENDING link to ACTIVE when a coordinator links the same user", async () => {
+    const email = `liam-pending-${suffix}@example.com`;
+    const existingPerson = await makeAgentUser(email);
+
+    const targetAgent = await dataSource
+      .getRepository(Agent)
+      .save(new Agent({ title: `Pending-link NGO ${suffix}` }));
+    createdAgentIds.push(targetAgent.id);
+
+    // e.g. a link an AGENT created before be#975.
+    const pending = await dataSource.getRepository(AgentPerson).save(
+      new AgentPerson({
+        agentId: targetAgent.id,
+        personId: existingPerson.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.PENDING,
+      }),
+    );
+
     const approved = await createAgentContact(
       targetAgent.id,
       {
@@ -155,7 +177,7 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
       },
       UserRole.COORDINATOR,
     );
-    expect(approved.id).toBe(membership.id);
+    expect(approved.id).toBe(pending.id);
     expect(approved.status).toBe(AgentMembershipStatus.ACTIVE);
   });
 

@@ -223,7 +223,6 @@ const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
     [TranslatedIntoType.NO_TRANSLATION]: "No translation",
   },
 };
-
 const PAIR_TARGET_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   [Lang.DE]: {
     [TranslatedIntoType.DEUTSCHE]: "Deutsch",

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { errorEmailRecipient } from "../../../config/constants";
 import { fetchJsonFromUrl } from "../../../data/utils";
+import logger from "../../../logger";
 import {
   ACCOMPANY_MATCH_BUILTIN,
   ACCOMPANY_NOT_FOUND_BUILTIN,
@@ -242,6 +243,29 @@ describe.each(CASES)("$name", ({ resetCache, send: doSend }) => {
     expect(msg.text ?? "").not.toMatch(UNRESOLVED_PLACEHOLDER_RE);
     expect(msg.text ?? "").not.toContain("undefined");
     expect(msg.html ?? "").not.toMatch(UNRESOLVED_PLACEHOLDER_RE);
+  });
+
+  // be#961: emails carry personal data, so nothing of a rendered email may
+  // reach the logs, at any level.
+  it("logs nothing from the rendered email", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      subject: "LOGCHECK SUBJECT",
+      text: "LOGCHECK BODY",
+      html: "<p>LOGCHECK HTML</p>",
+    });
+    const spies = (["debug", "info", "warn", "error"] as const).map((level) =>
+      vi.spyOn(logger, level).mockImplementation(() => logger),
+    );
+
+    try {
+      await doSend();
+
+      expect(send).toHaveBeenCalledTimes(1);
+      const logged = JSON.stringify(spies.map((spy) => spy.mock.calls));
+      expect(logged).not.toContain("LOGCHECK");
+    } finally {
+      spies.forEach((spy) => spy.mockRestore());
+    }
   });
 
   it("prefers a valid flat CDN manifest over the builtin fallback", async () => {

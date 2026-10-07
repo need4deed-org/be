@@ -16,17 +16,14 @@ const UNTRANSLATED_MIN_WORDS = 4;
 
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const URL = /https?:\/\/[^\s)]+/g;
-
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-
 const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
 const TIME = new RegExp(
   `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
   "gi",
 );
 const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
-
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
 const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
 

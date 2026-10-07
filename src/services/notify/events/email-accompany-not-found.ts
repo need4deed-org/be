@@ -4,7 +4,6 @@ import {
   emailFromNotify,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import logger from "../../../logger";
 import { formatOnetimerDate } from "../../dto/utils";
 import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
 import {
@@ -45,11 +44,6 @@ export async function sendEmailAccompanyNotFound(
     appointmentDistrict,
     clientName,
   });
-
-  logger.debug(
-    { opportunityId: opportunity.id, subject, text, html },
-    "attempting to send accompany-not-found cron email",
-  );
 
   await email.send({
     to: contactPersonEmail,

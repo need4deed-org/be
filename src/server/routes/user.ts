@@ -445,32 +445,22 @@ export default async function userRoutes(
           }
         }
 
-        const personRepository = fastify.db.personRepository;
-
-        // Existing person by id.
+        // Self-registration never links to an existing Person by id: this
+        // route is unauthenticated and Person ids are sequential, so anyone
+        // could attach a login (with their own email/password) to someone
+        // else's Person — including a GDPR-erased one (be#983). Linking by id
+        // is an admin-only operation (POST /user/admin).
         if (personData.id) {
-          const resolvedPerson = await personRepository.findOneBy({
-            id: personData.id,
-          });
-          if (!resolvedPerson) {
-            throw new BadRequestError(
-              `Person with ID ${personData.id} not found.`,
-            );
-          }
-          // Backfill the account email onto the person when it has none
-          // (cascade-saved with the user); never overwrite an existing value.
-          if (!resolvedPerson.email) {
-            resolvedPerson.email = email;
-          }
-          request.resolvedPerson = resolvedPerson;
-          return;
+          throw new BadRequestError(
+            "Linking to an existing person by id is not allowed on self-registration.",
+          );
         }
 
-        // No explicit person.id — look up an existing Person by email
-        // (case-insensitively) before creating a new, disconnected one, e.g.
-        // a Person that already exists via a legacy Volunteer row (be#923).
+        // Look up an existing Person by email (case-insensitively) before
+        // creating a new, disconnected one, e.g. a Person that already exists
+        // via a legacy Volunteer row (be#923).
         request.resolvedPerson = await resolvePersonByEmail(
-          personRepository,
+          fastify.db.personRepository,
           email,
           personData,
         );

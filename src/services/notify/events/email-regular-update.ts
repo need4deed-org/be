@@ -4,7 +4,6 @@ import {
   emailRegularUpdateManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import logger from "../../../logger";
 import { REGULAR_UPDATE_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -38,11 +37,6 @@ export async function sendEmailRegularUpdate(
     contactpersonName,
     volunteeringopportunityName,
   });
-
-  logger.debug(
-    { opportunityId: opportunity.id, subject, text, html },
-    "attempting to send regular-update cron email",
-  );
 
   await email.send({
     to: contactPersonEmail,

@@ -33,7 +33,7 @@ export async function sendEmailSuggestionAccompanying(
   const accompanying = opportunity?.accompanying;
 
   const appointmentTitle = opportunity?.title ?? "";
-  const appointmentAddress = opportunity?.district?.title ?? "Berlin";
+  const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
   const appointmentTime = formatOnetimerTime(opportunity?.onetimer?.date);

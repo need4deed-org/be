@@ -33,19 +33,24 @@ export function isGermanPublicHoliday(date: Date): boolean {
   const easter = easterSunday(y);
 
   const holidays = [
-    new Date(y, 0, 1), // Neujahr
-    new Date(y, 2, 8), // Internationaler Frauentag (Berlin)
-    new Date(y, 4, 1), // Tag der Arbeit
-    new Date(y, 9, 3), // Tag der Deutschen Einheit
-    new Date(y, 11, 25), // 1. Weihnachtstag
-    new Date(y, 11, 26), // 2. Weihnachtstag
-    addDays(easter, -2), // Karfreitag
-    addDays(easter, 1), // Ostermontag
-    addDays(easter, 39), // Christi Himmelfahrt
-    addDays(easter, 50), // Pfingstmontag
+    new Date(y, 0, 1),
+    new Date(y, 2, 8),
+    new Date(y, 4, 1),
+    new Date(y, 9, 3),
+    new Date(y, 11, 25),
+    new Date(y, 11, 26),
+    addDays(easter, -2),
+    addDays(easter, 1),
+    addDays(easter, 39),
+    addDays(easter, 50),
   ];
 
   return holidays.some((h) => sameDay(h, date));
+}
+
+export function isWorkingDay(date: Date): boolean {
+  const dow = date.getDay();
+  return dow !== 0 && dow !== 6 && !isGermanPublicHoliday(date);
 }
 
 export function addWorkingDays(from: Date, days: number): Date {
@@ -55,16 +60,14 @@ export function addWorkingDays(from: Date, days: number): Date {
   let added = 0;
   while (added < remaining) {
     result = addDays(result, direction);
-    const dow = result.getDay();
-    if (dow !== 0 && dow !== 6 && !isGermanPublicHoliday(result)) {
+    if (isWorkingDay(result)) {
       added++;
     }
   }
   return result;
 }
 
-export function monthsAgo(n: number): Date {
-  const now = new Date();
+export function monthsAgo(n: number, now: Date = new Date()): Date {
   const targetMonth = now.getMonth() - n;
   const y = now.getFullYear() + Math.floor(targetMonth / 12);
   const m = ((targetMonth % 12) + 12) % 12;
@@ -112,5 +115,23 @@ export function berlinDayBoundaries(berlinDate: Date): {
   return {
     startOfDay: new Date(Date.UTC(y, m, d, 0) - berlinOffsetMs),
     endOfDay: new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - berlinOffsetMs),
+  };
+}
+
+export function crossedMonthsAgo(
+  n: number,
+  now: Date = new Date(),
+): { from: Date; to: Date } {
+  return { from: monthsAgo(n, addDays(now, -1)), to: monthsAgo(n, now) };
+}
+
+export function appointmentsDue(
+  today: Date,
+  workingDaysAhead: number,
+): { from: Date; to: Date } {
+  const target = addWorkingDays(today, workingDaysAhead);
+  return {
+    from: berlinDayBoundaries(target).startOfDay,
+    to: berlinDayBoundaries(addWorkingDays(target, 1)).startOfDay,
   };
 }

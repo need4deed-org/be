@@ -20,6 +20,7 @@ import {
   createAgentContact,
   updateAgentContact,
 } from "../../utils";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 // Mirrors the role allowlist on PATCH /opportunity/:id: only these three
 // roles may reach the membership check, regardless of whether a stray
@@ -108,6 +109,11 @@ export default function agentContactRoutes(
         request.authUser?.role as UserRole,
       );
       agentPerson.agent = agent;
+      // Mask before echoing back, as every other Person-serializing route
+      // does (be#975). A no-op today for an AGENT (they never link an
+      // existing user, see createAgentContact) — kept so that can't regress
+      // into an email -> contact-details probe.
+      await maskForCaller(request, agentPerson);
 
       return reply.status(201).send({
         message: `Contact added to agent (id:${agentId}).`,
@@ -154,8 +160,26 @@ export default function agentContactRoutes(
         );
       }
 
+      // A PENDING membership may be someone else's join request or (created
+      // before be#975) an AGENT-made link to another NGO's user — without
+      // this, any member could overwrite that person's own profile. Only a
+      // coordinator/admin edits a non-ACTIVE contact (be#975).
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.ADMIN &&
+        membership.status !== AgentMembershipStatus.ACTIVE
+      ) {
+        throw new UnauthorizedError(
+          "Only active contacts of this agent can be edited.",
+        );
+      }
+
       const updated = await updateAgentContact(membership, request.body);
       updated.agent = agent;
+      // Redundant with the ACTIVE-only check above for an AGENT caller —
+      // kept as defense in depth should that check ever be loosened (be#975).
+      await maskForCaller(request, updated);
 
       return reply.status(200).send({
         message: `Contact (membershipId:${membershipId}) updated.`,

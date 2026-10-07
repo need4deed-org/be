@@ -13,14 +13,11 @@ export interface LocaleContent {
 }
 
 export type Manifest = Partial<Record<Lang, LocaleContent>> | LocaleContent;
-
 export type LocalizedValue = Record<Lang, string>;
-
 export type TemplateVar = string | number | LocalizedValue | null | undefined;
 export type TemplateVars = Record<string, TemplateVar>;
 
 const DEFAULT_LOCALE = Lang.DE;
-
 const PLACEHOLDER_RE = /\{\{\s*(\w+)(?:\.(\w+))?\s*\}\}/g;
 
 function isLocalizedValue(value: TemplateVar): value is LocalizedValue {
