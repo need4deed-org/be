@@ -1,8 +1,9 @@
-import { AgentRoleType } from "need4deed-sdk";
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Address from "../../../../data/entity/location/address.entity";
 import Postcode from "../../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
+import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Person from "../../../../data/entity/person.entity";
 import {
   getOrCreateSubmitterPerson,
@@ -15,6 +16,7 @@ const personUpdate = vi.fn((..._args: any[]) =>
   Promise.resolve({ affected: 1 }),
 );
 const personCount = vi.fn();
+const agentFind = vi.fn();
 const agentPersonFind = vi.fn();
 const agentPersonSave = vi.fn();
 const addressCreate = vi.fn((d: any) => d);
@@ -37,6 +39,8 @@ const fakeManager: any = {
         };
       case AgentPerson:
         return { findOne: agentPersonFind, save: agentPersonSave };
+      case Agent:
+        return { findOne: agentFind };
       case Address:
         return {
           create: addressCreate,
@@ -251,6 +255,21 @@ describe("getOrCreateSubmitterPerson", () => {
       agentId: 42,
       personId: 55,
       role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    });
+  });
+
+  it("links the submitter as PENDING when the NGO is unclaimed (never claims it)", async () => {
+    personFind.mockResolvedValueOnce(null);
+    personSave.mockImplementation(async (p: any) => ({ ...p, id: 57 }));
+    agentPersonFind.mockResolvedValueOnce(null);
+    agentFind.mockResolvedValueOnce({ id: 42, unclaimed: true });
+
+    await getOrCreateSubmitterPerson(baseBody, 42, fakeManager);
+
+    expect(agentPersonSave.mock.calls[0][0]).toMatchObject({
+      agentId: 42,
+      personId: 57,
+      status: AgentMembershipStatus.PENDING,
     });
   });
 
