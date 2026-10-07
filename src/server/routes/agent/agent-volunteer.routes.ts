@@ -9,6 +9,7 @@ import {
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
+import { assertAgentMemberOrStaff } from "../../utils/data/assert-agent-member-or-staff";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
@@ -38,6 +39,7 @@ export default function agentVolunteerRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
       assertAgentVisible(agent, request.authUser?.role);
+      await assertAgentMemberOrStaff(request, id);
 
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;

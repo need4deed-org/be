@@ -18,17 +18,28 @@ async function assertCanAccessMatchLog(
   id: number,
   access: "read" | "write",
 ): Promise<void> {
+  const { role, personId } = request.authUser ?? {};
+  const isStaff = role === UserRole.COORDINATOR || role === UserRole.ADMIN;
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
-    relations: { opportunity: true, volunteer: true },
+    // Staff need only the existence check; others need the owner ids.
+    ...(isStaff
+      ? {}
+      : {
+          relations: { opportunity: true, volunteer: true },
+          select: {
+            id: true,
+            opportunityId: true,
+            opportunity: { id: true, agentId: true },
+            volunteer: { id: true, personId: true },
+          },
+        }),
   });
   const notFound = new NotFoundError(`OpportunityVolunteer id:${id} not found`);
   if (!ov) {
     throw notFound;
   }
-
-  const { role, personId } = request.authUser ?? {};
-  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
+  if (isStaff) {
     return;
   }
   if (role === UserRole.AGENT) {

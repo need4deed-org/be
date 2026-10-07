@@ -3,12 +3,13 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  EntityTableName,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
   UserRole,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -21,6 +22,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -28,7 +30,7 @@ type Caller = "coordinator" | "member" | "outsider" | "volunteer";
 
 describe("read endpoints are scoped to the caller", () => {
   let fastify: FastifyInstance;
-  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const suffix = randomNumericSuffix();
 
   let agent: Agent;
   let volunteerDeal: Deal;
@@ -132,6 +134,9 @@ describe("read endpoints are scoped to the caller", () => {
   });
 
   afterAll(async () => {
+    await fastify.db.activityLogRepository.delete({
+      opportunityVolunteerId: match.id,
+    });
     await fastify.db.opportunityVolunteerRepository.delete({ id: match.id });
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
@@ -147,25 +152,46 @@ describe("read endpoints are scoped to the caller", () => {
   });
 
   describe("GET /comment", () => {
-    it("403s for a non-staff caller listing all comments", async () => {
-      expect((await get("/comment", "volunteer")).statusCode).toBe(403);
-      expect((await get("/comment", "member")).statusCode).toBe(403);
-    });
-
-    it("lets a non-staff caller fetch the comments tagging them", async () => {
+    it("gives non-staff callers no comments, even ones tagging them", async () => {
       const personId = (persons.member as Person).id;
-      const res = await get(`/comment?taggedPersonId=${personId}`, "member");
-      expect(res.statusCode).toBe(200);
-    });
-
-    it("403s for a non-staff caller asking for someone else's tags", async () => {
-      const otherId = (persons.coordinator as Person).id;
-      const res = await get(`/comment?taggedPersonId=${otherId}`, "member");
-      expect(res.statusCode).toBe(403);
+      for (const url of ["/comment", `/comment?taggedPersonId=${personId}`]) {
+        const res = await get(url, "member");
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data).toEqual([]);
+      }
+      expect((await get("/comment", "volunteer")).json().data).toEqual([]);
     });
 
     it("still lists everything for a coordinator", async () => {
       expect((await get("/comment", "coordinator")).statusCode).toBe(200);
+    });
+
+    it("404s a single comment for a non-staff caller it tags", async () => {
+      vi.spyOn(fastify.notify, "emailTagged").mockResolvedValue(undefined);
+      vi.spyOn(fastify.notify, "tagged").mockResolvedValue(undefined);
+      const created = await fastify.inject({
+        method: "POST",
+        url: "/comment",
+        cookies: { [accessCookieName]: cookies.coordinator as string },
+        payload: {
+          text: `Internal note ${suffix}`,
+          entityType: EntityTableName.VOLUNTEER,
+          entityId: volunteer.id,
+          taggedPersonIds: [(persons.member as Person).id],
+        },
+      });
+      expect(created.statusCode).toBe(201);
+      const commentId = created.json().data.id;
+      try {
+        expect((await get(`/comment/${commentId}`, "member")).statusCode).toBe(
+          404,
+        );
+        expect(
+          (await get(`/comment/${commentId}`, "coordinator")).statusCode,
+        ).toBe(200);
+      } finally {
+        await fastify.db.commentRepository.delete({ id: commentId });
+      }
     });
   });
 
@@ -183,6 +209,7 @@ describe("read endpoints are scoped to the caller", () => {
 
     it("gives a non-staff caller nothing for a non-staff role filter", async () => {
       const res = await get(`/user?role=${UserRole.VOLUNTEER}`, "member");
+      expect(res.statusCode).toBe(200);
       expect(res.json().data).toEqual([]);
     });
   });
@@ -209,6 +236,19 @@ describe("read endpoints are scoped to the caller", () => {
 
     it("404s for an NGO user of another NGO", async () => {
       expect((await get(url(), "outsider")).statusCode).toBe(404);
+    });
+
+    const post = (as: Caller) =>
+      fastify.inject({
+        method: "POST",
+        url: url(),
+        payload: { date: "2026-10-01", hours: 2 },
+        cookies: { [accessCookieName]: cookies[as] as string },
+      });
+
+    it("lets the NGO member write it and 404s an NGO user of another NGO", async () => {
+      expect((await post("member")).statusCode).toBe(201);
+      expect((await post("outsider")).statusCode).toBe(404);
     });
 
     it("403s when the volunteer tries to write it", async () => {

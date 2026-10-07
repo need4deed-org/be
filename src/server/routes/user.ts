@@ -99,8 +99,9 @@ export default async function userRoutes(
           .send({ message: "List of users page:1", data: [], count: 0 });
       }
       const where = getUserWhere(search, role) as FindOptionsWhere<User>;
-      if (!isPrivileged && !role) {
-        where.role = In(staffRoles);
+      if (!isPrivileged) {
+        where.role = role ?? In(staffRoles);
+        where.isActive = true;
       }
 
       const userRepository = fastify.db.userRepository;

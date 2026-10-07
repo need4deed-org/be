@@ -2,7 +2,7 @@ import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
-import { BadRequestError, UnauthorizedError } from "../../config";
+import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import CommentPerson from "../../data/entity/m2m/comment-person";
 import User from "../../data/entity/user.entity";
@@ -99,17 +99,13 @@ export default async function commentRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      // Comments are coordinator-only; others may only fetch the ones tagging
-      // them (notification badge).
+      // Comments are coordinator-only. Others get an empty list (not a 403):
+      // the notification badge asks for every role.
       const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-      if (
-        !isPrivileged &&
-        (request.query.taggedPersonId === undefined ||
-          request.query.taggedPersonId !== request.authUser?.personId)
-      ) {
-        throw new UnauthorizedError("Permission denied");
+      if (!role || !COMMENT_READER_ROLES.includes(role)) {
+        return reply
+          .status(200)
+          .send({ message: "Comments", data: [], count: 0 });
       }
 
       try {
@@ -200,12 +196,7 @@ export default async function commentRoutes(
         });
 
         const role = request.authUser?.role;
-        const isPrivileged =
-          role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-        const tagsCaller = comment?.commentPerson?.some(
-          (tag) => tag.personId === request.authUser?.personId,
-        );
-        if (!comment || (!isPrivileged && !tagsCaller)) {
+        if (!comment || !role || !COMMENT_READER_ROLES.includes(role)) {
           return reply
             .status(404)
             .send({ message: `Comment id:${id} not found.` });
