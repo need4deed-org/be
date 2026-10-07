@@ -10,10 +10,6 @@ import { getDateObj } from "../utils";
 
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
 
-// The main-communication dropdown only ever offers German/English, so the
-// only valid submissions are: none, German alone, English alone, or both
-// together — anything else means an id outside that set (or a stale/bogus
-// reference) slipped through.
 export async function assertValidMainCommunicationLanguages(
   languagesMain: { id: number | string }[] | undefined,
   languageRepository: Repository<Language>,
@@ -23,10 +19,6 @@ export async function assertValidMainCommunicationLanguages(
   }
   const ids = [...new Set(languagesMain.map(({ id }) => Number(id)))];
   const languages = await languageRepository.findBy({ id: In(ids) });
-  // Any id that didn't resolve to a real row (stale/bogus reference) must be
-  // rejected outright, not silently dropped — otherwise a request like
-  // [germanId, 999999] would validate as "German only" despite containing
-  // an unresolvable language.
   if (languages.length !== ids.length) {
     throw new BadRequestError(
       "Main communication language must be German, English, or both.",
@@ -68,8 +60,6 @@ export function parseOpportunity(body: ApiOpportunityPatch) {
         title: body.title,
         status: body.statusOpportunity,
         numberVolunteers: body.numberVolunteers,
-        // The PATCH handler keeps only the column the opportunity's type
-        // reads (be#1092), so both may end up null.
         info: body.description as string | null | undefined,
         infoConfidential: body.description as string | null | undefined,
         type: body.opportunity_type,

@@ -28,28 +28,6 @@ export function resetIntroductionTemplateCache(): void {
   loader.resetCache();
 }
 
-// German-only — this template is no longer split by recipient locale (see
-// be#838). The six sentences below are the only copy of this wording; they
-// fill introduction.json's flat {{ statmentOnCertificates }} placeholder
-// (there is no separate certificateStatements block in that manifest, CDN
-// or fallback).
-//
-// Previously branched on statusCgcProcess (UPLOADED/MISSING) to detect
-// "already applied", but nothing in fe ever sets that field — the
-// coordinator UI's CGC-application toggle instead writes statusCGC =
-// APPLIED_N4D directly (VolunteerProfileDocument.tsx). Since neither
-// cgcNo nor cgcYes matched APPLIED_N4D, that was the common case and this
-// always rendered a blank statement for it (be#1042 review). Reads
-// statusCGC's own three real, reachable values instead: NO (the volunteer
-// self-registration form's "Need to apply" answer), APPLIED_N4D (N4D
-// applied on the volunteer's behalf), YES (received).
-//
-// UNDEFINED — the column's own DB default (volunteer.entity.ts) — and
-// ASKED_TO_APPLY/APPLIED_SELF (unused by any writer today, confirmed by
-// grep) deliberately fall back to blank rather than asserting "we'll apply
-// immediately": UNDEFINED means the status was simply never set, and
-// APPLIED_SELF means the *volunteer* said they'd apply themselves, the
-// opposite of what that sentence claims (be#1043 review).
 function resolveStatmentOnCertificates(
   statusCGC: DocumentStatusType,
   statusVaccination: DocumentStatusType,
@@ -83,9 +61,6 @@ function resolveStatmentOnCertificates(
 export async function sendEmailIntroduction(
   email: EmailTransport,
   ov: OpportunityVolunteer,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
@@ -150,9 +125,6 @@ export async function sendEmailIntroduction(
       .filter(Boolean)
       .join(", ");
   })();
-  // be#1050: RAC/shelter agents are often named after their street, so this
-  // reads as "for {opportunity} in {NGO}" in the subject rather than just
-  // naming the volunteer and opportunity with no NGO context.
   const agentTitle = opportunity.agent?.title ?? "";
 
   const statmentOnCertificates = resolveStatmentOnCertificates(

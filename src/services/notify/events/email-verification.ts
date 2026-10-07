@@ -22,7 +22,6 @@ export interface EmailVerificationDeps {
 
 const loader = createManifestLoader(emailVerificationManifestUrl);
 
-/** Test-only: drop the cached manifest so each test fetches fresh. */
 export function resetVerificationTemplateCache(): void {
   loader.resetCache();
 }

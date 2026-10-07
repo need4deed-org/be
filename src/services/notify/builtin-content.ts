@@ -1,19 +1,3 @@
-// Fallback content for every notify email, used when the CDN manifest for
-// that email can't be loaded (fetch failure/timeout) or lacks a valid entry
-// for the requested locale. Kept in one file so editing copy doesn't require
-// hunting through every event file in ./events.
-//
-// Mirrors dev/cdn/emails/*.json (the live CDN content) exactly, so a
-// fallback looks the same as the real thing. Most of these are flat — a
-// single body used regardless of recipient — either because they're
-// German-only (RAC/contact-person workflow) or because they bilingually
-// concatenate English+German in one body (volunteer-facing workflow, where
-// the recipient's language can't be reliably known; see be#830/#838).
-// In the bilingual ones, a translatable value picks the language of its part
-// with {{ key.en }} / {{ key.de }} (be#1075).
-// PASSWORD_RESET_BUILTIN and TAGGED_BUILTIN are split per locale instead:
-// no flat manifest was provided for the former, and the latter goes to a
-// dashboard user whose language is known.
 import { Lang } from "need4deed-sdk";
 import type { LocaleContent } from "./email-template";
 
@@ -100,23 +84,16 @@ export const PASSWORD_RESET_BUILTIN: Record<Lang, LocaleContent> = {
   },
 };
 
-// Wording for the "you were tagged" email's per-language values; a manifest
-// entry can override any of them under "labels" (be#1075).
 export interface TaggedLabels {
   commentOnVolunteer: string;
   commentOnOpportunity: string;
   commentOnAgent: string;
   comment: string;
   post: string;
-  // Author with no name.
   someone: string;
-  // Greeting for a recipient with no name ("Hi there").
   noName: string;
 }
 
-// {{ where }} and {{ link }} are per-language values; {{ tagText }},
-// {{ authorName }} and {{ recipientName }} are user content, or a label
-// when the name is missing.
 export const TAGGED_BUILTIN: Record<
   Lang,
   LocaleContent & { labels: TaggedLabels }
