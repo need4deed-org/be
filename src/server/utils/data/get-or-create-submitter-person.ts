@@ -9,59 +9,24 @@ import { getRepository } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
 import { createAddress, patchOrReplaceAddress } from "./for-routes";
 
-// rac_address / rac_plz are optional so existing callers that only carry the
-// name/phone/email blob (e.g. backfill migrations) still satisfy the type.
 type SubmitterFields = Pick<
   OpportunityLegacyFormData,
   "rac_email" | "rac_full_name" | "rac_phone"
 > &
   Partial<Pick<OpportunityLegacyFormData, "rac_address" | "rac_plz">>;
 
-// An Address row cannot exist without a Postcode (NOT NULL). When a brand-new
-// submitter address is created and rac_plz doesn't resolve to a known Postcode,
-// fall back to this value rather than dropping the address entirely.
 const FALLBACK_PLZ = "12345";
 
-// Seeded placeholder address (see seeds/user.seed.ts) used for "unknown
-// address". Sharing it is now guarded structurally (isAddressExclusivelyOwned,
-// be#1026) rather than by this title, so nothing in src/ reads it as a guard
-// any more — kept as the one stable marker for identifying the legacy shared
-// row itself, needed by the be#1028 prod backfill.
 export const DUMMY_ADDRESS_TITLE = "Dummy";
 
-/**
- * Extract the street portion of a free-text address, cutting the German 5-digit
- * postcode and the city that follows it (e.g. "Musterstr. 1, 12345 Berlin" ->
- * "Musterstr. 1"). Returns "" when nothing usable remains.
- */
 export function streetFromAddress(raw: string | undefined): string {
   const trimmed = (raw ?? "").trim();
   if (!trimmed) {
     return "";
   }
-  // Drop the first 5-digit postcode and everything after it, plus any
-  // separator (comma/whitespace) immediately preceding it.
   return trimmed.replace(/[\s,]*\b\d{5}\b.*$/, "").trim();
 }
 
-/**
- * Patch (or create) the submitter Person's Address from rac_address / rac_plz.
- *
- *   - rac_address -> address.street (postcode + city stripped).
- *   - rac_plz     -> resolved to an existing Postcode by value (never created).
- *
- * When the submitter already has an Address, it's patched via
- * patchOrReplaceAddress — which patches in place unless that Address is
- * shared with another Person (the seeded "Dummy" placeholder or any other
- * row multiple Person rows happen to point at, see be#1019), in which case it
- * mints this submitter their own row instead. When they have no address at
- * all, a fresh one is created here directly:
- *
- *       - own address + plz resolves -> update street/postcode.
- *       - own address + plz unknown  -> update street, leave postcode.
- *       - no address                 -> create one, falling back to
- *         FALLBACK_PLZ when rac_plz does not resolve (Address needs a Postcode).
- */
 async function syncSubmitterAddress(
   person: Person,
   body: SubmitterFields,
@@ -80,7 +45,7 @@ async function syncSubmitterAddress(
 
   if (person.addressId) {
     if (!street && !resolved) {
-      return; // nothing to change (street empty, plz unknown)
+      return;
     }
     const addressData: Partial<Address> & { id: number } = {
       id: person.addressId,
@@ -88,7 +53,6 @@ async function syncSubmitterAddress(
     if (street) {
       addressData.street = street;
     }
-    // resolved ? set postcode : leave the existing postcode untouched.
     const patched = await patchOrReplaceAddress(
       person.id,
       addressData,
@@ -98,8 +62,6 @@ async function syncSubmitterAddress(
     if (patched) {
       return;
     }
-    // Dangling addressId (the Address row no longer exists) — fall through
-    // to create a fresh one below, same as the "no address at all" path.
   }
 
   const address = await createAddress(
@@ -116,12 +78,6 @@ async function syncSubmitterAddress(
   }
 }
 
-/**
- * Split a full name into first / middle / last via the shared getNameFields
- * helper (first token -> firstName, last token -> lastName, the rest ->
- * middleName). Falls back to the email local-part for firstName when the name
- * is empty, since Person.firstName is required.
- */
 function resolveName(
   rawName: string | undefined,
   email: string,
@@ -136,26 +92,6 @@ function resolveName(
   };
 }
 
-/**
- * Resolve a Person + AgentPerson link for the submitter of a legacy
- * opportunity:
- *
- *   1. Empty/missing rac_email -> return null (no Person manufactured).
- *   2. Lookup by email (case-insensitive).
- *        - Found     -> overwrite the rac_* fields (name/phone) from this
- *                       submission so blank/stale records get corrected. Only
- *                       fields the form actually provides are touched, so a
- *                       later submission omitting one does not wipe good data.
- *        - Not found -> create Person from rac_*.
- *   3. Patch the Person's Address from rac_address / rac_plz (see
- *      syncSubmitterAddress).
- *   4. Either way, upsert an AgentPerson link (VOLUNTEER_COORDINATOR) for
- *      (person, agentId) when one does not already exist.
- *
- * `manager` defaults to the global dataSource; pass a transactional
- * EntityManager (or a migration's QueryRunner.manager) to make the writes
- * atomic with surrounding work.
- */
 export async function getOrCreateSubmitterPerson(
   body: SubmitterFields,
   agentId: number,
@@ -188,17 +124,11 @@ export async function getOrCreateSubmitterPerson(
       }),
     );
   } else {
-    // Refresh the rac_* fields from this submission so blank/stale records get
-    // corrected. Only overwrite a field the form actually provides — an empty
-    // rac_full_name / rac_phone must not wipe an existing good value.
     let dirty = false;
     const fullName = (body.rac_full_name ?? "").trim();
     if (fullName) {
       const { firstName, middleName, lastName } = resolveName(fullName, email);
       person.firstName = firstName;
-      // Use null (not undefined) for absent name parts: TypeORM skips undefined
-      // on update, which would leave stale middle/last names behind (e.g.
-      // resubmitting "Cher" over "Mary van der Berg" -> "Cher van der Berg").
       person.middleName = middleName ?? (null as unknown as undefined);
       person.lastName = lastName ?? (null as unknown as undefined);
       dirty = true;

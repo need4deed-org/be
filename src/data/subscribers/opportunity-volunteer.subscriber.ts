@@ -64,7 +64,6 @@ export class OpportunityVolunteerSubscriber
       event.manager,
       parentIds(event.databaseEntity, event.entity ?? undefined),
     );
-    // Without the previous row (bulk update()) the transition is unknown.
     if (event.databaseEntity) {
       const after = event.entity as Partial<OpportunityVolunteer> | undefined;
       await logChange(event, event.databaseEntity, after);
@@ -210,8 +209,6 @@ async function logChange(
   }
 }
 
-// Volunteer engagement follows the link entering or leaving Active, on the same
-// transaction (the volunteer row is already locked by lockParents).
 async function syncEngagement(
   manager: EntityManager,
   before: Partial<OpportunityVolunteer> | undefined,

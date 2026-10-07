@@ -17,8 +17,6 @@ import {
 } from "../schema";
 import { ReplyMessage } from "../types/endpoint-handlers";
 
-// Statuses under which an opportunity is still publicly open — same set the
-// public opportunity listing filters to (opportunity/legacy.routes.ts).
 const OPEN_OPPORTUNITY_STATUSES: OpportunityStatusType[] = [
   OpportunityStatusType.NEW,
   OpportunityStatusType.ACTIVE,

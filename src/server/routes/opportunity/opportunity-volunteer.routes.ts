@@ -19,7 +19,6 @@ export default function opportunityOpportunityVolunteerRoutes(
 ) {
   fastify.get<{
     Params: { id: number };
-    // Handler sends entities; the DTO runs in the preSerialization hook.
     Reply: { message: string; data: OpportunityVolunteer[] };
   }>(
     "/",
@@ -69,16 +68,10 @@ export default function opportunityOpportunityVolunteerRoutes(
       });
 
       const agent = volunteers[0]?.opportunity?.agent;
-      // An INACTIVE agent's linked volunteers shouldn't read as live,
-      // actionable data (be#885) here either — this route surfaces the same
-      // underlying rows as GET /agent/:id/volunteer-linked, just scoped by
-      // opportunityId instead of agentId, so it needs the same rule. All
-      // rows share one opportunity/agent, so checking the first is enough.
       if (agent && shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
         maskVolunteerIdentities(volunteers);
       }
 
-      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Volunteers for opportunity id:${opportunityId}.`,
         data: volunteers,

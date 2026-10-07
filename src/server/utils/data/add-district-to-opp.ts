@@ -9,18 +9,12 @@ export function getDistrictToOpportunityHandler() {
   return {
     async addDistrictToOpportunity(
       opportunity: Opportunity,
-      // Optional caller-side precomputed resolution of the accompanying's
-      // own postcode -> district (e.g. GET /:id needs this same value for
-      // its response DTO) — pass it to reuse instead of querying it twice.
       accompanyingDistrict?: District | null,
     ): Promise<Opportunity> {
       if (opportunity.districtId) {
         return opportunity;
       }
 
-      // ACCOMPANYING: derive from the appointment's own postcode (be#895).
-      // `deal.postcode` mirrors the agent's own postcode — an unrelated
-      // concept — so it isn't used here.
       if (opportunity.type === OpportunityType.ACCOMPANYING) {
         let district: District | null;
         if (accompanyingDistrict !== undefined) {
@@ -38,11 +32,6 @@ export function getDistrictToOpportunityHandler() {
         }
       }
 
-      // REGULAR/EVENTS use the opportunity's own agent's district (be#895).
-      // Also the fallback for an ACCOMPANYING opportunity whose appointment
-      // postcode didn't resolve to a district. `agent.districtId` is an
-      // already-loaded FK column wherever `agent` is loaded at all, no extra
-      // relation needed.
       if (opportunity.agent?.districtId) {
         opportunity.districtId = opportunity.agent.districtId;
         updates.push(opportunity);

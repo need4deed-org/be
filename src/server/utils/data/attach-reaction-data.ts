@@ -2,11 +2,6 @@ import { FastifyInstance } from "fastify";
 import { In } from "typeorm";
 import Post from "../../../data/entity/post.entity";
 
-// Populates the virtual reactions/myReaction fields on a batch of post/reply
-// rows with two batched queries (not N+1 per row) — one grouped count per
-// emoji, one lookup for the requesting user's own reaction. Every route that
-// returns a post or reply must call this before mapping through
-// dtoPost/dtoPostReply, or the response silently reports no reactions.
 export async function attachReactionData(
   fastify: FastifyInstance,
   posts: Post[],

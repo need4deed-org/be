@@ -11,10 +11,6 @@ import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
 import { hashPassword, sha256Hex } from "../utils";
 
-// Mints a direct (non-login) API key for bot/automation access. No
-// self-service endpoint yet — see be#875.
-// Usage: yarn create-api-key --label <bot-label> --role <admin|coordinator|agent> [--agent-id <id>]
-
 const ALLOWED_ROLES = [UserRole.ADMIN, UserRole.COORDINATOR, UserRole.AGENT];
 const USAGE =
   "Usage: yarn create-api-key --label <bot-label> --role <admin|coordinator|agent> [--agent-id <id>]";
@@ -65,10 +61,6 @@ export function parseArgs(argv: string[]): CreateApiKeyOptions {
   return { label, role, agentId };
 }
 
-// All writes run in one transaction: a service User (+ Person/AgentPerson
-// for an agent-role key) with no corresponding ApiKey row would be an
-// unrevocable, untraceable credential-less account if a crash landed
-// between the individual saves.
 export async function createApiKey(
   ds: DataSource,
   { label, role, agentId }: CreateApiKeyOptions,
@@ -96,11 +88,6 @@ export async function createApiKey(
       }
     }
 
-    // Service user never logs in via password — the password column is NOT
-    // NULL, so a random, never-shared placeholder fills it rather than a
-    // guessable literal. admin/coordinator keys have no Person (not scoped
-    // to a center); an agent key gets a Person so it can hold the
-    // AgentPerson membership agent-scoped write routes require.
     const placeholderPassword = crypto.randomBytes(32).toString("hex");
     const user = await userRepository.save(
       new User({

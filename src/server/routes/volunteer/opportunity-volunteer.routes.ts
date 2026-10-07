@@ -67,7 +67,6 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      // Before PII masking, after any save of these entities (be#1068).
       await translateOpportunities(
         fastify,
         opportunities.map(({ opportunity }) => opportunity).filter(Boolean),

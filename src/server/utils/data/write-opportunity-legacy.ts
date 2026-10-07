@@ -15,7 +15,6 @@ import {
   queueOpportunityTranslation,
 } from "./translate-opportunities";
 
-// `originalLanguage`: the language the text was entered in (be#1068).
 export async function writeOpportunityLegacy(
   opportunity: Opportunity,
   originalLanguage: Lang = Lang.DE,
@@ -41,8 +40,6 @@ export async function writeOpportunityLegacy(
 
     await dealRepository.save(opportunity.deal);
 
-    // Deal m2m relations (activities, skills, languages, timeslots, districts)
-    // — saved after the deal so dealId exists
     for (const dealActivity of opportunity.deal.dealActivity) {
       dealActivity.dealId = opportunity.deal.id;
     }
@@ -83,12 +80,6 @@ export async function writeOpportunityLegacy(
     await opportunityRepository.save(opportunity);
     await queueOpportunityTranslation(transactionalEntityManager, opportunity);
 
-    // opportunity.status is normally left undefined at this point (the
-    // create form has no field to set it, so it's the entity's DB-level
-    // default) — fall back to that same default explicitly rather than
-    // assuming "creation always implies searching", so this stays correct if
-    // that default, or a future caller passing an explicit status, changes
-    // (be#862 / be#868 review).
     if (
       opportunity.agentId &&
       impliesAgentSearching(opportunity.status ?? OpportunityStatusType.NEW)

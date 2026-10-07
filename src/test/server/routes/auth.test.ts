@@ -357,7 +357,10 @@ describe("POST /auth/refresh", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({ message: "Invalid refresh token." });
+      expect(response.json()).toEqual({
+        error: "BadRequestError",
+        message: "Invalid refresh token.",
+      });
     }
 
     expect(findOneSpy).not.toHaveBeenCalled();
@@ -371,7 +374,10 @@ describe("POST /auth/refresh", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ message: "Refresh token is required." });
+    expect(response.json()).toEqual({
+      error: "BadRequestError",
+      message: "Refresh token is required.",
+    });
   });
 
   it("rejects a malformed refresh token", async () => {
@@ -382,7 +388,10 @@ describe("POST /auth/refresh", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ message: "Invalid refresh token." });
+    expect(response.json()).toEqual({
+      error: "BadRequestError",
+      message: "Invalid refresh token.",
+    });
   });
 });
 
