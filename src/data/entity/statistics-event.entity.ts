@@ -11,8 +11,7 @@ import District from "./location/district.entity";
 
 export const LEAD_FROM_METRIC = "lead-from";
 
-// Append-only and anonymous (no person or volunteer id): one row per counted
-// event, e.g. a ticked "where did you hear about us" answer.
+// Anonymous on purpose: no person or volunteer id.
 @Entity()
 @Index(["metric", "occurredAt"])
 export default class StatisticsEvent {
@@ -28,11 +27,9 @@ export default class StatisticsEvent {
   @Column({ type: "varchar" })
   metric: string;
 
-  // Set by the database, like the created_at columns other metrics bucket on.
   @CreateDateColumn()
   occurredAt: Date;
 
-  // What was counted, e.g. the lead_from option id or a match status.
   @Column({ type: "varchar" })
   valueKey: string;
 

@@ -6,9 +6,7 @@ import StatisticsEvent, {
 } from "../../../data/entity/statistics-event.entity";
 import logger from "../../../logger";
 
-// The per-option counter (all-time totals) and one statistics event per answer
-// (the timeline) are written together; this is bookkeeping only, so a failure
-// is logged and never fails the registration it belongs to.
+// Bookkeeping only: a failure must never fail the registration.
 export async function updateLeads(leads: LeadFrom[]): Promise<void> {
   const ids = [...new Set(leads.map((lead) => lead.id))];
   if (!ids.length) {
