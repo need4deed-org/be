@@ -93,12 +93,10 @@ const AGENT_SETTABLE_STATUSES = new Set([
   OpportunityVolunteerStatusType.ACTIVE,
   OpportunityVolunteerStatusType.PAST,
 ]);
-// A match a coordinator already made: an NGO can't skip the matching step.
 const AGENT_CHANGEABLE_STATUSES = new Set([
   OpportunityVolunteerStatusType.MATCHED,
   OpportunityVolunteerStatusType.ACTIVE,
 ]);
-// "Kein Match" on anything still open; a Past match is history.
 const AGENT_REMOVABLE_STATUSES = new Set([
   OpportunityVolunteerStatusType.PENDING,
   OpportunityVolunteerStatusType.MATCHED,
@@ -112,9 +110,6 @@ function assertCoordinator(request: FastifyRequest): void {
   }
 }
 
-// An NGO member may mark a match on their own opportunity Active or Past, or
-// remove it; matching itself stays with coordinators. Ownership is checked
-// first, so other NGOs' matches all look like 404.
 async function assertCanChangeMatch(
   fastify: FastifyInstance,
   request: FastifyRequest,
@@ -241,7 +236,6 @@ export default async function m2mOpportunityVolunteerRoutes(
         nextStatus,
       );
 
-      // An NGO caller changes only the status, never which match it is.
       const isAgent = request.authUser?.role === UserRole.AGENT;
       opportunityVolunteerRepository.merge(
         opportunityVolunteer,
