@@ -61,7 +61,7 @@ describe("commentSerializer", () => {
     expect(result.taggedPersons).toEqual([]);
   });
 
-  it("returns undefined authorName when user has no person", () => {
+  it('falls back to "Unknown Author" when user has no person', () => {
     const comment = {
       id: 8,
       text: "Note",
@@ -72,10 +72,10 @@ describe("commentSerializer", () => {
     };
 
     const result = commentSerializer(comment as any);
-    expect(result.authorName).toBeUndefined();
+    expect(result.authorName).toBe("Unknown Author");
   });
 
-  it("returns undefined authorName when user is missing", () => {
+  it('falls back to "Unknown Author" when user is missing', () => {
     const comment = {
       id: 9,
       text: "Note",
@@ -85,6 +85,6 @@ describe("commentSerializer", () => {
     };
 
     const result = commentSerializer(comment as any);
-    expect(result.authorName).toBeUndefined();
+    expect(result.authorName).toBe("Unknown Author");
   });
 });
