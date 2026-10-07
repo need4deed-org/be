@@ -9,11 +9,16 @@ import {
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
 import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -41,6 +46,7 @@ import {
 } from "../../types";
 import {
   buildEraseSummaryMessage,
+  createAddress,
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
@@ -341,20 +347,43 @@ export default async function volunteerRoutes(
         volunteerData = Object.keys(filtered).length ? filtered : undefined;
       }
 
-      let personData = patchedPersonData;
-      let addressData = patchedAddressData;
-      if (isSelf) {
-        if (personData) {
-          personData = { ...personData, id: volunteer.personId };
+      const personData = patchedPersonData
+        ? { ...patchedPersonData, id: volunteer.personId }
+        : undefined;
+      const ownPerson = await fastify.db.personRepository.findOne({
+        where: { id: volunteer.personId },
+        relations: ["address"],
+      });
+
+      const addressFields = Object.fromEntries(
+        Object.entries(patchedAddressData ?? {}).filter(
+          ([key, value]) => key !== "id" && value !== "",
+        ),
+      ) as Partial<Address>;
+      const sendsPostcode = Boolean(postcodeData?.id || postcodeData?.value);
+      let addressData: Partial<Address> | undefined;
+      let resolvedPostcode: Partial<Postcode> | undefined;
+      if (Object.keys(addressFields).length || sendsPostcode) {
+        if (sendsPostcode) {
+          const postcode = await fastify.db.postcodeRepository.findOneBy(
+            postcodeData?.id
+              ? { id: Number(postcodeData.id) }
+              : { value: postcodeData?.value },
+          );
+          if (!postcode) {
+            throw new BadRequestError("Address not saved: unknown postcode.");
+          }
+          resolvedPostcode = { id: postcode.id };
         }
-        if (addressData) {
-          const ownPerson = await fastify.db.personRepository.findOneBy({
-            id: volunteer.personId,
-          });
-          addressData = ownPerson?.addressId
-            ? { ...addressData, id: ownPerson.addressId }
-            : undefined;
+        if (!ownPerson?.addressId && !resolvedPostcode) {
+          throw new BadRequestError(
+            "Address not saved: a postcode is required.",
+          );
         }
+        addressData = {
+          ...addressFields,
+          id: ownPerson?.addressId ?? undefined,
+        };
       }
 
       const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
@@ -368,24 +397,21 @@ export default async function volunteerRoutes(
         });
       }
       let hasContactChange = false;
-      if ((personData && personData.id) || (addressData && addressData.id)) {
-        const prevPerson = await fastify.db.personRepository.findOne({
-          where: { id: (personData?.id ?? volunteer.personId) as number },
-          relations: ["address"],
-        });
-        if (personData) {
-          hasContactChange ||= Object.entries(personData).some(
-            ([key, value]) =>
-              key !== "id" && prevPerson?.[key as keyof Person] !== value,
-          );
-        }
-        if (addressData) {
-          hasContactChange ||= Object.entries(addressData).some(
+      if (personData) {
+        hasContactChange ||= Object.entries(personData).some(
+          ([key, value]) =>
+            key !== "id" && ownPerson?.[key as keyof Person] !== value,
+        );
+      }
+      if (addressData) {
+        hasContactChange ||=
+          Object.entries(addressData).some(
             ([key, value]) =>
               key !== "id" &&
-              prevPerson?.address?.[key as keyof Address] !== value,
-          );
-        }
+              ownPerson?.address?.[key as keyof Address] !== value,
+          ) ||
+          (resolvedPostcode !== undefined &&
+            resolvedPostcode.id !== ownPerson?.address?.postcodeId);
       }
       if (hasContactChange) {
         auditLogEntries.push({
@@ -404,7 +430,7 @@ export default async function volunteerRoutes(
           }
         }
 
-        if (personData && personData.id) {
+        if (personData) {
           const success = await patchEntity(Person, personData);
           if (!success) {
             return reply.status(400).send({
@@ -413,17 +439,30 @@ export default async function volunteerRoutes(
           }
         }
 
-        if (addressData && addressData.id) {
+        if (addressData?.id) {
           const success = await patchOrReplaceAddress(
-            personData?.id ?? volunteer.personId,
+            volunteer.personId,
             addressData as Partial<Address> & { id: number },
-            postcodeData,
+            resolvedPostcode ?? {},
           );
           if (!success) {
             return reply.status(400).send({
               message: `Address (id=${addressData.id}) not updated.`,
             });
           }
+        } else if (addressData) {
+          const { id: _id, ...newAddress } = addressData;
+          const address = await createAddress(
+            newAddress,
+            resolvedPostcode ?? {},
+          );
+          if (!address) {
+            throw new BadRequestError("Address not saved: unknown postcode.");
+          }
+          await fastify.db.personRepository.update(
+            { id: volunteer.personId },
+            { addressId: address.id },
+          );
         }
 
         if (languages) {
