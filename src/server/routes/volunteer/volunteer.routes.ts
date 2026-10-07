@@ -371,8 +371,7 @@ export default async function volunteerRoutes(
         volunteerData = Object.keys(filtered).length ? filtered : undefined;
       }
 
-      // The person and address are always the volunteer's own, never ids from
-      // the body (patchEntity would otherwise write whatever row they name).
+      // Never trust person/address ids from the body: patchEntity would write that row.
       const personData = patchedPersonData
         ? { ...patchedPersonData, id: volunteer.personId }
         : undefined;
@@ -381,9 +380,7 @@ export default async function volunteerRoutes(
         relations: ["address"],
       });
 
-      // Decided before any write, so an unusable address can't leave a
-      // half-saved request: empty strings count as not sent, a sent postcode
-      // must exist, and a new address needs one.
+      // Validated before any write, so a bad address can't half-save the request.
       const addressFields = Object.fromEntries(
         Object.entries(patchedAddressData ?? {}).filter(
           ([key, value]) => key !== "id" && value !== "",
