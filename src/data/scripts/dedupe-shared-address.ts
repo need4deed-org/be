@@ -8,22 +8,6 @@ import Person from "../entity/person.entity";
 import VolunteerAuditLog from "../entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
 
-// One-off backfill for be#1019/be#1028: before the seeding/write-path fixes
-// in be#1025/be#1026, many Person rows could end up sharing one Address row
-// (the seeded "Dummy" placeholder, or a per-postcode placeholder reused
-// across an entire bulk import). This gives every affected Person but one a
-// fresh, exclusively-owned Address, without ever deleting or mutating the
-// original row.
-//
-// Usage: yarn dedupe-shared-address [--apply] [--address-ids 1,2,3]
-//   (no flags)    dry run — prints the plan, writes nothing.
-//   --apply       performs the writes, one transaction per shared Address
-//                 group (so one group's failure can't roll back another).
-//   --address-ids restrict to specific shared Address ids (comma-separated),
-//                 e.g. to apply the fix in cautious batches rather than all
-//                 shared rows in prod at once. Omit to process every shared
-//                 Address row.
-
 export interface DedupeSharedAddressOptions {
   apply: boolean;
   addressIds?: number[];
@@ -35,10 +19,6 @@ export function parseArgs(argv: string[]): DedupeSharedAddressOptions {
 
   if (flagIndex !== -1) {
     const raw = argv[flagIndex + 1];
-    // A missing/flag-shaped value here (trailing flag, typo eating the
-    // value) must not silently fall back to "no filter" — that would run
-    // --apply against every shared row in prod instead of the cautious
-    // batch the operator asked for (be#1028/#1032 review).
     if (!raw || raw.startsWith("--")) {
       throw new Error(
         "--address-ids requires a comma-separated list of ids, e.g. --address-ids 1,2,3",
@@ -63,24 +43,12 @@ export interface DedupeGroupResult {
   keeperPersonId: number | null;
   keeperReason: string | null;
   repointedPersonIds: number[];
-  // Persons this group planned to repoint, but whose addressId had already
-  // changed away from the shared row by the time --apply tried to write —
-  // e.g. the live app repointed them in between the initial scan and this
-  // write. Left untouched rather than overwritten; surfaced for re-run/review.
   staleAddressPersonIds: number[];
 }
 
 export interface DedupeReport {
   groups: DedupeGroupResult[];
-  // Non-blank groups where no keeper could be identified: the real data in
-  // that Address row isn't confidently anyone's any more, and it's now (or
-  // would be, in a dry run) fully orphaned rather than guessed at — surfaced
-  // here for manual review/attribution.
   needsManualAttribution: DedupeGroupResult[];
-  // Groups that threw while processing (e.g. the Address was concurrently
-  // deleted) — recorded and skipped rather than aborting the whole run, so
-  // one bad group in a large prod run doesn't prevent every other group from
-  // being attempted (be#1032 review).
   erroredGroups: { addressId: number; error: string }[];
 }
 
@@ -111,11 +79,6 @@ async function findSharedAddressGroups(
   }));
 }
 
-// Best-guess signal for "who does this Address's current data actually
-// belong to": the most recent contact_details_changed entry among the
-// affected Persons' Volunteers. Not proof — the audit log stores a generic
-// description, not field-level before/after values — and agent contacts
-// (no Volunteer) have no signal at all.
 async function findKeeperSignal(
   manager: EntityManager,
   personIds: number[],
@@ -132,10 +95,6 @@ async function findKeeperSignal(
       volunteerId: In(volunteers.map((v) => v.id)),
       type: "contact_details_changed",
     },
-    // id DESC as a tiebreaker: bulk-imported/same-request audit rows can tie
-    // on occurredAt, and without a deterministic secondary key a re-run
-    // (--apply after a reviewed dry-run) could silently pick a different
-    // keeper than the one reported (be#1032 review).
     order: { occurredAt: "DESC", id: "DESC" },
   });
   if (!latest) {
@@ -164,10 +123,6 @@ export async function processGroup(
   const address = await manager
     .getRepository(Address)
     .findOneByOrFail({ id: addressId });
-  // Blank means "nothing real to lose" — checks every data-bearing field,
-  // not just street, so a row with an empty street but a real city isn't
-  // silently discarded as if it had no data worth attributing (be#1032
-  // review).
   const isBlankField = (value: string | null | undefined) =>
     !value || value.trim() === "";
   const blank = isBlankField(address.street) && isBlankField(address.city);
@@ -177,13 +132,6 @@ export async function processGroup(
   if (!blank) {
     const signal = await findKeeperSignal(manager, personIds);
     if (signal) {
-      // Re-check at write time: only trust this signal if the keeper still
-      // actually points at the shared Address being processed. If they've
-      // already moved off it (e.g. repointed by the live app in the window
-      // since the initial scan), nobody currently owns this row's real
-      // data — leave keeperPersonId null so it correctly surfaces in
-      // needsManualAttribution below instead of being silently excluded
-      // from that list (be#1032 review).
       const keeperPerson = await manager
         .getRepository(Person)
         .findOneBy({ id: signal.personId });
@@ -211,10 +159,6 @@ export async function processGroup(
             `(postcodeId=${address.postcodeId}).`,
         );
       }
-      // Re-check at write time: only repoint if this Person still points at
-      // the shared Address the initial scan found them on. Guards against a
-      // race with the live app (or an overlapping --address-ids run) moving
-      // them off it in between that scan and this write.
       const updateResult = await manager
         .getRepository(Person)
         .update({ id: personId, addressId }, { addressId: created.id });
@@ -222,9 +166,6 @@ export async function processGroup(
         repointedPersonIds.push(personId);
       } else {
         staleAddressPersonIds.push(personId);
-        // The repoint didn't happen, so this replacement was never linked
-        // to anyone — clean it up rather than leaving a permanently
-        // orphaned, untracked Address row behind (be#1032 review).
         await manager.getRepository(Address).delete({ id: created.id });
       }
     }
@@ -250,12 +191,6 @@ export async function runDedupe(
 ): Promise<DedupeReport> {
   const groups = await findSharedAddressGroups(ds, addressIds);
 
-  // Each group gets its own transaction rather than one transaction for the
-  // whole run: a failure partway through a large prod run (e.g. a
-  // concurrently-deleted Address) would otherwise roll back every
-  // already-processed, correctly-guarded group alongside it, forcing a full
-  // re-run through the same race window (be#1032 review). --address-ids
-  // still lets an operator scope a run to a smaller batch on top of this.
   const results: DedupeGroupResult[] = [];
   const erroredGroups: { addressId: number; error: string }[] = [];
   for (const group of groups) {
@@ -273,9 +208,6 @@ export async function runDedupe(
             ),
       );
     } catch (err) {
-      // Don't let one bad group (e.g. its Address concurrently deleted)
-      // abort every group after it in the same run — record and move on
-      // (be#1032 review).
       erroredGroups.push({
         addressId: group.addressId,
         error: err instanceof Error ? err.message : String(err),
@@ -349,9 +281,6 @@ async function main() {
   } finally {
     await dataSource.destroy();
   }
-  // Exit non-zero if anything errored, even though the run as a whole
-  // completed — a silent 0 exit would let an operator miss that some groups
-  // still need a re-run (be#1032 review).
   if (report.erroredGroups.length) {
     process.exitCode = 1;
   }

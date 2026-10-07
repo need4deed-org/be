@@ -21,8 +21,6 @@ export function getSslForDataSource(
       { cause: error },
     );
   }
-  // An empty ca makes Node fall back to the public root store, silently
-  // removing the pin.
   if (!ca.includes("-----BEGIN CERTIFICATE-----")) {
     throw new Error(
       `Database CA certificate at "${path}" contains no PEM certificate ` +

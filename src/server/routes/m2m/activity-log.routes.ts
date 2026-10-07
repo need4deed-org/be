@@ -62,7 +62,6 @@ export default async function activityLogCollectionRoutes(
 ) {
   fastify.addHook("onRequest", fastify.authenticate());
 
-  // GET /opportunity-volunteer/:id/activity-log
   fastify.get<{ Params: ParamsId }>(
     "/:id/activity-log",
     {
@@ -86,7 +85,6 @@ export default async function activityLogCollectionRoutes(
     },
   );
 
-  // POST /opportunity-volunteer/:id/activity-log
   fastify.post<{ Params: ParamsId; Body: ApiActivityLogPost }>(
     "/:id/activity-log",
     {

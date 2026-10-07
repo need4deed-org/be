@@ -26,13 +26,6 @@ async function jwtPlugin(
     },
   });
 
-  // Direct (non-login) API access: an O(1) indexed lookup of the raw key's
-  // SHA-256 digest against active (non-revoked) ApiKey rows, returning the
-  // linked service user. This must stay a cheap single-row lookup (not a
-  // linear bcrypt.compare scan) since, unlike the JWT-cookie path, it runs
-  // on every request from an unauthenticated caller that merely sends the
-  // header — an expensive per-row check here would be a free CPU-exhaustion
-  // lever for anyone spraying garbage keys at any protected route.
   async function findUserByApiKey(rawKey: string): Promise<User | null> {
     const apiKey = await fastify.db.apiKeyRepository.findOne({
       where: { keyHash: sha256Hex(rawKey), revokedAt: IsNull() },
@@ -85,17 +78,6 @@ async function jwtPlugin(
         const userId = request.user?.id;
         logger.debug(`jwtPlugin:authenticated: ${userId}`);
 
-        // Only a session ("access") token may authenticate here (be#908):
-        // verify/reset/refresh/coordinator-invite tokens are signed with the
-        // same secret, so without this check e.g. a password-reset link's
-        // token set as the access cookie would act as a full session — enough
-        // to hit DELETE /user/:id (be#1007 review).
-        //
-        // The id check stays as a second guard: TypeORM's
-        // `where: { id: undefined }` drops the id key entirely instead of
-        // filtering by it, turning the lookup below into a WHERE-less query
-        // that returns an arbitrary — often the very first, e.g. an admin —
-        // user (be#1011).
         if ((request.user as { type?: string })?.type !== "access") {
           throw new UnauthenticatedError("Authorization failed.");
         }
@@ -112,20 +94,10 @@ async function jwtPlugin(
         }
       }
 
-      // Checked once, after either auth path resolves `user`: a deactivated
-      // account (self-service deletion, be#583, or GDPR erasure) must stop
-      // authenticating immediately, not just once its already-issued 15-min
-      // access token happens to expire. Every request re-fetches `user`
-      // fresh (no session cache), so this takes effect on the very next
-      // request after deactivation. Previously only checked on the API-key
-      // path (be#1007 review).
       if (!user.isActive) {
         throw new UnauthenticatedError("Account is not active.");
       }
 
-      // Expose the already-loaded user (carries personId + DB-authoritative
-      // role) for downstream hooks (PII masking, self-auth) — avoids a second
-      // lookup and a JWT claim.
       request.authUser = user;
 
       if (user.role === UserRole.ADMIN) {
@@ -154,17 +126,6 @@ async function jwtPlugin(
     };
   });
 
-  // Best-effort caller identification for genuinely public routes that still
-  // need to vary behavior for a logged-in privileged caller (be#903: GET
-  // /event shows everything to a coordinator, only active events to everyone
-  // else). Never throws — anything short of a valid, unexpired "access"
-  // token just leaves request.authUser unset, same as an anonymous caller.
-  // Doesn't support the API-key path or role/allowSelf options: those only
-  // make sense for a route that actually requires auth.
-  //
-  // Checks the token's `type` claim, same as authenticate() (be#908): a
-  // "verify"/"reset" token is otherwise a validly-signed credential that
-  // would silently grant access here.
   fastify.decorate("tryAuthenticate", function () {
     return async function (request: FastifyRequest) {
       try {
@@ -176,9 +137,6 @@ async function jwtPlugin(
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user?.id },
         });
-        // Same isActive gate as authenticate(): a deactivated account's
-        // unexpired access cookie must not count as authenticated here either
-        // (be#1007 review).
         if (user?.isActive) {
           request.authUser = user;
         }

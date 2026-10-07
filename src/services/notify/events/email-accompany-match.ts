@@ -21,8 +21,6 @@ export function resetAccompanyMatchTemplateCache(): void {
   loader.resetCache();
 }
 
-// German-only — accompanymatch.json is no longer split by recipient locale
-// (see be#838); its recipients (RAC contact persons) are always German-speaking.
 function resolveContactSharing(
   shareContact: boolean,
   volunteerName: string,
@@ -38,9 +36,6 @@ function resolveContactSharing(
 export async function sendEmailAccompanyMatch(
   email: EmailTransport,
   ov: OpportunityVolunteer,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);

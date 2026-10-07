@@ -15,8 +15,6 @@ export default function agentCommunicationRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    // Handler sends entities; the DTO (ApiCommunicationGet) runs in the
-    // preSerialization hook.
     Reply: ReplyDataCount<Communication[]>;
   }>(
     `/`,
@@ -44,7 +42,6 @@ export default function agentCommunicationRoutes(
           where: { agentId: id },
         });
 
-      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Agent (id:${id}) communications fetched successfully`,
         data: communications,

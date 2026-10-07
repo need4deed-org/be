@@ -24,13 +24,6 @@ export class NotFoundError extends BaseError {
   }
 }
 
-// Distinct class (not just a BadRequestError message) so callers like the
-// frontend can discriminate this specific case from the route's other
-// BadRequestError throws via error.constructor.name, without string-matching
-// on message text. The default message is a server-side diagnostic only
-// (logged via request.log.error) — it is never shown to the end user, who
-// sees the frontend's own translated copy instead. Deliberately worded
-// unlike that copy so it can't be mistaken for user-facing text.
 export class InvalidOrganizationEmailError extends BaseError {
   constructor(
     message = "Unrecognized or untrusted organization email domain.",
@@ -39,10 +32,6 @@ export class InvalidOrganizationEmailError extends BaseError {
   }
 }
 
-// Distinct class (see InvalidOrganizationEmailError above for the same
-// rationale) so the frontend can discriminate this case from the route's
-// other BadRequestError throws via error.constructor.name — e.g. to point
-// the caller at login instead of showing a generic validation error.
 export class PersonAlreadyRegisteredError extends BaseError {
   constructor(
     message = "An account already exists for this email. Please log in instead.",

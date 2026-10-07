@@ -6,7 +6,6 @@ export interface TaggedDeps {
 }
 
 export interface TaggedInput {
-  // Where the tags are — posts share the comments channel (be#1075).
   kind: "comment" | "post";
   authorName: string;
   taggedNames: string[];

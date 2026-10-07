@@ -5,11 +5,6 @@ import { CallerVisibility, resolveCallerVisibility } from "./visible-persons";
 
 type Envelope = { message?: string; data?: unknown; count?: number };
 
-/**
- * What this caller may see UNMASKED, or `null` when no masking applies
- * (COORDINATOR/ADMIN or unauthenticated). For routes that build DTOs in
- * helpers — pass this through and `maskPii(entity, ctx)` before serializing.
- */
 export async function resolveCallerMask(
   request: FastifyRequest,
 ): Promise<CallerVisibility | null> {
@@ -22,12 +17,6 @@ export async function resolveCallerMask(
   return resolveCallerVisibility(request, user);
 }
 
-/**
- * Masks the PII the caller may not see (persons/addresses, an opportunity's
- * accompanying, comments), in place, on `data`. No-op for COORDINATOR/ADMIN and
- * unauthenticated requests. Use directly in handlers whose DTO needs extra
- * (handler-computed) args; otherwise prefer the `makePiiSerialization` hook.
- */
 export async function maskForCaller(
   request: FastifyRequest,
   data: unknown,
@@ -41,12 +30,6 @@ export async function maskForCaller(
   }
 }
 
-/**
- * Per-route `preSerialization` hook. The handler sends the loaded entity graph
- * as `data`; this masks the PII the caller may not see, then runs the route's
- * DTO. COORDINATOR/ADMIN (and unauthenticated/error payloads) pass through
- * untouched. List vs single is detected from `data`.
- */
 export function makePiiSerialization<TEntity, TDto>(
   dto: (entity: TEntity) => TDto,
 ) {
@@ -55,7 +38,6 @@ export function makePiiSerialization<TEntity, TDto>(
     _reply: FastifyReply,
     payload: Envelope,
   ): Promise<Envelope> {
-    // Error/empty replies ({ message } with no data) — nothing to serialize.
     if (!payload || payload.data === null || payload.data === undefined) {
       return payload;
     }

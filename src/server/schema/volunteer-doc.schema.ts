@@ -27,7 +27,6 @@ export const volunteerDocSchemaGetMeta200 = {
         "x-amz-meta-mime-type": { type: "string" },
         "x-amz-meta-s3-key": { type: "string" },
       },
-      // required: [],
     },
   },
   required: ["url", "fields"],

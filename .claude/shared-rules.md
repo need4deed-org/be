@@ -48,3 +48,14 @@ deliberate decisions, not incidental side effects of a feature.
 Any dev server or other long-running process started to check or verify a change (`yarn dev`,
 `yarn dev:docker`, `yarn start`, etc.) **must be killed once you're done with it**. Do not leave
 orphaned processes running — e.g. stray `next-server`/node instances piling up on ports 3000+.
+
+## Code comments: almost none
+
+Default to **no comments**. Name things so the code explains itself.
+
+- Allowed: a rare one-line comment for a non-obvious *why* (e.g. a security or data-protection
+  gotcha), and tool directives (`eslint-disable`, `@ts-expect-error`).
+- Not allowed: issue/PR references (`fe#123`, `be#456`), change history, review discussion,
+  explanations of what the code does, multi-line rationale. That belongs in the commit message or
+  PR description.
+- Don't copy the comment style of surrounding code; remove such comments when you touch it.

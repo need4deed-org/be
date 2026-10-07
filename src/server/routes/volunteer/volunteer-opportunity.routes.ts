@@ -43,8 +43,6 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealTimeslot.timeslot",
       ];
 
-      // `language` picks the response language (be#1068); everything else
-      // is a column filter.
       const { page, limit, language, ...filters } = request.query;
 
       const [skip, take] = getSkipTake({ page, limit });
@@ -75,7 +73,6 @@ export default async function volunteerOpportunityRoutes(
         await dealRepository.save(updates);
       }
 
-      // Before PII masking, after any save of these entities (be#1068).
       await translateOpportunities(
         fastify,
         opportunitiesCategory,

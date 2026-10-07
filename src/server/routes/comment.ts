@@ -11,14 +11,8 @@ import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 import { notifyTaggedByEmail, syncCommentTags } from "../utils";
 
-// Roles that can read comments, so the only ones emailed about a tag in one.
 const COMMENT_READER_ROLES = [UserRole.COORDINATOR, UserRole.ADMIN];
 
-// Slack + email for the persons newly tagged in a comment (be#1075), by
-// `tagger` — the requester, who on an edit may be an admin rather than the
-// comment's author. Fire-and-forget: tagged() swallows its own errors and
-// no-ops without a Slack webhook; notifyTaggedByEmail() never rejects.
-// Neither affects the response. `comment` needs commentPerson.person loaded.
 function notifyCommentTags(
   fastify: FastifyInstance,
   comment: Comment,
@@ -55,9 +49,6 @@ export default async function commentRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  //
-  // GET /comment
-  //
   fastify.get<{
     Querystring: {
       userId?: number;
@@ -112,10 +103,6 @@ export default async function commentRoutes(
 
         const commentRepository = fastify.db.commentRepository;
 
-        // Two-step lookup for the tag filter: a relation-filtered findAndCount
-        // would constrain the loaded commentPerson array to only the matching
-        // row, which would lie to the DTO about how many people the comment
-        // actually tags. Resolve the comment ids first, then load fully.
         let commentIdFilter: number[] | undefined;
         if (taggedPersonId !== undefined) {
           const tagRows = await commentRepository.manager
@@ -158,9 +145,6 @@ export default async function commentRoutes(
     },
   );
 
-  //
-  // GET /comment/:id
-  //
   fastify.get(
     "/:id",
     {
@@ -211,9 +195,6 @@ export default async function commentRoutes(
     },
   );
 
-  //
-  // POST /comment
-  //
   fastify.post(
     "/",
     {
@@ -276,7 +257,6 @@ export default async function commentRoutes(
           throw new Error(`Failed to reload comment after create`);
         }
 
-        // The requester is the comment's author here (user set from the token).
         notifyCommentTags(
           fastify,
           reloaded,
@@ -289,15 +269,9 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         });
       } catch (error) {
-        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
-        // to the global handler so it surfaces as 400 with its own message.
         if (error instanceof BadRequestError) {
           throw error;
         }
-        // Safety net: pre-validation should have caught this, but if a
-        // concurrent delete removed the Person between the check and the
-        // INSERT, a 23503 still slips through. Match on the failing table
-        // so it can't misfire on unrelated person-named constraints.
         if (
           (error as { code?: string }).code === "23503" &&
           (error as { table?: string }).table === "comment_person"
@@ -314,9 +288,6 @@ export default async function commentRoutes(
     },
   );
 
-  //
-  // PATCH /comment/:id
-  //
   fastify.patch(
     "/:id",
     {
@@ -357,10 +328,8 @@ export default async function commentRoutes(
             .send({ message: `Comment id:${id} not found.` });
         }
 
-        // Only creator or admin can edit
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user.id },
-          // person: the tagger's name in tag notifications (be#1075).
           relations: ["person"],
         });
 
@@ -394,14 +363,10 @@ export default async function commentRoutes(
           });
         }
 
-        // Tags before this edit — only the ones it adds get notified.
         let previousPersonIds: number[] = [];
         const reloaded = await commentRepository.manager.transaction(
           async (manager) => {
             await manager.getRepository(Comment).save(comment);
-            // Only sync tags when the field was sent in the patch — passing
-            // undefined leaves existing comment_person rows untouched, which
-            // matches PATCH semantics (only update fields the caller provided).
             if (taggedPersonIds !== undefined) {
               previousPersonIds = (
                 await manager
@@ -443,15 +408,9 @@ export default async function commentRoutes(
           data: commentSerializer(reloaded),
         };
       } catch (error) {
-        // Let BadRequestError (e.g. pre-validation in syncCommentTags) flow
-        // to the global handler so it surfaces as 400 with its own message.
         if (error instanceof BadRequestError) {
           throw error;
         }
-        // Safety net: pre-validation should have caught this, but if a
-        // concurrent delete removed the Person between the check and the
-        // INSERT, a 23503 still slips through. Match on the failing table
-        // so it can't misfire on unrelated person-named constraints.
         if (
           (error as { code?: string }).code === "23503" &&
           (error as { table?: string }).table === "comment_person"
@@ -468,9 +427,6 @@ export default async function commentRoutes(
     },
   );
 
-  //
-  // PATCH /comment/:id/read
-  //
   fastify.patch(
     "/:id/read",
     {
@@ -573,7 +529,6 @@ export default async function commentRoutes(
             .send({ message: `Comment id:${id} not found.` });
         }
 
-        // Only creator or admin can delete
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user.id },
         });

@@ -5,15 +5,6 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getRepository } from "../../../data/utils";
 
-/**
- * Resolves real en/de field_translation rows for each agent's agentType and
- * services, attaching them as agentType.translations / service.translations
- * (see the AgentType/Service entities) so the DTO can use them instead of
- * falling back to the raw title. Runs once per request as a batch, before
- * the preSerialization DTO conversion — mirrors addDistrictToAgent /
- * addComments2Entity. Expects the agentType and agentService.service
- * relations to already be loaded.
- */
 export async function addAgentTypeServiceTranslations(
   agents: Agent[],
 ): Promise<Agent[]> {
