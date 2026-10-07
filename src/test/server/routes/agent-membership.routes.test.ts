@@ -199,6 +199,29 @@ describe("/agent/membership", () => {
       expect(updated.status).toBe(AgentMembershipStatus.ACTIVE);
     });
 
+    it("claims a coordinator-created NGO when its membership is approved", async () => {
+      const { membership } = await makeMembership(
+        AgentMembershipStatus.PENDING,
+      );
+      await fastify.db.agentRepository.update(
+        { id: membership.agentId },
+        { unclaimed: true },
+      );
+
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/membership/${membership.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { status: AgentMembershipStatus.ACTIVE },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const agent = await fastify.db.agentRepository.findOneByOrFail({
+        id: membership.agentId,
+      });
+      expect(agent.unclaimed).toBe(false);
+    });
+
     it("404s a nonexistent membership id", async () => {
       const res = await fastify.inject({
         method: "PATCH",

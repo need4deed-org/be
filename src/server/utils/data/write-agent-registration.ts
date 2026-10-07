@@ -5,7 +5,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
-import { BaseError, NotFoundError, UnauthorizedError } from "../../../config";
+import { BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
@@ -186,6 +186,17 @@ export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
 ): Promise<AgentMembershipStatus> {
+  const agent = await dataSource.getRepository(Agent).findOne({
+    select: { id: true, unclaimed: true, engagementStatus: true },
+    where: { id: agentId },
+  });
+  if (
+    agent?.unclaimed ||
+    agent?.engagementStatus === AgentEngagementStatusType.INACTIVE
+  ) {
+    return AgentMembershipStatus.PENDING;
+  }
+
   const allowed = await isAgentDomainAllowed(
     registrantEmail,
     async (domain) => {
@@ -221,15 +232,6 @@ export async function joinAgent(
   if (!agent) {
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
-  if (agent.unclaimed) {
-    throw new UnauthorizedError(
-      "This agent has not been claimed yet and cannot be joined directly.",
-    );
-  }
-  if (agent.engagementStatus === AgentEngagementStatusType.INACTIVE) {
-    throw new UnauthorizedError("This agent is inactive and cannot be joined.");
-  }
-
   const existing = await repo.findOne({
     where: { agentId, personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
   });

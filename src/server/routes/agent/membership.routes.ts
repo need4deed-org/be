@@ -14,6 +14,7 @@ import {
   responseErrors,
 } from "../../schema";
 import { ParamsId } from "../../types";
+import { claimAgent } from "../../utils/data/claim-agent";
 
 export default async function agentMembershipRoutes(
   fastify: FastifyInstance,
@@ -71,7 +72,12 @@ export default async function agentMembershipRoutes(
       }
 
       membership.status = request.body.status;
-      await repo.save(membership);
+      await repo.manager.transaction(async (manager) => {
+        await manager.save(membership);
+        if (membership.status === AgentMembershipStatus.ACTIVE) {
+          await claimAgent(membership.agentId, manager);
+        }
+      });
       logger.debug(
         `agent-membership: ${request.params.id} -> ${request.body.status}`,
       );

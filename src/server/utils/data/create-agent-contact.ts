@@ -8,6 +8,7 @@ import { dataSource } from "../../../data/data-source";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
+import { claimAgent } from "./claim-agent";
 import { createAddress } from "./for-routes";
 
 async function findExistingAgentUserPerson(
@@ -63,6 +64,9 @@ export async function createAgentContact(
       } else if (agentPerson.status === AgentMembershipStatus.PENDING) {
         agentPerson.status = AgentMembershipStatus.ACTIVE;
         agentPerson = await agentPersonRepository.save(agentPerson);
+      }
+      if (agentPerson.status === AgentMembershipStatus.ACTIVE) {
+        await claimAgent(agentId, manager);
       }
       agentPerson.person = existingPerson;
       result = agentPerson;
