@@ -1,23 +1,3 @@
-// be#1061: domain -> display-name map for the organizations seeded from
-// email domains by SeedOrganizationFromAgentDomains1786109950000, used by
-// RenameDomainSeededOrganizations1790769607004.
-//
-// A `null` title means the organization isn't a real operator (Träger) and is
-// removed. Domains that map to the same title are one operator and get
-// merged into a single organization. A list of titles means several
-// operators share the domain: the seeded row becomes the first one, the
-// others are added as organizations of their own. A domain that was never
-// seeded (e.g. "www.berlin.de") adds its operator(s) as new organizations.
-//
-// Loaded from the CDN (${CDN_BASE_URL}/data/organization-titles.json, a
-// flat { domain: title | title[] | null } object), so names can be corrected without a
-// code change before the migration runs. CDN entries override the built-in
-// map per key; if the fetch fails or the JSON is malformed, the built-in map
-// is used as is — the same fallback pattern as the notify email manifests.
-//
-// Lives outside src/data/migrations on purpose: TypeORM instantiates every
-// exported function in a migration file as a migration class.
-
 export type OrganizationTitles = string | [string, ...string[]] | null;
 export type OrganizationTitleMap = Record<string, OrganizationTitles>;
 
@@ -338,8 +318,6 @@ export const BUILTIN_ORGANIZATION_TITLES: OrganizationTitleMap = {
   "zukunft-memorial.org": "Zukunft MEMORIAL e.V.",
 };
 
-// Processed first, so that when several domains merge into one organization
-// the surviving row keeps the operator's main domain as its website.
 export const PRIMARY_ORGANIZATION_DOMAINS = [
   "ba-mh.berlin.de",
   "city54.de",

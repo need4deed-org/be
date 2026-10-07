@@ -10,7 +10,6 @@ export enum Role {
 
 export { Lang as Country };
 
-// this will go to sdk
 export enum GermanCity {
   BERLIN = "Berlin",
   POTSDAM = "Potsdam",
