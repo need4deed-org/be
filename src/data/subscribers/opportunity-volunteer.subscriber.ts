@@ -55,8 +55,8 @@ export class OpportunityVolunteerSubscriber
 
   async afterInsert(event: InsertEvent<OpportunityVolunteer>) {
     await recompute(event.manager, parentIds(event.entity));
-    await syncEngagement(event.manager, undefined, event.entity);
     await logChange(event, undefined, event.entity);
+    await syncEngagement(event.manager, undefined, event.entity);
   }
 
   async afterUpdate(event: UpdateEvent<OpportunityVolunteer>) {
@@ -67,8 +67,8 @@ export class OpportunityVolunteerSubscriber
     // Without the previous row (bulk update()) the transition is unknown.
     if (event.databaseEntity) {
       const after = event.entity as Partial<OpportunityVolunteer> | undefined;
-      await syncEngagement(event.manager, event.databaseEntity, after);
       await logChange(event, event.databaseEntity, after);
+      await syncEngagement(event.manager, event.databaseEntity, after);
     }
   }
 
@@ -151,8 +151,24 @@ async function recompute(
   }
 }
 
-// Writes the volunteer activity-log entry for a created link or a status
-// change. Routes pass the acting user as the save's `data.actorUserId`.
+// A coordinator can re-point a link to another volunteer or opportunity; to
+// the volunteers involved that is a removal plus a new link.
+function isRepointed(
+  before: Partial<OpportunityVolunteer> | undefined,
+  after: Partial<OpportunityVolunteer> | undefined,
+): boolean {
+  return Boolean(
+    before &&
+      after &&
+      ((after.volunteerId !== undefined &&
+        after.volunteerId !== before.volunteerId) ||
+        (after.opportunityId !== undefined &&
+          after.opportunityId !== before.opportunityId)),
+  );
+}
+
+// Writes the volunteer activity-log entries for a created, changed or
+// re-pointed link. Routes pass the acting user as the save's `data.actorUserId`.
 async function logChange(
   {
     manager,
@@ -161,20 +177,37 @@ async function logChange(
   before: Partial<OpportunityVolunteer> | undefined,
   after: Partial<OpportunityVolunteer> | undefined,
 ): Promise<void> {
-  const volunteerId = after?.volunteerId ?? before?.volunteerId;
-  const opportunityId = after?.opportunityId ?? before?.opportunityId;
-  if (!volunteerId || !opportunityId || after?.status === undefined) {
+  const actorUserId = (queryRunner.data as { actorUserId?: number } | undefined)
+    ?.actorUserId;
+  const { logMatchChangeSafely } = await import("../utils");
+  const entry = (
+    link: Partial<OpportunityVolunteer> | undefined,
+    from: OpportunityVolunteer["status"] | undefined,
+    to: OpportunityVolunteer["status"] | undefined,
+  ) =>
+    link?.volunteerId && link.opportunityId
+      ? logMatchChangeSafely(manager, {
+          volunteerId: link.volunteerId,
+          opportunityId: link.opportunityId,
+          from,
+          to,
+          actorUserId,
+          title: link.opportunity?.title,
+        })
+      : undefined;
+
+  if (isRepointed(before, after)) {
+    await entry(before, before?.status, undefined);
+    await entry(
+      { ...before, ...after },
+      undefined,
+      after?.status ?? before?.status,
+    );
     return;
   }
-  const { logMatchChange } = await import("../utils");
-  await logMatchChange(manager, {
-    volunteerId,
-    opportunityId,
-    from: before?.status,
-    to: after.status,
-    actorUserId: (queryRunner.data as { actorUserId?: number } | undefined)
-      ?.actorUserId,
-  });
+  if (after?.status !== undefined) {
+    await entry({ ...before, ...after }, before?.status, after.status);
+  }
 }
 
 // Volunteer engagement follows the link entering or leaving Active, on the same
@@ -184,13 +217,33 @@ async function syncEngagement(
   before: Partial<OpportunityVolunteer> | undefined,
   after: Partial<OpportunityVolunteer> | undefined,
 ): Promise<void> {
+  const { syncEngagementForMatchChange } = await import(
+    "../../server/utils/data/sync-volunteer-engagement"
+  );
+  if (isRepointed(before, after)) {
+    if (before?.volunteerId) {
+      await syncEngagementForMatchChange(
+        manager,
+        before.volunteerId,
+        before.status,
+        undefined,
+      );
+    }
+    const volunteerId = after?.volunteerId ?? before?.volunteerId;
+    if (volunteerId) {
+      await syncEngagementForMatchChange(
+        manager,
+        volunteerId,
+        undefined,
+        after?.status ?? before?.status,
+      );
+    }
+    return;
+  }
   const volunteerId = after?.volunteerId ?? before?.volunteerId;
   if (!volunteerId) {
     return;
   }
-  const { syncEngagementForMatchChange } = await import(
-    "../../server/utils/data/sync-volunteer-engagement"
-  );
   await syncEngagementForMatchChange(
     manager,
     volunteerId,
