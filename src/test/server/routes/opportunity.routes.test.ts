@@ -287,9 +287,9 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(updated.title).toBe("Coordinator renamed");
   });
 
-  // Agents may now edit their own opportunity's fields generally (be#870),
-  // but reassigning it to a *different* agent stays coordinator-only.
-  it("403s when an agent tries to relink an opportunity to another agent via agent.id", async () => {
+  // Agents may edit their own opportunity's fields, and move it only to another
+  // NGO they belong to.
+  it("403s when an agent tries to move an opportunity to an NGO they don't belong to", async () => {
     const res = await fastify.inject({
       method: "PATCH",
       url: `/opportunity/${ownOpportunity.id}`,
@@ -328,6 +328,8 @@ describe("PATCH /opportunity/:id agent status update", () => {
         id: ownOpportunity.id,
       });
       expect(moved.agentId).toBe(otherAgent.id);
+      // The old contact belonged to the old NGO; the mover takes over.
+      expect(moved.contactPersonId).toBe(agentPerson.id);
     } finally {
       await fastify.db.opportunityRepository.update(
         { id: ownOpportunity.id },

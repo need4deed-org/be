@@ -753,15 +753,11 @@ export default async function opportunityRoutes(
       }
 
       if (role === UserRole.AGENT) {
-        const personId = request.authUser?.personId;
-        const membership = personId
-          ? await fastify.db.agentPersonRepository.findOneBy({
-              agentId: opportunity.agentId,
-              personId,
-              status: AgentMembershipStatus.ACTIVE,
-            })
-          : null;
-        if (!membership) {
+        const agentIds = await getCallerAgentIds(
+          request,
+          request.authUser?.personId,
+        );
+        if (!opportunity.agentId || !agentIds.includes(opportunity.agentId)) {
           throw new UnauthorizedError(
             "Agents can only update opportunities belonging to their own agent.",
           );
@@ -774,7 +770,7 @@ export default async function opportunityRoutes(
         if (
           agentBody?.id !== undefined &&
           agentBody.id !== opportunity.agentId &&
-          !(await getCallerAgentIds(request, personId)).includes(agentBody.id)
+          !agentIds.includes(agentBody.id)
         ) {
           throw new UnauthorizedError(
             "Agents can only move an opportunity to another NGO they belong to.",
@@ -948,14 +944,18 @@ export default async function opportunityRoutes(
         }
 
         if (agentLinkId !== undefined) {
-          // The opportunity's existing contact (if any) belongs to the *old*
-          // agent and has no guaranteed relationship to the new one — clear
-          // it rather than leave a stale cross-agent reference. If the
-          // request also carries `contact.id`, the contactLinkId branch
-          // below sets the real (validated-against-the-new-agent) value
-          // right after this.
+          // The old contact belongs to the old agent. Without a new
+          // `contact.id`, an NGO user moving it becomes the contact (they are a
+          // member of the new NGO); otherwise it is cleared.
           const contactReset: Partial<Opportunity> =
-            contactLinkId === undefined ? { contactPersonId: null } : {};
+            contactLinkId !== undefined
+              ? {}
+              : {
+                  contactPersonId:
+                    request.authUser?.role === UserRole.AGENT
+                      ? (request.authUser.personId ?? null)
+                      : null,
+                };
           const success = await patchEntity(
             Opportunity,
             { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,

@@ -9,6 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
+import { UNKNOWN_AUTHOR } from "./dto-comment";
 import {
   getAvailability,
   getCoordinates,
@@ -92,7 +93,7 @@ export function volunteerSerializer(
       id: comment.id,
       timestamp: comment.updatedAt,
       content: comment.text,
-      authorName: comment.user.person?.name || "Unknown Author",
+      authorName: comment.user.person?.name || UNKNOWN_AUTHOR,
     };
   });
 
