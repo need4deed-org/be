@@ -393,26 +393,14 @@ export default async function userRoutes(
           }
         }
 
-        const personRepository = fastify.db.personRepository;
-
         if (personData.id) {
-          const resolvedPerson = await personRepository.findOneBy({
-            id: personData.id,
-          });
-          if (!resolvedPerson) {
-            throw new BadRequestError(
-              `Person with ID ${personData.id} not found.`,
-            );
-          }
-          if (!resolvedPerson.email) {
-            resolvedPerson.email = email;
-          }
-          request.resolvedPerson = resolvedPerson;
-          return;
+          throw new BadRequestError(
+            "Linking to an existing person by id is not allowed on self-registration.",
+          );
         }
 
         request.resolvedPerson = await resolvePersonByEmail(
-          personRepository,
+          fastify.db.personRepository,
           email,
           personData,
         );

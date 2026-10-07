@@ -17,9 +17,7 @@ export const PERSON_PII_FIELDS = [
   "avatarUrl",
 ] as const;
 const ADDRESS_PII_FIELDS = ["title", "street", "city"] as const;
-
 const ACCOMPANYING_PII_FIELDS = ["name", "address", "phone", "email"] as const;
-
 const COMMENT_PII_FIELDS = ["text"] as const;
 
 export function maskString(): string {

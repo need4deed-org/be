@@ -20,6 +20,7 @@ import {
   runTranslationBatch,
 } from "../../services/translation/worker";
 import { runWithAdvisoryLock } from "../utils";
+import { queueUntranslatedOpportunities } from "../utils/data/translate-opportunities";
 
 const TRANSLATION_LOCK_ID = 20260929;
 
@@ -54,6 +55,15 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
     }
     let stats: BatchStats | undefined;
     await runWithAdvisoryLock(async () => {
+      if (!options?.rowIds) {
+        const queued = await queueUntranslatedOpportunities(dataSource.manager);
+        if (queued > 0) {
+          logger.info(
+            { queued },
+            "translation: queued untranslated opportunities",
+          );
+        }
+      }
       stats = await runTranslationBatch(
         dataSource.manager,
         service,

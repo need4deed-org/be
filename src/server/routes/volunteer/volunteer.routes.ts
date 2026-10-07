@@ -495,7 +495,7 @@ export default async function volunteerRoutes(
         }
       } catch (error) {
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
+        throw error;
       }
 
       if (auditLogEntries.length) {

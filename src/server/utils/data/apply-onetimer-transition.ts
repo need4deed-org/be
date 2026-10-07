@@ -7,6 +7,7 @@ import { EntityManager } from "typeorm";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import logger from "../../../logger";
+import { syncVolunteerEngagement } from "./sync-volunteer-engagement";
 
 interface VolunteerStatusUpdate {
   volunteer: OpportunityVolunteer;
@@ -31,9 +32,21 @@ export async function applyOnetimerTransition(
         opportunity.status = opportunityStatus;
         await manager.save(Opportunity, opportunity);
 
-        for (const { volunteer, status } of volunteerUpdates) {
+        const ordered = [...volunteerUpdates].sort(
+          (a, b) =>
+            a.volunteer.volunteerId - b.volunteer.volunteerId ||
+            a.volunteer.id - b.volunteer.id,
+        );
+        for (const { volunteer, status } of ordered) {
           volunteer.status = status;
           await manager.save(OpportunityVolunteer, volunteer);
+        }
+
+        const volunteerIds = new Set(
+          volunteerUpdates.map(({ volunteer }) => volunteer.volunteerId),
+        );
+        for (const volunteerId of volunteerIds) {
+          await syncVolunteerEngagement(manager, volunteerId);
         }
       },
     );

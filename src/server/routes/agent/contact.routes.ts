@@ -20,6 +20,7 @@ import {
   createAgentContact,
   updateAgentContact,
 } from "../../utils";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 function assertHasContactManagementRole(request: FastifyRequest): void {
   const role = request.authUser?.role;
@@ -91,6 +92,7 @@ export default function agentContactRoutes(
         request.authUser?.role as UserRole,
       );
       agentPerson.agent = agent;
+      await maskForCaller(request, agentPerson);
 
       return reply.status(201).send({
         message: `Contact added to agent (id:${agentId}).`,
@@ -137,8 +139,20 @@ export default function agentContactRoutes(
         );
       }
 
+      const role = request.authUser?.role;
+      if (
+        role !== UserRole.COORDINATOR &&
+        role !== UserRole.ADMIN &&
+        membership.status !== AgentMembershipStatus.ACTIVE
+      ) {
+        throw new UnauthorizedError(
+          "Only active contacts of this agent can be edited.",
+        );
+      }
+
       const updated = await updateAgentContact(membership, request.body);
       updated.agent = agent;
+      await maskForCaller(request, updated);
 
       return reply.status(200).send({
         message: `Contact (membershipId:${membershipId}) updated.`,

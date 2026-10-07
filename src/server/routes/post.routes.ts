@@ -25,7 +25,12 @@ import Post from "../../data/entity/post.entity";
 import { isDirectPostReply } from "../../data/utils/is-direct-post-reply";
 import { dtoPost } from "../../services/dto/dto-post";
 import { dtoPostReply } from "../../services/dto/dto-post-reply";
-import { idParamSchema, postListQuerySchema, responseSchema } from "../schema";
+import {
+  idParamSchema,
+  langQuerySchema,
+  postListQuerySchema,
+  responseSchema,
+} from "../schema";
 import {
   ParamsId,
   QuerystringPostList,
@@ -54,6 +59,10 @@ import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../utils/data/translate-opportunities";
 import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
@@ -87,6 +96,18 @@ function notifyPostTags(
     text: post.text,
     where: { kind: "post" },
   });
+}
+
+async function translateLinkedOpportunities(
+  fastify: FastifyInstance,
+  posts: Post[],
+  query: unknown,
+): Promise<void> {
+  await translateOpportunities(
+    fastify,
+    posts.flatMap((post) => post.linkedOpportunities ?? []),
+    requestLanguage(query),
+  );
 }
 
 export default async function postRoutes(
@@ -176,6 +197,7 @@ export default async function postRoutes(
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
       ]);
+      await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
         message: "Posts.",
         data: orderedPosts.map(dtoPost),
@@ -188,6 +210,7 @@ export default async function postRoutes(
     "/",
     {
       schema: {
+        querystring: langQuerySchema,
         body: { $ref: "ApiPostPost#" },
         response: responseSchema({
           dataSchemaRef: "ApiPostGet#",
@@ -250,6 +273,7 @@ export default async function postRoutes(
         request.authUser!.id,
         full.author,
       );
+      await translateLinkedOpportunities(fastify, [full], request.query);
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -265,6 +289,7 @@ export default async function postRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiPostPatch#" },
         response: responseSchema("ApiPostGet#"),
       },
@@ -342,6 +367,7 @@ export default async function postRoutes(
               : null;
         notifyPostTags(fastify, updated, added, request.authUser!.id, tagger);
       }
+      await translateLinkedOpportunities(fastify, [updated], request.query);
       return reply
         .status(200)
         .send({ message: `Post ${id} updated.`, data: dtoPost(updated) });

@@ -14,6 +14,10 @@ import {
   getSkipTake,
   normalizeStringArrayInput,
 } from "../../utils";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default async function volunteerOpportunityRoutes(
@@ -39,7 +43,7 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealTimeslot.timeslot",
       ];
 
-      const { page, limit, ...filters } = request.query;
+      const { page, limit, language, ...filters } = request.query;
 
       const [skip, take] = getSkipTake({ page, limit });
 
@@ -69,6 +73,11 @@ export default async function volunteerOpportunityRoutes(
         await dealRepository.save(updates);
       }
 
+      await translateOpportunities(
+        fastify,
+        opportunitiesCategory,
+        requestLanguage({ language }),
+      );
       await maskForCaller(request, opportunitiesCategory);
       const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);
 

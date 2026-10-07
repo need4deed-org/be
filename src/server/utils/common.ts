@@ -113,3 +113,9 @@ export function getVolunteerNotificationText(
 export function getOpportunityNotificationText(title: string): string {
   return `New opportunity arrived: "${title}" at ${formatBerlinTimestamp()}`;
 }
+
+export type Env = Record<string, string | undefined>;
+
+export function firstEnvValue(env: Env, names: string[]): string | undefined {
+  return names.map((name) => env[name]).find((value) => value !== undefined);
+}

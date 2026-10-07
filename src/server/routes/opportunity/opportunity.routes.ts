@@ -52,6 +52,7 @@ import { assertValidMainCommunicationLanguages } from "../../../services/dto/par
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
+  langQuerySchema,
   opportunityCreateBodySchema,
   opportunityCreateResponseSchema,
   opportunityListQuerySchema,
@@ -90,6 +91,11 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import {
+  queueOpportunityTranslation,
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -171,11 +177,16 @@ export default async function opportunityRoutes(
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
 
-  fastify.get<{ Params: ParamsId; Replay: ReplyData<ApiOpportunityGet> }>(
+  fastify.get<{
+    Params: ParamsId;
+    Querystring: { language?: string };
+    Replay: ReplyData<ApiOpportunityGet>;
+  }>(
     "/:id",
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("ApiOpportunityGet#"),
       },
     },
@@ -196,6 +207,7 @@ export default async function opportunityRoutes(
         "agent.agentType",
         "contactPerson",
         "submittedByPerson.agentPerson",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -255,6 +267,12 @@ export default async function opportunityRoutes(
         const opportunityRepository = fastify.db.opportunityRepository;
         await opportunityRepository.save(opportunityUpdates);
       }
+
+      await translateOpportunities(
+        fastify,
+        [opportunityComments],
+        requestLanguage(request.query),
+      );
 
       await maskForCaller(request, opportunityComments);
 
@@ -345,6 +363,7 @@ export default async function opportunityRoutes(
         "accompanying",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
+        "originalLanguage",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -401,6 +420,12 @@ export default async function opportunityRoutes(
       }
       logger.debug(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
+      );
+
+      await translateOpportunities(
+        fastify,
+        opportunitiesCategoryDistrict,
+        requestLanguage(request.query),
       );
 
       await maskForCaller(request, opportunitiesCategoryDistrict);
@@ -531,7 +556,10 @@ export default async function opportunityRoutes(
       const { addDistrictToOpportunity } = getDistrictToOpportunityHandler();
       Object.assign(opportunity, await addDistrictToOpportunity(opportunity));
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.body),
+      );
 
       fastify.notify.opsAlert(
         getOpportunityNotificationText(opportunity.title),
@@ -781,6 +809,16 @@ export default async function opportunityRoutes(
           if (!success) {
             throw new Error("Patching opportunity failed.");
           }
+          await queueOpportunityTranslation(manager, {
+            id: opportunity.id,
+            originalLanguageId: opportunity.originalLanguageId,
+            type: effectiveType,
+            title: opportunityObj.title ?? opportunity.title,
+            info:
+              opportunityObj.info !== undefined
+                ? opportunityObj.info
+                : opportunity.info,
+          });
 
           if (
             effectiveAgentId &&

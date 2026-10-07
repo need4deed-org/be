@@ -35,6 +35,10 @@ import {
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 
 function parseContactPerson(formData: OpportunityLegacyFormData): Person {
   const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
@@ -145,7 +149,10 @@ export default async function opportunityLegacyRoutes(
         }
       }
 
-      const id = await writeOpportunityLegacy(opportunity);
+      const id = await writeOpportunityLegacy(
+        opportunity,
+        requestLanguage(request.body),
+      );
 
       await writeOpportunityContactComment(
         id,
@@ -196,7 +203,7 @@ export default async function opportunityLegacyRoutes(
   fastify.get<{ Reply: OpportunityLegacyResponse[] }>(
     "/",
     { config: { public: true } as FastifyContextConfig },
-    async (_request, reply) => {
+    async (request, reply) => {
       function parseOpportunityLegacyResponse(
         rawList: Opportunity[],
       ): OpportunityLegacyResponse[] {
@@ -364,6 +371,11 @@ export default async function opportunityLegacyRoutes(
           "onetimer",
         ],
       });
+      await translateOpportunities(
+        fastify,
+        opportunities,
+        requestLanguage(request.query),
+      );
       return reply
         .status(200)
         .send(parseOpportunityLegacyResponse(opportunities));

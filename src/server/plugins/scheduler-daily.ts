@@ -3,8 +3,13 @@ import fp from "fastify-plugin";
 import cron from "node-cron";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
+import { berlinToday, isWorkingDay } from "../../services/jobs/german-holidays";
+import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
-import { isCronMuted, runNamedCronJobs, runWithAdvisoryLock } from "../utils";
+import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
+import { scanRegularUpdate } from "../../services/jobs/scan-regular-update";
+import { scanStalePending } from "../../services/jobs/scan-stale-pending";
+import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 const SCHEDULER_LOCK_ID = 20240707;
 
@@ -15,11 +20,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
     CRON_SCHEDULE_DAILY,
     async () => {
       try {
-        if (isCronMuted()) {
-          logger.info("scheduler: skipping daily scans — cron muted");
-          return;
-        }
-
         logger.info("scheduler: running daily scans");
 
         await runWithAdvisoryLock(
@@ -34,6 +34,26 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "scanExpiredOnetimers",
                   run: () => scanExpiredOnetimers(fastify),
                 },
+                {
+                  name: "scanStalePending",
+                  run: () => scanStalePending(fastify),
+                },
+                {
+                  name: "scanPostMatchCheckup",
+                  run: () => scanPostMatchCheckup(fastify),
+                },
+                {
+                  name: "scanRegularUpdate",
+                  run: () => scanRegularUpdate(fastify),
+                },
+                ...(isWorkingDay(berlinToday())
+                  ? [
+                      {
+                        name: "scanAccompanyNotFound",
+                        run: () => scanAccompanyNotFound(fastify),
+                      },
+                    ]
+                  : []),
               ],
               { sequential: true },
             ),

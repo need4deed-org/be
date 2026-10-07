@@ -18,6 +18,10 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
+import {
+  requestLanguage,
+  translateOpportunities,
+} from "../../utils/data/translate-opportunities";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";
@@ -63,6 +67,11 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
+      await translateOpportunities(
+        fastify,
+        opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
+        requestLanguage(request.query),
+      );
       await maskForCaller(request, opportunities);
       const data = opportunities.map(volunteerOpportunityVolunteerDTO);
 
@@ -125,6 +134,11 @@ export default function volunteerOpportunityVolunteerRoutes(
         );
       }
 
+      await translateOpportunities(
+        fastify,
+        [opportunity.opportunity].filter(Boolean),
+        requestLanguage(request.query),
+      );
       const data = volunteerOpportunityVolunteerDTO(opportunity);
       return reply.status(200).send({
         message: msg200(opportunity.opportunityId, volunteerId, "updated"),

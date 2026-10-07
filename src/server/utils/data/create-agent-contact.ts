@@ -35,37 +35,32 @@ export async function createAgentContact(
   callerRole: UserRole,
 ): Promise<AgentPerson> {
   let result!: AgentPerson;
-  const canApprove =
+  const canLinkExisting =
     callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
 
   await dataSource.manager.transaction(async (manager) => {
     const personRepository = getRepository(manager, Person);
     const agentPersonRepository = getRepository(manager, AgentPerson);
 
-    const existingPerson = input.email
-      ? await findExistingAgentUserPerson(manager, input.email)
-      : null;
+    const existingPerson =
+      canLinkExisting && input.email
+        ? await findExistingAgentUserPerson(manager, input.email)
+        : null;
 
     if (existingPerson) {
-      const existingMembership = await agentPersonRepository.findOne({
+      let agentPerson = await agentPersonRepository.findOne({
         where: { agentId, personId: existingPerson.id, role: input.role },
       });
-      let agentPerson = existingMembership;
       if (!agentPerson) {
         agentPerson = await agentPersonRepository.save(
           new AgentPerson({
             agentId,
             personId: existingPerson.id,
             role: input.role,
-            status: canApprove
-              ? AgentMembershipStatus.ACTIVE
-              : AgentMembershipStatus.PENDING,
+            status: AgentMembershipStatus.ACTIVE,
           }),
         );
-      } else if (
-        canApprove &&
-        agentPerson.status === AgentMembershipStatus.PENDING
-      ) {
+      } else if (agentPerson.status === AgentMembershipStatus.PENDING) {
         agentPerson.status = AgentMembershipStatus.ACTIVE;
         agentPerson = await agentPersonRepository.save(agentPerson);
       }
