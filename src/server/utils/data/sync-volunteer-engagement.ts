@@ -84,3 +84,47 @@ async function logEngagementChange(
     }),
   );
 }
+
+// Engagement follows a match only when it enters or leaves Active; other
+// transitions leave a hand-set status alone.
+export async function syncEngagementForMatchChange(
+  manager: EntityManager,
+  volunteerId: number,
+  from: OpportunityVolunteerStatusType | undefined,
+  to: OpportunityVolunteerStatusType | undefined,
+): Promise<void> {
+  const isActive = OpportunityVolunteerStatusType.ACTIVE;
+  if (to === isActive && from !== isActive) {
+    await syncVolunteerEngagement(manager, volunteerId, "follow");
+  } else if (from === isActive && to !== isActive) {
+    await syncVolunteerEngagement(manager, volunteerId, "release");
+  }
+}
+
+// Deletes a match and releases engagement in one transaction, with the
+// volunteer row locked like OpportunityVolunteerSubscriber does for saves.
+export async function deleteMatch(
+  manager: EntityManager,
+  match: Pick<OpportunityVolunteer, "id" | "volunteerId" | "status">,
+): Promise<boolean> {
+  return manager.transaction(async (tx) => {
+    await tx
+      .createQueryBuilder(Volunteer, "volunteer")
+      .select("volunteer.id")
+      .where("volunteer.id = :id", { id: match.volunteerId })
+      .setLock("for_no_key_update")
+      .getRawOne();
+    const { affected } = await tx.delete(OpportunityVolunteer, {
+      id: match.id,
+    });
+    if (affected) {
+      await syncEngagementForMatchChange(
+        tx,
+        match.volunteerId,
+        match.status,
+        undefined,
+      );
+    }
+    return Boolean(affected);
+  });
+}

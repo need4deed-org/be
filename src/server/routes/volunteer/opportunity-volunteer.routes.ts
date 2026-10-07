@@ -19,6 +19,7 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
+import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 import {
   requestLanguage,
   translateOpportunities,
@@ -174,9 +175,10 @@ export default function volunteerOpportunityVolunteerRoutes(
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
-      const { affected } = await opportunityVolunteerRepository.delete({
-        id: m2mId,
-      });
+      const affected = await deleteMatch(
+        opportunityVolunteerRepository.manager,
+        opportunity,
+      );
       await updateVolunteerMatching(opportunity.volunteerId);
       await updateOpportunityMatching(opportunity.opportunityId);
       // Only the request that actually removed the row logs it; a log failure

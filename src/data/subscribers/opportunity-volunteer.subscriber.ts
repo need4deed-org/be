@@ -55,6 +55,7 @@ export class OpportunityVolunteerSubscriber
 
   async afterInsert(event: InsertEvent<OpportunityVolunteer>) {
     await recompute(event.manager, parentIds(event.entity));
+    await syncEngagement(event.manager, undefined, event.entity);
     await logChange(event, undefined, event.entity);
   }
 
@@ -63,20 +64,23 @@ export class OpportunityVolunteerSubscriber
       event.manager,
       parentIds(event.databaseEntity, event.entity ?? undefined),
     );
-    // Without the previous row (bulk update()) the change can't be described.
+    // Without the previous row (bulk update()) the transition is unknown.
     if (event.databaseEntity) {
-      await logChange(
-        event,
-        event.databaseEntity,
-        event.entity as Partial<OpportunityVolunteer> | undefined,
-      );
+      const after = event.entity as Partial<OpportunityVolunteer> | undefined;
+      await syncEngagement(event.manager, event.databaseEntity, after);
+      await logChange(event, event.databaseEntity, after);
     }
   }
 
-  afterRemove(event: RemoveEvent<OpportunityVolunteer>) {
-    return recompute(
+  async afterRemove(event: RemoveEvent<OpportunityVolunteer>) {
+    await recompute(
       event.manager,
       parentIds(event.databaseEntity, event.entity),
+    );
+    await syncEngagement(
+      event.manager,
+      event.databaseEntity ?? event.entity,
+      undefined,
     );
   }
 }
@@ -171,4 +175,26 @@ async function logChange(
     actorUserId: (queryRunner.data as { actorUserId?: number } | undefined)
       ?.actorUserId,
   });
+}
+
+// Volunteer engagement follows the link entering or leaving Active, on the same
+// transaction (the volunteer row is already locked by lockParents).
+async function syncEngagement(
+  manager: EntityManager,
+  before: Partial<OpportunityVolunteer> | undefined,
+  after: Partial<OpportunityVolunteer> | undefined,
+): Promise<void> {
+  const volunteerId = after?.volunteerId ?? before?.volunteerId;
+  if (!volunteerId) {
+    return;
+  }
+  const { syncEngagementForMatchChange } = await import(
+    "../../server/utils/data/sync-volunteer-engagement"
+  );
+  await syncEngagementForMatchChange(
+    manager,
+    volunteerId,
+    before?.status,
+    after?.status,
+  );
 }
