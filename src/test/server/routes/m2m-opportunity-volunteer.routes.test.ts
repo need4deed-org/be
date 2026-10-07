@@ -1,16 +1,22 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentEngagementStatusType,
+  AgentMembershipStatus,
+  AgentRoleType,
   OpportunityMatchStatusType,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
   UserRole,
+  VolunteerStateEngagementType,
   VolunteerStateMatchType,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -154,13 +160,23 @@ describe("DELETE /opportunity-volunteer/:id", () => {
     await fastify.close();
   });
 
-  it("403s when a non-coordinator tries to remove the link", async () => {
+  it("404s when an NGO user who isn't a member of the opportunity's NGO tries to remove the link", async () => {
     const res = await fastify.inject({
       method: "DELETE",
       url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
       cookies: { [accessCookieName]: agentCookie },
     });
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("404s a status change by an NGO user who isn't a member, whatever the status", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      payload: { status: OpportunityVolunteerStatusType.PENDING },
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it("404s for a nonexistent m2m relation", async () => {
@@ -204,5 +220,263 @@ describe("DELETE /opportunity-volunteer/:id", () => {
     expect(survivingOpportunity?.statusMatch).toBe(
       OpportunityMatchStatusType.NEEDS_REMATCH,
     );
+  });
+});
+
+describe("NGO member changing a match on their own opportunity", () => {
+  let fastify: FastifyInstance;
+
+  let agent: Agent;
+  let deal: Deal;
+  let volunteerPerson: Person;
+  let volunteer: Volunteer;
+  let opportunityDeal: Deal;
+  let opportunity: Opportunity;
+  let opportunityVolunteer: OpportunityVolunteer;
+  let memberPerson: Person;
+  let volunteerUserPerson: Person;
+  let memberCookie: string;
+  let volunteerCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Test Agent (m2m member) ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteerPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Volunteer" }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({
+        dealId: deal.id,
+        personId: volunteerPerson.id,
+        statusEngagement: VolunteerStateEngagementType.AVAILABLE,
+      }),
+    );
+    opportunityDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (m2m member) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        dealId: opportunityDeal.id,
+        agentId: agent.id,
+      }),
+    );
+    opportunityVolunteer = await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status: OpportunityVolunteerStatusType.MATCHED,
+      }),
+    );
+
+    memberPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Member" }),
+    );
+    volunteerUserPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "VolunteerUser" }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: memberPerson.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
+    const pwHash = await hashPassword(PASSWORD);
+    const memberEmail = `agent-m2m-member-${suffix}@test.need4deed.org`;
+    const volunteerEmail = `volunteer-m2m-member-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: memberEmail,
+        password: pwHash,
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: memberPerson.id,
+      }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: volunteerEmail,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: volunteerUserPerson.id,
+      }),
+    );
+
+    const login = async (email: string): Promise<string> => {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      return getCookie(res.cookies, accessCookieName);
+    };
+    memberCookie = await login(memberEmail);
+    volunteerCookie = await login(volunteerEmail);
+  });
+
+  afterAll(async () => {
+    await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
+    for (const person of [memberPerson, volunteerUserPerson]) {
+      await fastify.db.userRepository.delete({ personId: person.id });
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+    await fastify.db.opportunityVolunteerRepository.delete({
+      id: opportunityVolunteer.id,
+    });
+    await fastify.db.volunteerAuditLogRepository.delete({
+      volunteerId: volunteer.id,
+    });
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await fastify.close();
+  });
+
+  const patchStatus = (
+    status: OpportunityVolunteerStatusType,
+    cookie: string,
+  ) =>
+    fastify.inject({
+      method: "PATCH",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      payload: { status },
+      cookies: { [accessCookieName]: cookie },
+    });
+
+  it("403s when the NGO member skips matching (Pending straight to Active)", async () => {
+    await fastify.db.opportunityVolunteerRepository.update(
+      { id: opportunityVolunteer.id },
+      { status: OpportunityVolunteerStatusType.PENDING },
+    );
+    try {
+      const res = await patchStatus(
+        OpportunityVolunteerStatusType.ACTIVE,
+        memberCookie,
+      );
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.opportunityVolunteerRepository.update(
+        { id: opportunityVolunteer.id },
+        { status: OpportunityVolunteerStatusType.MATCHED },
+      );
+    }
+  });
+
+  it("403s when the NGO member sets a status other than Active or Past", async () => {
+    const res = await patchStatus(
+      OpportunityVolunteerStatusType.PENDING,
+      memberCookie,
+    );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s for a volunteer", async () => {
+    const res = await patchStatus(
+      OpportunityVolunteerStatusType.ACTIVE,
+      volunteerCookie,
+    );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("lets the NGO member mark the match Active, and the volunteer becomes Active", async () => {
+    const res = await patchStatus(
+      OpportunityVolunteerStatusType.ACTIVE,
+      memberCookie,
+    );
+    expect(res.statusCode).toBe(204);
+
+    const ov = await fastify.db.opportunityVolunteerRepository.findOneBy({
+      id: opportunityVolunteer.id,
+    });
+    expect(ov?.status).toBe(OpportunityVolunteerStatusType.ACTIVE);
+    const updated = await fastify.db.volunteerRepository.findOneBy({
+      id: volunteer.id,
+    });
+    expect(updated?.statusEngagement).toBe(VolunteerStateEngagementType.ACTIVE);
+  });
+
+  it("lets the NGO member mark the match Past, and the volunteer is Available again", async () => {
+    const res = await patchStatus(
+      OpportunityVolunteerStatusType.PAST,
+      memberCookie,
+    );
+    expect(res.statusCode).toBe(204);
+
+    const updated = await fastify.db.volunteerRepository.findOneBy({
+      id: volunteer.id,
+    });
+    expect(updated?.statusEngagement).toBe(
+      VolunteerStateEngagementType.AVAILABLE,
+    );
+  });
+
+  it("403s when the NGO member removes a Past match", async () => {
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      cookies: { [accessCookieName]: memberCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s for members of an inactive NGO", async () => {
+    await fastify.db.agentRepository.update(
+      { id: agent.id },
+      { engagementStatus: AgentEngagementStatusType.INACTIVE },
+    );
+    try {
+      const res = await patchStatus(
+        OpportunityVolunteerStatusType.ACTIVE,
+        memberCookie,
+      );
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { engagementStatus: AgentEngagementStatusType.ACTIVE },
+      );
+    }
+  });
+
+  it("lets the NGO member remove the match", async () => {
+    await fastify.db.opportunityVolunteerRepository.update(
+      { id: opportunityVolunteer.id },
+      { status: OpportunityVolunteerStatusType.MATCHED },
+    );
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      cookies: { [accessCookieName]: memberCookie },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(
+      await fastify.db.opportunityVolunteerRepository.findOneBy({
+        id: opportunityVolunteer.id,
+      }),
+    ).toBeNull();
   });
 });
