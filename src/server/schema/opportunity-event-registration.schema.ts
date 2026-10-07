@@ -1,7 +1,6 @@
 import { responseSchema } from "./response-schema";
 import { responseErrors } from "./responseErrors";
 
-// Body for POST /event-registration (SDK ApiOpportunityEventRegistrationPost).
 export const opportunityEventRegistrationBodySchema = {
   type: "object",
   required: ["opportunityId", "fullName", "email", "numberOfPeople"],
@@ -21,9 +20,6 @@ export const opportunityEventRegistrationResponseSchema = responseSchema({
   statusCode: 201,
 });
 
-// Item shape for GET /opportunity/:id/registrations (SDK
-// ApiOpportunityEventRegistrationGet). Inline, not $ref'd — not yet part of
-// the generated sdk-types.json bundle.
 const opportunityEventRegistrationItemSchema = {
   type: "object",
   properties: {

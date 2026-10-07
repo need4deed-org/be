@@ -85,7 +85,6 @@ export async function createServer(): Promise<FastifyInstance> {
     },
   });
 
-  // Register external schemas first so they're available for $ref resolution
   await fastifyInstance.addSchema({
     $id: "entity-types",
     ...entityTypesSchema,

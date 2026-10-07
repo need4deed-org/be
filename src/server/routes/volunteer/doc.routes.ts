@@ -19,12 +19,6 @@ export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  // Documents can't be PII-masked (they're files/metadata), so these GETs stay
-  // COORDINATOR-only for everyone else — the parent /volunteer hook was
-  // relaxed to logged-in for the masked GET work, which would otherwise
-  // expose them to any user. A VOLUNTEER may still list their own documents
-  // (be#965's fe#1001 follow-up) — masking exists to hide *other* people's
-  // PII, not the caller's own.
   fastify.get<{ Params: { id: number } }>(
     "/",
     {

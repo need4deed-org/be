@@ -45,7 +45,6 @@ export function getErrorReply(error: HandledError): ErrorReply {
     return { statusCode: 400, body: { message: "There's nothing to update." } };
   }
 
-  // Plugin errors with their own client status, e.g. multipart's 413.
   if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
     return { statusCode: error.statusCode, body: { message: error.message } };
   }

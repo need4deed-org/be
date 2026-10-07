@@ -268,7 +268,11 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
           email: personA.email,
           // personA's client supplies personB's own address id — a request
           // this route never validated ownership of for non-self callers.
-          address: { id: addressOwnedByB.id, street: "Hijacked Street" },
+          address: {
+            id: addressOwnedByB.id,
+            street: "Hijacked Street",
+            postcode: { code: postcode.value },
+          },
         },
       },
     });
@@ -281,9 +285,15 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
       id: personB.id,
     });
 
-    // personA never gets pointed at personB's address.
+    // personA never gets pointed at personB's address; the body's id is
+    // ignored and personA, who had none, gets a new one from the submitted fields.
     expect(refreshedA.addressId).not.toBe(addressOwnedByB.id);
     expect(refreshedA.addressId).not.toBeNull();
+    const created = await addressRepository.findOneByOrFail({
+      id: refreshedA.addressId as number,
+    });
+    expect(created.street).toBe("Hijacked Street");
+    expect(created.postcodeId).toBe(postcode.id);
 
     // personB's address is completely untouched.
     expect(refreshedB.addressId).toBe(addressOwnedByB.id);
@@ -291,5 +301,152 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
       id: addressOwnedByB.id,
     });
     expect(untouched.street).toBe("B's Real Street");
+  });
+});
+
+describe("PATCH /volunteer/:id for a volunteer without an address", () => {
+  let fastify: FastifyInstance;
+  let person: Person;
+  let deal: Deal;
+  let volunteer: Volunteer;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let postcode: Postcode;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  const patch = (person: Record<string, unknown>) =>
+    fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { person },
+    });
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    person = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "NoAddress",
+        lastName: "Volunteer",
+        email: `no-address-${suffix}@example.com`,
+        phone: "0301234567",
+      }),
+    );
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: person.id }),
+    );
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const email = `coordinator-no-address-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    const created = await fastify.db.personRepository.findOneBy({
+      id: person.id,
+    });
+    await fastify.db.personRepository.delete({ id: person.id });
+    if (created?.addressId) {
+      await dataSource.getRepository(Address).delete({ id: created.addressId });
+    }
+    await fastify.close();
+  });
+
+  it("saves a phone change alongside an empty address, creating no address", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      phone: "0307654321",
+      address: { id: 0, street: "", city: "" },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(refreshed.phone).toBe("0307654321");
+    expect(refreshed.addressId).toBeNull();
+  });
+
+  it("400s for an unknown postcode before writing anything", async () => {
+    const before = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      phone: "0300000000",
+      address: { street: "Somewhere 1", postcode: { code: "00000" } },
+    });
+    expect(res.statusCode).toBe(400);
+
+    const refreshed = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(refreshed.phone).toBe(before.phone);
+    expect(refreshed.addressId).toBeNull();
+  });
+
+  it("400s a new address without a postcode", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Only Street 1" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("creates the address, then an empty payload doesn't blank it", async () => {
+    const created = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Kept Street 2", postcode: { code: postcode.value } },
+    });
+    expect(created.statusCode).toBe(200);
+
+    const emptied = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { id: 0, street: "", city: "" },
+    });
+    expect(emptied.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address"],
+    });
+    expect(refreshed.address?.street).toBe("Kept Street 2");
+    expect(refreshed.address?.postcodeId).toBe(postcode.id);
   });
 });

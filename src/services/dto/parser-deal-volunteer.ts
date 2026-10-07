@@ -19,10 +19,8 @@ import { getPostcode, getRRULE, getStartEnd } from "../../data/utils";
 import { getProfileEntityByTitle, getTimeslot } from "../../server/utils";
 
 export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
-  // postcode
   const postcode = await getPostcode(String(formData.postcode));
 
-  // activities
   const dealActivity: DealActivity[] = [];
   const volunteerActivities = (formData.activities || []) as string[];
   for (const volunteerActivity of volunteerActivities) {
@@ -37,7 +35,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     }
   }
 
-  // skills
   const dealSkill: DealSkill[] = [];
   const volunteerSkills = (formData.skills || []) as string[];
   for (const volunteerSkill of volunteerSkills) {
@@ -52,7 +49,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     }
   }
 
-  // languages
   const dealLanguage: DealLanguage[] = [];
 
   const volunteerLanguages: ApiLanguage[] = formData.languages || [];
@@ -70,7 +66,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     }
   }
 
-  // time
   const dealTimeslot: DealTimeslot[] = [];
   const volunteerTimes = formData.schedule || [];
   for (const volunteerTime of volunteerTimes) {
@@ -99,7 +94,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     dealTimeslot.push(dealTimeslotEntry);
   }
 
-  // districts
   const dealDistrict: DealDistrict[] = [];
   const volunteerDistricts = (formData.districts || []) as string[];
   for (const volunteerDistrict of volunteerDistricts) {
@@ -115,7 +109,6 @@ export async function dealParser(formData: VolunteerFormData): Promise<Deal> {
     }
   }
 
-  // deal
   const type = DealType.VOLUNTEER;
   const deal = new Deal({
     type,

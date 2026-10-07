@@ -141,9 +141,6 @@ export default async function personRoutes(
         throw new NotFoundError(`Person with id ${personId} not found.`);
       }
 
-      // role/agentId aren't person fields — a role-only patch has nothing
-      // for updatePerson to change, and TypeORM throws on an empty SET
-      // clause, so skip it entirely rather than no-op saving.
       const hasPersonFieldUpdates = Object.keys(request.body).some(
         (key) => key !== "role" && key !== "agentId",
       );
@@ -161,8 +158,6 @@ export default async function personRoutes(
           )
         : person;
 
-      // role lives on AgentPerson, not person — agentId disambiguates which
-      // membership to update for a person belonging to more than one agent.
       if (request.body.role !== undefined) {
         if (!request.body.agentId) {
           throw new BadRequestError(
