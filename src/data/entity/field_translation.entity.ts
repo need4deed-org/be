@@ -25,12 +25,6 @@ import Language from "./profile/language.entity";
 import Service from "./profile/service.entity";
 import Skill from "./profile/skill.entity";
 
-// One row per source row × field × target language (be#1066). The source row
-// is referenced by exactly one of the nullable FKs below, one per translated
-// table, each ON DELETE CASCADE, so deleting the source removes its
-// translations. The FK list must match src/services/translation/registry.ts;
-// adding a table means a new FK column, its partial unique index, and a new
-// CHECK, in a migration.
 @Entity()
 @Check(
   "CHK_field_translation_one_target",
@@ -75,11 +69,9 @@ import Skill from "./profile/skill.entity";
   ["leadFromId", "fieldName", "languageId"],
   { unique: true, where: `"lead_from_id" IS NOT NULL` },
 )
-// getInstanceByTranslation looks reference rows up by their translated text.
 @Index("IDX_field_translation_reference_text", ["translation"], {
   where: `"origin" = 'reference'`,
 })
-// The MT worker's queue (be#1067).
 @Index("IDX_field_translation_pending", ["updatedAt"], {
   where: `"status" = 'pending'`,
 })
@@ -93,7 +85,6 @@ export default class FieldTranslation {
   @MaxLength(100)
   fieldName: string;
 
-  // Target language of `translation`.
   @ManyToOne(() => Language, {
     nullable: false,
     onDelete: "CASCADE",
@@ -104,7 +95,6 @@ export default class FieldTranslation {
   @Column({ nullable: true })
   languageId: number;
 
-  // NULL while the row is pending or failed; readers then serve the original.
   @Column({ type: "text", nullable: true })
   @IsOptional()
   @IsString()
@@ -126,27 +116,20 @@ export default class FieldTranslation {
   @IsEnum(TranslationStatus)
   status: TranslationStatus;
 
-  // sha256 of the source text this translation was made from; a mismatch with
-  // the current source means the row is outdated. NULL for reference rows.
   @Column({ type: "varchar", length: 64, nullable: true })
   sourceHash: string | null;
 
   @Column({ default: 0 })
   attempts: number;
 
-  // Machine-readable reason of the last failure (e.g. "source_is_target");
-  // never source or translated text.
   @Column({ type: "varchar", length: 64, nullable: true })
   lastErrorCode: string | null;
 
-  // Provider/model that produced a machine row.
   @Column({ type: "varchar", nullable: true })
   model: string | null;
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  // --- the translated row: exactly one of these is set ---
 
   @ManyToOne(() => Opportunity, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "opportunity_id" })
@@ -154,8 +137,6 @@ export default class FieldTranslation {
   @Column({ nullable: true })
   opportunityId?: number;
 
-  // A Language reference row being translated (its title). Not to be
-  // confused with `language`, the target language of every row.
   @ManyToOne(() => Language, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "translated_language_id" })
   translatedLanguage?: Language;

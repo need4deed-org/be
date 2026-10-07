@@ -1,14 +1,3 @@
-// Schemas for POST /agent/register?token=<verify-jwt>.
-//
-// The user + person already exist (created via POST /user + email verification).
-// Authorization is the verify token carried in the querystring (see the route's
-// preHandler); the body only describes the agent action: JOIN an existing agent
-// by id, or CREATE a new one.
-//
-// NOTE: the create field names (`info`, `languages: number[]`) follow the
-// registration write contract (SDK ApiAgentRegisterNew) and intentionally
-// differ from the agent PATCH shape (`about`, `languages: OptionById[]`).
-
 export const registerAgentQuerySchema = {
   type: "object",
   required: ["token"],
@@ -18,7 +7,6 @@ export const registerAgentQuerySchema = {
   },
 };
 
-// GET /agent/register/search?token=&street= — picker lookup during registration.
 export const registerSearchQuerySchema = {
   type: "object",
   required: ["token"],
@@ -49,14 +37,6 @@ export const registerSearchResponseSchema = {
   },
 };
 
-// Fields shared by both create flows: self-registration's CREATE branch
-// (which also collects `phone`, written onto the registrant's own Person)
-// and the coordinator/admin bare-create below (which has no Person to
-// attach a phone to).
-//
-// No `districtId`: district is derived from addressPostcode, never
-// client-settable (be#1059, mirroring parseAgentPatch / be#827). AJV's
-// `removeAdditional` strips it if an older client still sends it.
 const agentCreateBaseSchema = {
   type: "object",
   required: ["title"],
@@ -124,9 +104,6 @@ export const registerAgentResponseSchema = {
   },
 };
 
-// 409 on CREATE when the title is taken (`title`) or the street+postcode
-// already resolve to an existing agent (`address`) — carries that agent's id so
-// the client can offer to JOIN instead. Overrides the generic 409.
 export const registerAgentConflictSchema = {
   type: "object",
   required: ["message", "conflict"],
@@ -137,10 +114,6 @@ export const registerAgentConflictSchema = {
   },
 };
 
-// POST /agent (coordinator/admin-only, fe#911) — same create fields as
-// registration's CREATE branch, minus `phone` (a bare agent has no linked
-// Person to attach it to — see createBareAgent). The body isn't wrapped in
-// { agent: ... } since this endpoint only ever creates, never joins.
 export const createAgentBodySchema = agentCreateBaseSchema;
 
 export const createAgentResponseSchema = {

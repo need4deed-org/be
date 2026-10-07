@@ -153,21 +153,6 @@ export default async function userRoutes(
     },
   );
 
-  // Self-service account deletion (be#583). Soft delete only — sets
-  // isActive to false (and stamps deactivatedAt) rather than removing the
-  // row.
-  //
-  // Deliberately does NOT use fastify.authenticate({ allowSelf: true }):
-  // that option's ADMIN bypass (documented, relied-on framework behavior —
-  // see CLAUDE.md) is appropriate for read/administrative routes, but this
-  // is a destructive, irreversible action with no reactivation path
-  // anywhere in the API (verify-email refuses deactivated accounts).
-  // Reusing the bypass here would let any ADMIN deactivate an arbitrary
-  // account (including another admin's, or their
-  // own by mistake) by id, contradicting be#583's own acceptance criteria
-  // ("only the authenticated user's own account can be targeted") — so the
-  // self-check below applies to every caller, ADMIN included (be#1007
-  // review).
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
@@ -184,9 +169,6 @@ export default async function userRoutes(
         throw new UnauthorizedError("Permission denied");
       }
 
-      // Nothing in the API can reactivate an account, so the last active
-      // ADMIN deactivating themselves would leave no one able to administer
-      // the platform without direct DB access (be#1007 review).
       if (request.authUser!.role === UserRole.ADMIN) {
         const otherActiveAdmins = await fastify.db.userRepository.count({
           where: { role: UserRole.ADMIN, isActive: true, id: Not(id) },
@@ -198,12 +180,6 @@ export default async function userRoutes(
         }
       }
 
-      // Single update + affected check instead of a separate findOne: one
-      // query instead of two, and it can't report a false-positive success
-      // if the row is removed between the check and the write (be#1007
-      // review) — request.authUser already confirms the row exists at the
-      // top of this request, so `affected === 0` here means a genuine
-      // concurrent removal, not the common case.
       const result = await fastify.db.userRepository.update(
         { id },
         { isActive: false, deactivatedAt: new Date() },
@@ -264,15 +240,9 @@ export default async function userRoutes(
         let agentId: number | undefined;
         let agentMemberships: ApiAgentMembershipSummary[] | undefined;
         if (user.role === UserRole.AGENT && user.personId) {
-          // Single query, derive both fields from it — querying agentId and
-          // agentMemberships separately let them race against a concurrent
-          // membership change and disagree (be#809 review).
           const memberships = await getActiveAgentMemberships(user.personId);
           agentId = pickRepresentativeMembership(memberships)?.agentId;
 
-          // Dedupe by agentId: a person can hold multiple roles at the same
-          // agent (AgentPerson's unique index is the (agentId, personId,
-          // role) triple), but ApiAgentMembershipSummary has no role field.
           const membershipsByAgentId = new Map(
             memberships.map((m) => [
               m.agentId,
@@ -347,9 +317,6 @@ export default async function userRoutes(
 
       const email = decodedToken?.email;
 
-      // Only an email-verification token may activate an account — an
-      // access/refresh/reset token carries the same email claim (be#1007
-      // review).
       if (!email || decodedToken.type !== "verify") {
         return reply.status(400).send({ message: "Invalid token format." });
       }
@@ -363,11 +330,6 @@ export default async function userRoutes(
         throw new BadRequestError("Invalid token.");
       }
 
-      // Only meaningful for VOLUNTEER: does the Person this account is
-      // linked to (possibly an existing one, via be#947's email-linking)
-      // already have a Volunteer profile — same email-first check
-      // documented in fe#956 (never resolved via userId/personId
-      // assumptions on their own, always the verified email's Person).
       let hasVolunteerProfile: boolean | undefined;
       if (user.role === UserRole.VOLUNTEER && user.personId) {
         hasVolunteerProfile =
@@ -381,8 +343,6 @@ export default async function userRoutes(
         throw new AlreadyUsedTokenError();
       }
 
-      // isActive: false also means "deactivated" — a still-valid verification
-      // link must not bring a deleted/erased account back (be#1007 review).
       if (user.deactivatedAt) {
         throw new BadRequestError("Account has been deactivated.");
       }
@@ -411,25 +371,13 @@ export default async function userRoutes(
           ...responseErrors,
         },
       },
-      // Pre-handler hook: authorize the registration and resolve the Person.
       preHandler: async (request) => {
         const { person: personData, email, role } = request.body;
 
-        // Privileged roles cannot be self-assigned via registration.
         if (role === UserRole.ADMIN || role === UserRole.COORDINATOR) {
           throw new UnauthorizedError();
         }
 
-        // Agents must register from a known RAC email domain: either an
-        // existing agent member already shares it, or it's on the trusted-domain
-        // allowlist (so a brand-new org's first representative can register).
-        // Volunteers and users self-register freely.
-        //
-        // A free/consumer domain (gmail.com, yahoo.com, ...) never qualifies
-        // via the existing-member shortcut — anyone can register an address
-        // there, so one agent already using it says nothing about this
-        // signup. Only an explicit TrustedDomain entry can clear the gate for
-        // those domains (be#1001).
         if (role === UserRole.AGENT) {
           const allowed = await isAgentDomainAllowed(email, (domain) =>
             fastify.db.agentRepository
@@ -445,20 +393,12 @@ export default async function userRoutes(
           }
         }
 
-        // Self-registration never links to an existing Person by id: this
-        // route is unauthenticated and Person ids are sequential, so anyone
-        // could attach a login (with their own email/password) to someone
-        // else's Person — including a GDPR-erased one (be#983). Linking by id
-        // is an admin-only operation (POST /user/admin).
         if (personData.id) {
           throw new BadRequestError(
             "Linking to an existing person by id is not allowed on self-registration.",
           );
         }
 
-        // Look up an existing Person by email (case-insensitively) before
-        // creating a new, disconnected one, e.g. a Person that already exists
-        // via a legacy Volunteer row (be#923).
         request.resolvedPerson = await resolvePersonByEmail(
           fastify.db.personRepository,
           email,
@@ -470,8 +410,6 @@ export default async function userRoutes(
       const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
 
-      // Surface the duplicate-email case as 409 up front (the DB unique
-      // constraint remains the ultimate guard for the rare race).
       await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
@@ -480,14 +418,10 @@ export default async function userRoutes(
         role,
         isActive: false,
         language: language ?? Lang.EN,
-        // Server-controlled (not in ApiUserPost). Set explicitly to the entity
-        // default so class-validator's @IsString passes (the DB default only
-        // applies at INSERT, not to the in-memory entity being validated).
         timezone: "CET",
         person: request.resolvedPerson,
       });
 
-      // Unexpected DB errors propagate to the global error handler.
       const result = await validateAndSaveUser(userRepository, newUser);
       if (result.status === "error") {
         return reply.status(400).send({
@@ -506,9 +440,6 @@ export default async function userRoutes(
     },
   );
 
-  // Admin-only user creation — accepts any role including admin/coordinator.
-  // Unlike POST /user/ this endpoint requires an authenticated admin session
-  // and activates the account immediately (no email verification flow).
   fastify.post<{
     Body: ApiUserPost;
     Reply: User | { message: string; errors?: any };
@@ -585,11 +516,6 @@ export default async function userRoutes(
     },
   );
 
-  // Admin-only: generate a coordinator invite link, so the admin never sets
-  // or sees the coordinator's password themselves (be#1002 epic). The
-  // upfront email check below is the same race-tolerant pattern as POST
-  // /user/admin above — a concurrent duplicate falls through to the global
-  // error handler rather than a clean 409, same trade-off made there.
   fastify.post<{
     Body: ApiCoordinatorInvitePost;
     Reply: ApiCoordinatorInviteResponse | { message: string; errors?: any };
@@ -614,9 +540,6 @@ export default async function userRoutes(
         { email, person, type: "coordinator-invite" },
         { expiresIn: `${COORDINATOR_INVITE_LIFESPAN_MS}` },
       );
-      // Derived from the token's own exp claim rather than a second
-      // Date.now() call, so it can't drift from what the server actually
-      // enforces on consumption.
       const { exp } = fastify.jwt.decode<{ exp: number }>(token)!;
 
       return reply.status(201).send({
@@ -627,14 +550,6 @@ export default async function userRoutes(
     },
   );
 
-  // Public: consume a coordinator invite link. Mirrors the authByVerifyToken
-  // preHandler pattern in volunteer/register.routes.ts — the caller is
-  // authorized by the invite JWT itself, not a session (be#1002 epic).
-  // Single-use is enforced the same way the email-uniqueness race is
-  // tolerated elsewhere in this file: once consumed, the User row for this
-  // email exists, so a token replay hits the same "already exists" check
-  // below (backed by the DB's unique constraint on User.email) rather than
-  // creating a second account. No separate used/consumedAt row needed.
   fastify.post<{
     Body: ApiCoordinatorRegisterWithInvite;
     Querystring: { token: string };
@@ -669,14 +584,6 @@ export default async function userRoutes(
           throw new UnauthenticatedError("Invalid invite token.");
         }
 
-        // Same email-first lookup as POST / (be#923) — an invited
-        // coordinator's email may already have a Person row (e.g. a prior
-        // Volunteer signup with no User yet); link to it instead of
-        // creating a disconnected duplicate. Shares request.resolvedPerson
-        // with POST / and POST /admin rather than a separate field.
-        // Checked before the User-uniqueness guard below, matching POST /'s
-        // ordering, so the same underlying "already registered" case
-        // surfaces the same error regardless of entry point (be#1011 review).
         request.resolvedPerson = await resolvePersonByEmail(
           fastify.db.personRepository,
           payload.email,

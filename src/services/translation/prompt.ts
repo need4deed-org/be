@@ -6,12 +6,6 @@ const LANGUAGE_NAME: Record<Lang, string> = {
   [Lang.DE]: "German",
 };
 
-/**
- * Prompt v1 from the be#1065 spike, for one field per call. The text is
- * untrusted user input: it goes into the user message JSON-encoded, never
- * into the system prompt, and rule 4 tells the model to translate
- * instructions instead of following them.
- */
 export function buildSystemPrompt(
   targetLang: Lang,
   glossary: readonly GlossaryEntry[],
@@ -43,7 +37,6 @@ export function buildUserMessage(text: string, targetLang: Lang): string {
   return JSON.stringify({ targetLang, text });
 }
 
-// Strict structured output: `json_object` is rejected by the Infomaniak API.
 export const RESPONSE_SCHEMA = {
   type: "object",
   properties: { text: { type: "string" } },

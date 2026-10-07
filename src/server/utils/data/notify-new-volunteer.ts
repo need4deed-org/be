@@ -10,9 +10,6 @@ export interface NotifyNewVolunteerProps {
   name: string;
 }
 
-// Fire-and-forget: runs after the volunteer has already been committed, so a
-// transient failure here (DB blip on the clone lookup, Slack outage) must
-// never turn a successful registration into a 500 for the caller.
 export function notifyNewVolunteer(
   fastify: FastifyInstance,
   { id, email, phone, name }: NotifyNewVolunteerProps,

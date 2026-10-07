@@ -5,10 +5,8 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
-
 import { Country, GermanCity } from "../../data/types";
 
-// this will go to sdk
 function isValidPLZ(plz: string, city?: string) {
   const code = Number(plz);
   if (isNaN(code)) {
@@ -46,12 +44,6 @@ function isPostcodeInAllowedAreas(
 
 @ValidatorConstraint({ async: false })
 export class IsPostcodeConstraint implements ValidatorConstraintInterface {
-  /**
-   * This method contains the core validation logic.
-   * It returns true if the value is valid, false otherwise.
-   * @param value The value of the property being validated.
-   * @param args Contains information about the validation (e.g., object, property name).
-   */
   validate(code: string, args: ValidationArguments) {
     const [countryCode, allowedAreas] = args.constraints as [
       Country,
@@ -61,11 +53,6 @@ export class IsPostcodeConstraint implements ValidatorConstraintInterface {
     return isPostcodeInAllowedAreas(code, countryCode, allowedAreas);
   }
 
-  /**
-   * This method returns the default error message if validation fails.
-   * You can customize the message based on the validation arguments.
-   * @param args Contains information about the validation.
-   */
   defaultMessage(args: ValidationArguments) {
     return `${args.property} is not a valid postcode.`;
   }

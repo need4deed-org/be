@@ -10,7 +10,6 @@ export type ExtendWithEnumValues<
 
 type Primitive = string | number | boolean | null | undefined;
 
-// The core recursive type alias
 export type DeeplyNestedObject = {
   [key: string]: Primitive | DeeplyNestedObject | DeeplyNestedObject[];
 };

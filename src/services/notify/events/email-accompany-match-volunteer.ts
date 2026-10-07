@@ -17,17 +17,9 @@ export function resetAccompanyMatchVolunteerTemplateCache(): void {
   loader.resetCache();
 }
 
-// Counterpart to sendEmailAccompanyMatch: that one tells the NGO contact who
-// is taking over the appointment, this one tells the matched VOLUNTEER the
-// full appointment details (date/time/address/accompanied-person contact)
-// they need to actually show up, plus who to reach at the organisation.
-// There was previously no volunteer-facing email at all for this event.
 export async function sendEmailAccompanyMatchVolunteer(
   email: EmailTransport,
   ov: OpportunityVolunteer,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
@@ -55,8 +47,6 @@ export async function sendEmailAccompanyMatchVolunteer(
     opportunity?.deal?.dealLanguage ?? [],
     `sendEmailAccompanyMatchVolunteer, ov ${ov.id}`,
   );
-  // An accompanying description is stored in infoConfidential (be#1092);
-  // `info` only for rows written before that.
   const appointmentComment =
     opportunity?.infoConfidential || opportunity?.info || "";
   const contactpersonName = contactPerson?.name ?? "";
@@ -81,8 +71,6 @@ export async function sendEmailAccompanyMatchVolunteer(
 
   await email.send({
     to: volunteerEmail,
-    // Accompanying-specific inbox, consistent with every other accompanying
-    // email in this PR (not emailFromVolunteer).
     cc: emailFromAccompanying,
     from: emailFromNotify,
     subject,

@@ -23,9 +23,6 @@ export function resetSuggestionTemplateCache(): void {
 export async function sendEmailSuggestion(
   email: EmailTransport,
   ov: OpportunityVolunteer,
-  // Bypasses dry-run redirection, same as ValidatingEmailTransport's
-  // errorTransport (be#847) — defaults to `email` for callers that don't
-  // care about that distinction (e.g. tests with a single mock transport).
   errorTransport: EmailTransport = email,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
@@ -37,11 +34,6 @@ export async function sendEmailSuggestion(
 
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
-  // The opportunity's own location/schedule, not the volunteer's — this
-  // email describes where and when the *opportunity* takes place, so
-  // reading from ov.volunteer.deal here (as this used to) instead read back
-  // the volunteer's own postcode/general availability, unrelated to the
-  // specific opportunity being suggested (fe#1036 / be schedule bug).
   const plz = ov.opportunity?.deal?.postcode?.value ?? "";
   const opportunitySchedule = await resolveOrAlert(
     errorTransport,
@@ -57,11 +49,6 @@ export async function sendEmailSuggestion(
     opportunityName,
     plz,
     opportunitySchedule,
-    // TODO(be#1042 review): remove once the live CDN suggestion.json uses
-    // {{ opportunitySchedule.en }} / {{ opportunitySchedule.de }} instead of
-    // {{ schedule }} — until then its plain {{ schedule }} leaves the
-    // language open, so renderEmail() sends the builtin (be#1075) instead of
-    // the placeholder staying unresolved and the send being suspended.
     schedule: opportunitySchedule,
   });
 

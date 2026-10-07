@@ -91,10 +91,6 @@ async function findOrCreateAgent(
       title: formData.rac_address,
       addressId: address.id,
     });
-    // Without this, a brand-new agent has no districtId and no loaded
-    // `address` relation, so addDistrictToOpportunity's agent-based
-    // resolution (be#895) below finds nothing and the opportunity is
-    // created with district_id NULL.
     await syncAgentDistrictFromPostcode(agent, postcode);
     await em.save(agent);
 
@@ -146,8 +142,6 @@ export default async function opportunityLegacyRoutes(
           opportunity.contactPersonId = person.id;
           opportunity.submittedByPersonId = person.id;
         } else {
-          // No rac_email on form — create a bare Person for contactPersonId
-          // without deduplication or an agent_person link.
           const personRepository = getRepository(dataSource, Person);
           const contactPerson = parseContactPerson(request.body);
           await personRepository.save(contactPerson);
@@ -155,15 +149,11 @@ export default async function opportunityLegacyRoutes(
         }
       }
 
-      // The form's language is the one its text is entered in (be#1104).
       const id = await writeOpportunityLegacy(
         opportunity,
         requestLanguage(request.body),
       );
 
-      // Durable backup of the submitter's contact as a piped <|> comment, in
-      // addition to the Person-based contact set above. Best-effort: never
-      // blocks the submission.
       await writeOpportunityContactComment(
         id,
         opportunity.agent?.id,
@@ -180,7 +170,6 @@ export default async function opportunityLegacyRoutes(
       });
     },
   );
-  // TODO: define type
   const _opp45 = {
     id: 8693,
     title: "Ukrainian language translation for Stammtisch, etc.",
@@ -294,13 +283,8 @@ export default async function opportunityLegacyRoutes(
             };
           }
 
-          // This route is public: the accompanied person's name, address,
-          // phone and email are never part of it (be#1092).
           const { languageToTranslate } = accompanying;
 
-          // Treat the epoch sentinel date as "no date set". Compare by
-          // timestamp (not string equality) since onetimerDate is a real
-          // Date instance here, not an ISO string.
           const EPOCH_MS = 0;
           const accomp_datetime =
             !onetimerDate || new Date(onetimerDate).getTime() === EPOCH_MS
@@ -340,8 +324,6 @@ export default async function opportunityLegacyRoutes(
           return {
             id: raw.id,
             title: raw.title,
-            // An accompanying opportunity's description is about one
-            // person's appointment: never on this public route (be#1092).
             vo_information:
               raw.type === OpportunityType.ACCOMPANYING
                 ? null
@@ -389,8 +371,6 @@ export default async function opportunityLegacyRoutes(
           "onetimer",
         ],
       });
-      // Public website cards in ?language= (be#1068): title for every type,
-      // info only where a translation exists (regular/events).
       await translateOpportunities(
         fastify,
         opportunities,

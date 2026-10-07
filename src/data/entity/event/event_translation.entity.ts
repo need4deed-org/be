@@ -9,9 +9,6 @@ import {
 import Language from "../profile/language.entity";
 import EventN4D from "./event.entity";
 
-// One translation per (event, language) — be#905 review found the upsert in
-// write-event.ts was a find-then-insert with no DB-level guard, so a
-// concurrent PATCH race could silently create duplicates.
 @Entity()
 @Unique(["eventn4dId", "languageId"])
 export default class EventTranslation {
@@ -59,7 +56,6 @@ export default class EventTranslation {
 
   @ManyToOne(() => EventN4D, (eventn4d) => eventn4d.eventTranslation, {
     onDelete: "CASCADE",
-    // createForeignKeyConstraints: false
   })
   @JoinColumn({ name: "eventn4d_id" })
   eventn4d: EventN4D;

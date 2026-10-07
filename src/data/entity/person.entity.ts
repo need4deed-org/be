@@ -19,7 +19,7 @@ import AgentPerson from "./m2m/agent-person";
 import CommentPerson from "./m2m/comment-person";
 import Organization from "./organization.entity";
 import Testimonial from "./testimonial.entity";
-import User from "./user.entity"; // Ensure this import is correct
+import User from "./user.entity";
 import Volunteer from "./volunteer/volunteer.entity";
 
 @Entity()
@@ -50,19 +50,19 @@ export default class Person {
 
   @Column({ nullable: true })
   @IsOptional()
-  @IsEmail() // Validate as email if provided
+  @IsEmail()
   email?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  @Length(7, 20) // Example phone length validation
+  @Length(7, 20)
   phone?: string;
 
   @Column({ nullable: true })
   @IsOptional()
   @IsString()
-  @Length(7, 20) // Example phone length validation
+  @Length(7, 20)
   landline?: string;
 
   @Column({ nullable: true })
@@ -129,6 +129,6 @@ export type PersonCreateType = Omit<
 export type PersonUpdateType = Partial<PersonCreateType> & { id: number };
 export type PersonResponseType = Omit<Person, "accounts"> & {
   users: User[];
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string;
+  updatedAt: string;
 };

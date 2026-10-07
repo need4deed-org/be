@@ -214,10 +214,6 @@ async function authRoutes(
       },
     },
     async (_request, reply) => {
-      // Logout is open (no auth guard) so a stale/expired session can always
-      // clear its cookies. Clear the httpOnly auth cookies on the caller's
-      // browser using the same options they were set with (path/sameSite/secure)
-      // so the browser actually removes them.
       reply.clearCookie(accessCookieName, cookieOptions);
       reply.clearCookie(refreshCookieName, cookieOptions);
 

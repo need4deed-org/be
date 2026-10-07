@@ -34,8 +34,6 @@ export async function seedEvents(dataSource: DataSource): Promise<void> {
         throw new Error("translations is empty.");
       }
 
-      // Matches createEvent's convention: the event's own languageId is
-      // whichever language the first submitted translation resolves to.
       const firstLanguage = await languageRepository.findOneBy({
         isoCode: translations[0].isoCode,
       });

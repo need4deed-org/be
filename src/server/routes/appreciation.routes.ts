@@ -62,12 +62,6 @@ export default async function appreciationRoutes(
         );
       }
 
-      // `status` is the source of truth, but a caller that only patches
-      // `dateDue`/`dateDelivery` (the pre-be#909 contract) would otherwise
-      // leave it stale — silently desyncing the two. Mirror the old
-      // date-inference rule (`dateDelivery` set -> received, else pending)
-      // whenever `status` itself isn't part of this patch; a caller that
-      // does send `status` (e.g. to set the new "post" state) always wins.
       const patch = { ...request.body };
       if (
         patch.status === undefined &&
