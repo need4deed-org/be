@@ -667,15 +667,11 @@ export default async function opportunityRoutes(
       }
 
       if (role === UserRole.AGENT) {
-        const personId = request.authUser?.personId;
-        const membership = personId
-          ? await fastify.db.agentPersonRepository.findOneBy({
-              agentId: opportunity.agentId,
-              personId,
-              status: AgentMembershipStatus.ACTIVE,
-            })
-          : null;
-        if (!membership) {
+        const agentIds = await getCallerAgentIds(
+          request,
+          request.authUser?.personId,
+        );
+        if (!opportunity.agentId || !agentIds.includes(opportunity.agentId)) {
           throw new UnauthorizedError(
             "Agents can only update opportunities belonging to their own agent.",
           );
@@ -685,10 +681,11 @@ export default async function opportunityRoutes(
         const agentBody = body.agent as { id?: number } | undefined;
         if (
           agentBody?.id !== undefined &&
-          agentBody.id !== opportunity.agentId
+          agentBody.id !== opportunity.agentId &&
+          !agentIds.includes(agentBody.id)
         ) {
           throw new UnauthorizedError(
-            "Agents cannot reassign an opportunity to a different agent.",
+            "Agents can only move an opportunity to another NGO they belong to.",
           );
         }
       }
@@ -835,7 +832,14 @@ export default async function opportunityRoutes(
 
         if (agentLinkId !== undefined) {
           const contactReset: Partial<Opportunity> =
-            contactLinkId === undefined ? { contactPersonId: null } : {};
+            contactLinkId !== undefined
+              ? {}
+              : {
+                  contactPersonId:
+                    request.authUser?.role === UserRole.AGENT
+                      ? (request.authUser.personId ?? null)
+                      : null,
+                };
           const success = await patchEntity(
             Opportunity,
             { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
