@@ -183,7 +183,9 @@ export default async function m2mOpportunityVolunteerRoutes(
       }
 
       const opportunityVolunteer = new OpportunityVolunteer(request.body);
-      await opportunityVolunteerRepository.save(opportunityVolunteer);
+      await opportunityVolunteerRepository.save(opportunityVolunteer, {
+        data: { actorUserId: request.authUser?.id },
+      });
 
       if (
         opportunityVolunteer.status === OpportunityVolunteerStatusType.PENDING
@@ -243,6 +245,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       );
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         reload: true,
+        data: { actorUserId: request.authUser?.id },
       });
 
       if (nextStatus && nextStatus !== prevStatus) {
@@ -379,7 +382,11 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       await assertCanChangeMatch(fastify, request, m2mInstance, "remove");
 
-      await deleteMatch(opportunityVolunteerRepository.manager, m2mInstance);
+      await deleteMatch(
+        opportunityVolunteerRepository.manager,
+        m2mInstance,
+        request.authUser?.id,
+      );
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
 

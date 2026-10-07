@@ -32,7 +32,10 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { updateVolunteerMatching } from "../../../data/utils";
+import {
+  logMatchChangeSafely,
+  updateVolunteerMatching,
+} from "../../../data/utils";
 import {
   getDistrictCentroids,
   getDistrictFromPostcode,
@@ -91,6 +94,7 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   queueOpportunityTranslation,
   requestLanguage,
@@ -1045,11 +1049,10 @@ export default async function opportunityRoutes(
 
       const { dealId, accompanyingId, onetimerId } = opportunity;
 
-      const linkedVolunteerIds = (
-        await fastify.db.opportunityVolunteerRepository.find({
-          where: { opportunityId: id },
-        })
-      ).map((ov) => ov.volunteerId);
+      const links = await fastify.db.opportunityVolunteerRepository.find({
+        where: { opportunityId: id },
+      });
+      const linkedVolunteerIds = links.map((ov) => ov.volunteerId);
 
       await dataSource.manager.transaction(async (manager) => {
         await manager.delete(Comment, {
@@ -1065,6 +1068,23 @@ export default async function opportunityRoutes(
         }
         if (onetimerId) {
           await manager.delete(Onetimer, { id: onetimerId });
+        }
+        // The cascade bypasses OpportunityVolunteerSubscriber, so the linked
+        // volunteers' activity log and engagement are updated here.
+        for (const link of links) {
+          await syncEngagementForMatchChange(
+            manager,
+            link.volunteerId,
+            link.status,
+            undefined,
+          );
+          await logMatchChangeSafely(manager, {
+            volunteerId: link.volunteerId,
+            opportunityId: id,
+            from: link.status,
+            actorUserId: request.authUser?.id,
+            title: opportunity.title,
+          });
         }
       });
 

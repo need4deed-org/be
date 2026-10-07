@@ -8,6 +8,7 @@ export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
 export * from "./getStartEndDates";
 export * from "./hash-token";
+export * from "./log-match-change";
 export * from "./passwd";
 export * from "./remove-data";
 export * from "./update-opportunity-matching";

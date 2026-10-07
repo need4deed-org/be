@@ -946,6 +946,14 @@ describe("DELETE /opportunity/:id", () => {
     expect(survivingVolunteer?.statusMatch).toBe(
       VolunteerStateMatchType.NEEDS_REMATCH,
     );
+
+    const removal = await fastify.db.volunteerAuditLogRepository.findBy({
+      volunteerId: volunteer.id,
+      type: "opportunity_status_changed",
+    });
+    expect(
+      removal.some((entry) => entry.detail.startsWith("Removed from")),
+    ).toBe(true);
   });
 });
 

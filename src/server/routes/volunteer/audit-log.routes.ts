@@ -40,7 +40,7 @@ export default function volunteerAuditLogRoutes(
 
       const entries = await fastify.db.volunteerAuditLogRepository.find({
         where: { volunteerId: id },
-        order: { occurredAt: "DESC" },
+        order: { occurredAt: "DESC", id: "DESC" },
       });
 
       return reply.send({

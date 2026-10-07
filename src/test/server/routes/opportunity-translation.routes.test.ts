@@ -327,14 +327,12 @@ describe("opportunity routes in the requested language", () => {
 
         expect(res.statusCode).toBe(200);
         expect(res.json().data.title).toBe(english.title);
-        const log = await dataSource.manager.findOneByOrFail(
-          VolunteerAuditLog,
-          {
-            volunteerId: volunteer.id,
-          },
-        );
-        expect(log.detail).toContain(opportunity.title);
-        expect(log.detail).not.toContain(english.title);
+        const logs = await dataSource.manager.findBy(VolunteerAuditLog, {
+          volunteerId: volunteer.id,
+        });
+        const log = logs.find((entry) => entry.detail.includes("changed from"));
+        expect(log?.detail).toContain(opportunity.title);
+        expect(log?.detail).not.toContain(english.title);
       });
     });
 
