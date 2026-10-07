@@ -169,6 +169,16 @@ describe("DELETE /opportunity-volunteer/:id", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("404s a status change by an NGO user who isn't a member, whatever the status", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      payload: { status: OpportunityVolunteerStatusType.PENDING },
+      cookies: { [accessCookieName]: agentCookie },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
   it("404s for a nonexistent m2m relation", async () => {
     const res = await fastify.inject({
       method: "DELETE",
@@ -424,7 +434,39 @@ describe("NGO member changing a match on their own opportunity", () => {
     );
   });
 
+  it("403s when the NGO member removes a Past match", async () => {
+    const res = await fastify.inject({
+      method: "DELETE",
+      url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+      cookies: { [accessCookieName]: memberCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s for members of an inactive NGO", async () => {
+    await fastify.db.agentRepository.update(
+      { id: agent.id },
+      { engagementStatus: AgentEngagementStatusType.INACTIVE },
+    );
+    try {
+      const res = await patchStatus(
+        OpportunityVolunteerStatusType.ACTIVE,
+        memberCookie,
+      );
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { engagementStatus: AgentEngagementStatusType.ACTIVE },
+      );
+    }
+  });
+
   it("lets the NGO member remove the match", async () => {
+    await fastify.db.opportunityVolunteerRepository.update(
+      { id: opportunityVolunteer.id },
+      { status: OpportunityVolunteerStatusType.MATCHED },
+    );
     const res = await fastify.inject({
       method: "DELETE",
       url: `/opportunity-volunteer/${opportunityVolunteer.id}`,

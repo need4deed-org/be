@@ -7,7 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../../data/entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
-import { syncVolunteerEngagement } from "../../../../server/utils/data/sync-volunteer-engagement";
+import {
+  syncEngagementForMatchChange,
+  syncVolunteerEngagement,
+} from "../../../../server/utils/data/sync-volunteer-engagement";
 
 const exists = vi.fn();
 const update = vi.fn();
@@ -118,5 +121,38 @@ describe("syncVolunteerEngagement", () => {
     await syncVolunteerEngagement(manager, 7);
 
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncEngagementForMatchChange", () => {
+  const { ACTIVE, MATCHED, PAST, PENDING } = OpportunityVolunteerStatusType;
+
+  it("sets Active when a match becomes Active", async () => {
+    exists.mockResolvedValue(true);
+    await syncEngagementForMatchChange(manager, 7, MATCHED, ACTIVE);
+    expect(update).toHaveBeenCalledWith(
+      Volunteer,
+      { id: 7 },
+      expect.objectContaining({
+        statusEngagement: VolunteerStateEngagementType.ACTIVE,
+      }),
+    );
+  });
+
+  it("takes Active back when an Active match leaves Active (also not via Past)", async () => {
+    exists.mockResolvedValue(false);
+    await syncEngagementForMatchChange(manager, 7, ACTIVE, MATCHED);
+    expect(update).toHaveBeenCalledWith(
+      Volunteer,
+      { id: 7, statusEngagement: VolunteerStateEngagementType.ACTIVE },
+      { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
+    );
+  });
+
+  it("leaves engagement alone for transitions that don't touch Active", async () => {
+    await syncEngagementForMatchChange(manager, 7, MATCHED, PAST);
+    await syncEngagementForMatchChange(manager, 7, PENDING, undefined);
+    expect(exists).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 });

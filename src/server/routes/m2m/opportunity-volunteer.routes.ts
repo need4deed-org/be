@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
+  AgentEngagementStatusType,
   CommunicationType,
   Lang,
   OpportunityVolunteerStatusType,
@@ -22,7 +23,7 @@ import { ParamsId, ReplyMessage } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
-import { syncVolunteerEngagement } from "../../utils/data/sync-volunteer-engagement";
+import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 
 // Sends the FIRST_INQUIRY "suggest" email for an OV that is (now) PENDING.
 // Called both right after creation (POST, which can create straight into
@@ -115,6 +116,12 @@ const AGENT_CHANGEABLE_STATUSES = new Set([
   OpportunityVolunteerStatusType.MATCHED,
   OpportunityVolunteerStatusType.ACTIVE,
 ]);
+// "Kein Match" on anything still open; a Past match is history.
+const AGENT_REMOVABLE_STATUSES = new Set([
+  OpportunityVolunteerStatusType.PENDING,
+  OpportunityVolunteerStatusType.MATCHED,
+  OpportunityVolunteerStatusType.ACTIVE,
+]);
 
 function assertCoordinator(request: FastifyRequest): void {
   const role = request.authUser?.role;
@@ -124,8 +131,10 @@ function assertCoordinator(request: FastifyRequest): void {
 }
 
 // An NGO member may mark a match on their own opportunity Active or Past, or
-// remove it; matching itself stays with coordinators.
+// remove it; matching itself stays with coordinators. Ownership is checked
+// first, so other NGOs' matches all look like 404.
 async function assertCanChangeMatch(
+  fastify: FastifyInstance,
   request: FastifyRequest,
   ov: OpportunityVolunteer,
   change: OpportunityVolunteerStatusType | "remove" | undefined,
@@ -134,45 +143,30 @@ async function assertCanChangeMatch(
     assertCoordinator(request);
     return;
   }
-  const isAllowed =
-    change === "remove" ||
-    (change !== undefined &&
-      AGENT_SETTABLE_STATUSES.has(change) &&
-      AGENT_CHANGEABLE_STATUSES.has(ov.status));
-  if (!isAllowed) {
-    throw new UnauthorizedError("Permission denied");
-  }
+  const opportunity = await fastify.db.opportunityRepository.findOne({
+    select: { id: true, agentId: true },
+    where: { id: ov.opportunityId },
+  });
   await assertAgentOwnsOpportunity(
     request,
     ov.opportunityId,
-    ov.opportunity?.agentId,
+    opportunity?.agentId,
   );
-}
-
-// Same rule as before the backend took this over: a match becoming Active sets
-// Active; Past or removal only takes back an Active no other match supports.
-async function syncEngagement(
-  fastify: FastifyInstance,
-  volunteerId: number,
-  change: OpportunityVolunteerStatusType | "remove",
-): Promise<void> {
-  const mode =
-    change === OpportunityVolunteerStatusType.ACTIVE
-      ? "follow"
-      : change === OpportunityVolunteerStatusType.PAST || change === "remove"
-        ? "release"
-        : undefined;
-  if (!mode) {
-    return;
+  const agent = await fastify.db.agentRepository.findOne({
+    select: { id: true, engagementStatus: true },
+    where: { id: opportunity?.agentId },
+  });
+  if (agent?.engagementStatus === AgentEngagementStatusType.INACTIVE) {
+    throw new UnauthorizedError("This NGO is inactive.");
   }
-  try {
-    await syncVolunteerEngagement(
-      fastify.db.opportunityVolunteerRepository.manager,
-      volunteerId,
-      mode,
-    );
-  } catch (err) {
-    logger.error(`engagement sync failed (volunteer ${volunteerId}): ${err}`);
+  const isAllowed =
+    change === "remove"
+      ? AGENT_REMOVABLE_STATUSES.has(ov.status)
+      : change !== undefined &&
+        AGENT_SETTABLE_STATUSES.has(change) &&
+        AGENT_CHANGEABLE_STATUSES.has(ov.status);
+  if (!isAllowed) {
+    throw new UnauthorizedError("Permission denied");
   }
 }
 
@@ -188,14 +182,13 @@ export default async function m2mOpportunityVolunteerRoutes(
   }>(
     "/",
     {
+      preValidation: async (request) => assertCoordinator(request),
       schema: {
         body: { $ref: "ApiVolunteerOpportunityPost#" },
         response: responseSchema({ statusCode: 201 }),
       },
     },
     async (request, reply) => {
-      assertCoordinator(request);
-
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
 
@@ -252,7 +245,6 @@ export default async function m2mOpportunityVolunteerRoutes(
       const opportunityVolunteer = await opportunityVolunteerRepository.findOne(
         {
           where: { id },
-          relations: { opportunity: true },
         },
       );
 
@@ -263,22 +255,24 @@ export default async function m2mOpportunityVolunteerRoutes(
       const prevStatus = opportunityVolunteer.status;
       const nextStatus = request.body.status;
 
-      await assertCanChangeMatch(request, opportunityVolunteer, nextStatus);
+      await assertCanChangeMatch(
+        fastify,
+        request,
+        opportunityVolunteer,
+        nextStatus,
+      );
 
-      // Only the status: the body schema also allows ids, which an NGO caller must not move.
-      opportunityVolunteerRepository.merge(opportunityVolunteer, {
-        status: nextStatus,
-      });
+      // An NGO caller changes only the status, never which match it is.
+      const isAgent = request.authUser?.role === UserRole.AGENT;
+      opportunityVolunteerRepository.merge(
+        opportunityVolunteer,
+        isAgent ? { status: nextStatus } : request.body,
+      );
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         reload: true,
       });
 
       if (nextStatus && nextStatus !== prevStatus) {
-        await syncEngagement(
-          fastify,
-          opportunityVolunteer.volunteerId,
-          nextStatus,
-        );
         const commRepo = fastify.db.communicationRepository;
 
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {
@@ -423,19 +417,17 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       const m2mInstance = await opportunityVolunteerRepository.findOne({
         where: { id },
-        relations: { opportunity: true },
       });
 
       if (!m2mInstance) {
         throw new NotFoundError(`There's no M2M relation id:${id}`);
       }
 
-      await assertCanChangeMatch(request, m2mInstance, "remove");
+      await assertCanChangeMatch(fastify, request, m2mInstance, "remove");
 
-      await opportunityVolunteerRepository.delete({ id });
+      await deleteMatch(opportunityVolunteerRepository.manager, m2mInstance);
       await updateVolunteerMatching(m2mInstance.volunteerId);
       await updateOpportunityMatching(m2mInstance.opportunityId);
-      await syncEngagement(fastify, m2mInstance.volunteerId, "remove");
 
       return reply.status(204).send();
     },
