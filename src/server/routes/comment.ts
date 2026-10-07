@@ -90,6 +90,14 @@ export default async function commentRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
+      // Non-staff get an empty list, not a 403: the notification badge asks for every role.
+      const role = request.authUser?.role;
+      if (!role || !COMMENT_READER_ROLES.includes(role)) {
+        return reply
+          .status(200)
+          .send({ message: "Comments", data: [], count: 0 });
+      }
+
       try {
         const { userId, entityId, entityType, taggedPersonId } = request.query;
 
@@ -170,7 +178,8 @@ export default async function commentRoutes(
           relations: ["user", "user.person", "language", "commentPerson"],
         });
 
-        if (!comment) {
+        const role = request.authUser?.role;
+        if (!comment || !role || !COMMENT_READER_ROLES.includes(role)) {
           return reply
             .status(404)
             .send({ message: `Comment id:${id} not found.` });

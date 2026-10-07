@@ -6,6 +6,7 @@ import { dtoCommunication } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyDataCount } from "../../types";
 import { assertAgentVisible } from "../../utils";
+import { assertAgentMemberOrStaff } from "../../utils/data/assert-agent-member-or-staff";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentCommunicationRoutes(
@@ -32,6 +33,8 @@ export default function agentCommunicationRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
       assertAgentVisible(agent, request.authUser?.role);
+
+      await assertAgentMemberOrStaff(request, id);
 
       const communicationRepository = fastify.db.communicationRepository;
       const [communications, count] =
