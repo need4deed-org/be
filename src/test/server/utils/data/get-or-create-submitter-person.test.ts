@@ -1,4 +1,5 @@
 import { AgentRoleType } from "need4deed-sdk";
+import { ILike } from "typeorm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Address from "../../../../data/entity/location/address.entity";
 import Postcode from "../../../../data/entity/location/postcode.entity";
@@ -228,6 +229,24 @@ describe("getOrCreateSubmitterPerson", () => {
     );
 
     expect(personSave).not.toHaveBeenCalled();
+  });
+
+  // be#1012 review: "_" is valid in an email's local part and must match
+  // literally, not as a single-character wildcard.
+  it("looks the Person up by an escaped email pattern", async () => {
+    personFind.mockResolvedValueOnce(null);
+    personSave.mockImplementation(async (p: any) => ({ ...p, id: 57 }));
+    agentPersonFind.mockResolvedValueOnce(null);
+
+    await getOrCreateSubmitterPerson(
+      { ...baseBody, rac_email: "s_m@center.de" },
+      42,
+      fakeManager,
+    );
+
+    expect(personFind).toHaveBeenCalledWith({
+      where: { email: ILike("s\\_m@center.de") },
+    });
   });
 
   it("branch 4 — person not found: creates Person from rac_*, then upserts AgentPerson", async () => {

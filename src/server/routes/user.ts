@@ -64,6 +64,7 @@ import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
 import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
+import { escapeLikePattern } from "../utils/data/person-name-ilike";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -440,7 +441,12 @@ export default async function userRoutes(
             fastify.db.agentRepository
               .findOne({
                 where: {
-                  agentPerson: { person: { email: ILike(`%@${domain}`) } },
+                  // Escaped so "_"/"%" can't act as wildcards. Email format
+                  // validation currently rejects both in a domain, so this
+                  // is defense in depth (be#1012 review).
+                  agentPerson: {
+                    person: { email: ILike(`%@${escapeLikePattern(domain)}`) },
+                  },
                 },
               })
               .then((agent) => !!agent),

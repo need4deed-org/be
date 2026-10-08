@@ -3,6 +3,7 @@ import { ILike, Repository } from "typeorm";
 import { BadRequestError, PersonAlreadyRegisteredError } from "../../../config";
 import Person from "../../../data/entity/person.entity";
 import logger from "../../../logger";
+import { escapeLikePattern } from "./person-name-ilike";
 
 // Shared "look up an existing Person by email (case-insensitively) before
 // creating a new, disconnected one" step used by every flow that creates a
@@ -25,7 +26,9 @@ export async function resolvePersonByEmail(
   registered: "reject" | "create" = "reject",
 ): Promise<Person> {
   const existingPerson = await personRepository.findOne({
-    where: { email: ILike(email) },
+    // Escaped so "_"/"%" in the address match literally, not as wildcards
+    // (a_b@x.org must not pick up aXb@x.org's Person; be#1012 review).
+    where: { email: ILike(escapeLikePattern(email)) },
     relations: ["users"],
   });
   if (existingPerson && !existingPerson.users?.length) {

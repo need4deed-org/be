@@ -8,6 +8,7 @@ import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
 import { createAddress, patchOrReplaceAddress } from "./for-routes";
+import { escapeLikePattern } from "./person-name-ilike";
 
 // rac_address / rac_plz are optional so existing callers that only carry the
 // name/phone/email blob (e.g. backfill migrations) still satisfy the type.
@@ -170,7 +171,8 @@ export async function getOrCreateSubmitterPerson(
   const agentPersonRepository = getRepository(manager, AgentPerson);
 
   let person = await personRepository.findOne({
-    where: { email: ILike(email) },
+    // Escaped so "_"/"%" match literally (be#1012 review).
+    where: { email: ILike(escapeLikePattern(email)) },
   });
 
   if (!person) {

@@ -205,6 +205,35 @@ describe("POST /user — links existing Person by email instead of duplicating (
     expect(personCount).toBe(1);
   });
 
+  // be#1012 review: "_" is valid in an email's local part; it must match
+  // literally, not pick up a different address's Person as a wildcard.
+  it("does not treat '_' in the email as a wildcard", async () => {
+    const lookalikePerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Look",
+        lastName: "Alike",
+        email: `wildXcard-${suffix}@example.com`,
+      }),
+    );
+    createdPersonIds.push(lookalikePerson.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email: `wild_card-${suffix}@example.com`,
+        password: "test_password",
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Wild", lastName: "Card" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+    createdPersonIds.push(res.json().person.id);
+    expect(res.json().person.id).not.toBe(lookalikePerson.id);
+  });
+
   it("rejects (400, PersonAlreadyRegisteredError) when the matched Person already has a User of any role", async () => {
     const email = `already-registered-${suffix}@example.com`;
     const existingPerson = await fastify.db.personRepository.save(
