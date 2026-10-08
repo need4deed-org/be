@@ -288,6 +288,76 @@ describe("POST /user — links existing Person by email instead of duplicating (
   });
 });
 
+// be#1012: a pending (never-verified) User no longer holds its email for
+// good — anyone can self-register any email, so a later signup replaces it.
+describe("POST /user — reclaims a pending (never-verified) User (be#1012)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const emails: string[] = [];
+
+  function register(email: string, password: string) {
+    return fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email,
+        password,
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Pending", lastName: "Signup" },
+      },
+    });
+  }
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    for (const email of emails) {
+      await fastify.db.userRepository.delete({ email });
+      await fastify.db.personRepository.delete({ email });
+    }
+    await fastify.close();
+  });
+
+  it("replaces a pending User with a new one for the same email", async () => {
+    const email = `reclaim-pending-${suffix}@example.com`;
+    emails.push(email);
+    const first = await register(email, "squatter_password");
+    expect(first.statusCode).toBe(201);
+
+    const second = await register(email, "owner_password");
+
+    expect(second.statusCode).toBe(201);
+    expect(second.json().id).not.toBe(first.json().id);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([second.json().id]);
+    expect(await users[0].checkPassword("owner_password")).toBe(true);
+    expect(await fastify.db.personRepository.countBy({ email })).toBe(1);
+  });
+
+  it("does not reclaim a deactivated User", async () => {
+    const email = `reclaim-deactivated-${suffix}@example.com`;
+    emails.push(email);
+    const first = await register(email, "test_password");
+    expect(first.statusCode).toBe(201);
+    await fastify.db.userRepository.update(
+      { id: first.json().id },
+      { deactivatedAt: new Date() },
+    );
+
+    const second = await register(email, "another_password");
+
+    expect(second.statusCode).toBe(400);
+    expect(second.json()).toMatchObject({
+      error: "PersonAlreadyRegisteredError",
+    });
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([first.json().id]);
+  });
+});
+
 // be#943: POST /user/verify-email now also reports whether a VOLUNTEER's
 // linked Person already has a Volunteer profile, so fe#956 can skip the
 // completion form and send an already-existing volunteer straight to login.

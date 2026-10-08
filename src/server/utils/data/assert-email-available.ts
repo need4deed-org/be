@@ -3,13 +3,10 @@ import { ConflictError } from "../../../config";
 import User from "../../../data/entity/user.entity";
 
 // What to do when the only User holding the email is a pending one (see
-// isPendingUser):
-// - "reject": treat it like any other User — 409;
-// - "allow": treat the email as available, but leave the row alone (for a
-//   caller that doesn't create the User itself, e.g. generating an invite);
-// - "reclaim": delete the pending row so the caller can create a new User
-//   for the email (be#1012).
-export type PendingUserPolicy = "reject" | "allow" | "reclaim";
+// isPendingUser): "reject" treats it like any other User (409); "allow"
+// treats the email as available but leaves the row alone — for a caller
+// that doesn't create the User itself, e.g. generating an invite (be#1012).
+export type PendingUserPolicy = "reject" | "allow";
 
 // A User that registered but never verified its email: inactive, but not
 // deactivated (self-service deletion / GDPR erasure stamp deactivatedAt,
@@ -34,26 +31,27 @@ export async function assertEmailAvailable(
   pending: PendingUserPolicy = "reject",
 ): Promise<void> {
   const existing = await userRepository.findOneBy({ email });
-  if (!existing) {
-    return;
-  }
-  if (pending === "reject" || !isPendingUser(existing)) {
+  if (existing && (pending === "reject" || !isPendingUser(existing))) {
     throw new ConflictError("User with this email already exists.");
   }
-  if (pending === "allow") {
-    return;
-  }
+}
 
-  // Deleted, not overwritten: the new User gets a new id, so a verification
-  // link issued to the pending one can't activate its replacement. The
-  // pending condition is repeated so a row verified since the read above
-  // is never deleted.
-  const { affected } = await userRepository.delete({
-    id: existing.id,
-    isActive: false,
-    deactivatedAt: IsNull(),
-  });
-  if (!affected) {
-    throw new ConflictError("User with this email already exists.");
+// Deletes the pending User holding the email, if there is one, so the
+// caller can create a new User for it (be#1012); any other User is left for
+// the caller's usual "already registered" handling. Deleted, not
+// overwritten: the new User gets a new id, so a verification link issued to
+// the pending one can't activate its replacement. The pending condition is
+// part of the delete, so a row verified since the read is never deleted.
+export async function reclaimPendingUser(
+  userRepository: Repository<User>,
+  email: string,
+): Promise<void> {
+  const existing = await userRepository.findOneBy({ email });
+  if (existing && isPendingUser(existing)) {
+    await userRepository.delete({
+      id: existing.id,
+      isActive: false,
+      deactivatedAt: IsNull(),
+    });
   }
 }

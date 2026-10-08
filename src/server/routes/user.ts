@@ -57,6 +57,7 @@ import {
   assertEmailAvailable,
   getSkipTake,
   getUserWhere,
+  reclaimPendingUser,
   resolvePersonByEmail,
   validateAndSaveUser,
   verifyTokenOfType,
@@ -461,6 +462,11 @@ export default async function userRoutes(
             "Linking to an existing person by id is not allowed on self-registration.",
           );
         }
+
+        // A pending (never-verified) User doesn't hold the email: this
+        // signup replaces it (be#1012). Done before the Person lookup, which
+        // would otherwise refuse the Person still linked to the pending User.
+        await reclaimPendingUser(fastify.db.userRepository, email);
 
         // Look up an existing Person by email (case-insensitively) before
         // creating a new, disconnected one, e.g. a Person that already exists
