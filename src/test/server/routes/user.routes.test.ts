@@ -308,6 +308,14 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     });
   }
 
+  function verify(token: string) {
+    return fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+  }
+
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
@@ -355,6 +363,39 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     });
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([first.json().id]);
+  });
+
+  // The takeover a reclaim could otherwise open: the owner signs up, someone
+  // re-registers the email with their own password before the owner clicks
+  // the link — the owner's link must not activate the replacement.
+  it("does not let the replaced User's verification link activate the replacement", async () => {
+    const email = `reclaim-takeover-${suffix}@example.com`;
+    emails.push(email);
+    const owner = await register(email, "owner_password");
+    expect(owner.statusCode).toBe(201);
+    // Same claims sendEmailVerification puts in the emailed link.
+    const ownerLink = fastify.jwt.sign({
+      id: owner.json().id,
+      email,
+      type: "verify",
+    });
+    const replacement = await register(email, "other_password");
+    expect(replacement.statusCode).toBe(201);
+
+    const res = await verify(ownerLink);
+
+    expect(res.statusCode).toBe(400);
+    const reloaded = await fastify.db.userRepository.findOneByOrFail({
+      id: replacement.json().id,
+    });
+    expect(reloaded.isActive).toBe(false);
+
+    const replacementLink = fastify.jwt.sign({
+      id: replacement.json().id,
+      email,
+      type: "verify",
+    });
+    expect((await verify(replacementLink)).statusCode).toBe(200);
   });
 });
 
@@ -1055,6 +1096,32 @@ describe("POST /user/admin/coordinator-invite", () => {
     expect(res.statusCode).toBe(201);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([pendingUser.id]);
+  });
+
+  it("409s for an email held by a deactivated User", async () => {
+    const email = `deactivated-invitee-${suffix}@example.com`;
+    const deactivatedUser = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: false,
+        deactivatedAt: new Date(),
+      }),
+    );
+    createdUserIds.push(deactivatedUser.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
   });
 });
 
