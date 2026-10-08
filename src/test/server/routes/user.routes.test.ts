@@ -1028,10 +1028,122 @@ describe("POST /user/admin/coordinator-invite", () => {
     });
     expect(res.statusCode).toBe(409);
   });
+
+  // be#1012: the pending User is only replaced once the invite is redeemed.
+  it("issues an invite for an email held only by a pending User, leaving it in place", async () => {
+    const email = `pending-invitee-${suffix}@example.com`;
+    const pendingUser = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: false,
+      }),
+    );
+    createdUserIds.push(pendingUser.id);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin/coordinator-invite",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        person: { firstName: "New", lastName: "Coordinator" },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([pendingUser.id]);
+  });
 });
 
 // be#1008: the public side of the invite flow — the invitee sets their own
 // password to activate a COORDINATOR account.
+// be#1012: an admin creating an account replaces a pending (never-verified)
+// User holding the email; any other User still 409s.
+describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const emails: string[] = [];
+  let adminAccessToken: string;
+
+  function createAsAdmin(email: string) {
+    return fastify.inject({
+      method: "POST",
+      url: "/user/admin",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        password: "admin_chosen_password",
+        role: UserRole.COORDINATOR,
+        person: { firstName: "Admin", lastName: "Created" },
+      },
+    });
+  }
+
+  async function makeUser(email: string, fields: Partial<User>) {
+    emails.push(email);
+    return fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        ...fields,
+      }),
+    );
+  }
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    const admin = await makeUser(`admin-${suffix}@test.need4deed.org`, {
+      role: UserRole.ADMIN,
+      isActive: true,
+    });
+    adminAccessToken = fastify.jwt.sign({
+      id: admin.id,
+      email: admin.email,
+      role: admin.role,
+      type: "access",
+    });
+  });
+
+  afterAll(async () => {
+    for (const email of emails) {
+      await fastify.db.userRepository.delete({ email });
+      await fastify.db.personRepository.delete({ email });
+    }
+    await fastify.close();
+  });
+
+  it("replaces a pending User with the admin-created one", async () => {
+    const email = `admin-reclaim-${suffix}@example.com`;
+    const pendingUser = await makeUser(email, { isActive: false });
+
+    const res = await createAsAdmin(email);
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().id).not.toBe(pendingUser.id);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([res.json().id]);
+  });
+
+  it.each([
+    ["an active", { isActive: true }],
+    ["a deactivated", { isActive: false, deactivatedAt: new Date() }],
+  ])("409s and keeps %s User", async (label, fields) => {
+    const email = `admin-keep-${label.split(" ")[1]}-${suffix}@example.com`;
+    const existingUser = await makeUser(email, fields);
+
+    const res = await createAsAdmin(email);
+
+    expect(res.statusCode).toBe(409);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([existingUser.id]);
+  });
+});
+
 describe("POST /user/register-with-invite", () => {
   let fastify: FastifyInstance;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;

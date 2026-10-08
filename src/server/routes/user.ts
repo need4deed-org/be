@@ -573,6 +573,9 @@ export default async function userRoutes(
       const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
 
+      // An admin creating the account outranks a pending (never-verified)
+      // User holding the email — replace it (be#1012).
+      await reclaimPendingUser(userRepository, email);
       await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({
@@ -620,7 +623,10 @@ export default async function userRoutes(
     async (request, reply) => {
       const { email, person } = request.body;
 
-      await assertEmailAvailable(fastify.db.userRepository, email);
+      // A pending (never-verified) User doesn't block the invite: it's
+      // replaced when the invite is redeemed (be#1012). Nothing is deleted
+      // here — generating a link doesn't commit the admin to using it.
+      await assertEmailAvailable(fastify.db.userRepository, email, "allow");
 
       const token = fastify.jwt.sign(
         { email, person, type: "coordinator-invite" },
