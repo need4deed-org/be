@@ -1,16 +1,13 @@
-import { IsNull } from "typeorm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConflictError } from "../../../../config";
 import User from "../../../../data/entity/user.entity";
 import {
   assertEmailAvailable,
   isPendingUser,
-  reclaimPendingUser,
 } from "../../../../server/utils/data/assert-email-available";
 
 const findOneBy = vi.fn();
-const deleteFn = vi.fn();
-const userRepository: any = { findOneBy, delete: deleteFn };
+const userRepository: any = { findOneBy };
 
 const email = "someone@example.org";
 const pendingUser = new User({ id: 7, isActive: false, deactivatedAt: null });
@@ -68,32 +65,5 @@ describe("assertEmailAvailable", () => {
     await expect(
       assertEmailAvailable(userRepository, email, "allow"),
     ).resolves.toBeUndefined();
-  });
-});
-
-describe("reclaimPendingUser", () => {
-  beforeEach(() => {
-    findOneBy.mockReset();
-    deleteFn.mockReset();
-  });
-
-  it("deletes a pending User, guarded on it still being pending", async () => {
-    findOneBy.mockResolvedValue(pendingUser);
-    await reclaimPendingUser(userRepository, email);
-    expect(deleteFn).toHaveBeenCalledWith({
-      id: pendingUser.id,
-      isActive: false,
-      deactivatedAt: IsNull(),
-    });
-  });
-
-  it.each([
-    ["no User", null],
-    ["an active User", activeUser],
-    ["a deactivated User", deactivatedUser],
-  ])("leaves %s alone", async (_label, user) => {
-    findOneBy.mockResolvedValue(user);
-    await reclaimPendingUser(userRepository, email);
-    expect(deleteFn).not.toHaveBeenCalled();
   });
 });

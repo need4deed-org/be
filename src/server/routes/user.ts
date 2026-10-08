@@ -1,4 +1,3 @@
-import { validate } from "class-validator";
 import {
   FastifyContextConfig,
   FastifyInstance,
@@ -28,7 +27,6 @@ import {
   COORDINATOR_INVITE_LIFESPAN_MS,
   urlCoordinatorInvite,
 } from "../../config/constants";
-import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
@@ -539,6 +537,16 @@ export default async function userRoutes(
         const { person: personData, email } = request.body;
         const personRepository = fastify.db.personRepository;
 
+        // An admin creating the account outranks a pending (never-verified)
+        // User holding the email — replace it (be#1012). Done first, so the
+        // Person lookup below can reuse that User's Person rather than
+        // leaving it behind as a same-email duplicate.
+        await reclaimPendingUser(
+          fastify.db.userRepository,
+          email,
+          personData.id,
+        );
+
         if (personData.id) {
           const resolvedPerson = await personRepository.findOneBy({
             id: personData.id,
@@ -555,27 +563,22 @@ export default async function userRoutes(
           return;
         }
 
-        const newPerson = new Person(personData);
-        newPerson.email = email;
-        const errors = await validate(newPerson);
-        if (errors.length > 0) {
-          const messages = errors.flatMap((err) =>
-            Object.values(err.constraints || {}),
-          );
-          throw new BadRequestError(
-            `Validation failed for new person data: ${messages.join("; ")}`,
-          );
-        }
-        request.resolvedPerson = newPerson;
+        // Same email-first lookup as POST / (be#923), so the account doesn't
+        // get a second Person with the same email (be#1012 review). Unlike
+        // POST /, a Person that already has a User doesn't block an admin —
+        // a new Person is created, as before.
+        request.resolvedPerson = await resolvePersonByEmail(
+          personRepository,
+          email,
+          personData,
+          "create",
+        );
       },
     },
     async (request, reply) => {
       const { email, password: passwordPlain, role, language } = request.body;
       const userRepository = fastify.db.userRepository;
 
-      // An admin creating the account outranks a pending (never-verified)
-      // User holding the email — replace it (be#1012).
-      await reclaimPendingUser(userRepository, email);
       await assertEmailAvailable(userRepository, email);
 
       const newUser = new User({

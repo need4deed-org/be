@@ -1,6 +1,8 @@
 import { IsNull, Repository } from "typeorm";
 import { ConflictError } from "../../../config";
+import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
+import { isPersonReferenced } from "./is-person-referenced";
 
 // What to do when the only User holding the email is a pending one (see
 // isPendingUser): "reject" treats it like any other User (409); "allow"
@@ -42,16 +44,36 @@ export async function assertEmailAvailable(
 // overwritten: the new User gets a new id, so a verification link issued to
 // the pending one can't activate its replacement. The pending condition is
 // part of the delete, so a row verified since the read is never deleted.
+//
+// The pending User's Person goes too when nothing else references it: it
+// was most likely created by that same signup, with names typed by whoever
+// squatted the email, and would otherwise be picked up by the email-first
+// Person lookup for the replacement. A Person that's referenced anywhere
+// else (e.g. a legacy Volunteer) is kept, and so is `keepPersonId` — the
+// Person an admin is explicitly linking the new User to.
 export async function reclaimPendingUser(
   userRepository: Repository<User>,
   email: string,
+  keepPersonId?: number,
 ): Promise<void> {
   const existing = await userRepository.findOneBy({ email });
-  if (existing && isPendingUser(existing)) {
-    await userRepository.delete({
+  if (!existing || !isPendingUser(existing)) {
+    return;
+  }
+
+  await userRepository.manager.transaction(async (manager) => {
+    const { affected } = await manager.delete(User, {
       id: existing.id,
       isActive: false,
       deactivatedAt: IsNull(),
     });
-  }
+    if (
+      affected &&
+      existing.personId &&
+      existing.personId !== keepPersonId &&
+      !(await isPersonReferenced(manager, existing.personId))
+    ) {
+      await manager.delete(Person, { id: existing.personId });
+    }
+  });
 }

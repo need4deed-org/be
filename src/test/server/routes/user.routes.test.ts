@@ -295,7 +295,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const emails: string[] = [];
 
-  function register(email: string, password: string) {
+  function register(email: string, password: string, firstName = "Pending") {
     return fastify.inject({
       method: "POST",
       url: "/user",
@@ -303,7 +303,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
         email,
         password,
         role: UserRole.VOLUNTEER,
-        person: { firstName: "Pending", lastName: "Signup" },
+        person: { firstName, lastName: "Signup" },
       },
     });
   }
@@ -332,17 +332,69 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
   it("replaces a pending User with a new one for the same email", async () => {
     const email = `reclaim-pending-${suffix}@example.com`;
     emails.push(email);
-    const first = await register(email, "squatter_password");
+    const first = await register(email, "squatter_password", "Squatter");
     expect(first.statusCode).toBe(201);
 
-    const second = await register(email, "owner_password");
+    const second = await register(email, "owner_password", "Owner");
 
     expect(second.statusCode).toBe(201);
     expect(second.json().id).not.toBe(first.json().id);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([second.json().id]);
     expect(await users[0].checkPassword("owner_password")).toBe(true);
-    expect(await fastify.db.personRepository.countBy({ email })).toBe(1);
+    // The squatter's bare Person (and the names typed into it) went with
+    // the pending User (be#1012 review).
+    const persons = await fastify.db.personRepository.findBy({ email });
+    expect(persons).toHaveLength(1);
+    expect(persons[0].id).not.toBe(first.json().person.id);
+    expect(persons[0].firstName).toBe("Owner");
+  });
+
+  // User.email is stored and looked up lowercased (be#1013), so a case
+  // variant of the squatted email still reclaims it (be#1012 review).
+  it("reclaims when the new signup uses a different case", async () => {
+    const email = `reclaim-case-${suffix}@example.com`;
+    emails.push(email);
+    const first = await register(email.toUpperCase(), "squatter_password");
+    expect(first.statusCode).toBe(201);
+
+    const second = await register(email, "owner_password");
+
+    expect(second.statusCode).toBe(201);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([second.json().id]);
+  });
+
+  it("keeps a Person referenced elsewhere (e.g. a legacy Volunteer)", async () => {
+    const email = `reclaim-legacy-${suffix}@example.com`;
+    emails.push(email);
+    const legacyPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Legacy", lastName: "Volunteer", email }),
+    );
+    const postcode = await getPostcode("10115");
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    const volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ personId: legacyPerson.id, dealId: deal.id }),
+    );
+    try {
+      const first = await register(email, "squatter_password");
+      expect(first.json().person.id).toBe(legacyPerson.id);
+
+      const second = await register(email, "owner_password");
+
+      expect(second.statusCode).toBe(201);
+      expect(second.json().person.id).toBe(legacyPerson.id);
+      const reloaded = await fastify.db.personRepository.findOneByOrFail({
+        id: legacyPerson.id,
+      });
+      expect(reloaded.firstName).toBe("Legacy");
+    } finally {
+      await fastify.db.userRepository.delete({ email });
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+      await fastify.db.dealRepository.delete({ id: deal.id });
+    }
   });
 
   it("does not reclaim a deactivated User", async () => {
@@ -1186,7 +1238,13 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
 
   it("replaces a pending User with the admin-created one", async () => {
     const email = `admin-reclaim-${suffix}@example.com`;
-    const pendingUser = await makeUser(email, { isActive: false });
+    const squatterPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Squat", lastName: "Ter", email }),
+    );
+    const pendingUser = await makeUser(email, {
+      isActive: false,
+      personId: squatterPerson.id,
+    });
 
     const res = await createAsAdmin(email);
 
@@ -1194,6 +1252,46 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
     expect(res.json().id).not.toBe(pendingUser.id);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([res.json().id]);
+    // No same-email duplicate Person left behind (be#1012 review).
+    const persons = await fastify.db.personRepository.findBy({ email });
+    expect(persons.map((p) => p.id)).toEqual([res.json().person.id]);
+    expect(persons[0].firstName).toBe("Admin");
+  });
+
+  it("reuses an existing unregistered Person with the email", async () => {
+    const email = `admin-reuse-person-${suffix}@example.com`;
+    emails.push(email);
+    const existingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Existing", lastName: "Person", email }),
+    );
+
+    const res = await createAsAdmin(email);
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().person.id).toBe(existingPerson.id);
+  });
+
+  it("keeps the pending User's Person when the admin links to it by id", async () => {
+    const email = `admin-link-pending-person-${suffix}@example.com`;
+    const pendingPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Pending", lastName: "Person", email }),
+    );
+    await makeUser(email, { isActive: false, personId: pendingPerson.id });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        password: "admin_chosen_password",
+        role: UserRole.COORDINATOR,
+        person: { id: pendingPerson.id },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().person.id).toBe(pendingPerson.id);
   });
 
   it.each([
@@ -1407,9 +1505,13 @@ describe("POST /user/register-with-invite", () => {
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
+    createdPersonIds.push(res.json().person.id);
     expect(res.json()).toMatchObject({
       role: UserRole.COORDINATOR,
       isActive: true,
+      // The admin's names from the invite, not the squatter's (be#1012
+      // review): the squatter's bare Person went with the pending User.
+      person: { firstName: "New", lastName: "Coordinator" },
     });
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([res.json().id]);
