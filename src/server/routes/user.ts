@@ -681,6 +681,13 @@ export default async function userRoutes(
           throw new UnauthenticatedError("Invalid invite token.");
         }
 
+        // The invite proves an admin chose this email, so a pending
+        // (never-verified) User squatting it — anyone can self-register any
+        // email — is replaced, same as on POST / (be#1012). Before the
+        // Person lookup, which would otherwise refuse the pending User's
+        // Person.
+        await reclaimPendingUser(fastify.db.userRepository, payload.email);
+
         // Same email-first lookup as POST / (be#923) — an invited
         // coordinator's email may already have a Person row (e.g. a prior
         // Volunteer signup with no User yet); link to it instead of

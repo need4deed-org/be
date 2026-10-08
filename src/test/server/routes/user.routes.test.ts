@@ -1200,6 +1200,66 @@ describe("POST /user/register-with-invite", () => {
       error: "PersonAlreadyRegisteredError",
     });
   });
+  // be#1012: anyone can self-register the invited email via public
+  // POST /user before the invite is redeemed; that pending User must not
+  // block the invite.
+  it("replaces a pending User squatting the invited email", async () => {
+    const email = `squatted-invite-${suffix}@example.com`;
+    const squat = await fastify.inject({
+      method: "POST",
+      url: "/user",
+      payload: {
+        email,
+        password: "squatter_password",
+        role: UserRole.VOLUNTEER,
+        person: { firstName: "Squat", lastName: "Ter" },
+      },
+    });
+    expect(squat.statusCode).toBe(201);
+    createdUserIds.push(squat.json().id);
+    createdPersonIds.push(squat.json().person.id);
+
+    const token = makeInviteToken(email);
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+
+    expect(res.statusCode).toBe(201);
+    createdUserIds.push(res.json().id);
+    expect(res.json()).toMatchObject({
+      role: UserRole.COORDINATOR,
+      isActive: true,
+    });
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([res.json().id]);
+  });
+
+  it("does not replace a deactivated User with the invited email", async () => {
+    const email = `deactivated-invite-${suffix}@example.com`;
+    const existingUser = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword("test_password"),
+        role: UserRole.VOLUNTEER,
+        isActive: false,
+        deactivatedAt: new Date(),
+      }),
+    );
+    createdUserIds.push(existingUser.id);
+
+    const token = makeInviteToken(email);
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/user/register-with-invite?token=${token}`,
+      payload: { password: "chosen_password" },
+    });
+
+    expect(res.statusCode).toBe(409);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([existingUser.id]);
+  });
 });
 
 describe("DELETE /user/:id (be#583)", () => {
