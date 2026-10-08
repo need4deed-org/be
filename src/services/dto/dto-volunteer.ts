@@ -9,6 +9,7 @@ import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
+import { UNKNOWN_AUTHOR } from "./dto-comment";
 import {
   getAvailability,
   getCoordinates,
@@ -28,9 +29,6 @@ export function volunteerListSerializer(
     const name = volunteer.person.name;
     const email = volunteer.person.email;
     const avatarUrl = volunteer.person?.avatarUrl || null;
-    // Collections may be absent when the list loads a reduced relation set
-    // (listType "table" skips activities/skills/availability) — default to []
-    // so the response shape stays stable.
     const languages = getLanguages(volunteer.deal.dealLanguage) ?? [];
     const availability = getAvailability(volunteer.deal.dealTimeslot) ?? [];
     const activities =
@@ -92,7 +90,7 @@ export function volunteerSerializer(
       id: comment.id,
       timestamp: comment.updatedAt,
       content: comment.text,
-      authorName: comment.user.person?.name || "Unknown Author",
+      authorName: comment.user.person?.name || UNKNOWN_AUTHOR,
     };
   });
 
@@ -101,7 +99,7 @@ export function volunteerSerializer(
       id,
       timestamp,
       content,
-      authorName: "", // TODO: add author field to timeline logs
+      authorName: "",
     }),
   );
   const person: ApiPersonGet = {
@@ -132,7 +130,6 @@ export function volunteerSerializer(
   const languages = getLanguages(volunteer.deal.dealLanguage);
   const availability = getAvailability(volunteer.deal.dealTimeslot);
 
-  // TODO: remove cast once need4deed-sdk >= 0.0.82 is published (adds statusVaccinationDate etc.)
   return {
     id: volunteer.id,
     person,

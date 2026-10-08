@@ -69,8 +69,6 @@ describe("isPersonReferenced", () => {
     expect(await referenced(person)).toBe(true);
   });
 
-  // post_person is ON DELETE CASCADE — exactly the kind of reference a
-  // failed delete would never have reported.
   it("is true for a Person tagged in a Post (many-to-many junction)", async () => {
     const author = await makePerson();
     const tagged = await makePerson();

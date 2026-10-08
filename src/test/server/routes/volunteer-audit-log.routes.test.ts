@@ -318,11 +318,14 @@ describe("volunteer activity audit log (be#919)", () => {
           type: "opportunity_status_changed",
         },
       });
-      expect(entries).toHaveLength(1);
-      expect(entries[0].detail).toContain(
+      // The fixture's own insert adds a "Linked to" entry.
+      const changes = entries.filter((e) => e.detail.includes("changed from"));
+      expect(changes).toHaveLength(1);
+      expect(changes[0].detail).toContain(
         OpportunityVolunteerStatusType.MATCHED,
       );
-      expect(entries[0].detail).toContain(opportunity.title);
+      expect(changes[0].detail).toContain(opportunity.title);
+      expect(changes[0].actorUserId).toBeTruthy();
     });
   });
 });

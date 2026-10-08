@@ -18,19 +18,9 @@ import Skill from "../../entity/profile/skill.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
 import { getCount } from "../utils";
 
-// Same values as the AddAgentTypeAndService migration's field_translation
-// seed — duplicated (not imported/shared) because that migration must stay
-// self-contained. This is the dev/test bootstrap's fallback path: on a fresh
-// DB, migrations run before `language` is seeded, so the migration's own
-// insert seeds 0 rows there; this backfills once `language` definitely
-// exists. On any already-migrated environment (where `language` predates
-// this migration), the migration's insert already did the job and
-// seedFieldTranslation's count!==0 guard skips this entirely.
 const AGENT_TYPE_TRANSLATIONS: Record<string, ContentEnDe> = {
   AE: { en: "Reception facility", de: "Aufnahmeeinrichtung" },
   GU1: { en: "shared accommodation 1", de: "Gemeinschaftsunterkunft 1" },
-  // GU2+ is not a category of its own — merged into GU2 (see the
-  // AddAgentTypeAndService migration's backfill).
   GU2: { en: "shared accommodation 2", de: "Gemeinschaftsunterkunft 2" },
   GU3: { en: "shared accommodation 3", de: "Gemeinschaftsunterkunft 3" },
   NU: { en: "Emergency shelter", de: "Notunterkunft" },

@@ -276,7 +276,7 @@ describe("POST /agent/register", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("rejects joining an unclaimed agent directly", async () => {
+  it("turns joining an unclaimed agent into a pending request", async () => {
     const agent = await makeAgent({ unclaimed: true });
     const { token } = await makeRegistrant("test.need4deed.org");
 
@@ -286,10 +286,13 @@ describe("POST /agent/register", () => {
       payload: { agentId: agent.id },
     });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(201);
+    expect(res.json().data.membershipStatus).toBe(
+      AgentMembershipStatus.PENDING,
+    );
   });
 
-  it("rejects joining an INACTIVE agent directly", async () => {
+  it("turns joining an INACTIVE agent into a pending request", async () => {
     const agent = await makeAgent({
       engagementStatus: AgentEngagementStatusType.INACTIVE,
     });
@@ -301,6 +304,9 @@ describe("POST /agent/register", () => {
       payload: { agentId: agent.id },
     });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(201);
+    expect(res.json().data.membershipStatus).toBe(
+      AgentMembershipStatus.PENDING,
+    );
   });
 });

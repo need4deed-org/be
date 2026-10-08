@@ -404,6 +404,33 @@ describe("createAgent", () => {
 });
 
 describe("resolveJoinStatus", () => {
+  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved,
+  // and the members lookup is skipped.
+  it.each([
+    ["unclaimed", { id: 33, unclaimed: true }],
+    [
+      "inactive",
+      {
+        id: 33,
+        unclaimed: false,
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+      },
+    ],
+  ])(
+    "returns PENDING for an %s agent, even on a domain match",
+    async (_l, agent) => {
+      agentRepoFindOne.mockResolvedValueOnce(agent);
+      agentPersonRepoFind.mockResolvedValueOnce([
+        { person: { email: "existing@center.de", users: [] } },
+      ]);
+
+      const status = await resolveJoinStatus(33, "newcomer@center.de");
+
+      expect(status).toBe(AgentMembershipStatus.PENDING);
+      expect(agentPersonRepoFind).not.toHaveBeenCalled();
+    },
+  );
+
   it("returns ACTIVE when a member's Person.email shares the registrant's domain", async () => {
     agentPersonRepoFind.mockResolvedValueOnce([
       { person: { email: "existing@center.de", users: [] } },
@@ -473,38 +500,6 @@ describe("joinAgent", () => {
     );
 
     expect(err).toBeInstanceOf(NotFoundError);
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
-  });
-
-  // fe#911: a coordinator-created agent is marked `unclaimed` until a real
-  // registration claims it. Excluding it from the /search picker isn't
-  // enough on its own — this is the endpoint that actually grants access, and
-  // it takes agentId directly from the client — so it must refuse to link
-  // anyone to an agent nobody has ever joined yet.
-  it("rejects joining an unclaimed (coordinator-created) agent", async () => {
-    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: true });
-
-    await expect(
-      joinAgent(11, 33, AgentMembershipStatus.PENDING),
-    ).rejects.toThrow(
-      "This agent has not been claimed yet and cannot be joined directly.",
-    );
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
-  });
-
-  // be#885: excluding an INACTIVE agent from the /search picker isn't enough
-  // on its own either, for the same reason as unclaimed above — this route
-  // takes agentId directly from the client.
-  it("rejects joining an INACTIVE agent", async () => {
-    agentRepoFindOne.mockResolvedValueOnce({
-      id: 33,
-      unclaimed: false,
-      engagementStatus: AgentEngagementStatusType.INACTIVE,
-    });
-
-    await expect(
-      joinAgent(11, 33, AgentMembershipStatus.PENDING),
-    ).rejects.toThrow("This agent is inactive and cannot be joined.");
     expect(agentPersonRepoSave).not.toHaveBeenCalled();
   });
 

@@ -1,18 +1,11 @@
 import type { EmailMessage } from "./types";
 
-// Mirrors fillTemplate()'s placeholder syntax so a leftover unresolved
-// placeholder is caught. Deliberately does not scan for any other substring
-// (e.g. the word "undefined") — that's fillTemplate's job at the source,
-// where it can tell an actual nullish variable apart from a user having
-// legitimately typed that word into free-text content.
 const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+(?:\.\w+)?\s*\}\}/;
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim();
 }
 
-/** Returns a list of problems with a computed EmailMessage — empty if valid.
- *  The problems name no values (addresses, subjects): they are logged. */
 export function validateEmailMessage(msg: EmailMessage): string[] {
   const problems: string[] = [];
 

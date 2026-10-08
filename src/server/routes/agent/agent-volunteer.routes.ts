@@ -9,6 +9,7 @@ import {
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
+import { assertAgentMemberOrStaff } from "../../utils/data/assert-agent-member-or-staff";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
@@ -17,7 +18,6 @@ export default function agentVolunteerRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    // Handler sends entities; the DTO runs in the preSerialization hook.
     Reply: ReplyData<OpportunityVolunteer[]>;
   }>(
     "/",
@@ -38,6 +38,7 @@ export default function agentVolunteerRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
       assertAgentVisible(agent, request.authUser?.role);
+      await assertAgentMemberOrStaff(request, id);
 
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
@@ -56,14 +57,10 @@ export default function agentVolunteerRoutes(
         ],
       });
 
-      // An INACTIVE agent's linked volunteers shouldn't read as live,
-      // actionable data (be#885) — mask volunteer identity for everyone
-      // except coordinator/admin.
       if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
         maskVolunteerIdentities(volunteers);
       }
 
-      // DTO runs in the preSerialization hook after PII masking.
       return reply.status(200).send({
         message: `Volunteers linked to agent (id:${id}) via its opportunities.`,
         data: volunteers,

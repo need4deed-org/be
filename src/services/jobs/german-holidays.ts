@@ -33,16 +33,16 @@ export function isGermanPublicHoliday(date: Date): boolean {
   const easter = easterSunday(y);
 
   const holidays = [
-    new Date(y, 0, 1), // Neujahr
-    new Date(y, 2, 8), // Internationaler Frauentag (Berlin)
-    new Date(y, 4, 1), // Tag der Arbeit
-    new Date(y, 9, 3), // Tag der Deutschen Einheit
-    new Date(y, 11, 25), // 1. Weihnachtstag
-    new Date(y, 11, 26), // 2. Weihnachtstag
-    addDays(easter, -2), // Karfreitag
-    addDays(easter, 1), // Ostermontag
-    addDays(easter, 39), // Christi Himmelfahrt
-    addDays(easter, 50), // Pfingstmontag
+    new Date(y, 0, 1),
+    new Date(y, 2, 8),
+    new Date(y, 4, 1),
+    new Date(y, 9, 3),
+    new Date(y, 11, 25),
+    new Date(y, 11, 26),
+    addDays(easter, -2),
+    addDays(easter, 1),
+    addDays(easter, 39),
+    addDays(easter, 50),
   ];
 
   return holidays.some((h) => sameDay(h, date));
@@ -67,9 +67,6 @@ export function addWorkingDays(from: Date, days: number): Date {
   return result;
 }
 
-// Returns a Date n calendar months before now, clamping the day to the last
-// day of the target month to avoid setMonth overflow (e.g. Apr 30 - 2 months
-// should be Feb 28, not Mar 2).
 export function monthsAgo(n: number, now: Date = new Date()): Date {
   const targetMonth = now.getMonth() - n;
   const y = now.getFullYear() + Math.floor(targetMonth / 12);
@@ -86,9 +83,6 @@ export function berlinToday(): Date {
   return new Date(y, m - 1, d);
 }
 
-// Returns UTC timestamps for the start and end of the given Berlin calendar day.
-// Necessary because Node.js `new Date(y, m, d)` uses the process-local timezone
-// (UTC on AWS), so it would not correctly represent Berlin midnight.
 export function berlinDayBoundaries(berlinDate: Date): {
   startOfDay: Date;
   endOfDay: Date;
@@ -96,12 +90,6 @@ export function berlinDayBoundaries(berlinDate: Date): {
   const y = berlinDate.getFullYear();
   const m = berlinDate.getMonth();
   const d = berlinDate.getDate();
-  // Sample the Berlin UTC offset at noon on the target day.
-  // DST transitions happen at 02:00 in Europe, so noon is always post-transition.
-  // We use formatToParts (not toLocaleString + new Date()) because toLocaleString
-  // + new Date() parsing is implementation-defined and produces wrong offsets on
-  // non-UTC developer machines. formatToParts extracts numeric field values
-  // independently of the process local timezone.
   const noonUTC = new Date(Date.UTC(y, m, d, 12));
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Berlin",
@@ -115,8 +103,6 @@ export function berlinDayBoundaries(berlinDate: Date): {
   }).formatToParts(noonUTC);
   const get = (type: string) =>
     parseInt(parts.find((p) => p.type === type)!.value, 10);
-  // Treating the Berlin wall-clock values as UTC gives us a timestamp we can
-  // subtract from noonUTC to obtain the Berlin UTC offset in milliseconds.
   const berlinNoonAsUTC = Date.UTC(
     get("year"),
     get("month") - 1,
@@ -132,13 +118,6 @@ export function berlinDayBoundaries(berlinDate: Date): {
   };
 }
 
-/**
- * The `updatedAt` range [from, to) a daily run takes for an n-month threshold
- * (be#1088): rows that crossed it since the previous day's run. Consecutive
- * days' ranges meet exactly, so a row is taken on one run only. Where the
- * month-end clamp gives two days the same threshold (Apr 29 and 30 → Feb 28),
- * the second day's range is empty rather than overlapping.
- */
 export function crossedMonthsAgo(
   n: number,
   now: Date = new Date(),
@@ -146,14 +125,6 @@ export function crossedMonthsAgo(
   return { from: monthsAgo(n, addDays(now, -1)), to: monthsAgo(n, now) };
 }
 
-/**
- * The appointment times [from, to) a working day's run takes when checking
- * for accompaniments still without a volunteer (be#1088): the day
- * `workingDaysAhead` working days ahead, plus the weekend or holidays right
- * after it, up to the next working day (Berlin time). Consecutive working
- * days' ranges cover every calendar day once, and a weekend or holiday
- * appointment gets as much notice as the working day before it.
- */
 export function appointmentsDue(
   today: Date,
   workingDaysAhead: number,

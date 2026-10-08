@@ -31,26 +31,12 @@ import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
 export type VolunteerSelfRegisterBody = ApiVolunteerRegisterNew;
 
-// Derived from build-deal-timeslots.ts's WEEKDAYS (["", "Monday", ...,
-// "Sunday"], index 1-7) instead of a second hand-maintained table, so the two
-// can't drift apart on a future day-name/ordering change.
 const BY_DAY_TO_WEEKDAY: Record<string, number> = Object.fromEntries(
   WEEKDAYS.map((day, index) => [day, index]).filter(([day]) => day !== ""),
 );
 
 const OCCASIONAL_DAYTIMES: string[] = Object.values(OccasionalType);
 
-// ApiAvailability's {day, daytime} (day a name string, "occasionally" or
-// absent meaning the occasional bucket) into the [day, daytime][] tuple
-// format buildDealTimeslots already knows how to resolve — same tuple shape
-// dealParserOpportunityCreate's formData.timeslots uses.
-//
-// `entry.day` and `entry.daytime` are independently optional at the schema
-// level (need4deed-sdk's ApiAvailability), so a client can send a
-// time-of-day daytime ("08-11") with no day at all. Only an occasional
-// daytime ("weekdays"/"weekends") is meaningful without a day — anything
-// else missing a day is a malformed entry, not a silent "occasional" default
-// (buildDealTimeslots would otherwise store a bogus occasional value).
 function availabilityToTimeslots(
   availability: ApiAvailability[] | undefined | null,
 ): [number, string][] {
@@ -75,8 +61,6 @@ function availabilityToTimeslots(
 }
 
 function optionIds(
-  // OptionById.id is `OptionId` (string | number) SDK-wide, unlike OptionItem
-  // (always numeric) — coerce so callers get real numbers regardless.
   options: Array<{ id: number | string }> | undefined | null,
 ): number[] {
   return (options || []).map((option) => Number(option.id));
@@ -99,8 +83,6 @@ async function resolveDealLanguages(
   const languageRepository = getRepository(dataSource, Language);
   const resolved = await languageRepository.findBy({ id: In(languageIds) });
 
-  // purpose left unset (entity default GENERAL) — RECIPIENT is specific to
-  // an opportunity's language need, not a volunteer's own languages.
   return resolved.map((language) => {
     const proficiency = proficiencyById.get(language.id);
     return new DealLanguage({
@@ -121,23 +103,6 @@ async function resolveLeadFrom(
   return leadFromRepository.findBy({ id: In(uniqueIds) });
 }
 
-// Reuses the Person's existing Address (patching its postcode) instead of
-// always minting a fresh one — the Person attached here can be pre-existing
-// (email-linked, be#947), and may already own a real address from an earlier
-// flow (e.g. an opportunity/event submission, get-or-create-submitter-person).
-//
-// Deliberately does NOT fetch/check the existing Address here at all — an
-// earlier version did (checking exclusive ownership, then fetching and
-// mutating the entity for a blind save much later), but writeVolunteerLegacy
-// runs after several more awaited round-trips, and both that ownership check
-// and the fetched postcode value could go stale in the gap (be#1031/#1033
-// review). Instead this just returns which existing Address to reuse and the
-// postcode it should end up with; writeVolunteerLegacy applies it via
-// patchOrReplaceAddress inside its own transaction, which re-checks exclusive
-// ownership fresh immediately before writing — collapsing the race window to
-// effectively nothing, and cloning into a fresh Address instead of patching
-// in place if the row became shared with another Person in the meantime
-// (be#1019).
 function resolveAddress(
   person: Person,
   postcode: Postcode,
@@ -158,13 +123,8 @@ export async function parserVolunteerSelfRegister(
   leads: LeadFrom[];
   addressReuse?: AddressReusePlan;
 }> {
-  // Required: both Address.postcodeId and Deal.postcodeId are NOT NULL, and
-  // a volunteer can't be matched to anything without a location.
   const postcode = await getPostcode(String(body.addressPostcode));
 
-  // None of these depend on each other's result, only on the final
-  // Deal/Volunteer construction below — resolve them concurrently instead of
-  // paying for each round-trip in series.
   const [dealActivity, dealSkill, dealDistrict, dealLanguage, dealTimeslot] =
     await Promise.all([
       resolveByIds(

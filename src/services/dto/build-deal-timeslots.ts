@@ -17,9 +17,6 @@ export const WEEKDAYS = [
   "Sunday",
 ] as const;
 
-// Shared by dealParserOpportunity (legacy) and dealParserOpportunityCreate
-// (dashboard): timeslot resolution doesn't depend on the title-vs-id split
-// between those two forms, so both use it as-is.
 export async function buildDealTimeslots(
   timeslots: [number, string][] | undefined | null,
   onetimeDateTime: string | undefined | null,
@@ -47,7 +44,7 @@ export async function buildDealTimeslots(
     const info = `One-time event on ${onetimeDateTime}`;
     const timeslot = await getTimeslot({ start, info });
 
-    await timeslotRepository.save(timeslot); // TODO: check if id is undefined before saving
+    await timeslotRepository.save(timeslot);
     logger.debug(`Created one-time timeslot: ${JSON.stringify(timeslot)}`);
 
     dealTimeslot.push(new DealTimeslot({ timeslot }));

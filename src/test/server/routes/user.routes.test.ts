@@ -205,8 +205,6 @@ describe("POST /user — links existing Person by email instead of duplicating (
     expect(personCount).toBe(1);
   });
 
-  // be#1012 review: "_" is valid in an email's local part; it must match
-  // literally, not pick up a different address's Person as a wildcard.
   it("does not treat '_' in the email as a wildcard", async () => {
     const lookalikePerson = await fastify.db.personRepository.save(
       new Person({
@@ -317,8 +315,6 @@ describe("POST /user — links existing Person by email instead of duplicating (
   });
 });
 
-// be#1012: a pending (never-verified) User no longer holds its email for
-// good — anyone can self-register any email, so a later signup replaces it.
 describe("POST /user — reclaims a pending (never-verified) User (be#1012)", () => {
   let fastify: FastifyInstance;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -371,16 +367,12 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([second.json().id]);
     expect(await users[0].checkPassword("owner_password")).toBe(true);
-    // The squatter's bare Person (and the names typed into it) went with
-    // the pending User (be#1012 review).
     const persons = await fastify.db.personRepository.findBy({ email });
     expect(persons).toHaveLength(1);
     expect(persons[0].id).not.toBe(first.json().person.id);
     expect(persons[0].firstName).toBe("Owner");
   });
 
-  // User.email is stored and looked up lowercased (be#1013), so a case
-  // variant of the squatted email still reclaims it (be#1012 review).
   it("reclaims when the new signup uses a different case", async () => {
     const email = `reclaim-case-${suffix}@example.com`;
     emails.push(email);
@@ -446,15 +438,11 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     expect(users.map((u) => u.id)).toEqual([first.json().id]);
   });
 
-  // The takeover a reclaim could otherwise open: the owner signs up, someone
-  // re-registers the email with their own password before the owner clicks
-  // the link — the owner's link must not activate the replacement.
   it("does not let the replaced User's verification link activate the replacement", async () => {
     const email = `reclaim-takeover-${suffix}@example.com`;
     emails.push(email);
     const owner = await register(email, "owner_password");
     expect(owner.statusCode).toBe(201);
-    // Same claims sendEmailVerification puts in the emailed link.
     const ownerLink = fastify.jwt.sign({
       id: owner.json().id,
       email,
@@ -708,8 +696,6 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
     expect(reloaded.isActive).toBe(false);
   });
 
-  // be#1012: a reclaimed pending User is replaced by a new row (new id) for
-  // the same email — a link issued to the old row must not activate it.
   it("rejects a token issued to a since-replaced User with the same email", async () => {
     const email = `reclaimed-${suffix}@example.com`;
     const stale = await makeInactiveUser(email, UserRole.VOLUNTEER);
@@ -1151,7 +1137,6 @@ describe("POST /user/admin/coordinator-invite", () => {
     expect(res.statusCode).toBe(409);
   });
 
-  // be#1012: the pending User is only replaced once the invite is redeemed.
   it("issues an invite for an email held only by a pending User, leaving it in place", async () => {
     const email = `pending-invitee-${suffix}@example.com`;
     const pendingUser = await fastify.db.userRepository.save(
@@ -1208,8 +1193,6 @@ describe("POST /user/admin/coordinator-invite", () => {
 
 // be#1008: the public side of the invite flow — the invitee sets their own
 // password to activate a COORDINATOR account.
-// be#1012: an admin creating an account replaces a pending (never-verified)
-// User holding the email; any other User still 409s.
 describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
   let fastify: FastifyInstance;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -1281,7 +1264,6 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
     expect(res.json().id).not.toBe(pendingUser.id);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([res.json().id]);
-    // No same-email duplicate Person left behind (be#1012 review).
     const persons = await fastify.db.personRepository.findBy({ email });
     expect(persons.map((p) => p.id)).toEqual([res.json().person.id]);
     expect(persons[0].firstName).toBe("Admin");
@@ -1506,9 +1488,6 @@ describe("POST /user/register-with-invite", () => {
       error: "PersonAlreadyRegisteredError",
     });
   });
-  // be#1012: anyone can self-register the invited email via public
-  // POST /user before the invite is redeemed; that pending User must not
-  // block the invite.
   it("replaces a pending User squatting the invited email", async () => {
     const email = `squatted-invite-${suffix}@example.com`;
     const squat = await fastify.inject({
@@ -1538,8 +1517,6 @@ describe("POST /user/register-with-invite", () => {
     expect(res.json()).toMatchObject({
       role: UserRole.COORDINATOR,
       isActive: true,
-      // The admin's names from the invite, not the squatter's (be#1012
-      // review): the squatter's bare Person went with the pending User.
       person: { firstName: "New", lastName: "Coordinator" },
     });
     const users = await fastify.db.userRepository.findBy({ email });

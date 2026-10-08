@@ -11,21 +11,12 @@ import Skill from "../../data/entity/profile/skill.entity";
 import { pascal2snake } from "../utils";
 
 interface TranslatedEntity {
-  // FieldTranslation property holding the FK to this table (be#1066 replaced
-  // the polymorphic entity_type/entity_id pair with one nullable FK per table).
   fk: keyof FieldTranslation;
   entity: new () => { id: number };
-  // field_name values a translation row of this table may carry.
   fields: readonly string[];
-  // true: user-entered text, translated by the MT worker (be#1067).
-  // false: seeded reference data (origin = reference), never sent to MT.
   machine: boolean;
 }
 
-// Every table that can have field_translation rows, keyed by the
-// EntityTableName the rest of the code already uses to name it. Adding a
-// table here also needs a migration: its FK column, its partial unique index,
-// and the field_translation_one_target CHECK.
 export const translatedEntities = {
   [EntityTableName.OPPORTUNITY]: {
     fk: "opportunityId",
@@ -98,8 +89,6 @@ export function getTranslationFkColumn(entityType: EntityTableName): string {
   return pascal2snake(getTranslatedEntity(entityType).fk, "lower");
 }
 
-// Only machine-translated tables and their listed fields are accepted: PII
-// fields (e.g. infoConfidential) and reference tables never reach the queue.
 export function getMachineEntry(
   entityType: EntityTableName,
   fieldNames: string[],

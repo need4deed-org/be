@@ -198,12 +198,6 @@ export async function getPostcodeGetter(dataSource: DataSource) {
   };
 }
 
-// Always creates a fresh Address row, even when the postcode/street match an
-// existing one — an Address is owned by exactly one Person/Organization, so
-// reusing an existing row here (as this used to do, including the seeded
-// "Dummy" placeholder for missing addressData) let many entities end up
-// sharing one row, and a later edit to one of them silently changed the rest
-// (be#1019).
 async function getOrCreateAddress(
   addressData: AddressJSON,
   dataSource: DataSource,
@@ -227,13 +221,6 @@ async function getOrCreateAddress(
   return address;
 }
 
-// Always creates a fresh Person row for a personless caller, even though
-// this used to hand every one of them the same seeded "Anna" placeholder
-// (dummyPerson) — a Person row is owned by exactly one volunteer/agent
-// contact/organization, so reusing one let unrelated entities end up
-// pointing at the same row, and a later edit through a route keyed on that
-// Person's id (e.g. contact-detail patches) silently changed all of them
-// (be#1027, same pattern as be#1025's Address fix).
 export async function getOrCreatePerson(
   personData: PersonJSON,
   dataSource: DataSource,
@@ -328,11 +315,9 @@ export async function createDeal(
   for (const title of dealData.profile.activities ?? []) {
     const activity = await activityRepository.findOne({ where: { title } });
     if (!activity) {
-      // logger.warn(`Activity ${title} not found. Skipping.`);
       continue;
     }
     categoryIds.push(activity.categoryId);
-    // DealActivity rows are created after the deal is saved (need dealId).
     activities.push(activity);
   }
 
@@ -340,10 +325,8 @@ export async function createDeal(
   for (const title of dealData.profile.skills ?? []) {
     const skill = await skillRepository.findOne({ where: { title } });
     if (!skill) {
-      // logger.warn(`Skill ${title} not found. Skipping.`);
       continue;
     }
-    // DealSkill rows are created after the deal is saved (need dealId).
     skills.push(skill);
   }
 
@@ -354,7 +337,6 @@ export async function createDeal(
       logger.warn(`Language ${title} not found. Skipping.`);
       continue;
     }
-    // DealLanguage rows are created after the deal is saved (need dealId).
     languages.push({ language, level });
   }
 
@@ -369,7 +351,6 @@ export async function createDeal(
       district = new District({ title });
       await districtRepository.save(district);
     }
-    // DealDistrict rows are created after the deal is saved (need dealId).
     districts.push(district);
   }
 

@@ -27,15 +27,6 @@ function formatReport(msg: EmailMessage, problems: string[]): string {
   ].join("\n");
 }
 
-/**
- * Validates a computed EmailMessage before handing it to the real transport.
- * On failure, suspends the send and instead reports the full original
- * message + the problems found to `errorRecipient`, via `errorTransport`
- * rather than `deliverable` — this is an internal engineering alert, not
- * end-user-facing content, so it must always actually reach someone
- * regardless of dry-run config (pass the transport's real underlying SMTP
- * client here, not a dry-run-wrapped one).
- */
 export class ValidatingEmailTransport implements EmailTransport {
   constructor(
     private readonly deliverable: EmailTransport,
@@ -50,7 +41,6 @@ export class ValidatingEmailTransport implements EmailTransport {
       return;
     }
 
-    // No recipient or subject here: the report below carries them.
     logger.error(
       `[notify] suspended invalid outbound email: ${problems.join("; ")}`,
     );

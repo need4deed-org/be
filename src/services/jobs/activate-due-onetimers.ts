@@ -14,11 +14,6 @@ export async function activateDueOnetimers(
 ): Promise<void> {
   const { endOfDay } = berlinDayBoundaries(berlinToday());
 
-  // `<= endOfDay` (rather than restricting to today's window) lets a onetimer
-  // whose exact appointment day the job missed — a deploy, an outage, a
-  // failed transaction — still get activated on the next run, instead of
-  // being silently skipped straight to PAST by scanExpiredOnetimers with no
-  // error raised (be#987 review).
   const dueOpportunities = await buildOnetimerOpportunityQuery(fastify)
     .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
       terminalStatuses: [

@@ -1,13 +1,7 @@
 import { EntityManager, EntityMetadata } from "typeorm";
 import Person from "../../../data/entity/person.entity";
 
-// Does any row anywhere point at this Person — a User, Volunteer, agent
-// membership, opportunity contact, post/comment tag, testimonial, ...?
-// Walks the TypeORM metadata rather than a hand-kept list, so a relation
-// added later is covered too. Several of those FKs are ON DELETE CASCADE
-// (agent_person, post, comment_person, ...), so a failed delete can't be
-// relied on to say "still in use" — deleting would silently take that data
-// with it. Person's own outgoing relations (e.g. its Address) don't count.
+// several FKs to Person are ON DELETE CASCADE, so a failed delete can't signal "in use"
 export async function isPersonReferenced(
   manager: EntityManager,
   personId: number,

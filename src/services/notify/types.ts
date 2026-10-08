@@ -7,8 +7,6 @@ export interface EmailMessage {
   from?: string;
 }
 
-// "cron": #cron-notifications (C0C3A594KHT), where the cron jobs' emails are
-// posted for coordinators instead of being sent (be#1088).
 export type SlackChannel = "ops" | "comments" | "cron";
 
 export interface SlackMessage {

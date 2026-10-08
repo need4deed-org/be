@@ -14,10 +14,8 @@ import {
   responseErrors,
 } from "../../schema";
 import { ParamsId } from "../../types";
+import { claimAgent } from "../../utils/data/claim-agent";
 
-// Moderation of agent memberships. COORDINATOR/ADMIN only — re-gated here since
-// the parent /agent onRequest hook was relaxed to logged-in for the GET PII
-// work. This is where PENDING joins get approved or rejected.
 export default async function agentMembershipRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -27,7 +25,6 @@ export default async function agentMembershipRoutes(
     fastify.authenticate({ role: UserRole.COORDINATOR }),
   );
 
-  // GET /agent/membership?status=pending — list memberships to moderate.
   fastify.get<{ Querystring: { status?: AgentMembershipStatus } }>(
     "/",
     {
@@ -57,7 +54,6 @@ export default async function agentMembershipRoutes(
     },
   );
 
-  // PATCH /agent/membership/:id — approve (status -> active) or change status.
   fastify.patch<{ Params: ParamsId; Body: { status: AgentMembershipStatus } }>(
     "/:id",
     {
@@ -76,7 +72,12 @@ export default async function agentMembershipRoutes(
       }
 
       membership.status = request.body.status;
-      await repo.save(membership);
+      await repo.manager.transaction(async (manager) => {
+        await manager.save(membership);
+        if (membership.status === AgentMembershipStatus.ACTIVE) {
+          await claimAgent(membership.agentId, manager);
+        }
+      });
       logger.debug(
         `agent-membership: ${request.params.id} -> ${request.body.status}`,
       );
@@ -84,7 +85,6 @@ export default async function agentMembershipRoutes(
     },
   );
 
-  // DELETE /agent/membership/:id — reject the join (remove the link).
   fastify.delete<{ Params: ParamsId }>(
     "/:id",
     {

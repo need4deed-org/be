@@ -1,7 +1,7 @@
-import { FastifyJWT } from "@fastify/jwt";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import fp from "fastify-plugin";
 import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
+import { BadRequestError } from "../../config";
 import {
   ACCESS_LIFESPAN_MS,
   accessCookieName,
@@ -26,6 +26,11 @@ import {
 import { ReplyMessage, RoutePrefix } from "../types";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
+import {
+  getRefreshPayload,
+  getRefreshToken,
+  refreshRateLimitKey,
+} from "../utils/refresh-token";
 
 async function authRoutes(
   fastify: FastifyInstance,
@@ -125,7 +130,13 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: "1 minute",
+          keyGenerator: refreshRateLimitKey,
+        },
+      },
       schema: {
         body: refreshAccessSchema,
         response: {
@@ -136,40 +147,14 @@ async function authRoutes(
     },
     async (request, reply) => {
       // verify if refresh token is provided and valid
-      let id: number;
-      let token: string;
-
-      if (request.body?.refresh) {
-        token = request.body.refresh;
-      } else if (request.cookies && request.cookies[refreshCookieName]) {
-        token = request.cookies[refreshCookieName];
+      if (!getRefreshToken(request)) {
+        throw new BadRequestError("Refresh token is required.");
       }
-
-      if (!token) {
-        return reply
-          .status(400)
-          .send({ message: "Refresh token is required." });
+      const decoded = getRefreshPayload(request);
+      if (!decoded) {
+        throw new BadRequestError("Invalid refresh token.");
       }
-
-      try {
-        const decoded = (await fastify.jwt.verify(
-          token,
-        )) as FastifyJWT["payload"] & {
-          id: number;
-        };
-        if (
-          !decoded ||
-          !(decoded.id && decoded.email) ||
-          decoded.type !== "refresh"
-        ) {
-          return reply.status(400).send({ message: "Invalid refresh token." });
-        }
-
-        id = decoded.id;
-      } catch (error) {
-        logger.error(`JWT verification failed: ${error.message}`);
-        return reply.status(400).send({ message: "Invalid refresh token." });
-      }
+      const id = decoded.id;
 
       try {
         const userRepository = fastify.db.userRepository;
@@ -229,10 +214,6 @@ async function authRoutes(
       },
     },
     async (_request, reply) => {
-      // Logout is open (no auth guard) so a stale/expired session can always
-      // clear its cookies. Clear the httpOnly auth cookies on the caller's
-      // browser using the same options they were set with (path/sameSite/secure)
-      // so the browser actually removes them.
       reply.clearCookie(accessCookieName, cookieOptions);
       reply.clearCookie(refreshCookieName, cookieOptions);
 

@@ -45,6 +45,7 @@ import Category from "./entity/profile/category.entity";
 import Language from "./entity/profile/language.entity";
 import Service from "./entity/profile/service.entity";
 import Skill from "./entity/profile/skill.entity";
+import StatisticsEvent from "./entity/statistics-event.entity";
 import Testimonial from "./entity/testimonial.entity";
 import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
@@ -121,6 +122,7 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
     VolunteerAuditLog,
+    StatisticsEvent,
   ],
   ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),
   migrations: isTest ? [] : [__dirname + "/migrations/**/*{.ts,.js}"],

@@ -135,7 +135,7 @@
     "PreferredCommunicationType": {
       "$id": "PreferredCommunicationType",
       "type": "string",
-      "enum": ["email", "mobilePhone", "whatsapp", "telegram"]
+      "enum": ["email", "mobilePhone", "whatsapp", "telegram", "sms"]
     },
     "VolunteerCommunicationType": {
       "$id": "VolunteerCommunicationType",

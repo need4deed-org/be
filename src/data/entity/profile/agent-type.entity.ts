@@ -23,8 +23,5 @@ export default class AgentType {
   @OneToMany(() => Agent, (agent) => agent.agentType)
   agent: Agent[];
 
-  // Populated by getOptionTitleTranslations before serialization — unlike
-  // Skill/Language's single resolved `translation: string`, this needs both
-  // en and de at once to match the OptionById.title shape in a single response.
   translations?: OptionTitle;
 }

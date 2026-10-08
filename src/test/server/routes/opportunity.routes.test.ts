@@ -287,9 +287,9 @@ describe("PATCH /opportunity/:id agent status update", () => {
     expect(updated.title).toBe("Coordinator renamed");
   });
 
-  // Agents may now edit their own opportunity's fields generally (be#870),
-  // but reassigning it to a *different* agent stays coordinator-only.
-  it("403s when an agent tries to relink an opportunity to another agent via agent.id", async () => {
+  // Agents may edit their own opportunity's fields, and move it only to another
+  // NGO they belong to.
+  it("403s when an agent tries to move an opportunity to an NGO they don't belong to", async () => {
     const res = await fastify.inject({
       method: "PATCH",
       url: `/opportunity/${ownOpportunity.id}`,
@@ -305,6 +305,38 @@ describe("PATCH /opportunity/:id agent status update", () => {
       id: ownOpportunity.id,
     });
     expect(unchanged.agentId).toBe(ownAgent.id);
+  });
+
+  it("lets an agent move an opportunity to another NGO they also belong to", async () => {
+    const membership = await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: otherAgent.id,
+        personId: agentPerson.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/opportunity/${ownOpportunity.id}`,
+        cookies: { [accessCookieName]: agentCookie },
+        payload: { agent: { id: otherAgent.id } },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const moved = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: ownOpportunity.id,
+      });
+      expect(moved.agentId).toBe(otherAgent.id);
+      // The old contact belonged to the old NGO; the mover takes over.
+      expect(moved.contactPersonId).toBe(agentPerson.id);
+    } finally {
+      await fastify.db.opportunityRepository.update(
+        { id: ownOpportunity.id },
+        { agentId: ownAgent.id },
+      );
+      await fastify.db.agentPersonRepository.delete({ id: membership.id });
+    }
   });
 
   // agentBody.id === undefined is parser-opportunity-patch-data.ts's
@@ -946,6 +978,14 @@ describe("DELETE /opportunity/:id", () => {
     expect(survivingVolunteer?.statusMatch).toBe(
       VolunteerStateMatchType.NEEDS_REMATCH,
     );
+
+    const removal = await fastify.db.volunteerAuditLogRepository.findBy({
+      volunteerId: volunteer.id,
+      type: "opportunity_status_changed",
+    });
+    expect(
+      removal.some((entry) => entry.detail.startsWith("Removed from")),
+    ).toBe(true);
   });
 });
 

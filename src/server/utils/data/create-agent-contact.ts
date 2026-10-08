@@ -8,34 +8,9 @@ import { dataSource } from "../../../data/data-source";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
+import { claimAgent } from "./claim-agent";
 import { createAddress } from "./for-routes";
 
-// Only a Person who already has an AGENT-role User represents someone with
-// real, existing NGO login access — that's the one case where linking
-// (rather than creating a duplicate Person) actually grants them access to
-// this agent too, mirroring what joinAgent (write-agent-registration.ts)
-// does for self-service registration (be#1048). A match on a VOLUNTEER/
-// COORDINATOR-only Person, or no match at all, falls through to the
-// existing new-Person path unchanged.
-//
-// Matches on Person.email OR any linked User's email — Person.email is
-// often unset for agent-side people, with the real identifying email living
-// on the User row instead (same reasoning as resolveJoinStatus in
-// write-agent-registration.ts).
-//
-// Doesn't reuse getOrCreateSubmitterPerson (opportunity-legacy's rac_email
-// linking) — that helper links unconditionally regardless of whether the
-// matched Person has any User at all, which is right for its own use case
-// (submitter tracking) but wrong here: granting a real NGO membership is a
-// higher-stakes action than that submitter-tracking link.
-//
-// Exact, case-insensitive match on a trimmed value (LOWER(...) = LOWER(...)),
-// not ILIKE: `email` is an unvalidated string, and ILIKE treats `%`/`_` as
-// wildcards, letting a crafted value match or link unintended users
-// (be#1048 review). Inner-joins only AGENT-role users, so a Person with no
-// User at all (e.g. a stale duplicate from before this feature existed)
-// can never match, and getOne() can't pick an unrelated userless Person over
-// the real AGENT-linked one (be#1048 review).
 async function findExistingAgentUserPerson(
   manager: EntityManager,
   email: string,
@@ -55,36 +30,6 @@ async function findExistingAgentUserPerson(
     .getOne();
 }
 
-/**
- * Adds a contact to an existing agent, from that agent's own profile —
- * distinct from the self-registration flow (write-agent-registration.ts),
- * which only ever links the *authenticated caller's own* person.
- *
- * For a coordinator/admin caller, if `input.email` matches an existing
- * Person who already has an AGENT-role User, links that existing Person with
- * a new ACTIVE AgentPerson membership instead of creating a duplicate,
- * disconnected Person (be#1048). `input`'s other fields (name, phone,
- * address, …) are ignored in this case: the existing Person's own profile
- * stays authoritative rather than being overwritten by whatever the caller
- * happened to type for someone else's account (be#1048 review). Idempotent:
- * an existing membership for the same (agent, person, role) is returned
- * as-is, promoted to ACTIVE if it was PENDING (that's the same deliberate
- * approval a fresh link represents).
- *
- * An AGENT caller never links: any response difference between "linked an
- * existing account" and "created a new contact" — and the linked row then
- * showing up in GET /agent/:id — would tell any NGO member whether an email
- * belongs to a registered AGENT user (be#975). They always get a new Person,
- * as before be#1048; a coordinator can link the real account later.
- *
- * Otherwise (no email, or no matching AGENT-role Person), behavior is
- * unchanged: always creates a brand-new Person. Address is best-effort: if
- * street+postcode are given but the postcode doesn't resolve to a known
- * Postcode, the contact is still created without an address rather than
- * failing the whole request. Person + AgentPerson are written in one
- * transaction so a partial failure can't leave an orphan Person with no
- * membership.
- */
 export async function createAgentContact(
   agentId: number,
   input: ApiAgentContactPost,
@@ -119,6 +64,9 @@ export async function createAgentContact(
       } else if (agentPerson.status === AgentMembershipStatus.PENDING) {
         agentPerson.status = AgentMembershipStatus.ACTIVE;
         agentPerson = await agentPersonRepository.save(agentPerson);
+      }
+      if (agentPerson.status === AgentMembershipStatus.ACTIVE) {
+        await claimAgent(agentId, manager);
       }
       agentPerson.person = existingPerson;
       result = agentPerson;

@@ -14,8 +14,6 @@ import {
   TranslationFk,
 } from "./registry";
 
-// The source text a translation was made from; a different hash means the
-// translation is outdated.
 export function sourceHashOf(text: string): string {
   return sha256Hex(text);
 }
@@ -28,20 +26,6 @@ function rowsOf(
   return { [fk]: entityId, ...extra } as FindOptionsWhere<FieldTranslation>;
 }
 
-/**
- * Queues machine translation of `fields` into every language other than the
- * entity's original one. Call it in the same transaction as the write that
- * changes the text, so text and source hash always change together.
- *
- * - unchanged text (same source hash) is left alone, whatever its state:
- *   done, failed, or a human translation;
- * - changed text resets the row to a pending machine translation, human
- *   rows included (epic decision 2: a translation of outdated text is worse
- *   than a fresh machine one);
- * - empty text removes the field's translations.
- *
- * No text leaves the server here; the worker does the translating.
- */
 export async function enqueue(
   manager: EntityManager,
   entityType: EntityTableName,
@@ -61,8 +45,6 @@ export async function enqueue(
     }
     const sourceHash = sourceHashOf(text);
 
-    // Translating into the original language is never wanted (be#1065:
-    // same-language input comes back reworded).
     await repository.delete(
       rowsOf(fk, entity.id, { fieldName, languageId: idOf[original] }),
     );
@@ -107,8 +89,6 @@ async function loadEntity(
   fieldNames: string[],
 ) {
   const entry = getMachineEntry(entityType, fieldNames);
-  // The registry is generic over its tables; fields are read by name, and
-  // machineEntry has already checked they belong to this table.
   const entity = (await manager.findOneBy(entry.entity, {
     id: entityId,
   })) as unknown as (TranslatableEntity & Record<string, unknown>) | null;
@@ -118,11 +98,6 @@ async function loadEntity(
   return { entry, entity };
 }
 
-/**
- * Stores a person's translation of the field's current text (be#1070:
- * a write in a language other than the original). Kept until the source
- * text changes; then enqueue re-translates it.
- */
 export async function setHuman(
   manager: EntityManager,
   entityType: EntityTableName,
@@ -167,12 +142,6 @@ export async function setHuman(
   }
 }
 
-/**
- * A coordinator's correction of the language the text was typed in
- * (be#1070). The worker never changes it: model-based detection proved
- * unreliable (be#1065). Drops the translations into the new original
- * language and queues the ones now needed, including the previous one.
- */
 export async function setOriginalLanguage(
   manager: EntityManager,
   entityType: EntityTableName,
