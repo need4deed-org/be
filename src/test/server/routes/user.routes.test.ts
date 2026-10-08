@@ -515,6 +515,32 @@ describe("POST /user/verify-email — hasVolunteerProfile (be#943)", () => {
     });
     expect(reloaded.isActive).toBe(false);
   });
+
+  // be#1012: a reclaimed pending User is replaced by a new row (new id) for
+  // the same email — a link issued to the old row must not activate it.
+  it("rejects a token issued to a since-replaced User with the same email", async () => {
+    const email = `reclaimed-${suffix}@example.com`;
+    const stale = await makeInactiveUser(email, UserRole.VOLUNTEER);
+    const token = fastify.jwt.sign({
+      id: stale.id,
+      email: stale.email,
+      type: "verify",
+    });
+    await fastify.db.userRepository.delete({ id: stale.id });
+    const replacement = await makeInactiveUser(email, UserRole.VOLUNTEER);
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: { token },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const reloaded = await fastify.db.userRepository.findOneOrFail({
+      where: { id: replacement.id },
+    });
+    expect(reloaded.isActive).toBe(false);
+  });
 });
 
 // be#809: a person can hold more than one active AgentPerson membership (the

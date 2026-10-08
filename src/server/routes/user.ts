@@ -337,7 +337,7 @@ export default async function userRoutes(
           .send({ message: "Token is required for email verification." });
       }
 
-      let decodedToken: { email: string; type?: string };
+      let decodedToken: { id?: number; email: string; type?: string };
       try {
         decodedToken = await fastify.jwt.verify(token);
       } catch (error) {
@@ -354,9 +354,15 @@ export default async function userRoutes(
         return reply.status(400).send({ message: "Invalid token format." });
       }
 
-      const user = await userRepository.findOne({
-        where: { email },
-      });
+      // Looked up by the token's id as well as its email: when a pending
+      // (never-verified) User is reclaimed by a new signup, the replacement
+      // gets a new id, so a link issued to the old row can't activate an
+      // account whose password someone else chose (be#1012).
+      const user = decodedToken.id
+        ? await userRepository.findOne({
+            where: { id: decodedToken.id, email },
+          })
+        : null;
 
       if (!user) {
         logger.warn("User not found for login attempt.");
