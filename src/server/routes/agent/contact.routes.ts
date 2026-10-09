@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
+import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   AgentMembershipStatus,
   ApiAgentContactPatch,
@@ -16,47 +16,14 @@ import {
 } from "../../schema";
 import { ParamsId } from "../../types";
 import {
+  assertActiveAgentMemberOrStaff,
   assertAgentVisible,
+  assertRoleIn,
   createAgentContact,
+  isAgentStaffRole,
   updateAgentContact,
 } from "../../utils";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
-
-function assertHasContactManagementRole(request: FastifyRequest): void {
-  const role = request.authUser?.role;
-  if (
-    role !== UserRole.COORDINATOR &&
-    role !== UserRole.AGENT &&
-    role !== UserRole.ADMIN
-  ) {
-    throw new UnauthorizedError();
-  }
-}
-
-async function assertCanManageContacts(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-  agentId: number,
-): Promise<void> {
-  const role = request.authUser?.role;
-  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
-    return;
-  }
-
-  const personId = request.authUser?.personId;
-  const membership = personId
-    ? await fastify.db.agentPersonRepository.findOneBy({
-        agentId,
-        personId,
-        status: AgentMembershipStatus.ACTIVE,
-      })
-    : null;
-  if (!membership) {
-    throw new UnauthorizedError(
-      "Only active members of this agent can manage its contacts.",
-    );
-  }
-}
 
 export default function agentContactRoutes(
   fastify: FastifyInstance,
@@ -74,7 +41,7 @@ export default function agentContactRoutes(
     async (request, reply) => {
       const agentId = Number(request.params.id);
 
-      assertHasContactManagementRole(request);
+      assertRoleIn(request);
 
       const agent = await fastify.db.agentRepository.findOneBy({
         id: agentId,
@@ -84,7 +51,11 @@ export default function agentContactRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      await assertCanManageContacts(fastify, request, agentId);
+      await assertActiveAgentMemberOrStaff(
+        request,
+        agentId,
+        "Only active members of this agent can manage its contacts.",
+      );
 
       const agentPerson = await createAgentContact(
         agentId,
@@ -117,7 +88,7 @@ export default function agentContactRoutes(
       const agentId = Number(request.params.id);
       const membershipId = Number(request.params.membershipId);
 
-      assertHasContactManagementRole(request);
+      assertRoleIn(request);
 
       const agent = await fastify.db.agentRepository.findOneBy({
         id: agentId,
@@ -127,7 +98,11 @@ export default function agentContactRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      await assertCanManageContacts(fastify, request, agentId);
+      await assertActiveAgentMemberOrStaff(
+        request,
+        agentId,
+        "Only active members of this agent can manage its contacts.",
+      );
 
       const membership = await fastify.db.agentPersonRepository.findOne({
         where: { id: membershipId, agentId },
@@ -139,10 +114,8 @@ export default function agentContactRoutes(
         );
       }
 
-      const role = request.authUser?.role;
       if (
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.ADMIN &&
+        !isAgentStaffRole(request.authUser?.role) &&
         membership.status !== AgentMembershipStatus.ACTIVE
       ) {
         throw new UnauthorizedError(
