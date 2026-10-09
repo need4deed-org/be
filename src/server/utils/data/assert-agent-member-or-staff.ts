@@ -1,21 +1,20 @@
 import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
-import { getCallerAgentIds } from "./get-caller-agent-ids";
+import { isActiveAgentMember, isAgentStaffRole } from "./agent-membership";
 
 export async function assertAgentMemberOrStaff(
   request: FastifyRequest,
   agentId: number,
 ): Promise<void> {
   const role = request.authUser?.role;
-  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
+  if (isAgentStaffRole(role)) {
     return;
   }
-  const agentIds =
-    role === UserRole.AGENT
-      ? await getCallerAgentIds(request, request.authUser?.personId)
-      : [];
-  if (!agentIds.includes(agentId)) {
+  if (
+    role !== UserRole.AGENT ||
+    !(await isActiveAgentMember(request, agentId))
+  ) {
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
 }

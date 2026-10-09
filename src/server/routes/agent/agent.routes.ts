@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
-  AgentMembershipStatus,
   ApiAgentCreateResponse,
   ApiAgentGetList,
   ApiAgentPatch,
@@ -44,7 +43,9 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  assertActiveAgentMemberOrStaff,
   assertAgentVisible,
+  assertRoleIn,
   createAddress,
   getAgentWhere,
   getDistrictToAgentHandler,
@@ -70,42 +71,6 @@ async function denyVolunteer(request: FastifyRequest): Promise<void> {
     request.authUser?.role === UserRole.VOLUNTEER
   ) {
     throw new UnauthorizedError();
-  }
-}
-
-function assertHasOrgEditRole(request: FastifyRequest): void {
-  const role = request.authUser?.role;
-  if (
-    role !== UserRole.COORDINATOR &&
-    role !== UserRole.AGENT &&
-    role !== UserRole.ADMIN
-  ) {
-    throw new UnauthorizedError();
-  }
-}
-
-async function assertCanEditOrg(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-  agentId: number,
-): Promise<void> {
-  const role = request.authUser?.role;
-  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
-    return;
-  }
-
-  const personId = request.authUser?.personId;
-  const membership = personId
-    ? await fastify.db.agentPersonRepository.findOneBy({
-        agentId,
-        personId,
-        status: AgentMembershipStatus.ACTIVE,
-      })
-    : null;
-  if (!membership) {
-    throw new UnauthorizedError(
-      "Only active members of this agent can edit its organization details.",
-    );
   }
 }
 
@@ -321,7 +286,7 @@ export default async function agentRoutes(
       const { id } = request.params;
       logger.debug(`PATCH /agent/${id}, fields:${Object.keys(request.body)}`);
 
-      assertHasOrgEditRole(request);
+      assertRoleIn(request);
 
       const agentRepository = fastify.db.agentRepository;
       const agent = await agentRepository.findOneBy({ id });
@@ -330,7 +295,11 @@ export default async function agentRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 
-      await assertCanEditOrg(fastify, request, id);
+      await assertActiveAgentMemberOrStaff(
+        request,
+        id,
+        "Only active members of this agent can edit its organization details.",
+      );
 
       const { addressStreet, addressPostcode, languages, serviceIds } =
         request.body;
