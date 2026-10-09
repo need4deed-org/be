@@ -13,6 +13,7 @@ import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
 import { createAddress, patchOrReplaceAddress } from "./for-routes";
+import { escapeLikePattern } from "./person-name-ilike";
 
 type SubmitterFields = Pick<
   OpportunityLegacyFormData,
@@ -111,7 +112,7 @@ export async function getOrCreateSubmitterPerson(
   const agentPersonRepository = getRepository(manager, AgentPerson);
 
   let person = await personRepository.findOne({
-    where: { email: ILike(email) },
+    where: { email: ILike(escapeLikePattern(email)) },
   });
 
   if (!person) {

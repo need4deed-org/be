@@ -3,21 +3,23 @@ import { ILike, Repository } from "typeorm";
 import { BadRequestError, PersonAlreadyRegisteredError } from "../../../config";
 import Person from "../../../data/entity/person.entity";
 import logger from "../../../logger";
+import { escapeLikePattern } from "./person-name-ilike";
 
 export async function resolvePersonByEmail(
   personRepository: Repository<Person>,
   email: string,
   newPersonData: Partial<Person>,
+  registered: "reject" | "create" = "reject",
 ): Promise<Person> {
   const existingPerson = await personRepository.findOne({
-    where: { email: ILike(email) },
+    where: { email: ILike(escapeLikePattern(email)) },
     relations: ["users"],
   });
-  if (existingPerson) {
-    if (existingPerson.users?.length) {
-      throw new PersonAlreadyRegisteredError();
-    }
+  if (existingPerson && !existingPerson.users?.length) {
     return existingPerson;
+  }
+  if (existingPerson && registered === "reject") {
+    throw new PersonAlreadyRegisteredError();
   }
 
   const newPerson = new Person({ ...newPersonData, email });

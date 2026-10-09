@@ -70,11 +70,10 @@ declare module "fastify" {
     tryAuthenticate(): onRequestHookHandler;
   }
   interface FastifyRequest {
-    resolvedPerson?: Person;
     personId?: number;
     agents?: Agent[];
     registrant?: User;
-    coordinatorInvite?: { email: string };
+    coordinatorInvite?: { email: string; person: CoordinatorInvitePerson };
     authUser?: User;
     callerAgentIds?: number[];
   }
