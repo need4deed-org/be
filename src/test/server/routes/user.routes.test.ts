@@ -418,6 +418,25 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     }
   });
 
+  it("keeps an older Person the pending User reused", async () => {
+    const email = `reclaim-curated-${suffix}@example.com`;
+    emails.push(email);
+    const curated = await fastify.db.personRepository.save(
+      new Person({ firstName: "Curated", lastName: "Person", email }),
+    );
+    const first = await register(email, "squatter_password");
+    expect(first.json().person.id).toBe(curated.id);
+
+    const second = await register(email, "owner_password");
+
+    expect(second.statusCode).toBe(201);
+    expect(second.json().person.id).toBe(curated.id);
+    const reloaded = await fastify.db.personRepository.findOneByOrFail({
+      id: curated.id,
+    });
+    expect(reloaded.firstName).toBe("Curated");
+  });
+
   it("does not reclaim a deactivated User", async () => {
     const email = `reclaim-deactivated-${suffix}@example.com`;
     emails.push(email);
@@ -1250,12 +1269,9 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
 
   it("replaces a pending User with the admin-created one", async () => {
     const email = `admin-reclaim-${suffix}@example.com`;
-    const squatterPerson = await fastify.db.personRepository.save(
-      new Person({ firstName: "Squat", lastName: "Ter", email }),
-    );
     const pendingUser = await makeUser(email, {
       isActive: false,
-      personId: squatterPerson.id,
+      person: new Person({ firstName: "Squat", lastName: "Ter", email }),
     });
 
     const res = await createAsAdmin(email);
@@ -1303,6 +1319,33 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
 
     expect(res.statusCode).toBe(201);
     expect(res.json().person.id).toBe(pendingPerson.id);
+  });
+
+  it("keeps the pending User when the request fails", async () => {
+    const email = `admin-reclaim-failed-${suffix}@example.com`;
+    const pendingUser = await makeUser(email, {
+      isActive: false,
+      person: new Person({ firstName: "Still", lastName: "Pending", email }),
+    });
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/user/admin",
+      cookies: { access: adminAccessToken },
+      payload: {
+        email,
+        password: "admin_chosen_password",
+        role: UserRole.COORDINATOR,
+        person: { id: 2147483647 },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const users = await fastify.db.userRepository.findBy({ email });
+    expect(users.map((u) => u.id)).toEqual([pendingUser.id]);
+    expect(
+      await fastify.db.personRepository.countBy({ id: pendingUser.personId }),
+    ).toBe(1);
   });
 
   it.each([

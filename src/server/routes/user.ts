@@ -14,7 +14,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { FindOptionsWhere, ILike, In, Not } from "typeorm";
+import { EntityManager, FindOptionsWhere, ILike, In, Not } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
@@ -27,6 +27,7 @@ import {
   COORDINATOR_INVITE_LIFESPAN_MS,
   urlCoordinatorInvite,
 } from "../../config/constants";
+import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
@@ -53,11 +54,10 @@ import {
 } from "../types";
 import {
   assertEmailAvailable,
+  createUserReclaimingEmail,
   getSkipTake,
   getUserWhere,
-  reclaimPendingUser,
   resolvePersonByEmail,
-  validateAndSaveUser,
   verifyTokenOfType,
 } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
@@ -419,33 +419,36 @@ export default async function userRoutes(
             "Linking to an existing person by id is not allowed on self-registration.",
           );
         }
-
-        await reclaimPendingUser(fastify.db.userRepository, email);
-
-        request.resolvedPerson = await resolvePersonByEmail(
-          fastify.db.personRepository,
-          email,
-          personData,
-        );
       },
     },
     async (request, reply) => {
-      const { email, password: passwordPlain, role, language } = request.body;
-      const userRepository = fastify.db.userRepository;
-
-      await assertEmailAvailable(userRepository, email);
-
-      const newUser = new User({
+      const {
         email,
-        password: await hashPassword(passwordPlain),
+        password: passwordPlain,
         role,
-        isActive: false,
-        language: language ?? Lang.EN,
-        timezone: "CET",
-        person: request.resolvedPerson,
-      });
+        language,
+        person: personData,
+      } = request.body;
+      const password = await hashPassword(passwordPlain);
 
-      const result = await validateAndSaveUser(userRepository, newUser);
+      const result = await createUserReclaimingEmail(
+        fastify.db.userRepository.manager,
+        email,
+        async (manager) =>
+          new User({
+            email,
+            password,
+            role,
+            isActive: false,
+            language: language ?? Lang.EN,
+            timezone: "CET",
+            person: await resolvePersonByEmail(
+              manager.getRepository(Person),
+              email,
+              personData,
+            ),
+          }),
+      );
       if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
@@ -477,57 +480,56 @@ export default async function userRoutes(
         },
       },
       onRequest: [fastify.authenticate({ role: UserRole.ADMIN })],
-      preHandler: async (request) => {
-        const { person: personData, email } = request.body;
-        const personRepository = fastify.db.personRepository;
-
-        await reclaimPendingUser(
-          fastify.db.userRepository,
-          email,
-          personData.id,
-        );
-
-        if (personData.id) {
-          const resolvedPerson = await personRepository.findOneBy({
-            id: personData.id,
-          });
-          if (!resolvedPerson) {
-            throw new BadRequestError(
-              `Person with ID ${personData.id} not found.`,
-            );
-          }
-          if (!resolvedPerson.email) {
-            resolvedPerson.email = email;
-          }
-          request.resolvedPerson = resolvedPerson;
-          return;
-        }
-
-        request.resolvedPerson = await resolvePersonByEmail(
-          personRepository,
-          email,
-          personData,
-          "create",
-        );
-      },
     },
     async (request, reply) => {
-      const { email, password: passwordPlain, role, language } = request.body;
-      const userRepository = fastify.db.userRepository;
-
-      await assertEmailAvailable(userRepository, email);
-
-      const newUser = new User({
+      const {
         email,
-        password: await hashPassword(passwordPlain),
+        password: passwordPlain,
         role,
-        isActive: true,
-        language: language ?? Lang.EN,
-        timezone: "CET",
-        person: request.resolvedPerson,
-      });
+        language,
+        person: personData,
+      } = request.body;
+      const password = await hashPassword(passwordPlain);
 
-      const result = await validateAndSaveUser(userRepository, newUser);
+      const resolvePerson = async (manager: EntityManager) => {
+        const personRepository = manager.getRepository(Person);
+        if (!personData.id) {
+          return resolvePersonByEmail(
+            personRepository,
+            email,
+            personData,
+            "create",
+          );
+        }
+        const person = await personRepository.findOneBy({
+          id: personData.id,
+        });
+        if (!person) {
+          throw new BadRequestError(
+            `Person with ID ${personData.id} not found.`,
+          );
+        }
+        if (!person.email) {
+          person.email = email;
+        }
+        return person;
+      };
+
+      const result = await createUserReclaimingEmail(
+        fastify.db.userRepository.manager,
+        email,
+        async (manager) =>
+          new User({
+            email,
+            password,
+            role,
+            isActive: true,
+            language: language ?? Lang.EN,
+            timezone: "CET",
+            person: await resolvePerson(manager),
+          }),
+        personData.id,
+      );
       if (result.status === "error") {
         return reply.status(400).send({
           message: "Validation failed for newUser data",
@@ -607,36 +609,33 @@ export default async function userRoutes(
           throw new UnauthenticatedError("Invalid invite token.");
         }
 
-        await reclaimPendingUser(fastify.db.userRepository, payload.email);
-
-        request.resolvedPerson = await resolvePersonByEmail(
-          fastify.db.personRepository,
-          payload.email,
-          payload.person,
-        );
-
-        await assertEmailAvailable(fastify.db.userRepository, payload.email);
-
-        request.coordinatorInvite = { email: payload.email };
+        request.coordinatorInvite = {
+          email: payload.email,
+          person: payload.person,
+        };
       },
     },
     async (request, reply) => {
-      const { email } = request.coordinatorInvite!;
-      const { password } = request.body;
+      const { email, person: personData } = request.coordinatorInvite!;
+      const password = await hashPassword(request.body.password);
 
-      const newUser = new User({
+      const result = await createUserReclaimingEmail(
+        fastify.db.userRepository.manager,
         email,
-        password: await hashPassword(password),
-        role: UserRole.COORDINATOR,
-        isActive: true,
-        language: Lang.EN,
-        timezone: "CET",
-        person: request.resolvedPerson,
-      });
-
-      const result = await validateAndSaveUser(
-        fastify.db.userRepository,
-        newUser,
+        async (manager) =>
+          new User({
+            email,
+            password,
+            role: UserRole.COORDINATOR,
+            isActive: true,
+            language: Lang.EN,
+            timezone: "CET",
+            person: await resolvePersonByEmail(
+              manager.getRepository(Person),
+              email,
+              personData,
+            ),
+          }),
       );
       if (result.status === "error") {
         return reply.status(400).send({
