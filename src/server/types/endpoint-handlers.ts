@@ -45,6 +45,10 @@ export interface QuerystringEventGetList {
   to?: string;
 }
 
+export interface QuerystringEventGet {
+  language?: Lang;
+}
+
 export interface QuerystringOpportunityFiltering {
   filter?: {
     type: string;
