@@ -6,7 +6,7 @@ import {
   idParamSchema,
   opportunityEventRegistrationListResponseSchema,
 } from "../../schema";
-import { assertActiveAgentMemberOrStaff, assertRoleIn } from "../../utils";
+import { assertAgentMemberOrStaffOr403, assertRoleIn } from "../../utils";
 
 async function getAuthorizedRegistrations(
   fastify: FastifyInstance,
@@ -21,7 +21,7 @@ async function getAuthorizedRegistrations(
   if (!opportunity) {
     throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
   }
-  await assertActiveAgentMemberOrStaff(
+  await assertAgentMemberOrStaffOr403(
     request,
     opportunity.agentId,
     "Agents can only view registrations for their own agent's opportunities.",

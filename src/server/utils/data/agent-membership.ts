@@ -1,9 +1,9 @@
 import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { UnauthorizedError } from "../../../config";
+import { NotFoundError, UnauthorizedError } from "../../../config";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 
-export const AGENT_SCOPED_ROLES: readonly UserRole[] = [
+const AGENT_SCOPED_ROLES: readonly UserRole[] = [
   UserRole.COORDINATOR,
   UserRole.AGENT,
   UserRole.ADMIN,
@@ -34,15 +34,32 @@ export async function isActiveAgentMember(
   return agentIds.includes(agentId);
 }
 
-export async function assertActiveAgentMemberOrStaff(
+async function isAgentMemberOrStaff(
+  request: FastifyRequest,
+  agentId: number | null | undefined,
+): Promise<boolean> {
+  const role = request.authUser?.role;
+  if (isAgentStaffRole(role)) {
+    return true;
+  }
+  return role === UserRole.AGENT && isActiveAgentMember(request, agentId);
+}
+
+export async function assertAgentMemberOrStaffOr403(
   request: FastifyRequest,
   agentId: number | null | undefined,
   message: string,
 ): Promise<void> {
-  if (isAgentStaffRole(request.authUser?.role)) {
-    return;
-  }
-  if (!(await isActiveAgentMember(request, agentId))) {
+  if (!(await isAgentMemberOrStaff(request, agentId))) {
     throw new UnauthorizedError(message);
+  }
+}
+
+export async function assertAgentMemberOrStaffOr404(
+  request: FastifyRequest,
+  agentId: number,
+): Promise<void> {
+  if (!(await isAgentMemberOrStaff(request, agentId))) {
+    throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
 }

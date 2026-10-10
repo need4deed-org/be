@@ -72,7 +72,7 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
-  assertActiveAgentMemberOrStaff,
+  assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertRoleIn,
   getCallerAgentIds,
@@ -503,7 +503,7 @@ export default async function opportunityRoutes(
         );
       }
 
-      await assertActiveAgentMemberOrStaff(
+      await assertAgentMemberOrStaffOr403(
         request,
         agentId,
         "Agents can only create opportunities for their own agent.",

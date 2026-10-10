@@ -16,7 +16,7 @@ import {
 } from "../../schema";
 import { ParamsId } from "../../types";
 import {
-  assertActiveAgentMemberOrStaff,
+  assertAgentMemberOrStaffOr403,
   assertAgentVisible,
   assertRoleIn,
   createAgentContact,
@@ -51,7 +51,7 @@ export default function agentContactRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      await assertActiveAgentMemberOrStaff(
+      await assertAgentMemberOrStaffOr403(
         request,
         agentId,
         "Only active members of this agent can manage its contacts.",
@@ -98,7 +98,7 @@ export default function agentContactRoutes(
       }
       assertAgentVisible(agent, request.authUser?.role);
 
-      await assertActiveAgentMemberOrStaff(
+      await assertAgentMemberOrStaffOr403(
         request,
         agentId,
         "Only active members of this agent can manage its contacts.",

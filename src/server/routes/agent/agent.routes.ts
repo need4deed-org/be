@@ -43,7 +43,7 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
-  assertActiveAgentMemberOrStaff,
+  assertAgentMemberOrStaffOr403,
   assertAgentVisible,
   assertRoleIn,
   createAddress,
@@ -295,7 +295,7 @@ export default async function agentRoutes(
         throw new NotFoundError(`Agent (id:${id}) not found.`);
       }
 
-      await assertActiveAgentMemberOrStaff(
+      await assertAgentMemberOrStaffOr403(
         request,
         id,
         "Only active members of this agent can edit its organization details.",
