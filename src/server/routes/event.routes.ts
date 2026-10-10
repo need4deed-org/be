@@ -12,10 +12,10 @@ import { dtoEventN4DGet, dtoEventN4DGetList } from "../../services";
 import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
+  eventListQuerySchema,
   eventListResponseSchema,
   eventPatchBodySchema,
   idParamSchema,
-  langQuerySchema,
   responseSchema,
 } from "../schema";
 import {
@@ -26,9 +26,11 @@ import {
   ReplyMessage,
 } from "../types";
 import {
+  applyEventDateRange,
   createEvent,
   getLanguageCode,
   isStaffRole,
+  matchesEventSearch,
   updateEvent,
 } from "../utils";
 
@@ -43,7 +45,7 @@ export default async function eventRoutes(
     "/",
     {
       schema: {
-        querystring: langQuerySchema,
+        querystring: eventListQuerySchema,
         response: eventListResponseSchema,
       },
       onRequest: fastify.tryAuthenticate(),
@@ -53,13 +55,22 @@ export default async function eventRoutes(
       const isPrivileged = isStaffRole(role);
       const language = getLanguageCode(request.query.language) || Lang.DE;
 
-      const events = await fastify.db.eventRepository.find({
-        where: isPrivileged ? {} : { isActive: true },
-        relations: ["eventTranslation.language"],
-        order: { date: "ASC" },
-      });
+      const { search } = request.query;
+
+      const qb = fastify.db.eventRepository
+        .createQueryBuilder("event")
+        .leftJoinAndSelect("event.eventTranslation", "eventTranslation")
+        .leftJoinAndSelect("eventTranslation.language", "language")
+        .orderBy("event.date", "ASC");
+      if (!isPrivileged) {
+        qb.andWhere("event.isActive = :isActive", { isActive: true });
+      }
+      const events = await applyEventDateRange(qb, request.query).getMany();
 
       const data = events
+        .filter(
+          (event) => !search || matchesEventSearch(event, language, search),
+        )
         .map((event) => dtoEventN4DGetList(event, language, isPrivileged))
         .filter((event): event is ApiEventN4DGetList => event !== null);
 

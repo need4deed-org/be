@@ -40,6 +40,9 @@ export interface QuerystringPaginationLanguage
 
 export interface QuerystringEventGetList {
   language?: Lang;
+  search?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface QuerystringOpportunityFiltering {

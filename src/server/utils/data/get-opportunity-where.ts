@@ -8,7 +8,6 @@ import {
   MoreThanOrEqual,
   Not,
 } from "typeorm";
-import { BadRequestError } from "../../../config/error";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
 import {
@@ -16,6 +15,7 @@ import {
   QuerystringOpportunityList,
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
+import { parseDateOnly } from "./parse-date-only";
 import { escapeLikePattern } from "./person-name-ilike";
 
 export type OpportunityAppointmentFilter = Pick<
@@ -30,15 +30,6 @@ function hasFilterValue(value: string | string[] | undefined): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
 
-function parseAppointmentDate(value: string): Date {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) {
-    throw new BadRequestError(`Invalid date: "${value}"`);
-  }
-  const [, year, month, day] = match;
-  return new Date(Number(year), Number(month) - 1, Number(day));
-}
-
 function getAppointmentDateWhere(
   appointment?: OpportunityAppointmentFilter,
 ): FindOptionsWhere<Opportunity> {
@@ -48,12 +39,11 @@ function getAppointmentDateWhere(
   if (appointmentDateFrom !== undefined || appointmentDateTo !== undefined) {
     const from =
       appointmentDateFrom !== undefined
-        ? berlinDayBoundaries(parseAppointmentDate(appointmentDateFrom))
-            .startOfDay
+        ? berlinDayBoundaries(parseDateOnly(appointmentDateFrom)).startOfDay
         : undefined;
     const to =
       appointmentDateTo !== undefined
-        ? berlinDayBoundaries(parseAppointmentDate(appointmentDateTo)).endOfDay
+        ? berlinDayBoundaries(parseDateOnly(appointmentDateTo)).endOfDay
         : undefined;
 
     return {
