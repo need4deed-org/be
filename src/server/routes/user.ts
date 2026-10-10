@@ -57,6 +57,7 @@ import {
   createUserReclaimingEmail,
   getSkipTake,
   getUserWhere,
+  isStaffRole,
   resolvePersonByEmail,
   verifyTokenOfType,
 } from "../utils";
@@ -89,8 +90,7 @@ export default async function userRoutes(
 
       // Non-staff only see staff accounts, never volunteers' or NGO users' emails.
       const callerRole = request.authUser?.role;
-      const isPrivileged =
-        callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
+      const isPrivileged = isStaffRole(callerRole);
       const staffRoles = [UserRole.COORDINATOR, UserRole.ADMIN];
       if (!isPrivileged && role && !staffRoles.includes(role)) {
         return reply
@@ -393,7 +393,7 @@ export default async function userRoutes(
       preHandler: async (request) => {
         const { person: personData, email, role } = request.body;
 
-        if (role === UserRole.ADMIN || role === UserRole.COORDINATOR) {
+        if (isStaffRole(role)) {
           throw new UnauthorizedError();
         }
 

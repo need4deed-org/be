@@ -1,5 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { isStaffRole } from "../data/is-staff-role";
 import { maskPii } from "./mask";
 import { CallerVisibility, resolveCallerVisibility } from "./visible-persons";
 
@@ -9,8 +9,7 @@ export async function resolveCallerMask(
   request: FastifyRequest,
 ): Promise<CallerVisibility | null> {
   const user = request.authUser;
-  const privileged =
-    user?.role === UserRole.COORDINATOR || user?.role === UserRole.ADMIN;
+  const privileged = isStaffRole(user?.role);
   if (!user || privileged) {
     return null;
   }

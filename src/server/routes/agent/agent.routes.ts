@@ -50,6 +50,7 @@ import {
   getAgentWhere,
   getDistrictToAgentHandler,
   getSkipTake,
+  isStaffRole,
   patchAddress,
   syncAgentDistrictFromPostcode,
   updateAgentLanguages,
@@ -119,8 +120,7 @@ export default async function agentRoutes(
       const where = await getAgentWhere(filter);
 
       const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      const isPrivileged = isStaffRole(role);
       if (!isPrivileged) {
         where.unclaimed = false;
       }

@@ -9,6 +9,7 @@ import {
 import { idParamSchema } from "../../schema";
 import { ParamsId } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
+import { isStaffRole } from "../../utils/data/is-staff-role";
 
 async function assertCanAccessMatchLog(
   fastify: FastifyInstance,
@@ -17,7 +18,7 @@ async function assertCanAccessMatchLog(
   access: "read" | "write",
 ): Promise<void> {
   const { role, personId } = request.authUser ?? {};
-  const isStaff = role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+  const isStaff = isStaffRole(role);
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
     ...(isStaff

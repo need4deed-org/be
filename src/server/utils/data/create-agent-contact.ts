@@ -10,6 +10,7 @@ import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { claimAgent } from "./claim-agent";
 import { createAddress } from "./for-routes";
+import { isStaffRole } from "./is-staff-role";
 
 async function findExistingAgentUserPerson(
   manager: EntityManager,
@@ -36,8 +37,7 @@ export async function createAgentContact(
   callerRole: UserRole,
 ): Promise<AgentPerson> {
   let result!: AgentPerson;
-  const canLinkExisting =
-    callerRole === UserRole.COORDINATOR || callerRole === UserRole.ADMIN;
+  const canLinkExisting = isStaffRole(callerRole);
 
   await dataSource.manager.transaction(async (manager) => {
     const personRepository = getRepository(manager, Person);
