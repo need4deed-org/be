@@ -230,9 +230,16 @@ describe("X-API-Key authentication", () => {
       ...coordinatorUser,
       isActive: false,
     } as any);
-    const eventFindSpy = vi
-      .spyOn(fastify.db.eventRepository, "find")
-      .mockResolvedValue([]);
+    const andWhere = vi.fn();
+    const qb = {
+      leftJoinAndSelect: () => qb,
+      orderBy: () => qb,
+      andWhere: andWhere.mockImplementation(() => qb),
+      getMany: async () => [],
+    };
+    vi.spyOn(fastify.db.eventRepository, "createQueryBuilder").mockReturnValue(
+      qb as any,
+    );
 
     const accessToken = fastify.jwt.sign({
       id: 42,
@@ -249,9 +256,9 @@ describe("X-API-Key authentication", () => {
 
     expect(response.statusCode).toBe(200);
     // Not privileged: only active events are queried.
-    expect(eventFindSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true } }),
-    );
+    expect(andWhere).toHaveBeenCalledWith("event.isActive = :isActive", {
+      isActive: true,
+    });
   });
 
   it.each(["verify", "reset", "refresh"] as const)(
