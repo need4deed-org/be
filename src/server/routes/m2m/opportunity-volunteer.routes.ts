@@ -22,6 +22,7 @@ import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
+import { isStaffRole } from "../../utils/data/is-staff-role";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 
@@ -104,8 +105,7 @@ const AGENT_REMOVABLE_STATUSES = new Set([
 ]);
 
 function assertCoordinator(request: FastifyRequest): void {
-  const role = request.authUser?.role;
-  if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+  if (!isStaffRole(request.authUser?.role)) {
     throw new UnauthorizedError("Permission denied");
   }
 }

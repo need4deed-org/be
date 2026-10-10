@@ -59,6 +59,7 @@ import {
   getUserWhere,
   isStaffRole,
   resolvePersonByEmail,
+  STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
@@ -91,15 +92,14 @@ export default async function userRoutes(
       // Non-staff only see staff accounts, never volunteers' or NGO users' emails.
       const callerRole = request.authUser?.role;
       const isPrivileged = isStaffRole(callerRole);
-      const staffRoles = [UserRole.COORDINATOR, UserRole.ADMIN];
-      if (!isPrivileged && role && !staffRoles.includes(role)) {
+      if (!isPrivileged && role && !isStaffRole(role)) {
         return reply
           .status(200)
           .send({ message: "List of users page:1", data: [], count: 0 });
       }
       const where = getUserWhere(search, role) as FindOptionsWhere<User>;
       if (!isPrivileged) {
-        where.role = role ?? In(staffRoles);
+        where.role = role ?? In(STAFF_ROLES);
         where.isActive = true;
       }
 

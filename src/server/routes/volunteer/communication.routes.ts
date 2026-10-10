@@ -3,6 +3,7 @@ import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
 import { UnauthorizedError } from "../../../config";
 import { dtoCommunication } from "../../../services/dto/dto-communication";
 import { idParamSchema } from "../../schema";
+import { isStaffRole } from "../../utils";
 
 export default function volunteerCommunicationRoutes(
   fastify: FastifyInstance,
@@ -39,7 +40,7 @@ export default function volunteerCommunicationRoutes(
         request.authUser?.personId !== undefined &&
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
-      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
+      if (!isStaffRole(role) && !isSelf) {
         throw new UnauthorizedError();
       }
 
