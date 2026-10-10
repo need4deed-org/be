@@ -425,12 +425,15 @@ describe("GET /event", () => {
       expect(ids).not.toContain(inactiveEvent.id);
     });
 
-    it("rejects a malformed date with 400", async () => {
-      const res = await fastify.inject({
-        method: "GET",
-        url: "/event?from=yesterday",
-      });
-      expect(res.statusCode).toBe(400);
-    });
+    it.each(["from=yesterday", "to=2026-02-31", "from=2026-13-01"])(
+      "rejects a malformed or impossible date with 400 (%s)",
+      async (query) => {
+        const res = await fastify.inject({
+          method: "GET",
+          url: `/event?${query}`,
+        });
+        expect(res.statusCode).toBe(400);
+      },
+    );
   });
 });
