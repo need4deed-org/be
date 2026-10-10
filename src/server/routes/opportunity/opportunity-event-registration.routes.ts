@@ -1,56 +1,19 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
-import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import { NotFoundError } from "../../../config";
 import OpportunityEventRegistration from "../../../data/entity/opportunity-event-registration.entity";
 import { dtoOpportunityEventRegistration } from "../../../services";
 import {
   idParamSchema,
   opportunityEventRegistrationListResponseSchema,
 } from "../../schema";
-
-function assertHasRegistrationsRole(request: FastifyRequest): void {
-  const role = request.authUser?.role;
-  if (
-    role !== UserRole.COORDINATOR &&
-    role !== UserRole.AGENT &&
-    role !== UserRole.ADMIN
-  ) {
-    throw new UnauthorizedError();
-  }
-}
-
-async function assertCanViewRegistrations(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-  agentId?: number,
-): Promise<void> {
-  const role = request.authUser?.role;
-  if (role === UserRole.COORDINATOR || role === UserRole.ADMIN) {
-    return;
-  }
-
-  const personId = request.authUser?.personId;
-  const membership =
-    personId !== undefined && agentId !== undefined
-      ? await fastify.db.agentPersonRepository.findOneBy({
-          agentId,
-          personId,
-          status: AgentMembershipStatus.ACTIVE,
-        })
-      : null;
-  if (!membership) {
-    throw new UnauthorizedError(
-      "Agents can only view registrations for their own agent's opportunities.",
-    );
-  }
-}
+import { assertAgentMemberOrStaffOr403, assertRoleIn } from "../../utils";
 
 async function getAuthorizedRegistrations(
   fastify: FastifyInstance,
   request: FastifyRequest,
   opportunityId: number,
 ): Promise<OpportunityEventRegistration[]> {
-  assertHasRegistrationsRole(request);
+  assertRoleIn(request);
 
   const opportunity = await fastify.db.opportunityRepository.findOne({
     where: { id: opportunityId },
@@ -58,7 +21,11 @@ async function getAuthorizedRegistrations(
   if (!opportunity) {
     throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
   }
-  await assertCanViewRegistrations(fastify, request, opportunity.agentId);
+  await assertAgentMemberOrStaffOr403(
+    request,
+    opportunity.agentId,
+    "Agents can only view registrations for their own agent's opportunities.",
+  );
 
   return fastify.db.opportunityEventRegistrationRepository.find({
     where: { opportunityId },

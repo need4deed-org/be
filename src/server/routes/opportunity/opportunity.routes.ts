@@ -72,7 +72,9 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
+  assertRoleIn,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
@@ -84,6 +86,7 @@ import {
   getPostcode,
   getSkipTake,
   impliesAgentSearching,
+  isActiveAgentMember,
   mergeIntoWhere,
   patchEntity,
   setAgentSearching,
@@ -478,14 +481,7 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
-      const role = request.authUser?.role;
-      if (
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT &&
-        role !== UserRole.ADMIN
-      ) {
-        throw new UnauthorizedError();
-      }
+      assertRoleIn(request);
 
       const body = request.body;
 
@@ -507,21 +503,11 @@ export default async function opportunityRoutes(
         );
       }
 
-      if (role === UserRole.AGENT) {
-        const personId = request.authUser?.personId;
-        const membership = personId
-          ? await fastify.db.agentPersonRepository.findOneBy({
-              agentId,
-              personId,
-              status: AgentMembershipStatus.ACTIVE,
-            })
-          : null;
-        if (!membership) {
-          throw new UnauthorizedError(
-            "Agents can only create opportunities for their own agent.",
-          );
-        }
-      }
+      await assertAgentMemberOrStaffOr403(
+        request,
+        agentId,
+        "Agents can only create opportunities for their own agent.",
+      );
 
       const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
@@ -646,14 +632,8 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
+      assertRoleIn(request);
       const role = request.authUser?.role;
-      if (
-        role !== UserRole.COORDINATOR &&
-        role !== UserRole.AGENT &&
-        role !== UserRole.ADMIN
-      ) {
-        throw new UnauthorizedError();
-      }
 
       const id = request.params.id;
 
@@ -667,11 +647,7 @@ export default async function opportunityRoutes(
       }
 
       if (role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          request,
-          request.authUser?.personId,
-        );
-        if (!opportunity.agentId || !agentIds.includes(opportunity.agentId)) {
+        if (!(await isActiveAgentMember(request, opportunity.agentId))) {
           throw new UnauthorizedError(
             "Agents can only update opportunities belonging to their own agent.",
           );
@@ -682,7 +658,7 @@ export default async function opportunityRoutes(
         if (
           agentBody?.id !== undefined &&
           agentBody.id !== opportunity.agentId &&
-          !agentIds.includes(agentBody.id)
+          !(await isActiveAgentMember(request, agentBody.id))
         ) {
           throw new UnauthorizedError(
             "Agents can only move an opportunity to another NGO they belong to.",
