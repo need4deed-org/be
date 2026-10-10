@@ -13,6 +13,7 @@ export * from "./for-routes";
 export * from "./get-agent-by-postcode";
 export * from "./get-agent-where";
 export * from "./get-caller-agent-ids";
+export * from "./get-event-filters";
 export * from "./get-language-title";
 export * from "./get-opportunity-orphanage-agent";
 export * from "./get-opportunity-where";

@@ -18,6 +18,16 @@ export const langQuerySchema = {
   properties: langProp,
 };
 
+export const eventListQuerySchema = {
+  type: "object",
+  properties: {
+    ...langProp,
+    search: { type: "string" },
+    from: { type: "string" },
+    to: { type: "string" },
+  },
+};
+
 const sortOrderProps = {
   sortOrder: {
     type: "string",

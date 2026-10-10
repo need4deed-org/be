@@ -1,7 +1,7 @@
 import { ApiEventN4DGet, ApiEventN4DGetList, Lang } from "need4deed-sdk";
 import EventN4D from "../../data/entity/event/event.entity";
 
-function resolveTranslation(event: EventN4D, language: Lang) {
+export function resolveEventTranslation(event: EventN4D, language: Lang) {
   return (
     event.eventTranslation?.find((t) => t.language?.isoCode === language) ??
     event.eventTranslation?.[0]
@@ -20,7 +20,7 @@ export function dtoEventN4DGetList(
   language: Lang,
   isPrivileged: boolean,
 ): ApiEventN4DGetList | null {
-  const translation = resolveTranslation(event, language);
+  const translation = resolveEventTranslation(event, language);
   if (!translation && !isPrivileged) {
     return null;
   }
@@ -54,7 +54,7 @@ export function dtoEventN4DGet(
   if (!list) {
     return null;
   }
-  const translation = resolveTranslation(event, language);
+  const translation = resolveEventTranslation(event, language);
 
   return {
     ...list,
