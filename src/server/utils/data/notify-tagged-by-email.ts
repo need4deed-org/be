@@ -10,7 +10,7 @@ import type { TaggedWhere } from "../../../services/notify/events/email-tagged";
 export interface NotifyTaggedByEmailProps {
   personIds: number[];
   author: { userId: number; personId?: number | null; name?: string };
-  allowedRoles: UserRole[];
+  allowedRoles: readonly UserRole[];
   text: string;
   where: TaggedWhere;
 }

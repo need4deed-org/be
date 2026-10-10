@@ -55,6 +55,7 @@ import {
   getSkipTake,
   getVolunteerPatchData,
   getVolunteerWhere,
+  isStaffRole,
   patchEntity,
   patchOrReplaceAddress,
   updateOptionList,
@@ -311,7 +312,7 @@ export default async function volunteerRoutes(
         request.authUser?.personId !== undefined &&
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
-      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN && !isSelf) {
+      if (!isStaffRole(role) && !isSelf) {
         throw new UnauthorizedError();
       }
 

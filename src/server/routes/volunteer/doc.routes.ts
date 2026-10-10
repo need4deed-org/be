@@ -13,7 +13,7 @@ import {
   volunteerDocSchemaGetMeta200,
   volunteerDocSchemaUploadMeta,
 } from "../../schema";
-import { getVolunteerDocuments } from "../../utils";
+import { getVolunteerDocuments, isStaffRole } from "../../utils";
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
@@ -33,7 +33,7 @@ export default async function volunteerDocRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const role = request.authUser?.role;
-      if (role !== UserRole.COORDINATOR && role !== UserRole.ADMIN) {
+      if (!isStaffRole(role)) {
         if (role !== UserRole.VOLUNTEER) {
           throw new UnauthorizedError();
         }

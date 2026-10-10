@@ -25,7 +25,12 @@ import {
   ReplyDataCount,
   ReplyMessage,
 } from "../types";
-import { createEvent, getLanguageCode, updateEvent } from "../utils";
+import {
+  createEvent,
+  getLanguageCode,
+  isStaffRole,
+  updateEvent,
+} from "../utils";
 
 export default async function eventRoutes(
   fastify: FastifyInstance,
@@ -45,8 +50,7 @@ export default async function eventRoutes(
     },
     async (request, reply) => {
       const role = request.authUser?.role;
-      const isPrivileged =
-        role === UserRole.COORDINATOR || role === UserRole.ADMIN;
+      const isPrivileged = isStaffRole(role);
       const language = getLanguageCode(request.query.language) || Lang.DE;
 
       const events = await fastify.db.eventRepository.find({

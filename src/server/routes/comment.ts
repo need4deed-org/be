@@ -9,9 +9,9 @@ import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
-import { notifyTaggedByEmail, syncCommentTags } from "../utils";
+import { notifyTaggedByEmail, STAFF_ROLES, syncCommentTags } from "../utils";
 
-const COMMENT_READER_ROLES = [UserRole.COORDINATOR, UserRole.ADMIN];
+const COMMENT_READER_ROLES = STAFF_ROLES;
 
 function notifyCommentTags(
   fastify: FastifyInstance,

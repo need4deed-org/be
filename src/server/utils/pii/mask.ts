@@ -5,6 +5,7 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import { isStaffRole } from "../data/is-staff-role";
 import { CallerVisibility } from "./visible-persons";
 
 export const PERSON_PII_FIELDS = [
@@ -72,7 +73,7 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
     return true;
   }
   const authorRole = comment.user?.role ?? UserRole.USER;
-  if (authorRole === UserRole.COORDINATOR || authorRole === UserRole.ADMIN) {
+  if (isStaffRole(authorRole)) {
     return false;
   }
   return isEntityVisible(comment.entityType, comment.entityId, ctx);

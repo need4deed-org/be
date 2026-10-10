@@ -7,7 +7,6 @@ import {
   assertAgentMemberOrStaffOr404,
   assertRoleIn,
   isActiveAgentMember,
-  isAgentStaffRole,
 } from "../../../../server/utils/data/agent-membership";
 
 const AGENT_ID = 7;
@@ -22,16 +21,6 @@ function fakeRequest(
     callerAgentIds,
   } as unknown as FastifyRequest;
 }
-
-describe("isAgentStaffRole", () => {
-  it("is true only for coordinator and admin", () => {
-    expect(isAgentStaffRole(UserRole.COORDINATOR)).toBe(true);
-    expect(isAgentStaffRole(UserRole.ADMIN)).toBe(true);
-    expect(isAgentStaffRole(UserRole.AGENT)).toBe(false);
-    expect(isAgentStaffRole(UserRole.VOLUNTEER)).toBe(false);
-    expect(isAgentStaffRole(undefined)).toBe(false);
-  });
-});
 
 describe("assertRoleIn", () => {
   it("defaults to coordinator, agent and admin", () => {

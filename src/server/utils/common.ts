@@ -74,7 +74,7 @@ export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
 
 export function validatePermissions<E extends { userId: number }>(
   entity: E,
-  roles: UserRole[],
+  roles: readonly UserRole[],
   user: { id: number; role: UserRole },
 ) {
   return entity.userId === user.id || roles?.includes(user.role);
