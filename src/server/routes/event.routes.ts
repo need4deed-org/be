@@ -12,6 +12,7 @@ import { dtoEventN4DGet, dtoEventN4DGetList } from "../../services";
 import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
+  eventGetResponseSchema,
   eventListResponseSchema,
   eventPatchBodySchema,
   idParamSchema,
@@ -20,6 +21,7 @@ import {
 } from "../schema";
 import {
   ParamsId,
+  QuerystringEventGet,
   QuerystringEventGetList,
   ReplyData,
   ReplyDataCount,
@@ -66,6 +68,39 @@ export default async function eventRoutes(
       return reply
         .status(200)
         .send({ message: "Events.", data, count: data.length });
+    },
+  );
+
+  fastify.get<{
+    Params: ParamsId;
+    Querystring: QuerystringEventGet;
+    Reply: ReplyData<ApiEventN4DGet>;
+  }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        querystring: langQuerySchema,
+        response: eventGetResponseSchema,
+      },
+      onRequest: fastify.tryAuthenticate(),
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const isPrivileged = isStaffRole(request.authUser?.role);
+      const language = getLanguageCode(request.query.language) || Lang.DE;
+
+      const event = await fastify.db.eventRepository.findOne({
+        where: isPrivileged ? { id } : { id, isActive: true },
+        relations: ["eventTranslation.language"],
+      });
+      // 404 drafts/untranslated events for non-staff so their existence isn't leaked.
+      const data = event && dtoEventN4DGet(event, language, isPrivileged);
+      if (!data) {
+        throw new NotFoundError(`Event (id:${id}) not found.`);
+      }
+
+      return reply.status(200).send({ message: "Event.", data });
     },
   );
 
