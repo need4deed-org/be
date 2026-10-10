@@ -22,6 +22,7 @@ export * from "./get-volunteer-clones";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
+export * from "./is-staff-role";
 export * from "./is-trusted-domain";
 export * from "./mask-inactive-agent";
 export * from "./merge-into-where";

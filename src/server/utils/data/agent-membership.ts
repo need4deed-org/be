@@ -2,16 +2,13 @@ import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError, UnauthorizedError } from "../../../config";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
+import { isStaffRole } from "./is-staff-role";
 
 const AGENT_SCOPED_ROLES: readonly UserRole[] = [
   UserRole.COORDINATOR,
   UserRole.AGENT,
   UserRole.ADMIN,
 ];
-
-export function isAgentStaffRole(role: UserRole | undefined): boolean {
-  return role === UserRole.COORDINATOR || role === UserRole.ADMIN;
-}
 
 export function assertRoleIn(
   request: FastifyRequest,
@@ -39,7 +36,7 @@ async function isAgentMemberOrStaff(
   agentId: number | null | undefined,
 ): Promise<boolean> {
   const role = request.authUser?.role;
-  if (isAgentStaffRole(role)) {
+  if (isStaffRole(role)) {
     return true;
   }
   return role === UserRole.AGENT && isActiveAgentMember(request, agentId);

@@ -20,7 +20,7 @@ import {
   assertAgentVisible,
   assertRoleIn,
   createAgentContact,
-  isAgentStaffRole,
+  isStaffRole,
   updateAgentContact,
 } from "../../utils";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
@@ -115,7 +115,7 @@ export default function agentContactRoutes(
       }
 
       if (
-        !isAgentStaffRole(request.authUser?.role) &&
+        !isStaffRole(request.authUser?.role) &&
         membership.status !== AgentMembershipStatus.ACTIVE
       ) {
         throw new UnauthorizedError(
