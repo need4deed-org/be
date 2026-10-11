@@ -8,6 +8,7 @@ import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
 import { createManifestLoader, renderEmail } from "../email-template";
+import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
@@ -34,7 +35,7 @@ export async function sendEmailAccompanyMatchVolunteer(
   const contactPerson = getOpportunityRepresentativePerson(opportunity);
 
   const volunteerName = ov.volunteer.person.name;
-  const appointmentTitle = opportunity?.title ?? "";
+  const appointmentTitle = await localizedOpportunityTitle(opportunity);
   const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);

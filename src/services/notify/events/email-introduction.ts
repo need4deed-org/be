@@ -1,4 +1,4 @@
-import { DocumentStatusType } from "need4deed-sdk";
+import { DocumentStatusType, Lang } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -18,6 +18,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { opportunityTitleIn } from "../opportunity-title";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
@@ -78,7 +79,10 @@ export async function sendEmailIntroduction(
 
   const volunteerName = volunteer.person.name;
   const contactpersonName = contactPerson.name;
-  const volunteeringopportunityName = opportunity.title;
+  const volunteeringopportunityName = await opportunityTitleIn(
+    opportunity,
+    Lang.DE,
+  );
 
   const volunteerLanguage = await resolveOrAlert(
     errorTransport,

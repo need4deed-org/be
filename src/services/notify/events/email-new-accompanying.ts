@@ -14,6 +14,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { opportunityTitleIn } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
@@ -44,7 +45,7 @@ export async function sendEmailNewAccompanying(
     opportunity.district?.title ?? accompanying?.postcode?.value ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const clientName = accompanying?.name ?? "";
-  const appointmentTitle = opportunity.title;
+  const appointmentTitle = await opportunityTitleIn(opportunity, Lang.DE);
   const appointmentAddress = accompanying?.address ?? "";
   const { [Lang.DE]: accompaniedpersonLanguage } =
     await resolveAccompaniedPersonLanguage(

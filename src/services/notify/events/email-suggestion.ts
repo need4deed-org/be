@@ -8,6 +8,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import { createManifestLoader, renderEmail } from "../email-template";
+import { localizedOpportunityTitle } from "../opportunity-title";
 import {
   OPPORTUNITY_SCHEDULE_LABELS,
   resolveOrAlert,
@@ -45,7 +46,7 @@ export async function sendEmailSuggestion(
   }
 
   const volunteerName = ov.volunteer.person.name;
-  const opportunityName = ov.opportunity?.title ?? "";
+  const opportunityName = await localizedOpportunityTitle(ov.opportunity);
   const plz = ov.opportunity?.deal?.postcode?.value ?? "";
   const dealTimeslot = ov.opportunity?.deal?.dealTimeslot ?? [];
   const opportunitySchedule = await resolveOrAlert(

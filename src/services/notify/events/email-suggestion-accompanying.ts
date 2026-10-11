@@ -7,6 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import { createManifestLoader, renderEmail } from "../email-template";
+import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
@@ -32,7 +33,7 @@ export async function sendEmailSuggestionAccompanying(
   const opportunity = ov.opportunity;
   const accompanying = opportunity?.accompanying;
 
-  const appointmentTitle = opportunity?.title ?? "";
+  const appointmentTitle = await localizedOpportunityTitle(opportunity);
   const appointmentAddress = accompanying?.address ?? "";
   const appointmentPlz = accompanying?.postcode?.value ?? "";
   const appointmentDate = formatOnetimerDate(opportunity?.onetimer?.date);
