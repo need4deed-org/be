@@ -16,6 +16,18 @@ describe("IsPostcodeConstraint", () => {
       expect(constraint.validate("99998", makeArgs(Country.DE))).toBe(true);
     });
 
+    it("accepts non-Berlin postcodes, including a leading zero", () => {
+      expect(constraint.validate("15344", makeArgs(Country.DE))).toBe(true);
+      expect(constraint.validate("01067", makeArgs(Country.DE))).toBe(true);
+    });
+
+    it("rejects strings that are not exactly five digits", () => {
+      expect(constraint.validate("1067", makeArgs(Country.DE))).toBe(false);
+      expect(constraint.validate("123456", makeArgs(Country.DE))).toBe(false);
+      expect(constraint.validate("1e4", makeArgs(Country.DE))).toBe(false);
+      expect(constraint.validate("10115.0", makeArgs(Country.DE))).toBe(false);
+    });
+
     it("rejects postcodes outside the German range", () => {
       expect(constraint.validate("00000", makeArgs(Country.DE))).toBe(false);
       expect(constraint.validate("99999", makeArgs(Country.DE))).toBe(false);
