@@ -1,3 +1,4 @@
+import { Lang } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -10,6 +11,7 @@ import {
   fillTemplate,
   resolveFlatContent,
 } from "../email-template";
+import { opportunityTitleIn } from "../opportunity-title";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailRegularUpdateManifestUrl);
@@ -30,7 +32,10 @@ export async function sendEmailRegularUpdate(
   }
 
   const contactpersonName = opportunity.contactPerson!.name;
-  const volunteeringopportunityName = opportunity.title;
+  const volunteeringopportunityName = await opportunityTitleIn(
+    opportunity,
+    Lang.DE,
+  );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
