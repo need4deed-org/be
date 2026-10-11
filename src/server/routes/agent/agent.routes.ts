@@ -57,7 +57,11 @@ import {
   updateAgentServices,
 } from "../../utils";
 import { createAgent } from "../../utils/data/write-agent-registration";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { maskPii } from "../../utils/pii/mask";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
 import agentVolunteerRoutes from "./agent-volunteer.routes";
@@ -117,7 +121,8 @@ export default async function agentRoutes(
       logger.debug(`GET /agent: request.query:${Object.keys(request.query)}`);
       const { page, limit, sortOrder, filter } = request.query;
       const [skip, take] = getSkipTake({ page, limit });
-      const where = await getAgentWhere(filter);
+      const visibility = await resolveCallerMask(request);
+      const where = await getAgentWhere(filter, visibility);
 
       const role = request.authUser?.role;
       const isPrivileged = isStaffRole(role);
@@ -156,7 +161,9 @@ export default async function agentRoutes(
         await agentRepository.save(updates);
       }
 
-      await maskForCaller(request, agentsDistrict);
+      if (visibility) {
+        maskPii(agentsDistrict, visibility);
+      }
 
       const neededDistrictIds = new Map(
         agentsDistrict.map((agent) => [

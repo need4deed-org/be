@@ -60,10 +60,8 @@ import {
   patchOrReplaceAddress,
   updateOptionList,
 } from "../../utils";
-import {
-  maskForCaller,
-  resolveCallerMask,
-} from "../../utils/pii/pre-serialization";
+import { maskPii } from "../../utils/pii/mask";
+import { resolveCallerMask } from "../../utils/pii/pre-serialization";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -228,7 +226,11 @@ export default async function volunteerRoutes(
       );
       const [skip, take] = getSkipTake({ page, limit });
 
-      const where = getVolunteerWhere(filter) as FindOptionsWhere<Volunteer>;
+      const visibility = await resolveCallerMask(request);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+      ) as FindOptionsWhere<Volunteer>;
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };
@@ -253,7 +255,9 @@ export default async function volunteerRoutes(
           })
         : [];
 
-      await maskForCaller(request, volunteers);
+      if (visibility) {
+        maskPii(volunteers, visibility);
+      }
       const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
       reply.status(200).send({
