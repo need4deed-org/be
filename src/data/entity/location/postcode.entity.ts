@@ -2,7 +2,7 @@ import { IsNotEmpty } from "class-validator";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { IsPostcode } from "../../../services/validators/custom";
 import { numericTransformer } from "../../lib/numeric-transformer";
-import { Country, GermanCity } from "../../types";
+import { Country } from "../../types";
 import Deal from "../deal.entity";
 import DistrictPostcode from "../m2m/district-postcode";
 import Accompanying from "../opportunity/accompanying.entity";
@@ -39,7 +39,7 @@ export default class Postcode {
 
   @Column()
   @IsNotEmpty()
-  @IsPostcode(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM])
+  @IsPostcode(Country.DE)
   value: string;
 
   @OneToMany(

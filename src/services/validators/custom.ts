@@ -8,10 +8,10 @@ import {
 import { Country, GermanCity } from "../../data/types";
 
 function isValidPLZ(plz: string, city?: string) {
-  const code = Number(plz);
-  if (isNaN(code)) {
+  if (!/^\d{5}$/.test(plz)) {
     return false;
   }
+  const code = Number(plz);
 
   if (!city) {
     return code >= 1067 && code <= 99998;
