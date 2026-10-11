@@ -327,8 +327,8 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     const [alert, message] = send.mock.calls.map(([msg]) => msg);
     expect(alert.to).toBe(errorEmailRecipient);
     expect(alert.subject).toContain("sendEmailSuggestion");
-    expect(message.text ?? "").toContain("taking place on to be confirmed.");
-    expect(message.text ?? "").toContain("am wird noch abgestimmt.");
+    expect(message.text ?? "").toContain("When: to be confirmed (");
+    expect(message.text ?? "").toContain("Wann: wird noch abgestimmt (");
     expect(message.text ?? "").not.toContain("undefined");
     expect(alert.text).toContain('"en":"to be confirmed"');
   });

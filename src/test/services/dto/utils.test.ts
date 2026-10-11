@@ -164,6 +164,95 @@ describe("formatScheduleDe / formatScheduleLocalized", () => {
     });
   });
 
+  const DAY_DATES: Record<string, string> = {
+    MO: "2026-01-05",
+    TU: "2026-01-06",
+    WE: "2026-01-07",
+    TH: "2026-01-08",
+    FR: "2026-01-09",
+    SA: "2026-01-10",
+    SU: "2026-01-11",
+  };
+
+  const weekly = (byDay: string, fromHour: string, toHour: string) =>
+    new DealTimeslot({
+      timeslot: new Timeslot({
+        rrule: `FREQ=WEEKLY;BYDAY=${byDay};`,
+        start: new Date(`${DAY_DATES[byDay]}T${fromHour}:00:00Z`),
+        end: new Date(`${DAY_DATES[byDay]}T${toHour}:00:00Z`),
+      }),
+    });
+
+  it("should keep the plain list for exactly 3 slots", () => {
+    const dealTimeslot = [
+      weekly("MO", "14", "17"),
+      weekly("TU", "14", "17"),
+      weekly("WE", "14", "17"),
+    ];
+
+    expect(formatScheduleDe(dealTimeslot)).toBe(
+      "Montag, 14–17 Uhr, Dienstag, 14–17 Uhr, Mittwoch, 14–17 Uhr",
+    );
+  });
+
+  it("should collapse consecutive weekdays sharing a time range into a day range", () => {
+    const dealTimeslot = ["FR", "TH", "WE", "TU", "MO"].map((day) =>
+      weekly(day, "14", "17"),
+    );
+
+    expect(formatScheduleLocalized(dealTimeslot)).toEqual({
+      en: "Monday to Friday, 14:00–17:00",
+      de: "Montag bis Freitag, 14:00–17:00",
+    });
+  });
+
+  it("should list non-consecutive days sharing a time range with 'und'", () => {
+    const dealTimeslot = [
+      weekly("MO", "17", "20"),
+      weekly("WE", "17", "20"),
+      weekly("FR", "17", "20"),
+      weekly("SU", "17", "20"),
+    ];
+
+    expect(formatScheduleDe(dealTimeslot)).toBe(
+      "Montag, Mittwoch, Freitag und Sonntag, 17–20 Uhr",
+    );
+  });
+
+  it("should group days by identical time ranges and combine ranges with single days", () => {
+    const dealTimeslot = [
+      weekly("MO", "08", "11"),
+      weekly("MO", "14", "17"),
+      weekly("TU", "08", "11"),
+      weekly("TU", "14", "17"),
+      weekly("WE", "08", "11"),
+      weekly("WE", "14", "17"),
+      weekly("FR", "08", "11"),
+      weekly("FR", "14", "17"),
+      weekly("SA", "17", "20"),
+    ];
+
+    expect(formatScheduleDe(dealTimeslot)).toBe(
+      "Montag bis Mittwoch und Freitag, 08–11 Uhr und 14–17 Uhr; Samstag, 17–20 Uhr",
+    );
+  });
+
+  it("should append occasional slots after the weekly groups", () => {
+    const dealTimeslot = [
+      weekly("MO", "08", "11"),
+      weekly("TU", "08", "11"),
+      weekly("WE", "08", "11"),
+      new DealTimeslot({
+        timeslot: new Timeslot({ occasional: OccasionalType.WEEKENDS }),
+      }),
+    ];
+
+    expect(formatScheduleLocalized(dealTimeslot)).toEqual({
+      en: "Monday to Wednesday, 08:00–11:00; on weekends",
+      de: "Montag bis Mittwoch, 08:00–11:00; am Wochenende",
+    });
+  });
+
   it("should throw for a Timeslot with none of occasional/rrule/start", () => {
     const dealTimeslot = [
       new DealTimeslot({ timeslot: new Timeslot({ info: "only info set" }) }),
