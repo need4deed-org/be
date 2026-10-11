@@ -26,6 +26,11 @@ async function jwtPlugin(
     },
   });
 
+  function readApiKeyHeader(request: FastifyRequest): string | undefined {
+    const header = request.headers[apiKeyHeaderName];
+    return Array.isArray(header) ? header[0] : header;
+  }
+
   async function findUserByApiKey(rawKey: string): Promise<User | null> {
     const apiKey = await fastify.db.apiKeyRepository.findOne({
       where: { keyHash: sha256Hex(rawKey), revokedAt: IsNull() },
@@ -55,10 +60,7 @@ async function jwtPlugin(
         return;
       }
 
-      const apiKeyHeader = request.headers[apiKeyHeaderName];
-      const rawApiKey = Array.isArray(apiKeyHeader)
-        ? apiKeyHeader[0]
-        : apiKeyHeader;
+      const rawApiKey = readApiKeyHeader(request);
 
       let user: User | null;
 
@@ -128,6 +130,15 @@ async function jwtPlugin(
 
   fastify.decorate("tryAuthenticate", function () {
     return async function (request: FastifyRequest) {
+      const rawApiKey = readApiKeyHeader(request);
+      if (rawApiKey) {
+        const user = await findUserByApiKey(rawApiKey);
+        if (user?.isActive) {
+          request.authUser = user;
+        }
+        return;
+      }
+
       try {
         await request.jwtVerify();
         if ((request.user as { type?: string })?.type !== "access") {
