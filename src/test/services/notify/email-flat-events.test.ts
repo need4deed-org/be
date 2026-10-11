@@ -327,8 +327,8 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     const [alert, message] = send.mock.calls.map(([msg]) => msg);
     expect(alert.to).toBe(errorEmailRecipient);
     expect(alert.subject).toContain("sendEmailSuggestion");
-    expect(message.text ?? "").toContain("taking place on to be confirmed.");
-    expect(message.text ?? "").toContain("am wird noch abgestimmt.");
+    expect(message.text ?? "").toContain("When: to be confirmed.");
+    expect(message.text ?? "").toContain("Wann: wird noch abgestimmt.");
     expect(message.text ?? "").not.toContain("undefined");
     expect(alert.text).toContain('"en":"to be confirmed"');
   });
@@ -354,6 +354,61 @@ describe("schedule fallback for malformed Timeslot data (be#932)", () => {
     // The alert went through `errorTransport`, not `email`.
     expect(errorSend).toHaveBeenCalledTimes(1);
     expect(errorSend.mock.calls[0][0].to).toBe(errorEmailRecipient);
+  });
+});
+
+describe("sendEmailSuggestion one-of-these-times note", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetSuggestionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const weekly = (byDay: string, day: string) => ({
+    timeslot: {
+      id: 1,
+      rrule: `FREQ=WEEKLY;BYDAY=${byDay};`,
+      start: new Date(`2026-01-${day}T14:00:00`),
+      end: new Date(`2026-01-${day}T17:00:00`),
+    },
+  });
+
+  const sendWith = async (dealTimeslot: unknown[]) => {
+    await sendEmailSuggestion(
+      email,
+      ov({
+        opportunity: opportunity({ deal: { dealTimeslot } }),
+      }) as unknown as Parameters<typeof sendEmailSuggestion>[1],
+    );
+    return send.mock.calls.at(-1)?.[0].text ?? "";
+  };
+
+  it("is added when the opportunity has several times", async () => {
+    const text = await sendWith([weekly("MO", "05"), weekly("TU", "06")]);
+
+    expect(text).toContain(
+      "When: Monday, 14:00–17:00, Tuesday, 14:00–17:00 (you only need to be available at one of these times).",
+    );
+    expect(text).toContain(
+      "Wann: Montag, 14:00–17:00, Dienstag, 14:00–17:00 (du musst nur zu einer dieser Zeiten verfügbar sein).",
+    );
+  });
+
+  it("is left out when the opportunity has a single time", async () => {
+    const text = await sendWith([weekly("MO", "05")]);
+
+    expect(text).toContain("When: Monday, 14:00–17:00. If");
+    expect(text).toContain("Wann: Montag, 14:00–17:00.\n");
+  });
+
+  it("is left out when the schedule falls back", async () => {
+    const text = await sendWith([
+      { timeslot: { id: 1, info: "only info set" } },
+      { timeslot: { id: 2, info: "only info set" } },
+    ]);
+
+    expect(text).toContain("When: to be confirmed. If");
+    expect(text).toContain("Wann: wird noch abgestimmt.\n");
   });
 });
 

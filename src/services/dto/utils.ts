@@ -78,35 +78,113 @@ interface ScheduleLabels {
   day: Record<ByDay, string>;
   timeSlot: Record<TimeSlot, string>;
   occasional: Record<OccasionalType, string>;
+  and: string;
+  dayRange: string;
+}
+
+const SENTENCE_THRESHOLD = 3;
+const MIN_DAY_RANGE = 3;
+const WEEK = Object.values(ByDay);
+const TIME_SLOTS = Object.values(TimeSlot);
+
+function formatSlot(
+  { day, daytime }: ApiAvailability,
+  labels: ScheduleLabels,
+): string {
+  if (day === Occasionally.OCCASIONALLY) {
+    return labels.occasional[daytime as OccasionalType] ?? String(daytime);
+  }
+  if (day === null) {
+    throw new Error("Timeslot has a weekly rrule with no recognizable BYDAY");
+  }
+  if (day) {
+    const dayLabel = labels.day[day] ?? String(day);
+    const timeLabel = labels.timeSlot[daytime as TimeSlot] ?? String(daytime);
+    return `${dayLabel}, ${timeLabel}`;
+  }
+  return String(daytime);
+}
+
+function joinWithAnd(parts: string[], and: string): string {
+  return parts.length <= 1
+    ? parts.join("")
+    : `${parts.slice(0, -1).join(", ")} ${and} ${parts.at(-1)}`;
+}
+
+function joinDays(days: ByDay[], labels: ScheduleLabels): string {
+  const runs: ByDay[][] = [];
+  for (const day of days) {
+    const run = runs.at(-1);
+    if (run && WEEK.indexOf(day) === WEEK.indexOf(run.at(-1)!) + 1) {
+      run.push(day);
+    } else {
+      runs.push([day]);
+    }
+  }
+  const parts = runs.flatMap((run) =>
+    run.length >= MIN_DAY_RANGE
+      ? [`${labels.day[run[0]]} ${labels.dayRange} ${labels.day[run.at(-1)!]}`]
+      : run.map((day) => labels.day[day]),
+  );
+  return joinWithAnd(parts, labels.and);
+}
+
+function isWeeklySlot(
+  slot: ApiAvailability,
+): slot is { day: ByDay; daytime: TimeSlot } {
+  return (
+    WEEK.includes(slot.day as ByDay) &&
+    TIME_SLOTS.includes(slot.daytime as TimeSlot)
+  );
+}
+
+function formatScheduleSentence(
+  availability: ApiAvailability[],
+  labels: ScheduleLabels,
+): string {
+  const slotsByDay = new Map<ByDay, Set<TimeSlot>>();
+  const others: string[] = [];
+  for (const slot of availability) {
+    if (isWeeklySlot(slot)) {
+      const slots = slotsByDay.get(slot.day) ?? new Set<TimeSlot>();
+      slotsByDay.set(slot.day, slots.add(slot.daytime));
+    } else {
+      others.push(formatSlot(slot, labels));
+    }
+  }
+
+  const groups = new Map<string, { days: ByDay[]; slots: TimeSlot[] }>();
+  for (const day of WEEK) {
+    const daySlots = slotsByDay.get(day);
+    if (!daySlots) {
+      continue;
+    }
+    const slots = TIME_SLOTS.filter((slot) => daySlots.has(slot));
+    const key = slots.join();
+    const group = groups.get(key) ?? { days: [], slots };
+    group.days.push(day);
+    groups.set(key, group);
+  }
+
+  const weekly = [...groups.values()].map(
+    ({ days, slots }) =>
+      `${joinDays(days, labels)}, ${joinWithAnd(
+        slots.map((slot) => labels.timeSlot[slot]),
+        labels.and,
+      )}`,
+  );
+  return [...weekly, ...others].join("; ");
 }
 
 function formatSchedule(
   dealTimeslot: DealTimeslot[],
   labels: ScheduleLabels,
 ): string {
-  return (
-    getAvailability(dealTimeslot)
-      ?.map(({ day, daytime }) => {
-        if (day === Occasionally.OCCASIONALLY) {
-          return (
-            labels.occasional[daytime as OccasionalType] ?? String(daytime)
-          );
-        }
-        if (day === null) {
-          throw new Error(
-            "Timeslot has a weekly rrule with no recognizable BYDAY",
-          );
-        }
-        if (day) {
-          const dayLabel = labels.day[day as ByDay] ?? String(day);
-          const timeLabel =
-            labels.timeSlot[daytime as TimeSlot] ?? String(daytime);
-          return `${dayLabel}, ${timeLabel}`;
-        }
-        return String(daytime);
-      })
-      .join(", ") ?? ""
-  );
+  const availability = getAvailability(dealTimeslot) ?? [];
+  if (availability.length > SENTENCE_THRESHOLD) {
+    return formatScheduleSentence(availability, labels);
+  }
+  return availability.map((slot) => formatSlot(slot, labels)).join(", ");
 }
 
 const DAY_LABELS_DE: Record<ByDay, string> = {
@@ -136,6 +214,8 @@ export function formatScheduleDe(dealTimeslot: DealTimeslot[]): string {
     day: DAY_LABELS_DE,
     timeSlot: TIME_SLOT_LABELS_DE,
     occasional: OCCASIONAL_LABELS_DE,
+    and: "und",
+    dayRange: "bis",
   });
 }
 
@@ -174,11 +254,15 @@ export function formatScheduleLocalized(
       day: DAY_LABELS_EN,
       timeSlot: TIME_SLOT_LABELS_NEUTRAL,
       occasional: OCCASIONAL_LABELS_EN,
+      and: "and",
+      dayRange: "to",
     }),
     [Lang.DE]: formatSchedule(dealTimeslot, {
       day: DAY_LABELS_DE,
       timeSlot: TIME_SLOT_LABELS_NEUTRAL,
       occasional: OCCASIONAL_LABELS_DE_SHORT,
+      and: "und",
+      dayRange: "bis",
     }),
   };
 }
