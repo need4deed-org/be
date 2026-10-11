@@ -2,9 +2,14 @@ import { ApiEventN4DGet, ApiEventN4DGetList, Lang } from "need4deed-sdk";
 import EventN4D from "../../data/entity/event/event.entity";
 
 export function resolveEventTranslation(event: EventN4D, language: Lang) {
+  const translations = event.eventTranslation ?? [];
   return (
-    event.eventTranslation?.find((t) => t.language?.isoCode === language) ??
-    event.eventTranslation?.[0]
+    translations.find((t) => t.language?.isoCode === language) ??
+    translations.find((t) => t.languageId === event.languageId) ??
+    translations.reduce<(typeof translations)[number] | undefined>(
+      (lowest, t) => (!lowest || t.id < lowest.id ? t : lowest),
+      undefined,
+    )
   );
 }
 

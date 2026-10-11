@@ -33,6 +33,8 @@ describe("GET /event/:id", () => {
   let activeEvent: EventN4D;
   let inactiveEvent: EventN4D;
   let untranslatedEvent: EventN4D;
+  let primaryFallbackEvent: EventN4D;
+  let lowestIdFallbackEvent: EventN4D;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
   let volunteerPerson: Person;
@@ -134,6 +136,59 @@ describe("GET /event/:id", () => {
       }),
     );
 
+    const [uk, ar, fr] = await Promise.all(
+      ["uk", "ar", "fr"].map((isoCode) =>
+        fastify.db.languageRepository.findOneOrFail({ where: { isoCode } }),
+      ),
+    );
+    const fallbackTranslation = (
+      eventn4dId: number,
+      languageId: number,
+      menuTitle: string,
+    ) =>
+      new EventTranslation({
+        eventn4dId,
+        languageId,
+        title: `${menuTitle} ${suffix}`,
+        menuTitle,
+        description: menuTitle,
+        shortDescription: menuTitle,
+      });
+
+    primaryFallbackEvent = await fastify.db.eventRepository.save(
+      new EventN4D({
+        isActive: true,
+        date: new Date("2026-11-01T13:00:00Z"),
+        type: EventN4DType.PARTY,
+        address: "Elsenstraße 87, Berlin",
+        rsvpLink: "https://forms.example/rsvp-primary",
+        languageId: ar.id,
+      }),
+    );
+    await eventTranslationRepository.save(
+      fallbackTranslation(primaryFallbackEvent.id, uk.id, "uk-first"),
+    );
+    await eventTranslationRepository.save(
+      fallbackTranslation(primaryFallbackEvent.id, ar.id, "ar-primary"),
+    );
+
+    lowestIdFallbackEvent = await fastify.db.eventRepository.save(
+      new EventN4D({
+        isActive: true,
+        date: new Date("2026-11-02T13:00:00Z"),
+        type: EventN4DType.PARTY,
+        address: "Elsenstraße 87, Berlin",
+        rsvpLink: "https://forms.example/rsvp-lowest",
+        languageId: de.id,
+      }),
+    );
+    await eventTranslationRepository.save(
+      fallbackTranslation(lowestIdFallbackEvent.id, fr.id, "fr-first"),
+    );
+    await eventTranslationRepository.save(
+      fallbackTranslation(lowestIdFallbackEvent.id, uk.id, "uk-second"),
+    );
+
     const pwHash = await hashPassword(PASSWORD);
 
     coordinatorPerson = await fastify.db.personRepository.save(
@@ -179,6 +234,10 @@ describe("GET /event/:id", () => {
     await fastify.db.eventRepository.delete({ id: activeEvent.id });
     await fastify.db.eventRepository.delete({ id: inactiveEvent.id });
     await fastify.db.eventRepository.delete({ id: untranslatedEvent.id });
+    for (const event of [primaryFallbackEvent, lowestIdFallbackEvent]) {
+      await eventTranslationRepository.delete({ eventn4dId: event.id });
+      await fastify.db.eventRepository.delete({ id: event.id });
+    }
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.db.userRepository.delete({ personId: volunteerPerson.id });
@@ -288,6 +347,26 @@ describe("GET /event/:id", () => {
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.json().data.menuTitle).toBe("Entwurf");
+  });
+
+  it("falls back to the event's own language before any other translation", async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/event/${primaryFallbackEvent.id}?language=en`,
+      });
+      expect(res.json().data.menuTitle).toBe("ar-primary");
+    }
+  });
+
+  it("falls back to the earliest translation when the event's own language has none", async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/event/${lowestIdFallbackEvent.id}?language=en`,
+      });
+      expect(res.json().data.menuTitle).toBe("fr-first");
+    }
   });
 
   it("does not grant privileged access from a validly-signed non-access token", async () => {
