@@ -16,6 +16,18 @@ import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailSuggestionManifestUrl);
 
+const SCHEDULE_FALLBACK = {
+  [Lang.EN]: "to be confirmed",
+  [Lang.DE]: "wird noch abgestimmt",
+};
+
+const ONE_OF_THESE_TIMES_NOTE = {
+  [Lang.EN]: " (you only need to be available at one of these times)",
+  [Lang.DE]: " (du musst nur zu einer dieser Zeiten verfügbar sein)",
+};
+
+const NO_NOTE = { [Lang.EN]: "", [Lang.DE]: "" };
+
 export function resetSuggestionTemplateCache(): void {
   loader.resetCache();
 }
@@ -35,14 +47,19 @@ export async function sendEmailSuggestion(
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = ov.opportunity?.title ?? "";
   const plz = ov.opportunity?.deal?.postcode?.value ?? "";
+  const dealTimeslot = ov.opportunity?.deal?.dealTimeslot ?? [];
   const opportunitySchedule = await resolveOrAlert(
     errorTransport,
-    ov.opportunity?.deal?.dealTimeslot ?? [],
+    dealTimeslot,
     formatScheduleLocalized,
-    { [Lang.EN]: "to be confirmed", [Lang.DE]: "wird noch abgestimmt" },
+    SCHEDULE_FALLBACK,
     `sendEmailSuggestion, ov ${ov.id}`,
     OPPORTUNITY_SCHEDULE_LABELS,
   );
+  const scheduleNote =
+    opportunitySchedule !== SCHEDULE_FALLBACK && dealTimeslot.length > 1
+      ? ONE_OF_THESE_TIMES_NOTE
+      : NO_NOTE;
 
   const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
     volunteerName,
@@ -50,6 +67,7 @@ export async function sendEmailSuggestion(
     plz,
     opportunitySchedule,
     schedule: opportunitySchedule,
+    scheduleNote,
   });
 
   await email.send({

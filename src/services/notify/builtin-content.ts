@@ -36,7 +36,7 @@ export const ACCOMPANY_MATCH_BUILTIN: LocaleContent = {
 
 export const SUGGESTION_BUILTIN: LocaleContent = {
   subject: "Volunteering opportunity match — Need4Deed",
-  text: `Dear {{ volunteerName }},\n \nWe have an opportunity that may interest you: {{ opportunityName }}, in Berlin {{ plz }}. When: {{ opportunitySchedule.en }} (you only need to be available at one of these times). If you'd like to volunteer, please reply to volunteer@need4deed.org in the next 10 days.\n\nThe Need4Deed Team :)\nvolunteer@need4deed.org\n\nHallo {{ volunteerName }},\n\nWir haben eine Möglichkeit, die dich interessieren könnte: {{ opportunityName }}, in Berlin {{ plz }}. Wann: {{ opportunitySchedule.de }} (du musst nur zu einer dieser Zeiten verfügbar sein).\nWenn du dich ehrenamtlich engagieren möchtest, antworte bitte innerhalb der nächsten 10 Tage an volunteer@need4deed.org.\n\nDas Need4Deed-Team :)\nvolunteer@need4deed.org`,
+  text: `Dear {{ volunteerName }},\n \nWe have an opportunity that may interest you: {{ opportunityName }}, in Berlin {{ plz }}. When: {{ opportunitySchedule.en }}{{ scheduleNote.en }}. If you'd like to volunteer, please reply to volunteer@need4deed.org in the next 10 days.\n\nThe Need4Deed Team :)\nvolunteer@need4deed.org\n\nHallo {{ volunteerName }},\n\nWir haben eine Möglichkeit, die dich interessieren könnte: {{ opportunityName }}, in Berlin {{ plz }}. Wann: {{ opportunitySchedule.de }}{{ scheduleNote.de }}.\nWenn du dich ehrenamtlich engagieren möchtest, antworte bitte innerhalb der nächsten 10 Tage an volunteer@need4deed.org.\n\nDas Need4Deed-Team :)\nvolunteer@need4deed.org`,
 };
 
 export const SUGGESTION_ACCOMPANYING_BUILTIN: LocaleContent = {
