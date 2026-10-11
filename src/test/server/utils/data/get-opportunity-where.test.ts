@@ -1,4 +1,4 @@
-import { OpportunityType } from "need4deed-sdk";
+import { OpportunityType, TranslationStatus } from "need4deed-sdk";
 import {
   Between,
   FindOptionsWhere,
@@ -29,25 +29,75 @@ describe("getOpportunityWhere", () => {
     expect(getOpportunityWhere(undefined)).toEqual({});
   });
 
-  it("applies filter.type/status/search unchanged", () => {
+  it("applies filter.type/status unchanged", () => {
     expect(
       getOpportunityWhere({
         type: ["regular"],
         status: ["opp-active"],
-        search: "tutoring",
       } as never),
     ).toEqual({
       type: In(["regular"]),
       status: In(["opp-active"]),
-      title: ILike("%tutoring%"),
     });
   });
 
-  // A literal "%" or "_" in a search term must match as text, not act as a
-  // SQL wildcard/single-char-match.
-  it("escapes LIKE metacharacters in filter.search", () => {
-    expect(getOpportunityWhere({ search: "50%_off" } as never)).toEqual({
-      title: ILike("%50\\%\\_off%"),
+  describe("search (be#972)", () => {
+    it("ORs filter.search across title and info, carrying other filters onto both", () => {
+      expect(
+        getOpportunityWhere({
+          status: ["opp-active"],
+          search: "tutoring",
+        } as never),
+      ).toEqual([
+        { status: In(["opp-active"]), title: ILike("%tutoring%") },
+        { status: In(["opp-active"]), info: ILike("%tutoring%") },
+      ]);
+    });
+
+    // A literal "%" or "_" in a search term must match as text, not act as a
+    // SQL wildcard/single-char-match.
+    it("escapes LIKE metacharacters in filter.search", () => {
+      expect(getOpportunityWhere({ search: "50%_off" } as never)).toEqual([
+        { title: ILike("%50\\%\\_off%") },
+        { info: ILike("%50\\%\\_off%") },
+      ]);
+    });
+
+    it("adds a displayed-translation branch when a search language is given", () => {
+      const where = getOpportunityWhere(
+        { status: ["opp-active"], search: "50%" } as never,
+        undefined,
+        4,
+      ) as FindOptionsWhere<Opportunity>[];
+      expect(where).toHaveLength(3);
+      expect(where[2].status).toEqual(In(["opp-active"]));
+      const raw = where[2].id as unknown as {
+        _type: string;
+        _objectLiteralParameters: Record<string, unknown>;
+      };
+      expect(raw._type).toBe("raw");
+      expect(raw._objectLiteralParameters).toMatchObject({
+        searchLanguageId: 4,
+        searchTranslationStatus: TranslationStatus.DONE,
+        searchPattern: "%50\\%%",
+      });
+    });
+
+    it("crosses the search branches with the district branches", () => {
+      expect(
+        getOpportunityWhere({ search: "x", district: "2" } as never),
+      ).toEqual([
+        { title: ILike("%x%"), districtId: "2" },
+        {
+          title: ILike("%x%"),
+          deal: { dealDistrict: { district: { id: "2" } } },
+        },
+        { info: ILike("%x%"), districtId: "2" },
+        {
+          info: ILike("%x%"),
+          deal: { dealDistrict: { district: { id: "2" } } },
+        },
+      ]);
     });
   });
 

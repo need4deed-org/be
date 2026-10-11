@@ -263,6 +263,7 @@ describe("GET /volunteer", () => {
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
   const numericSuffix = randomNumericSuffix();
+  const phone = `+49 30 ${numericSuffix}`;
   const LAT = 52.52;
   const LON = 13.405;
 
@@ -288,6 +289,7 @@ describe("GET /volunteer", () => {
       new Person({
         firstName: "Test",
         lastName,
+        phone,
         addressId: address.id,
       }),
     );
@@ -416,6 +418,40 @@ describe("GET /volunteer", () => {
     expect(row.name).not.toContain(lastName);
     expect(row.lat).toBeNull();
     expect(row.lon).toBeNull();
+  });
+
+  it("matches a volunteer by phone (be#972)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(numericSuffix)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.map((v: { id: number }) => v.id)).toContain(
+      volunteer.id,
+    );
+  });
+
+  it("matches a volunteer by phone regardless of formatting (be#972)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(`+49 (30) ${numericSuffix.slice(0, 3)}-${numericSuffix.slice(3)}`)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.map((v: { id: number }) => v.id)).toContain(
+      volunteer.id,
+    );
+  });
+
+  it("does not let a caller match on a phone masked from them (be#666, be#972)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(phone.replace(/\s/g, ""))}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().count).toBe(0);
   });
 
   it("does not let a caller match on PII masked from them (be#666)", async () => {
