@@ -4,10 +4,13 @@ import {
   AgentRoleType,
   AgentVolunteerSearchType,
   EntityTableName,
+  Lang,
   OpportunityLegacyFormData,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
+  TranslationOrigin,
+  TranslationStatus,
   UserRole,
   VolunteerStateMatchType,
 } from "need4deed-sdk";
@@ -24,6 +27,7 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -40,7 +44,9 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { languageIdOf } from "../../../server/utils/data/translate-opportunities";
 import { parseOpportunityLegacy } from "../../../services/dto/parser-opportunity-legacy";
+import { sourceHashOf } from "../../../services/translation/queue";
 import { formatDate, formatTime } from "../../../services/utils";
 import { randomNumericSuffix } from "../../random";
 
@@ -2935,5 +2941,115 @@ describe("accompanying description storage (be#1092)", () => {
 
     expect(opportunity.info).toBe("Created volunteering text");
     expect(opportunity.infoConfidential).toBeUndefined();
+  });
+});
+
+describe("GET /opportunity search matches displayed translations (be#972)", () => {
+  let fastify: FastifyInstance;
+  let opportunity: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const coordinatorEmail = `coordinator-mt-search-${suffix}@test.need4deed.org`;
+  const title = `Hausaufgabenhilfe ${suffix}`;
+  // Leading/trailing whitespace: sourceHash is over the JS-trimmed text.
+  const info = `\n  Wir suchen Unterstützung ${suffix}\u00a0\n`;
+  const shownToken = `HomeworkShown${suffix}`;
+  const staleToken = `HomeworkStale${suffix}`;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({ title, info, type: OpportunityType.REGULAR }),
+    );
+
+    const enId = await languageIdOf(dataSource.manager, Lang.EN);
+    const translationRepository = getRepository(dataSource, FieldTranslation);
+    await translationRepository.save([
+      translationRepository.create({
+        opportunityId: opportunity.id,
+        fieldName: "info",
+        languageId: enId,
+        translation: `We are looking for support ${shownToken}`,
+        origin: TranslationOrigin.MACHINE,
+        status: TranslationStatus.DONE,
+        sourceHash: sourceHashOf(info.trim()),
+      }),
+      // Translated from an older title: resolve() won't display it.
+      translationRepository.create({
+        opportunityId: opportunity.id,
+        fieldName: "title",
+        languageId: enId,
+        translation: `Homework help ${staleToken}`,
+        origin: TranslationOrigin.MACHINE,
+        status: TranslationStatus.DONE,
+        sourceHash: sourceHashOf("an older title"),
+      }),
+    ]);
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "MtSearchCoordinator" }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: coordinatorEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: coordinatorEmail, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(login.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.close();
+  });
+
+  const search = async (term: string, language: Lang, extra = "") => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?language=${language}&filter[search]=${encodeURIComponent(term)}${extra}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().data.map((o: { id: number }) => o.id);
+  };
+
+  it.each([
+    ["default order", ""],
+    ["sortBy=start-date", "&sortBy=start-date"],
+  ])(
+    "finds it by text only in the displayed translation (%s)",
+    async (_label, extra) => {
+      expect(await search(shownToken, Lang.EN, extra)).toEqual([
+        opportunity.id,
+      ]);
+    },
+  );
+
+  it("does not match a translation in a language other than the response's", async () => {
+    expect(await search(shownToken, Lang.DE)).toEqual([]);
+  });
+
+  it("does not match a stale translation that isn't displayed", async () => {
+    expect(await search(staleToken, Lang.EN)).toEqual([]);
+  });
+
+  it("still matches the original text when a translation is shown", async () => {
+    expect(await search(`Hausaufgabenhilfe ${suffix}`, Lang.EN)).toEqual([
+      opportunity.id,
+    ]);
   });
 });

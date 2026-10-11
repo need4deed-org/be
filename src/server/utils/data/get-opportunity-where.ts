@@ -1,4 +1,4 @@
-import { OpportunityType } from "need4deed-sdk";
+import { OpportunityType, TranslationStatus } from "need4deed-sdk";
 import {
   Between,
   FindOptionsWhere,
@@ -7,6 +7,7 @@ import {
   LessThanOrEqual,
   MoreThanOrEqual,
   Not,
+  Raw,
 } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
@@ -27,6 +28,42 @@ export type OpportunityAppointmentFilter = Pick<
 >;
 
 const SEARCH_FIELDS = ["title", "info"] as const;
+
+// Mirrors translation/resolve.ts: a translation is only displayed when it is
+// DONE, in the response language, and its sourceHash still matches the
+// current (JS-trimmed) source text.
+const TRIM_CHARS = " \t\n\r\f\v\u00a0\ufeff";
+const TRANSLATION_SEARCH_SQL = (alias: string) => `${alias} IN (
+  SELECT ft.opportunity_id
+    FROM field_translation ft
+    JOIN opportunity o ON o.id = ft.opportunity_id
+   WHERE ft.language_id = :searchLanguageId
+     AND ft.status = :searchTranslationStatus
+     AND ft.field_name IN ('title', 'info')
+     AND ft.translation ILIKE :searchPattern
+     AND ft.source_hash = encode(sha256(convert_to(btrim(
+           CASE ft.field_name WHEN 'title' THEN o.title ELSE o.info END,
+           :searchTrimChars), 'UTF8')), 'hex'))`;
+
+function getSearchBranches(
+  pattern: string,
+  languageId?: number,
+): FindOptionsWhere<Opportunity>[] {
+  const branches: FindOptionsWhere<Opportunity>[] = SEARCH_FIELDS.map(
+    (field) => ({ [field]: ILike(pattern) }),
+  );
+  if (languageId !== undefined) {
+    branches.push({
+      id: Raw(TRANSLATION_SEARCH_SQL, {
+        searchLanguageId: languageId,
+        searchTranslationStatus: TranslationStatus.DONE,
+        searchPattern: pattern,
+        searchTrimChars: TRIM_CHARS,
+      }),
+    });
+  }
+  return branches;
+}
 
 function hasFilterValue(value: string | string[] | undefined): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
@@ -113,6 +150,7 @@ function getDealWhere(
 export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   appointment?: OpportunityAppointmentFilter,
+  searchLanguageId?: number,
 ): FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[] {
   const dealFilter = getDealWhere(filter);
 
@@ -131,7 +169,10 @@ export function getOpportunityWhere(
     ? `%${escapeLikePattern(filter.search)}%`
     : undefined;
   let branches: FindOptionsWhere<Opportunity>[] = searchPattern
-    ? SEARCH_FIELDS.map((field) => ({ ...base, [field]: ILike(searchPattern) }))
+    ? getSearchBranches(searchPattern, searchLanguageId).map((branch) => ({
+        ...base,
+        ...branch,
+      }))
     : [base];
 
   if (hasFilterValue(filter?.district)) {

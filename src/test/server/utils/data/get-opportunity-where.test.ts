@@ -1,4 +1,4 @@
-import { OpportunityType } from "need4deed-sdk";
+import { OpportunityType, TranslationStatus } from "need4deed-sdk";
 import {
   Between,
   FindOptionsWhere,
@@ -61,6 +61,26 @@ describe("getOpportunityWhere", () => {
         { title: ILike("%50\\%\\_off%") },
         { info: ILike("%50\\%\\_off%") },
       ]);
+    });
+
+    it("adds a displayed-translation branch when a search language is given", () => {
+      const where = getOpportunityWhere(
+        { status: ["opp-active"], search: "50%" } as never,
+        undefined,
+        4,
+      ) as FindOptionsWhere<Opportunity>[];
+      expect(where).toHaveLength(3);
+      expect(where[2].status).toEqual(In(["opp-active"]));
+      const raw = where[2].id as unknown as {
+        _type: string;
+        _objectLiteralParameters: Record<string, unknown>;
+      };
+      expect(raw._type).toBe("raw");
+      expect(raw._objectLiteralParameters).toMatchObject({
+        searchLanguageId: 4,
+        searchTranslationStatus: TranslationStatus.DONE,
+        searchPattern: "%50\\%%",
+      });
     });
 
     it("crosses the search branches with the district branches", () => {

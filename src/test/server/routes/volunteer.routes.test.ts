@@ -432,10 +432,22 @@ describe("GET /volunteer", () => {
     );
   });
 
+  it("matches a volunteer by phone regardless of formatting (be#972)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(`+49 (30) ${numericSuffix.slice(0, 3)}-${numericSuffix.slice(3)}`)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.map((v: { id: number }) => v.id)).toContain(
+      volunteer.id,
+    );
+  });
+
   it("does not let a caller match on a phone masked from them (be#666, be#972)", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: `/volunteer?filter[search]=${encodeURIComponent(phone)}`,
+      url: `/volunteer?filter[search]=${encodeURIComponent(phone.replace(/\s/g, ""))}`,
       cookies: { [accessCookieName]: unrelatedUserCookie },
     });
     expect(res.statusCode).toBe(200);

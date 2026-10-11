@@ -99,6 +99,7 @@ import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
+  languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
   translateOpportunities,
@@ -337,7 +338,16 @@ export default async function opportunityRoutes(
             ? { order: { createdAt: "ASC" } as const }
             : undefined;
 
-      const where = getOpportunityWhere(request.query.filter, request.query);
+      const where = getOpportunityWhere(
+        request.query.filter,
+        request.query,
+        request.query.filter?.search
+          ? await languageIdOf(
+              dataSource.manager,
+              requestLanguage(request.query),
+            )
+          : undefined,
+      );
       const message = `Opportunities page:${request.query.page}.`;
 
       if (request.authUser?.role === UserRole.AGENT) {

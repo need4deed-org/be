@@ -54,6 +54,36 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
     expect(where.person?.[0]).toEqual({ firstName: ILike("%a\\_b\\%%") });
   });
 
+  describe("formatting-insensitive phone match", () => {
+    const phoneDigitsBranch = (search: string) =>
+      getVolunteerWhere({ search }, null).person?.[4] as
+        | { phone: { _type: string; _objectLiteralParameters: unknown } }
+        | undefined;
+
+    it.each(["+4930123", "+49 (30) 123-4", "030/123.45"])(
+      "adds a digits-only phone branch for phone-like input %j",
+      (search) => {
+        const branch = phoneDigitsBranch(search);
+        expect(branch?.phone._type).toBe("raw");
+        expect(branch?.phone._objectLiteralParameters).toEqual({
+          phoneDigits: `%${search.replace(/\D/g, "")}%`,
+        });
+      },
+    );
+
+    it.each(["ann", "Ann 030", "12", "+ -"])(
+      "adds no digits-only phone branch for %j",
+      (search) => {
+        expect(phoneDigitsBranch(search)).toBeUndefined();
+      },
+    );
+
+    it("scopes the phone branch to visible persons too", () => {
+      const where = getVolunteerWhere({ search: "030 123" }, visibility([7]));
+      expect(where.person?.[4]).toMatchObject({ id: In([7]) });
+    });
+  });
+
   it("does not scope a masked caller's query without a search", () => {
     expect(getVolunteerWhere({ district: ["3"] }, visibility([]))).toEqual({
       deal: { dealDistrict: { district: { id: In(["3"]) } } },
