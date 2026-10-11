@@ -2482,6 +2482,7 @@ describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const coordinatorEmail = `coordinator-no-deal-${suffix}@test.need4deed.org`;
+  const infoToken = `InfoOnly${suffix}`;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -2490,6 +2491,7 @@ describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
     opportunity = await fastify.db.opportunityRepository.save(
       new Opportunity({
         title: `Test No Deal ${suffix}`,
+        info: `Description mentioning ${infoToken}`,
         type: OpportunityType.REGULAR,
       }),
     );
@@ -2540,6 +2542,25 @@ describe("GET /opportunity with a deal-less opportunity (be#999)", () => {
     expect(found.activities).toEqual([]);
     expect(found.location).toEqual([]);
   });
+
+  it.each([
+    ["default order", ""],
+    ["sortBy=start-date", "&sortBy=start-date"],
+  ])(
+    "finds it by a search term that only appears in its info (be#972, %s)",
+    async (_label, extra) => {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity?filter[search]=${encodeURIComponent(infoToken)}${extra}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().count).toBe(1);
+      expect(res.json().data.map((o: { id: number }) => o.id)).toEqual([
+        opportunity.id,
+      ]);
+    },
+  );
 
   it("serves it by id", async () => {
     const res = await fastify.inject({

@@ -26,6 +26,8 @@ export type OpportunityAppointmentFilter = Pick<
   | "excludeAccompanying"
 >;
 
+const SEARCH_FIELDS = ["title", "info"] as const;
+
 function hasFilterValue(value: string | string[] | undefined): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
@@ -122,27 +124,29 @@ export function getOpportunityWhere(
           status: normalizeStringArrayInput(filter.status),
         }
       : {}),
-    ...(filter?.search
-      ? {
-          title: ILike(`%${escapeLikePattern(filter.search)}%`),
-        }
-      : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
   } as FindOptionsWhere<Opportunity>;
 
+  const searchPattern = filter?.search
+    ? `%${escapeLikePattern(filter.search)}%`
+    : undefined;
+  let branches: FindOptionsWhere<Opportunity>[] = searchPattern
+    ? SEARCH_FIELDS.map((field) => ({ ...base, [field]: ILike(searchPattern) }))
+    : [base];
+
   if (hasFilterValue(filter?.district)) {
     const districtIds = normalizeStringArrayInput(filter!.district!);
-    return [
-      { ...base, districtId: districtIds },
+    branches = branches.flatMap((branch) => [
+      { ...branch, districtId: districtIds },
       {
-        ...base,
+        ...branch,
         deal: {
-          ...((base.deal as Record<string, unknown>) ?? {}),
+          ...((branch.deal as Record<string, unknown>) ?? {}),
           dealDistrict: { district: { id: districtIds } },
         },
       },
-    ] as FindOptionsWhere<Opportunity>[];
+    ]) as FindOptionsWhere<Opportunity>[];
   }
 
-  return base;
+  return branches.length === 1 ? branches[0] : branches;
 }

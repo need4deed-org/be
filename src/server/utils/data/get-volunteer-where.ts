@@ -2,6 +2,9 @@ import { ILike, In } from "typeorm";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
+import { escapeLikePattern } from "./person-name-ilike";
+
+const SEARCH_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
 
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
@@ -45,11 +48,10 @@ export function getVolunteerWhere(
       : {}),
     ...(filter?.search
       ? {
-          person: [
-            { firstName: ILike(`%${filter.search}%`), ...personScope },
-            { lastName: ILike(`%${filter.search}%`), ...personScope },
-            { email: ILike(`%${filter.search}%`), ...personScope },
-          ],
+          person: SEARCH_FIELDS.map((field) => ({
+            [field]: ILike(`%${escapeLikePattern(filter.search!)}%`),
+            ...personScope,
+          })),
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),

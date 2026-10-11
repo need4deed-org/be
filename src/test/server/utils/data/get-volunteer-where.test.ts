@@ -15,13 +15,14 @@ function visibility(personIds: number[]): CallerVisibility {
   };
 }
 
-describe("getVolunteerWhere search (be#666)", () => {
+describe("getVolunteerWhere search (be#666, be#972)", () => {
   it("matches name/email across all persons for a privileged caller", () => {
     expect(getVolunteerWhere({ search: "ann" }, null)).toEqual({
       person: [
         { firstName: ILike("%ann%") },
         { lastName: ILike("%ann%") },
         { email: ILike("%ann%") },
+        { phone: ILike("%ann%") },
       ],
     });
   });
@@ -32,6 +33,7 @@ describe("getVolunteerWhere search (be#666)", () => {
         { firstName: ILike("%ann%"), id: In([7, 9]) },
         { lastName: ILike("%ann%"), id: In([7, 9]) },
         { email: ILike("%ann%"), id: In([7, 9]) },
+        { phone: ILike("%ann%"), id: In([7, 9]) },
       ],
     });
   });
@@ -42,8 +44,14 @@ describe("getVolunteerWhere search (be#666)", () => {
         { firstName: ILike("%ann%"), id: In([-1]) },
         { lastName: ILike("%ann%"), id: In([-1]) },
         { email: ILike("%ann%"), id: In([-1]) },
+        { phone: ILike("%ann%"), id: In([-1]) },
       ],
     });
+  });
+
+  it("escapes LIKE metacharacters in filter.search", () => {
+    const where = getVolunteerWhere({ search: "a_b%" }, null);
+    expect(where.person?.[0]).toEqual({ firstName: ILike("%a\\_b\\%%") });
   });
 
   it("does not scope a masked caller's query without a search", () => {
