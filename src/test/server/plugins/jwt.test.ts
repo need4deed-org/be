@@ -261,6 +261,77 @@ describe("X-API-Key authentication", () => {
     });
   });
 
+  describe("tryAuthenticate with an API key", () => {
+    const rawKey = "n4d_test-raw-key";
+
+    function mockEventQuery() {
+      const andWhere = vi.fn();
+      const qb = {
+        leftJoinAndSelect: () => qb,
+        orderBy: () => qb,
+        andWhere: andWhere.mockImplementation(() => qb),
+        getMany: async () => [],
+      };
+      vi.spyOn(
+        fastify.db.eventRepository,
+        "createQueryBuilder",
+      ).mockReturnValue(qb as any);
+      return andWhere;
+    }
+
+    function mockKeyUser(user: typeof coordinatorUser | null) {
+      vi.spyOn(fastify.db.apiKeyRepository, "findOne").mockResolvedValue(
+        user &&
+          new ApiKey({
+            id: 1,
+            keyHash: sha256Hex(rawKey),
+            revokedAt: null,
+            userId: user.id,
+            user: user as any,
+          }),
+      );
+      vi.spyOn(fastify.db.apiKeyRepository, "update").mockResolvedValue(
+        {} as any,
+      );
+    }
+
+    it("treats a valid coordinator key as privileged", async () => {
+      mockKeyUser(coordinatorUser);
+      const andWhere = mockEventQuery();
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/event",
+        headers: { "x-api-key": rawKey },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(andWhere).not.toHaveBeenCalledWith(
+        "event.isActive = :isActive",
+        expect.anything(),
+      );
+    });
+
+    it.each([
+      ["an unknown key", null],
+      ["a deactivated user's key", { ...coordinatorUser, isActive: false }],
+    ])("treats %s as anonymous", async (_label, user) => {
+      mockKeyUser(user);
+      const andWhere = mockEventQuery();
+
+      const response = await fastify.inject({
+        method: "GET",
+        url: "/event",
+        headers: { "x-api-key": rawKey },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(andWhere).toHaveBeenCalledWith("event.isActive = :isActive", {
+        isActive: true,
+      });
+    });
+  });
+
   it.each(["verify", "reset", "refresh"] as const)(
     "be#908: rejects a %s token used as the access cookie",
     async (type) => {

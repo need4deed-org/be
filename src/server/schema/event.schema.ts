@@ -67,6 +67,19 @@ export const eventListResponseSchema = {
   ...responseErrors,
 };
 
+export const eventGetResponseSchema = {
+  200: {
+    type: "object",
+    required: ["message", "data"],
+    properties: {
+      message: { type: "string" },
+      data: eventFullItemSchema,
+    },
+    additionalProperties: false,
+  },
+  ...responseErrors,
+};
+
 const eventTranslationInputSchema = {
   type: "object",
   properties: {
