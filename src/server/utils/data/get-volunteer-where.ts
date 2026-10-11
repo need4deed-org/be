@@ -1,10 +1,16 @@
-import { ILike } from "typeorm";
+import { ILike, In } from "typeorm";
 import { QuerystringVolunteerFiltering } from "../../types";
+import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
 
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
+  visibility: CallerVisibility | null = null,
 ) {
+  const personScope = visibility
+    ? { id: In(visibility.personIds.size ? [...visibility.personIds] : [-1]) }
+    : {};
+
   const dealFilter: Record<string, unknown> = {};
   if (filter?.language) {
     dealFilter.dealLanguage = {
@@ -40,9 +46,9 @@ export function getVolunteerWhere(
     ...(filter?.search
       ? {
           person: [
-            { firstName: ILike(`%${filter.search}%`) },
-            { lastName: ILike(`%${filter.search}%`) },
-            { email: ILike(`%${filter.search}%`) },
+            { firstName: ILike(`%${filter.search}%`), ...personScope },
+            { lastName: ILike(`%${filter.search}%`), ...personScope },
+            { email: ILike(`%${filter.search}%`), ...personScope },
           ],
         }
       : {}),

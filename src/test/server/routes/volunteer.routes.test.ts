@@ -6,6 +6,7 @@ import {
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
+  SortOrder,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -257,6 +258,7 @@ describe("GET /volunteer", () => {
   let unrelatedPerson: Person;
   let coordinatorCookie: string;
   let unrelatedUserCookie: string;
+  let volunteerUserCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const lastName = `MapPin-${suffix}`;
@@ -326,6 +328,16 @@ describe("GET /volunteer", () => {
       }),
     );
 
+    await fastify.db.userRepository.save(
+      new User({
+        email: `volunteer-vol-list-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: volunteerPerson.id,
+      }),
+    );
+
     const login = async (email: string): Promise<string> => {
       const res = await fastify.inject({
         method: "POST",
@@ -340,11 +352,15 @@ describe("GET /volunteer", () => {
     unrelatedUserCookie = await login(
       `unrelated-user-vol-list-${suffix}@test.need4deed.org`,
     );
+    volunteerUserCookie = await login(
+      `volunteer-vol-list-${suffix}@test.need4deed.org`,
+    );
   });
 
   afterAll(async () => {
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.userRepository.delete({ personId: unrelatedPerson.id });
+    await fastify.db.userRepository.delete({ personId: volunteerPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
@@ -388,16 +404,43 @@ describe("GET /volunteer", () => {
   it("nulls lat/lon for a caller with no visibility into the volunteer, alongside their masked name", async () => {
     const res = await fastify.inject({
       method: "GET",
+      url: `/volunteer?limit=120&sortOrder=${SortOrder.NewToOld}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const row = res
+      .json()
+      .data.find((v: { id: number }) => v.id === volunteer.id);
+    expect(row).toBeDefined();
+    expect(row.name).not.toContain(lastName);
+    expect(row.lat).toBeNull();
+    expect(row.lon).toBeNull();
+  });
+
+  it("does not let a caller match on PII masked from them (be#666)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
       url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
       cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toHaveLength(0);
+    expect(res.json().count).toBe(0);
+  });
+
+  it("still lets a masked caller match on PII visible to them (be#666)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: volunteerUserCookie },
     });
     expect(res.statusCode).toBe(200);
 
     const body = res.json();
     expect(body.data).toHaveLength(1);
-    expect(body.data[0].name).not.toContain(lastName);
-    expect(body.data[0].lat).toBeNull();
-    expect(body.data[0].lon).toBeNull();
+    expect(body.data[0].id).toBe(volunteer.id);
+    expect(body.data[0].name).toContain(lastName);
   });
 });
 

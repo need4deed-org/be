@@ -4,10 +4,12 @@ import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getRepository } from "../../../data/utils";
 import { QuerystringAgentFiltering } from "../../types";
+import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
 
 export async function getAgentWhere(
   filter: QuerystringAgentFiltering["filter"],
+  visibility: CallerVisibility | null = null,
 ): Promise<FindOptionsWhere<Agent>> {
   let agentIdsForServices: number[] | null = null;
   if (filter?.services) {
@@ -18,6 +20,17 @@ export async function getAgentWhere(
       where: { serviceId: In(serviceIds) },
     });
     agentIdsForServices = [...new Set(matches.map(({ agentId }) => agentId))];
+  }
+
+  let agentIds = agentIdsForServices;
+  if (visibility && filter?.street) {
+    const visibleAgentIds = new Set([
+      ...visibility.agentIds,
+      ...visibility.matchedAgentIds,
+    ]);
+    agentIds = (agentIds ?? [...visibleAgentIds]).filter((id) =>
+      visibleAgentIds.has(id),
+    );
   }
 
   return {
@@ -51,9 +64,9 @@ export async function getAgentWhere(
           districtId: normalizeStringArrayInput(filter.district),
         }
       : {}),
-    ...(agentIdsForServices
+    ...(agentIds
       ? {
-          id: In(agentIdsForServices.length > 0 ? agentIdsForServices : [-1]),
+          id: In(agentIds.length > 0 ? agentIds : [-1]),
         }
       : {}),
   } as FindOptionsWhere<Agent>;
