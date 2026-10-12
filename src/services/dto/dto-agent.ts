@@ -78,6 +78,7 @@ export function dtoAgentGetList(
       agent.representative?.person?.email || agent.organization?.email || "",
     district: { id: agent.districtId, title: { de: agent?.district?.title } },
     unclaimed: agent.unclaimed,
+    statusEngagement: agent.engagementStatus,
     ...getAgentCoordinates(agent, districtCentroid),
   };
 }
@@ -110,7 +111,6 @@ export function dtoAgentGet(
       dtoOptionTitle(as.serviceId, as.service),
     ),
     trustLevel: agent.trustLevel,
-    statusEngagement: agent.engagementStatus,
     agentDetails: dtoAgentDetails(agent),
     comments: agent.comments?.map(commentSerializer),
     languages:

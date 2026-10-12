@@ -41,11 +41,12 @@ export class AgentTitleConflictError extends BaseError {
   }
 }
 
-async function assertNoAddressConflict(
-  addressStreet?: string,
-  addressPostcode?: string,
-): Promise<void> {
-  if (!addressStreet || !addressPostcode) {
+async function assertNoAddressConflict({
+  addressStreet,
+  addressPostcode,
+  confirmSharedAddress,
+}: ApiAgentRegisterNew): Promise<void> {
+  if (confirmSharedAddress || !addressStreet || !addressPostcode) {
     return;
   }
   const agents = await dataSource.getRepository(Agent).find({
@@ -116,7 +117,7 @@ export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
-  await assertNoAddressConflict(input.addressStreet, input.addressPostcode);
+  await assertNoAddressConflict(input);
 
   let result!: RegisterAgentResult;
 
@@ -160,7 +161,7 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
-  await assertNoAddressConflict(input.addressStreet, input.addressPostcode);
+  await assertNoAddressConflict(input);
 
   let agentId!: number;
 

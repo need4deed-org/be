@@ -217,6 +217,30 @@ describe("createAgentForPerson", () => {
     expect(agentSave).not.toHaveBeenCalled();
   });
 
+  it("creates a distinct agent at an existing agent's address when confirmSharedAddress is set", async () => {
+    agentRepoFind.mockResolvedValueOnce([
+      {
+        id: 77,
+        address: {
+          street: "Bitterfelder Str 11",
+          postcode: { value: "12681" },
+        },
+      },
+    ]);
+    createAddressMock.mockResolvedValueOnce({ id: 99 });
+
+    const result = await createAgentForPerson(11, {
+      title: "Second Org HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+      confirmSharedAddress: true,
+    });
+
+    expect(result.agentId).toBe(33);
+    expect(agentRepoFind).not.toHaveBeenCalled();
+    expect(agentSave.mock.calls[0][0].addressId).toBe(99);
+  });
+
   it("skips Address when only street or only postcode is given", async () => {
     await createAgentForPerson(11, {
       title: "Centre HERO",
@@ -354,6 +378,30 @@ describe("createAgent", () => {
     expect(err).toBeInstanceOf(AgentAddressConflictError);
     expect(err.agentId).toBe(77);
     expect(agentSave).not.toHaveBeenCalled();
+  });
+
+  it("creates a distinct agent at an existing agent's address when confirmSharedAddress is set", async () => {
+    agentRepoFind.mockResolvedValueOnce([
+      {
+        id: 77,
+        address: {
+          street: "Bitterfelder Str 11",
+          postcode: { value: "12681" },
+        },
+      },
+    ]);
+    createAddressMock.mockResolvedValueOnce({ id: 99 });
+
+    const result = await createAgent({
+      title: "Second Bare Agent HERO",
+      addressStreet: "Bitterfelder Str 11",
+      addressPostcode: "12681",
+      confirmSharedAddress: true,
+    });
+
+    expect(result.agentId).toBe(33);
+    expect(agentRepoFind).not.toHaveBeenCalled();
+    expect(agentSave.mock.calls[0][0].addressId).toBe(99);
   });
 
   it("be#1059: derives districtId from the resolved Address's postcode, ignoring a client-supplied districtId", async () => {
