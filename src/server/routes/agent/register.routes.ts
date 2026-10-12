@@ -24,6 +24,8 @@ import {
 } from "../../schema";
 import {
   createAgentForPerson,
+  getAgentIdsJoinableAsActive,
+  isExactStreetMatch,
   joinAgent,
   resolveJoinStatus,
   searchAgentCandidates,
@@ -70,7 +72,10 @@ export default async function agentRegisterRoutes(
   }>(
     "/search",
     {
-      config: { public: true } as FastifyContextConfig,
+      config: {
+        public: true,
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      } as FastifyContextConfig,
       schema: {
         querystring: registerSearchQuerySchema,
         response: { 200: registerSearchResponseSchema, ...responseErrors },
@@ -93,10 +98,21 @@ export default async function agentRegisterRoutes(
         })
         .getMany();
 
-      const data = searchAgentCandidates(candidates, street).map((a) => ({
-        id: a.id,
-        title: a.title,
-      }));
+      const matches = searchAgentCandidates(candidates, street);
+      const joinable = await getAgentIdsJoinableAsActive(
+        request.registrant?.email ?? "",
+        matches.map((a) => a.id),
+      );
+      // be#1041: an agent whose title the registrant can't see is returned
+      // (as { id }) only for its exact street and house number. A prefix
+      // match would let a registrant list orgs street by street, and an
+      // addressless agent matches on its title, which would leak it
+      // substring by substring.
+      const data = matches
+        .filter((a) => joinable.has(a.id) || isExactStreetMatch(a, street))
+        .map((a) =>
+          joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
+        );
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });

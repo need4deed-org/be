@@ -17,6 +17,7 @@ import {
   classifyRegisterAgentConflict,
   createAgent,
   createAgentForPerson,
+  getAgentIdsJoinableAsActive,
   joinAgent,
   resolveJoinStatus,
 } from "../../../../server/utils/data/write-agent-registration";
@@ -461,6 +462,17 @@ describe("createAgent", () => {
 });
 
 describe("resolveJoinStatus", () => {
+  it("only counts ACTIVE members, so a pending join request can't vouch for its own domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([]);
+
+    await resolveJoinStatus(33, "newcomer@center.de");
+
+    expect(agentPersonRepoFind.mock.calls[0][0].where).toEqual({
+      agentId: 33,
+      status: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
   // A coordinator-created (unclaimed) or inactive NGO is never auto-approved,
   // and the members lookup is skipped.
   it.each([
@@ -624,5 +636,61 @@ describe("classifyRegisterAgentConflict", () => {
         detail: "Key (something_else)=(...) already exists.",
       }),
     ).toBeNull();
+  });
+});
+
+describe("getAgentIdsJoinableAsActive", () => {
+  it("returns the agents with a member on the registrant's domain, in one lookup", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([
+      { agentId: 1, person: { email: "existing@center.de", users: [] } },
+      { agentId: 2, person: { email: "other@elsewhere.de", users: [] } },
+      {
+        agentId: 3,
+        person: { email: null, users: [{ email: "user@center.de" }] },
+      },
+    ]);
+
+    const ids = await getAgentIdsJoinableAsActive(
+      "newcomer@center.de",
+      [1, 2, 3],
+    );
+
+    expect([...ids].sort()).toEqual([1, 3]);
+    expect(agentPersonRepoFind).toHaveBeenCalledTimes(1);
+  });
+
+  it("only counts ACTIVE members, so a pending join request can't vouch for its own domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([]);
+
+    await getAgentIdsJoinableAsActive("newcomer@center.de", [1]);
+
+    expect(agentPersonRepoFind.mock.calls[0][0].where).toMatchObject({
+      status: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
+  it("returns every agent for a trusted domain without loading members", async () => {
+    isEmailDomainTrustedMock.mockResolvedValueOnce(true);
+
+    const ids = await getAgentIdsJoinableAsActive(
+      "someone@lafberlin.de",
+      [1, 2],
+    );
+
+    expect([...ids].sort()).toEqual([1, 2]);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
+
+  it("returns none for a free-mail domain without loading members", async () => {
+    const ids = await getAgentIdsJoinableAsActive("newcomer@gmail.com", [1]);
+
+    expect(ids.size).toBe(0);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
+
+  it("returns none for an empty email or no agent ids", async () => {
+    expect((await getAgentIdsJoinableAsActive("", [1])).size).toBe(0);
+    expect((await getAgentIdsJoinableAsActive("a@center.de", [])).size).toBe(0);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
   });
 });

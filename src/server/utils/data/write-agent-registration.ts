@@ -4,7 +4,7 @@ import {
   AgentRoleType,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
-import { EntityManager } from "typeorm";
+import { EntityManager, In } from "typeorm";
 import { BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -15,8 +15,10 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
+import { isFreeEmailDomain } from "./free-email-domains";
 import { getAgentByAddress } from "./get-agent-by-postcode";
 import { isAgentDomainAllowed } from "./is-agent-domain-allowed";
+import { isEmailDomainTrusted } from "./is-trusted-domain";
 
 export interface RegisterAgentResult {
   agentId: number;
@@ -201,24 +203,57 @@ export async function resolveJoinStatus(
   const allowed = await isAgentDomainAllowed(
     registrantEmail,
     async (domain) => {
-      const suffix = `@${domain}`;
       const members = await dataSource.getRepository(AgentPerson).find({
-        where: { agentId },
+        where: { agentId, status: AgentMembershipStatus.ACTIVE },
         relations: ["person", "person.users"],
       });
-      return members.some((member) => {
-        const personEmail = member.person?.email;
-        if (personEmail) {
-          return personEmail.toLowerCase().endsWith(suffix);
-        }
-        return (member.person?.users ?? []).some((user) =>
-          user.email?.toLowerCase().endsWith(suffix),
-        );
-      });
+      return members.some((member) => isMemberOnDomain(member, domain));
     },
   );
 
   return allowed ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
+}
+
+// Only ACTIVE members count: a PENDING row is an unreviewed join request, and
+// counting it would let a registrant vouch for their own domain (be#1041).
+function isMemberOnDomain(member: AgentPerson, domain: string): boolean {
+  const suffix = `@${domain}`;
+  const personEmail = member.person?.email;
+  if (personEmail) {
+    return personEmail.toLowerCase().endsWith(suffix);
+  }
+  return (member.person?.users ?? []).some((user) =>
+    user.email?.toLowerCase().endsWith(suffix),
+  );
+}
+
+// Batch form of resolveJoinStatus's domain check, for callers that already
+// filtered out unclaimed/INACTIVE agents: which of agentIds would the
+// registrant JOIN as ACTIVE.
+export async function getAgentIdsJoinableAsActive(
+  registrantEmail: string,
+  agentIds: number[],
+): Promise<Set<number>> {
+  const domain = (registrantEmail || "").split("@").pop()?.toLowerCase();
+  if (!domain || agentIds.length === 0) {
+    return new Set();
+  }
+  if (await isEmailDomainTrusted(registrantEmail)) {
+    return new Set(agentIds);
+  }
+  if (isFreeEmailDomain(domain)) {
+    return new Set();
+  }
+
+  const members = await dataSource.getRepository(AgentPerson).find({
+    where: { agentId: In(agentIds), status: AgentMembershipStatus.ACTIVE },
+    relations: ["person", "person.users"],
+  });
+  return new Set(
+    members
+      .filter((member) => isMemberOnDomain(member, domain))
+      .map((member) => member.agentId),
+  );
 }
 
 export async function joinAgent(

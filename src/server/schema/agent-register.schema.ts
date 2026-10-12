@@ -26,7 +26,7 @@ export const registerSearchResponseSchema = {
       type: "array",
       items: {
         type: "object",
-        required: ["id", "title"],
+        required: ["id"],
         additionalProperties: false,
         properties: {
           id: { type: "integer", minimum: 1 },

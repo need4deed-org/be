@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAgentByAddress,
   getAgentByPostcode,
+  isExactStreetMatch,
   searchAgentCandidates,
 } from "../../../../server/utils";
 
@@ -262,5 +263,42 @@ describe("searchAgentCandidates", () => {
 
   it("returns an empty array when the typed value normalizes to empty", () => {
     expect(searchAgentCandidates([mueller, legacyDemo], "   ")).toEqual([]);
+  });
+});
+
+describe("isExactStreetMatch", () => {
+  const mueller = {
+    id: 1,
+    address: { street: "Müllerstraße 48" },
+    title: "Müller Wohnheim",
+  } as any;
+
+  it("matches the full street and house number across spelling variants", () => {
+    expect(isExactStreetMatch(mueller, "Müllerstraße 48")).toBe(true);
+    expect(isExactStreetMatch(mueller, "müllerstr. 48")).toBe(true);
+  });
+
+  it("rejects a street prefix, a street without a house number, or another number", () => {
+    expect(isExactStreetMatch(mueller, "Müllerstr")).toBe(false);
+    expect(isExactStreetMatch(mueller, "Müllerstraße 4")).toBe(false);
+    expect(isExactStreetMatch(mueller, "Müllerstraße 49")).toBe(false);
+  });
+
+  it("never matches an agent without an address", () => {
+    expect(
+      isExactStreetMatch(
+        { id: 2, title: "Müllerstraße 48" } as any,
+        "Müllerstraße 48",
+      ),
+    ).toBe(false);
+  });
+
+  it("requires a house number even if the stored street has none", () => {
+    expect(
+      isExactStreetMatch(
+        { id: 3, address: { street: "Müllerstraße" } } as any,
+        "Müllerstraße",
+      ),
+    ).toBe(false);
   });
 });

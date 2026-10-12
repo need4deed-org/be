@@ -88,6 +88,17 @@ export function searchAgentCandidates(
   });
 }
 
+// The registrant typed this agent's full address (street and house number),
+// not just a prefix of it.
+export function isExactStreetMatch(agent: Agent, street: string): boolean {
+  if (!agent.address || !extractHouseNumber(street)) {
+    return false;
+  }
+  return (
+    normalizeStreet(agent.address.street ?? "") === normalizeStreet(street)
+  );
+}
+
 export function getAgentByPostcode(
   agents: Agent[],
   plz: string,
