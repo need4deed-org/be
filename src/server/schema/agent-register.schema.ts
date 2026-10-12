@@ -110,8 +110,28 @@ export const registerAgentConflictSchema = {
   required: ["message", "conflict"],
   properties: {
     message: { type: "string" },
-    conflict: { type: "string", enum: ["title", "address"] },
+    conflict: { type: "string", enum: ["title", "address", "registered"] },
     agentId: { type: "integer", minimum: 1 },
+    membershipStatus: { type: "string", enum: ["active", "pending"] },
+  },
+};
+
+export const registerAgentStatusResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "object",
+      required: ["registered"],
+      additionalProperties: false,
+      properties: {
+        registered: { type: "boolean" },
+        agentId: { type: "integer", minimum: 1 },
+        agentTitle: { type: "string" },
+        membershipStatus: { type: "string", enum: ["active", "pending"] },
+      },
+    },
   },
 };
 

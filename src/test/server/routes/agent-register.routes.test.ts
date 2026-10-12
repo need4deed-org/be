@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
+  AgentRoleType,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,11 +17,7 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
-// be#652: POST /agent/register had zero route-level coverage — only the
-// write-helper unit tests and the /search picker's INACTIVE-exclusion case
-// (be#885) existed. This exercises the route itself: auth via the verify
-// token, the JOIN vs CREATE branches, and the conflict/error paths.
-describe("POST /agent/register", () => {
+describe("/agent/register", () => {
   let fastify: FastifyInstance;
 
   const password = "test_password";
@@ -92,6 +89,140 @@ describe("POST /agent/register", () => {
       await fastify.db.personRepository.delete({ id: personId });
     }
     await fastify.close();
+  });
+
+  it("reports no registration for a registrant without a coordinator membership", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const initial = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json().data).toEqual({ registered: false });
+    const agent = await makeAgent();
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: person.id,
+        role: AgentRoleType.OTHER,
+      }),
+    );
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual({ registered: false });
+  });
+
+  it.each([AgentMembershipStatus.ACTIVE, AgentMembershipStatus.PENDING])(
+    "reports an existing %s coordinator membership and rejects repeated create/join submissions",
+    async (status) => {
+      const { token, person } = await makeRegistrant("example.org");
+      const agent = await makeAgent();
+      const membership = await fastify.db.agentPersonRepository.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: person.id,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+          status,
+        }),
+      );
+      const res = await fastify.inject({
+        url: `/agent/register/status?token=${token}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual({
+        registered: true,
+        agentId: agent.id,
+        agentTitle: agent.title,
+        membershipStatus: status,
+      });
+
+      const title = `Repeated NGO ${randomNumericSuffix()}`;
+      for (const payload of [
+        { agent: { title } },
+        { agentId: agent.id },
+        { agentId: 999999999 },
+      ]) {
+        const repeated = await fastify.inject({
+          method: "POST",
+          url: `/agent/register?token=${token}`,
+          payload,
+        });
+        expect(repeated.statusCode).toBe(409);
+        expect(repeated.json()).toMatchObject({
+          conflict: "registered",
+          agentId: agent.id,
+          membershipStatus: status,
+        });
+      }
+      expect(await fastify.db.agentRepository.findOneBy({ title })).toBeNull();
+      const memberships = await fastify.db.agentPersonRepository.findBy({
+        personId: person.id,
+      });
+      expect(memberships.map((row) => row.id)).toEqual([membership.id]);
+      expect(memberships[0].status).toBe(status);
+    },
+  );
+
+  it("rejects invalid, expired and wrong-type tokens on the status endpoint", async () => {
+    const { user } = await makeRegistrant("example.org");
+    const expiredPayload = {
+      id: user.id,
+      email: user.email,
+      type: "verify" as const,
+      exp: Math.floor(Date.now() / 1000) - 60,
+    };
+    const tokens = [
+      "not-a-real-token",
+      fastify.jwt.sign(expiredPayload),
+      fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        type: "access",
+      }),
+    ];
+    for (const token of tokens) {
+      const res = await fastify.inject({
+        url: `/agent/register/status?token=${token}`,
+      });
+      expect(res.statusCode).toBe(401);
+    }
+  });
+
+  it("does not reveal another registrant's membership", async () => {
+    const registered = await makeRegistrant("example.org");
+    const other = await makeRegistrant("example.org");
+    const agent = await makeAgent();
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: registered.person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      }),
+    );
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${other.token}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual({ registered: false });
+  });
+
+  it("rejects status lookups for unverified accounts and non-agent roles", async () => {
+    const { token, user } = await makeRegistrant("example.org");
+    await fastify.db.userRepository.update(user.id, { isActive: false });
+    expect(
+      (await fastify.inject({ url: `/agent/register/status?token=${token}` }))
+        .statusCode,
+    ).toBe(401);
+    await fastify.db.userRepository.update(user.id, {
+      isActive: true,
+      role: UserRole.VOLUNTEER,
+    });
+    expect(
+      (await fastify.inject({ url: `/agent/register/status?token=${token}` }))
+        .statusCode,
+    ).toBe(403);
   });
 
   it("401s with no token", async () => {
@@ -179,6 +310,17 @@ describe("POST /agent/register", () => {
     });
     expect(membership).not.toBeNull();
     expect(membership?.status).toBe(AgentMembershipStatus.ACTIVE);
+
+    const status = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().data).toEqual({
+      registered: true,
+      agentId: body.data.agentId,
+      agentTitle: `Brand New NGO ${suffix}`,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
   });
 
   it("joins an existing agent as ACTIVE when the registrant's email domain matches an existing member", async () => {
