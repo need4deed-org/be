@@ -462,6 +462,17 @@ describe("createAgent", () => {
 });
 
 describe("resolveJoinStatus", () => {
+  it("only counts ACTIVE members, so a pending join request can't vouch for its own domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([]);
+
+    await resolveJoinStatus(33, "newcomer@center.de");
+
+    expect(agentPersonRepoFind.mock.calls[0][0].where).toEqual({
+      agentId: 33,
+      status: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
   // A coordinator-created (unclaimed) or inactive NGO is never auto-approved,
   // and the members lookup is skipped.
   it.each([
@@ -646,6 +657,16 @@ describe("getAgentIdsJoinableAsActive", () => {
 
     expect([...ids].sort()).toEqual([1, 3]);
     expect(agentPersonRepoFind).toHaveBeenCalledTimes(1);
+  });
+
+  it("only counts ACTIVE members, so a pending join request can't vouch for its own domain", async () => {
+    agentPersonRepoFind.mockResolvedValueOnce([]);
+
+    await getAgentIdsJoinableAsActive("newcomer@center.de", [1]);
+
+    expect(agentPersonRepoFind.mock.calls[0][0].where).toMatchObject({
+      status: AgentMembershipStatus.ACTIVE,
+    });
   });
 
   it("returns every agent for a trusted domain without loading members", async () => {

@@ -221,6 +221,30 @@ describe("GET /agent/register/search", () => {
     expect(match).toEqual({ id: addressedForeignAgent.id });
   });
 
+  it("doesn't reveal a title through a PENDING member on the registrant's domain", async () => {
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: addressedForeignAgent.id,
+        personId: memberPerson.id,
+        status: AgentMembershipStatus.PENDING,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("findable allee 12a")}`,
+    });
+
+    await fastify.db.agentPersonRepository.delete({
+      agentId: addressedForeignAgent.id,
+      personId: memberPerson.id,
+    });
+    const match = res
+      .json()
+      .data.find((a: { id: number }) => a.id === addressedForeignAgent.id);
+    expect(match).toEqual({ id: addressedForeignAgent.id });
+  });
+
   it("omits an addressed agent whose title the registrant can't see on a street prefix", async () => {
     const res = await fastify.inject({
       method: "GET",

@@ -204,7 +204,7 @@ export async function resolveJoinStatus(
     registrantEmail,
     async (domain) => {
       const members = await dataSource.getRepository(AgentPerson).find({
-        where: { agentId },
+        where: { agentId, status: AgentMembershipStatus.ACTIVE },
         relations: ["person", "person.users"],
       });
       return members.some((member) => isMemberOnDomain(member, domain));
@@ -214,6 +214,8 @@ export async function resolveJoinStatus(
   return allowed ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
 }
 
+// Only ACTIVE members count: a PENDING row is an unreviewed join request, and
+// counting it would let a registrant vouch for their own domain (be#1041).
 function isMemberOnDomain(member: AgentPerson, domain: string): boolean {
   const suffix = `@${domain}`;
   const personEmail = member.person?.email;
@@ -244,7 +246,7 @@ export async function getAgentIdsJoinableAsActive(
   }
 
   const members = await dataSource.getRepository(AgentPerson).find({
-    where: { agentId: In(agentIds) },
+    where: { agentId: In(agentIds), status: AgentMembershipStatus.ACTIVE },
     relations: ["person", "person.users"],
   });
   return new Set(
