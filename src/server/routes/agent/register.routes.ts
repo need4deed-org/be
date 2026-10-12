@@ -24,6 +24,7 @@ import {
 } from "../../schema";
 import {
   createAgentForPerson,
+  getAgentIdsJoinableAsActive,
   joinAgent,
   resolveJoinStatus,
   searchAgentCandidates,
@@ -96,15 +97,19 @@ export default async function agentRegisterRoutes(
         })
         .getMany();
 
-      const registrantEmail = request.registrant?.email ?? "";
-      const data = await Promise.all(
-        searchAgentCandidates(candidates, street).map(async (a) =>
-          (await resolveJoinStatus(a.id, registrantEmail)) ===
-          AgentMembershipStatus.ACTIVE
-            ? { id: a.id, title: a.title }
-            : { id: a.id },
-        ),
+      const matches = searchAgentCandidates(candidates, street);
+      const joinable = await getAgentIdsJoinableAsActive(
+        request.registrant?.email ?? "",
+        matches.map((a) => a.id),
       );
+      // be#1041: an addressless agent matches on its title, so returning it
+      // to a registrant who can't see that title would leak it substring by
+      // substring.
+      const data = matches
+        .filter((a) => a.address || joinable.has(a.id))
+        .map((a) =>
+          joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
+        );
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });
