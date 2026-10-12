@@ -1,6 +1,11 @@
 import { FastifyInstance } from "fastify";
-import { AgentEngagementStatusType, UserRole } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  AgentMembershipStatus,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -18,6 +23,8 @@ describe("GET /agent/register/search", () => {
   let activeAgent: Agent;
   let inactiveAgent: Agent;
   let unclaimedAgent: Agent;
+  let foreignAgent: Agent;
+  let memberPerson: Person;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -30,7 +37,7 @@ describe("GET /agent/register/search", () => {
     );
     registrantUser = await fastify.db.userRepository.save(
       new User({
-        email: `registrant-${suffix}@test.need4deed.org`,
+        email: `registrant@n4d-${suffix}.test`,
         password: await hashPassword("test_password"),
         role: UserRole.AGENT,
         isActive: true,
@@ -55,6 +62,26 @@ describe("GET /agent/register/search", () => {
         engagementStatus: AgentEngagementStatusType.INACTIVE,
       }),
     );
+    foreignAgent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Findable Foreign NGO ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    memberPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Member",
+        lastName: `Agent-${suffix}`,
+        email: `member@n4d-${suffix}.test`,
+      }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: activeAgent.id,
+        personId: memberPerson.id,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
     unclaimedAgent = await fastify.db.agentRepository.save(
       new Agent({
         title: `Findable Unclaimed NGO ${suffix}`,
@@ -64,6 +91,12 @@ describe("GET /agent/register/search", () => {
   });
 
   afterAll(async () => {
+    await fastify.db.agentPersonRepository.delete({
+      agentId: activeAgent.id,
+      personId: memberPerson.id,
+    });
+    await fastify.db.personRepository.delete({ id: memberPerson.id });
+    await fastify.db.agentRepository.delete({ id: foreignAgent.id });
     await fastify.db.agentRepository.delete({ id: activeAgent.id });
     await fastify.db.agentRepository.delete({ id: inactiveAgent.id });
     await fastify.db.agentRepository.delete({ id: unclaimedAgent.id });
@@ -132,5 +165,55 @@ describe("GET /agent/register/search", () => {
 
     const ids = res.json().data.map((a: { id: number }) => a.id);
     expect(ids).toContain(inactiveAgent.id);
+  });
+
+  // be#1041: an org's title is only revealed to a registrant whose email
+  // domain would let them JOIN it as ACTIVE; others just learn it exists.
+  it("reveals the title of an agent with a member on the registrant's email domain", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("Findable")}`,
+    });
+
+    const match = res
+      .json()
+      .data.find((a: { id: number }) => a.id === activeAgent.id);
+    expect(match).toEqual({ id: activeAgent.id, title: activeAgent.title });
+  });
+
+  it("hides the title of an agent with no member on the registrant's email domain", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("Findable")}`,
+    });
+
+    const match = res
+      .json()
+      .data.find((a: { id: number }) => a.id === foreignAgent.id);
+    expect(match).toEqual({ id: foreignAgent.id });
+  });
+});
+
+describe("GET /agent/register/search rate limiting", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("limits to 30 requests per minute", async () => {
+    const url = "/agent/register/search?token=not-a-real-token&street=abc";
+    for (let i = 0; i < 30; i++) {
+      const res = await fastify.inject({ method: "GET", url });
+      expect(res.statusCode).not.toBe(429);
+    }
+
+    const res = await fastify.inject({ method: "GET", url });
+    expect(res.statusCode).toBe(429);
   });
 });

@@ -70,7 +70,10 @@ export default async function agentRegisterRoutes(
   }>(
     "/search",
     {
-      config: { public: true } as FastifyContextConfig,
+      config: {
+        public: true,
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      } as FastifyContextConfig,
       schema: {
         querystring: registerSearchQuerySchema,
         response: { 200: registerSearchResponseSchema, ...responseErrors },
@@ -93,10 +96,15 @@ export default async function agentRegisterRoutes(
         })
         .getMany();
 
-      const data = searchAgentCandidates(candidates, street).map((a) => ({
-        id: a.id,
-        title: a.title,
-      }));
+      const registrantEmail = request.registrant?.email ?? "";
+      const data = await Promise.all(
+        searchAgentCandidates(candidates, street).map(async (a) =>
+          (await resolveJoinStatus(a.id, registrantEmail)) ===
+          AgentMembershipStatus.ACTIVE
+            ? { id: a.id, title: a.title }
+            : { id: a.id },
+        ),
+      );
       return reply
         .status(200)
         .send({ message: `Found ${data.length} matches`, data });
