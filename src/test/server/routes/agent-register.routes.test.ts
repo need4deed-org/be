@@ -5,6 +5,8 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
@@ -12,6 +14,7 @@ import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 // be#652: POST /agent/register had zero route-level coverage — only the
 // write-helper unit tests and the /search picker's INACTIVE-exclusion case
@@ -24,6 +27,7 @@ describe("POST /agent/register", () => {
   const createdUserIds: number[] = [];
   const createdPersonIds: number[] = [];
   const createdAgentIds: number[] = [];
+  const createdAddressIds: number[] = [];
 
   async function makeRegistrant(domain: string): Promise<{
     person: Person;
@@ -77,6 +81,9 @@ describe("POST /agent/register", () => {
     }
     for (const agentId of createdAgentIds) {
       await fastify.db.agentRepository.delete({ id: agentId });
+    }
+    for (const addressId of createdAddressIds) {
+      await dataSource.getRepository(Address).delete({ id: addressId });
     }
     for (const userId of createdUserIds) {
       await fastify.db.userRepository.delete({ id: userId });
@@ -262,6 +269,56 @@ describe("POST /agent/register", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.json().conflict).toBe("title");
+  });
+
+  it("409s creating an agent at an existing agent's address unless confirmSharedAddress is set", async () => {
+    const address = {
+      addressStreet: `Gemeinsame Str ${randomNumericSuffix()}`,
+      addressPostcode: "10115",
+    };
+    const register = async (agent: Record<string, unknown>) => {
+      const { token } = await makeRegistrant("test.need4deed.org");
+      return fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agent },
+      });
+    };
+    const track = async (agentId: number) => {
+      createdAgentIds.push(agentId);
+      const agent = await fastify.db.agentRepository.findOneByOrFail({
+        id: agentId,
+      });
+      if (agent.addressId) {
+        createdAddressIds.push(agent.addressId);
+      }
+    };
+
+    const first = await register({
+      title: `First NGO ${randomNumericSuffix()}`,
+      ...address,
+    });
+    expect(first.statusCode).toBe(201);
+    await track(first.json().data.agentId);
+
+    const blocked = await register({
+      title: `Second NGO ${randomNumericSuffix()}`,
+      ...address,
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toMatchObject({
+      conflict: "address",
+      agentId: first.json().data.agentId,
+    });
+
+    const confirmed = await register({
+      title: `Second NGO ${randomNumericSuffix()}`,
+      ...address,
+      confirmSharedAddress: true,
+    });
+    expect(confirmed.statusCode).toBe(201);
+    await track(confirmed.json().data.agentId);
+    expect(confirmed.json().data.agentId).not.toBe(first.json().data.agentId);
   });
 
   it("404s joining a nonexistent agent", async () => {

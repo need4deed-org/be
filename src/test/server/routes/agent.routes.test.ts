@@ -615,6 +615,7 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     // `unclaimed`, or fast-json-stringify silently strips it from the wire
     // response even though dtoAgentGetList sets it (same bug class as be#575).
     expect(coordinatorEntry.unclaimed).toBe(true);
+    expect(coordinatorEntry.statusEngagement).toBeDefined();
   });
 
   it("hides an unclaimed agent from GET /agent/:id for a non-privileged caller, but not a coordinator", async () => {

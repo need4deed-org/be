@@ -1427,6 +1427,9 @@
         },
         "lon": {
           "type": ["number", "null"]
+        },
+        "statusEngagement": {
+          "$ref": "AgentEngagementStatusType#"
         }
       }
     },
@@ -1445,7 +1448,8 @@
         "volunteerSearch",
         "unclaimed",
         "lat",
-        "lon"
+        "lon",
+        "statusEngagement"
       ]
     },
     "AgentProps": {
