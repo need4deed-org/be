@@ -78,7 +78,7 @@ describe("GET /agent/register/search", () => {
       .save(new Postcode({ value: `9${String(Date.now()).slice(-4)}` }));
     address = await fastify.db.agentRepository.manager
       .getRepository(Address)
-      .save(new Address({ street: `Findable Allee ${suffix}`, postcode }));
+      .save(new Address({ street: "Findable Allee 12a", postcode }));
     addressedForeignAgent = await fastify.db.agentRepository.save(
       new Agent({
         title: `Addressed Foreign NGO ${suffix}`,
@@ -209,16 +209,26 @@ describe("GET /agent/register/search", () => {
     expect(match).toEqual({ id: activeAgent.id, title: activeAgent.title });
   });
 
-  it("hides the title of an addressed agent with no member on the registrant's email domain", async () => {
+  it("returns an addressed agent with no member on the registrant's domain, without its title, for its exact street and house number", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("Findable")}`,
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("findable allee 12a")}`,
     });
 
     const match = res
       .json()
       .data.find((a: { id: number }) => a.id === addressedForeignAgent.id);
     expect(match).toEqual({ id: addressedForeignAgent.id });
+  });
+
+  it("omits an addressed agent whose title the registrant can't see on a street prefix", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/search?token=${token}&street=${encodeURIComponent("Findable Allee")}`,
+    });
+
+    const ids = res.json().data.map((a: { id: number }) => a.id);
+    expect(ids).not.toContain(addressedForeignAgent.id);
   });
 
   it("omits an addressless agent whose title the registrant can't see, so its title can't be probed", async () => {

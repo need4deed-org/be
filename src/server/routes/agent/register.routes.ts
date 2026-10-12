@@ -25,6 +25,7 @@ import {
 import {
   createAgentForPerson,
   getAgentIdsJoinableAsActive,
+  isExactStreetMatch,
   joinAgent,
   resolveJoinStatus,
   searchAgentCandidates,
@@ -102,11 +103,13 @@ export default async function agentRegisterRoutes(
         request.registrant?.email ?? "",
         matches.map((a) => a.id),
       );
-      // be#1041: an addressless agent matches on its title, so returning it
-      // to a registrant who can't see that title would leak it substring by
-      // substring.
+      // be#1041: an agent whose title the registrant can't see is returned
+      // (as { id }) only for its exact street and house number. A prefix
+      // match would let a registrant list orgs street by street, and an
+      // addressless agent matches on its title, which would leak it
+      // substring by substring.
       const data = matches
-        .filter((a) => a.address || joinable.has(a.id))
+        .filter((a) => joinable.has(a.id) || isExactStreetMatch(a, street))
         .map((a) =>
           joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
         );
