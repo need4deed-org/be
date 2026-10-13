@@ -218,7 +218,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
   it("lists need4deed-only volunteers with filter[ownerAgent]=none", async () => {
     const res = await request(
       "GET",
-      `/volunteer?limit=200&filter[ownerAgent]=none`,
+      `/volunteer?limit=50&filter[ownerAgent]=none&filter[search]=Owner${suffix}`,
       "coordinator",
     );
     const ids = (res.json().data as { id: number }[]).map((v) => v.id);
