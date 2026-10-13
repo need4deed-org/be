@@ -45,6 +45,7 @@ export function dtoEventN4DGetList(
     description: translation?.description ?? "",
     shortDescription: translation?.shortDescription ?? "",
     linkRSVP: event.rsvpLink,
+    hostName: event.hostName,
     additionalTitle: translation?.additionalTitle,
     additionalInfo: sanitizeAdditionalInfo(translation?.additionalInfo),
   };
@@ -63,7 +64,6 @@ export function dtoEventN4DGet(
 
   return {
     ...list,
-    hostName: event.hostName,
     time: translation?.timeStr,
     locationLink: event.locationLink,
     followUpText: translation?.followupText,
