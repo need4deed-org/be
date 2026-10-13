@@ -4,6 +4,7 @@ import {
   OpportunityLegacyType,
   OpportunityStatusType,
   OpportunityType,
+  TranslationOrigin,
   TranslationStatus,
   UserRole,
 } from "need4deed-sdk";
@@ -76,10 +77,14 @@ describe("opportunity writes queue translations", () => {
     return opportunity;
   }
 
-  const patch = (id: number, payload: Record<string, unknown>) =>
+  const patch = (
+    id: number,
+    payload: Record<string, unknown>,
+    language?: Lang,
+  ) =>
     fastify.inject({
       method: "PATCH",
-      url: `/opportunity/${id}`,
+      url: `/opportunity/${id}${language ? `?language=${language}` : ""}`,
       cookies: { [accessCookieName]: cookie },
       payload,
     });
@@ -270,6 +275,79 @@ describe("opportunity writes queue translations", () => {
       expect(rows[0].sourceHash).toBe(sourceHashOf("Neue Beschreibung"));
     });
 
+    describe("in another language than the original", () => {
+      async function translated() {
+        const opportunity = await saved({});
+        await dataSource.manager.update(
+          FieldTranslation,
+          { opportunityId: opportunity.id, fieldName: "title" },
+          { status: TranslationStatus.DONE, translation: "Tutoring" },
+        );
+        return opportunity;
+      }
+
+      const stored = (id: number) =>
+        fastify.db.opportunityRepository.findOneByOrFail({ id });
+
+      it("stores a human translation and keeps the source", async () => {
+        const opportunity = await translated();
+
+        const res = await patch(
+          opportunity.id,
+          { title: "Homework help", numberVolunteers: 7 },
+          Lang.EN,
+        );
+
+        expect(res.statusCode).toBe(204);
+        const source = await stored(opportunity.id);
+        expect(source.title).toBe(opportunity.title);
+        expect(source.numberVolunteers).toBe(7);
+        const [info, title] = await rowsOf(opportunity.id);
+        expect(title).toMatchObject({
+          origin: TranslationOrigin.HUMAN,
+          status: TranslationStatus.DONE,
+          translation: "Homework help",
+        });
+        expect(info.origin).toBe(TranslationOrigin.MACHINE);
+      });
+
+      it("creates no human rows for a full form with unchanged values", async () => {
+        const opportunity = await translated();
+        const before = await rowsOf(opportunity.id);
+
+        const res = await patch(
+          opportunity.id,
+          { title: "Tutoring", description: opportunity.info },
+          Lang.EN,
+        );
+
+        expect(res.statusCode).toBe(204);
+        expect(await rowsOf(opportunity.id)).toEqual(before);
+      });
+
+      it("keeps the human row until its source is edited", async () => {
+        const opportunity = await translated();
+        await patch(opportunity.id, { title: "Homework help" }, Lang.EN);
+
+        await patch(opportunity.id, { title: opportunity.title }, Lang.DE);
+        const [, kept] = await rowsOf(opportunity.id);
+        expect(kept).toMatchObject({
+          origin: TranslationOrigin.HUMAN,
+          translation: "Homework help",
+        });
+
+        await patch(opportunity.id, { title: "Hausaufgabenhilfe" }, Lang.DE);
+        const [, reset] = await rowsOf(opportunity.id);
+        expect(reset).toMatchObject({
+          origin: TranslationOrigin.MACHINE,
+          status: TranslationStatus.PENDING,
+          translation: null,
+          sourceHash: sourceHashOf("Hausaufgabenhilfe"),
+        });
+        expect((await stored(opportunity.id)).title).toBe("Hausaufgabenhilfe");
+      });
+    });
+
     it("drops info translations on a type change to accompanying", async () => {
       // A leftover accompanying row, so the type change needs no details.
       const accompanying = await fastify.db.accompanyingRepository.save(
@@ -288,8 +366,6 @@ describe("opportunity writes queue translations", () => {
     });
   });
 
-  // ?language= picks a response language: the post routes take it; the
-  // opportunity writes don't (their language is in the body, be#1104).
   it("documents ?language= only where a route reads it", async () => {
     const { paths } = (
       await fastify.inject({ method: "GET", url: "/swagger/json" })
@@ -305,13 +381,13 @@ describe("opportunity writes queue translations", () => {
     for (const [path, method] of [
       ["/post/", "post"],
       ["/post/{id}", "patch"],
+      ["/opportunity/{id}", "patch"],
     ]) {
       expect(languageParam(path, method), `${method} ${path}`).toBeDefined();
     }
     for (const [path, method] of [
       ["/opportunity/", "post"],
       ["/opportunity/legacy/", "post"],
-      ["/opportunity/{id}", "patch"],
     ]) {
       expect(languageParam(path, method), `${method} ${path}`).toBeUndefined();
     }

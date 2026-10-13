@@ -11,6 +11,10 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { languageIds } from "../../../services/translation/languages";
 import { enqueue } from "../../../services/translation/queue";
 import { translatedEntities } from "../../../services/translation/registry";
+import {
+  writeHumanTranslations,
+  writesOriginalLanguage,
+} from "../../../services/translation/write";
 import { getLanguageCode } from "../common";
 
 const OPPORTUNITY_FIELDS = [
@@ -65,6 +69,35 @@ export async function queueOpportunityTranslation(
       ? opportunity.info
       : null,
   });
+}
+
+export async function divertTranslatedEdits(
+  manager: EntityManager,
+  opportunity: Opportunity,
+  patch: Partial<Opportunity>,
+  effectiveType: OpportunityType,
+  lang: Lang,
+): Promise<void> {
+  if (await writesOriginalLanguage(manager, opportunity, lang)) {
+    return;
+  }
+  const fields: ("title" | "info")[] = ["title"];
+  if (
+    TRANSLATED_INFO_TYPES.includes(opportunity.type) &&
+    TRANSLATED_INFO_TYPES.includes(effectiveType)
+  ) {
+    fields.push("info");
+  }
+  await writeHumanTranslations(
+    manager,
+    EntityTableName.OPPORTUNITY,
+    opportunity,
+    lang,
+    Object.fromEntries(fields.map((field) => [field, patch[field]])),
+  );
+  for (const field of fields) {
+    delete patch[field];
+  }
 }
 
 const BACKFILL_LIMIT = 100;

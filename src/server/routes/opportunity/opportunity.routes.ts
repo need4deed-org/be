@@ -99,6 +99,7 @@ import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
+  divertTranslatedEdits,
   languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
@@ -630,6 +631,7 @@ export default async function opportunityRoutes(
 
   fastify.patch<{
     Params: ParamsId;
+    Querystring: { language?: string };
     Body: ApiOpportunityPatch;
     Reply: null;
   }>(
@@ -637,6 +639,7 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
@@ -787,6 +790,13 @@ export default async function opportunityRoutes(
 
       await dataSource.manager.transaction(async (manager) => {
         if (opportunityObj) {
+          await divertTranslatedEdits(
+            manager,
+            opportunity,
+            opportunityObj,
+            effectiveType,
+            requestLanguage(request.query),
+          );
           const success = await patchEntity(
             Opportunity,
             opportunityObj,
