@@ -3,9 +3,16 @@ import { In } from "typeorm";
 import Post from "../../../data/entity/post.entity";
 
 const AGENT_TOKEN = /<@agent:(\d+)>/g;
+const MAX_INT4 = 2147483647;
 
 export function getTaggedAgentIds(text: string): number[] {
-  return [...new Set([...text.matchAll(AGENT_TOKEN)].map((m) => Number(m[1])))];
+  return [
+    ...new Set(
+      [...text.matchAll(AGENT_TOKEN)]
+        .map((m) => Number(m[1]))
+        .filter((id) => id <= MAX_INT4),
+    ),
+  ];
 }
 
 export async function attachTaggedAgents(
@@ -19,7 +26,7 @@ export async function attachTaggedAgents(
   const agents = allIds.length
     ? await fastify.db.agentRepository.find({
         select: { id: true, title: true },
-        where: { id: In(allIds) },
+        where: { id: In(allIds), unclaimed: false },
       })
     : [];
   const titleById = new Map(agents.map((a) => [a.id, a.title]));
