@@ -1,6 +1,5 @@
 import { FastifyRequest } from "fastify";
 import { AgentEngagementStatusType, ApiAgentTagCandidate } from "need4deed-sdk";
-import { ILike, In, Not } from "typeorm";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { escapeLikePattern } from "./person-name-ilike";
 
@@ -10,49 +9,46 @@ export async function getAgentTagCandidates(
   request: FastifyRequest,
   search?: string,
 ): Promise<ApiAgentTagCandidate[]> {
-  const agentRepository = request.server.db.agentRepository;
   const ownAgentIds = await getCallerAgentIds(
     request,
     request.authUser?.personId,
   );
-  const ownDistrictIds = ownAgentIds.length
-    ? (
-        await agentRepository.find({
-          select: { id: true, districtId: true },
-          where: { id: In(ownAgentIds) },
-        })
+
+  const query = request.server.db.agentRepository
+    .createQueryBuilder("agent")
+    .leftJoinAndSelect("agent.district", "district")
+    .where("agent.unclaimed = false")
+    .andWhere(
+      "(agent.engagementStatus IS NULL OR agent.engagementStatus != :inactive)",
+      { inactive: AgentEngagementStatusType.INACTIVE },
+    );
+  if (ownAgentIds.length) {
+    query
+      .andWhere("agent.id NOT IN (:...ownAgentIds)", { ownAgentIds })
+      .addSelect(
+        `CASE WHEN agent.district_id IN (SELECT own.district_id FROM agent own WHERE own.id IN (:...ownAgentIds)) THEN 0 ELSE 1 END`,
+        "nearby_rank",
       )
-        .map((a) => a.districtId)
-        .filter((id): id is number => id !== null && id !== undefined)
-    : [];
+      .orderBy("nearby_rank", "ASC");
+  }
+  if (search) {
+    query.andWhere("agent.title ILIKE :search", {
+      search: `%${escapeLikePattern(search)}%`,
+    });
+  }
+  const agents = await query
+    .addOrderBy("agent.title", "ASC")
+    .take(TAG_CANDIDATE_LIMIT)
+    .getMany();
 
-  const agents = await agentRepository.find({
-    select: { id: true, title: true, districtId: true },
-    where: {
-      unclaimed: false,
-      engagementStatus: Not(AgentEngagementStatusType.INACTIVE),
-      ...(ownAgentIds.length ? { id: Not(In(ownAgentIds)) } : {}),
-      ...(search ? { title: ILike(`%${escapeLikePattern(search)}%`) } : {}),
-    },
-    relations: ["district"],
-    order: { title: "ASC" },
-  });
-
-  const isNearby = (districtId: number | null | undefined) =>
-    districtId !== null &&
-    districtId !== undefined &&
-    ownDistrictIds.includes(districtId);
-
-  return agents
-    .sort(
-      (a, b) => Number(isNearby(b.districtId)) - Number(isNearby(a.districtId)),
-    )
-    .slice(0, TAG_CANDIDATE_LIMIT)
-    .map((agent) => ({
-      id: agent.id,
-      title: agent.title,
-      district: agent.districtId
-        ? { id: agent.districtId, title: { de: agent.district?.title } }
-        : null,
-    }));
+  return agents.map((agent) => ({
+    id: agent.id,
+    title: agent.title,
+    district: agent.districtId
+      ? {
+          id: agent.districtId,
+          title: { de: agent.district?.title, en: agent.district?.title },
+        }
+      : null,
+  }));
 }

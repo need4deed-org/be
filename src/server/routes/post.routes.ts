@@ -42,7 +42,10 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
-import { attachTaggedAgents } from "../utils/data/attach-tagged-agents";
+import {
+  attachTaggedAgents,
+  getTaggedAgentIds,
+} from "../utils/data/attach-tagged-agents";
 import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
@@ -57,8 +60,10 @@ import {
   getRootPostWhere,
 } from "../utils/data/get-post-where";
 import {
-  getTaggedAgentPersons,
+  assertTaggableAgents,
+  getAgentMemberPersons,
   mergePersons,
+  resolveTaggedAgentIds,
 } from "../utils/data/get-tagged-agent-persons";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
@@ -231,10 +236,12 @@ export default async function postRoutes(
       const {
         text,
         taggedPersonIds = [],
-        taggedAgentIds = [],
+        taggedAgentIds,
         linkedOpportunityIds = [],
       } = request.body;
 
+      const agentIds = resolveTaggedAgentIds(text, taggedAgentIds);
+      await assertTaggableAgents(request, agentIds);
       const agentPerson = await getAgentPersonRepresentative(personId);
 
       const [taggedPersons, agentPersons, linkedOpportunities] =
@@ -242,7 +249,7 @@ export default async function postRoutes(
           taggedPersonIds.length
             ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
             : [],
-          getTaggedAgentPersons(fastify, taggedAgentIds),
+          getAgentMemberPersons(request, agentIds),
           linkedOpportunityIds.length
             ? fastify.db.opportunityRepository.findBy({
                 id: In(linkedOpportunityIds),
@@ -334,25 +341,40 @@ export default async function postRoutes(
       const { text, taggedPersonIds, taggedAgentIds, linkedOpportunityIds } =
         request.body;
       const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
+      const previousAgentIds = getTaggedAgentIds(post.text);
 
       if (text !== null && text !== undefined) {
         post.text = text;
       }
+      const agentIds = resolveTaggedAgentIds(post.text, taggedAgentIds);
+      await assertTaggableAgents(
+        request,
+        agentIds.filter((id) => !previousAgentIds.includes(id)),
+      );
+      const removedAgentMemberIds = new Set(
+        (
+          await getAgentMemberPersons(
+            request,
+            previousAgentIds.filter((id) => !agentIds.includes(id)),
+          )
+        ).map((person) => person.id),
+      );
+
+      let directPersons = (post.taggedPersons ?? []).filter(
+        (person) => !removedAgentMemberIds.has(person.id),
+      );
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
-        const found = taggedPersonIds.length
+        directPersons = taggedPersonIds.length
           ? await fastify.db.personRepository.findBy({
               id: In(taggedPersonIds),
             })
           : [];
-        validateRelationIds(taggedPersonIds, found, "tagged person");
-        post.taggedPersons = found;
+        validateRelationIds(taggedPersonIds, directPersons, "tagged person");
       }
-      if (taggedAgentIds !== null && taggedAgentIds !== undefined) {
-        post.taggedPersons = mergePersons(
-          post.taggedPersons ?? [],
-          await getTaggedAgentPersons(fastify, taggedAgentIds),
-        );
-      }
+      post.taggedPersons = mergePersons(
+        directPersons,
+        await getAgentMemberPersons(request, agentIds),
+      );
       if (linkedOpportunityIds !== null && linkedOpportunityIds !== undefined) {
         const found = linkedOpportunityIds.length
           ? await fastify.db.opportunityRepository.findBy({
