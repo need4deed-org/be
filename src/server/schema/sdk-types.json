@@ -1101,7 +1101,8 @@
         "appointmentDate",
         "appointmentTime",
         "lat",
-        "lon"
+        "lon",
+        "postcode"
       ]
     },
     "ApiOpportunityGet": {
@@ -1453,6 +1454,7 @@
         "unclaimed",
         "lat",
         "lon",
+        "postcode",
         "statusEngagement"
       ]
     },

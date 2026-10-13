@@ -10,6 +10,10 @@ describe("getTaggedAgentIds", () => {
     ).toEqual([4, 12]);
   });
 
+  it("ignores ids beyond the integer column range", () => {
+    expect(getTaggedAgentIds("<@agent:99999999999> <@agent:7>")).toEqual([7]);
+  });
+
   it("returns nothing for text without agent tokens", () => {
     expect(getTaggedAgentIds("No tags <@3>")).toEqual([]);
   });
