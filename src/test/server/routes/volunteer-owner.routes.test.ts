@@ -3,13 +3,18 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  OpportunityStatusType,
+  OpportunityType,
+  OpportunityVolunteerStatusType,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
@@ -22,7 +27,11 @@ const PASSWORD = "test_password";
 
 type AgentKey = "owner" | "sharing" | "sharingOwner" | "outsider";
 type Caller = AgentKey | "coordinator" | "admin";
-type VolunteerKey = "platform" | "ownedByOwner" | "ownedBySharingOwner";
+type VolunteerKey =
+  | "platform"
+  | "ownedByOwner"
+  | "ownedBySharingOwner"
+  | "ownedByOwnerMatchedToOutsider";
 
 describe("NGO-owned volunteers (be#1056)", () => {
   let fastify: FastifyInstance;
@@ -32,6 +41,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
   const volunteers = {} as Record<VolunteerKey, Volunteer>;
   const persons: Person[] = [];
   const deals: Deal[] = [];
+  let outsiderOpportunity: Opportunity;
   const cookies = {} as Record<Caller, string>;
 
   const request = (
@@ -117,6 +127,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
       platform: null,
       ownedByOwner: agents.owner.id,
       ownedBySharingOwner: agents.sharingOwner.id,
+      ownedByOwnerMatchedToOutsider: agents.owner.id,
     };
     for (const key of Object.keys(owners) as VolunteerKey[]) {
       const person = await fastify.db.personRepository.save(
@@ -135,9 +146,36 @@ describe("NGO-owned volunteers (be#1056)", () => {
         }),
       );
     }
+
+    const opportunityDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    deals.push(opportunityDeal);
+    outsiderOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Outsider Opportunity ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.ACTIVE,
+        agentId: agents.outsider.id,
+        dealId: opportunityDeal.id,
+      }),
+    );
+    await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: outsiderOpportunity.id,
+        volunteerId: volunteers.ownedByOwnerMatchedToOutsider.id,
+        status: OpportunityVolunteerStatusType.MATCHED,
+      }),
+    );
   });
 
   afterAll(async () => {
+    await fastify.db.opportunityVolunteerRepository.delete({
+      opportunityId: outsiderOpportunity.id,
+    });
+    await fastify.db.opportunityRepository.delete({
+      id: outsiderOpportunity.id,
+    });
     for (const volunteer of Object.values(volunteers)) {
       await fastify.db.volunteerRepository.delete({ id: volunteer.id });
     }
@@ -196,6 +234,18 @@ describe("NGO-owned volunteers (be#1056)", () => {
       expect(res.json().data.person.firstName).toMatch(/^[a-z]\*\*\*$/);
     });
 
+    it("shows another NGO's volunteer, with its owner, once matched to the caller", async () => {
+      const res = await getVolunteer(
+        "ownedByOwnerMatchedToOutsider",
+        "outsider",
+      );
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.ownerAgentId).toBe(agents.owner.id);
+      expect(res.json().data.person.firstName).toBe(
+        "VolownedByOwnerMatchedToOutsider",
+      );
+    });
+
     it("shows every volunteer to a coordinator", async () => {
       expect(
         (await getVolunteer("ownedByOwner", "coordinator")).statusCode,
@@ -226,6 +276,40 @@ describe("NGO-owned volunteers (be#1056)", () => {
     expect(ids).not.toContain(volunteers.ownedByOwner.id);
   });
 
+  describe("GET /volunteer?filter[search]=", () => {
+    const search = async (as: Caller) => {
+      const res = await request(
+        "GET",
+        `/volunteer?limit=50&filter[search]=Owner${suffix}`,
+        as,
+      );
+      expect(res.statusCode).toBe(200);
+      return res.json().data as {
+        id: number;
+        ownerAgentId: number | null;
+        firstName?: string;
+      }[];
+    };
+
+    it("finds an NGO's own volunteers by name", async () => {
+      const ids = (await search("owner")).map((v) => v.id);
+      expect(ids).toEqual(
+        expect.arrayContaining([
+          volunteers.ownedByOwner.id,
+          volunteers.ownedByOwnerMatchedToOutsider.id,
+        ]),
+      );
+    });
+
+    it("finds another NGO's volunteer matched to the caller, with its owner", async () => {
+      const found = await search("outsider");
+      expect(found.map((v) => v.id)).toEqual([
+        volunteers.ownedByOwnerMatchedToOutsider.id,
+      ]);
+      expect(found[0].ownerAgentId).toBe(agents.owner.id);
+    });
+  });
+
   describe("GET /volunteer?filter[ownerAgent]=", () => {
     const listIds = async (agentKey: AgentKey, as: Caller) => {
       const res = await request(
@@ -238,8 +322,17 @@ describe("NGO-owned volunteers (be#1056)", () => {
     };
 
     it("lists an NGO's own volunteers", async () => {
-      expect(await listIds("owner", "owner")).toEqual([
-        volunteers.ownedByOwner.id,
+      expect((await listIds("owner", "owner")).sort()).toEqual(
+        [
+          volunteers.ownedByOwner.id,
+          volunteers.ownedByOwnerMatchedToOutsider.id,
+        ].sort(),
+      );
+    });
+
+    it("lists another NGO's volunteer matched to the caller", async () => {
+      expect(await listIds("owner", "outsider")).toEqual([
+        volunteers.ownedByOwnerMatchedToOutsider.id,
       ]);
     });
 

@@ -38,17 +38,3 @@ export async function assertVolunteerVisible(
     throw new NotFoundError(`Volunteer (id:${volunteerId}) not found.`);
   }
 }
-
-export function hideUnsharedOwner<T extends { ownerAgentId: number | null }>(
-  volunteer: T,
-  visibility: CallerVisibility | null,
-): T {
-  if (
-    visibility &&
-    volunteer.ownerAgentId !== null &&
-    !visibility.ownerAgentIds.has(volunteer.ownerAgentId)
-  ) {
-    return { ...volunteer, ownerAgentId: null };
-  }
-  return volunteer;
-}

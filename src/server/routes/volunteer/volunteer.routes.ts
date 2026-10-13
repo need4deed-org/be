@@ -62,10 +62,7 @@ import {
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
 import { resolveCallerMask } from "../../utils/pii/pre-serialization";
-import {
-  assertVolunteerVisible,
-  hideUnsharedOwner,
-} from "../../utils/pii/volunteer-visibility";
+import { isVolunteerVisible } from "../../utils/pii/volunteer-visibility";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -169,28 +166,29 @@ export default async function volunteerRoutes(
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
-      await assertVolunteerVisible(request, id);
-
+      const visibility = await resolveCallerMask(request);
+      let data: ApiVolunteerGet | null;
       try {
-        const visibility = await resolveCallerMask(request);
-        const data = await fetchVolunteerById(
-          id,
-          isoCode,
-          relations,
-          visibility,
-        );
+        data = await fetchVolunteerById(id, isoCode, relations, visibility);
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}).`);
           throw new Error(`Volunteer (id=${id}) not found after patch.`);
         }
-        return reply.status(200).send({
-          message: `Volunteer (id=${id}).`,
-          data: hideUnsharedOwner(data, visibility),
-        });
       } catch (error) {
         logger.error(`Error fetching volunteer id=${id}: ${error}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
+      const ownership = {
+        ownerAgentId: data.ownerAgentId,
+        personId: data.person?.id ?? null,
+      };
+      if (!isVolunteerVisible(ownership, visibility)) {
+        throw new NotFoundError(`Volunteer (id:${id}) not found.`);
+      }
+      return reply.status(200).send({
+        message: `Volunteer (id=${id}).`,
+        data,
+      });
     },
   );
 
@@ -262,10 +260,7 @@ export default async function volunteerRoutes(
       if (visibility) {
         maskPii(volunteers, visibility);
       }
-      const data = volunteers
-        .map(volunteerListSerializer)
-        .filter(Boolean)
-        .map((v) => hideUnsharedOwner(v, visibility));
+      const data = volunteers.map(volunteerListSerializer).filter(Boolean);
 
       reply.status(200).send({
         message: `Volunteers page ${request.query.page}`,

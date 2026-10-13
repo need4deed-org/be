@@ -161,7 +161,10 @@ export default class Volunteer {
   personId: number;
 
   @ManyToOne(() => Agent, { nullable: true, onDelete: "SET NULL" })
-  @JoinColumn({ name: "owner_agent_id" })
+  @JoinColumn({
+    name: "owner_agent_id",
+    foreignKeyConstraintName: "FK_volunteer_owner_agent",
+  })
   ownerAgent: Agent | null;
 
   @Index("IDX_volunteer_owner_agent")

@@ -98,7 +98,6 @@ describe("resolveCallerVisibility", () => {
         { id: 100, person_id: null }, // opportunity with no matched volunteer
         { id: 101, person_id: 9 },
       ]);
-      query.mockResolvedValueOnce([{ person_id: 11 }]);
       query.mockResolvedValueOnce([]);
 
       const v = await resolveCallerVisibility(
@@ -107,7 +106,8 @@ describe("resolveCallerVisibility", () => {
       );
 
       expect(sorted(v.agentIds)).toEqual([42, 43]);
-      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9, 11]);
+      // owned volunteers are unmasked via ownerAgentId, not listed here
+      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
       expect(sorted(v.ownerAgentIds)).toEqual([42, 43]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
       // member lookup scoped to the caller's ACTIVE agent memberships only;
@@ -129,7 +129,6 @@ describe("resolveCallerVisibility", () => {
       find.mockResolvedValue([]);
       query
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 42 }, { id: 50 }]);
 
       const sharing = await resolveCallerVisibility(
@@ -139,10 +138,7 @@ describe("resolveCallerVisibility", () => {
       expect(sorted(sharing.ownerAgentIds)).toEqual([42, 50]);
 
       request.callerAgentIds = undefined;
-      query
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const notSharing = await resolveCallerVisibility(
         request,
