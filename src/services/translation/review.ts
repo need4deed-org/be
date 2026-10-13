@@ -11,11 +11,11 @@ import FieldTranslation from "../../data/entity/field_translation.entity";
 import { dtoFieldTranslation } from "../dto/dto-field-translation";
 import { languageIds, originalLang } from "./languages";
 import { loadEntity, sourceHashOf, sourceTextOf } from "./queue";
-import { translatedEntities, TranslatedEntityType } from "./registry";
-
-export const reviewedEntityTypes = (
-  Object.keys(translatedEntities) as TranslatedEntityType[]
-).filter((entityType) => translatedEntities[entityType].machine);
+import {
+  machineEntityTypes,
+  translatedEntities,
+  TranslatedEntityType,
+} from "./registry";
 
 export async function getFieldTranslations(
   manager: EntityManager,
@@ -55,7 +55,7 @@ export async function confirmTranslation(
   id: number,
 ): Promise<void> {
   const row = await manager.findOneBy(FieldTranslation, { id });
-  const entityType = reviewedEntityTypes.find(
+  const entityType = machineEntityTypes.find(
     (type) => row?.[translatedEntities[type].fk],
   );
   if (!row || !entityType) {

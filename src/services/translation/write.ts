@@ -6,35 +6,26 @@ import { SourceEntity, sourceTextOf, storeHuman } from "./queue";
 import { getMachineEntry } from "./registry";
 import { resolve } from "./resolve";
 
-export async function writesOriginalLanguage(
-  manager: EntityManager,
-  entity: TranslatableEntity,
-  lang: Lang,
-): Promise<boolean> {
-  const { langOf } = await languageIds(manager);
-  return originalLang(entity, langOf) === lang;
-}
-
 export async function writeHumanTranslations(
   manager: EntityManager,
   entityType: EntityTableName,
   entity: TranslatableEntity,
   lang: Lang,
   fields: Record<string, string | null | undefined>,
-): Promise<void> {
+): Promise<boolean> {
   const source = entity as SourceEntity;
+  const { idOf, langOf } = await languageIds(manager);
+  if (lang === originalLang(source, langOf)) {
+    return false;
+  }
   const submitted = Object.entries(fields).filter(
     (entry): entry is [string, string | null] => entry[1] !== undefined,
   );
   if (submitted.length === 0) {
-    return;
+    return true;
   }
   const fieldNames = submitted.map(([fieldName]) => fieldName);
   const { fk } = getMachineEntry(entityType, fieldNames);
-  const { idOf, langOf } = await languageIds(manager);
-  if (lang === originalLang(source, langOf)) {
-    throw new Error(`${lang} is the original language of ${entityType}`);
-  }
   const [served] = await resolve(
     manager,
     entityType,
@@ -65,4 +56,5 @@ export async function writeHumanTranslations(
   for (const [fieldName, text] of changed) {
     await storeHuman(manager, fk, source, idOf[lang], fieldName, text);
   }
+  return true;
 }

@@ -11,20 +11,21 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { languageIds } from "../../../services/translation/languages";
 import { enqueue } from "../../../services/translation/queue";
 import { translatedEntities } from "../../../services/translation/registry";
-import {
-  writeHumanTranslations,
-  writesOriginalLanguage,
-} from "../../../services/translation/write";
+import { writeHumanTranslations } from "../../../services/translation/write";
 import { getLanguageCode } from "../common";
 
 const OPPORTUNITY_FIELDS = [
   ...translatedEntities[EntityTableName.OPPORTUNITY].fields,
 ];
 
+export function editLanguage(query: unknown): Lang | null {
+  return getLanguageCode(
+    (query as { language?: unknown } | undefined)?.language as string,
+  );
+}
+
 export function requestLanguage(queryOrBody: unknown): Lang {
-  const language = (queryOrBody as { language?: unknown } | undefined)
-    ?.language;
-  return getLanguageCode(language as string) || Lang.DE;
+  return editLanguage(queryOrBody) ?? Lang.DE;
 }
 
 export async function translateOpportunities(
@@ -71,35 +72,36 @@ export async function queueOpportunityTranslation(
   });
 }
 
-export function editLanguage(query: unknown): Lang | null {
-  return getLanguageCode(
-    (query as { language?: unknown } | undefined)?.language as string,
-  );
-}
-
 export async function divertTranslatedEdits(
   manager: EntityManager,
-  opportunity: Opportunity,
+  opportunity: Pick<Opportunity, "id">,
   patch: Partial<Opportunity>,
   submitted: Pick<Partial<Opportunity>, "title" | "info">,
   effectiveType: OpportunityType,
   lang: Lang | null,
 ): Promise<void> {
-  if (!lang || (await writesOriginalLanguage(manager, opportunity, lang))) {
+  if (!lang) {
     return;
   }
+  const current = await manager.findOneOrFail(Opportunity, {
+    where: { id: opportunity.id },
+    lock: { mode: "pessimistic_write" },
+  });
   const fields: ("title" | "info")[] = TRANSLATED_INFO_TYPES.includes(
     effectiveType,
   )
     ? ["title", "info"]
     : ["title"];
-  await writeHumanTranslations(
+  const diverted = await writeHumanTranslations(
     manager,
     EntityTableName.OPPORTUNITY,
-    opportunity,
+    current,
     lang,
     Object.fromEntries(fields.map((field) => [field, submitted[field]])),
   );
+  if (!diverted) {
+    return;
+  }
   for (const field of fields) {
     if (submitted[field] !== undefined) {
       delete patch[field];

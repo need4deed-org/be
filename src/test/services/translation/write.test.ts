@@ -12,10 +12,7 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import { enqueue } from "../../../services/translation/queue";
-import {
-  writeHumanTranslations,
-  writesOriginalLanguage,
-} from "../../../services/translation/write";
+import { writeHumanTranslations } from "../../../services/translation/write";
 import { randomNumericSuffix } from "../../random";
 
 const OPP = EntityTableName.OPPORTUNITY;
@@ -76,31 +73,32 @@ describe("translation writes", () => {
     }
   });
 
-  describe("writesOriginalLanguage", () => {
+  describe("writeHumanTranslations", () => {
     it.each([
-      [Lang.DE, Lang.DE, true],
-      [Lang.DE, Lang.EN, false],
-      [Lang.EN, Lang.EN, true],
-      [Lang.EN, Lang.DE, false],
-    ])("original %s, written in %s: %s", async (original, lang, expected) => {
-      const entity = { id: 1, originalLanguageId: ids[original] };
-      expect(await writesOriginalLanguage(manager(), entity, lang)).toBe(
-        expected,
-      );
-    });
+      [Lang.DE, Lang.DE, false],
+      [Lang.DE, Lang.EN, true],
+      [Lang.EN, Lang.EN, false],
+      [Lang.EN, Lang.DE, true],
+    ])(
+      "original %s, written in %s: handled %s",
+      async (original, lang, handled) => {
+        const opportunity = await queued({ originalLanguageId: ids[original] });
+        expect(
+          await writeHumanTranslations(manager(), OPP, opportunity, lang, {}),
+        ).toBe(handled);
+      },
+    );
 
     it("treats a NULL original language as German", async () => {
-      const legacy = { id: 1, originalLanguageId: null };
-      expect(await writesOriginalLanguage(manager(), legacy, Lang.DE)).toBe(
-        true,
-      );
-      expect(await writesOriginalLanguage(manager(), legacy, Lang.EN)).toBe(
-        false,
-      );
+      const legacy = await queued({ originalLanguageId: null });
+      expect(
+        await writeHumanTranslations(manager(), OPP, legacy, Lang.DE, {}),
+      ).toBe(false);
+      expect(
+        await writeHumanTranslations(manager(), OPP, legacy, Lang.EN, {}),
+      ).toBe(true);
     });
-  });
 
-  describe("writeHumanTranslations", () => {
     it("stores a changed field as a human translation and keeps the source", async () => {
       const opportunity = await queued();
       await translated(opportunity);

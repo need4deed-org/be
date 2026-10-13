@@ -1,11 +1,11 @@
 import { Lang, TranslationOrigin, TranslationStatus } from "need4deed-sdk";
-import { reviewedEntityTypes } from "../../services/translation/review";
+import { machineEntityTypes } from "../../services/translation/registry";
 
 export const translationEntityParamSchema = {
   type: "object",
   required: ["entityType", "entityId"],
   properties: {
-    entityType: { type: "string", enum: reviewedEntityTypes },
+    entityType: { type: "string", enum: machineEntityTypes },
     entityId: { type: "integer", minimum: 1 },
   },
 };
