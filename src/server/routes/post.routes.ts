@@ -56,6 +56,10 @@ import {
   getPostReplyWhere,
   getRootPostWhere,
 } from "../utils/data/get-post-where";
+import {
+  getTaggedAgentPersons,
+  mergePersons,
+} from "../utils/data/get-tagged-agent-persons";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
@@ -227,21 +231,24 @@ export default async function postRoutes(
       const {
         text,
         taggedPersonIds = [],
+        taggedAgentIds = [],
         linkedOpportunityIds = [],
       } = request.body;
 
       const agentPerson = await getAgentPersonRepresentative(personId);
 
-      const [taggedPersons, linkedOpportunities] = await Promise.all([
-        taggedPersonIds.length
-          ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
-          : [],
-        linkedOpportunityIds.length
-          ? fastify.db.opportunityRepository.findBy({
-              id: In(linkedOpportunityIds),
-            })
-          : [],
-      ]);
+      const [taggedPersons, agentPersons, linkedOpportunities] =
+        await Promise.all([
+          taggedPersonIds.length
+            ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
+            : [],
+          getTaggedAgentPersons(fastify, taggedAgentIds),
+          linkedOpportunityIds.length
+            ? fastify.db.opportunityRepository.findBy({
+                id: In(linkedOpportunityIds),
+              })
+            : [],
+        ]);
 
       validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
       validateRelationIds(
@@ -254,7 +261,7 @@ export default async function postRoutes(
         text,
         authorId: personId,
         agentId: agentPerson?.agentId ?? null,
-        taggedPersons,
+        taggedPersons: mergePersons(taggedPersons, agentPersons),
         linkedOpportunities,
       });
 
@@ -324,7 +331,8 @@ export default async function postRoutes(
         resource: "posts",
       });
 
-      const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
+      const { text, taggedPersonIds, taggedAgentIds, linkedOpportunityIds } =
+        request.body;
       const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
 
       if (text !== null && text !== undefined) {
@@ -338,6 +346,12 @@ export default async function postRoutes(
           : [];
         validateRelationIds(taggedPersonIds, found, "tagged person");
         post.taggedPersons = found;
+      }
+      if (taggedAgentIds !== null && taggedAgentIds !== undefined) {
+        post.taggedPersons = mergePersons(
+          post.taggedPersons ?? [],
+          await getTaggedAgentPersons(fastify, taggedAgentIds),
+        );
       }
       if (linkedOpportunityIds !== null && linkedOpportunityIds !== undefined) {
         const found = linkedOpportunityIds.length

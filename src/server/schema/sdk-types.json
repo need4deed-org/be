@@ -1728,6 +1728,18 @@
       },
       "required": ["id", "fullName"]
     },
+    "ApiAgentTagCandidate": {
+      "$id": "ApiAgentTagCandidate",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "district": {
+          "oneOf": [{ "$ref": "OptionById#" }, { "type": "null" }]
+        }
+      },
+      "required": ["id", "title", "district"]
+    },
     "ApiPostAgent": {
       "$id": "ApiPostAgent",
       "type": "object",
@@ -1860,6 +1872,7 @@
       "properties": {
         "text": { "type": "string", "minLength": 1 },
         "taggedPersonIds": { "type": "array", "items": { "type": "integer" } },
+        "taggedAgentIds": { "type": "array", "items": { "type": "integer" } },
         "linkedOpportunityIds": {
           "type": "array",
           "items": { "type": "integer" }
@@ -1874,6 +1887,10 @@
       "properties": {
         "text": { "type": ["string", "null"], "minLength": 1 },
         "taggedPersonIds": {
+          "type": ["array", "null"],
+          "items": { "type": "integer" }
+        },
+        "taggedAgentIds": {
           "type": ["array", "null"],
           "items": { "type": "integer" }
         },

@@ -4,6 +4,7 @@ import {
   ApiAgentGetList,
   ApiAgentPatch,
   ApiAgentRegisterNew,
+  ApiAgentTagCandidate,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -56,6 +57,7 @@ import {
   updateAgentLanguages,
   updateAgentServices,
 } from "../../utils";
+import { getAgentTagCandidates } from "../../utils/data/get-agent-tag-candidates";
 import { createAgent } from "../../utils/data/write-agent-registration";
 import { hidePostcodeUnless } from "../../utils/pii/location-visibility";
 import { maskPii } from "../../utils/pii/mask";
@@ -224,6 +226,31 @@ export default async function agentRoutes(
         message: "Agent created successfully.",
         data: result,
       });
+    },
+  );
+
+  fastify.get<{
+    Querystring: { search?: string };
+    Reply: ReplyData<ApiAgentTagCandidate[]>;
+  }>(
+    "/tag-candidates",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          properties: { search: { type: "string", maxLength: 100 } },
+          additionalProperties: false,
+        },
+        response: responseSchema("ApiAgentTagCandidate#", true, false),
+      },
+    },
+    async (request, reply) => {
+      const role = request.authUser?.role;
+      if (role !== UserRole.AGENT && !isStaffRole(role)) {
+        throw new UnauthorizedError();
+      }
+      const data = await getAgentTagCandidates(request, request.query.search);
+      return reply.status(200).send({ message: "Tag candidates.", data });
     },
   );
 
