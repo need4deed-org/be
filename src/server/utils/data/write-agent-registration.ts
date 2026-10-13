@@ -5,13 +5,14 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager, In } from "typeorm";
-import { BaseError, NotFoundError } from "../../../config";
+import { BadRequestError, BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
@@ -74,8 +75,20 @@ async function createBareAgent(
         )
       : null;
 
+  if (
+    input.organizationId !== undefined &&
+    !(await manager
+      .getRepository(Organization)
+      .existsBy({ id: input.organizationId }))
+  ) {
+    throw new BadRequestError(
+      `Organization (id:${input.organizationId}) not found.`,
+    );
+  }
+
   const newAgent = new Agent({
     title: input.title,
+    organizationId: input.organizationId,
     agentTypeId: input.typeId ?? undefined,
     info: input.info ?? undefined,
     website: input.website ?? undefined,
