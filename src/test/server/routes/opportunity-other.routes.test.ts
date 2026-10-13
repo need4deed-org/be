@@ -23,7 +23,7 @@ import { randomNumericSuffix } from "../../random";
 const PASSWORD = "test_password";
 
 type Caller = "member" | "volunteer";
-type OpportunityKey = "own" | "otherOpen" | "otherPast";
+type OpportunityKey = "own" | "otherOpen" | "otherPast" | "otherAccompanying";
 
 describe("GET /opportunity/other (fe#1052)", () => {
   let fastify: FastifyInstance;
@@ -32,6 +32,7 @@ describe("GET /opportunity/other (fe#1052)", () => {
 
   let ownAgent: Agent;
   let otherAgent: Agent;
+  let districtId: number;
   const deals: Deal[] = [];
   const opportunities = {} as Record<OpportunityKey, Opportunity>;
   const persons: Person[] = [];
@@ -51,12 +52,18 @@ describe("GET /opportunity/other (fe#1052)", () => {
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
     });
+    const [district]: { id: number }[] =
+      await fastify.db.agentRepository.manager.query(
+        `SELECT id FROM district ORDER BY id LIMIT 1`,
+      );
+    districtId = district.id;
     [ownAgent, otherAgent] = await Promise.all(
       ["own", "other"].map((key) =>
         fastify.db.agentRepository.save(
           new Agent({
             title: `${prefix} agent ${key}`,
             engagementStatus: AgentEngagementStatusType.ACTIVE,
+            districtId,
           }),
         ),
       ),
@@ -64,15 +71,20 @@ describe("GET /opportunity/other (fe#1052)", () => {
 
     const setup: Record<
       OpportunityKey,
-      { agent: Agent; status: OpportunityStatusType }
+      { agent: Agent; status: OpportunityStatusType; type?: OpportunityType }
     > = {
       own: { agent: ownAgent, status: OpportunityStatusType.NEW },
       otherOpen: { agent: otherAgent, status: OpportunityStatusType.SEARCHING },
       otherPast: { agent: otherAgent, status: OpportunityStatusType.PAST },
+      otherAccompanying: {
+        agent: otherAgent,
+        status: OpportunityStatusType.SEARCHING,
+        type: OpportunityType.ACCOMPANYING,
+      },
     };
-    for (const [key, { agent, status }] of Object.entries(setup) as [
+    for (const [key, { agent, status, type }] of Object.entries(setup) as [
       OpportunityKey,
-      { agent: Agent; status: OpportunityStatusType },
+      { agent: Agent; status: OpportunityStatusType; type?: OpportunityType },
     ][]) {
       const deal = await fastify.db.dealRepository.save(
         new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
@@ -81,7 +93,7 @@ describe("GET /opportunity/other (fe#1052)", () => {
       opportunities[key] = await fastify.db.opportunityRepository.save(
         new Opportunity({
           title: `${prefix} ${key}`,
-          type: OpportunityType.REGULAR,
+          type: type ?? OpportunityType.REGULAR,
           status,
           dealId: deal.id,
           agentId: agent.id,
@@ -160,6 +172,7 @@ describe("GET /opportunity/other (fe#1052)", () => {
       ["createdAt", "district", "id", "title"].sort(),
     );
     expect(data[0].id).toBe(opportunities.otherOpen.id);
+    expect(data[0].district?.id).toBe(districtId);
   });
 
   it("is only for NGO users", async () => {

@@ -3,8 +3,10 @@ import {
   ApiOpportunityOtherGetList,
   Lang,
   OpportunityStatusType,
+  OpportunityType,
 } from "need4deed-sdk";
-import { ILike, In, Not } from "typeorm";
+import { ILike, In, Not, Raw } from "typeorm";
+import { dtoOpportunityOtherGetList } from "../../../services/dto/dto-opportunity-other";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { escapeLikePattern } from "./person-name-ilike";
 import { translateOpportunities } from "./translate-opportunities";
@@ -27,34 +29,31 @@ export async function getOtherOpportunities(
     request,
     request.authUser?.personId,
   );
+  if (ownAgentIds.length === 0) {
+    return { data: [], count: 0 };
+  }
+
   const [opportunities, count] =
     await request.server.db.opportunityRepository.findAndCount({
-      select: { id: true, title: true, districtId: true, createdAt: true },
       where: {
         status: In(OPEN_STATUSES),
-        ...(ownAgentIds.length ? { agentId: Not(In(ownAgentIds)) } : {}),
+        type: Not(OpportunityType.ACCOMPANYING),
+        agentId: Raw(
+          (column) =>
+            `${column} IS NOT NULL AND ${column} NOT IN (:...ownAgentIds)`,
+          {
+            ownAgentIds,
+          },
+        ),
         ...(search ? { title: ILike(`%${escapeLikePattern(search)}%`) } : {}),
       },
-      relations: ["district"],
-      order: { createdAt: "DESC" },
+      relations: ["district", "agent.district"],
+      order: { createdAt: "DESC", id: "DESC" },
       skip,
       take,
     });
 
   await translateOpportunities(request.server, opportunities, language);
 
-  return {
-    count,
-    data: opportunities.map((opportunity) => ({
-      id: opportunity.id,
-      title: opportunity.title,
-      district: opportunity.districtId
-        ? {
-            id: opportunity.districtId,
-            title: { de: opportunity.district?.title },
-          }
-        : null,
-      createdAt: opportunity.createdAt,
-    })),
-  };
+  return { count, data: opportunities.map(dtoOpportunityOtherGetList) };
 }
