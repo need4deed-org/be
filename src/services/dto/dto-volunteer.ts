@@ -42,6 +42,7 @@ export function volunteerListSerializer(
 
     return {
       id,
+      ownerAgentId: volunteer.ownerAgentId ?? null,
       statusEngagement,
       statusType,
       statusMatch,
@@ -132,6 +133,7 @@ export function volunteerSerializer(
 
   return {
     id: volunteer.id,
+    ownerAgentId: volunteer.ownerAgentId ?? null,
     person,
     statusEngagement: volunteer.statusEngagement,
     statusCommunication: volunteer.statusCommunication,

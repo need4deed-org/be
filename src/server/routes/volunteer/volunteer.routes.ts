@@ -8,7 +8,7 @@ import {
   UserRole,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
+import { FindOptionsOrder, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -62,6 +62,7 @@ import {
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
 import { resolveCallerMask } from "../../utils/pii/pre-serialization";
+import { assertVolunteerVisible } from "../../utils/pii/volunteer-visibility";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -165,6 +166,8 @@ export default async function volunteerRoutes(
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
+      await assertVolunteerVisible(request, id);
+
       try {
         const data = await fetchVolunteerById(
           id,
@@ -227,10 +230,7 @@ export default async function volunteerRoutes(
       const [skip, take] = getSkipTake({ page, limit });
 
       const visibility = await resolveCallerMask(request);
-      const where = getVolunteerWhere(
-        filter,
-        visibility,
-      ) as FindOptionsWhere<Volunteer>;
+      const where = getVolunteerWhere(filter, visibility);
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };
@@ -350,6 +350,23 @@ export default async function volunteerRoutes(
           ),
         ) as typeof patchedVolunteerData;
         volunteerData = Object.keys(filtered).length ? filtered : undefined;
+      }
+
+      const { ownerAgentId } = request.body;
+      if (
+        ownerAgentId !== undefined &&
+        ownerAgentId !== volunteer.ownerAgentId
+      ) {
+        if (role !== UserRole.ADMIN) {
+          throw new UnauthorizedError();
+        }
+        if (
+          ownerAgentId !== null &&
+          !(await fastify.db.agentRepository.existsBy({ id: ownerAgentId }))
+        ) {
+          throw new BadRequestError(`Agent (id:${ownerAgentId}) not found.`);
+        }
+        volunteerData = { ...volunteerData, ownerAgentId };
       }
 
       const personData = patchedPersonData

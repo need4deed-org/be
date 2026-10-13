@@ -23,6 +23,7 @@ import {
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { assertVolunteerVisible } from "../../utils/pii/volunteer-visibility";
 
 const msg400 = "URL param must ba a positive number";
 
@@ -56,6 +57,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       if (volunteerId <= 0) {
         throw new BadRequestError(msg400);
       }
+      await assertVolunteerVisible(request, volunteerId);
 
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;

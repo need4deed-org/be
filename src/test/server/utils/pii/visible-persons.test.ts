@@ -98,6 +98,8 @@ describe("resolveCallerVisibility", () => {
         { id: 100, person_id: null }, // opportunity with no matched volunteer
         { id: 101, person_id: 9 },
       ]);
+      query.mockResolvedValueOnce([{ person_id: 11 }]);
+      query.mockResolvedValueOnce([]);
 
       const v = await resolveCallerVisibility(
         request,
@@ -105,7 +107,8 @@ describe("resolveCallerVisibility", () => {
       );
 
       expect(sorted(v.agentIds)).toEqual([42, 43]);
-      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
+      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9, 11]);
+      expect(sorted(v.ownerAgentIds)).toEqual([42, 43]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
       // member lookup scoped to the caller's ACTIVE agent memberships only;
       // a PENDING co-applicant must not get their PII unmasked
@@ -117,6 +120,38 @@ describe("resolveCallerVisibility", () => {
       });
 
       expect(query.mock.calls[0][1]).toEqual([[42, 43]]);
+    });
+
+    it("adds every sharing agent as a visible owner only when the caller shares", async () => {
+      mockMemberships.mockResolvedValue([{ agentId: 42 }] as unknown as Awaited<
+        ReturnType<typeof getActiveAgentMemberships>
+      >);
+      find.mockResolvedValue([]);
+      query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: 42, own: true },
+          { id: 50, own: false },
+        ]);
+
+      const sharing = await resolveCallerVisibility(
+        request,
+        makeUser(UserRole.AGENT, 1),
+      );
+      expect(sorted(sharing.ownerAgentIds)).toEqual([42, 50]);
+
+      request.callerAgentIds = undefined;
+      query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 50, own: false }]);
+
+      const notSharing = await resolveCallerVisibility(
+        request,
+        makeUser(UserRole.AGENT, 1),
+      );
+      expect(sorted(notSharing.ownerAgentIds)).toEqual([42]);
     });
 
     it("stops at own person when the AGENT has no memberships", async () => {

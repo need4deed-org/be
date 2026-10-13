@@ -28,6 +28,7 @@ const ctx = (
   opportunityIds: new Set(p.opportunityIds ?? []),
   agentIds: new Set(p.agentIds ?? []),
   matchedAgentIds: new Set(p.matchedAgentIds ?? []),
+  ownerAgentIds: new Set(),
 });
 
 const makePerson = (id: number): Person =>

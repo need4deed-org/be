@@ -15,6 +15,7 @@ export interface CallerVisibility {
   opportunityIds: Set<number>;
   agentIds: Set<number>;
   matchedAgentIds: Set<number>;
+  ownerAgentIds: Set<number>;
 }
 
 export const VISIBLE_MATCH_STATUSES = [
@@ -33,8 +34,15 @@ export async function resolveCallerVisibility(
     opportunityIds: new Set<number>(),
     agentIds: new Set<number>(),
     matchedAgentIds: new Set<number>(),
+    ownerAgentIds: new Set<number>(),
   };
-  const { personIds, opportunityIds, agentIds, matchedAgentIds } = visibility;
+  const {
+    personIds,
+    opportunityIds,
+    agentIds,
+    matchedAgentIds,
+    ownerAgentIds,
+  } = visibility;
   const personId = user.personId ?? undefined;
 
   if (user.role === UserRole.USER || !personId) {
@@ -95,6 +103,27 @@ export async function resolveCallerVisibility(
       personIds.add(Number(r.person_id));
     }
   });
+
+  const owned: { person_id: number | null }[] =
+    await agentPersonRepository.manager.query(
+      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)`,
+      [[...agentIds]],
+    );
+  owned.forEach((r) => {
+    if (r.person_id !== null) {
+      personIds.add(Number(r.person_id));
+    }
+  });
+
+  agentIds.forEach((id) => ownerAgentIds.add(id));
+  const sharing: { id: number; own: boolean }[] =
+    await agentPersonRepository.manager.query(
+      `SELECT id, id = ANY($1) AS own FROM agent WHERE shares_volunteers`,
+      [[...agentIds]],
+    );
+  if (sharing.some((a) => a.own)) {
+    sharing.forEach((a) => ownerAgentIds.add(Number(a.id)));
+  }
 
   return visibility;
 }

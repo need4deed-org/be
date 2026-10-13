@@ -1,4 +1,5 @@
-import { ILike, In, Raw } from "typeorm";
+import { FindOptionsWhere, ILike, In, IsNull, Raw } from "typeorm";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
@@ -28,7 +29,43 @@ function getPersonSearchBranches(search: string): Record<string, unknown>[] {
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
-) {
+): FindOptionsWhere<Volunteer> | FindOptionsWhere<Volunteer>[] {
+  const where = getVolunteerFilterWhere(filter, visibility);
+  const requestedOwners = filter?.ownerAgent
+    ? [filter.ownerAgent].flat().map(Number).filter(Number.isInteger)
+    : null;
+
+  if (!visibility) {
+    return requestedOwners
+      ? { ...where, ownerAgentId: In(requestedOwners) }
+      : where;
+  }
+
+  const visibleOwners = [...visibility.ownerAgentIds].filter(
+    (id) => !requestedOwners || requestedOwners.includes(id),
+  );
+  const personIds = [...visibility.personIds];
+  const branches: FindOptionsWhere<Volunteer>[] = [];
+  if (!requestedOwners) {
+    branches.push({ ...where, ownerAgentId: IsNull() });
+  }
+  if (visibleOwners.length) {
+    branches.push({ ...where, ownerAgentId: In(visibleOwners) });
+  }
+  if (personIds.length) {
+    branches.push({
+      ...where,
+      personId: In(personIds),
+      ...(requestedOwners ? { ownerAgentId: In(requestedOwners) } : {}),
+    });
+  }
+  return branches.length ? branches : { ...where, id: In([-1]) };
+}
+
+export function getVolunteerFilterWhere(
+  filter: QuerystringVolunteerFiltering["filter"],
+  visibility: CallerVisibility | null,
+): FindOptionsWhere<Volunteer> {
   const personScope = visibility
     ? { id: In(visibility.personIds.size ? [...visibility.personIds] : [-1]) }
     : {};
@@ -74,5 +111,5 @@ export function getVolunteerWhere(
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
-  };
+  } as FindOptionsWhere<Volunteer>;
 }

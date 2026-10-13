@@ -1,0 +1,29 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class AddVolunteerOwnerAgent1791460000000 implements MigrationInterface {
+  name = "AddVolunteerOwnerAgent1791460000000";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "volunteer" ADD "owner_agent_id" integer`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "agent" ADD "shares_volunteers" boolean NOT NULL DEFAULT false`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "volunteer" ADD CONSTRAINT "FK_volunteer_owner_agent" FOREIGN KEY ("owner_agent_id") REFERENCES "agent"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "volunteer" DROP CONSTRAINT "FK_volunteer_owner_agent"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "agent" DROP COLUMN "shares_volunteers"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "volunteer" DROP COLUMN "owner_agent_id"`,
+    );
+  }
+}

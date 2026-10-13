@@ -23,6 +23,7 @@ import Communication from "../communication.entity";
 import Deal from "../deal.entity";
 import Document from "../document.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
+import Agent from "../opportunity/agent.entity";
 import Person from "../person.entity";
 import Appreciation from "./appreciation.entity";
 
@@ -157,6 +158,13 @@ export default class Volunteer {
 
   @Column({ nullable: true, unique: true })
   personId: number;
+
+  @ManyToOne(() => Agent, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "owner_agent_id" })
+  ownerAgent: Agent | null;
+
+  @Column({ type: "integer", nullable: true })
+  ownerAgentId: number | null;
 
   @OneToMany(
     () => OpportunityVolunteer,

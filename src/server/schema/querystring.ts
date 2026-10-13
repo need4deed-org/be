@@ -137,6 +137,12 @@ export const volunteerListQuerySchema = {
             { type: "array", items: { type: "string" } },
           ],
         },
+        ownerAgent: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         engagement: {
           anyOf: [
             { type: "string" },

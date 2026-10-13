@@ -66,6 +66,7 @@ describe("getAgentWhere", () => {
       opportunityIds: new Set(),
       agentIds: new Set(agentIds),
       matchedAgentIds: new Set(matchedAgentIds),
+      ownerAgentIds: new Set(),
     });
 
     it("leaves the street filter unscoped for a privileged caller", async () => {

@@ -1,23 +1,30 @@
 import { UserRole } from "need4deed-sdk";
-import { ILike, In } from "typeorm";
+import { ILike, In, IsNull } from "typeorm";
 import { describe, expect, it } from "vitest";
-import { getVolunteerWhere } from "../../../../server/utils/data/get-volunteer-where";
+import {
+  getVolunteerFilterWhere,
+  getVolunteerWhere,
+} from "../../../../server/utils/data/get-volunteer-where";
 import { CallerVisibility } from "../../../../server/utils/pii/visible-persons";
 
-function visibility(personIds: number[]): CallerVisibility {
+function visibility(
+  personIds: number[],
+  ownerAgentIds: number[] = [],
+): CallerVisibility {
   return {
     userId: 1,
-    role: UserRole.VOLUNTEER,
+    role: UserRole.AGENT,
     personIds: new Set(personIds),
     opportunityIds: new Set(),
     agentIds: new Set(),
     matchedAgentIds: new Set(),
+    ownerAgentIds: new Set(ownerAgentIds),
   };
 }
 
 describe("getVolunteerWhere search (be#666, be#972)", () => {
   it("matches name/email across all persons for a privileged caller", () => {
-    expect(getVolunteerWhere({ search: "ann" }, null)).toEqual({
+    expect(getVolunteerFilterWhere({ search: "ann" }, null)).toEqual({
       person: [
         { firstName: ILike("%ann%") },
         { lastName: ILike("%ann%") },
@@ -28,7 +35,9 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
   });
 
   it("scopes each search branch to persons visible to a masked caller", () => {
-    expect(getVolunteerWhere({ search: "ann" }, visibility([7, 9]))).toEqual({
+    expect(
+      getVolunteerFilterWhere({ search: "ann" }, visibility([7, 9])),
+    ).toEqual({
       person: [
         { firstName: ILike("%ann%"), id: In([7, 9]) },
         { lastName: ILike("%ann%"), id: In([7, 9]) },
@@ -39,7 +48,7 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
   });
 
   it("matches nothing for a masked caller who can see no person", () => {
-    expect(getVolunteerWhere({ search: "ann" }, visibility([]))).toEqual({
+    expect(getVolunteerFilterWhere({ search: "ann" }, visibility([]))).toEqual({
       person: [
         { firstName: ILike("%ann%"), id: In([-1]) },
         { lastName: ILike("%ann%"), id: In([-1]) },
@@ -50,13 +59,13 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
   });
 
   it("escapes LIKE metacharacters in filter.search", () => {
-    const where = getVolunteerWhere({ search: "a_b%" }, null);
+    const where = getVolunteerFilterWhere({ search: "a_b%" }, null);
     expect(where.person?.[0]).toEqual({ firstName: ILike("%a\\_b\\%%") });
   });
 
   describe("formatting-insensitive phone match", () => {
     const phoneDigitsBranch = (search: string) =>
-      getVolunteerWhere({ search }, null).person?.[4] as
+      getVolunteerFilterWhere({ search }, null).person?.[4] as
         | { phone: { _type: string; _objectLiteralParameters: unknown } }
         | undefined;
 
@@ -79,14 +88,57 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
     );
 
     it("scopes the phone branch to visible persons too", () => {
-      const where = getVolunteerWhere({ search: "030 123" }, visibility([7]));
+      const where = getVolunteerFilterWhere(
+        { search: "030 123" },
+        visibility([7]),
+      );
       expect(where.person?.[4]).toMatchObject({ id: In([7]) });
     });
   });
 
   it("does not scope a masked caller's query without a search", () => {
-    expect(getVolunteerWhere({ district: ["3"] }, visibility([]))).toEqual({
+    expect(
+      getVolunteerFilterWhere({ district: ["3"] }, visibility([])),
+    ).toEqual({
       deal: { dealDistrict: { district: { id: In(["3"]) } } },
     });
+  });
+});
+
+describe("getVolunteerWhere owner scoping (be#1056)", () => {
+  it("adds no owner condition for a privileged caller", () => {
+    expect(getVolunteerWhere({}, null)).toEqual({});
+  });
+
+  it("filters a privileged caller by ownerAgent", () => {
+    expect(getVolunteerWhere({ ownerAgent: ["4"] }, null)).toEqual({
+      ownerAgentId: In([4]),
+    });
+  });
+
+  it("shows platform volunteers, visible owners and visible persons", () => {
+    expect(getVolunteerWhere({}, visibility([7], [4, 5]))).toEqual([
+      { ownerAgentId: IsNull() },
+      { ownerAgentId: In([4, 5]) },
+      { personId: In([7]) },
+    ]);
+  });
+
+  it("shows only platform volunteers when nothing else is visible", () => {
+    expect(getVolunteerWhere({}, visibility([]))).toEqual([
+      { ownerAgentId: IsNull() },
+    ]);
+  });
+
+  it("limits ownerAgent to owners the caller may see", () => {
+    expect(
+      getVolunteerWhere({ ownerAgent: ["4", "9"] }, visibility([], [4])),
+    ).toEqual([{ ownerAgentId: In([4]) }]);
+  });
+
+  it("matches nothing for an ownerAgent the caller may not see", () => {
+    expect(getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4]))).toEqual(
+      { id: In([-1]) },
+    );
   });
 });
