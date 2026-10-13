@@ -14,7 +14,6 @@ import {
 } from "need4deed-sdk";
 import { UnauthenticatedError, UnauthorizedError } from "../../../config";
 import logger from "../../../logger";
-import { dtoOrganizationGetList } from "../../../services/dto/dto-organization";
 import {
   registerAgentBodySchema,
   registerAgentConflictSchema,
@@ -35,6 +34,7 @@ import {
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
+import { listOrganizations } from "../../utils/data/list-organizations";
 
 async function authByVerifyToken(
   fastify: FastifyInstance,
@@ -92,15 +92,11 @@ export default async function agentRegisterRoutes(
       preHandler: (request, reply) =>
         authByVerifyToken(fastify, request, reply),
     },
-    async (_request, reply) => {
-      const organizations = await fastify.db.organizationRepository.find({
-        order: { title: "ASC" },
-      });
-      return reply.status(200).send({
-        message: "Organizations.",
-        data: organizations.map(dtoOrganizationGetList),
-      });
-    },
+    async (_request, reply) =>
+      reply.status(200).send({
+        message: "Organizations found.",
+        data: await listOrganizations(),
+      }),
   );
 
   fastify.get<{

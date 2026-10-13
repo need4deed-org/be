@@ -44,6 +44,19 @@ export class AgentTitleConflictError extends BaseError {
   }
 }
 
+async function assertOrganizationExists({
+  organizationId,
+}: ApiAgentRegisterNew): Promise<void> {
+  if (
+    organizationId !== undefined &&
+    !(await dataSource
+      .getRepository(Organization)
+      .existsBy({ id: organizationId }))
+  ) {
+    throw new BadRequestError(`Organization (id:${organizationId}) not found.`);
+  }
+}
+
 async function assertNoAddressConflict({
   addressStreet,
   addressPostcode,
@@ -74,17 +87,6 @@ async function createBareAgent(
           manager,
         )
       : null;
-
-  if (
-    input.organizationId !== undefined &&
-    !(await manager
-      .getRepository(Organization)
-      .existsBy({ id: input.organizationId }))
-  ) {
-    throw new BadRequestError(
-      `Organization (id:${input.organizationId}) not found.`,
-    );
-  }
 
   const newAgent = new Agent({
     title: input.title,
@@ -132,6 +134,7 @@ export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
+  await assertOrganizationExists(input);
   await assertNoAddressConflict(input);
 
   let result!: RegisterAgentResult;
@@ -176,6 +179,7 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
+  await assertOrganizationExists(input);
   await assertNoAddressConflict(input);
 
   let agentId!: number;

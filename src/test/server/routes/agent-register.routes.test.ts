@@ -266,7 +266,15 @@ describe("POST /agent/register", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.json().data)).toBe(true);
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    expect(res.json().data).toContainEqual(
+      expect.objectContaining({
+        id: organization.id,
+        title: organization.title,
+      }),
+    );
     expect(
       (
         await fastify.inject({
