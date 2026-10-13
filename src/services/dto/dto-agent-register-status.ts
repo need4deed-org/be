@@ -1,4 +1,4 @@
-import { ApiAgentRegisterStatus } from "need4deed-sdk";
+import { AgentMembershipStatus, ApiAgentRegisterStatus } from "need4deed-sdk";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 
 export function dtoAgentRegisterStatus(
@@ -8,7 +8,9 @@ export function dtoAgentRegisterStatus(
     ? {
         registered: true,
         agentId: membership.agentId,
-        agentTitle: membership.agent.title,
+        ...(membership.status === AgentMembershipStatus.ACTIVE
+          ? { agentTitle: membership.agent.title }
+          : {}),
         membershipStatus: membership.status,
       }
     : { registered: false };

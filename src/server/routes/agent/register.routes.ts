@@ -142,6 +142,7 @@ export default async function agentRegisterRoutes(
       );
       const data = matches
         .filter((a) => joinable.has(a.id) || isExactStreetMatch(a, street))
+        // Address-only matches must not reveal NGO names to untrusted registrants.
         .map((a) =>
           joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
         );

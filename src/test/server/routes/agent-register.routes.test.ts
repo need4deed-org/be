@@ -133,9 +133,15 @@ describe("/agent/register", () => {
       expect(res.json().data).toEqual({
         registered: true,
         agentId: agent.id,
-        agentTitle: agent.title,
+        ...(status === AgentMembershipStatus.ACTIVE
+          ? { agentTitle: agent.title }
+          : {}),
         membershipStatus: status,
       });
+      if (status === AgentMembershipStatus.PENDING) {
+        expect(res.json().data).not.toHaveProperty("agentTitle");
+        expect(res.body).not.toContain(agent.title);
+      }
 
       const title = `Repeated NGO ${randomNumericSuffix()}`;
       for (const payload of [
