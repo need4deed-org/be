@@ -72,6 +72,10 @@ export type TranslatedEntityType = keyof typeof translatedEntities;
 export type TranslationFk =
   (typeof translatedEntities)[TranslatedEntityType]["fk"];
 
+export const machineEntityTypes = (
+  Object.keys(translatedEntities) as TranslatedEntityType[]
+).filter((entityType) => translatedEntities[entityType].machine);
+
 export function isTranslatedEntityType(
   entityType: EntityTableName,
 ): entityType is TranslatedEntityType {
