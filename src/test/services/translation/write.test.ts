@@ -89,16 +89,14 @@ describe("translation writes", () => {
       );
     });
 
-    it("treats a NULL original language as the written one", async () => {
-      for (const lang of Object.values(Lang)) {
-        expect(
-          await writesOriginalLanguage(
-            manager(),
-            { id: 1, originalLanguageId: null },
-            lang,
-          ),
-        ).toBe(true);
-      }
+    it("treats a NULL original language as German", async () => {
+      const legacy = { id: 1, originalLanguageId: null };
+      expect(await writesOriginalLanguage(manager(), legacy, Lang.DE)).toBe(
+        true,
+      );
+      expect(await writesOriginalLanguage(manager(), legacy, Lang.EN)).toBe(
+        false,
+      );
     });
   });
 
@@ -149,6 +147,34 @@ describe("translation writes", () => {
       });
 
       expect(await rows(opportunity.id)).toEqual(before);
+    });
+
+    it("writes nothing when any field is refused", async () => {
+      const opportunity = await queued();
+      await translated(opportunity);
+      const before = await rows(opportunity.id);
+
+      await expect(
+        writeHumanTranslations(manager(), OPP, opportunity, Lang.EN, {
+          title: "Babysitting",
+          info: "",
+        }),
+      ).rejects.toThrow(BadRequestError);
+
+      expect(await rows(opportunity.id)).toEqual(before);
+    });
+
+    it("refuses a translation of a field with no original text", async () => {
+      const opportunity = await queued({ info: null });
+
+      await expect(
+        writeHumanTranslations(manager(), OPP, opportunity, Lang.EN, {
+          info: "We need help",
+        }),
+      ).rejects.toThrow(/no original text/);
+      expect((await rows(opportunity.id)).map((row) => row.fieldName)).toEqual([
+        "title",
+      ]);
     });
 
     it("refuses to clear a field outside the original language", async () => {
