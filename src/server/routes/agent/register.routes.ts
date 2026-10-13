@@ -9,10 +9,12 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   ApiAgentRegister,
+  ApiOrganizationGetList,
   UserRole,
 } from "need4deed-sdk";
 import { UnauthenticatedError, UnauthorizedError } from "../../../config";
 import logger from "../../../logger";
+import { dtoOrganizationGetList } from "../../../services/dto/dto-organization";
 import {
   registerAgentBodySchema,
   registerAgentConflictSchema,
@@ -21,7 +23,9 @@ import {
   registerSearchQuerySchema,
   registerSearchResponseSchema,
   responseErrors,
+  responseSchema,
 } from "../../schema";
+import { ReplyData } from "../../types";
 import {
   createAgentForPerson,
   getAgentIdsJoinableAsActive,
@@ -67,6 +71,38 @@ export default async function agentRegisterRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  fastify.get<{
+    Querystring: { token: string };
+    Reply: ReplyData<ApiOrganizationGetList[]>;
+  }>(
+    "/organizations",
+    {
+      config: {
+        public: true,
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      } as FastifyContextConfig,
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["token"],
+          properties: { token: { type: "string" } },
+        },
+        response: responseSchema("ApiOrganizationGetList#", true, false),
+      },
+      preHandler: (request, reply) =>
+        authByVerifyToken(fastify, request, reply),
+    },
+    async (_request, reply) => {
+      const organizations = await fastify.db.organizationRepository.find({
+        order: { title: "ASC" },
+      });
+      return reply.status(200).send({
+        message: "Organizations.",
+        data: organizations.map(dtoOrganizationGetList),
+      });
+    },
+  );
+
   fastify.get<{
     Querystring: { token: string; street?: string };
   }>(

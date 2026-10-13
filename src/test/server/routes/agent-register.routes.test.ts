@@ -257,6 +257,26 @@ describe("POST /agent/register", () => {
     }
   });
 
+  it("lists operators for a registrant with a verify token", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/organizations?token=${token}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json().data)).toBe(true);
+    expect(
+      (
+        await fastify.inject({
+          method: "GET",
+          url: "/agent/register/organizations?token=invalid",
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
   it("stores the chosen operator (Träger) on the new agent", async () => {
     const organization = await fastify.db.organizationRepository.findOneOrFail({
       where: {},
