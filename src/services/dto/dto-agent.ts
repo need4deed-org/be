@@ -80,6 +80,7 @@ export function dtoAgentGetList(
     unclaimed: agent.unclaimed,
     statusEngagement: agent.engagementStatus,
     ...getAgentCoordinates(agent, districtCentroid),
+    postcode: agent.address?.postcode?.value ?? null,
   };
 }
 

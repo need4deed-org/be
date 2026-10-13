@@ -105,7 +105,11 @@ import {
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { hidePostcodeUnless } from "../../utils/pii/location-visibility";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -375,6 +379,7 @@ export default async function opportunityRoutes(
         "deal.dealLanguage.language",
         "deal.dealTimeslot.timeslot",
         "deal.dealDistrict.district",
+        "deal.postcode",
         "agent",
         "agent.address.postcode",
         "accompanying",
@@ -461,13 +466,18 @@ export default async function opportunityRoutes(
         ),
       ]);
 
+      const visibility = await resolveCallerMask(request);
       const data = opportunitiesCategoryDistrict.map((opportunity) => {
         const districtId = neededDistrictIds.get(opportunity.id);
-        return dtoOpportunityGetList(
-          opportunity,
-          districtId !== undefined
-            ? districtCentroids.get(districtId)
-            : undefined,
+        return hidePostcodeUnless(
+          dtoOpportunityGetList(
+            opportunity,
+            districtId !== undefined
+              ? districtCentroids.get(districtId)
+              : undefined,
+          ),
+          visibility,
+          (v) => v.opportunityIds,
         );
       });
 

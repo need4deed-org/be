@@ -18,7 +18,11 @@ import {
   requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { hidePostcodeUnless } from "../../utils/pii/location-visibility";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 
 export default async function volunteerOpportunityRoutes(
   fastify: FastifyInstance,
@@ -41,6 +45,7 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealActivity.activity",
         "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
+        "deal.postcode",
       ];
 
       const { page, limit, language, ...filters } = request.query;
@@ -79,7 +84,14 @@ export default async function volunteerOpportunityRoutes(
         requestLanguage({ language }),
       );
       await maskForCaller(request, opportunitiesCategory);
-      const data = opportunitiesCategory.map(dtoVolunteerOpportunityGetList);
+      const visibility = await resolveCallerMask(request);
+      const data = opportunitiesCategory.map((opportunity) =>
+        hidePostcodeUnless(
+          dtoVolunteerOpportunityGetList(opportunity),
+          visibility,
+          (v) => v.opportunityIds,
+        ),
+      );
 
       return reply.status(200).send({
         message: `Opportunities for a volunteer.`,

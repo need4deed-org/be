@@ -57,6 +57,7 @@ import {
   updateAgentServices,
 } from "../../utils";
 import { createAgent } from "../../utils/data/write-agent-registration";
+import { hidePostcodeUnless } from "../../utils/pii/location-visibility";
 import { maskPii } from "../../utils/pii/mask";
 import {
   maskForCaller,
@@ -181,11 +182,15 @@ export default async function agentRoutes(
 
       const data = agentsDistrict.map((agent) => {
         const districtId = neededDistrictIds.get(agent.id);
-        return dtoAgentGetList(
-          agent,
-          districtId !== undefined
-            ? districtCentroids.get(districtId)
-            : undefined,
+        return hidePostcodeUnless(
+          dtoAgentGetList(
+            agent,
+            districtId !== undefined
+              ? districtCentroids.get(districtId)
+              : undefined,
+          ),
+          visibility,
+          (v) => v.agentIds,
         );
       });
 

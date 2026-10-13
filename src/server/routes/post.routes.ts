@@ -42,6 +42,7 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
+import { attachTaggedAgents } from "../utils/data/attach-tagged-agents";
 import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
@@ -196,6 +197,7 @@ export default async function postRoutes(
       await Promise.all([
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
+        attachTaggedAgents(fastify, orderedPosts),
       ]);
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
@@ -273,7 +275,10 @@ export default async function postRoutes(
         request.authUser!.id,
         full.author,
       );
-      await translateLinkedOpportunities(fastify, [full], request.query);
+      await Promise.all([
+        attachTaggedAgents(fastify, [full]),
+        translateLinkedOpportunities(fastify, [full], request.query),
+      ]);
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -349,6 +354,7 @@ export default async function postRoutes(
         fastify.db.postRepository.count({ where: { rootId: updated.id } }),
         attachReactionData(fastify, [updated], request.authUser?.personId),
         attachBookmarkData(fastify, [updated], request.authUser?.personId),
+        attachTaggedAgents(fastify, [updated]),
       ]);
       updated.replyCount = replyCount;
 

@@ -1,4 +1,4 @@
-import { ApiPostReactionSummary } from "need4deed-sdk";
+import { ApiPostAgent, ApiPostReactionSummary } from "need4deed-sdk";
 import {
   Check,
   Column,
@@ -87,6 +87,8 @@ export default class Post {
   myReaction?: string | null;
 
   bookmarked?: boolean;
+
+  taggedAgents?: ApiPostAgent[];
 
   @CreateDateColumn()
   createdAt: Date;
