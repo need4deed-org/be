@@ -53,7 +53,8 @@
         "languages",
         "activities",
         "location",
-        "availability"
+        "availability",
+        "postcode"
       ],
       "additionalProperties": false
     }
