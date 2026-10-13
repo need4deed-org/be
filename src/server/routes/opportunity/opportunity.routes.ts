@@ -3,6 +3,7 @@ import {
   AgentMembershipStatus,
   ApiOpportunityGet,
   ApiOpportunityGetList,
+  ApiOpportunityOtherGetList,
   ApiOpportunityPatch,
   CommunicationType,
   EntityTableName,
@@ -96,6 +97,7 @@ import {
 } from "../../utils";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
+import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
@@ -188,6 +190,51 @@ export default async function opportunityRoutes(
   await fastify.register(opportunityEventRegistrationRoutes, {
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
+
+  fastify.get<{
+    Querystring: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      language?: string;
+    };
+    Reply: ReplyDataCount<ApiOpportunityOtherGetList[]>;
+  }>(
+    "/other",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "integer", minimum: 1 },
+            limit: { type: "integer", minimum: 1, maximum: 120 },
+            search: { type: "string", maxLength: 100 },
+            language: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        response: responseSchema("ApiOpportunityOtherGetList#", true),
+      },
+    },
+    async (request, reply) => {
+      if (request.authUser?.role !== UserRole.AGENT) {
+        throw new UnauthorizedError();
+      }
+      const [skip, take] = getSkipTake({
+        page: request.query.page,
+        limit: request.query.limit,
+      });
+      const { data, count } = await getOtherOpportunities(request, {
+        skip,
+        take,
+        search: request.query.search,
+        language: requestLanguage(request.query),
+      });
+      return reply
+        .status(200)
+        .send({ message: "Other opportunities.", data, count });
+    },
+  );
 
   fastify.get<{
     Params: ParamsId;
