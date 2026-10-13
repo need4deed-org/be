@@ -97,6 +97,7 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { reloadDealRelations } from "../../utils/data/reload-deal-relations";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   languageIdOf,
@@ -409,6 +410,20 @@ export default async function opportunityRoutes(
               take,
               ...(order ? order : {}),
             });
+
+      const filter = request.query.filter;
+      if (
+        [
+          filter?.language,
+          filter?.activity,
+          filter?.skill,
+          filter?.district,
+        ].some((value) =>
+          Array.isArray(value) ? value.length > 0 : Boolean(value),
+        )
+      ) {
+        await reloadDealRelations(opportunities);
+      }
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();
