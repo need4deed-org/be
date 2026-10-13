@@ -2,12 +2,9 @@ import { EntityTableName, Lang } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../config";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
-import { setHuman } from "./queue";
+import { SourceEntity, sourceTextOf, storeHuman } from "./queue";
+import { getMachineEntry } from "./registry";
 import { resolve } from "./resolve";
-
-type SourceEntity = TranslatableEntity & Record<string, unknown>;
-
-const textOf = (value: unknown) => String(value ?? "").trim();
 
 export async function writesOriginalLanguage(
   manager: EntityManager,
@@ -32,30 +29,40 @@ export async function writeHumanTranslations(
   if (submitted.length === 0) {
     return;
   }
+  const fieldNames = submitted.map(([fieldName]) => fieldName);
+  const { fk } = getMachineEntry(entityType, fieldNames);
+  const { idOf, langOf } = await languageIds(manager);
+  if (lang === originalLang(source, langOf)) {
+    throw new Error(`${lang} is the original language of ${entityType}`);
+  }
   const [served] = await resolve(
     manager,
     entityType,
     [{ ...source }],
-    submitted.map(([fieldName]) => fieldName),
+    fieldNames,
     lang,
   );
 
   const changed = submitted
-    .map(([fieldName, value]) => [fieldName, textOf(value)] as const)
-    .filter(([fieldName, text]) => text !== textOf(served[fieldName]));
+    .map(([fieldName, value]) => [fieldName, sourceTextOf(value)] as const)
+    .filter(
+      ([fieldName, text]) =>
+        text !== sourceTextOf(served[fieldName]) &&
+        text !== sourceTextOf(source[fieldName]),
+    );
   for (const [fieldName, text] of changed) {
     if (!text) {
       throw new BadRequestError(
         `${fieldName} can only be cleared in the original language.`,
       );
     }
-    if (!textOf(source[fieldName])) {
+    if (!sourceTextOf(source[fieldName])) {
       throw new BadRequestError(
         `${fieldName} has no original text to translate; edit it in the original language.`,
       );
     }
   }
   for (const [fieldName, text] of changed) {
-    await setHuman(manager, entityType, entity.id, fieldName, lang, text);
+    await storeHuman(manager, fk, source, idOf[lang], fieldName, text);
   }
 }

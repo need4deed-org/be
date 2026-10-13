@@ -219,6 +219,23 @@ describe("/translation coordinator review", () => {
       });
     });
 
+    it("refuses a translation of outdated original text", async () => {
+      const opportunity = await queued();
+      const row = await translatedTitle(opportunity);
+      await dataSource.manager.update(
+        Opportunity,
+        { id: opportunity.id },
+        { title: `Neu ${suffix}` },
+      );
+
+      const res = await request("POST", `/${row.id}/confirm`);
+
+      expect(res.statusCode).toBe(409);
+      expect((await titleRow(opportunity.id)).origin).toBe(
+        TranslationOrigin.MACHINE,
+      );
+    });
+
     it("refuses a translation that isn't done", async () => {
       const opportunity = await queued();
       const row = await titleRow(opportunity.id);
@@ -269,6 +286,17 @@ describe("/translation coordinator review", () => {
         ["info", ids[Lang.DE], TranslationStatus.PENDING],
         ["title", ids[Lang.DE], TranslationStatus.PENDING],
       ]);
+    });
+
+    it("404s on a missing entity", async () => {
+      const res = await request(
+        "PUT",
+        "/opportunity/2147483647/original-language",
+        UserRole.COORDINATOR,
+        { language: Lang.EN },
+      );
+
+      expect(res.statusCode).toBe(404);
     });
 
     it("rejects a language outside Lang", async () => {

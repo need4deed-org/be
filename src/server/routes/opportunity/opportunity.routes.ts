@@ -100,6 +100,7 @@ import { logEmailCommunication } from "../../utils/data/log-email-communication"
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
+  editLanguage,
   languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
@@ -729,6 +730,10 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      const submitted = {
+        title: opportunityObj?.title,
+        info: opportunityObj?.info,
+      };
 
       if (opportunityObj) {
         if (effectiveType === OpportunityType.ACCOMPANYING) {
@@ -794,8 +799,9 @@ export default async function opportunityRoutes(
             manager,
             opportunity,
             opportunityObj,
+            submitted,
             effectiveType,
-            requestLanguage(request.query),
+            editLanguage(request.query),
           );
           const success = await patchEntity(
             Opportunity,

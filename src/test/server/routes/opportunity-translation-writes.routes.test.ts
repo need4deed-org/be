@@ -348,6 +348,81 @@ describe("opportunity writes queue translations", () => {
       });
     });
 
+    it.each([
+      ["no ?language=", undefined],
+      ["an unknown one", "fr"],
+    ])("writes the source with %s", async (_, language) => {
+      const opportunity = await saved({ originalLanguageId: ids[Lang.EN] });
+
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/opportunity/${opportunity.id}${language ? `?language=${language}` : ""}`,
+        cookies: { [accessCookieName]: cookie },
+        payload: { title: `Homework help ${suffix}` },
+      });
+
+      expect(res.statusCode).toBe(204);
+      const stored = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: opportunity.id,
+      });
+      expect(stored.title).toBe(`Homework help ${suffix}`);
+      const rows = await rowsOf(opportunity.id);
+      expect(rows.map((row) => row.origin)).not.toContain(
+        TranslationOrigin.HUMAN,
+      );
+    });
+
+    describe("type change from accompanying in another language", () => {
+      async function accompanyingOpportunity() {
+        const accompanying = await fastify.db.accompanyingRepository.save(
+          new Accompanying({ name: "Writes Test", address: "Writes Street 1" }),
+        );
+        accompanyings.push(accompanying.id);
+        return saved({
+          type: OpportunityType.ACCOMPANYING,
+          accompanyingId: accompanying.id,
+          info: null,
+          infoConfidential: "Termin beim Amt",
+        });
+      }
+
+      it("refuses a description, which has no original text yet", async () => {
+        const opportunity = await accompanyingOpportunity();
+
+        const res = await patch(
+          opportunity.id,
+          {
+            opportunity_type: OpportunityType.REGULAR,
+            description: "English text",
+          },
+          Lang.EN,
+        );
+
+        expect(res.statusCode).toBe(400);
+        const stored = await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunity.id,
+        });
+        expect(stored.type).toBe(OpportunityType.ACCOMPANYING);
+        expect(stored.info).toBeNull();
+      });
+
+      it("still moves the existing text over without a description", async () => {
+        const opportunity = await accompanyingOpportunity();
+
+        const res = await patch(
+          opportunity.id,
+          { opportunity_type: OpportunityType.REGULAR },
+          Lang.EN,
+        );
+
+        expect(res.statusCode).toBe(204);
+        const stored = await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunity.id,
+        });
+        expect(stored.info).toBe("Termin beim Amt");
+      });
+    });
+
     it("drops info translations on a type change to accompanying", async () => {
       // A leftover accompanying row, so the type change needs no details.
       const accompanying = await fastify.db.accompanyingRepository.save(

@@ -5,7 +5,6 @@ import { TranslatedEntityType } from "../../services/translation/registry";
 import {
   confirmTranslation,
   getFieldTranslations,
-  loadReviewedEntity,
 } from "../../services/translation/review";
 import {
   fieldTranslationsResponseSchema,
@@ -78,15 +77,14 @@ export default async function translationRoutes(
     },
     async (request, reply) => {
       const { entityType, entityId } = request.params;
-      await dataSource.manager.transaction(async (manager) => {
-        await loadReviewedEntity(manager, entityType, entityId);
-        await fastify.translation.setOriginalLanguage(
+      await dataSource.manager.transaction((manager) =>
+        fastify.translation.setOriginalLanguage(
           manager,
           entityType,
           entityId,
           request.body.language,
-        );
-      });
+        ),
+      );
       return reply.status(204).send();
     },
   );

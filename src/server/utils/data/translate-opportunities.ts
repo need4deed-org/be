@@ -71,32 +71,39 @@ export async function queueOpportunityTranslation(
   });
 }
 
+export function editLanguage(query: unknown): Lang | null {
+  return getLanguageCode(
+    (query as { language?: unknown } | undefined)?.language as string,
+  );
+}
+
 export async function divertTranslatedEdits(
   manager: EntityManager,
   opportunity: Opportunity,
   patch: Partial<Opportunity>,
+  submitted: Pick<Partial<Opportunity>, "title" | "info">,
   effectiveType: OpportunityType,
-  lang: Lang,
+  lang: Lang | null,
 ): Promise<void> {
-  if (await writesOriginalLanguage(manager, opportunity, lang)) {
+  if (!lang || (await writesOriginalLanguage(manager, opportunity, lang))) {
     return;
   }
-  const fields: ("title" | "info")[] = ["title"];
-  if (
-    TRANSLATED_INFO_TYPES.includes(opportunity.type) &&
-    TRANSLATED_INFO_TYPES.includes(effectiveType)
-  ) {
-    fields.push("info");
-  }
+  const fields: ("title" | "info")[] = TRANSLATED_INFO_TYPES.includes(
+    effectiveType,
+  )
+    ? ["title", "info"]
+    : ["title"];
   await writeHumanTranslations(
     manager,
     EntityTableName.OPPORTUNITY,
     opportunity,
     lang,
-    Object.fromEntries(fields.map((field) => [field, patch[field]])),
+    Object.fromEntries(fields.map((field) => [field, submitted[field]])),
   );
   for (const field of fields) {
-    delete patch[field];
+    if (submitted[field] !== undefined) {
+      delete patch[field];
+    }
   }
 }
 

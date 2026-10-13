@@ -2,71 +2,40 @@ import {
   ApiFieldTranslation,
   ApiFieldTranslationGet,
   Lang,
-  TranslationErrorCode,
   TranslationOrigin,
   TranslationStatus,
 } from "need4deed-sdk";
 import { EntityManager, FindOptionsWhere } from "typeorm";
-import { BadRequestError, NotFoundError } from "../../config";
+import { BadRequestError, ConflictError, NotFoundError } from "../../config";
 import FieldTranslation from "../../data/entity/field_translation.entity";
-import { languageIds, originalLang, TranslatableEntity } from "./languages";
+import { dtoFieldTranslation } from "../dto/dto-field-translation";
+import { languageIds, originalLang } from "./languages";
+import { loadEntity, sourceHashOf, sourceTextOf } from "./queue";
 import { translatedEntities, TranslatedEntityType } from "./registry";
 
 export const reviewedEntityTypes = (
   Object.keys(translatedEntities) as TranslatedEntityType[]
 ).filter((entityType) => translatedEntities[entityType].machine);
 
-const reviewedFks = reviewedEntityTypes.map(
-  (entityType) => translatedEntities[entityType].fk,
-);
-
-export async function loadReviewedEntity(
-  manager: EntityManager,
-  entityType: TranslatedEntityType,
-  entityId: number,
-): Promise<TranslatableEntity & Record<string, unknown>> {
-  const entity = await manager.findOneBy(
-    translatedEntities[entityType].entity,
-    {
-      id: entityId,
-    },
-  );
-  if (!entity) {
-    throw new NotFoundError(`${entityType} (id:${entityId}) not found.`);
-  }
-  return entity as unknown as TranslatableEntity & Record<string, unknown>;
-}
-
-function dtoFieldTranslation(row: FieldTranslation): ApiFieldTranslation {
-  return {
-    id: row.id,
-    text: row.translation,
-    origin: row.origin,
-    status: row.status,
-    ...(row.lastErrorCode && {
-      lastErrorCode: row.lastErrorCode as TranslationErrorCode,
-    }),
-  };
-}
-
 export async function getFieldTranslations(
   manager: EntityManager,
   entityType: TranslatedEntityType,
   entityId: number,
 ): Promise<ApiFieldTranslationGet[]> {
-  const entity = await loadReviewedEntity(manager, entityType, entityId);
-  const { fk, fields } = translatedEntities[entityType];
+  const { entry, entity } = await loadEntity(manager, entityType, entityId, [
+    ...translatedEntities[entityType].fields,
+  ]);
   const { langOf } = await languageIds(manager);
   const originalLanguage = originalLang(entity, langOf);
   const rows = await manager.find(FieldTranslation, {
-    where: { [fk]: entityId } as FindOptionsWhere<FieldTranslation>,
+    where: { [entry.fk]: entityId } as FindOptionsWhere<FieldTranslation>,
     order: { id: "ASC" },
   });
 
-  return fields
+  return entry.fields
     .map((fieldName) => ({
       fieldName,
-      original: String(entity[fieldName] ?? "").trim(),
+      original: sourceTextOf(entity[fieldName]),
     }))
     .filter(({ original }) => original)
     .map(({ fieldName, original }) => {
@@ -86,7 +55,10 @@ export async function confirmTranslation(
   id: number,
 ): Promise<void> {
   const row = await manager.findOneBy(FieldTranslation, { id });
-  if (!row || !reviewedFks.some((fk) => Boolean(row[fk]))) {
+  const entityType = reviewedEntityTypes.find(
+    (type) => row?.[translatedEntities[type].fk],
+  );
+  if (!row || !entityType) {
     throw new NotFoundError(`Translation (id:${id}) not found.`);
   }
   if (row.origin === TranslationOrigin.HUMAN) {
@@ -97,9 +69,26 @@ export async function confirmTranslation(
       `Translation (id:${id}) is ${row.status}; only a done translation can be confirmed.`,
     );
   }
-  await manager.update(
+  const { entity } = await loadEntity(
+    manager,
+    entityType,
+    row[translatedEntities[entityType].fk] as number,
+    [row.fieldName],
+  );
+  const sourceHash = sourceHashOf(sourceTextOf(entity[row.fieldName]));
+  const { affected } = await manager.update(
     FieldTranslation,
-    { id },
+    {
+      id,
+      origin: TranslationOrigin.MACHINE,
+      status: TranslationStatus.DONE,
+      sourceHash,
+    },
     { origin: TranslationOrigin.HUMAN },
   );
+  if (!affected) {
+    throw new ConflictError(
+      `Translation (id:${id}) no longer matches its original text; reload and review again.`,
+    );
+  }
 }

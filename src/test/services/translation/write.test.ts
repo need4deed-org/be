@@ -138,6 +138,18 @@ describe("translation writes", () => {
       expect(await rows(opportunity.id)).toEqual(before);
     });
 
+    it("treats a value equal to the original as unchanged", async () => {
+      const opportunity = await queued();
+      await translated(opportunity);
+      const before = await rows(opportunity.id);
+
+      await writeHumanTranslations(manager(), OPP, opportunity, Lang.EN, {
+        title: opportunity.title,
+      });
+
+      expect(await rows(opportunity.id)).toEqual(before);
+    });
+
     it("skips fields that are not submitted", async () => {
       const opportunity = await queued();
       const before = await rows(opportunity.id);
