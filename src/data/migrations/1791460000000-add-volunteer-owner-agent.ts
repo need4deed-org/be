@@ -13,9 +13,13 @@ export class AddVolunteerOwnerAgent1791460000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "volunteer" ADD CONSTRAINT "FK_volunteer_owner_agent" FOREIGN KEY ("owner_agent_id") REFERENCES "agent"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
     );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_volunteer_owner_agent" ON "volunteer" ("owner_agent_id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "public"."IDX_volunteer_owner_agent"`);
     await queryRunner.query(
       `ALTER TABLE "volunteer" DROP CONSTRAINT "FK_volunteer_owner_agent"`,
     );

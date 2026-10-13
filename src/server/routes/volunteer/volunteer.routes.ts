@@ -62,7 +62,10 @@ import {
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
 import { resolveCallerMask } from "../../utils/pii/pre-serialization";
-import { assertVolunteerVisible } from "../../utils/pii/volunteer-visibility";
+import {
+  assertVolunteerVisible,
+  hideUnsharedOwner,
+} from "../../utils/pii/volunteer-visibility";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -169,11 +172,12 @@ export default async function volunteerRoutes(
       await assertVolunteerVisible(request, id);
 
       try {
+        const visibility = await resolveCallerMask(request);
         const data = await fetchVolunteerById(
           id,
           isoCode,
           relations,
-          await resolveCallerMask(request),
+          visibility,
         );
         if (!data) {
           logger.error(`Failed fetching volunteer (id=${id}).`);
@@ -181,7 +185,7 @@ export default async function volunteerRoutes(
         }
         return reply.status(200).send({
           message: `Volunteer (id=${id}).`,
-          data,
+          data: hideUnsharedOwner(data, visibility),
         });
       } catch (error) {
         logger.error(`Error fetching volunteer id=${id}: ${error}`);
@@ -258,7 +262,10 @@ export default async function volunteerRoutes(
       if (visibility) {
         maskPii(volunteers, visibility);
       }
-      const data = volunteers.map(volunteerListSerializer).filter(Boolean);
+      const data = volunteers
+        .map(volunteerListSerializer)
+        .filter(Boolean)
+        .map((v) => hideUnsharedOwner(v, visibility));
 
       reply.status(200).send({
         message: `Volunteers page ${request.query.page}`,

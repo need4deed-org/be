@@ -13,6 +13,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -163,6 +164,7 @@ export default class Volunteer {
   @JoinColumn({ name: "owner_agent_id" })
   ownerAgent: Agent | null;
 
+  @Index("IDX_volunteer_owner_agent")
   @Column({ type: "integer", nullable: true })
   ownerAgentId: number | null;
 

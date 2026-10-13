@@ -116,14 +116,14 @@ export async function resolveCallerVisibility(
   });
 
   agentIds.forEach((id) => ownerAgentIds.add(id));
-  const sharing: { id: number; own: boolean }[] =
-    await agentPersonRepository.manager.query(
-      `SELECT id, id = ANY($1) AS own FROM agent WHERE shares_volunteers`,
-      [[...agentIds]],
-    );
-  if (sharing.some((a) => a.own)) {
-    sharing.forEach((a) => ownerAgentIds.add(Number(a.id)));
-  }
+  const sharing: { id: number }[] = await agentPersonRepository.manager.query(
+    `SELECT id FROM agent
+      WHERE shares_volunteers
+        AND EXISTS (SELECT 1 FROM agent own
+                     WHERE own.id = ANY($1) AND own.shares_volunteers)`,
+    [[...agentIds]],
+  );
+  sharing.forEach((a) => ownerAgentIds.add(Number(a.id)));
 
   return visibility;
 }

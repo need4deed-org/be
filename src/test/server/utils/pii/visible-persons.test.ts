@@ -130,10 +130,7 @@ describe("resolveCallerVisibility", () => {
       query
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: 42, own: true },
-          { id: 50, own: false },
-        ]);
+        .mockResolvedValueOnce([{ id: 42 }, { id: 50 }]);
 
       const sharing = await resolveCallerVisibility(
         request,
@@ -145,7 +142,7 @@ describe("resolveCallerVisibility", () => {
       query
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: 50, own: false }]);
+        .mockResolvedValueOnce([]);
 
       const notSharing = await resolveCallerVisibility(
         request,

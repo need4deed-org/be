@@ -203,13 +203,27 @@ describe("NGO-owned volunteers (be#1056)", () => {
     });
   });
 
-  it("404s the linked-opportunities list of a hidden volunteer", async () => {
+  it.each(["opportunity-linked", "appreciation"])(
+    "404s the %s list of a hidden volunteer",
+    async (subRoute) => {
+      const res = await request(
+        "GET",
+        `/volunteer/${volunteers.ownedByOwner.id}/${subRoute}`,
+        "outsider",
+      );
+      expect(res.statusCode).toBe(404);
+    },
+  );
+
+  it("lists need4deed-only volunteers with filter[ownerAgent]=none", async () => {
     const res = await request(
       "GET",
-      `/volunteer/${volunteers.ownedByOwner.id}/opportunity-linked`,
-      "outsider",
+      `/volunteer?limit=200&filter[ownerAgent]=none`,
+      "coordinator",
     );
-    expect(res.statusCode).toBe(404);
+    const ids = (res.json().data as { id: number }[]).map((v) => v.id);
+    expect(ids).toContain(volunteers.platform.id);
+    expect(ids).not.toContain(volunteers.ownedByOwner.id);
   });
 
   describe("GET /volunteer?filter[ownerAgent]=", () => {

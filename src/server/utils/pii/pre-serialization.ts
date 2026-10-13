@@ -8,12 +8,14 @@ type Envelope = { message?: string; data?: unknown; count?: number };
 export async function resolveCallerMask(
   request: FastifyRequest,
 ): Promise<CallerVisibility | null> {
+  if (request.callerVisibility !== undefined) {
+    return request.callerVisibility;
+  }
   const user = request.authUser;
   const privileged = isStaffRole(user?.role);
-  if (!user || privileged) {
-    return null;
-  }
-  return resolveCallerVisibility(request, user);
+  request.callerVisibility =
+    !user || privileged ? null : await resolveCallerVisibility(request, user);
+  return request.callerVisibility;
 }
 
 export async function maskForCaller(

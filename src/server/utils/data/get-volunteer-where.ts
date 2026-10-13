@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In, IsNull, Raw } from "typeorm";
+import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -26,40 +26,44 @@ function getPersonSearchBranches(search: string): Record<string, unknown>[] {
   return branches;
 }
 
+const NO_OWNER = "none";
+
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
-): FindOptionsWhere<Volunteer> | FindOptionsWhere<Volunteer>[] {
+): FindOptionsWhere<Volunteer> {
   const where = getVolunteerFilterWhere(filter, visibility);
-  const requestedOwners = filter?.ownerAgent
-    ? [filter.ownerAgent].flat().map(Number).filter(Number.isInteger)
-    : null;
+  const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
+  const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
+  const requestsNoOwner = requested?.includes(NO_OWNER) ?? false;
 
-  if (!visibility) {
-    return requestedOwners
-      ? { ...where, ownerAgentId: In(requestedOwners) }
-      : where;
+  if (!requested && !visibility) {
+    return where;
   }
 
-  const visibleOwners = [...visibility.ownerAgentIds].filter(
-    (id) => !requestedOwners || requestedOwners.includes(id),
+  const ownerAgentId = Raw(
+    (column) => {
+      const personColumn = column.replace("owner_agent_id", "person_id");
+      const conditions: string[] = [];
+      if (requested) {
+        conditions.push(
+          `(${requestsNoOwner ? `${column} IS NULL OR ` : ""}${column} = ANY(:requestedOwners))`,
+        );
+      }
+      if (visibility) {
+        conditions.push(
+          `(${column} IS NULL OR ${column} = ANY(:visibleOwners) OR ${personColumn} = ANY(:visiblePersons))`,
+        );
+      }
+      return conditions.join(" AND ");
+    },
+    {
+      requestedOwners: requestedIds,
+      visibleOwners: [...(visibility?.ownerAgentIds ?? [])],
+      visiblePersons: [...(visibility?.personIds ?? [])],
+    },
   );
-  const personIds = [...visibility.personIds];
-  const branches: FindOptionsWhere<Volunteer>[] = [];
-  if (!requestedOwners) {
-    branches.push({ ...where, ownerAgentId: IsNull() });
-  }
-  if (visibleOwners.length) {
-    branches.push({ ...where, ownerAgentId: In(visibleOwners) });
-  }
-  if (personIds.length) {
-    branches.push({
-      ...where,
-      personId: In(personIds),
-      ...(requestedOwners ? { ownerAgentId: In(requestedOwners) } : {}),
-    });
-  }
-  return branches.length ? branches : { ...where, id: In([-1]) };
+  return { ...where, ownerAgentId };
 }
 
 export function getVolunteerFilterWhere(

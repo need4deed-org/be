@@ -1,5 +1,5 @@
 import { UserRole } from "need4deed-sdk";
-import { ILike, In, IsNull } from "typeorm";
+import { ILike, In } from "typeorm";
 import { describe, expect, it } from "vitest";
 import {
   getVolunteerFilterWhere,
@@ -106,39 +106,47 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
 });
 
 describe("getVolunteerWhere owner scoping (be#1056)", () => {
-  it("adds no owner condition for a privileged caller", () => {
+  type RawOwner = {
+    _type: string;
+    _getSql: (alias: string) => string;
+    _objectLiteralParameters: Record<string, unknown>;
+  };
+  const ownerCondition = (where: object) =>
+    (where as { ownerAgentId?: RawOwner }).ownerAgentId;
+  const COLUMN = `"Volunteer"."owner_agent_id"`;
+
+  it("adds no owner condition for a privileged caller without a filter", () => {
     expect(getVolunteerWhere({}, null)).toEqual({});
   });
 
-  it("filters a privileged caller by ownerAgent", () => {
-    expect(getVolunteerWhere({ ownerAgent: ["4"] }, null)).toEqual({
-      ownerAgentId: In([4]),
+  it("filters a privileged caller by ownerAgent, incl. none", () => {
+    const owner = ownerCondition(
+      getVolunteerWhere({ ownerAgent: ["4", "none"] }, null),
+    );
+    expect(owner?._getSql(COLUMN)).toBe(
+      `(${COLUMN} IS NULL OR ${COLUMN} = ANY(:requestedOwners))`,
+    );
+    expect(owner?._objectLiteralParameters.requestedOwners).toEqual([4]);
+  });
+
+  it("limits a masked caller to no owner, visible owners or visible persons", () => {
+    const owner = ownerCondition(
+      getVolunteerWhere({}, visibility([7], [4, 5])),
+    );
+    expect(owner?._getSql(COLUMN)).toBe(
+      `(${COLUMN} IS NULL OR ${COLUMN} = ANY(:visibleOwners) OR "Volunteer"."person_id" = ANY(:visiblePersons))`,
+    );
+    expect(owner?._objectLiteralParameters).toMatchObject({
+      visibleOwners: [4, 5],
+      visiblePersons: [7],
     });
   });
 
-  it("shows platform volunteers, visible owners and visible persons", () => {
-    expect(getVolunteerWhere({}, visibility([7], [4, 5]))).toEqual([
-      { ownerAgentId: IsNull() },
-      { ownerAgentId: In([4, 5]) },
-      { personId: In([7]) },
-    ]);
-  });
-
-  it("shows only platform volunteers when nothing else is visible", () => {
-    expect(getVolunteerWhere({}, visibility([]))).toEqual([
-      { ownerAgentId: IsNull() },
-    ]);
-  });
-
-  it("limits ownerAgent to owners the caller may see", () => {
-    expect(
-      getVolunteerWhere({ ownerAgent: ["4", "9"] }, visibility([], [4])),
-    ).toEqual([{ ownerAgentId: In([4]) }]);
-  });
-
-  it("matches nothing for an ownerAgent the caller may not see", () => {
-    expect(getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4]))).toEqual(
-      { id: In([-1]) },
+  it("ANDs a requested owner with the caller's visibility", () => {
+    const owner = ownerCondition(
+      getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4])),
     );
+    expect(owner?._getSql(COLUMN)).toContain(") AND (");
+    expect(owner?._objectLiteralParameters.requestedOwners).toEqual([9]);
   });
 });
