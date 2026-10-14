@@ -77,14 +77,13 @@ import {
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertRoleIn,
-  findAvailabilityDealIds,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
+  getOpportunityListWhere,
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
-  getOpportunityWhere,
   getOrCreateTimeslot,
   getPostcode,
   getSkipTake,
@@ -93,6 +92,7 @@ import {
   mergeIntoWhere,
   patchEntity,
   setAgentSearching,
+  syncOnetimeTimeslot,
   updateOptionList,
   upsertOnetimer,
   writeOpportunityLegacy,
@@ -105,7 +105,6 @@ import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-en
 import {
   divertTranslatedEdits,
   editLanguage,
-  languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
   translateOpportunities,
@@ -394,17 +393,10 @@ export default async function opportunityRoutes(
         });
       }
 
-      const [searchLanguageId, availabilityDealIds] = await Promise.all([
-        request.query.filter?.search
-          ? languageIdOf(dataSource.manager, requestLanguage(request.query))
-          : undefined,
-        findAvailabilityDealIds(request.query.filter?.availability),
-      ]);
-      const where = getOpportunityWhere(
+      const where = await getOpportunityListWhere(
         request.query.filter,
+        requestLanguage(request.query),
         request.query,
-        searchLanguageId,
-        availabilityDealIds,
       );
       if (agentIds) {
         mergeIntoWhere(where, { agent: { id: In(agentIds) } });
@@ -1005,6 +997,10 @@ export default async function opportunityRoutes(
               manager,
             );
             opportunity.onetimerId = onetimer.id;
+          }
+          // a schedule in the body replaces the deal's timeslots below
+          if (effectiveType === OpportunityType.EVENTS && !schedule) {
+            await syncOnetimeTimeslot(dealId, resolvedOnetimerDate, manager);
           }
         });
       }

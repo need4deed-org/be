@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
   responseSchema,
@@ -10,11 +11,10 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
-  dealIdIn,
-  findAvailabilityDealIds,
   getCategoryToDealHandler,
+  getOpportunityListWhere,
   getSkipTake,
-  normalizeStringArrayInput,
+  mergeIntoWhere,
 } from "../../utils";
 import {
   requestLanguage,
@@ -46,22 +46,17 @@ export default async function volunteerOpportunityRoutes(
         "deal.postcode",
       ];
 
-      const { page, limit, language, availability, ...filters } = request.query;
+      const { page, limit, language, agentId, ...filter } = request.query;
 
       const [skip, take] = getSkipTake({ page, limit });
 
-      const availabilityDealIds = await findAvailabilityDealIds(availability);
-      const where = {
-        ...Object.fromEntries(
-          Object.entries(filters).map(([key, value]) => [
-            key,
-            normalizeStringArrayInput(value as string | string[]),
-          ]),
-        ),
-        ...(availabilityDealIds
-          ? { dealId: dealIdIn(availabilityDealIds) }
-          : {}),
-      };
+      const where = await getOpportunityListWhere(
+        filter,
+        requestLanguage({ language }),
+      );
+      if (agentId) {
+        mergeIntoWhere<Opportunity>(where, { agentId });
+      }
 
       const opportunityRepository = fastify.db.opportunityRepository;
 

@@ -12,6 +12,7 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
@@ -51,6 +52,25 @@ const SLOTS: Record<Key, Partial<Timeslot>> = {
   mondayOnetime: { start: new Date("2026-01-12T17:30:00+01:00") },
 };
 
+type OnetimerKey = "eventMoved" | "accompanying";
+
+// appointment dates live in onetimer.date, not in deal timeslots
+const ONETIMERS: Record<
+  OnetimerKey,
+  { type: OpportunityType; date: Date; slot?: Partial<Timeslot> }
+> = {
+  // moved from Monday to Tuesday 18:00; the Monday one-time timeslot is stale
+  eventMoved: {
+    type: OpportunityType.EVENTS,
+    date: new Date("2026-01-13T18:00:00+01:00"),
+    slot: { start: new Date("2026-01-12T18:00:00+01:00") },
+  },
+  accompanying: {
+    type: OpportunityType.ACCOMPANYING,
+    date: new Date("2026-01-14T09:00:00+01:00"),
+  },
+};
+
 describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
@@ -62,6 +82,9 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   const persons: Person[] = [];
   const volunteers = {} as Record<Key, Volunteer>;
   const opportunities = {} as Record<Key, Opportunity>;
+  const onetimerOpportunities = {} as Record<OnetimerKey, Opportunity>;
+  const onetimers: Onetimer[] = [];
+  const extraOpportunities: Opportunity[] = [];
 
   const get = (url: string) =>
     fastify.inject({
@@ -70,7 +93,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
       cookies: { [accessCookieName]: cookie },
     });
 
-  async function dealWith(type: DealType, slot: Partial<Timeslot>) {
+  async function dealWith(type: DealType, slot?: Partial<Timeslot>) {
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
     });
@@ -78,6 +101,9 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
       new Deal({ type, postcodeId: postcode.id }),
     );
     deals.push(deal);
+    if (!slot) {
+      return deal;
+    }
     const timeslot = await getRepository(dataSource, Timeslot).save(
       new Timeslot(slot),
     );
@@ -120,6 +146,24 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
       );
     }
 
+    for (const [key, { type, date, slot }] of Object.entries(ONETIMERS)) {
+      const onetimer = await getRepository(dataSource, Onetimer).save(
+        new Onetimer({ date }),
+      );
+      onetimers.push(onetimer);
+      onetimerOpportunities[key as OnetimerKey] =
+        await fastify.db.opportunityRepository.save(
+          new Opportunity({
+            title: `Availability ${key} ${suffix}`,
+            type,
+            status: OpportunityStatusType.SEARCHING,
+            dealId: (await dealWith(DealType.VOLUNTEER, slot)).id,
+            onetimerId: onetimer.id,
+            agentId: agent.id,
+          }),
+        );
+    }
+
     coordinator = await fastify.db.personRepository.save(
       new Person({ firstName: "Availability", lastName: `Coord${suffix}` }),
     );
@@ -143,7 +187,11 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   });
 
   afterAll(async () => {
-    for (const opportunity of Object.values(opportunities)) {
+    for (const opportunity of [
+      ...Object.values(opportunities),
+      ...Object.values(onetimerOpportunities),
+      ...extraOpportunities,
+    ]) {
       await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     }
     for (const volunteer of Object.values(volunteers)) {
@@ -151,6 +199,9 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
     }
     for (const deal of deals) {
       await fastify.db.dealRepository.delete({ id: deal.id });
+    }
+    for (const onetimer of onetimers) {
+      await getRepository(dataSource, Onetimer).delete({ id: onetimer.id });
     }
     for (const timeslot of timeslots) {
       await getRepository(dataSource, Timeslot).delete({ id: timeslot.id });
@@ -211,9 +262,11 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
 
   const ids = (res: { json: () => { data: { id: number }[] } }) =>
     res.json().data.map(({ id }) => id);
-  const expectedIds = (entities: Record<Key, { id: number }>, keys: Key[]) =>
-    keys.map((k) => entities[k].id).sort();
-  const own = (entities: Record<Key, { id: number }>, list: number[]) =>
+  const expectedIds = <K extends string>(
+    entities: Record<K, { id: number }>,
+    keys: K[],
+  ) => keys.map((k) => entities[k].id).sort();
+  const own = (entities: Record<string, { id: number }>, list: number[]) =>
     list
       .filter((id) => Object.values(entities).some((e) => e.id === id))
       .sort();
@@ -250,4 +303,121 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
       );
     },
   );
+
+  const onetimerCases: [string, string, OnetimerKey[]][] = [
+    ["its day", "availability=days~Tuesday", ["eventMoved"]],
+    ["a stale timeslot day", "availability=days~Monday", []],
+    [
+      "a day without timeslots",
+      "availability=days~Wednesday",
+      ["accompanying"],
+    ],
+    ["its time", "availability=times~17-20", ["eventMoved"]],
+    [
+      "its day and time",
+      "availability=days~Wednesday&availability=times~08-11",
+      ["accompanying"],
+    ],
+    [
+      "occasional",
+      "availability=occasional~weekdays",
+      ["eventMoved", "accompanying"],
+    ],
+  ];
+
+  it.each(onetimerCases)(
+    "filters onetimer opportunities by %s",
+    async (_, query, expected) => {
+      const res = await get(
+        `/opportunity?limit=100&filter[search]=${suffix}&${query.replaceAll("availability=", "filter[availability]=")}`,
+      );
+      expect(res.statusCode).toBe(200);
+      expect(own(onetimerOpportunities, ids(res))).toEqual(
+        expectedIds(onetimerOpportunities, expected),
+      );
+    },
+  );
+
+  it("filters a volunteer's onetimer opportunities by onetimer date", async () => {
+    const res = await get(
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.EVENTS}&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}&availability=days~Tuesday`,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(own(onetimerOpportunities, ids(res))).toEqual(
+      expectedIds(onetimerOpportunities, ["eventMoved"]),
+    );
+  });
+
+  it("applies non-column filters on a volunteer's opportunities", async () => {
+    const res = await get(
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.REGULAR}&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}&search=fridayEvening%20${suffix}`,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(own(opportunities, ids(res))).toEqual(
+      expectedIds(opportunities, ["fridayEvening"]),
+    );
+  });
+
+  it("moves an event's one-time timeslot when PATCH changes its date", async () => {
+    const deal = await dealWith(DealType.VOLUNTEER, SLOTS.mondayMorning);
+    const stale = await getRepository(dataSource, Timeslot).save(
+      new Timeslot({ start: new Date("2026-01-12T18:00:00+01:00") }),
+    );
+    timeslots.push(stale);
+    await getRepository(dataSource, DealTimeslot).save(
+      new DealTimeslot({ dealId: deal.id, timeslotId: stale.id }),
+    );
+    const onetimer = await getRepository(dataSource, Onetimer).save(
+      new Onetimer({ date: stale.start }),
+    );
+    onetimers.push(onetimer);
+    const opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Availability eventPatched ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.SEARCHING,
+        dealId: deal.id,
+        onetimerId: onetimer.id,
+        agentId: agent.id,
+      }),
+    );
+    extraOpportunities.push(opportunity);
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: cookie },
+      payload: {
+        opportunity_type: OpportunityType.EVENTS,
+        event: { date: "2026-01-15", time: "18:00" },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const slots = await getRepository(dataSource, DealTimeslot).find({
+      where: { dealId: deal.id },
+      relations: { timeslot: true },
+    });
+    for (const { timeslot } of slots) {
+      if (!timeslots.some(({ id }) => id === timeslot.id)) {
+        timeslots.push(timeslot);
+      }
+    }
+    const date = (
+      await getRepository(dataSource, Onetimer).findOneByOrFail({
+        id: onetimer.id,
+      })
+    ).date;
+    expect(
+      slots
+        .filter(({ timeslot }) => !timeslot.rrule)
+        .map(({ timeslot }) => timeslot.start.getTime()),
+    ).toEqual([new Date(date).getTime()]);
+    expect(slots.filter(({ timeslot }) => timeslot.rrule)).toHaveLength(1);
+
+    const thursday = await get(
+      `/opportunity?limit=100&filter[search]=${suffix}&filter[availability]=days~Thursday`,
+    );
+    expect(ids(thursday)).toContain(opportunity.id);
+  });
 });
