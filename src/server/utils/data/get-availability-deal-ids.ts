@@ -18,7 +18,7 @@ export type AvailabilityFilter = {
 export function parseAvailabilityFilter(
   input: string | string[] | undefined,
 ): AvailabilityFilter | null {
-  const values = [input ?? []].flat();
+  const values = [input ?? []].flat().filter(Boolean);
   if (!values.length) {
     return null;
   }

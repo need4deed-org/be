@@ -171,6 +171,11 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
       "filter[availability]=days~Saturday&filter[availability]=times~08-11",
       [],
     ],
+    [
+      "an empty value",
+      "filter[availability]=",
+      ["mondayMorning", "fridayEvening", "weekends"],
+    ],
     ["an unknown value", "filter[availability]=days~Someday", []],
     ["the wrong separator", "filter[availability]=days|Monday", []],
   ];
