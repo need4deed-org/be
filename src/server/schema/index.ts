@@ -15,3 +15,4 @@ export * from "./user.schema";
 export * from "./volunteer-audit-log.schema";
 export * from "./volunteer-doc.schema";
 export * from "./volunteer-register.schema";
+export * from "./translation.schema";

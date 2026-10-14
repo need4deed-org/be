@@ -29,6 +29,7 @@ export const RoutePrefix = {
   CHANGE_PASSWORD: "/password-change",
   REGISTER: "/register",
   SWAGGER: "/swagger",
+  TRANSLATION: "/translation",
   TRUSTED_DOMAIN: "/trusted-domain",
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",

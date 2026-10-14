@@ -99,6 +99,8 @@ import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
+  divertTranslatedEdits,
+  editLanguage,
   languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
@@ -385,13 +387,13 @@ export default async function opportunityRoutes(
 
       const opportunityRepository = fastify.db.opportunityRepository;
 
-      const [opportunities, count] =
+      const [pageRows, count] =
         request.query.sortBy === OpportunitySortField.START_DATE
           ? await opportunityRepository
               .createQueryBuilder("opportunity")
               .setFindOptions({
                 where,
-                relations: relations.filter((r) => r !== "onetimer"),
+                select: { id: true, createdAt: true },
                 skip,
                 take,
               })
@@ -404,11 +406,25 @@ export default async function opportunityRoutes(
               .getManyAndCount()
           : await opportunityRepository.findAndCount({
               where,
-              relations,
+              select: { id: true, createdAt: true },
               skip,
               take,
               ...(order ? order : {}),
             });
+
+      // Loaded without the filter: a where on a relation also trims what it loads.
+      const pageIds = pageRows.map(({ id }) => id);
+      const loaded = pageIds.length
+        ? await opportunityRepository.find({
+            where: { id: In(pageIds) },
+            relations,
+            relationLoadStrategy: "query",
+          })
+        : [];
+      const loadedById = new Map(loaded.map((o) => [o.id, o]));
+      const opportunities = pageIds
+        .map((id) => loadedById.get(id))
+        .filter((o): o is Opportunity => o !== undefined);
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();
@@ -630,6 +646,7 @@ export default async function opportunityRoutes(
 
   fastify.patch<{
     Params: ParamsId;
+    Querystring: { language?: string };
     Body: ApiOpportunityPatch;
     Reply: null;
   }>(
@@ -637,6 +654,7 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
@@ -726,6 +744,10 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      const submitted = {
+        title: opportunityObj?.title,
+        info: opportunityObj?.info,
+      };
 
       if (opportunityObj) {
         if (effectiveType === OpportunityType.ACCOMPANYING) {
@@ -787,6 +809,14 @@ export default async function opportunityRoutes(
 
       await dataSource.manager.transaction(async (manager) => {
         if (opportunityObj) {
+          await divertTranslatedEdits(
+            manager,
+            opportunity,
+            opportunityObj,
+            submitted,
+            effectiveType,
+            editLanguage(request.query),
+          );
           const success = await patchEntity(
             Opportunity,
             opportunityObj,

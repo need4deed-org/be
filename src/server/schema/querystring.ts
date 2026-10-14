@@ -95,6 +95,8 @@ export const agentListQuerySchema = {
   additionalProperties: false,
 };
 
+const OWNER_AGENT_PATTERN = "^(none|[1-9][0-9]{0,8})$";
+
 export const volunteerListQuerySchema = {
   type: "object",
   properties: {
@@ -135,6 +137,15 @@ export const volunteerListQuerySchema = {
           anyOf: [
             { type: "string" },
             { type: "array", items: { type: "string" } },
+          ],
+        },
+        ownerAgent: {
+          anyOf: [
+            { type: "string", pattern: OWNER_AGENT_PATTERN },
+            {
+              type: "array",
+              items: { type: "string", pattern: OWNER_AGENT_PATTERN },
+            },
           ],
         },
         engagement: {

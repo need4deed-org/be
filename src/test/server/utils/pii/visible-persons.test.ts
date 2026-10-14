@@ -7,7 +7,10 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
 import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
-import { resolveCallerVisibility } from "../../../../server/utils/pii/visible-persons";
+import {
+  resolveCallerVisibility,
+  VISIBLE_MATCH_STATUSES,
+} from "../../../../server/utils/pii/visible-persons";
 
 vi.mock("../../../../server/utils/data/get-agent-memberships", () => ({
   getActiveAgentMemberships: vi.fn(),
@@ -98,6 +101,7 @@ describe("resolveCallerVisibility", () => {
         { id: 100, person_id: null }, // opportunity with no matched volunteer
         { id: 101, person_id: 9 },
       ]);
+      query.mockResolvedValueOnce([{ person_id: 11 }]);
 
       const v = await resolveCallerVisibility(
         request,
@@ -105,7 +109,8 @@ describe("resolveCallerVisibility", () => {
       );
 
       expect(sorted(v.agentIds)).toEqual([42, 43]);
-      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
+      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9, 11]);
+      expect(sorted(v.ownerAgentIds)).toEqual([42, 43]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
       // member lookup scoped to the caller's ACTIVE agent memberships only;
       // a PENDING co-applicant must not get their PII unmasked
@@ -116,7 +121,26 @@ describe("resolveCallerVisibility", () => {
         },
       });
 
-      expect(query.mock.calls[0][1]).toEqual([[42, 43]]);
+      expect(query.mock.calls[0][1]).toEqual([
+        [42, 43],
+        VISIBLE_MATCH_STATUSES,
+      ]);
+    });
+
+    it("counts only the caller's own agents as visible owners", async () => {
+      mockMemberships.mockResolvedValueOnce([
+        { agentId: 42 },
+      ] as unknown as Awaited<ReturnType<typeof getActiveAgentMemberships>>);
+      find.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const v = await resolveCallerVisibility(
+        request,
+        makeUser(UserRole.AGENT, 1),
+      );
+
+      expect(sorted(v.ownerAgentIds)).toEqual([42]);
+      expect(query).toHaveBeenCalledTimes(2);
     });
 
     it("stops at own person when the AGENT has no memberships", async () => {

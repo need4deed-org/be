@@ -417,6 +417,9 @@
       "$id": "ApiLanguage",
       "type": "object",
       "properties": {
+        "id": {
+          "type": "integer"
+        },
         "title": {
           "type": "string"
         },
@@ -1506,6 +1509,9 @@
         "organizationId": {
           "type": "number",
           "minimum": 1
+        },
+        "sharesVolunteers": {
+          "type": "boolean"
         }
       }
     },
@@ -1528,6 +1534,9 @@
             },
             "operator": {
               "type": "string"
+            },
+            "sharesVolunteers": {
+              "type": "boolean"
             },
             "representative": {
               "$ref": "AgentRepresentative#"

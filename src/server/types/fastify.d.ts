@@ -31,6 +31,7 @@ import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
+import { CallerVisibility } from "../utils/pii/visible-persons";
 import { AuthOptions, CoordinatorInvitePerson } from "./auth";
 
 declare module "fastify" {
@@ -76,6 +77,7 @@ declare module "fastify" {
     coordinatorInvite?: { email: string; person: CoordinatorInvitePerson };
     authUser?: User;
     callerAgentIds?: number[];
+    callerVisibility?: CallerVisibility | null;
   }
 }
 
