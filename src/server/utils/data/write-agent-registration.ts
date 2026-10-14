@@ -34,6 +34,20 @@ export class AgentAddressConflictError extends BaseError {
   }
 }
 
+export class AgentAlreadyRegisteredError extends BaseError {
+  constructor(
+    public readonly agentId: number,
+    public readonly membershipStatus: AgentMembershipStatus,
+  ) {
+    super(
+      "Agent registration already completed or awaiting approval.",
+      409,
+      true,
+      { conflict: "registered", agentId, membershipStatus },
+    );
+  }
+}
+
 export class AgentTitleConflictError extends BaseError {
   constructor(public readonly agentId?: number) {
     super("An agent with this title already exists.", 409, true, {
@@ -43,15 +57,56 @@ export class AgentTitleConflictError extends BaseError {
   }
 }
 
-async function assertNoAddressConflict({
-  addressStreet,
-  addressPostcode,
-  confirmSharedAddress,
-}: ApiAgentRegisterNew): Promise<void> {
+export async function findRegistrationMembership(
+  personId: number,
+  manager: EntityManager = dataSource.manager,
+  relations: string[] = [],
+): Promise<AgentPerson | null> {
+  const memberships = await manager.getRepository(AgentPerson).find({
+    where: { personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
+    relations,
+    order: { id: "ASC" },
+  });
+  return (
+    memberships.find((m) => m.status === AgentMembershipStatus.ACTIVE) ??
+    memberships[0] ??
+    null
+  );
+}
+
+// Serializes concurrent submissions so they can't both pass the check.
+export async function lockRegistration(
+  personId: number,
+  manager: EntityManager,
+): Promise<void> {
+  await manager.query(
+    "SELECT pg_advisory_xact_lock(hashtext('agent-register'), $1)",
+    [personId],
+  );
+}
+
+async function assertNotRegistered(
+  personId: number,
+  manager: EntityManager,
+): Promise<void> {
+  await lockRegistration(personId, manager);
+  const membership = await findRegistrationMembership(personId, manager);
+  if (membership) {
+    throw new AgentAlreadyRegisteredError(
+      membership.agentId,
+      membership.status,
+    );
+  }
+}
+
+async function assertNoAddressConflict(
+  { addressStreet, addressPostcode, confirmSharedAddress }: ApiAgentRegisterNew,
+  manager: EntityManager,
+): Promise<void> {
   if (confirmSharedAddress || !addressStreet || !addressPostcode) {
     return;
   }
-  const agents = await dataSource.getRepository(Agent).find({
+  const agents = await manager.getRepository(Agent).find({
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
   const match = getAgentByAddress(agents, addressStreet, addressPostcode);
@@ -119,12 +174,12 @@ export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
-  await assertNoAddressConflict(input);
-
   let result!: RegisterAgentResult;
 
   try {
     await dataSource.manager.transaction(async (manager) => {
+      await assertNotRegistered(personId, manager);
+      await assertNoAddressConflict(input, manager);
       const agent = await createBareAgent(input, manager);
 
       await manager.getRepository(AgentPerson).save(
@@ -163,12 +218,11 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
-  await assertNoAddressConflict(input);
-
   let agentId!: number;
 
   try {
     await dataSource.manager.transaction(async (manager) => {
+      await assertNoAddressConflict(input, manager);
       const agent = await createBareAgent(input, manager, true);
       agentId = agent.id;
     });
@@ -261,19 +315,15 @@ export async function joinAgent(
   agentId: number,
   status: AgentMembershipStatus,
 ): Promise<RegisterAgentResult> {
-  const repo = dataSource.getRepository(AgentPerson);
-  const agentRepo = dataSource.getRepository(Agent);
-
-  const agent = await agentRepo.findOne({ where: { id: agentId } });
-  if (!agent) {
-    throw new NotFoundError(`Agent (id:${agentId}) not found.`);
-  }
-  const existing = await repo.findOne({
-    where: { agentId, personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
-  });
-
-  if (!existing) {
-    await repo.save(
+  await dataSource.manager.transaction(async (manager) => {
+    await assertNotRegistered(personId, manager);
+    const agent = await manager
+      .getRepository(Agent)
+      .findOne({ select: { id: true }, where: { id: agentId } });
+    if (!agent) {
+      throw new NotFoundError(`Agent (id:${agentId}) not found.`);
+    }
+    await manager.getRepository(AgentPerson).save(
       new AgentPerson({
         agentId,
         personId,
@@ -281,9 +331,9 @@ export async function joinAgent(
         status,
       }),
     );
-  }
+  });
 
-  return { agentId, membershipStatus: existing?.status ?? status };
+  return { agentId, membershipStatus: status };
 }
 
 export function classifyRegisterAgentConflict(err: unknown): "title" | null {

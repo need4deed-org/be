@@ -15,6 +15,7 @@ import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { lockRegistration } from "../../../server/utils/data/write-agent-registration";
 import { randomNumericSuffix } from "../../random";
 
 describe("/agent/register", () => {
@@ -193,6 +194,102 @@ describe("/agent/register", () => {
         url: `/agent/register/status?token=${token}`,
       });
       expect(res.statusCode).toBe(401);
+    }
+  });
+
+  it("reports the ACTIVE membership over an older PENDING one", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const pendingAgent = await makeAgent();
+    const activeAgent = await makeAgent();
+    await fastify.db.agentPersonRepository.save([
+      new AgentPerson({
+        agentId: pendingAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.PENDING,
+      }),
+      new AgentPerson({
+        agentId: activeAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    ]);
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(res.json().data).toEqual({
+      registered: true,
+      agentId: activeAgent.id,
+      agentTitle: activeAgent.title,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
+  it("waits for a concurrent registration of the same person, then 409s", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const agent = await makeAgent();
+    const title = `Race NGO ${randomNumericSuffix()}`;
+    const runner = dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await lockRegistration(person.id, runner.manager);
+      let settled = false;
+      const pending = fastify
+        .inject({
+          method: "POST",
+          url: `/agent/register?token=${token}`,
+          payload: { agent: { title } },
+        })
+        .then((res) => {
+          settled = true;
+          return res;
+        });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(settled).toBe(false);
+
+      await runner.manager.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: person.id,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        }),
+      );
+      await runner.commitTransaction();
+
+      const res = await pending;
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        conflict: "registered",
+        agentId: agent.id,
+        membershipStatus: AgentMembershipStatus.ACTIVE,
+      });
+      expect(await fastify.db.agentRepository.findOneBy({ title })).toBeNull();
+    } finally {
+      if (runner.isTransactionActive) {
+        await runner.rollbackTransaction();
+      }
+      await runner.release();
+    }
+  });
+
+  it("500s with no membership leak when the registrant has no linked person", async () => {
+    const { token, user } = await makeRegistrant("example.org");
+    await fastify.db.userRepository.update(user.id, {
+      personId: null as unknown as number,
+    });
+    for (const request of [
+      { url: `/agent/register/status?token=${token}` },
+      {
+        method: "POST" as const,
+        url: `/agent/register?token=${token}`,
+        payload: { agent: { title: `No Person ${randomNumericSuffix()}` } },
+      },
+    ]) {
+      const res = await fastify.inject(request);
+      expect(res.statusCode).toBe(500);
+      expect(res.json().message).toBe("Account is missing a person record.");
     }
   });
 
