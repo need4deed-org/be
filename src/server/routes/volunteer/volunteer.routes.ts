@@ -8,7 +8,7 @@ import {
   UserRole,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import { FindOptionsOrder, FindOptionsWhere, In } from "typeorm";
+import { FindOptionsOrder, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -61,7 +61,14 @@ import {
   updateOptionList,
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
-import { resolveCallerMask } from "../../utils/pii/pre-serialization";
+import {
+  resetCallerMask,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
+import {
+  assertVolunteerVisible,
+  resolveVolunteerVisibility,
+} from "../../utils/pii/volunteer-visibility";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -105,6 +112,12 @@ export default async function volunteerRoutes(
       : [...listRelationsCommon, ...listRelationsCardExtra];
 
   fastify.addHook("onRequest", fastify.authenticate());
+  fastify.addHook("preHandler", async (request) => {
+    const { id } = (request.params ?? {}) as { id?: string };
+    if (id !== undefined && Number.isInteger(Number(id))) {
+      await assertVolunteerVisible(request, Number(id));
+    }
+  });
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
@@ -165,25 +178,19 @@ export default async function volunteerRoutes(
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
-      try {
-        const data = await fetchVolunteerById(
-          id,
-          isoCode,
-          relations,
-          await resolveCallerMask(request),
-        );
-        if (!data) {
-          logger.error(`Failed fetching volunteer (id=${id}).`);
-          throw new Error(`Volunteer (id=${id}) not found after patch.`);
-        }
-        return reply.status(200).send({
-          message: `Volunteer (id=${id}).`,
-          data,
-        });
-      } catch (error) {
-        logger.error(`Error fetching volunteer id=${id}: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
+      const data = await fetchVolunteerById(
+        id,
+        isoCode,
+        relations,
+        await resolveCallerMask(request),
+      );
+      if (!data) {
+        throw new NotFoundError(`Volunteer (id:${id}) not found.`);
       }
+      return reply.status(200).send({
+        message: `Volunteer (id=${id}).`,
+        data,
+      });
     },
   );
 
@@ -226,11 +233,8 @@ export default async function volunteerRoutes(
       );
       const [skip, take] = getSkipTake({ page, limit });
 
-      const visibility = await resolveCallerMask(request);
-      const where = getVolunteerWhere(
-        filter,
-        visibility,
-      ) as FindOptionsWhere<Volunteer>;
+      const visibility = await resolveVolunteerVisibility(request);
+      const where = getVolunteerWhere(filter, visibility);
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };
@@ -350,6 +354,23 @@ export default async function volunteerRoutes(
           ),
         ) as typeof patchedVolunteerData;
         volunteerData = Object.keys(filtered).length ? filtered : undefined;
+      }
+
+      const { ownerAgentId } = request.body;
+      if (
+        ownerAgentId !== undefined &&
+        ownerAgentId !== volunteer.ownerAgentId
+      ) {
+        if (role !== UserRole.ADMIN) {
+          throw new UnauthorizedError();
+        }
+        if (
+          ownerAgentId !== null &&
+          !(await fastify.db.agentRepository.existsBy({ id: ownerAgentId }))
+        ) {
+          throw new BadRequestError(`Agent (id:${ownerAgentId}) not found.`);
+        }
+        volunteerData = { ...volunteerData, ownerAgentId };
       }
 
       const personData = patchedPersonData
@@ -558,6 +579,7 @@ export default async function volunteerRoutes(
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+      resetCallerMask(request);
 
       try {
         const data = await fetchVolunteerById(

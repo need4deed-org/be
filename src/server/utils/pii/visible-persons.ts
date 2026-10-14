@@ -15,6 +15,7 @@ export interface CallerVisibility {
   opportunityIds: Set<number>;
   agentIds: Set<number>;
   matchedAgentIds: Set<number>;
+  ownerAgentIds: Set<number>;
 }
 
 export const VISIBLE_MATCH_STATUSES = [
@@ -33,8 +34,15 @@ export async function resolveCallerVisibility(
     opportunityIds: new Set<number>(),
     agentIds: new Set<number>(),
     matchedAgentIds: new Set<number>(),
+    ownerAgentIds: new Set<number>(),
   };
-  const { personIds, opportunityIds, agentIds, matchedAgentIds } = visibility;
+  const {
+    personIds,
+    opportunityIds,
+    agentIds,
+    matchedAgentIds,
+    ownerAgentIds,
+  } = visibility;
   const personId = user.personId ?? undefined;
 
   if (user.role === UserRole.USER || !personId) {
@@ -80,17 +88,33 @@ export async function resolveCallerVisibility(
   });
   members.forEach((m) => personIds.add(m.personId));
 
+  agentIds.forEach((id) => ownerAgentIds.add(id));
+
   const rows: { id: number; person_id: number | null }[] =
     await agentPersonRepository.manager.query(
       `SELECT o.id, v.person_id
          FROM opportunity o
          LEFT JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
          LEFT JOIN volunteer v ON v.id = ov.volunteer_id
+          AND (v.owner_agent_id IS NULL
+               OR v.owner_agent_id = ANY($1)
+               OR ov.status = ANY($2))
         WHERE o.agent_id = ANY($1)`,
-      [[...agentIds]],
+      [[...agentIds], VISIBLE_MATCH_STATUSES],
     );
   rows.forEach((r) => {
     opportunityIds.add(Number(r.id));
+    if (r.person_id !== null) {
+      personIds.add(Number(r.person_id));
+    }
+  });
+
+  const owned: { person_id: number | null }[] =
+    await agentPersonRepository.manager.query(
+      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)`,
+      [[...agentIds]],
+    );
+  owned.forEach((r) => {
     if (r.person_id !== null) {
       personIds.add(Number(r.person_id));
     }

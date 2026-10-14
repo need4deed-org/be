@@ -19,6 +19,9 @@
         "avatarUrl": {
           "type": ["string", "null"]
         },
+        "ownerAgentId": {
+          "type": ["integer", "null"]
+        },
         "statusEngagement": {
           "$ref": "VolunteerStateEngagementType#"
         },

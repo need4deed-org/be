@@ -1,4 +1,5 @@
-import { ILike, In, Raw } from "typeorm";
+import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
@@ -25,10 +26,47 @@ function getPersonSearchBranches(search: string): Record<string, unknown>[] {
   return branches;
 }
 
+const NO_OWNER = "none";
+
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
-) {
+): FindOptionsWhere<Volunteer> {
+  const where = getVolunteerFilterWhere(filter, visibility);
+  const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
+  const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
+  const requestsNoOwner = requested?.includes(NO_OWNER) ?? false;
+
+  return {
+    ...where,
+    ...(requested
+      ? {
+          ownerAgentId: Raw(
+            (column) =>
+              `(${requestsNoOwner ? `${column} IS NULL OR ` : ""}${column} = ANY(:requestedOwners))`,
+            { requestedOwners: requestedIds },
+          ),
+        }
+      : {}),
+    ...(visibility
+      ? {
+          id: Raw(
+            (column) =>
+              `${column} IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
+            {
+              visibleOwners: [...visibility.ownerAgentIds],
+              visiblePersons: [...visibility.personIds],
+            },
+          ),
+        }
+      : {}),
+  };
+}
+
+export function getVolunteerFilterWhere(
+  filter: QuerystringVolunteerFiltering["filter"],
+  visibility: CallerVisibility | null,
+): FindOptionsWhere<Volunteer> {
   const personScope = visibility
     ? { id: In(visibility.personIds.size ? [...visibility.personIds] : [-1]) }
     : {};
@@ -74,5 +112,5 @@ export function getVolunteerWhere(
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),
-  };
+  } as FindOptionsWhere<Volunteer>;
 }

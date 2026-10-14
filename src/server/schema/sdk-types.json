@@ -1509,6 +1509,9 @@
         "organizationId": {
           "type": "number",
           "minimum": 1
+        },
+        "sharesVolunteers": {
+          "type": "boolean"
         }
       }
     },
@@ -1531,6 +1534,9 @@
             },
             "operator": {
               "type": "string"
+            },
+            "sharesVolunteers": {
+              "type": "boolean"
             },
             "representative": {
               "$ref": "AgentRepresentative#"

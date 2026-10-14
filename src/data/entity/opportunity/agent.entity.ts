@@ -155,4 +155,7 @@ export default class Agent {
 
   @Column({ default: false })
   unclaimed: boolean;
+
+  @Column({ default: false })
+  sharesVolunteers: boolean;
 }

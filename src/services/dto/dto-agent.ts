@@ -99,6 +99,7 @@ export function dtoAgentGet(
     ...dtoAgentGetList(agent, districtCentroid),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
+    sharesVolunteers: agent.sharesVolunteers ?? false,
     operator: agent?.organization?.title,
     representative: {
       ...dtoSerializePerson(agent?.representative?.person),
