@@ -39,9 +39,7 @@ describe("TypeORM Sanity Check", () => {
   it("should have a DB table for every registered entity", async () => {
     const ds = fastify.db.userRepository.manager.connection;
     for (const metadata of ds.entityMetadatas) {
-      if (metadata.tableType === "view") {
-        continue;
-      }
+      if (metadata.tableType === "view") {continue;}
       const result: { exists: string }[] = await ds.query(
         `SELECT EXISTS (
           SELECT FROM information_schema.tables

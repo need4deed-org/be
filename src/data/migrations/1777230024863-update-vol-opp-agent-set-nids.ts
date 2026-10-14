@@ -1984,9 +1984,7 @@ UPDATE public.agent SET nid = '929' WHERE id = 486;
 UPDATE public.agent SET nid = '931' WHERE id = 487;
 `;
 
-export class UpdateVolOppAgentSetNids1777230024863
-  implements MigrationInterface
-{
+export class UpdateVolOppAgentSetNids1777230024863 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(volunteerNids);
     await queryRunner.query(opportunityNids);

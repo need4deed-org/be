@@ -5,6 +5,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+
 import Postcode from "../location/postcode.entity";
 import Agent from "../opportunity/agent.entity";
 

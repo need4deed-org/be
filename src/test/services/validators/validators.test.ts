@@ -87,19 +87,13 @@ describe("IsPostcodeConstraint", () => {
 
   describe("multi-city allowed areas", () => {
     it("accepts postcodes valid in any of the listed cities", () => {
-      const args = makeArgs(Country.DE, [
-        GermanCity.BERLIN,
-        GermanCity.POTSDAM,
-      ]);
+      const args = makeArgs(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM]);
       expect(constraint.validate("10115", args)).toBe(true);
       expect(constraint.validate("14467", args)).toBe(true);
     });
 
     it("rejects postcodes valid in neither listed city", () => {
-      const args = makeArgs(Country.DE, [
-        GermanCity.BERLIN,
-        GermanCity.POTSDAM,
-      ]);
+      const args = makeArgs(Country.DE, [GermanCity.BERLIN, GermanCity.POTSDAM]);
       expect(constraint.validate("80331", args)).toBe(false);
     });
   });
