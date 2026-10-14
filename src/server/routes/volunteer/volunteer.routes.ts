@@ -27,6 +27,7 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { DealType } from "../../../data/types";
 import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerListSerializer } from "../../../services";
@@ -50,6 +51,7 @@ import {
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
+  findAvailabilityDealIds,
   getLanguageCode,
   getOrCreateTimeslot,
   getSkipTake,
@@ -234,7 +236,11 @@ export default async function volunteerRoutes(
       const [skip, take] = getSkipTake({ page, limit });
 
       const visibility = await resolveVolunteerVisibility(request);
-      const where = getVolunteerWhere(filter, visibility);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+        await findAvailabilityDealIds(filter?.availability, DealType.VOLUNTEER),
+      );
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };

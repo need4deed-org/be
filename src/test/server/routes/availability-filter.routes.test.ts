@@ -24,7 +24,7 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type Key = "mondayMorning" | "fridayEvening" | "weekends";
+type Key = "mondayMorning" | "fridayEvening" | "weekends" | "mondayOnetime";
 
 const SLOTS: Record<Key, Partial<Timeslot>> = {
   mondayMorning: {
@@ -38,6 +38,7 @@ const SLOTS: Record<Key, Partial<Timeslot>> = {
     end: new Date(2026, 0, 9, 20, 0),
   },
   weekends: { occasional: OccasionalType.WEEKENDS },
+  mondayOnetime: { start: new Date(2026, 0, 12, 18, 0) },
 };
 
 describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
@@ -153,12 +154,20 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   });
 
   const cases: [string, string, Key[]][] = [
-    ["a day", "filter[availability]=days~Monday", ["mondayMorning"]],
-    ["a time", "filter[availability]=times~17-20", ["fridayEvening"]],
+    [
+      "a day",
+      "filter[availability]=days~Monday",
+      ["mondayMorning", "mondayOnetime"],
+    ],
+    [
+      "a time",
+      "filter[availability]=times~17-20",
+      ["fridayEvening", "mondayOnetime"],
+    ],
     [
       "a day and a time together",
       "filter[availability]=days~Monday&filter[availability]=times~17-20",
-      [],
+      ["mondayOnetime"],
     ],
     ["occasional", "filter[availability]=occasional~weekends", ["weekends"]],
     [
@@ -169,14 +178,15 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
     [
       "a day covered by occasional with a time",
       "filter[availability]=days~Saturday&filter[availability]=times~08-11",
-      [],
+      ["weekends"],
     ],
     [
       "an empty value",
       "filter[availability]=",
-      ["mondayMorning", "fridayEvening", "weekends"],
+      ["mondayMorning", "fridayEvening", "weekends", "mondayOnetime"],
     ],
-    ["an unknown value", "filter[availability]=days~Someday", []],
+    ["an unknown day", "filter[availability]=days~Someday", []],
+    ["a time outside the time slots", "filter[availability]=times~09-12", []],
     ["the wrong separator", "filter[availability]=days|Monday", []],
   ];
 
@@ -191,7 +201,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
 
   it.each(cases)("filters opportunities by %s", async (_, query, expected) => {
     const res = await get(
-      `/opportunity?limit=100&filter[search]=${suffix}&${query.replaceAll("filter[availability]=", "filter[availability][]=")}`,
+      `/opportunity?limit=100&filter[search]=${suffix}&${query}`,
     );
     expect(res.statusCode).toBe(200);
     const ids = (res.json().data as { id: number }[])

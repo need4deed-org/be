@@ -68,7 +68,12 @@ export const opportunityListQuerySchema = {
       properties: {
         language: { type: "array", items: { type: "string" } },
         district: { type: "array", items: { type: "string" } },
-        availability: { type: "array", items: { type: "string" } },
+        availability: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         type: {
           type: "array",
           items: getRef("OpportunityType#"),

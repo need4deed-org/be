@@ -1,3 +1,4 @@
+export * from "./by-day-code";
 export * from "./fetch-json";
 export * from "./get-district";
 export * from "./get-opportunity-representative-person";

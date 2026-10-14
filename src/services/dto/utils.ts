@@ -10,6 +10,7 @@ import {
 } from "need4deed-sdk";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
+import { ByDayCode } from "../../data/utils/by-day-code";
 
 export function getAvailability(
   dealTimeslot: DealTimeslot[],
@@ -58,7 +59,7 @@ export function getByDay(rrule: string): ByDay | null {
   if (!(byDay in ByDay)) {
     throw new Error("RRule BYDAY value is not recognized");
   }
-  return ByDay[byDay as keyof typeof ByDay];
+  return ByDay[byDay as ByDayCode];
 }
 
 export function getTimeSlotForDaytime(start: Date, end: Date): TimeSlot {

@@ -1,19 +1,22 @@
-import { ByDay, OccasionalType } from "need4deed-sdk";
+import { ByDay, OccasionalType, TimeSlot } from "need4deed-sdk";
 import { Raw } from "typeorm";
+import { dataSource } from "../../../data/data-source";
+import { DealType } from "../../../data/types";
+import { ByDayCode, getByDayCode } from "../../../data/utils/by-day-code";
 
 const SEPARATOR = "~";
-const BY_DAY_CODE = new Map(
-  Object.entries(ByDay).map(([code, name]) => [name as string, code]),
-);
-const WEEKEND_CODES = new Set(["SA", "SU"]);
-const TIME_RANGE = /^\d{2}-\d{2}$/;
+const ISO_DAY_CODES = Object.keys(ByDay) as ByDayCode[];
+const WEEKEND_CODES = new Set<ByDayCode>(["SA", "SU"]);
+const TIME_SLOTS = new Set<string>(Object.values(TimeSlot));
 const OCCASIONAL = new Set<string>(Object.values(OccasionalType));
 
 export type AvailabilityFilter = {
-  days: string[];
+  days: ByDayCode[];
   times: string[];
   occasional: string[];
 };
+
+type Params = Record<string, unknown>;
 
 export function parseAvailabilityFilter(
   input: string | string[] | undefined,
@@ -25,9 +28,10 @@ export function parseAvailabilityFilter(
   const filter: AvailabilityFilter = { days: [], times: [], occasional: [] };
   for (const value of values) {
     const [group, item] = value.split(SEPARATOR);
-    if (group === "days" && BY_DAY_CODE.has(item)) {
-      filter.days.push(BY_DAY_CODE.get(item) as string);
-    } else if (group === "times" && TIME_RANGE.test(item)) {
+    const dayCode = group === "days" ? getByDayCode(item) : null;
+    if (dayCode) {
+      filter.days.push(dayCode);
+    } else if (group === "times" && TIME_SLOTS.has(item)) {
       filter.times.push(item);
     } else if (group === "occasional" && OCCASIONAL.has(item)) {
       filter.occasional.push(item);
@@ -36,55 +40,94 @@ export function parseAvailabilityFilter(
   return filter;
 }
 
-function occasionalCoveringDays(days: string[]): string[] {
-  const covering = new Set<string>();
-  for (const code of days) {
-    covering.add(
-      WEEKEND_CODES.has(code)
-        ? OccasionalType.WEEKENDS
-        : OccasionalType.WEEKDAYS,
-    );
-  }
-  return [...covering];
+function occasionalCoveringDays(days: ByDayCode[]): OccasionalType[] {
+  return [
+    ...new Set(
+      days.map((code) =>
+        WEEKEND_CODES.has(code)
+          ? OccasionalType.WEEKENDS
+          : OccasionalType.WEEKDAYS,
+      ),
+    ),
+  ];
 }
 
-export function dealIdMatchingAvailability({
+function getAvailabilityCondition({
   days,
   times,
   occasional,
-}: AvailabilityFilter) {
+}: AvailabilityFilter): [string, Params] {
   const branches: string[] = [];
-  const params: Record<string, unknown> = {};
+  const params: Params = {};
   if (days.length || times.length) {
-    const conditions = ["t.rrule IS NOT NULL"];
+    const recurring = ["t.rrule IS NOT NULL"];
+    const onetime = [
+      "t.rrule IS NULL",
+      "t.occasional IS NULL",
+      "t.start IS NOT NULL",
+    ];
     if (days.length) {
-      conditions.push(`t.rrule ~ :availabilityDayPattern`);
-      params.availabilityDayPattern = `BYDAY=([^;,]*,)*[+-]?[0-9]*(${days.join("|")})(,|;|$)`;
+      recurring.push("t.rrule ~ :availabilityDayPattern");
+      params.availabilityDayPattern = `BYDAY=(${days.join("|")})(;|$)`;
+      onetime.push("EXTRACT(ISODOW FROM t.start) IN (:...availabilityIsoDays)");
+      params.availabilityIsoDays = days.map(
+        (code) => ISO_DAY_CODES.indexOf(code) + 1,
+      );
     }
     if (times.length) {
-      conditions.push(
+      recurring.push(
         `to_char(t.start, 'HH24') || '-' || to_char(t."end", 'HH24') IN (:...availabilityTimes)`,
       );
       params.availabilityTimes = times;
+      onetime.push(
+        `(${times
+          .map((time, i) => {
+            const [from, to] = time.split("-").map(Number);
+            params[`availabilityFrom${i}`] = from;
+            params[`availabilityTo${i}`] = to;
+            return `(EXTRACT(HOUR FROM t.start) >= :availabilityFrom${i} AND EXTRACT(HOUR FROM t.start) < :availabilityTo${i})`;
+          })
+          .join(" OR ")})`,
+      );
     }
-    branches.push(conditions.join(" AND "));
+    branches.push(recurring.join(" AND "), onetime.join(" AND "));
   }
   const occasionalTypes = [
-    ...new Set([
-      ...occasional,
-      ...(times.length ? [] : occasionalCoveringDays(days)),
-    ]),
+    ...new Set([...occasional, ...occasionalCoveringDays(days)]),
   ];
   if (occasionalTypes.length) {
-    branches.push(`t.occasional::text IN (:...availabilityOccasional)`);
+    branches.push("t.occasional::text IN (:...availabilityOccasional)");
     params.availabilityOccasional = occasionalTypes;
   }
-  const where = branches.length
-    ? branches.map((b) => `(${b})`).join(" OR ")
-    : "FALSE";
-  return Raw(
-    (column) =>
-      `${column} IN (SELECT dt.deal_id FROM deal_timeslot dt JOIN timeslot t ON t.id = dt.timeslot_id WHERE ${where})`,
+  return [
+    branches.length ? branches.map((b) => `(${b})`).join(" OR ") : "FALSE",
     params,
-  );
+  ];
+}
+
+export async function findAvailabilityDealIds(
+  input: string | string[] | undefined,
+  dealType: DealType,
+): Promise<number[] | null> {
+  const filter = parseAvailabilityFilter(input);
+  if (!filter) {
+    return null;
+  }
+  const [condition, params] = getAvailabilityCondition(filter);
+  const rows: { dealId: number }[] = await dataSource
+    .createQueryBuilder()
+    .select("DISTINCT dt.deal_id", "dealId")
+    .from("deal_timeslot", "dt")
+    .innerJoin("timeslot", "t", "t.id = dt.timeslot_id")
+    .innerJoin("deal", "d", "d.id = dt.deal_id")
+    .where("d.type = :availabilityDealType", { availabilityDealType: dealType })
+    .andWhere(`(${condition})`, params)
+    .getRawMany();
+  return rows.map(({ dealId }) => dealId);
+}
+
+export function dealIdIn(dealIds: number[]) {
+  return Raw((column) => `${column} = ANY(:availabilityDealIds)`, {
+    availabilityDealIds: dealIds,
+  });
 }
