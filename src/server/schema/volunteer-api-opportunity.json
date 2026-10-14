@@ -39,6 +39,9 @@
           "items": {
             "$ref": "ApiAvailability#"
           }
+        },
+        "postcode": {
+          "type": ["string", "null"]
         }
       },
       "required": [
@@ -50,7 +53,8 @@
         "languages",
         "activities",
         "location",
-        "availability"
+        "availability",
+        "postcode"
       ],
       "additionalProperties": false
     }

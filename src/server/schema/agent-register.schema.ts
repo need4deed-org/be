@@ -57,6 +57,7 @@ const agentCreateBaseSchema = {
       items: { type: "integer", minimum: 1 },
     },
     confirmSharedAddress: { type: "boolean" },
+    organizationId: { type: "integer", minimum: 1 },
   },
 };
 

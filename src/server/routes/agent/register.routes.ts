@@ -9,6 +9,7 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   ApiAgentRegister,
+  ApiOrganizationGetList,
   UserRole,
 } from "need4deed-sdk";
 import {
@@ -27,7 +28,9 @@ import {
   registerSearchQuerySchema,
   registerSearchResponseSchema,
   responseErrors,
+  responseSchema,
 } from "../../schema";
+import { ReplyData } from "../../types";
 import {
   createAgentForPerson,
   findRegistrationMembership,
@@ -37,6 +40,7 @@ import {
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
+import { listOrganizations } from "../../utils/data/list-organizations";
 
 async function authByVerifyToken(
   fastify: FastifyInstance,
@@ -103,6 +107,30 @@ export default async function agentRegisterRoutes(
         data: dtoAgentRegisterStatus(membership),
       });
     },
+  );
+
+  fastify.get<{
+    Querystring: { token: string };
+    Reply: ReplyData<ApiOrganizationGetList[]>;
+  }>(
+    "/organizations",
+    {
+      config: {
+        public: true,
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      } as FastifyContextConfig,
+      schema: {
+        querystring: registerAgentQuerySchema,
+        response: responseSchema("ApiOrganizationGetList#", true, false),
+      },
+      preHandler: (request, reply) =>
+        authByVerifyToken(fastify, request, reply),
+    },
+    async (_request, reply) =>
+      reply.status(200).send({
+        message: "Organizations found.",
+        data: await listOrganizations(fastify),
+      }),
   );
 
   fastify.get<{

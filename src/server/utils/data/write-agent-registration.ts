@@ -7,7 +7,7 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { DataSource, EntityManager, In } from "typeorm";
-import { BaseError, NotFoundError } from "../../../config";
+import { BadRequestError, BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
@@ -140,6 +140,7 @@ async function createBareAgent(
 
   const newAgent = new Agent({
     title: input.title,
+    organizationId: input.organizationId,
     agentTypeId: input.typeId ?? undefined,
     info: input.info ?? undefined,
     website: input.website ?? undefined,
@@ -213,13 +214,7 @@ export async function createAgentForPerson(
       };
     });
   } catch (err) {
-    if (classifyRegisterAgentConflict(err) === "title") {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      throw new AgentTitleConflictError(existing?.id);
-    }
-    throw err;
+    throw await toRegisterAgentError(err, input);
   }
 
   return result;
@@ -238,13 +233,7 @@ export async function createAgent(
       agentId = agent.id;
     });
   } catch (err) {
-    if (classifyRegisterAgentConflict(err) === "title") {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      throw new AgentTitleConflictError(existing?.id);
-    }
-    throw err;
+    throw await toRegisterAgentError(err, input);
   }
 
   return { agentId };
@@ -352,10 +341,38 @@ export async function joinAgent(
   return { agentId, membershipStatus: status };
 }
 
-export function classifyRegisterAgentConflict(err: unknown): "title" | null {
+async function toRegisterAgentError(
+  err: unknown,
+  input: ApiAgentRegisterNew,
+): Promise<unknown> {
+  switch (classifyRegisterAgentConflict(err)) {
+    case "title": {
+      const existing = await dataSource
+        .getRepository(Agent)
+        .findOne({ where: { title: input.title } });
+      return new AgentTitleConflictError(existing?.id);
+    }
+    case "organization":
+      return new BadRequestError(
+        `Organization (id:${input.organizationId}) not found.`,
+      );
+    default:
+      return err;
+  }
+}
+
+export function classifyRegisterAgentConflict(
+  err: unknown,
+): "title" | "organization" | null {
   const e = err as { code?: string; detail?: string };
-  if (e?.code !== "23505" || !e.detail) {
+  if (!e?.detail) {
     return null;
   }
-  return e.detail.includes("title") ? "title" : null;
+  if (e.code === "23505" && e.detail.includes("title")) {
+    return "title";
+  }
+  if (e.code === "23503" && e.detail.includes("organization_id")) {
+    return "organization";
+  }
+  return null;
 }

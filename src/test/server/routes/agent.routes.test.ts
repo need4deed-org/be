@@ -830,6 +830,14 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
     expect(find(geocodedAgent.id)).toMatchObject({
       lat: DISTRICT_LAT,
       lon: DISTRICT_LON,
+      postcode: null,
+    });
+  });
+
+  it("lists the agent's postcode for a caller who can see it", async () => {
+    const find = await getList(UserRole.COORDINATOR);
+    expect(find(geocodedAgent.id)).toMatchObject({
+      postcode: agentPostcode.value,
     });
   });
 
@@ -846,6 +854,8 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
     expect(coordinator.json().data).toMatchObject({
       lat: AGENT_LAT,
       lon: AGENT_LON,
+      postcode: agentPostcode.value,
+      agentDetails: { addressPostcode: agentPostcode.value },
     });
 
     const user = await get(UserRole.USER);
@@ -853,6 +863,8 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
     expect(user.json().data).toMatchObject({
       lat: DISTRICT_LAT,
       lon: DISTRICT_LON,
+      postcode: null,
+      agentDetails: { addressPostcode: null },
     });
   });
 });

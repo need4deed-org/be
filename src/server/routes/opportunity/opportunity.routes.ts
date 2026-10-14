@@ -377,6 +377,7 @@ export default async function opportunityRoutes(
         "deal.dealLanguage.language",
         "deal.dealTimeslot.timeslot",
         "deal.dealDistrict.district",
+        "deal.postcode",
         "agent",
         "agent.address.postcode",
         "accompanying",

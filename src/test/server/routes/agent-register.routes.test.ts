@@ -522,6 +522,77 @@ describe("/agent/register", () => {
     }
   });
 
+  it("lists operators for a registrant with a verify token", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/organizations?token=${token}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    expect(res.json().data).toContainEqual(
+      expect.objectContaining({
+        id: organization.id,
+        title: organization.title,
+      }),
+    );
+    expect(
+      (
+        await fastify.inject({
+          method: "GET",
+          url: "/agent/register/organizations?token=invalid",
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
+  it("stores the chosen operator (Träger) on the new agent", async () => {
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: organization.id,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const agentId = res.json().data.agentId;
+    createdAgentIds.push(agentId);
+    const agent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agentId,
+    });
+    expect(agent.organizationId).toBe(organization.id);
+  });
+
+  it("400s an unknown operator", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: 999999999,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it("409s creating an agent whose title is already taken", async () => {
     const existing = await makeAgent();
     const { token } = await makeRegistrant("test.need4deed.org");

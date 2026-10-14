@@ -23,18 +23,26 @@ export const VISIBLE_MATCH_STATUSES = [
   OpportunityVolunteerStatusType.ACTIVE,
 ];
 
-export async function resolveCallerVisibility(
-  request: FastifyRequest,
-  user: User,
-): Promise<CallerVisibility> {
-  const visibility: CallerVisibility = {
-    userId: user.id,
-    role: user.role,
+export function anonymousVisibility(): CallerVisibility {
+  return {
+    userId: 0,
+    role: UserRole.USER,
     personIds: new Set<number>(),
     opportunityIds: new Set<number>(),
     agentIds: new Set<number>(),
     matchedAgentIds: new Set<number>(),
     ownerAgentIds: new Set<number>(),
+  };
+}
+
+export async function resolveCallerVisibility(
+  request: FastifyRequest,
+  user: User,
+): Promise<CallerVisibility> {
+  const visibility: CallerVisibility = {
+    ...anonymousVisibility(),
+    userId: user.id,
+    role: user.role,
   };
   const {
     personIds,

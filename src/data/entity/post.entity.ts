@@ -54,6 +54,14 @@ export default class Post {
   })
   taggedPersons: Person[];
 
+  @ManyToMany(() => Agent)
+  @JoinTable({
+    name: "post_agent",
+    joinColumn: { name: "post_id" },
+    inverseJoinColumn: { name: "agent_id" },
+  })
+  taggedAgents: Agent[];
+
   @ManyToMany(() => Opportunity)
   @JoinTable({
     name: "post_opportunity",

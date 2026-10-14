@@ -60,6 +60,10 @@ import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
+  attachTaggedAgents,
+  findTaggedAgents,
+} from "../utils/data/tagged-agents";
+import {
   requestLanguage,
   translateOpportunities,
 } from "../utils/data/translate-opportunities";
@@ -196,6 +200,7 @@ export default async function postRoutes(
       await Promise.all([
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
+        attachTaggedAgents(fastify, orderedPosts),
       ]);
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
@@ -230,16 +235,18 @@ export default async function postRoutes(
 
       const agentPerson = await getAgentPersonRepresentative(personId);
 
-      const [taggedPersons, linkedOpportunities] = await Promise.all([
-        taggedPersonIds.length
-          ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
-          : [],
-        linkedOpportunityIds.length
-          ? fastify.db.opportunityRepository.findBy({
-              id: In(linkedOpportunityIds),
-            })
-          : [],
-      ]);
+      const [taggedPersons, linkedOpportunities, taggedAgents] =
+        await Promise.all([
+          taggedPersonIds.length
+            ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
+            : [],
+          linkedOpportunityIds.length
+            ? fastify.db.opportunityRepository.findBy({
+                id: In(linkedOpportunityIds),
+              })
+            : [],
+          findTaggedAgents(fastify, text),
+        ]);
 
       validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
       validateRelationIds(
@@ -253,6 +260,7 @@ export default async function postRoutes(
         authorId: personId,
         agentId: agentPerson?.agentId ?? null,
         taggedPersons,
+        taggedAgents,
         linkedOpportunities,
       });
 
@@ -273,7 +281,10 @@ export default async function postRoutes(
         request.authUser!.id,
         full.author,
       );
-      await translateLinkedOpportunities(fastify, [full], request.query);
+      await Promise.all([
+        attachTaggedAgents(fastify, [full]),
+        translateLinkedOpportunities(fastify, [full], request.query),
+      ]);
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -322,8 +333,9 @@ export default async function postRoutes(
       const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
       const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
 
-      if (text !== null && text !== undefined) {
+      if (text !== null && text !== undefined && text !== post.text) {
         post.text = text;
+        post.taggedAgents = await findTaggedAgents(fastify, text);
       }
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
         const found = taggedPersonIds.length
@@ -349,6 +361,7 @@ export default async function postRoutes(
         fastify.db.postRepository.count({ where: { rootId: updated.id } }),
         attachReactionData(fastify, [updated], request.authUser?.personId),
         attachBookmarkData(fastify, [updated], request.authUser?.personId),
+        attachTaggedAgents(fastify, [updated]),
       ]);
       updated.replyCount = replyCount;
 

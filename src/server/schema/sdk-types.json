@@ -1081,6 +1081,7 @@
         "lon": {
           "type": ["number", "null"]
         },
+        "postcode": { "type": ["string", "null"] },
         "originalLanguage": { "$ref": "Lang#" }
       },
       "required": [
@@ -1431,6 +1432,9 @@
         "lon": {
           "type": ["number", "null"]
         },
+        "postcode": {
+          "type": ["string", "null"]
+        },
         "statusEngagement": {
           "$ref": "AgentEngagementStatusType#"
         }
@@ -1452,6 +1456,7 @@
         "unclaimed",
         "lat",
         "lon",
+        "postcode",
         "statusEngagement"
       ]
     },
@@ -1727,6 +1732,15 @@
       },
       "required": ["id", "fullName"]
     },
+    "ApiPostAgent": {
+      "$id": "ApiPostAgent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
     "ApiPostLinkedOpportunity": {
       "$id": "ApiPostLinkedOpportunity",
       "type": "object",
@@ -1748,6 +1762,10 @@
           "type": "array",
           "items": { "$ref": "ApiPostPerson#" }
         },
+        "taggedAgents": {
+          "type": "array",
+          "items": { "$ref": "ApiPostAgent#" }
+        },
         "linkedOpportunities": {
           "type": "array",
           "items": { "$ref": "ApiPostLinkedOpportunity#" }
@@ -1767,6 +1785,7 @@
         "author",
         "agentId",
         "taggedPersons",
+        "taggedAgents",
         "linkedOpportunities",
         "replyCount",
         "reactions",
