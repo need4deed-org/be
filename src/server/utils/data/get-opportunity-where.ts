@@ -16,6 +16,10 @@ import {
   QuerystringOpportunityList,
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
+import {
+  dealIdMatchingAvailability,
+  parseAvailabilityFilter,
+} from "./get-availability-deal-ids";
 import { parseDateOnly } from "./parse-date-only";
 import { escapeLikePattern } from "./person-name-ilike";
 
@@ -153,8 +157,12 @@ export function getOpportunityWhere(
   searchLanguageId?: number,
 ): FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[] {
   const dealFilter = getDealWhere(filter);
+  const availability = parseAvailabilityFilter(filter?.availability);
 
   const base = {
+    ...(availability
+      ? { dealId: dealIdMatchingAvailability(availability) }
+      : {}),
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
     ...(hasFilterValue(filter?.status)
