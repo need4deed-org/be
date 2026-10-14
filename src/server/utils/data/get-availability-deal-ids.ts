@@ -1,11 +1,12 @@
-import { ByDay, OccasionalType, TimeSlot } from "need4deed-sdk";
+import { ByDay, OccasionalType } from "need4deed-sdk";
 import { Raw } from "typeorm";
 
-const SEPARATOR = "|";
+const SEPARATOR = "~";
 const BY_DAY_CODE = new Map(
   Object.entries(ByDay).map(([code, name]) => [name as string, code]),
 );
-const TIME_SLOTS = new Set<string>(Object.values(TimeSlot));
+const WEEKEND_CODES = new Set(["SA", "SU"]);
+const TIME_RANGE = /^\d{2}-\d{2}$/;
 const OCCASIONAL = new Set<string>(Object.values(OccasionalType));
 
 export type AvailabilityFilter = {
@@ -17,20 +18,34 @@ export type AvailabilityFilter = {
 export function parseAvailabilityFilter(
   input: string | string[] | undefined,
 ): AvailabilityFilter | null {
+  const values = [input ?? []].flat();
+  if (!values.length) {
+    return null;
+  }
   const filter: AvailabilityFilter = { days: [], times: [], occasional: [] };
-  for (const value of [input ?? []].flat()) {
+  for (const value of values) {
     const [group, item] = value.split(SEPARATOR);
     if (group === "days" && BY_DAY_CODE.has(item)) {
       filter.days.push(BY_DAY_CODE.get(item) as string);
-    } else if (group === "times" && TIME_SLOTS.has(item)) {
+    } else if (group === "times" && TIME_RANGE.test(item)) {
       filter.times.push(item);
     } else if (group === "occasional" && OCCASIONAL.has(item)) {
       filter.occasional.push(item);
     }
   }
-  const isEmpty =
-    !filter.days.length && !filter.times.length && !filter.occasional.length;
-  return isEmpty ? null : filter;
+  return filter;
+}
+
+function occasionalCoveringDays(days: string[]): string[] {
+  const covering = new Set<string>();
+  for (const code of days) {
+    covering.add(
+      WEEKEND_CODES.has(code)
+        ? OccasionalType.WEEKENDS
+        : OccasionalType.WEEKDAYS,
+    );
+  }
+  return [...covering];
 }
 
 export function dealIdMatchingAvailability({
@@ -39,33 +54,37 @@ export function dealIdMatchingAvailability({
   occasional,
 }: AvailabilityFilter) {
   const branches: string[] = [];
+  const params: Record<string, unknown> = {};
   if (days.length || times.length) {
     const conditions = ["t.rrule IS NOT NULL"];
     if (days.length) {
-      conditions.push(
-        `(${days.map((_, i) => `t.rrule LIKE :availabilityDay${i}`).join(" OR ")})`,
-      );
+      conditions.push(`t.rrule ~ :availabilityDayPattern`);
+      params.availabilityDayPattern = `BYDAY=([^;,]*,)*[+-]?[0-9]*(${days.join("|")})(,|;|$)`;
     }
     if (times.length) {
       conditions.push(
         `to_char(t.start, 'HH24') || '-' || to_char(t."end", 'HH24') IN (:...availabilityTimes)`,
       );
+      params.availabilityTimes = times;
     }
     branches.push(conditions.join(" AND "));
   }
-  if (occasional.length) {
+  const occasionalTypes = [
+    ...new Set([
+      ...occasional,
+      ...(times.length ? [] : occasionalCoveringDays(days)),
+    ]),
+  ];
+  if (occasionalTypes.length) {
     branches.push(`t.occasional::text IN (:...availabilityOccasional)`);
+    params.availabilityOccasional = occasionalTypes;
   }
-  const params: Record<string, unknown> = {
-    ...Object.fromEntries(
-      days.map((code, i) => [`availabilityDay${i}`, `%BYDAY=%${code}%`]),
-    ),
-    ...(times.length ? { availabilityTimes: times } : {}),
-    ...(occasional.length ? { availabilityOccasional: occasional } : {}),
-  };
+  const where = branches.length
+    ? branches.map((b) => `(${b})`).join(" OR ")
+    : "FALSE";
   return Raw(
     (column) =>
-      `${column} IN (SELECT dt.deal_id FROM deal_timeslot dt JOIN timeslot t ON t.id = dt.timeslot_id WHERE ${branches.map((b) => `(${b})`).join(" OR ")})`,
+      `${column} IN (SELECT dt.deal_id FROM deal_timeslot dt JOIN timeslot t ON t.id = dt.timeslot_id WHERE ${where})`,
     params,
   );
 }

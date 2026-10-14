@@ -33,7 +33,7 @@ const SLOTS: Record<Key, Partial<Timeslot>> = {
     end: new Date(2026, 0, 5, 11, 0),
   },
   fridayEvening: {
-    rrule: "FREQ=WEEKLY;BYDAY=FR;",
+    rrule: "FREQ=WEEKLY;BYDAY=FR;WKST=MO",
     start: new Date(2026, 0, 9, 17, 0),
     end: new Date(2026, 0, 9, 20, 0),
   },
@@ -153,14 +153,26 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   });
 
   const cases: [string, string, Key[]][] = [
-    ["a day", "filter[availability]=days|Monday", ["mondayMorning"]],
-    ["a time", "filter[availability]=times|17-20", ["fridayEvening"]],
+    ["a day", "filter[availability]=days~Monday", ["mondayMorning"]],
+    ["a time", "filter[availability]=times~17-20", ["fridayEvening"]],
     [
       "a day and a time together",
-      "filter[availability]=days|Monday&filter[availability]=times|17-20",
+      "filter[availability]=days~Monday&filter[availability]=times~17-20",
       [],
     ],
-    ["occasional", "filter[availability]=occasional|weekends", ["weekends"]],
+    ["occasional", "filter[availability]=occasional~weekends", ["weekends"]],
+    [
+      "a day covered by occasional",
+      "filter[availability]=days~Saturday",
+      ["weekends"],
+    ],
+    [
+      "a day covered by occasional with a time",
+      "filter[availability]=days~Saturday&filter[availability]=times~08-11",
+      [],
+    ],
+    ["an unknown value", "filter[availability]=days~Someday", []],
+    ["the wrong separator", "filter[availability]=days|Monday", []],
   ];
 
   it.each(cases)("filters volunteers by %s", async (_, query, expected) => {
