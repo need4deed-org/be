@@ -148,17 +148,15 @@ describe("GET /opportunity language filter", () => {
       );
 
   it.each([
-    ["language only", ""],
-    ["with district", `&filter[district][]=${0}`],
+    ["language only", () => ""],
+    ["with district", () => `&filter[district][]=${districtId}`],
     [
       "with district and status",
-      `&filter[district][]=${0}&filter[status][]=opp-searching`,
+      () => `&filter[district][]=${districtId}&filter[status][]=opp-searching`,
     ],
-    ["sorted by start date", `&sortBy=start-date`],
+    ["sorted by start date", () => "&sortBy=start-date"],
   ])("returns only opportunities with that language (%s)", async (_, extra) => {
-    const res = await list(
-      `filter[language][]=${englishId}${extra.replaceAll("=0", `=${districtId}`)}`,
-    );
+    const res = await list(`filter[language][]=${englishId}${extra()}`);
     expect(res.statusCode).toBe(200);
     expect(ownIds(res.json().data)).toEqual([opportunities.english.id]);
   });

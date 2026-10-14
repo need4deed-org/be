@@ -97,7 +97,6 @@ import {
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
-import { reloadDealRelations } from "../../utils/data/reload-deal-relations";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
@@ -388,13 +387,13 @@ export default async function opportunityRoutes(
 
       const opportunityRepository = fastify.db.opportunityRepository;
 
-      const [opportunities, count] =
+      const [pageRows, count] =
         request.query.sortBy === OpportunitySortField.START_DATE
           ? await opportunityRepository
               .createQueryBuilder("opportunity")
               .setFindOptions({
                 where,
-                relations: relations.filter((r) => r !== "onetimer"),
+                select: { id: true, createdAt: true },
                 skip,
                 take,
               })
@@ -407,25 +406,25 @@ export default async function opportunityRoutes(
               .getManyAndCount()
           : await opportunityRepository.findAndCount({
               where,
-              relations,
+              select: { id: true, createdAt: true },
               skip,
               take,
               ...(order ? order : {}),
             });
 
-      const filter = request.query.filter;
-      if (
-        [
-          filter?.language,
-          filter?.activity,
-          filter?.skill,
-          filter?.district,
-        ].some((value) =>
-          Array.isArray(value) ? value.length > 0 : Boolean(value),
-        )
-      ) {
-        await reloadDealRelations(opportunities);
-      }
+      // Loaded without the filter: a where on a relation also trims what it loads.
+      const pageIds = pageRows.map(({ id }) => id);
+      const loaded = pageIds.length
+        ? await opportunityRepository.find({
+            where: { id: In(pageIds) },
+            relations,
+            relationLoadStrategy: "query",
+          })
+        : [];
+      const loadedById = new Map(loaded.map((o) => [o.id, o]));
+      const opportunities = pageIds
+        .map((id) => loadedById.get(id))
+        .filter((o): o is Opportunity => o !== undefined);
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();
