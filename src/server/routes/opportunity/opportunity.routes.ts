@@ -100,6 +100,8 @@ import { logEmailCommunication } from "../../utils/data/log-email-communication"
 import { reloadDealRelations } from "../../utils/data/reload-deal-relations";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
+  divertTranslatedEdits,
+  editLanguage,
   languageIdOf,
   queueOpportunityTranslation,
   requestLanguage,
@@ -645,6 +647,7 @@ export default async function opportunityRoutes(
 
   fastify.patch<{
     Params: ParamsId;
+    Querystring: { language?: string };
     Body: ApiOpportunityPatch;
     Reply: null;
   }>(
@@ -652,6 +655,7 @@ export default async function opportunityRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiVolunteerOpportunityPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
@@ -741,6 +745,10 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      const submitted = {
+        title: opportunityObj?.title,
+        info: opportunityObj?.info,
+      };
 
       if (opportunityObj) {
         if (effectiveType === OpportunityType.ACCOMPANYING) {
@@ -802,6 +810,14 @@ export default async function opportunityRoutes(
 
       await dataSource.manager.transaction(async (manager) => {
         if (opportunityObj) {
+          await divertTranslatedEdits(
+            manager,
+            opportunity,
+            opportunityObj,
+            submitted,
+            effectiveType,
+            editLanguage(request.query),
+          );
           const success = await patchEntity(
             Opportunity,
             opportunityObj,
