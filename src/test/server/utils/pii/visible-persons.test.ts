@@ -101,7 +101,7 @@ describe("resolveCallerVisibility", () => {
         { id: 100, person_id: null }, // opportunity with no matched volunteer
         { id: 101, person_id: 9 },
       ]);
-      query.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([{ person_id: 11 }]);
 
       const v = await resolveCallerVisibility(
         request,
@@ -109,8 +109,7 @@ describe("resolveCallerVisibility", () => {
       );
 
       expect(sorted(v.agentIds)).toEqual([42, 43]);
-      // owned volunteers are unmasked via ownerAgentId, not listed here
-      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9]);
+      expect(sorted(v.personIds)).toEqual([1, 2, 8, 9, 11]);
       expect(sorted(v.ownerAgentIds)).toEqual([42, 43]);
       expect(sorted(v.opportunityIds)).toEqual([100, 101]);
       // member lookup scoped to the caller's ACTIVE agent memberships only;
@@ -133,7 +132,7 @@ describe("resolveCallerVisibility", () => {
         { agentId: 42 },
       ] as unknown as Awaited<ReturnType<typeof getActiveAgentMemberships>>);
       find.mockResolvedValueOnce([]);
-      query.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const v = await resolveCallerVisibility(
         request,
@@ -141,7 +140,7 @@ describe("resolveCallerVisibility", () => {
       );
 
       expect(sorted(v.ownerAgentIds)).toEqual([42]);
-      expect(query).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledTimes(2);
     });
 
     it("stops at own person when the AGENT has no memberships", async () => {

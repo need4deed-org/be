@@ -109,5 +109,16 @@ export async function resolveCallerVisibility(
     }
   });
 
+  const owned: { person_id: number | null }[] =
+    await agentPersonRepository.manager.query(
+      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)`,
+      [[...agentIds]],
+    );
+  owned.forEach((r) => {
+    if (r.person_id !== null) {
+      personIds.add(Number(r.person_id));
+    }
+  });
+
   return visibility;
 }

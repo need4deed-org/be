@@ -61,7 +61,10 @@ import {
   updateOptionList,
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
-import { resolveCallerMask } from "../../utils/pii/pre-serialization";
+import {
+  resetCallerMask,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import {
   assertVolunteerVisible,
   resolveVolunteerVisibility,
@@ -576,6 +579,7 @@ export default async function volunteerRoutes(
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
+      resetCallerMask(request);
 
       try {
         const data = await fetchVolunteerById(

@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, Raw } from "typeorm";
+import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -68,16 +68,7 @@ export function getVolunteerFilterWhere(
   visibility: CallerVisibility | null,
 ): FindOptionsWhere<Volunteer> {
   const personScope = visibility
-    ? {
-        id: Raw(
-          (column) =>
-            `(${column} = ANY(:scopePersons) OR ${column} IN (SELECT person_id FROM volunteer WHERE owner_agent_id = ANY(:scopeAgents)))`,
-          {
-            scopePersons: [...visibility.personIds],
-            scopeAgents: [...visibility.agentIds],
-          },
-        ),
-      }
+    ? { id: In(visibility.personIds.size ? [...visibility.personIds] : [-1]) }
     : {};
 
   const dealFilter: Record<string, unknown> = {};

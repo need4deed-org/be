@@ -10,14 +10,13 @@ import { CallerVisibility } from "../../../../server/utils/pii/visible-persons";
 function visibility(
   personIds: number[],
   ownerAgentIds: number[] = [],
-  agentIds: number[] = [],
 ): CallerVisibility {
   return {
     userId: 1,
     role: UserRole.AGENT,
     personIds: new Set(personIds),
     opportunityIds: new Set(),
-    agentIds: new Set(agentIds),
+    agentIds: new Set(),
     matchedAgentIds: new Set(),
     ownerAgentIds: new Set(ownerAgentIds),
   };
@@ -35,47 +34,27 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
     });
   });
 
-  type RawScope = {
-    _type: string;
-    _getSql: (alias: string) => string;
-    _objectLiteralParameters: Record<string, unknown>;
-  };
-  const scopes = (where: object) =>
-    ((where as { person?: { id: RawScope }[] }).person ?? []).map((b) => b.id);
-
   it("scopes each search branch to persons visible to a masked caller", () => {
-    const where = getVolunteerFilterWhere(
-      { search: "ann" },
-      visibility([7, 9], [], [4]),
-    );
-    expect(where).toMatchObject({
+    expect(
+      getVolunteerFilterWhere({ search: "ann" }, visibility([7, 9])),
+    ).toEqual({
       person: [
-        { firstName: ILike("%ann%") },
-        { lastName: ILike("%ann%") },
-        { email: ILike("%ann%") },
-        { phone: ILike("%ann%") },
+        { firstName: ILike("%ann%"), id: In([7, 9]) },
+        { lastName: ILike("%ann%"), id: In([7, 9]) },
+        { email: ILike("%ann%"), id: In([7, 9]) },
+        { phone: ILike("%ann%"), id: In([7, 9]) },
       ],
     });
-    const branchScopes = scopes(where);
-    expect(branchScopes).toHaveLength(4);
-    for (const scope of branchScopes) {
-      expect(scope._getSql("p.id")).toBe(
-        "(p.id = ANY(:scopePersons) OR p.id IN (SELECT person_id FROM volunteer WHERE owner_agent_id = ANY(:scopeAgents)))",
-      );
-      expect(scope._objectLiteralParameters).toEqual({
-        scopePersons: [7, 9],
-        scopeAgents: [4],
-      });
-    }
   });
 
   it("matches nothing for a masked caller who can see no person", () => {
-    const [scope] = scopes(
-      getVolunteerFilterWhere({ search: "ann" }, visibility([])),
-    );
-    expect(scope._objectLiteralParameters).toEqual({
-      scopePersons: [],
-      scopeAgents: [],
+    expect(getVolunteerFilterWhere({ search: "ann" }, visibility([]))).toEqual({
+      person: [
+        { firstName: ILike("%ann%"), id: In([-1]) },
+        { lastName: ILike("%ann%"), id: In([-1]) },
+        { email: ILike("%ann%"), id: In([-1]) },
+        { phone: ILike("%ann%"), id: In([-1]) },
+      ],
     });
   });
 
@@ -113,10 +92,7 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
         { search: "030 123" },
         visibility([7]),
       );
-      expect(
-        (where.person as unknown as { id: RawScope }[])[4].id
-          ._objectLiteralParameters,
-      ).toMatchObject({ scopePersons: [7] });
+      expect(where.person?.[4]).toMatchObject({ id: In([7]) });
     });
   });
 

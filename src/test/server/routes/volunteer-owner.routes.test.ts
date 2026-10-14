@@ -25,7 +25,12 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type AgentKey = "owner" | "sharing" | "sharingOwner" | "outsider";
+type AgentKey =
+  | "owner"
+  | "sharing"
+  | "sharingOwner"
+  | "outsider"
+  | "inactiveSharing";
 type Caller = AgentKey | "coordinator" | "admin";
 type VolunteerKey =
   | "platform"
@@ -72,12 +77,16 @@ describe("NGO-owned volunteers (be#1056)", () => {
       sharing: true,
       sharingOwner: true,
       outsider: false,
+      inactiveSharing: true,
     };
     for (const key of Object.keys(sharing) as AgentKey[]) {
       agents[key] = await fastify.db.agentRepository.save(
         new Agent({
           title: `Owner Agent ${key} ${suffix}`,
-          engagementStatus: AgentEngagementStatusType.ACTIVE,
+          engagementStatus:
+            key === "inactiveSharing"
+              ? AgentEngagementStatusType.INACTIVE
+              : AgentEngagementStatusType.ACTIVE,
           sharesVolunteers: sharing[key],
         }),
       );
@@ -89,6 +98,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
       sharing: UserRole.AGENT,
       sharingOwner: UserRole.AGENT,
       outsider: UserRole.AGENT,
+      inactiveSharing: UserRole.AGENT,
       coordinator: UserRole.COORDINATOR,
       admin: UserRole.ADMIN,
     };
@@ -273,6 +283,13 @@ describe("NGO-owned volunteers (be#1056)", () => {
       ).toBe(404);
     });
 
+    it("hides other sharing NGOs' volunteers from an inactive sharing NGO", async () => {
+      expect(
+        (await getVolunteer("ownedBySharingOwner", "inactiveSharing"))
+          .statusCode,
+      ).toBe(404);
+    });
+
     it("hides the volunteers of a sharing NGO without active members", async () => {
       expect(
         (await getVolunteer("ownedByMemberlessSharing", "sharing")).statusCode,
@@ -363,6 +380,18 @@ describe("NGO-owned volunteers (be#1056)", () => {
       expect(res.statusCode).toBe(200);
       return (res.json().data as { id: number }[]).map((v) => v.id);
     };
+
+    it.each(["99999999999", "abc"])(
+      "rejects filter[ownerAgent]=%s",
+      async (value) => {
+        const res = await request(
+          "GET",
+          `/volunteer?filter[ownerAgent]=${value}`,
+          "coordinator",
+        );
+        expect(res.statusCode).toBe(400);
+      },
+    );
 
     it("lists an NGO's own volunteers", async () => {
       expect((await listIds("owner", "owner")).sort()).toEqual(

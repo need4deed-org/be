@@ -6,7 +6,6 @@ import Accompanying from "../../../../data/entity/opportunity/accompanying.entit
 import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../../data/entity/person.entity";
-import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
 import { maskPii, maskString } from "../../../../server/utils/pii/mask";
 import { CallerVisibility } from "../../../../server/utils/pii/visible-persons";
 
@@ -232,37 +231,6 @@ describe("maskPii", () => {
       maskPii(agent, ctx({ role: UserRole.AGENT, agentIds: [6] }));
       expect(agent.title).toBe("Center");
       expect(agent.address.street).toMatch(MASKED);
-    });
-  });
-
-  describe("NGO-owned volunteer (be#1056)", () => {
-    const makeVolunteer = (ownerAgentId: number | null): Volunteer =>
-      Object.assign(new Volunteer(), {
-        id: 1,
-        ownerAgentId,
-        person: Object.assign(makePerson(2), {
-          address: makeAddress("Owned St 1"),
-        }),
-      });
-
-    it("leaves the person and address of a volunteer the caller's agent owns", () => {
-      const v = makeVolunteer(42);
-      maskPii(v, ctx({ agentIds: [42] }));
-      expect(v.person.firstName).toBe("John");
-      expect(v.person.address.street).toBe("Owned St 1");
-    });
-
-    it("masks the person of a volunteer another agent owns", () => {
-      const v = makeVolunteer(43);
-      maskPii([v], ctx({ agentIds: [42] }));
-      expect(v.person.firstName).toMatch(MASKED);
-      expect(v.person.address.street).toMatch(MASKED);
-    });
-
-    it("masks the person of a need4deed volunteer", () => {
-      const v = makeVolunteer(null);
-      maskPii(v, ctx({ agentIds: [42] }));
-      expect(v.person.firstName).toMatch(MASKED);
     });
   });
 
