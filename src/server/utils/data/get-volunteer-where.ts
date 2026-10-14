@@ -37,33 +37,30 @@ export function getVolunteerWhere(
   const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
   const requestsNoOwner = requested?.includes(NO_OWNER) ?? false;
 
-  if (!requested && !visibility) {
-    return where;
-  }
-
-  const ownerAgentId = Raw(
-    (column) => {
-      const personColumn = column.replace(/ownerAgentId$/, "personId");
-      const conditions: string[] = [];
-      if (requested) {
-        conditions.push(
-          `(${requestsNoOwner ? `${column} IS NULL OR ` : ""}${column} = ANY(:requestedOwners))`,
-        );
-      }
-      if (visibility) {
-        conditions.push(
-          `(${column} IS NULL OR ${column} = ANY(:visibleOwners) OR ${personColumn} = ANY(:visiblePersons))`,
-        );
-      }
-      return conditions.join(" AND ");
-    },
-    {
-      requestedOwners: requestedIds,
-      visibleOwners: [...(visibility?.ownerAgentIds ?? [])],
-      visiblePersons: [...(visibility?.personIds ?? [])],
-    },
-  );
-  return { ...where, ownerAgentId };
+  return {
+    ...where,
+    ...(requested
+      ? {
+          ownerAgentId: Raw(
+            (column) =>
+              `(${requestsNoOwner ? `${column} IS NULL OR ` : ""}${column} = ANY(:requestedOwners))`,
+            { requestedOwners: requestedIds },
+          ),
+        }
+      : {}),
+    ...(visibility
+      ? {
+          id: Raw(
+            (column) =>
+              `${column} IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
+            {
+              visibleOwners: [...visibility.ownerAgentIds],
+              visiblePersons: [...visibility.personIds],
+            },
+          ),
+        }
+      : {}),
+  };
 }
 
 export function getVolunteerFilterWhere(

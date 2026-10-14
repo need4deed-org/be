@@ -31,7 +31,9 @@ type VolunteerKey =
   | "platform"
   | "ownedByOwner"
   | "ownedBySharingOwner"
-  | "ownedByOwnerMatchedToOutsider";
+  | "ownedByOwnerMatchedToOutsider"
+  | "ownedByOwnerSuggestedToOutsider"
+  | "ownedByMemberlessSharing";
 
 describe("NGO-owned volunteers (be#1056)", () => {
   let fastify: FastifyInstance;
@@ -42,6 +44,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
   const persons: Person[] = [];
   const deals: Deal[] = [];
   let outsiderOpportunity: Opportunity;
+  let memberlessSharing: Agent;
   const cookies = {} as Record<Caller, string>;
 
   const request = (
@@ -123,11 +126,21 @@ describe("NGO-owned volunteers (be#1056)", () => {
         ?.value as string;
     }
 
+    memberlessSharing = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Owner Agent memberless ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+        sharesVolunteers: true,
+      }),
+    );
+
     const owners: Record<VolunteerKey, number | null> = {
       platform: null,
       ownedByOwner: agents.owner.id,
       ownedBySharingOwner: agents.sharingOwner.id,
       ownedByOwnerMatchedToOutsider: agents.owner.id,
+      ownedByOwnerSuggestedToOutsider: agents.owner.id,
+      ownedByMemberlessSharing: memberlessSharing.id,
     };
     for (const key of Object.keys(owners) as VolunteerKey[]) {
       const person = await fastify.db.personRepository.save(
@@ -167,6 +180,13 @@ describe("NGO-owned volunteers (be#1056)", () => {
         status: OpportunityVolunteerStatusType.MATCHED,
       }),
     );
+    await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: outsiderOpportunity.id,
+        volunteerId: volunteers.ownedByOwnerSuggestedToOutsider.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -189,7 +209,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
       await fastify.db.userRepository.delete({ personId: person.id });
       await fastify.db.personRepository.delete({ id: person.id });
     }
-    for (const agent of Object.values(agents)) {
+    for (const agent of [...Object.values(agents), memberlessSharing]) {
       await fastify.db.agentRepository.delete({ id: agent.id });
     }
     await fastify.close();
@@ -246,6 +266,27 @@ describe("NGO-owned volunteers (be#1056)", () => {
       );
     });
 
+    it("hides another NGO's volunteer that is only suggested to the caller", async () => {
+      expect(
+        (await getVolunteer("ownedByOwnerSuggestedToOutsider", "outsider"))
+          .statusCode,
+      ).toBe(404);
+    });
+
+    it("hides the volunteers of a sharing NGO without active members", async () => {
+      expect(
+        (await getVolunteer("ownedByMemberlessSharing", "sharing")).statusCode,
+      ).toBe(404);
+    });
+
+    it.each<Caller>(["outsider", "coordinator"])(
+      "404s an unknown volunteer id for %s",
+      async (as) => {
+        const res = await request("GET", "/volunteer/2147483000", as);
+        expect(res.statusCode).toBe(404);
+      },
+    );
+
     it("shows every volunteer to a coordinator", async () => {
       expect(
         (await getVolunteer("ownedByOwner", "coordinator")).statusCode,
@@ -254,14 +295,16 @@ describe("NGO-owned volunteers (be#1056)", () => {
   });
 
   it.each(["opportunity-linked", "appreciation"])(
-    "404s the %s list of a hidden volunteer",
+    "404s the %s list of a hidden or unknown volunteer",
     async (subRoute) => {
-      const res = await request(
-        "GET",
-        `/volunteer/${volunteers.ownedByOwner.id}/${subRoute}`,
-        "outsider",
-      );
-      expect(res.statusCode).toBe(404);
+      for (const id of [volunteers.ownedByOwner.id, 2147483000]) {
+        const res = await request(
+          "GET",
+          `/volunteer/${id}/${subRoute}`,
+          "outsider",
+        );
+        expect(res.statusCode).toBe(404);
+      }
     },
   );
 
@@ -326,6 +369,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
         [
           volunteers.ownedByOwner.id,
           volunteers.ownedByOwnerMatchedToOutsider.id,
+          volunteers.ownedByOwnerSuggestedToOutsider.id,
         ].sort(),
       );
     });

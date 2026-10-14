@@ -62,7 +62,10 @@ import {
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
 import { resolveCallerMask } from "../../utils/pii/pre-serialization";
-import { isVolunteerVisible } from "../../utils/pii/volunteer-visibility";
+import {
+  assertVolunteerVisible,
+  resolveVolunteerVisibility,
+} from "../../utils/pii/volunteer-visibility";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -106,6 +109,12 @@ export default async function volunteerRoutes(
       : [...listRelationsCommon, ...listRelationsCardExtra];
 
   fastify.addHook("onRequest", fastify.authenticate());
+  fastify.addHook("preHandler", async (request) => {
+    const { id } = (request.params ?? {}) as { id?: string };
+    if (id !== undefined && Number.isInteger(Number(id))) {
+      await assertVolunteerVisible(request, Number(id));
+    }
+  });
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,
@@ -166,23 +175,13 @@ export default async function volunteerRoutes(
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
 
-      const visibility = await resolveCallerMask(request);
-      let data: ApiVolunteerGet | null;
-      try {
-        data = await fetchVolunteerById(id, isoCode, relations, visibility);
-        if (!data) {
-          logger.error(`Failed fetching volunteer (id=${id}).`);
-          throw new Error(`Volunteer (id=${id}) not found after patch.`);
-        }
-      } catch (error) {
-        logger.error(`Error fetching volunteer id=${id}: ${error}`);
-        return reply.status(500).send({ message: "Internal server error." });
-      }
-      const ownership = {
-        ownerAgentId: data.ownerAgentId,
-        personId: data.person?.id ?? null,
-      };
-      if (!isVolunteerVisible(ownership, visibility)) {
+      const data = await fetchVolunteerById(
+        id,
+        isoCode,
+        relations,
+        await resolveCallerMask(request),
+      );
+      if (!data) {
         throw new NotFoundError(`Volunteer (id:${id}) not found.`);
       }
       return reply.status(200).send({
@@ -231,7 +230,7 @@ export default async function volunteerRoutes(
       );
       const [skip, take] = getSkipTake({ page, limit });
 
-      const visibility = await resolveCallerMask(request);
+      const visibility = await resolveVolunteerVisibility(request);
       const where = getVolunteerWhere(filter, visibility);
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",

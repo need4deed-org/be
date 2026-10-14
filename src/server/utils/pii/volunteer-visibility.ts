@@ -1,4 +1,9 @@
 import { FastifyRequest } from "fastify";
+import {
+  AgentEngagementStatusType,
+  AgentMembershipStatus,
+  UserRole,
+} from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import { resolveCallerMask } from "./pre-serialization";
 import { CallerVisibility } from "./visible-persons";
@@ -7,6 +12,40 @@ type VolunteerOwnership = {
   ownerAgentId: number | null;
   personId: number | null;
 };
+
+const withSharingOwners = new WeakSet<CallerVisibility>();
+
+export async function resolveVolunteerVisibility(
+  request: FastifyRequest,
+): Promise<CallerVisibility | null> {
+  const visibility = await resolveCallerMask(request);
+  if (
+    !visibility ||
+    visibility.role !== UserRole.AGENT ||
+    visibility.agentIds.size === 0 ||
+    withSharingOwners.has(visibility)
+  ) {
+    return visibility;
+  }
+  withSharingOwners.add(visibility);
+  const sharing: { id: number }[] =
+    await request.server.db.agentRepository.manager.query(
+      `SELECT a.id FROM agent a
+      WHERE a.shares_volunteers
+        AND a.engagement_status <> $2
+        AND EXISTS (SELECT 1 FROM agent_person ap
+                     WHERE ap.agent_id = a.id AND ap.status = $3)
+        AND EXISTS (SELECT 1 FROM agent own
+                     WHERE own.id = ANY($1) AND own.shares_volunteers)`,
+      [
+        [...visibility.agentIds],
+        AgentEngagementStatusType.INACTIVE,
+        AgentMembershipStatus.ACTIVE,
+      ],
+    );
+  sharing.forEach((a) => visibility.ownerAgentIds.add(Number(a.id)));
+  return visibility;
+}
 
 export function isVolunteerVisible(
   volunteer: VolunteerOwnership,
@@ -26,7 +65,7 @@ export async function assertVolunteerVisible(
   request: FastifyRequest,
   volunteerId: number,
 ): Promise<void> {
-  const visibility = await resolveCallerMask(request);
+  const visibility = await resolveVolunteerVisibility(request);
   if (!visibility) {
     return;
   }
@@ -34,7 +73,7 @@ export async function assertVolunteerVisible(
     select: { id: true, ownerAgentId: true, personId: true },
     where: { id: volunteerId },
   });
-  if (volunteer && !isVolunteerVisible(volunteer, visibility)) {
+  if (!volunteer || !isVolunteerVisible(volunteer, visibility)) {
     throw new NotFoundError(`Volunteer (id:${volunteerId}) not found.`);
   }
 }

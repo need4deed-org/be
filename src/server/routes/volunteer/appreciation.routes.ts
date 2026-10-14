@@ -7,7 +7,6 @@ import {
 import { dtoAppreciation } from "../../../services/dto/dto-appreciation";
 import { idParamSchema, responseErrors } from "../../schema";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
-import { assertVolunteerVisible } from "../../utils/pii/volunteer-visibility";
 
 export default function volunteerAppreciationRoutes(
   fastify: FastifyInstance,
@@ -39,7 +38,6 @@ export default function volunteerAppreciationRoutes(
     },
     async (request, reply) => {
       const volunteerId = Number(request.params.id);
-      await assertVolunteerVisible(request, volunteerId);
 
       const appreciationRepository = fastify.db.appreciationRepository;
       const appreciations = await appreciationRepository.find({
