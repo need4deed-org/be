@@ -29,6 +29,7 @@ import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
 import postRoutes from "./routes/post.routes";
+import translationRoutes from "./routes/translation.routes";
 import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
@@ -215,6 +216,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(workerRoutes, {
     prefix: RoutePrefix.WORKER,
+  });
+  await fastifyInstance.register(translationRoutes, {
+    prefix: RoutePrefix.TRANSLATION,
   });
   await fastifyInstance.register(trustedDomainRoutes, {
     prefix: RoutePrefix.TRUSTED_DOMAIN,

@@ -2,7 +2,7 @@ import { EntityTableName, Lang, TranslationStatus } from "need4deed-sdk";
 import { EntityManager, FindOptionsWhere, In } from "typeorm";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
-import { sourceHashOf } from "./queue";
+import { sourceHashOf, sourceTextOf } from "./queue";
 import { getMachineEntry } from "./registry";
 
 export async function resolve<E extends TranslatableEntity>(
@@ -41,7 +41,7 @@ export async function resolve<E extends TranslatableEntity>(
       if (
         row?.translation &&
         typeof current === "string" &&
-        row.sourceHash === sourceHashOf(current.trim())
+        row.sourceHash === sourceHashOf(sourceTextOf(current))
       ) {
         record[field] = row.translation;
       }
