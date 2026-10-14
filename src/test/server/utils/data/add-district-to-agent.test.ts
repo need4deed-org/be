@@ -39,7 +39,10 @@ describe("syncAgentDistrictFromPostcode", () => {
     const agent = makeAgent();
     const result = await syncAgentDistrictFromPostcode(agent, postcode);
 
-    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(postcode);
+    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(
+      postcode,
+      expect.anything(),
+    );
     expect(result.district).toBe(district);
     expect(result.districtId).toBe(7);
   });
@@ -65,7 +68,10 @@ describe("syncAgentDistrictFromPostcode", () => {
 
     const result = await syncAgentDistrictFromPostcode(makeAgent(), 3);
 
-    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(3);
+    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(
+      3,
+      expect.anything(),
+    );
     expect(result.districtId).toBe(8);
   });
 
@@ -77,7 +83,10 @@ describe("syncAgentDistrictFromPostcode", () => {
     const agent = makeAgent({ address: { postcode } as any });
     await syncAgentDistrictFromPostcode(agent);
 
-    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(postcode);
+    expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(
+      postcode,
+      expect.anything(),
+    );
   });
 
   it("leaves district/districtId untouched when no district resolves for the postcode", async () => {

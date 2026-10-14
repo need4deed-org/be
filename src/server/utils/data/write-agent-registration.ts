@@ -2,9 +2,11 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  ApiAgentAddressConflict,
+  ApiAgentAlreadyRegisteredConflict,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
-import { EntityManager, In } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
 import { BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -27,9 +29,9 @@ export interface RegisterAgentResult {
 
 export class AgentAddressConflictError extends BaseError {
   constructor(public readonly agentId: number) {
+    const details: ApiAgentAddressConflict = { conflict: "address", agentId };
     super("An agent at this address already exists.", 409, true, {
-      conflict: "address",
-      agentId,
+      ...details,
     });
   }
 }
@@ -39,11 +41,16 @@ export class AgentAlreadyRegisteredError extends BaseError {
     public readonly agentId: number,
     public readonly membershipStatus: AgentMembershipStatus,
   ) {
+    const details: ApiAgentAlreadyRegisteredConflict = {
+      conflict: "registered",
+      agentId,
+      membershipStatus,
+    };
     super(
       "Agent registration already completed or awaiting approval.",
       409,
       true,
-      { conflict: "registered", agentId, membershipStatus },
+      { ...details },
     );
   }
 }
@@ -59,8 +66,10 @@ export class AgentTitleConflictError extends BaseError {
 
 export async function findRegistrationMembership(
   personId: number,
-  manager: EntityManager = dataSource.manager,
-  relations: string[] = [],
+  {
+    manager = dataSource,
+    relations = [],
+  }: { manager?: DataSource | EntityManager; relations?: string[] } = {},
 ): Promise<AgentPerson | null> {
   const memberships = await manager.getRepository(AgentPerson).find({
     where: { personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
@@ -90,7 +99,7 @@ async function assertNotRegistered(
   manager: EntityManager,
 ): Promise<void> {
   await lockRegistration(personId, manager);
-  const membership = await findRegistrationMembership(personId, manager);
+  const membership = await findRegistrationMembership(personId, { manager });
   if (membership) {
     throw new AgentAlreadyRegisteredError(
       membership.agentId,
@@ -101,7 +110,7 @@ async function assertNotRegistered(
 
 async function assertNoAddressConflict(
   { addressStreet, addressPostcode, confirmSharedAddress }: ApiAgentRegisterNew,
-  manager: EntityManager,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<void> {
   if (confirmSharedAddress || !addressStreet || !addressPostcode) {
     return;
@@ -141,6 +150,7 @@ async function createBareAgent(
     await syncAgentDistrictFromPostcode(
       newAgent,
       address?.postcodeId ?? ({ value: input.addressPostcode } as Postcode),
+      manager,
     );
   }
   const agent = await manager.getRepository(Agent).save(newAgent);
@@ -218,11 +228,12 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
+  await assertNoAddressConflict(input);
+
   let agentId!: number;
 
   try {
     await dataSource.manager.transaction(async (manager) => {
-      await assertNoAddressConflict(input, manager);
       const agent = await createBareAgent(input, manager, true);
       agentId = agent.id;
     });
@@ -242,8 +253,9 @@ export async function createAgent(
 export async function resolveJoinStatus(
   agentId: number,
   registrantEmail: string,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<AgentMembershipStatus> {
-  const agent = await dataSource.getRepository(Agent).findOne({
+  const agent = await manager.getRepository(Agent).findOne({
     select: { id: true, unclaimed: true, engagementStatus: true },
     where: { id: agentId },
   });
@@ -257,12 +269,13 @@ export async function resolveJoinStatus(
   const allowed = await isAgentDomainAllowed(
     registrantEmail,
     async (domain) => {
-      const members = await dataSource.getRepository(AgentPerson).find({
+      const members = await manager.getRepository(AgentPerson).find({
         where: { agentId, status: AgentMembershipStatus.ACTIVE },
         relations: ["person", "person.users"],
       });
       return members.some((member) => isMemberOnDomain(member, domain));
     },
+    manager,
   );
 
   return allowed ? AgentMembershipStatus.ACTIVE : AgentMembershipStatus.PENDING;
@@ -313,8 +326,10 @@ export async function getAgentIdsJoinableAsActive(
 export async function joinAgent(
   personId: number,
   agentId: number,
-  status: AgentMembershipStatus,
+  registrantEmail: string,
 ): Promise<RegisterAgentResult> {
+  let status!: AgentMembershipStatus;
+
   await dataSource.manager.transaction(async (manager) => {
     await assertNotRegistered(personId, manager);
     const agent = await manager
@@ -323,6 +338,7 @@ export async function joinAgent(
     if (!agent) {
       throw new NotFoundError(`Agent (id:${agentId}) not found.`);
     }
+    status = await resolveJoinStatus(agentId, registrantEmail, manager);
     await manager.getRepository(AgentPerson).save(
       new AgentPerson({
         agentId,

@@ -170,7 +170,7 @@ describe("createAgentForPerson", () => {
       districtId: 1,
     } as ApiAgentRegisterNew);
 
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3, txnManager);
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
 
@@ -440,7 +440,7 @@ describe("createAgent", () => {
       districtId: 1,
     } as ApiAgentRegisterNew);
 
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3, txnManager);
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
 
@@ -454,9 +454,10 @@ describe("createAgent", () => {
     } as ApiAgentRegisterNew);
 
     expect(createAddressMock).not.toHaveBeenCalled();
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith({
-      value: "12681",
-    });
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(
+      { value: "12681" },
+      txnManager,
+    );
     expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
@@ -588,7 +589,7 @@ describe("joinAgent", () => {
   it("404s (not 403) when the agent doesn't exist at all", async () => {
     agentRepoFindOne.mockResolvedValueOnce(null);
 
-    const err = await joinAgent(11, 33, AgentMembershipStatus.PENDING).catch(
+    const err = await joinAgent(11, 33, "registrant@example.org").catch(
       (e) => e,
     );
 
@@ -602,7 +603,7 @@ describe("joinAgent", () => {
   it("allows joining a non-unclaimed agent even with zero existing memberships", async () => {
     agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: false });
 
-    const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
+    const result = await joinAgent(11, 33, "registrant@example.org");
 
     expect(agentPersonSave).toHaveBeenCalledTimes(1);
     expect(agentPersonSave.mock.calls[0][0]).toMatchObject({
@@ -623,7 +624,7 @@ describe("joinAgent", () => {
       { id: 7, agentId: 22, status: AgentMembershipStatus.ACTIVE },
     ]);
 
-    const err = await joinAgent(11, 33, AgentMembershipStatus.PENDING).catch(
+    const err = await joinAgent(11, 33, "registrant@example.org").catch(
       (e) => e,
     );
 

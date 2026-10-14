@@ -55,6 +55,22 @@ describe("/agent/register", () => {
     return { person, user, token };
   }
 
+  async function waitForRegistrationLockWaiter(personId: number) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [{ waiting }] = await dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_locks
+         WHERE locktype = 'advisory' AND objsubid = 2
+           AND objid::bigint = $1 AND NOT granted`,
+        [personId],
+      );
+      if (waiting > 0) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error("POST never waited on the registration lock");
+  }
+
   async function makeAgent(overrides: Partial<Agent> = {}): Promise<Agent> {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const agent = await fastify.db.agentRepository.save(
@@ -246,7 +262,7 @@ describe("/agent/register", () => {
           settled = true;
           return res;
         });
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await waitForRegistrationLockWaiter(person.id);
       expect(settled).toBe(false);
 
       await runner.manager.save(
@@ -274,11 +290,15 @@ describe("/agent/register", () => {
     }
   });
 
-  it("500s with no membership leak when the registrant has no linked person", async () => {
+  it("500s with no membership leak when the registrant has no linked person, but still serves search", async () => {
     const { token, user } = await makeRegistrant("example.org");
     await fastify.db.userRepository.update(user.id, {
       personId: null as unknown as number,
     });
+    const search = await fastify.inject({
+      url: `/agent/register/search?token=${token}&street=Nowhere`,
+    });
+    expect(search.statusCode).toBe(200);
     for (const request of [
       { url: `/agent/register/status?token=${token}` },
       {

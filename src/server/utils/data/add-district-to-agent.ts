@@ -1,3 +1,5 @@
+import { DataSource, EntityManager } from "typeorm";
+import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getDistrictFromPostcode } from "../../../data/utils/get-district";
@@ -28,9 +30,11 @@ export function getDistrictToAgentHandler(isRepresentative = false) {
 export async function syncAgentDistrictFromPostcode(
   agent: Agent,
   postcode?: Voidable<Postcode | number>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<Agent> {
   const district = await getDistrictFromPostcode(
     postcode ?? agent.address?.postcode,
+    manager,
   );
   if (district) {
     agent.district = district;

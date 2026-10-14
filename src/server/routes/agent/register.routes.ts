@@ -34,7 +34,6 @@ import {
   getAgentIdsJoinableAsActive,
   isExactStreetMatch,
   joinAgent,
-  resolveJoinStatus,
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
@@ -67,12 +66,16 @@ async function authByVerifyToken(
     throw new UnauthorizedError("Only agent accounts can register an agent.");
   }
 
+  request.registrant = user;
+}
+
+function getRegistrantPersonId(request: FastifyRequest): number {
+  const user = request.registrant!;
   if (!user.personId) {
     logger.error(`register-agent: registrant ${user.id} has no linked person`);
     throw new BaseError("Account is missing a person record.", 500);
   }
-
-  request.registrant = user;
+  return user.personId;
 }
 
 export default async function agentRegisterRoutes(
@@ -92,9 +95,8 @@ export default async function agentRegisterRoutes(
     },
     async (request, reply) => {
       const membership = await findRegistrationMembership(
-        request.registrant!.personId,
-        undefined,
-        ["agent"],
+        getRegistrantPersonId(request),
+        { relations: ["agent"] },
       );
       return reply.status(200).send({
         message: "Agent registration status.",
@@ -168,17 +170,13 @@ export default async function agentRegisterRoutes(
         authByVerifyToken(fastify, request, reply),
     },
     async (request, reply) => {
-      const user = request.registrant!;
-      const personId = user.personId;
+      const personId = getRegistrantPersonId(request);
+      const email = request.registrant!.email;
       const body = request.body;
 
       const result =
         "agentId" in body
-          ? await joinAgent(
-              personId,
-              body.agentId,
-              await resolveJoinStatus(body.agentId, user.email),
-            )
+          ? await joinAgent(personId, body.agentId, email)
           : await createAgentForPerson(personId, body.agent);
 
       const message =
