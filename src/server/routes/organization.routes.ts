@@ -23,7 +23,7 @@ export default async function organizationRoutes(
     async (_request, reply) =>
       reply.status(200).send({
         message: "Organizations found.",
-        data: await listOrganizations(),
+        data: await listOrganizations(fastify),
       }),
   );
 

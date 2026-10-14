@@ -120,11 +120,7 @@ export default async function agentRegisterRoutes(
         rateLimit: { max: 30, timeWindow: "1 minute" },
       } as FastifyContextConfig,
       schema: {
-        querystring: {
-          type: "object",
-          required: ["token"],
-          properties: { token: { type: "string" } },
-        },
+        querystring: registerAgentQuerySchema,
         response: responseSchema("ApiOrganizationGetList#", true, false),
       },
       preHandler: (request, reply) =>
@@ -133,7 +129,7 @@ export default async function agentRegisterRoutes(
     async (_request, reply) =>
       reply.status(200).send({
         message: "Organizations found.",
-        data: await listOrganizations(),
+        data: await listOrganizations(fastify),
       }),
   );
 
