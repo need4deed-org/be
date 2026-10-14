@@ -669,7 +669,7 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("stores tagged NGOs from <@agent:ID> tokens and returns them on create, list and PATCH", async () => {
+  it("stores tagged NGOs from taggedAgentIds and returns them on create, list and PATCH", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const [tagged, unclaimed] = await fastify.db.agentRepository.save([
       new Agent({
@@ -681,12 +681,24 @@ describe("POST /post", () => {
     createdAgentIds.push(tagged.id, unclaimed.id);
     const expected = [{ id: tagged.id, title: tagged.title }];
 
+    const rejected = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        text: `Tagging ${suffix} <@agent:${tagged.id}> <@agent:${unclaimed.id}>`,
+        taggedAgentIds: [tagged.id, unclaimed.id],
+      },
+    });
+    expect(rejected.statusCode).toBe(400);
+
     const created = await fastify.inject({
       method: "POST",
       url: "/post",
       cookies: { [accessCookieName]: coordinatorCookie },
       payload: {
-        text: `Tagging ${suffix} <@agent:${tagged.id}> <@agent:${unclaimed.id}> <@agent:999999999>`,
+        text: `Tagging ${suffix} <@agent:${tagged.id}>`,
+        taggedAgentIds: [tagged.id],
       },
     });
     expect(created.statusCode).toBe(201);
@@ -698,23 +710,7 @@ describe("POST /post", () => {
       where: { id: postId },
       relations: ["taggedAgents"],
     });
-    expect(stored?.taggedAgents.map((a) => a.id).sort()).toEqual(
-      [tagged.id, unclaimed.id].sort(),
-    );
-
-    await fastify.db.agentRepository.update(unclaimed.id, {
-      unclaimed: false,
-    });
-    const afterClaim = await fastify.inject({
-      method: "GET",
-      url: `/post?search=${encodeURIComponent(`Tagging ${suffix}`)}`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-    expect(
-      afterClaim.json().data.find((p: { id: number }) => p.id === postId)
-        ?.taggedAgents,
-    ).toHaveLength(2);
-    await fastify.db.agentRepository.update(unclaimed.id, { unclaimed: true });
+    expect(stored?.taggedAgents.map((a) => a.id)).toEqual([tagged.id]);
 
     const listed = await fastify.inject({
       method: "GET",

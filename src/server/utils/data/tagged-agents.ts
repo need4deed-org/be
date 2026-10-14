@@ -1,5 +1,4 @@
 import { FastifyInstance } from "fastify";
-import { In } from "typeorm";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Post from "../../../data/entity/post.entity";
 
@@ -14,19 +13,6 @@ export function getTaggedAgentIds(text: string): number[] {
         .filter((id) => id <= MAX_INT4),
     ),
   ];
-}
-
-export async function findTaggedAgents(
-  fastify: FastifyInstance,
-  text: string,
-): Promise<Agent[]> {
-  const ids = getTaggedAgentIds(text);
-  return ids.length
-    ? fastify.db.agentRepository.find({
-        select: { id: true },
-        where: { id: In(ids) },
-      })
-    : [];
 }
 
 export async function attachTaggedAgents(

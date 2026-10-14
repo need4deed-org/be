@@ -60,9 +60,12 @@ import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
-  attachTaggedAgents,
-  findTaggedAgents,
-} from "../utils/data/tagged-agents";
+  assertTaggableAgents,
+  getAgentMemberPersons,
+  mergePersons,
+  resolveTaggedAgentIds,
+} from "../utils/data/tag-agents";
+import { attachTaggedAgents } from "../utils/data/tagged-agents";
 import {
   requestLanguage,
   translateOpportunities,
@@ -230,9 +233,11 @@ export default async function postRoutes(
       const {
         text,
         taggedPersonIds = [],
+        taggedAgentIds,
         linkedOpportunityIds = [],
       } = request.body;
 
+      const agentIds = resolveTaggedAgentIds(text, taggedAgentIds, []);
       const agentPerson = await getAgentPersonRepresentative(personId);
 
       const [taggedPersons, linkedOpportunities, taggedAgents] =
@@ -245,7 +250,7 @@ export default async function postRoutes(
                 id: In(linkedOpportunityIds),
               })
             : [],
-          findTaggedAgents(fastify, text),
+          assertTaggableAgents(request, agentIds),
         ]);
 
       validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
@@ -254,6 +259,8 @@ export default async function postRoutes(
         linkedOpportunities,
         "linked opportunity",
       );
+
+      const agentMembers = await getAgentMemberPersons(request, agentIds);
 
       const post = fastify.db.postRepository.create({
         text,
@@ -277,7 +284,10 @@ export default async function postRoutes(
       notifyPostTags(
         fastify,
         full,
-        full.taggedPersons ?? [],
+        mergePersons(
+          full.taggedPersons ?? [],
+          agentMembers.filter((member) => member.id !== personId),
+        ),
         request.authUser!.id,
         full.author,
       );
@@ -316,7 +326,12 @@ export default async function postRoutes(
 
       const post = await fastify.db.postRepository.findOne({
         where: getRootPostWhere(id),
-        relations: ["author", "taggedPersons", "linkedOpportunities"],
+        relations: [
+          "author",
+          "taggedPersons",
+          "taggedAgents",
+          "linkedOpportunities",
+        ],
       });
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
@@ -330,30 +345,66 @@ export default async function postRoutes(
         resource: "posts",
       });
 
-      const { text, taggedPersonIds, linkedOpportunityIds } = request.body;
+      const { text, taggedPersonIds, taggedAgentIds, linkedOpportunityIds } =
+        request.body;
       const previousTaggedIds = (post.taggedPersons ?? []).map((p) => p.id);
+      const previousAgents = post.taggedAgents ?? [];
+      const previousAgentIds = previousAgents.map((a) => a.id);
 
-      if (text !== null && text !== undefined && text !== post.text) {
+      const textChanged =
+        text !== null && text !== undefined && text !== post.text;
+      if (textChanged) {
         post.text = text;
-        post.taggedAgents = await findTaggedAgents(fastify, text);
       }
+      const agentIds =
+        textChanged || (taggedAgentIds !== null && taggedAgentIds !== undefined)
+          ? resolveTaggedAgentIds(post.text, taggedAgentIds, previousAgents)
+          : previousAgentIds;
+      const addedAgentIds = agentIds.filter(
+        (agentId) => !previousAgentIds.includes(agentId),
+      );
+
+      const [addedAgents, foundPersons, foundOpportunities] = await Promise.all(
+        [
+          assertTaggableAgents(request, addedAgentIds, post.agentId),
+          taggedPersonIds?.length
+            ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
+            : [],
+          linkedOpportunityIds?.length
+            ? fastify.db.opportunityRepository.findBy({
+                id: In(linkedOpportunityIds),
+              })
+            : [],
+        ],
+      );
+
+      const keptAgentIds = previousAgentIds.filter((agentId) =>
+        agentIds.includes(agentId),
+      );
+      const [addedAgentMembers, keptAgentMembers] = addedAgents.length
+        ? await Promise.all([
+            getAgentMemberPersons(request, addedAgentIds),
+            getAgentMemberPersons(request, keptAgentIds),
+          ])
+        : [[], []];
+      const alreadyNotifiedIds = new Set(
+        keptAgentMembers.map((member) => member.id),
+      );
+      post.taggedAgents = [
+        ...previousAgents.filter((agent) => keptAgentIds.includes(agent.id)),
+        ...addedAgents,
+      ];
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
-        const found = taggedPersonIds.length
-          ? await fastify.db.personRepository.findBy({
-              id: In(taggedPersonIds),
-            })
-          : [];
-        validateRelationIds(taggedPersonIds, found, "tagged person");
-        post.taggedPersons = found;
+        validateRelationIds(taggedPersonIds, foundPersons, "tagged person");
+        post.taggedPersons = foundPersons;
       }
       if (linkedOpportunityIds !== null && linkedOpportunityIds !== undefined) {
-        const found = linkedOpportunityIds.length
-          ? await fastify.db.opportunityRepository.findBy({
-              id: In(linkedOpportunityIds),
-            })
-          : [];
-        validateRelationIds(linkedOpportunityIds, found, "linked opportunity");
-        post.linkedOpportunities = found;
+        validateRelationIds(
+          linkedOpportunityIds,
+          foundOpportunities,
+          "linked opportunity",
+        );
+        post.linkedOpportunities = foundOpportunities;
       }
 
       const updated = await fastify.db.postRepository.save(post);
@@ -365,11 +416,20 @@ export default async function postRoutes(
       ]);
       updated.replyCount = replyCount;
 
-      const added = (updated.taggedPersons ?? []).filter(
-        (p) => !previousTaggedIds.includes(p.id),
+      const taggerPersonId = request.authUser?.personId;
+      const added = mergePersons(
+        (updated.taggedPersons ?? []).filter(
+          (p) => !previousTaggedIds.includes(p.id),
+        ),
+        addedAgentMembers.filter(
+          (member) =>
+            member.id !== taggerPersonId &&
+            member.id !== post.authorId &&
+            !previousTaggedIds.includes(member.id) &&
+            !alreadyNotifiedIds.has(member.id),
+        ),
       );
       if (added.length > 0) {
-        const taggerPersonId = request.authUser?.personId;
         const tagger =
           taggerPersonId === post.authorId
             ? post.author
