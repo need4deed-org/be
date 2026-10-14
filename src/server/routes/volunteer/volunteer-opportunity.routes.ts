@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
+import { dataSource } from "../../../data/data-source";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
   responseSchema,
@@ -10,13 +12,14 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
-  dealIdIn,
-  findAvailabilityDealIds,
+  findOpportunityAvailabilityDealIds,
   getCategoryToDealHandler,
+  getOpportunityWhere,
   getSkipTake,
-  normalizeStringArrayInput,
+  mergeIntoWhere,
 } from "../../utils";
 import {
+  languageIdOf,
   requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
@@ -46,22 +49,25 @@ export default async function volunteerOpportunityRoutes(
         "deal.postcode",
       ];
 
-      const { page, limit, language, availability, ...filters } = request.query;
+      const { page, limit, language, agentId, ...filter } = request.query;
 
       const [skip, take] = getSkipTake({ page, limit });
 
-      const availabilityDealIds = await findAvailabilityDealIds(availability);
-      const where = {
-        ...Object.fromEntries(
-          Object.entries(filters).map(([key, value]) => [
-            key,
-            normalizeStringArrayInput(value as string | string[]),
-          ]),
-        ),
-        ...(availabilityDealIds
-          ? { dealId: dealIdIn(availabilityDealIds) }
-          : {}),
-      };
+      const [searchLanguageId, availabilityDealIds] = await Promise.all([
+        filter.search
+          ? languageIdOf(dataSource.manager, requestLanguage({ language }))
+          : undefined,
+        findOpportunityAvailabilityDealIds(filter.availability),
+      ]);
+      const where = getOpportunityWhere(
+        filter,
+        undefined,
+        searchLanguageId,
+        availabilityDealIds,
+      );
+      if (agentId) {
+        mergeIntoWhere<Opportunity>(where, { agentId });
+      }
 
       const opportunityRepository = fastify.db.opportunityRepository;
 

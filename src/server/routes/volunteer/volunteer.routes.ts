@@ -234,12 +234,11 @@ export default async function volunteerRoutes(
       );
       const [skip, take] = getSkipTake({ page, limit });
 
-      const visibility = await resolveVolunteerVisibility(request);
-      const where = getVolunteerWhere(
-        filter,
-        visibility,
-        await findAvailabilityDealIds(filter?.availability),
-      );
+      const [visibility, availabilityDealIds] = await Promise.all([
+        resolveVolunteerVisibility(request),
+        findAvailabilityDealIds(filter?.availability),
+      ]);
+      const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };

@@ -77,7 +77,7 @@ import {
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertRoleIn,
-  findAvailabilityDealIds,
+  findOpportunityAvailabilityDealIds,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
@@ -398,7 +398,7 @@ export default async function opportunityRoutes(
         request.query.filter?.search
           ? languageIdOf(dataSource.manager, requestLanguage(request.query))
           : undefined,
-        findAvailabilityDealIds(request.query.filter?.availability),
+        findOpportunityAvailabilityDealIds(request.query.filter?.availability),
       ]);
       const where = getOpportunityWhere(
         request.query.filter,

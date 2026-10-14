@@ -1,4 +1,4 @@
-import { OccasionalType } from "need4deed-sdk";
+import { ByDay, OccasionalType } from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import Timeslot from "../../data/entity/time/timeslot.entity";
@@ -6,16 +6,8 @@ import { getRepository, getRRULE, getStartEnd } from "../../data/utils";
 import logger from "../../logger";
 import { getTimeslot } from "../../server/utils";
 
-export const WEEKDAYS = [
-  "",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
+// index = ISO weekday (1 = Monday)
+export const WEEKDAYS: readonly string[] = ["", ...Object.values(ByDay)];
 
 export async function buildDealTimeslots(
   timeslots: [number, string][] | undefined | null,
