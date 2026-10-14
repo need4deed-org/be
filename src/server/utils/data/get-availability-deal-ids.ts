@@ -89,43 +89,53 @@ function getSlotDays({ days, occasional }: AvailabilityFilter): ByDayCode[] {
   ];
 }
 
-// day/time conditions on a single Berlin-local start instant
+// Binds the day/time params once and returns a builder for the conditions
+// on any Berlin-local start expression.
 function getOnetimeConditions(
   filter: AvailabilityFilter,
-  start: string,
   params: Params,
-): string[] {
+): (start: string) => string[] {
   const { times } = filter;
   const slotDays = getSlotDays(filter);
-  const conditions: string[] = [];
   if (slotDays.length) {
-    conditions.push(
-      `EXTRACT(ISODOW FROM ${start}) IN (:...availabilityIsoDays)`,
-    );
     params.availabilityIsoDays = slotDays.map(getIsoDay);
   }
-  if (times.length) {
-    conditions.push(
-      `(${times
-        .map((time, i) => {
-          const [from, to] = time.split("-").map(Number);
-          params[`availabilityFrom${i}`] = from;
-          params[`availabilityTo${i}`] = to;
-          return `(EXTRACT(HOUR FROM ${start}) >= :availabilityFrom${i} AND EXTRACT(HOUR FROM ${start}) < :availabilityTo${i})`;
-        })
-        .join(" OR ")})`,
-    );
-  }
+  times.forEach((time, i) => {
+    const [from, to] = time.split("-").map(Number);
+    params[`availabilityFrom${i}`] = from;
+    params[`availabilityTo${i}`] = to;
+  });
   params.availabilityLocalTimeZone = LOCAL_TIME_ZONE;
-  return conditions;
+  return (start) => [
+    ...(slotDays.length
+      ? [`EXTRACT(ISODOW FROM ${start}) IN (:...availabilityIsoDays)`]
+      : []),
+    ...(times.length
+      ? [
+          `(${times
+            .map(
+              (_, i) =>
+                `(EXTRACT(HOUR FROM ${start}) >= :availabilityFrom${i} AND EXTRACT(HOUR FROM ${start}) < :availabilityTo${i})`,
+            )
+            .join(" OR ")})`,
+        ]
+      : []),
+  ];
 }
+
+type AvailabilityCondition = {
+  condition: string;
+  params: Params;
+  onetimeAt: (start: string) => string[];
+};
 
 function getAvailabilityCondition(
   filter: AvailabilityFilter,
-): [string, Params] {
+): AvailabilityCondition {
   const { times } = filter;
   const branches: string[] = [];
   const params: Params = {};
+  const onetimeAt = getOnetimeConditions(filter, params);
   const slotDays = getSlotDays(filter);
   if (slotDays.length || times.length) {
     const recurring = ["t.rrule IS NOT NULL"];
@@ -143,7 +153,7 @@ function getAvailabilityCondition(
       "t.rrule IS NULL",
       "t.occasional IS NULL",
       "t.start IS NOT NULL",
-      ...getOnetimeConditions(filter, ONETIME_START, params),
+      ...onetimeAt(ONETIME_START),
     ];
     params.availabilityServerTimeZone = SERVER_TIME_ZONE;
     branches.push(recurring.join(" AND "), onetime.join(" AND "));
@@ -153,7 +163,11 @@ function getAvailabilityCondition(
     branches.push("t.occasional::text IN (:...availabilityOccasional)");
     params.availabilityOccasional = occasionalTypes;
   }
-  return [branches.map((b) => `(${b})`).join(" OR "), params];
+  return {
+    condition: branches.map((b) => `(${b})`).join(" OR "),
+    params,
+    onetimeAt,
+  };
 }
 
 function isEmptyFilter({ days, times, occasional }: AvailabilityFilter) {
@@ -171,7 +185,7 @@ export async function findAvailabilityDealIds(
   if (isEmptyFilter(filter)) {
     return [];
   }
-  const [condition, params] = getAvailabilityCondition(filter);
+  const { condition, params } = getAvailabilityCondition(filter);
   const rows: { dealId: number }[] = await dataSource
     .createQueryBuilder()
     .select("DISTINCT dt.deal_id", "dealId")
@@ -195,11 +209,12 @@ export async function findOpportunityAvailabilityDealIds(
   if (isEmptyFilter(filter)) {
     return [];
   }
-  const [slotCondition, params] = getAvailabilityCondition(filter);
-  const onetimer = [
-    "ot.id IS NOT NULL",
-    ...getOnetimeConditions(filter, ONETIMER_START, params),
-  ];
+  const {
+    condition: slotCondition,
+    params,
+    onetimeAt,
+  } = getAvailabilityCondition(filter);
+  const onetimer = ["ot.id IS NOT NULL", ...onetimeAt(ONETIMER_START)];
   const rows: { dealId: number }[] = await dataSource
     .createQueryBuilder()
     .select("DISTINCT o.deal_id", "dealId")

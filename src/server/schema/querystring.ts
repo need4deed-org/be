@@ -219,7 +219,6 @@ export const volunteerOpportunityListQuerySchema = {
     status: getRef("OpportunityStatusType#"),
     agentId: { type: "number", minimum: 1 },
     search: { type: "string" },
-    german: { type: "boolean" },
     activity: { type: "string" },
     skill: { type: "string" },
     availability: {

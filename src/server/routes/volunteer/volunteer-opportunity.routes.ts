@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
-import { dataSource } from "../../../data/data-source";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
@@ -12,14 +11,12 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
-  findOpportunityAvailabilityDealIds,
   getCategoryToDealHandler,
-  getOpportunityWhere,
+  getOpportunityListWhere,
   getSkipTake,
   mergeIntoWhere,
 } from "../../utils";
 import {
-  languageIdOf,
   requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
@@ -53,17 +50,9 @@ export default async function volunteerOpportunityRoutes(
 
       const [skip, take] = getSkipTake({ page, limit });
 
-      const [searchLanguageId, availabilityDealIds] = await Promise.all([
-        filter.search
-          ? languageIdOf(dataSource.manager, requestLanguage({ language }))
-          : undefined,
-        findOpportunityAvailabilityDealIds(filter.availability),
-      ]);
-      const where = getOpportunityWhere(
+      const where = await getOpportunityListWhere(
         filter,
-        undefined,
-        searchLanguageId,
-        availabilityDealIds,
+        requestLanguage({ language }),
       );
       if (agentId) {
         mergeIntoWhere<Opportunity>(where, { agentId });

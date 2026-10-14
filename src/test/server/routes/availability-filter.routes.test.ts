@@ -84,6 +84,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
   const opportunities = {} as Record<Key, Opportunity>;
   const onetimerOpportunities = {} as Record<OnetimerKey, Opportunity>;
   const onetimers: Onetimer[] = [];
+  const extraOpportunities: Opportunity[] = [];
 
   const get = (url: string) =>
     fastify.inject({
@@ -189,6 +190,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
     for (const opportunity of [
       ...Object.values(opportunities),
       ...Object.values(onetimerOpportunities),
+      ...extraOpportunities,
     ]) {
       await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     }
@@ -348,11 +350,74 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
 
   it("applies non-column filters on a volunteer's opportunities", async () => {
     const res = await get(
-      `/volunteer/opportunity?limit=100&type=${OpportunityType.REGULAR}&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}&search=fridayEvening%20${suffix}&german=true`,
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.REGULAR}&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}&search=fridayEvening%20${suffix}`,
     );
     expect(res.statusCode).toBe(200);
     expect(own(opportunities, ids(res))).toEqual(
       expectedIds(opportunities, ["fridayEvening"]),
     );
+  });
+
+  it("moves an event's one-time timeslot when PATCH changes its date", async () => {
+    const deal = await dealWith(DealType.VOLUNTEER, SLOTS.mondayMorning);
+    const stale = await getRepository(dataSource, Timeslot).save(
+      new Timeslot({ start: new Date("2026-01-12T18:00:00+01:00") }),
+    );
+    timeslots.push(stale);
+    await getRepository(dataSource, DealTimeslot).save(
+      new DealTimeslot({ dealId: deal.id, timeslotId: stale.id }),
+    );
+    const onetimer = await getRepository(dataSource, Onetimer).save(
+      new Onetimer({ date: stale.start }),
+    );
+    onetimers.push(onetimer);
+    const opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Availability eventPatched ${suffix}`,
+        type: OpportunityType.EVENTS,
+        status: OpportunityStatusType.SEARCHING,
+        dealId: deal.id,
+        onetimerId: onetimer.id,
+        agentId: agent.id,
+      }),
+    );
+    extraOpportunities.push(opportunity);
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: cookie },
+      payload: {
+        opportunity_type: OpportunityType.EVENTS,
+        event: { date: "2026-01-15", time: "18:00" },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const slots = await getRepository(dataSource, DealTimeslot).find({
+      where: { dealId: deal.id },
+      relations: { timeslot: true },
+    });
+    for (const { timeslot } of slots) {
+      if (!timeslots.some(({ id }) => id === timeslot.id)) {
+        timeslots.push(timeslot);
+      }
+    }
+    const date = (
+      await getRepository(dataSource, Onetimer).findOneByOrFail({
+        id: onetimer.id,
+      })
+    ).date;
+    expect(
+      slots
+        .filter(({ timeslot }) => !timeslot.rrule)
+        .map(({ timeslot }) => timeslot.start.getTime()),
+    ).toEqual([new Date(date).getTime()]);
+    expect(slots.filter(({ timeslot }) => timeslot.rrule)).toHaveLength(1);
+
+    const thursday = await get(
+      `/opportunity?limit=100&filter[search]=${suffix}&filter[availability]=days~Thursday`,
+    );
+    expect(ids(thursday)).toContain(opportunity.id);
   });
 });

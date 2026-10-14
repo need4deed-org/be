@@ -56,7 +56,6 @@ export interface QuerystringOpportunityFiltering {
     agentId?: number;
     search?: string;
     language?: string;
-    german?: boolean;
     activity?: string;
     skill?: string;
     availability?: string | string[];
