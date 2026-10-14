@@ -20,16 +20,12 @@ function sanitizeAdditionalInfo(value: unknown): string[] | undefined {
   return value.every((item) => typeof item === "string") ? value : undefined;
 }
 
-export function dtoEventN4DGetList(
-  event: EventN4D,
-  language: Lang,
-  isPrivileged: boolean,
-): ApiEventN4DGetList | null {
-  const translation = resolveEventTranslation(event, language);
-  if (!translation && !isPrivileged) {
-    return null;
-  }
+type EventTranslation = ReturnType<typeof resolveEventTranslation>;
 
+function eventListItem(
+  event: EventN4D,
+  translation: EventTranslation,
+): ApiEventN4DGetList {
   return {
     id: event.id,
     active: event.isActive,
@@ -51,19 +47,30 @@ export function dtoEventN4DGetList(
   };
 }
 
+export function dtoEventN4DGetList(
+  event: EventN4D,
+  language: Lang,
+  isPrivileged: boolean,
+): ApiEventN4DGetList | null {
+  const translation = resolveEventTranslation(event, language);
+  if (!translation && !isPrivileged) {
+    return null;
+  }
+  return eventListItem(event, translation);
+}
+
 export function dtoEventN4DGet(
   event: EventN4D,
   language: Lang,
   isPrivileged: boolean,
 ): ApiEventN4DGet | null {
-  const list = dtoEventN4DGetList(event, language, isPrivileged);
-  if (!list) {
+  const translation = resolveEventTranslation(event, language);
+  if (!translation && !isPrivileged) {
     return null;
   }
-  const translation = resolveEventTranslation(event, language);
 
   return {
-    ...list,
+    ...eventListItem(event, translation),
     time: translation?.timeStr,
     locationLink: event.locationLink,
     followUpText: translation?.followupText,
