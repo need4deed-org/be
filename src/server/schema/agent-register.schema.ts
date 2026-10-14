@@ -121,7 +121,11 @@ export const registerAgentConflictSchema = {
     {
       type: "object",
       required: ["message", "conflict", "agentId"],
-      properties: { ...conflictBase, conflict: { const: "address" } },
+      properties: {
+        ...conflictBase,
+        conflict: { const: "address" },
+        agentTitle: { type: "string" },
+      },
     },
     {
       type: "object",
