@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTaggedAgentIds } from "../../../../server/utils/data/attach-tagged-agents";
+import { getTaggedAgentIds } from "../../../../server/utils/data/tagged-agents";
 
 describe("getTaggedAgentIds", () => {
   it("returns each tagged agent id once, ignoring person tokens", () => {

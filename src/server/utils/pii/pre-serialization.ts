@@ -1,7 +1,11 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { isStaffRole } from "../data/is-staff-role";
 import { maskPii } from "./mask";
-import { CallerVisibility, resolveCallerVisibility } from "./visible-persons";
+import {
+  anonymousVisibility,
+  CallerVisibility,
+  resolveCallerVisibility,
+} from "./visible-persons";
 
 type Envelope = { message?: string; data?: unknown; count?: number };
 
@@ -12,10 +16,18 @@ export async function resolveCallerMask(
     return request.callerVisibility;
   }
   const user = request.authUser;
-  const privileged = isStaffRole(user?.role);
-  request.callerVisibility =
-    !user || privileged ? null : await resolveCallerVisibility(request, user);
+  if (!user) {
+    request.callerVisibility = anonymousVisibility();
+  } else {
+    request.callerVisibility = isStaffRole(user.role)
+      ? null
+      : await resolveCallerVisibility(request, user);
+  }
   return request.callerVisibility;
+}
+
+export function resetCallerMask(request: FastifyRequest): void {
+  request.callerVisibility = undefined;
 }
 
 export async function maskForCaller(

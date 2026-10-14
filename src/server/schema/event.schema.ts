@@ -19,6 +19,7 @@ export const eventItemSchema = {
     description: { type: "string" },
     shortDescription: { type: "string" },
     linkRSVP: { type: "string" },
+    hostName: { type: ["string", "null"] },
     additionalTitle: { type: ["string", "null"] },
     additionalInfo: {
       type: ["array", "null"],
@@ -44,7 +45,6 @@ export const eventFullItemSchema = {
   ...eventItemSchema,
   properties: {
     ...eventItemSchema.properties,
-    hostName: { type: ["string", "null"] },
     time: { type: ["string", "null"] },
     locationLink: { type: ["string", "null"] },
     followUpText: { type: ["string", "null"] },

@@ -106,22 +106,23 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
 });
 
 describe("getVolunteerWhere owner scoping (be#1056)", () => {
-  type RawOwner = {
+  type RawCondition = {
     _type: string;
     _getSql: (alias: string) => string;
     _objectLiteralParameters: Record<string, unknown>;
   };
-  const ownerCondition = (where: object) =>
-    (where as { ownerAgentId?: RawOwner }).ownerAgentId;
-  const COLUMN = `"Volunteer"."owner_agent_id"`;
+  const condition = (where: object, key: "ownerAgentId" | "id") =>
+    (where as Record<string, RawCondition | undefined>)[key];
+  const COLUMN = "Volunteer.ownerAgentId";
 
   it("adds no owner condition for a privileged caller without a filter", () => {
     expect(getVolunteerWhere({}, null)).toEqual({});
   });
 
   it("filters a privileged caller by ownerAgent, incl. none", () => {
-    const owner = ownerCondition(
+    const owner = condition(
       getVolunteerWhere({ ownerAgent: ["4", "none"] }, null),
+      "ownerAgentId",
     );
     expect(owner?._getSql(COLUMN)).toBe(
       `(${COLUMN} IS NULL OR ${COLUMN} = ANY(:requestedOwners))`,
@@ -130,23 +131,26 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
   });
 
   it("limits a masked caller to no owner, visible owners or visible persons", () => {
-    const owner = ownerCondition(
-      getVolunteerWhere({}, visibility([7], [4, 5])),
+    const where = getVolunteerWhere({}, visibility([7], [4, 5]));
+    expect(condition(where, "ownerAgentId")).toBeUndefined();
+    const scope = condition(where, "id");
+    expect(scope?._getSql("Volunteer.id")).toBe(
+      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))",
     );
-    expect(owner?._getSql(COLUMN)).toBe(
-      `(${COLUMN} IS NULL OR ${COLUMN} = ANY(:visibleOwners) OR "Volunteer"."person_id" = ANY(:visiblePersons))`,
-    );
-    expect(owner?._objectLiteralParameters).toMatchObject({
+    expect(scope?._objectLiteralParameters).toEqual({
       visibleOwners: [4, 5],
       visiblePersons: [7],
     });
   });
 
   it("ANDs a requested owner with the caller's visibility", () => {
-    const owner = ownerCondition(
-      getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4])),
-    );
-    expect(owner?._getSql(COLUMN)).toContain(") AND (");
-    expect(owner?._objectLiteralParameters.requestedOwners).toEqual([9]);
+    const where = getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4]));
+    expect(
+      condition(where, "ownerAgentId")?._objectLiteralParameters
+        .requestedOwners,
+    ).toEqual([9]);
+    expect(condition(where, "id")?._objectLiteralParameters).toMatchObject({
+      visibleOwners: [4],
+    });
   });
 });

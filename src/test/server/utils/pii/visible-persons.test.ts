@@ -7,7 +7,10 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
 import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
-import { resolveCallerVisibility } from "../../../../server/utils/pii/visible-persons";
+import {
+  resolveCallerVisibility,
+  VISIBLE_MATCH_STATUSES,
+} from "../../../../server/utils/pii/visible-persons";
 
 vi.mock("../../../../server/utils/data/get-agent-memberships", () => ({
   getActiveAgentMemberships: vi.fn(),
@@ -99,7 +102,6 @@ describe("resolveCallerVisibility", () => {
         { id: 101, person_id: 9 },
       ]);
       query.mockResolvedValueOnce([{ person_id: 11 }]);
-      query.mockResolvedValueOnce([]);
 
       const v = await resolveCallerVisibility(
         request,
@@ -119,36 +121,26 @@ describe("resolveCallerVisibility", () => {
         },
       });
 
-      expect(query.mock.calls[0][1]).toEqual([[42, 43]]);
+      expect(query.mock.calls[0][1]).toEqual([
+        [42, 43],
+        VISIBLE_MATCH_STATUSES,
+      ]);
     });
 
-    it("adds every sharing agent as a visible owner only when the caller shares", async () => {
-      mockMemberships.mockResolvedValue([{ agentId: 42 }] as unknown as Awaited<
-        ReturnType<typeof getActiveAgentMemberships>
-      >);
-      find.mockResolvedValue([]);
-      query
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: 42 }, { id: 50 }]);
+    it("counts only the caller's own agents as visible owners", async () => {
+      mockMemberships.mockResolvedValueOnce([
+        { agentId: 42 },
+      ] as unknown as Awaited<ReturnType<typeof getActiveAgentMemberships>>);
+      find.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-      const sharing = await resolveCallerVisibility(
+      const v = await resolveCallerVisibility(
         request,
         makeUser(UserRole.AGENT, 1),
       );
-      expect(sorted(sharing.ownerAgentIds)).toEqual([42, 50]);
 
-      request.callerAgentIds = undefined;
-      query
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
-
-      const notSharing = await resolveCallerVisibility(
-        request,
-        makeUser(UserRole.AGENT, 1),
-      );
-      expect(sorted(notSharing.ownerAgentIds)).toEqual([42]);
+      expect(sorted(v.ownerAgentIds)).toEqual([42]);
+      expect(query).toHaveBeenCalledTimes(2);
     });
 
     it("stops at own person when the AGENT has no memberships", async () => {

@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
+  AgentRoleType,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -14,13 +15,10 @@ import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { lockRegistration } from "../../../server/utils/data/write-agent-registration";
 import { randomNumericSuffix } from "../../random";
 
-// be#652: POST /agent/register had zero route-level coverage — only the
-// write-helper unit tests and the /search picker's INACTIVE-exclusion case
-// (be#885) existed. This exercises the route itself: auth via the verify
-// token, the JOIN vs CREATE branches, and the conflict/error paths.
-describe("POST /agent/register", () => {
+describe("/agent/register", () => {
   let fastify: FastifyInstance;
 
   const password = "test_password";
@@ -55,6 +53,22 @@ describe("POST /agent/register", () => {
       type: "verify",
     });
     return { person, user, token };
+  }
+
+  async function waitForRegistrationLockWaiter(personId: number) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [{ waiting }] = await dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_locks
+         WHERE locktype = 'advisory' AND objsubid = 2
+           AND objid::bigint = $1 AND NOT granted`,
+        [personId],
+      );
+      if (waiting > 0) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error("POST never waited on the registration lock");
   }
 
   async function makeAgent(overrides: Partial<Agent> = {}): Promise<Agent> {
@@ -92,6 +106,246 @@ describe("POST /agent/register", () => {
       await fastify.db.personRepository.delete({ id: personId });
     }
     await fastify.close();
+  });
+
+  it("reports no registration for a registrant without a coordinator membership", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const initial = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json().data).toEqual({ registered: false });
+    const agent = await makeAgent();
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: person.id,
+        role: AgentRoleType.OTHER,
+      }),
+    );
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual({ registered: false });
+  });
+
+  it.each([AgentMembershipStatus.ACTIVE, AgentMembershipStatus.PENDING])(
+    "reports an existing %s coordinator membership and rejects repeated create/join submissions",
+    async (status) => {
+      const { token, person } = await makeRegistrant("example.org");
+      const agent = await makeAgent();
+      const membership = await fastify.db.agentPersonRepository.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: person.id,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+          status,
+        }),
+      );
+      const res = await fastify.inject({
+        url: `/agent/register/status?token=${token}`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual({
+        registered: true,
+        agentId: agent.id,
+        ...(status === AgentMembershipStatus.ACTIVE
+          ? { agentTitle: agent.title }
+          : {}),
+        membershipStatus: status,
+      });
+      if (status === AgentMembershipStatus.PENDING) {
+        expect(res.json().data).not.toHaveProperty("agentTitle");
+        expect(res.body).not.toContain(agent.title);
+      }
+
+      const title = `Repeated NGO ${randomNumericSuffix()}`;
+      for (const payload of [
+        { agent: { title } },
+        { agentId: agent.id },
+        { agentId: 999999999 },
+      ]) {
+        const repeated = await fastify.inject({
+          method: "POST",
+          url: `/agent/register?token=${token}`,
+          payload,
+        });
+        expect(repeated.statusCode).toBe(409);
+        expect(repeated.json()).toMatchObject({
+          conflict: "registered",
+          agentId: agent.id,
+          membershipStatus: status,
+        });
+      }
+      expect(await fastify.db.agentRepository.findOneBy({ title })).toBeNull();
+      const memberships = await fastify.db.agentPersonRepository.findBy({
+        personId: person.id,
+      });
+      expect(memberships.map((row) => row.id)).toEqual([membership.id]);
+      expect(memberships[0].status).toBe(status);
+    },
+  );
+
+  it("rejects invalid, expired and wrong-type tokens on the status endpoint", async () => {
+    const { user } = await makeRegistrant("example.org");
+    const expiredPayload = {
+      id: user.id,
+      email: user.email,
+      type: "verify" as const,
+      exp: Math.floor(Date.now() / 1000) - 60,
+    };
+    const tokens = [
+      "not-a-real-token",
+      fastify.jwt.sign(expiredPayload),
+      fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        type: "access",
+      }),
+    ];
+    for (const token of tokens) {
+      const res = await fastify.inject({
+        url: `/agent/register/status?token=${token}`,
+      });
+      expect(res.statusCode).toBe(401);
+    }
+  });
+
+  it("reports the ACTIVE membership over an older PENDING one", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const pendingAgent = await makeAgent();
+    const activeAgent = await makeAgent();
+    await fastify.db.agentPersonRepository.save([
+      new AgentPerson({
+        agentId: pendingAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.PENDING,
+      }),
+      new AgentPerson({
+        agentId: activeAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    ]);
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(res.json().data).toEqual({
+      registered: true,
+      agentId: activeAgent.id,
+      agentTitle: activeAgent.title,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
+  it("waits for a concurrent registration of the same person, then 409s", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const agent = await makeAgent();
+    const title = `Race NGO ${randomNumericSuffix()}`;
+    const runner = dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await lockRegistration(person.id, runner.manager);
+      let settled = false;
+      const pending = fastify
+        .inject({
+          method: "POST",
+          url: `/agent/register?token=${token}`,
+          payload: { agent: { title } },
+        })
+        .then((res) => {
+          settled = true;
+          return res;
+        });
+      await waitForRegistrationLockWaiter(person.id);
+      expect(settled).toBe(false);
+
+      await runner.manager.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: person.id,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        }),
+      );
+      await runner.commitTransaction();
+
+      const res = await pending;
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        conflict: "registered",
+        agentId: agent.id,
+        membershipStatus: AgentMembershipStatus.ACTIVE,
+      });
+      expect(await fastify.db.agentRepository.findOneBy({ title })).toBeNull();
+    } finally {
+      if (runner.isTransactionActive) {
+        await runner.rollbackTransaction();
+      }
+      await runner.release();
+    }
+  });
+
+  it("500s with no membership leak when the registrant has no linked person, but still serves search", async () => {
+    const { token, user } = await makeRegistrant("example.org");
+    await fastify.db.userRepository.update(user.id, {
+      personId: null as unknown as number,
+    });
+    const search = await fastify.inject({
+      url: `/agent/register/search?token=${token}&street=Nowhere`,
+    });
+    expect(search.statusCode).toBe(200);
+    for (const request of [
+      { url: `/agent/register/status?token=${token}` },
+      {
+        method: "POST" as const,
+        url: `/agent/register?token=${token}`,
+        payload: { agent: { title: `No Person ${randomNumericSuffix()}` } },
+      },
+    ]) {
+      const res = await fastify.inject(request);
+      expect(res.statusCode).toBe(500);
+      expect(res.json().message).toBe("Account is missing a person record.");
+    }
+  });
+
+  it("does not reveal another registrant's membership", async () => {
+    const registered = await makeRegistrant("example.org");
+    const other = await makeRegistrant("example.org");
+    const agent = await makeAgent();
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: registered.person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+      }),
+    );
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${other.token}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toEqual({ registered: false });
+  });
+
+  it("rejects status lookups for unverified accounts and non-agent roles", async () => {
+    const { token, user } = await makeRegistrant("example.org");
+    await fastify.db.userRepository.update(user.id, { isActive: false });
+    expect(
+      (await fastify.inject({ url: `/agent/register/status?token=${token}` }))
+        .statusCode,
+    ).toBe(401);
+    await fastify.db.userRepository.update(user.id, {
+      isActive: true,
+      role: UserRole.VOLUNTEER,
+    });
+    expect(
+      (await fastify.inject({ url: `/agent/register/status?token=${token}` }))
+        .statusCode,
+    ).toBe(403);
   });
 
   it("401s with no token", async () => {
@@ -179,6 +433,17 @@ describe("POST /agent/register", () => {
     });
     expect(membership).not.toBeNull();
     expect(membership?.status).toBe(AgentMembershipStatus.ACTIVE);
+
+    const status = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().data).toEqual({
+      registered: true,
+      agentId: body.data.agentId,
+      agentTitle: `Brand New NGO ${suffix}`,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
   });
 
   it("joins an existing agent as ACTIVE when the registrant's email domain matches an existing member", async () => {
@@ -255,6 +520,77 @@ describe("POST /agent/register", () => {
     } finally {
       await fastify.db.trustedDomainRepository.delete({ id: trusted.id });
     }
+  });
+
+  it("lists operators for a registrant with a verify token", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/organizations?token=${token}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    expect(res.json().data).toContainEqual(
+      expect.objectContaining({
+        id: organization.id,
+        title: organization.title,
+      }),
+    );
+    expect(
+      (
+        await fastify.inject({
+          method: "GET",
+          url: "/agent/register/organizations?token=invalid",
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
+  it("stores the chosen operator (Träger) on the new agent", async () => {
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: organization.id,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const agentId = res.json().data.agentId;
+    createdAgentIds.push(agentId);
+    const agent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agentId,
+    });
+    expect(agent.organizationId).toBe(organization.id);
+  });
+
+  it("400s an unknown operator", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: 999999999,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
   });
 
   it("409s creating an agent whose title is already taken", async () => {

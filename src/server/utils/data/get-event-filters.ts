@@ -1,7 +1,6 @@
-import { Lang } from "need4deed-sdk";
 import { SelectQueryBuilder } from "typeorm";
 import EventN4D from "../../../data/entity/event/event.entity";
-import { resolveEventTranslation } from "../../../services/dto/dto-event";
+import { ResolvedEventTranslation } from "../../../services/dto/dto-event";
 import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
 import { QuerystringEventGetList } from "../../types";
 import { parseDateOnly } from "./parse-date-only";
@@ -38,14 +37,13 @@ export function applyEventDateRange(
 // shown (same fallback as the DTO), plus the structural hostName / address.
 export function matchesEventSearch(
   event: EventN4D,
-  language: Lang,
+  translation: ResolvedEventTranslation,
   search: string,
 ): boolean {
   const needle = search.trim().toLocaleLowerCase();
   if (!needle) {
     return true;
   }
-  const translation = resolveEventTranslation(event, language);
   return [
     translation?.title,
     translation?.description,
