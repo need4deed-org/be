@@ -13,6 +13,7 @@ import Agent from "../../../../data/entity/opportunity/agent.entity";
 import Person from "../../../../data/entity/person.entity";
 import {
   AgentAddressConflictError,
+  AgentAlreadyRegisteredError,
   AgentTitleConflictError,
   classifyRegisterAgentConflict,
   createAgent,
@@ -39,7 +40,7 @@ vi.mock("../../../../server/utils/data/is-trusted-domain", () => ({
     isEmailDomainTrustedMock(...args),
 }));
 
-const txnManager: any = { getRepository: vi.fn() };
+const txnManager: any = { getRepository: vi.fn(), query: vi.fn() };
 
 // Agent.find (address-dedup lookup) and Agent.findOne (joinAgent's
 // exists/unclaimed check, createAgent's title-conflict lookup) — kept
@@ -49,9 +50,7 @@ const txnManager: any = { getRepository: vi.fn() };
 const agentRepoFind = vi.fn();
 const agentRepoFindOne = vi.fn();
 
-const agentPersonRepoFindOne = vi.fn();
 const agentPersonRepoFind = vi.fn();
-const agentPersonRepoSave = vi.fn();
 
 vi.mock("../../../../data/data-source", () => ({
   dataSource: {
@@ -59,16 +58,13 @@ vi.mock("../../../../data/data-source", () => ({
     getRepository: (entity: any) =>
       entity?.name === "Agent"
         ? { find: agentRepoFind, findOne: agentRepoFindOne }
-        : {
-            findOne: agentPersonRepoFindOne,
-            find: agentPersonRepoFind,
-            save: agentPersonRepoSave,
-          },
+        : { find: agentPersonRepoFind },
   },
 }));
 
 const agentSave = vi.fn();
 const agentPersonSave = vi.fn();
+const agentPersonFind = vi.fn();
 const agentLanguageSave = vi.fn();
 const agentServiceSave = vi.fn();
 const personUpdate = vi.fn();
@@ -79,9 +75,13 @@ beforeEach(() => {
   txnManager.getRepository.mockImplementation((entity: any) => {
     switch (entity) {
       case Agent:
-        return { save: agentSave };
+        return {
+          save: agentSave,
+          find: agentRepoFind,
+          findOne: agentRepoFindOne,
+        };
       case AgentPerson:
-        return { save: agentPersonSave };
+        return { save: agentPersonSave, find: agentPersonFind };
       case AgentLanguage:
         return { save: agentLanguageSave };
       case AgentService:
@@ -96,6 +96,9 @@ beforeEach(() => {
   // Default: the address-dedup lookup (dataSource.getRepository(Agent).find)
   // finds no existing agent, so createAgentForPerson proceeds to create.
   agentRepoFind.mockResolvedValue([]);
+
+  // Default: the registrant has no coordinator membership yet.
+  agentPersonFind.mockResolvedValue([]);
 
   // Default: domain not on the trusted allowlist (member-match decides).
   isEmailDomainTrustedMock.mockResolvedValue(false);
@@ -167,7 +170,7 @@ describe("createAgentForPerson", () => {
       districtId: 1,
     } as ApiAgentRegisterNew);
 
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3, txnManager);
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
 
@@ -299,6 +302,27 @@ describe("createAgentForPerson", () => {
     expect(personUpdate).not.toHaveBeenCalled();
   });
 
+  it("throws AgentAlreadyRegisteredError before the address check when the registrant already coordinates an agent", async () => {
+    agentPersonFind.mockResolvedValueOnce([
+      { id: 6, agentId: 21, status: AgentMembershipStatus.PENDING },
+    ]);
+
+    const err = await createAgentForPerson(11, {
+      title: "Centre HERO",
+      addressStreet: "Example Str. 1",
+      addressPostcode: "10115",
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(AgentAlreadyRegisteredError);
+    expect(err.details).toEqual({
+      conflict: "registered",
+      agentId: 21,
+      membershipStatus: AgentMembershipStatus.PENDING,
+    });
+    expect(agentRepoFind).not.toHaveBeenCalled();
+    expect(agentSave).not.toHaveBeenCalled();
+  });
+
   it("throws AgentTitleConflictError with the existing agent's id on a unique-title violation", async () => {
     agentSave.mockRejectedValueOnce({
       code: "23505",
@@ -416,7 +440,7 @@ describe("createAgent", () => {
       districtId: 1,
     } as ApiAgentRegisterNew);
 
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3);
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(3, txnManager);
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
 
@@ -430,9 +454,10 @@ describe("createAgent", () => {
     } as ApiAgentRegisterNew);
 
     expect(createAddressMock).not.toHaveBeenCalled();
-    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith({
-      value: "12681",
-    });
+    expect(getDistrictFromPostcodeMock).toHaveBeenCalledWith(
+      { value: "12681" },
+      txnManager,
+    );
     expect(agentSave.mock.calls[0][0].addressId).toBeUndefined();
     expect(agentSave.mock.calls[0][0].districtId).toBe(7);
   });
@@ -564,12 +589,12 @@ describe("joinAgent", () => {
   it("404s (not 403) when the agent doesn't exist at all", async () => {
     agentRepoFindOne.mockResolvedValueOnce(null);
 
-    const err = await joinAgent(11, 33, AgentMembershipStatus.PENDING).catch(
+    const err = await joinAgent(11, 33, "registrant@example.org").catch(
       (e) => e,
     );
 
     expect(err).toBeInstanceOf(NotFoundError);
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
+    expect(agentPersonSave).not.toHaveBeenCalled();
   });
 
   // A legacy agent (e.g. created via POST /opportunity/legacy with no
@@ -577,12 +602,11 @@ describe("joinAgent", () => {
   // `unclaimed` — it must stay joinable, unlike a coordinator-created agent.
   it("allows joining a non-unclaimed agent even with zero existing memberships", async () => {
     agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: false });
-    agentPersonRepoFindOne.mockResolvedValueOnce(null);
 
-    const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
+    const result = await joinAgent(11, 33, "registrant@example.org");
 
-    expect(agentPersonRepoSave).toHaveBeenCalledTimes(1);
-    expect(agentPersonRepoSave.mock.calls[0][0]).toMatchObject({
+    expect(agentPersonSave).toHaveBeenCalledTimes(1);
+    expect(agentPersonSave.mock.calls[0][0]).toMatchObject({
       agentId: 33,
       personId: 11,
       role: AgentRoleType.VOLUNTEER_COORDINATOR,
@@ -594,20 +618,28 @@ describe("joinAgent", () => {
     });
   });
 
-  it("is idempotent: returns the existing membership status without saving again", async () => {
-    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: false });
-    agentPersonRepoFindOne.mockResolvedValueOnce({
-      id: 7,
-      status: AgentMembershipStatus.ACTIVE,
-    });
+  it("throws AgentAlreadyRegisteredError, preferring the ACTIVE membership, before touching the agent", async () => {
+    agentPersonFind.mockResolvedValueOnce([
+      { id: 6, agentId: 21, status: AgentMembershipStatus.PENDING },
+      { id: 7, agentId: 22, status: AgentMembershipStatus.ACTIVE },
+    ]);
 
-    const result = await joinAgent(11, 33, AgentMembershipStatus.PENDING);
+    const err = await joinAgent(11, 33, "registrant@example.org").catch(
+      (e) => e,
+    );
 
-    expect(agentPersonRepoSave).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      agentId: 33,
+    expect(err).toBeInstanceOf(AgentAlreadyRegisteredError);
+    expect(err.details).toEqual({
+      conflict: "registered",
+      agentId: 22,
       membershipStatus: AgentMembershipStatus.ACTIVE,
     });
+    expect(txnManager.query).toHaveBeenCalledWith(
+      expect.stringContaining("pg_advisory_xact_lock"),
+      [11],
+    );
+    expect(agentRepoFindOne).not.toHaveBeenCalled();
+    expect(agentPersonSave).not.toHaveBeenCalled();
   });
 });
 

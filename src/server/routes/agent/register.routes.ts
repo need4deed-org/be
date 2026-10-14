@@ -8,13 +8,15 @@ import {
 import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
-  AgentRoleType,
-  ApiAgentAlreadyRegisteredConflict,
   ApiAgentRegister,
   ApiOrganizationGetList,
   UserRole,
 } from "need4deed-sdk";
-import { UnauthenticatedError, UnauthorizedError } from "../../../config";
+import {
+  BaseError,
+  UnauthenticatedError,
+  UnauthorizedError,
+} from "../../../config";
 import logger from "../../../logger";
 import { dtoAgentRegisterStatus } from "../../../services/dto/dto-agent-register-status";
 import {
@@ -31,10 +33,10 @@ import {
 import { ReplyData } from "../../types";
 import {
   createAgentForPerson,
+  findRegistrationMembership,
   getAgentIdsJoinableAsActive,
   isExactStreetMatch,
   joinAgent,
-  resolveJoinStatus,
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
@@ -71,17 +73,19 @@ async function authByVerifyToken(
   request.registrant = user;
 }
 
+function getRegistrantPersonId(request: FastifyRequest): number {
+  const user = request.registrant!;
+  if (!user.personId) {
+    logger.error(`register-agent: registrant ${user.id} has no linked person`);
+    throw new BaseError("Account is missing a person record.", 500);
+  }
+  return user.personId;
+}
+
 export default async function agentRegisterRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  const getRegistrationMembership = (personId: number) =>
-    fastify.db.agentPersonRepository.findOne({
-      where: { personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
-      relations: ["agent"],
-      order: { status: "ASC", id: "ASC" },
-    });
-
   fastify.get<{ Querystring: { token: string } }>(
     "/status",
     {
@@ -94,13 +98,10 @@ export default async function agentRegisterRoutes(
         authByVerifyToken(fastify, request, reply),
     },
     async (request, reply) => {
-      const personId = request.registrant?.personId;
-      if (!personId) {
-        return reply
-          .status(500)
-          .send({ message: "Account is missing a person record." });
-      }
-      const membership = await getRegistrationMembership(personId);
+      const membership = await findRegistrationMembership(
+        getRegistrantPersonId(request),
+        { relations: ["agent"] },
+      );
       return reply.status(200).send({
         message: "Agent registration status.",
         data: dtoAgentRegisterStatus(membership),
@@ -201,39 +202,13 @@ export default async function agentRegisterRoutes(
         authByVerifyToken(fastify, request, reply),
     },
     async (request, reply) => {
-      const user = request.registrant;
-      const personId = user?.personId;
-      if (!personId) {
-        logger.error(
-          `register-agent: registrant ${user?.id} has no linked person`,
-        );
-        return reply
-          .status(500)
-          .send({ message: "Account is missing a person record." });
-      }
-
-      const membership = await getRegistrationMembership(personId);
-      if (membership) {
-        const conflict: ApiAgentAlreadyRegisteredConflict = {
-          conflict: "registered",
-          agentId: membership.agentId,
-          membershipStatus: membership.status,
-        };
-        return reply.status(409).send({
-          message: "Agent registration already completed or awaiting approval.",
-          ...conflict,
-        });
-      }
-
+      const personId = getRegistrantPersonId(request);
+      const email = request.registrant!.email;
       const body = request.body;
 
       const result =
         "agentId" in body
-          ? await joinAgent(
-              personId,
-              body.agentId,
-              await resolveJoinStatus(body.agentId, user!.email),
-            )
+          ? await joinAgent(personId, body.agentId, email)
           : await createAgentForPerson(personId, body.agent);
 
       const message =
