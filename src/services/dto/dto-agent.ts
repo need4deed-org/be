@@ -4,6 +4,7 @@ import {
   ApiAgentGetList,
   ApiAgentMembership,
   ApiAgentOpportunity,
+  ApiAgentTagCandidate,
   ApiOpportunityAgent,
   OptionById,
   OptionTitle,
@@ -188,5 +189,23 @@ export function dtoAgentOpportunity(
         name: ov.volunteer?.person?.name,
         avatarUrl: ov.volunteer?.person?.avatarUrl,
       })),
+  };
+}
+
+export function dtoAgentTagCandidate(row: {
+  id: number;
+  title: string;
+  districtId: number | null;
+  districtTitle: string | null;
+}): ApiAgentTagCandidate {
+  return {
+    id: Number(row.id),
+    title: row.title,
+    district: row.districtId
+      ? {
+          id: Number(row.districtId),
+          title: { de: row.districtTitle ?? undefined },
+        }
+      : null,
   };
 }

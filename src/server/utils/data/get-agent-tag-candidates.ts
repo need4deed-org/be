@@ -1,6 +1,7 @@
 import { FastifyRequest } from "fastify";
 import { ApiAgentTagCandidate } from "need4deed-sdk";
 import { In } from "typeorm";
+import { dtoAgentTagCandidate } from "../../../services/dto/dto-agent";
 import { escapeLikePattern } from "./person-name-ilike";
 import { taggableAgentsQuery } from "./tag-agents";
 
@@ -52,17 +53,5 @@ export async function getAgentTagCandidates(
       districtTitle: string | null;
     }>();
 
-  return rows.map((row) => ({
-    id: Number(row.id),
-    title: row.title,
-    district: row.districtId
-      ? {
-          id: Number(row.districtId),
-          title: {
-            de: row.districtTitle ?? undefined,
-            en: row.districtTitle ?? undefined,
-          },
-        }
-      : null,
-  }));
+  return rows.map(dtoAgentTagCandidate);
 }

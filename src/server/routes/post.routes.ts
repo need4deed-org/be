@@ -252,7 +252,6 @@ export default async function postRoutes(
             : [],
           assertTaggableAgents(request, agentIds),
         ]);
-      const agentMembers = await getAgentMemberPersons(request, agentIds);
 
       validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
       validateRelationIds(
@@ -260,6 +259,8 @@ export default async function postRoutes(
         linkedOpportunities,
         "linked opportunity",
       );
+
+      const agentMembers = await getAgentMemberPersons(request, agentIds);
 
       const post = fastify.db.postRepository.create({
         text,
@@ -357,7 +358,7 @@ export default async function postRoutes(
       }
       const agentIds =
         textChanged || (taggedAgentIds !== null && taggedAgentIds !== undefined)
-          ? resolveTaggedAgentIds(post.text, taggedAgentIds, previousAgentIds)
+          ? resolveTaggedAgentIds(post.text, taggedAgentIds, previousAgents)
           : previousAgentIds;
       const addedAgentIds = agentIds.filter(
         (agentId) => !previousAgentIds.includes(agentId),
@@ -365,7 +366,7 @@ export default async function postRoutes(
 
       const [addedAgents, foundPersons, foundOpportunities] = await Promise.all(
         [
-          assertTaggableAgents(request, addedAgentIds),
+          assertTaggableAgents(request, addedAgentIds, post.agentId),
           taggedPersonIds?.length
             ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
             : [],
@@ -423,6 +424,7 @@ export default async function postRoutes(
         addedAgentMembers.filter(
           (member) =>
             member.id !== taggerPersonId &&
+            member.id !== post.authorId &&
             !previousTaggedIds.includes(member.id) &&
             !alreadyNotifiedIds.has(member.id),
         ),

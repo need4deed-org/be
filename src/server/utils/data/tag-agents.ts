@@ -17,14 +17,17 @@ export function canTagAgents(role: UserRole | undefined): boolean {
   return role === UserRole.AGENT || isStaffRole(role);
 }
 
-export async function taggableAgentsQuery(request: FastifyRequest): Promise<{
+export async function taggableAgentsQuery(
+  request: FastifyRequest,
+  postAgentId?: number | null,
+): Promise<{
   query: SelectQueryBuilder<Agent>;
   ownAgentIds: number[];
 }> {
-  const ownAgentIds = await getCallerAgentIds(
-    request,
-    request.authUser?.personId,
-  );
+  const ownAgentIds = [
+    ...(await getCallerAgentIds(request, request.authUser?.personId)),
+    ...(postAgentId ? [postAgentId] : []),
+  ];
   const query = request.server.db.agentRepository
     .createQueryBuilder("agent")
     .where("agent.unclaimed = false")
@@ -41,11 +44,13 @@ export async function taggableAgentsQuery(request: FastifyRequest): Promise<{
 export function resolveTaggedAgentIds(
   text: string,
   taggedAgentIds: number[] | null | undefined,
-  previousAgentIds: number[],
+  previousAgents: Pick<Agent, "id" | "unclaimed">[],
 ): number[] {
   const tokenIds = getTaggedAgentIds(text);
+  const kept = (agent: Pick<Agent, "id" | "unclaimed">) =>
+    tokenIds.includes(agent.id);
   if (taggedAgentIds === null || taggedAgentIds === undefined) {
-    return tokenIds.filter((id) => previousAgentIds.includes(id));
+    return previousAgents.filter(kept).map((agent) => agent.id);
   }
   const requested = [...new Set(taggedAgentIds)];
   if (requested.some((id) => !tokenIds.includes(id))) {
@@ -53,12 +58,17 @@ export function resolveTaggedAgentIds(
       "taggedAgentIds must appear as <@agent:ID> tokens in the text.",
     );
   }
-  return requested;
+  // Unclaimed NGOs are hidden from clients, so a round-trip can't keep them.
+  const hidden = previousAgents
+    .filter((agent) => agent.unclaimed && kept(agent))
+    .map((agent) => agent.id);
+  return [...new Set([...requested, ...hidden])];
 }
 
 export async function assertTaggableAgents(
   request: FastifyRequest,
   agentIds: number[],
+  postAgentId?: number | null,
 ): Promise<Agent[]> {
   if (agentIds.length === 0) {
     return [];
@@ -66,7 +76,7 @@ export async function assertTaggableAgents(
   if (!canTagAgents(request.authUser?.role)) {
     throw new UnauthorizedError("Only NGO users and staff can tag NGOs.");
   }
-  const { query } = await taggableAgentsQuery(request);
+  const { query } = await taggableAgentsQuery(request, postAgentId);
   const agents = await query
     .select(["agent.id", "agent.title"])
     .andWhere("agent.id IN (:...agentIds)", { agentIds })

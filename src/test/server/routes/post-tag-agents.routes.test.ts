@@ -18,7 +18,7 @@ import { randomNumericSuffix } from "../../random";
 const PASSWORD = "test_password";
 
 type AgentKey = "own" | "nearby" | "far";
-type Caller = "member" | "nearbyMember" | "volunteer";
+type Caller = "member" | "nearbyMember" | "volunteer" | "coordinator";
 
 describe("tagging NGOs in posts (fe#1053)", () => {
   let fastify: FastifyInstance;
@@ -71,6 +71,7 @@ describe("tagging NGOs in posts (fe#1053)", () => {
       member: { role: UserRole.AGENT, agent: "own" },
       nearbyMember: { role: UserRole.AGENT, agent: "nearby" },
       volunteer: { role: UserRole.VOLUNTEER },
+      coordinator: { role: UserRole.COORDINATOR },
     };
     for (const [caller, { role, agent }] of Object.entries(callers) as [
       Caller,
@@ -246,6 +247,52 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data.taggedAgents).toEqual([]);
+  });
+
+  it("won't let an editor tag the post's own NGO", async () => {
+    const created = await request("POST", "/post", "member", {
+      text: "Own post",
+    });
+    const postId = created.json().data.id;
+    postIds.push(postId);
+
+    const res = await request("PATCH", `/post/${postId}`, "coordinator", {
+      text: `Own post <@agent:${agents.own.id}>`,
+      taggedAgentIds: [agents.own.id],
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("keeps a tag hidden because its NGO was unclaimed when the client round-trips the visible ones", async () => {
+    const text = `Hidden <@agent:${agents.nearby.id}> <@agent:${agents.far.id}>`;
+    const created = await request("POST", "/post", "member", {
+      text,
+      taggedAgentIds: [agents.nearby.id, agents.far.id],
+    });
+    const postId = created.json().data.id;
+    postIds.push(postId);
+
+    await fastify.db.agentRepository.update(agents.far.id, {
+      unclaimed: true,
+    });
+    try {
+      const res = await request("PATCH", `/post/${postId}`, "member", {
+        text: `${text} edited`,
+        taggedAgentIds: [agents.nearby.id],
+      });
+      expect(res.statusCode).toBe(200);
+      const stored = await fastify.db.postRepository.findOne({
+        where: { id: postId },
+        relations: ["taggedAgents"],
+      });
+      expect(stored?.taggedAgents.map((a) => a.id).sort()).toEqual(
+        [agents.nearby.id, agents.far.id].sort(),
+      );
+    } finally {
+      await fastify.db.agentRepository.update(agents.far.id, {
+        unclaimed: false,
+      });
+    }
   });
 
   it("doesn't re-notify a member already reached through another tagged NGO", async () => {
