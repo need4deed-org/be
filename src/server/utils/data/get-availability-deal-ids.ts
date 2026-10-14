@@ -1,10 +1,15 @@
-import { ByDay, OccasionalType, TimeSlot } from "need4deed-sdk";
+import {
+  AVAILABILITY_FILTER_SEPARATOR,
+  AvailabilityFilterGroup,
+  ByDay,
+  OccasionalType,
+  TimeSlot,
+} from "need4deed-sdk";
 import { Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import { DealType } from "../../../data/types";
 import { ByDayCode, getByDayCode } from "../../../data/utils/by-day-code";
 
-const SEPARATOR = "~";
 const ISO_DAY_CODES = Object.keys(ByDay) as ByDayCode[];
 const WEEKEND_CODES = new Set<ByDayCode>(["SA", "SU"]);
 const TIME_SLOTS = new Set<string>(Object.values(TimeSlot));
@@ -27,13 +32,20 @@ export function parseAvailabilityFilter(
   }
   const filter: AvailabilityFilter = { days: [], times: [], occasional: [] };
   for (const value of values) {
-    const [group, item] = value.split(SEPARATOR);
-    const dayCode = group === "days" ? getByDayCode(item) : null;
+    const [group, item] = value.split(AVAILABILITY_FILTER_SEPARATOR);
+    const dayCode =
+      group === AvailabilityFilterGroup.DAYS ? getByDayCode(item) : null;
     if (dayCode) {
       filter.days.push(dayCode);
-    } else if (group === "times" && TIME_SLOTS.has(item)) {
+    } else if (
+      group === AvailabilityFilterGroup.TIMES &&
+      TIME_SLOTS.has(item)
+    ) {
       filter.times.push(item);
-    } else if (group === "occasional" && OCCASIONAL.has(item)) {
+    } else if (
+      group === AvailabilityFilterGroup.OCCASIONAL &&
+      OCCASIONAL.has(item)
+    ) {
       filter.occasional.push(item);
     }
   }
