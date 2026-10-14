@@ -177,7 +177,7 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("rejects taggedAgentIds that don't match the text's tokens", async () => {
+  it("rejects taggedAgentIds that aren't tokens in the text", async () => {
     const res = await request("POST", "/post", "member", {
       text: "Hello",
       taggedAgentIds: [agents.nearby.id],
@@ -231,5 +231,51 @@ describe("tagging NGOs in posts (fe#1053)", () => {
       { id: agents.far.id, title: agents.far.title },
     ]);
     spy.mockRestore();
+  });
+
+  it("still saves a post whose text holds a token that isn't tagged", async () => {
+    const created = await request("POST", "/post", "member", {
+      text: "Stale <@agent:999999999>",
+    });
+    const postId = created.json().data.id;
+    postIds.push(postId);
+
+    const res = await request("PATCH", `/post/${postId}`, "member", {
+      text: "Stale <@agent:999999999> edited",
+      taggedAgentIds: [],
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.taggedAgents).toEqual([]);
+  });
+
+  it("doesn't re-notify a member already reached through another tagged NGO", async () => {
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agents.far.id,
+        personId: persons.nearbyMember.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+    const created = await request("POST", "/post", "member", {
+      text: `Both <@agent:${agents.nearby.id}>`,
+      taggedAgentIds: [agents.nearby.id],
+    });
+    const postId = created.json().data.id;
+    postIds.push(postId);
+
+    const spy = vi.spyOn(fastify.notify, "tagged");
+    const res = await request("PATCH", `/post/${postId}`, "member", {
+      text: `Both <@agent:${agents.nearby.id}> <@agent:${agents.far.id}>`,
+      taggedAgentIds: [agents.nearby.id, agents.far.id],
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.taggedAgents).toHaveLength(2);
+    expect(notifiedNames(spy).join(" ")).not.toContain(`nearbyMember${suffix}`);
+    spy.mockRestore();
+    await fastify.db.agentPersonRepository.delete({
+      agentId: agents.far.id,
+      personId: persons.nearbyMember.id,
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { FastifyRequest } from "fastify";
 import { ApiAgentTagCandidate } from "need4deed-sdk";
+import { In } from "typeorm";
 import { escapeLikePattern } from "./person-name-ilike";
 import { taggableAgentsQuery } from "./tag-agents";
 
@@ -10,13 +11,30 @@ export async function getAgentTagCandidates(
   search?: string,
 ): Promise<ApiAgentTagCandidate[]> {
   const { query, ownAgentIds } = await taggableAgentsQuery(request);
-  query.leftJoinAndSelect("agent.district", "district");
-  if (ownAgentIds.length) {
+  const ownDistrictIds = ownAgentIds.length
+    ? (
+        await request.server.db.agentRepository.find({
+          select: { districtId: true },
+          where: { id: In(ownAgentIds) },
+        })
+      )
+        .map((agent) => agent.districtId)
+        .filter((id): id is number => typeof id === "number")
+    : [];
+
+  query
+    .leftJoin("agent.district", "district")
+    .select("agent.id", "id")
+    .addSelect("agent.title", "title")
+    .addSelect("agent.district_id", "districtId")
+    .addSelect("district.title", "districtTitle");
+  if (ownDistrictIds.length) {
     query
       .addSelect(
-        `CASE WHEN agent.district_id IN (SELECT own.district_id FROM agent own WHERE own.id IN (:...ownAgentIds)) THEN 0 ELSE 1 END`,
+        "CASE WHEN agent.district_id IN (:...ownDistrictIds) THEN 0 ELSE 1 END",
         "nearby_rank",
       )
+      .setParameter("ownDistrictIds", ownDistrictIds)
       .orderBy("nearby_rank", "ASC");
   }
   if (search) {
@@ -24,18 +42,26 @@ export async function getAgentTagCandidates(
       search: `%${escapeLikePattern(search)}%`,
     });
   }
-  const agents = await query
+  const rows = await query
     .addOrderBy("agent.title", "ASC")
-    .take(TAG_CANDIDATE_LIMIT)
-    .getMany();
+    .limit(TAG_CANDIDATE_LIMIT)
+    .getRawMany<{
+      id: number;
+      title: string;
+      districtId: number | null;
+      districtTitle: string | null;
+    }>();
 
-  return agents.map((agent) => ({
-    id: agent.id,
-    title: agent.title,
-    district: agent.districtId
+  return rows.map((row) => ({
+    id: Number(row.id),
+    title: row.title,
+    district: row.districtId
       ? {
-          id: agent.districtId,
-          title: { de: agent.district?.title, en: agent.district?.title },
+          id: Number(row.districtId),
+          title: {
+            de: row.districtTitle ?? undefined,
+            en: row.districtTitle ?? undefined,
+          },
         }
       : null,
   }));

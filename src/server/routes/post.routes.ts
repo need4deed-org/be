@@ -240,7 +240,7 @@ export default async function postRoutes(
       const agentIds = resolveTaggedAgentIds(text, taggedAgentIds, []);
       const agentPerson = await getAgentPersonRepresentative(personId);
 
-      const [taggedPersons, linkedOpportunities, taggedAgents, agentMembers] =
+      const [taggedPersons, linkedOpportunities, taggedAgents] =
         await Promise.all([
           taggedPersonIds.length
             ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
@@ -251,8 +251,8 @@ export default async function postRoutes(
               })
             : [],
           assertTaggableAgents(request, agentIds),
-          getAgentMemberPersons(request, agentIds),
         ]);
+      const agentMembers = await getAgentMemberPersons(request, agentIds);
 
       validateRelationIds(taggedPersonIds, taggedPersons, "tagged person");
       validateRelationIds(
@@ -363,10 +363,9 @@ export default async function postRoutes(
         (agentId) => !previousAgentIds.includes(agentId),
       );
 
-      const [addedAgents, addedAgentMembers, foundPersons, foundOpportunities] =
-        await Promise.all([
+      const [addedAgents, foundPersons, foundOpportunities] = await Promise.all(
+        [
           assertTaggableAgents(request, addedAgentIds),
-          getAgentMemberPersons(request, addedAgentIds),
           taggedPersonIds?.length
             ? fastify.db.personRepository.findBy({ id: In(taggedPersonIds) })
             : [],
@@ -375,10 +374,23 @@ export default async function postRoutes(
                 id: In(linkedOpportunityIds),
               })
             : [],
-        ]);
+        ],
+      );
 
+      const keptAgentIds = previousAgentIds.filter((agentId) =>
+        agentIds.includes(agentId),
+      );
+      const [addedAgentMembers, keptAgentMembers] = addedAgents.length
+        ? await Promise.all([
+            getAgentMemberPersons(request, addedAgentIds),
+            getAgentMemberPersons(request, keptAgentIds),
+          ])
+        : [[], []];
+      const alreadyNotifiedIds = new Set(
+        keptAgentMembers.map((member) => member.id),
+      );
       post.taggedAgents = [
-        ...previousAgents.filter((agent) => agentIds.includes(agent.id)),
+        ...previousAgents.filter((agent) => keptAgentIds.includes(agent.id)),
         ...addedAgents,
       ];
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
@@ -411,7 +423,8 @@ export default async function postRoutes(
         addedAgentMembers.filter(
           (member) =>
             member.id !== taggerPersonId &&
-            !previousTaggedIds.includes(member.id),
+            !previousTaggedIds.includes(member.id) &&
+            !alreadyNotifiedIds.has(member.id),
         ),
       );
       if (added.length > 0) {

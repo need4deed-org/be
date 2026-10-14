@@ -47,16 +47,13 @@ export function resolveTaggedAgentIds(
   if (taggedAgentIds === null || taggedAgentIds === undefined) {
     return tokenIds.filter((id) => previousAgentIds.includes(id));
   }
-  const requested = new Set(taggedAgentIds);
-  if (
-    requested.size !== tokenIds.length ||
-    tokenIds.some((id) => !requested.has(id))
-  ) {
+  const requested = [...new Set(taggedAgentIds)];
+  if (requested.some((id) => !tokenIds.includes(id))) {
     throw new BadRequestError(
-      "taggedAgentIds must match the <@agent:ID> tokens in the text.",
+      "taggedAgentIds must appear as <@agent:ID> tokens in the text.",
     );
   }
-  return tokenIds;
+  return requested;
 }
 
 export async function assertTaggableAgents(
@@ -86,10 +83,14 @@ export async function getAgentMemberPersons(
     return [];
   }
   const members = await request.server.db.agentPersonRepository.find({
-    where: { agentId: In(agentIds), status: AgentMembershipStatus.ACTIVE },
+    where: {
+      agentId: In(agentIds),
+      status: AgentMembershipStatus.ACTIVE,
+      person: { users: { isActive: true } },
+    },
     relations: ["person"],
   });
-  return members.map((m) => m.person).filter(Boolean);
+  return mergePersons(members.map((m) => m.person).filter(Boolean));
 }
 
 export function mergePersons(...groups: Person[][]): Person[] {
