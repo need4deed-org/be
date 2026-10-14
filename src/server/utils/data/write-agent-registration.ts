@@ -15,6 +15,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
+import logger from "../../../logger";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
 import { isFreeEmailDomain } from "./free-email-domains";
@@ -28,8 +29,15 @@ export interface RegisterAgentResult {
 }
 
 export class AgentAddressConflictError extends BaseError {
-  constructor(public readonly agentId: number) {
-    const details: ApiAgentAddressConflict = { conflict: "address", agentId };
+  constructor(
+    public readonly agentId: number,
+    agentTitle?: string,
+  ) {
+    const details: ApiAgentAddressConflict = {
+      conflict: "address",
+      agentId,
+      ...(agentTitle ? { agentTitle } : {}),
+    };
     super("An agent at this address already exists.", 409, true, {
       ...details,
     });
@@ -108,9 +116,32 @@ async function assertNotRegistered(
   }
 }
 
+// Only registrants who would join as ACTIVE may learn the NGO's name — the
+// same rule as the registration search.
+async function getTitleVisibleToRegistrant(
+  agent: Agent,
+  registrantEmail: string | undefined,
+  manager: DataSource | EntityManager,
+): Promise<string | undefined> {
+  if (!registrantEmail) {
+    return undefined;
+  }
+  try {
+    const status = await resolveJoinStatus(agent.id, registrantEmail, manager);
+    return status === AgentMembershipStatus.ACTIVE ? agent.title : undefined;
+  } catch (error) {
+    // Never turn the 409 into a 500; the conflict just goes out unnamed.
+    logger.warn(
+      `register-agent: conflict title lookup failed for agent ${agent.id}: ${error}`,
+    );
+    return undefined;
+  }
+}
+
 async function assertNoAddressConflict(
   { addressStreet, addressPostcode, confirmSharedAddress }: ApiAgentRegisterNew,
   manager: DataSource | EntityManager = dataSource,
+  registrantEmail?: string,
 ): Promise<void> {
   if (confirmSharedAddress || !addressStreet || !addressPostcode) {
     return;
@@ -120,7 +151,10 @@ async function assertNoAddressConflict(
   });
   const match = getAgentByAddress(agents, addressStreet, addressPostcode);
   if (match) {
-    throw new AgentAddressConflictError(match.id);
+    throw new AgentAddressConflictError(
+      match.id,
+      await getTitleVisibleToRegistrant(match, registrantEmail, manager),
+    );
   }
 }
 
@@ -184,13 +218,14 @@ type AgentRegisterInput = ApiAgentRegisterNew & { phone?: string };
 export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
+  registrantEmail?: string,
 ): Promise<RegisterAgentResult> {
   let result!: RegisterAgentResult;
 
   try {
     await dataSource.manager.transaction(async (manager) => {
       await assertNotRegistered(personId, manager);
-      await assertNoAddressConflict(input, manager);
+      await assertNoAddressConflict(input, manager, registrantEmail);
       const agent = await createBareAgent(input, manager);
 
       await manager.getRepository(AgentPerson).save(

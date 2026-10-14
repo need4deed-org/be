@@ -205,7 +205,7 @@ export default async function agentRegisterRoutes(
       const result =
         "agentId" in body
           ? await joinAgent(personId, body.agentId, email)
-          : await createAgentForPerson(personId, body.agent);
+          : await createAgentForPerson(personId, body.agent, email);
 
       const message =
         result.membershipStatus === AgentMembershipStatus.PENDING
