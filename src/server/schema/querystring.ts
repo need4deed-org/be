@@ -222,7 +222,9 @@ export const volunteerOpportunityListQuerySchema = {
     german: { type: "boolean" },
     activity: { type: "string" },
     skill: { type: "string" },
-    availability: { type: "string" },
+    availability: {
+      anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+    },
     district: { type: "string" },
   },
   required: ["type", "status"],

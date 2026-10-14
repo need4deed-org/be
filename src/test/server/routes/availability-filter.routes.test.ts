@@ -24,7 +24,12 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type Key = "mondayMorning" | "fridayEvening" | "weekends" | "mondayOnetime";
+type Key =
+  | "mondayMorning"
+  | "fridayEvening"
+  | "saturdayMorning"
+  | "weekends"
+  | "mondayOnetime";
 
 const SLOTS: Record<Key, Partial<Timeslot>> = {
   mondayMorning: {
@@ -37,8 +42,13 @@ const SLOTS: Record<Key, Partial<Timeslot>> = {
     start: new Date(2026, 0, 9, 17, 0),
     end: new Date(2026, 0, 9, 20, 0),
   },
+  saturdayMorning: {
+    rrule: "FREQ=WEEKLY;BYDAY=TU,SA;",
+    start: new Date(2026, 0, 10, 8, 0),
+    end: new Date(2026, 0, 10, 11, 0),
+  },
   weekends: { occasional: OccasionalType.WEEKENDS },
-  mondayOnetime: { start: new Date(2026, 0, 12, 18, 0) },
+  mondayOnetime: { start: new Date("2026-01-12T17:30:00+01:00") },
 };
 
 describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
@@ -153,60 +163,91 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
     await fastify.close();
   });
 
+  const ALL: Key[] = [
+    "mondayMorning",
+    "fridayEvening",
+    "saturdayMorning",
+    "weekends",
+    "mondayOnetime",
+  ];
   const cases: [string, string, Key[]][] = [
+    ["a day", "availability=days~Monday", ["mondayMorning", "mondayOnetime"]],
     [
-      "a day",
-      "filter[availability]=days~Monday",
-      ["mondayMorning", "mondayOnetime"],
+      "a day listed second in BYDAY",
+      "availability=days~Saturday",
+      ["saturdayMorning", "weekends"],
     ],
     [
       "a time",
-      "filter[availability]=times~17-20",
-      ["fridayEvening", "mondayOnetime"],
+      "availability=times~17-20",
+      ["fridayEvening", "mondayOnetime", "weekends"],
     ],
     [
       "a day and a time together",
-      "filter[availability]=days~Monday&filter[availability]=times~17-20",
+      "availability=days~Monday&availability=times~17-20",
       ["mondayOnetime"],
     ],
-    ["occasional", "filter[availability]=occasional~weekends", ["weekends"]],
     [
-      "a day covered by occasional",
-      "filter[availability]=days~Saturday",
+      "occasional",
+      "availability=occasional~weekends",
+      ["saturdayMorning", "weekends"],
+    ],
+    [
+      "occasional and a time",
+      "availability=occasional~weekends&availability=times~17-20",
       ["weekends"],
     ],
     [
       "a day covered by occasional with a time",
-      "filter[availability]=days~Saturday&filter[availability]=times~08-11",
+      "availability=days~Sunday&availability=times~08-11",
       ["weekends"],
     ],
-    [
-      "an empty value",
-      "filter[availability]=",
-      ["mondayMorning", "fridayEvening", "weekends", "mondayOnetime"],
-    ],
-    ["an unknown day", "filter[availability]=days~Someday", []],
-    ["a time outside the time slots", "filter[availability]=times~09-12", []],
-    ["the wrong separator", "filter[availability]=days|Monday", []],
+    ["an empty value", "availability=", ALL],
+    ["an unknown day", "availability=days~Someday", []],
+    ["a day in the wrong case", "availability=days~monday", []],
+    ["a time outside the time slots", "availability=times~09-12", []],
+    ["the wrong separator", "availability=days|Monday", []],
   ];
+
+  const ids = (res: { json: () => { data: { id: number }[] } }) =>
+    res.json().data.map(({ id }) => id);
+  const expectedIds = (entities: Record<Key, { id: number }>, keys: Key[]) =>
+    keys.map((k) => entities[k].id).sort();
+  const own = (entities: Record<Key, { id: number }>, list: number[]) =>
+    list
+      .filter((id) => Object.values(entities).some((e) => e.id === id))
+      .sort();
 
   it.each(cases)("filters volunteers by %s", async (_, query, expected) => {
     const res = await get(
-      `/volunteer?limit=50&filter[search]=Slot${suffix}&${query}`,
+      `/volunteer?limit=50&filter[search]=Slot${suffix}&${query.replaceAll("availability=", "filter[availability]=")}`,
     );
     expect(res.statusCode).toBe(200);
-    const ids = (res.json().data as { id: number }[]).map(({ id }) => id);
-    expect(ids.sort()).toEqual(expected.map((k) => volunteers[k].id).sort());
+    expect(own(volunteers, ids(res))).toEqual(
+      expectedIds(volunteers, expected),
+    );
   });
 
   it.each(cases)("filters opportunities by %s", async (_, query, expected) => {
     const res = await get(
-      `/opportunity?limit=100&filter[search]=${suffix}&${query}`,
+      `/opportunity?limit=100&filter[search]=${suffix}&${query.replaceAll("availability=", "filter[availability]=")}`,
     );
     expect(res.statusCode).toBe(200);
-    const ids = (res.json().data as { id: number }[])
-      .map(({ id }) => id)
-      .filter((id) => Object.values(opportunities).some((o) => o.id === id));
-    expect(ids.sort()).toEqual(expected.map((k) => opportunities[k].id).sort());
+    expect(own(opportunities, ids(res))).toEqual(
+      expectedIds(opportunities, expected),
+    );
   });
+
+  it.each(cases)(
+    "filters a volunteer's opportunities by %s",
+    async (_, query, expected) => {
+      const res = await get(
+        `/volunteer/opportunity?limit=100&type=${OpportunityType.REGULAR}&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}&${query}`,
+      );
+      expect(res.statusCode).toBe(200);
+      expect(own(opportunities, ids(res))).toEqual(
+        expectedIds(opportunities, expected),
+      );
+    },
+  );
 });

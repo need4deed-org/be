@@ -10,6 +10,8 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
+  dealIdIn,
+  findAvailabilityDealIds,
   getCategoryToDealHandler,
   getSkipTake,
   normalizeStringArrayInput,
@@ -44,15 +46,22 @@ export default async function volunteerOpportunityRoutes(
         "deal.postcode",
       ];
 
-      const { page, limit, language, ...filters } = request.query;
+      const { page, limit, language, availability, ...filters } = request.query;
 
       const [skip, take] = getSkipTake({ page, limit });
 
-      const where = Object.fromEntries(
-        Object.entries(filters as QuerystringVolunteerOpportunityGetList).map(
-          ([key, value]) => [key, normalizeStringArrayInput(value)],
+      const availabilityDealIds = await findAvailabilityDealIds(availability);
+      const where = {
+        ...Object.fromEntries(
+          Object.entries(filters).map(([key, value]) => [
+            key,
+            normalizeStringArrayInput(value as string | string[]),
+          ]),
         ),
-      );
+        ...(availabilityDealIds
+          ? { dealId: dealIdIn(availabilityDealIds) }
+          : {}),
+      };
 
       const opportunityRepository = fastify.db.opportunityRepository;
 

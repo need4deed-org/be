@@ -68,7 +68,8 @@ export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering;
 
 export type QuerystringVolunteerOpportunityGetList =
-  QuerystringPaginationLanguage & QuerystringOpportunityFiltering;
+  QuerystringPaginationLanguage &
+    NonNullable<QuerystringOpportunityFiltering["filter"]>;
 
 export type QuerystringOpportunityList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering & {

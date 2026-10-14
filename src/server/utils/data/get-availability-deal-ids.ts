@@ -9,15 +9,31 @@ import { Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import { ByDayCode, getByDayCode } from "../../../data/utils/by-day-code";
 
-const ISO_DAY_CODES = Object.keys(ByDay) as ByDayCode[];
-const WEEKEND_CODES = new Set<ByDayCode>(["SA", "SU"]);
+const ISO_DAY: Record<ByDayCode, number> = {
+  MO: 1,
+  TU: 2,
+  WE: 3,
+  TH: 4,
+  FR: 5,
+  SA: 6,
+  SU: 7,
+};
+const OCCASIONAL_DAYS: Record<OccasionalType, ByDayCode[]> = {
+  [OccasionalType.WEEKDAYS]: ["MO", "TU", "WE", "TH", "FR"],
+  [OccasionalType.WEEKENDS]: ["SA", "SU"],
+};
 const TIME_SLOTS = new Set<string>(Object.values(TimeSlot));
 const OCCASIONAL = new Set<string>(Object.values(OccasionalType));
+const SERVER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const LOCAL_TIME_ZONE = "Europe/Berlin";
+// one-time starts are absolute instants stored as server-local wall time
+const ONETIME_START =
+  "((t.start AT TIME ZONE :availabilityServerTimeZone) AT TIME ZONE :availabilityLocalTimeZone)";
 
 export type AvailabilityFilter = {
   days: ByDayCode[];
   times: string[];
-  occasional: string[];
+  occasional: OccasionalType[];
 };
 
 type Params = Record<string, unknown>;
@@ -34,7 +50,7 @@ export function parseAvailabilityFilter(
     const [group, item] = value.split(AVAILABILITY_FILTER_SEPARATOR);
     const dayCode =
       group === AvailabilityFilterGroup.DAYS ? getByDayCode(item) : null;
-    if (dayCode) {
+    if (dayCode && ByDay[dayCode] === item) {
       filter.days.push(dayCode);
     } else if (
       group === AvailabilityFilterGroup.TIMES &&
@@ -45,45 +61,53 @@ export function parseAvailabilityFilter(
       group === AvailabilityFilterGroup.OCCASIONAL &&
       OCCASIONAL.has(item)
     ) {
-      filter.occasional.push(item);
+      filter.occasional.push(item as OccasionalType);
     }
   }
   return filter;
 }
 
-function occasionalCoveringDays(days: ByDayCode[]): OccasionalType[] {
-  return [
-    ...new Set(
-      days.map((code) =>
-        WEEKEND_CODES.has(code)
-          ? OccasionalType.WEEKENDS
-          : OccasionalType.WEEKDAYS,
-      ),
-    ),
-  ];
-}
-
-function getAvailabilityCondition({
+function matchingOccasionalTypes({
   days,
   times,
   occasional,
-}: AvailabilityFilter): [string, Params] {
+}: AvailabilityFilter): OccasionalType[] {
+  return Object.values(OccasionalType).filter((type) =>
+    days.length
+      ? occasional.includes(type) ||
+        OCCASIONAL_DAYS[type].some((day) => days.includes(day))
+      : occasional.length
+        ? occasional.includes(type)
+        : times.length > 0,
+  );
+}
+
+function getAvailabilityCondition(
+  filter: AvailabilityFilter,
+): [string, Params] {
+  const { days, times, occasional } = filter;
   const branches: string[] = [];
   const params: Params = {};
-  if (days.length || times.length) {
+  const slotDays = [
+    ...new Set([
+      ...days,
+      ...occasional.flatMap((type) => OCCASIONAL_DAYS[type]),
+    ]),
+  ];
+  if (slotDays.length || times.length) {
     const recurring = ["t.rrule IS NOT NULL"];
     const onetime = [
       "t.rrule IS NULL",
       "t.occasional IS NULL",
       "t.start IS NOT NULL",
     ];
-    if (days.length) {
+    if (slotDays.length) {
       recurring.push("t.rrule ~ :availabilityDayPattern");
-      params.availabilityDayPattern = `BYDAY=(${days.join("|")})(;|$)`;
-      onetime.push("EXTRACT(ISODOW FROM t.start) IN (:...availabilityIsoDays)");
-      params.availabilityIsoDays = days.map(
-        (code) => ISO_DAY_CODES.indexOf(code) + 1,
+      params.availabilityDayPattern = `BYDAY=([^;]*,)?(${slotDays.join("|")})(,|;|$)`;
+      onetime.push(
+        `EXTRACT(ISODOW FROM ${ONETIME_START}) IN (:...availabilityIsoDays)`,
       );
+      params.availabilityIsoDays = slotDays.map((day) => ISO_DAY[day]);
     }
     if (times.length) {
       recurring.push(
@@ -96,16 +120,16 @@ function getAvailabilityCondition({
             const [from, to] = time.split("-").map(Number);
             params[`availabilityFrom${i}`] = from;
             params[`availabilityTo${i}`] = to;
-            return `(EXTRACT(HOUR FROM t.start) >= :availabilityFrom${i} AND EXTRACT(HOUR FROM t.start) < :availabilityTo${i})`;
+            return `(EXTRACT(HOUR FROM ${ONETIME_START}) >= :availabilityFrom${i} AND EXTRACT(HOUR FROM ${ONETIME_START}) < :availabilityTo${i})`;
           })
           .join(" OR ")})`,
       );
     }
+    params.availabilityServerTimeZone = SERVER_TIME_ZONE;
+    params.availabilityLocalTimeZone = LOCAL_TIME_ZONE;
     branches.push(recurring.join(" AND "), onetime.join(" AND "));
   }
-  const occasionalTypes = [
-    ...new Set([...occasional, ...occasionalCoveringDays(days)]),
-  ];
+  const occasionalTypes = matchingOccasionalTypes(filter);
   if (occasionalTypes.length) {
     branches.push("t.occasional::text IN (:...availabilityOccasional)");
     params.availabilityOccasional = occasionalTypes;
