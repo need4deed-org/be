@@ -23,8 +23,8 @@ export async function findTaggedAgents(
   const ids = getTaggedAgentIds(text);
   return ids.length
     ? fastify.db.agentRepository.find({
-        select: { id: true, title: true },
-        where: { id: In(ids), unclaimed: false },
+        select: { id: true },
+        where: { id: In(ids) },
       })
     : [];
 }
@@ -47,9 +47,15 @@ export async function attachTaggedAgents(
     .orderBy("agent.id")
     .getRawMany<{ postId: number; id: number; title: string }>();
 
+  const agentsByPost = new Map<number, Agent[]>();
+  for (const row of rows) {
+    const postId = Number(row.postId);
+    agentsByPost.set(postId, [
+      ...(agentsByPost.get(postId) ?? []),
+      new Agent({ id: Number(row.id), title: row.title }),
+    ]);
+  }
   for (const post of posts) {
-    post.taggedAgents = rows
-      .filter((row) => Number(row.postId) === post.id)
-      .map((row) => new Agent({ id: Number(row.id), title: row.title }));
+    post.taggedAgents = agentsByPost.get(post.id) ?? [];
   }
 }

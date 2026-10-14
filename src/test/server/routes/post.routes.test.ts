@@ -698,7 +698,23 @@ describe("POST /post", () => {
       where: { id: postId },
       relations: ["taggedAgents"],
     });
-    expect(stored?.taggedAgents.map((a) => a.id)).toEqual([tagged.id]);
+    expect(stored?.taggedAgents.map((a) => a.id).sort()).toEqual(
+      [tagged.id, unclaimed.id].sort(),
+    );
+
+    await fastify.db.agentRepository.update(unclaimed.id, {
+      unclaimed: false,
+    });
+    const afterClaim = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`Tagging ${suffix}`)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(
+      afterClaim.json().data.find((p: { id: number }) => p.id === postId)
+        ?.taggedAgents,
+    ).toHaveLength(2);
+    await fastify.db.agentRepository.update(unclaimed.id, { unclaimed: true });
 
     const listed = await fastify.inject({
       method: "GET",
