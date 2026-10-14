@@ -1,3 +1,4 @@
+import { IsEnum } from "class-validator";
 import { EventN4DType } from "need4deed-sdk";
 import {
   Column,
@@ -7,8 +8,6 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
-import { IsEnum } from "class-validator";
 import Language from "../profile/language.entity";
 import EventTranslation from "./event_translation.entity";
 
@@ -52,7 +51,7 @@ export default class EventN4D {
   address: string;
 
   @Column({ type: "varchar", length: 256, nullable: true })
-  hostName?: string;
+  hostName?: string | null;
 
   @ManyToOne(() => Language, (language) => language.eventn4d)
   @JoinColumn({ name: "language_id" })
