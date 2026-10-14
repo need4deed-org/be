@@ -9,28 +9,38 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   ApiAgentRegister,
+  ApiOrganizationGetList,
   UserRole,
 } from "need4deed-sdk";
-import { UnauthenticatedError, UnauthorizedError } from "../../../config";
+import {
+  BaseError,
+  UnauthenticatedError,
+  UnauthorizedError,
+} from "../../../config";
 import logger from "../../../logger";
+import { dtoAgentRegisterStatus } from "../../../services/dto/dto-agent-register-status";
 import {
   registerAgentBodySchema,
   registerAgentConflictSchema,
   registerAgentQuerySchema,
   registerAgentResponseSchema,
+  registerAgentStatusResponseSchema,
   registerSearchQuerySchema,
   registerSearchResponseSchema,
   responseErrors,
+  responseSchema,
 } from "../../schema";
+import { ReplyData } from "../../types";
 import {
   createAgentForPerson,
+  findRegistrationMembership,
   getAgentIdsJoinableAsActive,
   isExactStreetMatch,
   joinAgent,
-  resolveJoinStatus,
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
+import { listOrganizations } from "../../utils/data/list-organizations";
 
 async function authByVerifyToken(
   fastify: FastifyInstance,
@@ -63,10 +73,66 @@ async function authByVerifyToken(
   request.registrant = user;
 }
 
+function getRegistrantPersonId(request: FastifyRequest): number {
+  const user = request.registrant!;
+  if (!user.personId) {
+    logger.error(`register-agent: registrant ${user.id} has no linked person`);
+    throw new BaseError("Account is missing a person record.", 500);
+  }
+  return user.personId;
+}
+
 export default async function agentRegisterRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  fastify.get<{ Querystring: { token: string } }>(
+    "/status",
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: {
+        querystring: registerAgentQuerySchema,
+        response: { 200: registerAgentStatusResponseSchema, ...responseErrors },
+      },
+      preHandler: (request, reply) =>
+        authByVerifyToken(fastify, request, reply),
+    },
+    async (request, reply) => {
+      const membership = await findRegistrationMembership(
+        getRegistrantPersonId(request),
+        { relations: ["agent"] },
+      );
+      return reply.status(200).send({
+        message: "Agent registration status.",
+        data: dtoAgentRegisterStatus(membership),
+      });
+    },
+  );
+
+  fastify.get<{
+    Querystring: { token: string };
+    Reply: ReplyData<ApiOrganizationGetList[]>;
+  }>(
+    "/organizations",
+    {
+      config: {
+        public: true,
+        rateLimit: { max: 30, timeWindow: "1 minute" },
+      } as FastifyContextConfig,
+      schema: {
+        querystring: registerAgentQuerySchema,
+        response: responseSchema("ApiOrganizationGetList#", true, false),
+      },
+      preHandler: (request, reply) =>
+        authByVerifyToken(fastify, request, reply),
+    },
+    async (_request, reply) =>
+      reply.status(200).send({
+        message: "Organizations found.",
+        data: await listOrganizations(fastify),
+      }),
+  );
+
   fastify.get<{
     Querystring: { token: string; street?: string };
   }>(
@@ -103,13 +169,9 @@ export default async function agentRegisterRoutes(
         request.registrant?.email ?? "",
         matches.map((a) => a.id),
       );
-      // be#1041: an agent whose title the registrant can't see is returned
-      // (as { id }) only for its exact street and house number. A prefix
-      // match would let a registrant list orgs street by street, and an
-      // addressless agent matches on its title, which would leak it
-      // substring by substring.
       const data = matches
         .filter((a) => joinable.has(a.id) || isExactStreetMatch(a, street))
+        // Address-only matches must not reveal NGO names to untrusted registrants.
         .map((a) =>
           joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
         );
@@ -136,26 +198,13 @@ export default async function agentRegisterRoutes(
         authByVerifyToken(fastify, request, reply),
     },
     async (request, reply) => {
-      const user = request.registrant;
-      const personId = user?.personId;
-      if (!personId) {
-        logger.error(
-          `register-agent: registrant ${user?.id} has no linked person`,
-        );
-        return reply
-          .status(500)
-          .send({ message: "Account is missing a person record." });
-      }
-
+      const personId = getRegistrantPersonId(request);
+      const email = request.registrant!.email;
       const body = request.body;
 
       const result =
         "agentId" in body
-          ? await joinAgent(
-              personId,
-              body.agentId,
-              await resolveJoinStatus(body.agentId, user!.email),
-            )
+          ? await joinAgent(personId, body.agentId, email)
           : await createAgentForPerson(personId, body.agent);
 
       const message =

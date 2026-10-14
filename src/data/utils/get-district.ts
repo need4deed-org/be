@@ -1,4 +1,4 @@
-import { In } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
 import { Voidable } from "../../server/utils";
 import { dataSource } from "../data-source";
 import District from "../entity/location/district.entity";
@@ -64,20 +64,18 @@ export async function getDistrictCentroids(
 
 export async function getDistrictFromPostcode(
   postcode: Voidable<Postcode | number>,
+  manager: DataSource | EntityManager = dataSource,
 ): Promise<District | null> {
   let postcodeId = typeof postcode === "number" ? postcode : postcode?.id;
   if (!postcodeId && typeof postcode === "object" && postcode?.value) {
-    const postcodeRepository = getRepository(dataSource, Postcode);
+    const postcodeRepository = getRepository(manager, Postcode);
     const postcodeEntity = await postcodeRepository.findOne({
       where: { value: postcode.value },
     });
     postcodeId = postcodeEntity?.id;
   }
   if (postcodeId) {
-    const districtPostcodeRepository = getRepository(
-      dataSource,
-      DistrictPostcode,
-    );
+    const districtPostcodeRepository = getRepository(manager, DistrictPostcode);
     const districtPostcode = await districtPostcodeRepository.findOne({
       where: { postcodeId: postcodeId },
       relations: ["district"],

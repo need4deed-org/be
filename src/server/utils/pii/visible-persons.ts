@@ -23,18 +23,26 @@ export const VISIBLE_MATCH_STATUSES = [
   OpportunityVolunteerStatusType.ACTIVE,
 ];
 
-export async function resolveCallerVisibility(
-  request: FastifyRequest,
-  user: User,
-): Promise<CallerVisibility> {
-  const visibility: CallerVisibility = {
-    userId: user.id,
-    role: user.role,
+export function anonymousVisibility(): CallerVisibility {
+  return {
+    userId: 0,
+    role: UserRole.USER,
     personIds: new Set<number>(),
     opportunityIds: new Set<number>(),
     agentIds: new Set<number>(),
     matchedAgentIds: new Set<number>(),
     ownerAgentIds: new Set<number>(),
+  };
+}
+
+export async function resolveCallerVisibility(
+  request: FastifyRequest,
+  user: User,
+): Promise<CallerVisibility> {
+  const visibility: CallerVisibility = {
+    ...anonymousVisibility(),
+    userId: user.id,
+    role: user.role,
   };
   const {
     personIds,
@@ -88,14 +96,19 @@ export async function resolveCallerVisibility(
   });
   members.forEach((m) => personIds.add(m.personId));
 
+  agentIds.forEach((id) => ownerAgentIds.add(id));
+
   const rows: { id: number; person_id: number | null }[] =
     await agentPersonRepository.manager.query(
       `SELECT o.id, v.person_id
          FROM opportunity o
          LEFT JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
          LEFT JOIN volunteer v ON v.id = ov.volunteer_id
+          AND (v.owner_agent_id IS NULL
+               OR v.owner_agent_id = ANY($1)
+               OR ov.status = ANY($2))
         WHERE o.agent_id = ANY($1)`,
-      [[...agentIds]],
+      [[...agentIds], VISIBLE_MATCH_STATUSES],
     );
   rows.forEach((r) => {
     opportunityIds.add(Number(r.id));
@@ -114,16 +127,6 @@ export async function resolveCallerVisibility(
       personIds.add(Number(r.person_id));
     }
   });
-
-  agentIds.forEach((id) => ownerAgentIds.add(id));
-  const sharing: { id: number }[] = await agentPersonRepository.manager.query(
-    `SELECT id FROM agent
-      WHERE shares_volunteers
-        AND EXISTS (SELECT 1 FROM agent own
-                     WHERE own.id = ANY($1) AND own.shares_volunteers)`,
-    [[...agentIds]],
-  );
-  sharing.forEach((a) => ownerAgentIds.add(Number(a.id)));
 
   return visibility;
 }

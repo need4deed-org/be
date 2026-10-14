@@ -5,7 +5,7 @@ import {
   AgentRoleType,
   UserRole,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -31,7 +31,7 @@ describe("tagging NGOs in posts (fe#1053)", () => {
   const postIds: number[] = [];
 
   const request = (
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PATCH",
     url: string,
     as: Caller,
     payload?: object,
@@ -147,7 +147,13 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     });
   });
 
-  it("tags an NGO's active members and returns the NGO on the post", async () => {
+  const notifiedNames = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.flatMap(
+      ([event]) => (event as { taggedNames: string[] }).taggedNames,
+    );
+
+  it("tags an NGO, notifies its active members, and keeps them out of taggedPersons", async () => {
+    const spy = vi.spyOn(fastify.notify, "tagged");
     const res = await request("POST", "/post", "member", {
       text: `Hello <@agent:${agents.nearby.id}>`,
       taggedAgentIds: [agents.nearby.id],
@@ -158,16 +164,72 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     expect(post.taggedAgents).toEqual([
       { id: agents.nearby.id, title: agents.nearby.title },
     ]);
-    expect(post.taggedPersons.map((p: { id: number }) => p.id)).toContain(
-      persons.nearbyMember.id,
-    );
+    expect(post.taggedPersons).toEqual([]);
+    expect(notifiedNames(spy).join(" ")).toContain(`nearbyMember${suffix}`);
+    spy.mockRestore();
   });
 
   it("rejects an unknown NGO id", async () => {
     const res = await request("POST", "/post", "member", {
-      text: "Hello",
+      text: "Hello <@agent:999999999>",
       taggedAgentIds: [999999999],
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects taggedAgentIds that don't match the text's tokens", async () => {
+    const res = await request("POST", "/post", "member", {
+      text: "Hello",
+      taggedAgentIds: [agents.nearby.id],
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("ignores a bare token in the text instead of failing (volunteer)", async () => {
+    const res = await request("POST", "/post", "volunteer", {
+      text: `Pasted <@agent:${agents.nearby.id}>`,
+    });
+    expect(res.statusCode).toBe(201);
+    postIds.push(res.json().data.id);
+    expect(res.json().data.taggedAgents).toEqual([]);
+  });
+
+  it("on PATCH notifies only newly tagged NGOs and keeps direct tags when an NGO is removed", async () => {
+    const text = `Event <@agent:${agents.nearby.id}>`;
+    const created = await request("POST", "/post", "member", {
+      text,
+      taggedAgentIds: [agents.nearby.id],
+      taggedPersonIds: [persons.nearbyMember.id],
+    });
+    expect(created.statusCode).toBe(201);
+    const postId = created.json().data.id;
+    postIds.push(postId);
+
+    const spy = vi.spyOn(fastify.notify, "tagged");
+    const typo = await request("PATCH", `/post/${postId}`, "member", {
+      text: `${text} (fixed)`,
+      taggedAgentIds: [agents.nearby.id],
+    });
+    expect(typo.statusCode).toBe(200);
+    expect(spy).not.toHaveBeenCalled();
+
+    const removed = await request("PATCH", `/post/${postId}`, "member", {
+      text: "Event without NGOs",
+      taggedAgentIds: [],
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json().data.taggedAgents).toEqual([]);
+    expect(
+      removed.json().data.taggedPersons.map((p: { id: number }) => p.id),
+    ).toEqual([persons.nearbyMember.id]);
+
+    const readded = await request("PATCH", `/post/${postId}`, "member", {
+      text: `Back <@agent:${agents.far.id}>`,
+      taggedAgentIds: [agents.far.id],
+    });
+    expect(readded.json().data.taggedAgents).toEqual([
+      { id: agents.far.id, title: agents.far.title },
+    ]);
+    spy.mockRestore();
   });
 });

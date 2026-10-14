@@ -1,7 +1,7 @@
 import { FastifyRequest } from "fastify";
-import { AgentEngagementStatusType, ApiAgentTagCandidate } from "need4deed-sdk";
-import { getCallerAgentIds } from "./get-caller-agent-ids";
+import { ApiAgentTagCandidate } from "need4deed-sdk";
 import { escapeLikePattern } from "./person-name-ilike";
+import { taggableAgentsQuery } from "./tag-agents";
 
 const TAG_CANDIDATE_LIMIT = 20;
 
@@ -9,22 +9,10 @@ export async function getAgentTagCandidates(
   request: FastifyRequest,
   search?: string,
 ): Promise<ApiAgentTagCandidate[]> {
-  const ownAgentIds = await getCallerAgentIds(
-    request,
-    request.authUser?.personId,
-  );
-
-  const query = request.server.db.agentRepository
-    .createQueryBuilder("agent")
-    .leftJoinAndSelect("agent.district", "district")
-    .where("agent.unclaimed = false")
-    .andWhere(
-      "(agent.engagementStatus IS NULL OR agent.engagementStatus != :inactive)",
-      { inactive: AgentEngagementStatusType.INACTIVE },
-    );
+  const { query, ownAgentIds } = await taggableAgentsQuery(request);
+  query.leftJoinAndSelect("agent.district", "district");
   if (ownAgentIds.length) {
     query
-      .andWhere("agent.id NOT IN (:...ownAgentIds)", { ownAgentIds })
       .addSelect(
         `CASE WHEN agent.district_id IN (SELECT own.district_id FROM agent own WHERE own.id IN (:...ownAgentIds)) THEN 0 ELSE 1 END`,
         "nearby_rank",

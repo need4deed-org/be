@@ -58,8 +58,8 @@ import {
   updateAgentServices,
 } from "../../utils";
 import { getAgentTagCandidates } from "../../utils/data/get-agent-tag-candidates";
+import { canTagAgents } from "../../utils/data/tag-agents";
 import { createAgent } from "../../utils/data/write-agent-registration";
-import { hidePostcodeUnless } from "../../utils/pii/location-visibility";
 import { maskPii } from "../../utils/pii/mask";
 import {
   maskForCaller,
@@ -184,15 +184,11 @@ export default async function agentRoutes(
 
       const data = agentsDistrict.map((agent) => {
         const districtId = neededDistrictIds.get(agent.id);
-        return hidePostcodeUnless(
-          dtoAgentGetList(
-            agent,
-            districtId !== undefined
-              ? districtCentroids.get(districtId)
-              : undefined,
-          ),
-          visibility,
-          (v) => v.agentIds,
+        return dtoAgentGetList(
+          agent,
+          districtId !== undefined
+            ? districtCentroids.get(districtId)
+            : undefined,
         );
       });
 
@@ -245,8 +241,7 @@ export default async function agentRoutes(
       },
     },
     async (request, reply) => {
-      const role = request.authUser?.role;
-      if (role !== UserRole.AGENT && !isStaffRole(role)) {
+      if (!canTagAgents(request.authUser?.role)) {
         throw new UnauthorizedError();
       }
       const data = await getAgentTagCandidates(request, request.query.search);
