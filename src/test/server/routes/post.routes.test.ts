@@ -718,6 +718,18 @@ describe("POST /post", () => {
     });
     expect(untouched.json().data.taggedAgents).toEqual(expected);
 
+    await fastify.db.agentRepository.update(tagged.id, { unclaimed: true });
+    const afterUnclaim = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`Tagging ${suffix}`)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(
+      afterUnclaim.json().data.find((p: { id: number }) => p.id === postId)
+        ?.taggedAgents,
+    ).toEqual([]);
+    await fastify.db.agentRepository.update(tagged.id, { unclaimed: false });
+
     const untagged = await fastify.inject({
       method: "PATCH",
       url: `/post/${postId}`,

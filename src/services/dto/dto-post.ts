@@ -16,9 +16,10 @@ export function dtoPost(post: Post): ApiPostGet {
       fullName: p.name,
       avatarUrl: p.avatarUrl,
     })),
-    taggedAgents: (post.taggedAgents ?? [])
-      .filter((agent) => !agent.unclaimed)
-      .map((agent) => ({ id: agent.id, title: agent.title })),
+    taggedAgents: (post.taggedAgents ?? []).map((agent) => ({
+      id: agent.id,
+      title: agent.title,
+    })),
     linkedOpportunities: (post.linkedOpportunities ?? []).map((o) => ({
       id: o.id,
       title: o.title,

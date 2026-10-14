@@ -40,13 +40,9 @@ export async function resolveCallerVisibility(
   user: User,
 ): Promise<CallerVisibility> {
   const visibility: CallerVisibility = {
+    ...anonymousVisibility(),
     userId: user.id,
     role: user.role,
-    personIds: new Set<number>(),
-    opportunityIds: new Set<number>(),
-    agentIds: new Set<number>(),
-    matchedAgentIds: new Set<number>(),
-    ownerAgentIds: new Set<number>(),
   };
   const {
     personIds,
