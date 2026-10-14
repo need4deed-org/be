@@ -57,6 +57,7 @@ const agentCreateBaseSchema = {
       items: { type: "integer", minimum: 1 },
     },
     confirmSharedAddress: { type: "boolean" },
+    organizationId: { type: "integer", minimum: 1 },
   },
 };
 
@@ -105,15 +106,37 @@ export const registerAgentResponseSchema = {
   },
 };
 
+const conflictBase = {
+  message: { type: "string" },
+  agentId: { type: "integer", minimum: 1 },
+};
+
 export const registerAgentConflictSchema = {
-  type: "object",
-  required: ["message", "conflict"],
-  properties: {
-    message: { type: "string" },
-    conflict: { type: "string", enum: ["title", "address", "registered"] },
-    agentId: { type: "integer", minimum: 1 },
-    membershipStatus: { type: "string", enum: ["active", "pending"] },
-  },
+  anyOf: [
+    {
+      type: "object",
+      required: ["message", "conflict"],
+      properties: { ...conflictBase, conflict: { const: "title" } },
+    },
+    {
+      type: "object",
+      required: ["message", "conflict", "agentId"],
+      properties: {
+        ...conflictBase,
+        conflict: { const: "address" },
+        agentTitle: { type: "string" },
+      },
+    },
+    {
+      type: "object",
+      required: ["message", "conflict", "agentId", "membershipStatus"],
+      properties: {
+        ...conflictBase,
+        conflict: { const: "registered" },
+        membershipStatus: { type: "string", enum: ["active", "pending"] },
+      },
+    },
+  ],
 };
 
 export const registerAgentStatusResponseSchema = {

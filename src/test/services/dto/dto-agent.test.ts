@@ -290,6 +290,7 @@ describe("dtoAgentGetList", () => {
       volunteerSearch: "agent-searching",
       lat: null,
       lon: null,
+      postcode: "10115",
     });
   });
 

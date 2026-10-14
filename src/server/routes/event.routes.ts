@@ -8,7 +8,11 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { NotFoundError } from "../../config";
-import { dtoEventN4DGet, dtoEventN4DGetList } from "../../services";
+import {
+  dtoEventN4DGet,
+  dtoEventN4DGetList,
+  resolveEventTranslation,
+} from "../../services";
 import {
   eventCreateBodySchema,
   eventCreateResponseSchema,
@@ -71,10 +75,17 @@ export default async function eventRoutes(
       const events = await applyEventDateRange(qb, request.query).getMany();
 
       const data = events
+        .map((event) => ({
+          event,
+          translation: resolveEventTranslation(event, language),
+        }))
         .filter(
-          (event) => !search || matchesEventSearch(event, language, search),
+          ({ event, translation }) =>
+            !search || matchesEventSearch(event, translation, search),
         )
-        .map((event) => dtoEventN4DGetList(event, language, isPrivileged))
+        .map(({ event, translation }) =>
+          dtoEventN4DGetList(event, translation, isPrivileged),
+        )
         .filter((event): event is ApiEventN4DGetList => event !== null);
 
       return reply

@@ -229,6 +229,14 @@ describe("GET /event", () => {
     expect(ids).not.toContain(untranslatedEvent.id);
   });
 
+  it("lists each event's host name, null when it has none", async () => {
+    const res = await fastify.inject({ method: "GET", url: "/event" });
+    const byId = (id: number) =>
+      res.json().data.find((e: { id: number }) => e.id === id);
+    expect(byId(ongoingEvent.id).hostName).toBe(`Host-${suffix}`);
+    expect(byId(activeEvent.id).hostName).toBeNull();
+  });
+
   it("shows only active events to a non-privileged authenticated caller too", async () => {
     const res = await fastify.inject({
       method: "GET",

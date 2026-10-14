@@ -15,6 +15,7 @@ import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { lockRegistration } from "../../../server/utils/data/write-agent-registration";
 import { randomNumericSuffix } from "../../random";
 
 describe("/agent/register", () => {
@@ -52,6 +53,22 @@ describe("/agent/register", () => {
       type: "verify",
     });
     return { person, user, token };
+  }
+
+  async function waitForRegistrationLockWaiter(personId: number) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [{ waiting }] = await dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_locks
+         WHERE locktype = 'advisory' AND objsubid = 2
+           AND objid::bigint = $1 AND NOT granted`,
+        [personId],
+      );
+      if (waiting > 0) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error("POST never waited on the registration lock");
   }
 
   async function makeAgent(overrides: Partial<Agent> = {}): Promise<Agent> {
@@ -193,6 +210,106 @@ describe("/agent/register", () => {
         url: `/agent/register/status?token=${token}`,
       });
       expect(res.statusCode).toBe(401);
+    }
+  });
+
+  it("reports the ACTIVE membership over an older PENDING one", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const pendingAgent = await makeAgent();
+    const activeAgent = await makeAgent();
+    await fastify.db.agentPersonRepository.save([
+      new AgentPerson({
+        agentId: pendingAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.PENDING,
+      }),
+      new AgentPerson({
+        agentId: activeAgent.id,
+        personId: person.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    ]);
+    const res = await fastify.inject({
+      url: `/agent/register/status?token=${token}`,
+    });
+    expect(res.json().data).toEqual({
+      registered: true,
+      agentId: activeAgent.id,
+      agentTitle: activeAgent.title,
+      membershipStatus: AgentMembershipStatus.ACTIVE,
+    });
+  });
+
+  it("waits for a concurrent registration of the same person, then 409s", async () => {
+    const { token, person } = await makeRegistrant("example.org");
+    const agent = await makeAgent();
+    const title = `Race NGO ${randomNumericSuffix()}`;
+    const runner = dataSource.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await lockRegistration(person.id, runner.manager);
+      let settled = false;
+      const pending = fastify
+        .inject({
+          method: "POST",
+          url: `/agent/register?token=${token}`,
+          payload: { agent: { title } },
+        })
+        .then((res) => {
+          settled = true;
+          return res;
+        });
+      await waitForRegistrationLockWaiter(person.id);
+      expect(settled).toBe(false);
+
+      await runner.manager.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: person.id,
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        }),
+      );
+      await runner.commitTransaction();
+
+      const res = await pending;
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        conflict: "registered",
+        agentId: agent.id,
+        membershipStatus: AgentMembershipStatus.ACTIVE,
+      });
+      expect(await fastify.db.agentRepository.findOneBy({ title })).toBeNull();
+    } finally {
+      if (runner.isTransactionActive) {
+        await runner.rollbackTransaction();
+      }
+      await runner.release();
+    }
+  });
+
+  it("500s with no membership leak when the registrant has no linked person, but still serves search", async () => {
+    const { token, user } = await makeRegistrant("example.org");
+    await fastify.db.userRepository.update(user.id, {
+      personId: null as unknown as number,
+    });
+    const search = await fastify.inject({
+      url: `/agent/register/search?token=${token}&street=Nowhere`,
+    });
+    expect(search.statusCode).toBe(200);
+    for (const request of [
+      { url: `/agent/register/status?token=${token}` },
+      {
+        method: "POST" as const,
+        url: `/agent/register?token=${token}`,
+        payload: { agent: { title: `No Person ${randomNumericSuffix()}` } },
+      },
+    ]) {
+      const res = await fastify.inject(request);
+      expect(res.statusCode).toBe(500);
+      expect(res.json().message).toBe("Account is missing a person record.");
     }
   });
 
@@ -405,6 +522,77 @@ describe("/agent/register", () => {
     }
   });
 
+  it("lists operators for a registrant with a verify token", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/register/organizations?token=${token}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    expect(res.json().data).toContainEqual(
+      expect.objectContaining({
+        id: organization.id,
+        title: organization.title,
+      }),
+    );
+    expect(
+      (
+        await fastify.inject({
+          method: "GET",
+          url: "/agent/register/organizations?token=invalid",
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
+  it("stores the chosen operator (Träger) on the new agent", async () => {
+    const organization = await fastify.db.organizationRepository.findOneOrFail({
+      where: {},
+    });
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: organization.id,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const agentId = res.json().data.agentId;
+    createdAgentIds.push(agentId);
+    const agent = await fastify.db.agentRepository.findOneByOrFail({
+      id: agentId,
+    });
+    expect(agent.organizationId).toBe(organization.id);
+  });
+
+  it("400s an unknown operator", async () => {
+    const { token } = await makeRegistrant("test.need4deed.org");
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/register?token=${token}`,
+      payload: {
+        agent: {
+          title: `Operator NGO ${randomNumericSuffix()}`,
+          organizationId: 999999999,
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it("409s creating an agent whose title is already taken", async () => {
     const existing = await makeAgent();
     const { token } = await makeRegistrant("test.need4deed.org");
@@ -467,6 +655,101 @@ describe("/agent/register", () => {
     expect(confirmed.statusCode).toBe(201);
     await track(confirmed.json().data.agentId);
     expect(confirmed.json().data.agentId).not.toBe(first.json().data.agentId);
+  });
+
+  describe("names the existing agent in an address 409", () => {
+    async function registerAt(
+      domain: string,
+      address: { addressStreet: string; addressPostcode: string },
+    ) {
+      const { token } = await makeRegistrant(domain);
+      return fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: {
+          agent: { title: `Address NGO ${randomNumericSuffix()}`, ...address },
+        },
+      });
+    }
+
+    async function makeAgentAt(domain: string) {
+      const address = {
+        addressStreet: `Namensstr ${randomNumericSuffix()}`,
+        addressPostcode: "10115",
+      };
+      const created = await registerAt(domain, address);
+      expect(created.statusCode).toBe(201);
+      const agent = await fastify.db.agentRepository.findOneByOrFail({
+        id: created.json().data.agentId,
+      });
+      createdAgentIds.push(agent.id);
+      if (agent.addressId) {
+        createdAddressIds.push(agent.addressId);
+      }
+      return { agent, address };
+    }
+
+    it("only for a registrant on a member's email domain", async () => {
+      const domain = `conflict-${randomNumericSuffix()}.example.org`;
+      const { agent, address } = await makeAgentAt(domain);
+
+      const sameDomain = await registerAt(domain, address);
+      expect(sameDomain.statusCode).toBe(409);
+      expect(sameDomain.json()).toMatchObject({
+        conflict: "address",
+        agentId: agent.id,
+        agentTitle: agent.title,
+      });
+
+      const otherDomain = await registerAt(
+        `other-${randomNumericSuffix()}.example.org`,
+        address,
+      );
+      expect(otherDomain.statusCode).toBe(409);
+      expect(otherDomain.json()).toMatchObject({
+        conflict: "address",
+        agentId: agent.id,
+      });
+      expect(otherDomain.json().agentTitle).toBeUndefined();
+    });
+
+    it("for a registrant on a trusted domain", async () => {
+      const { agent, address } = await makeAgentAt(
+        `member-${randomNumericSuffix()}.example.org`,
+      );
+      const domain = `trusted-${randomNumericSuffix()}.example.org`;
+      const trusted = await fastify.db.trustedDomainRepository.save(
+        new TrustedDomain({ domain }),
+      );
+
+      try {
+        const res = await registerAt(domain, address);
+        expect(res.statusCode).toBe(409);
+        expect(res.json().agentTitle).toBe(agent.title);
+      } finally {
+        await fastify.db.trustedDomainRepository.delete({ id: trusted.id });
+      }
+    });
+
+    it.each([
+      ["INACTIVE", { engagementStatus: AgentEngagementStatusType.INACTIVE }],
+      ["unclaimed", { unclaimed: true }],
+    ])(
+      "never for a %s agent, even on a member's domain",
+      async (_label, patch: Partial<Agent>) => {
+        const domain = `conflict-${randomNumericSuffix()}.example.org`;
+        const { agent, address } = await makeAgentAt(domain);
+        await fastify.db.agentRepository.update({ id: agent.id }, patch);
+
+        const res = await registerAt(domain, address);
+        expect(res.statusCode).toBe(409);
+        expect(res.json()).toMatchObject({
+          conflict: "address",
+          agentId: agent.id,
+        });
+        expect(res.json().agentTitle).toBeUndefined();
+      },
+    );
   });
 
   it("404s joining a nonexistent agent", async () => {

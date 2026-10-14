@@ -20,12 +20,15 @@ function sanitizeAdditionalInfo(value: unknown): string[] | undefined {
   return value.every((item) => typeof item === "string") ? value : undefined;
 }
 
+export type ResolvedEventTranslation = ReturnType<
+  typeof resolveEventTranslation
+>;
+
 export function dtoEventN4DGetList(
   event: EventN4D,
-  language: Lang,
+  translation: ResolvedEventTranslation,
   isPrivileged: boolean,
 ): ApiEventN4DGetList | null {
-  const translation = resolveEventTranslation(event, language);
   if (!translation && !isPrivileged) {
     return null;
   }
@@ -45,6 +48,7 @@ export function dtoEventN4DGetList(
     description: translation?.description ?? "",
     shortDescription: translation?.shortDescription ?? "",
     linkRSVP: event.rsvpLink,
+    hostName: event.hostName,
     additionalTitle: translation?.additionalTitle,
     additionalInfo: sanitizeAdditionalInfo(translation?.additionalInfo),
   };
@@ -55,15 +59,14 @@ export function dtoEventN4DGet(
   language: Lang,
   isPrivileged: boolean,
 ): ApiEventN4DGet | null {
-  const list = dtoEventN4DGetList(event, language, isPrivileged);
+  const translation = resolveEventTranslation(event, language);
+  const list = dtoEventN4DGetList(event, translation, isPrivileged);
   if (!list) {
     return null;
   }
-  const translation = resolveEventTranslation(event, language);
 
   return {
     ...list,
-    hostName: event.hostName,
     time: translation?.timeStr,
     locationLink: event.locationLink,
     followUpText: translation?.followupText,

@@ -4,6 +4,7 @@ import {
   ApiAgentGetList,
   ApiAgentMembership,
   ApiAgentOpportunity,
+  ApiAgentTagCandidate,
   ApiOpportunityAgent,
   OptionById,
   OptionTitle,
@@ -80,6 +81,7 @@ export function dtoAgentGetList(
     unclaimed: agent.unclaimed,
     statusEngagement: agent.engagementStatus,
     ...getAgentCoordinates(agent, districtCentroid),
+    postcode: agent.address?.postcode?.value ?? null,
   };
 }
 
@@ -99,6 +101,7 @@ export function dtoAgentGet(
     ...dtoAgentGetList(agent, districtCentroid),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
+    sharesVolunteers: agent.sharesVolunteers ?? false,
     operator: agent?.organization?.title,
     representative: {
       ...dtoSerializePerson(agent?.representative?.person),
@@ -186,5 +189,23 @@ export function dtoAgentOpportunity(
         name: ov.volunteer?.person?.name,
         avatarUrl: ov.volunteer?.person?.avatarUrl,
       })),
+  };
+}
+
+export function dtoAgentTagCandidate(row: {
+  id: number;
+  title: string;
+  districtId: number | null;
+  districtTitle: string | null;
+}): ApiAgentTagCandidate {
+  return {
+    id: Number(row.id),
+    title: row.title,
+    district: row.districtId
+      ? {
+          id: Number(row.districtId),
+          title: { de: row.districtTitle ?? undefined },
+        }
+      : null,
   };
 }

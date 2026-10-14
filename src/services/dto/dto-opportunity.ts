@@ -180,6 +180,7 @@ export function dtoOpportunityGetList(
       .map((ov) => ov.volunteer?.person?.name)
       .filter((name): name is string => Boolean(name)),
     ...getOpportunityCoordinates(opportunity, districtCentroid),
+    postcode: opportunity.deal?.postcode?.value ?? null,
     originalLanguage:
       (opportunity.originalLanguage?.isoCode as Lang | undefined) ?? Lang.DE,
   } as ApiOpportunityGetList;
@@ -217,6 +218,7 @@ export function dtoVolunteerOpportunityGetList(
       deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
+    postcode: opportunity.deal?.postcode?.value ?? null,
   } as ApiVolunteerOpportunityGetList;
 }
 

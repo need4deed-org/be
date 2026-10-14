@@ -417,6 +417,9 @@
       "$id": "ApiLanguage",
       "type": "object",
       "properties": {
+        "id": {
+          "type": "integer"
+        },
         "title": {
           "type": "string"
         },
@@ -1078,6 +1081,7 @@
         "lon": {
           "type": ["number", "null"]
         },
+        "postcode": { "type": ["string", "null"] },
         "originalLanguage": { "$ref": "Lang#" }
       },
       "required": [
@@ -1428,6 +1432,9 @@
         "lon": {
           "type": ["number", "null"]
         },
+        "postcode": {
+          "type": ["string", "null"]
+        },
         "statusEngagement": {
           "$ref": "AgentEngagementStatusType#"
         }
@@ -1449,6 +1456,7 @@
         "unclaimed",
         "lat",
         "lon",
+        "postcode",
         "statusEngagement"
       ]
     },
@@ -1506,6 +1514,9 @@
         "organizationId": {
           "type": "number",
           "minimum": 1
+        },
+        "sharesVolunteers": {
+          "type": "boolean"
         }
       }
     },
@@ -1528,6 +1539,9 @@
             },
             "operator": {
               "type": "string"
+            },
+            "sharesVolunteers": {
+              "type": "boolean"
             },
             "representative": {
               "$ref": "AgentRepresentative#"
@@ -1718,6 +1732,41 @@
       },
       "required": ["id", "fullName"]
     },
+    "ApiAgentTagCandidate": {
+      "$id": "ApiAgentTagCandidate",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "district": {
+          "oneOf": [{ "$ref": "OptionById#" }, { "type": "null" }]
+        }
+      },
+      "required": ["id", "title", "district"]
+    },
+    "ApiPostAgent": {
+      "$id": "ApiPostAgent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "ApiOpportunityOtherGetList": {
+      "$id": "ApiOpportunityOtherGetList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "district": {
+          "oneOf": [{ "$ref": "OptionById#" }, { "type": "null" }]
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "district", "createdAt"],
+      "additionalProperties": false
+    },
     "ApiPostLinkedOpportunity": {
       "$id": "ApiPostLinkedOpportunity",
       "type": "object",
@@ -1739,6 +1788,10 @@
           "type": "array",
           "items": { "$ref": "ApiPostPerson#" }
         },
+        "taggedAgents": {
+          "type": "array",
+          "items": { "$ref": "ApiPostAgent#" }
+        },
         "linkedOpportunities": {
           "type": "array",
           "items": { "$ref": "ApiPostLinkedOpportunity#" }
@@ -1758,6 +1811,7 @@
         "author",
         "agentId",
         "taggedPersons",
+        "taggedAgents",
         "linkedOpportunities",
         "replyCount",
         "reactions",
@@ -1836,6 +1890,7 @@
       "properties": {
         "text": { "type": "string", "minLength": 1 },
         "taggedPersonIds": { "type": "array", "items": { "type": "integer" } },
+        "taggedAgentIds": { "type": "array", "items": { "type": "integer" } },
         "linkedOpportunityIds": {
           "type": "array",
           "items": { "type": "integer" }
@@ -1850,6 +1905,10 @@
       "properties": {
         "text": { "type": ["string", "null"], "minLength": 1 },
         "taggedPersonIds": {
+          "type": ["array", "null"],
+          "items": { "type": "integer" }
+        },
+        "taggedAgentIds": {
           "type": ["array", "null"],
           "items": { "type": "integer" }
         },

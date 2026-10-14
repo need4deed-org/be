@@ -28,6 +28,7 @@ const ctx = (
   opportunityIds: new Set(p.opportunityIds ?? []),
   agentIds: new Set(p.agentIds ?? []),
   matchedAgentIds: new Set(p.matchedAgentIds ?? []),
+  ownerAgentIds: new Set(),
 });
 
 const makePerson = (id: number): Person =>
@@ -230,6 +231,60 @@ describe("maskPii", () => {
       maskPii(agent, ctx({ role: UserRole.AGENT, agentIds: [6] }));
       expect(agent.title).toBe("Center");
       expect(agent.address.street).toMatch(MASKED);
+    });
+  });
+
+  describe("postcode", () => {
+    const withPostcode = (street: string) =>
+      Object.assign(makeAddress(street), {
+        postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+      });
+    const makeAgent = (id: number) =>
+      Object.assign(new Agent(), { id, address: withPostcode("Agent St 1") });
+    const makeOpportunity = (id: number) =>
+      Object.assign(new Opportunity(), {
+        id,
+        deal: { postcode: { value: "12043", latitude: 52.4, longitude: 13.4 } },
+      });
+
+    it("hides a hidden agent's postcode value", () => {
+      const agent = makeAgent(7);
+      maskPii(agent, ctx({ role: UserRole.VOLUNTEER }));
+      expect(agent.address.postcode).toMatchObject({
+        value: null,
+        latitude: null,
+      });
+    });
+
+    it("keeps the postcode of an agent the caller belongs to or is matched to", () => {
+      const own = makeAgent(7);
+      const matched = makeAgent(8);
+      maskPii(own, ctx({ role: UserRole.AGENT, agentIds: [7] }));
+      maskPii(matched, ctx({ role: UserRole.VOLUNTEER, matchedAgentIds: [8] }));
+      expect(own.address.postcode.value).toBe("10115");
+      expect(matched.address.postcode.value).toBe("10115");
+    });
+
+    it("keeps a hidden person's postcode value (only coordinates are hidden)", () => {
+      const person = Object.assign(makePerson(2), {
+        address: withPostcode("Person St 1"),
+      });
+      maskPii(person, ctx({ personIds: [1] }));
+      expect(person.address.postcode).toMatchObject({
+        value: "10115",
+        latitude: null,
+      });
+    });
+
+    it("hides a hidden opportunity's location postcode and keeps a visible one's", () => {
+      const hidden = makeOpportunity(5);
+      const visible = makeOpportunity(6);
+      maskPii([hidden, visible], ctx({ opportunityIds: [6] }));
+      expect(hidden.deal.postcode).toMatchObject({
+        value: null,
+        latitude: null,
+      });
+      expect(visible.deal.postcode.value).toBe("12043");
     });
   });
 

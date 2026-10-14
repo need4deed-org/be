@@ -11,5 +11,6 @@ export function parseAgentPatch(agent: ApiAgentPatch): Partial<Agent> {
     trustLevel: agent.trustLevel,
     searchStatus: agent.statusSearch ?? agent.volunteerSearch,
     engagementStatus: agent.statusEngagement,
+    sharesVolunteers: agent.sharesVolunteers,
   };
 }

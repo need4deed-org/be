@@ -37,16 +37,32 @@ export function maskFields(
   }
 }
 
-function maskAddressCoordinates(address: Record<string, unknown>): void {
-  const postcode = address.postcode;
+function maskPostcode(
+  owner: Record<string, unknown>,
+  { hideValue }: { hideValue: boolean },
+): void {
+  const postcode = owner.postcode;
   if (postcode && typeof postcode === "object") {
-    address.postcode = { ...postcode, latitude: null, longitude: null };
+    owner.postcode = {
+      ...postcode,
+      latitude: null,
+      longitude: null,
+      ...(hideValue ? { value: null } : {}),
+    };
   }
 }
 
-function maskAddress(address: Record<string, unknown>): void {
+function maskAddress(
+  address: Record<string, unknown>,
+  { hidePostcode }: { hidePostcode: boolean },
+): void {
   maskFields(address, ADDRESS_PII_FIELDS);
-  maskAddressCoordinates(address);
+  maskPostcode(address, { hideValue: hidePostcode });
+}
+
+interface AddressSets {
+  visible: WeakSet<object>;
+  ofAgents: WeakSet<object>;
 }
 
 function isAgentVisible(agentId: number, ctx: CallerVisibility): boolean {
@@ -79,11 +95,11 @@ function isCommentVisible(comment: Comment, ctx: CallerVisibility): boolean {
   return isEntityVisible(comment.entityType, comment.entityId, ctx);
 }
 
-function collectVisibleAddresses(
+function collectAddresses(
   node: unknown,
   ctx: CallerVisibility,
   seen: WeakSet<object>,
-  visibleAddresses: WeakSet<object>,
+  addresses: AddressSets,
 ): void {
   if (node === null || typeof node !== "object") {
     return;
@@ -95,7 +111,7 @@ function collectVisibleAddresses(
 
   if (Array.isArray(node)) {
     for (const item of node) {
-      collectVisibleAddresses(item, ctx, seen, visibleAddresses);
+      collectAddresses(item, ctx, seen, addresses);
     }
     return;
   }
@@ -106,32 +122,34 @@ function collectVisibleAddresses(
       node.address &&
       typeof node.address === "object"
     ) {
-      visibleAddresses.add(node.address);
+      addresses.visible.add(node.address);
     }
   } else if (node instanceof Agent) {
-    if (
-      isAgentVisible(node.id, ctx) &&
-      node.address &&
-      typeof node.address === "object"
-    ) {
-      visibleAddresses.add(node.address);
+    if (node.address && typeof node.address === "object") {
+      addresses.ofAgents.add(node.address);
+      if (isAgentVisible(node.id, ctx)) {
+        addresses.visible.add(node.address);
+      }
     }
   }
 
   for (const key of Object.keys(node)) {
-    collectVisibleAddresses(
+    collectAddresses(
       (node as Record<string, unknown>)[key],
       ctx,
       seen,
-      visibleAddresses,
+      addresses,
     );
   }
 }
 
 export function maskPii<T>(data: T, ctx: CallerVisibility): T {
-  const visibleAddresses = new WeakSet<object>();
-  collectVisibleAddresses(data, ctx, new WeakSet<object>(), visibleAddresses);
-  walk(data, ctx, new WeakSet<object>(), visibleAddresses);
+  const addresses: AddressSets = {
+    visible: new WeakSet<object>(),
+    ofAgents: new WeakSet<object>(),
+  };
+  collectAddresses(data, ctx, new WeakSet<object>(), addresses);
+  walk(data, ctx, new WeakSet<object>(), addresses);
   return data;
 }
 
@@ -139,7 +157,7 @@ function walk(
   node: unknown,
   ctx: CallerVisibility,
   seen: WeakSet<object>,
-  visibleAddresses: WeakSet<object>,
+  addresses: AddressSets,
 ): void {
   if (node === null || typeof node !== "object") {
     return;
@@ -151,7 +169,7 @@ function walk(
 
   if (Array.isArray(node)) {
     for (const item of node) {
-      walk(item, ctx, seen, visibleAddresses);
+      walk(item, ctx, seen, addresses);
     }
     return;
   }
@@ -162,8 +180,10 @@ function walk(
       maskFields(node as unknown as Record<string, unknown>, PERSON_PII_FIELDS);
     }
     if (node.address && typeof node.address === "object") {
-      if (!visibleAddresses.has(node.address)) {
-        maskAddress(node.address as unknown as Record<string, unknown>);
+      if (!addresses.visible.has(node.address)) {
+        maskAddress(node.address as unknown as Record<string, unknown>, {
+          hidePostcode: addresses.ofAgents.has(node.address),
+        });
       }
       seen.add(node.address);
     }
@@ -174,23 +194,29 @@ function walk(
     if (
       node.address &&
       typeof node.address === "object" &&
-      visibleAddresses.has(node.address)
+      addresses.visible.has(node.address)
     ) {
       seen.add(node.address);
     }
   } else if (node instanceof Address) {
-    if (!visibleAddresses.has(node)) {
-      maskAddress(node as unknown as Record<string, unknown>);
+    if (!addresses.visible.has(node)) {
+      maskAddress(node as unknown as Record<string, unknown>, {
+        hidePostcode: addresses.ofAgents.has(node),
+      });
     }
   } else if (node instanceof Opportunity) {
-    if (
-      !ctx.opportunityIds.has(node.id) &&
-      node.accompanying instanceof Accompanying
-    ) {
-      maskFields(
-        node.accompanying as unknown as Record<string, unknown>,
-        ACCOMPANYING_PII_FIELDS,
-      );
+    if (!ctx.opportunityIds.has(node.id)) {
+      if (node.accompanying instanceof Accompanying) {
+        maskFields(
+          node.accompanying as unknown as Record<string, unknown>,
+          ACCOMPANYING_PII_FIELDS,
+        );
+      }
+      if (node.deal && typeof node.deal === "object") {
+        maskPostcode(node.deal as unknown as Record<string, unknown>, {
+          hideValue: true,
+        });
+      }
     }
   } else if (node instanceof Comment) {
     if (!isCommentVisible(node, ctx)) {
@@ -202,6 +228,6 @@ function walk(
   }
 
   for (const key of Object.keys(node)) {
-    walk((node as Record<string, unknown>)[key], ctx, seen, visibleAddresses);
+    walk((node as Record<string, unknown>)[key], ctx, seen, addresses);
   }
 }

@@ -3,6 +3,7 @@ import {
   AgentMembershipStatus,
   ApiOpportunityGet,
   ApiOpportunityGetList,
+  ApiOpportunityOtherGetList,
   ApiOpportunityPatch,
   CommunicationType,
   EntityTableName,
@@ -59,6 +60,7 @@ import {
   opportunityCreateBodySchema,
   opportunityCreateResponseSchema,
   opportunityListQuerySchema,
+  otherOpportunityListQuerySchema,
   responseSchema,
 } from "../../schema";
 import {
@@ -96,6 +98,7 @@ import {
 } from "../../utils";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
+import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
@@ -186,6 +189,42 @@ export default async function opportunityRoutes(
   await fastify.register(opportunityEventRegistrationRoutes, {
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
+
+  fastify.get<{
+    Querystring: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      language?: string;
+    };
+    Reply: ReplyDataCount<ApiOpportunityOtherGetList[]>;
+  }>(
+    "/other",
+    {
+      schema: {
+        querystring: otherOpportunityListQuerySchema,
+        response: responseSchema("ApiOpportunityOtherGetList#", true),
+      },
+    },
+    async (request, reply) => {
+      if (request.authUser?.role !== UserRole.AGENT) {
+        throw new UnauthorizedError();
+      }
+      const [skip, take] = getSkipTake({
+        page: request.query.page,
+        limit: request.query.limit,
+      });
+      const { data, count } = await getOtherOpportunities(request, {
+        skip,
+        take,
+        search: request.query.search,
+        language: requestLanguage(request.query),
+      });
+      return reply
+        .status(200)
+        .send({ message: "Other opportunities.", data, count });
+    },
+  );
 
   fastify.get<{
     Params: ParamsId;
@@ -377,6 +416,7 @@ export default async function opportunityRoutes(
         "deal.dealLanguage.language",
         "deal.dealTimeslot.timeslot",
         "deal.dealDistrict.district",
+        "deal.postcode",
         "agent",
         "agent.address.postcode",
         "accompanying",
@@ -387,13 +427,13 @@ export default async function opportunityRoutes(
 
       const opportunityRepository = fastify.db.opportunityRepository;
 
-      const [opportunities, count] =
+      const [pageRows, count] =
         request.query.sortBy === OpportunitySortField.START_DATE
           ? await opportunityRepository
               .createQueryBuilder("opportunity")
               .setFindOptions({
                 where,
-                relations: relations.filter((r) => r !== "onetimer"),
+                select: { id: true, createdAt: true },
                 skip,
                 take,
               })
@@ -406,11 +446,25 @@ export default async function opportunityRoutes(
               .getManyAndCount()
           : await opportunityRepository.findAndCount({
               where,
-              relations,
+              select: { id: true, createdAt: true },
               skip,
               take,
               ...(order ? order : {}),
             });
+
+      // Loaded without the filter: a where on a relation also trims what it loads.
+      const pageIds = pageRows.map(({ id }) => id);
+      const loaded = pageIds.length
+        ? await opportunityRepository.find({
+            where: { id: In(pageIds) },
+            relations,
+            relationLoadStrategy: "query",
+          })
+        : [];
+      const loadedById = new Map(loaded.map((o) => [o.id, o]));
+      const opportunities = pageIds
+        .map((id) => loadedById.get(id))
+        .filter((o): o is Opportunity => o !== undefined);
 
       const { addCategoryToDeal, updates: dealUpdates } =
         getCategoryToDealHandler();

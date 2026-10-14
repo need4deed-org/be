@@ -105,6 +105,7 @@ export interface QuerystringVolunteerFiltering {
     district?: string | string[];
     engagement?: string | string[];
     match?: string | string[];
+    ownerAgent?: string | string[];
   };
 }
 export type VolunteerListType = "card" | "table";
