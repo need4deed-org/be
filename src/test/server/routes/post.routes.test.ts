@@ -669,6 +669,65 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it("stores tagged NGOs from <@agent:ID> tokens and returns them on create, list and PATCH", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const [tagged, unclaimed] = await fastify.db.agentRepository.save([
+      new Agent({
+        title: `Tagged NGO ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+      new Agent({ title: `Unclaimed NGO ${suffix}`, unclaimed: true }),
+    ]);
+    createdAgentIds.push(tagged.id, unclaimed.id);
+    const expected = [{ id: tagged.id, title: tagged.title }];
+
+    const created = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        text: `Tagging ${suffix} <@agent:${tagged.id}> <@agent:${unclaimed.id}> <@agent:999999999>`,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const postId = created.json().data.id;
+    createdPostIds.push(postId);
+    expect(created.json().data.taggedAgents).toEqual(expected);
+
+    const stored = await fastify.db.postRepository.findOne({
+      where: { id: postId },
+      relations: ["taggedAgents"],
+    });
+    expect(stored?.taggedAgents.map((a) => a.id)).toEqual([tagged.id]);
+
+    const listed = await fastify.inject({
+      method: "GET",
+      url: `/post?search=${encodeURIComponent(`Tagging ${suffix}`)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(
+      listed.json().data.find((p: { id: number }) => p.id === postId)
+        ?.taggedAgents,
+    ).toEqual(expected);
+
+    const untouched = await fastify.inject({
+      method: "PATCH",
+      url: `/post/${postId}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { taggedPersonIds: [] },
+    });
+    expect(untouched.json().data.taggedAgents).toEqual(expected);
+
+    const untagged = await fastify.inject({
+      method: "PATCH",
+      url: `/post/${postId}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: { text: `Tagging ${suffix} without NGOs` },
+    });
+    expect(untagged.statusCode).toBe(200);
+    expect(untagged.json().data.taggedAgents).toEqual([]);
+  });
+
   it("finds posts by post text, reply text, tagged person name, and opportunity title", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 

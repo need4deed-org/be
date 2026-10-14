@@ -182,7 +182,7 @@ function walk(
     if (node.address && typeof node.address === "object") {
       if (!addresses.visible.has(node.address)) {
         maskAddress(node.address as unknown as Record<string, unknown>, {
-          hidePostcode: false,
+          hidePostcode: addresses.ofAgents.has(node.address),
         });
       }
       seen.add(node.address);

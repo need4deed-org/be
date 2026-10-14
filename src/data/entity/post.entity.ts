@@ -1,4 +1,4 @@
-import { ApiPostAgent, ApiPostReactionSummary } from "need4deed-sdk";
+import { ApiPostReactionSummary } from "need4deed-sdk";
 import {
   Check,
   Column,
@@ -54,6 +54,14 @@ export default class Post {
   })
   taggedPersons: Person[];
 
+  @ManyToMany(() => Agent)
+  @JoinTable({
+    name: "post_agent",
+    joinColumn: { name: "post_id" },
+    inverseJoinColumn: { name: "agent_id" },
+  })
+  taggedAgents: Agent[];
+
   @ManyToMany(() => Opportunity)
   @JoinTable({
     name: "post_opportunity",
@@ -87,8 +95,6 @@ export default class Post {
   myReaction?: string | null;
 
   bookmarked?: boolean;
-
-  taggedAgents?: ApiPostAgent[];
 
   @CreateDateColumn()
   createdAt: Date;

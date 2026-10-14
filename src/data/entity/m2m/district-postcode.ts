@@ -5,7 +5,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
 import District from "../location/district.entity";
 import Postcode from "../location/postcode.entity";
 

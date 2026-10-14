@@ -653,6 +653,16 @@ describe("classifyRegisterAgentConflict", () => {
     ).toBe("title");
   });
 
+  it("returns 'organization' for a 23503 violation on organization_id", () => {
+    expect(
+      classifyRegisterAgentConflict({
+        code: "23503",
+        detail:
+          'Key (organization_id)=(999) is not present in table "organization".',
+      }),
+    ).toBe("organization");
+  });
+
   it("returns null for non-unique-violation errors", () => {
     expect(
       classifyRegisterAgentConflict({ code: "23502", detail: "anything" }),

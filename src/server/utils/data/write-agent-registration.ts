@@ -14,7 +14,6 @@ import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
-import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
@@ -109,20 +108,6 @@ async function assertNotRegistered(
   }
 }
 
-async function assertOrganizationExists(
-  { organizationId }: ApiAgentRegisterNew,
-  manager: DataSource | EntityManager = dataSource,
-): Promise<void> {
-  if (
-    organizationId !== undefined &&
-    !(await manager
-      .getRepository(Organization)
-      .existsBy({ id: organizationId }))
-  ) {
-    throw new BadRequestError(`Organization (id:${organizationId}) not found.`);
-  }
-}
-
 async function assertNoAddressConflict(
   { addressStreet, addressPostcode, confirmSharedAddress }: ApiAgentRegisterNew,
   manager: DataSource | EntityManager = dataSource,
@@ -205,7 +190,6 @@ export async function createAgentForPerson(
   try {
     await dataSource.manager.transaction(async (manager) => {
       await assertNotRegistered(personId, manager);
-      await assertOrganizationExists(input, manager);
       await assertNoAddressConflict(input, manager);
       const agent = await createBareAgent(input, manager);
 
@@ -230,13 +214,7 @@ export async function createAgentForPerson(
       };
     });
   } catch (err) {
-    if (classifyRegisterAgentConflict(err) === "title") {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      throw new AgentTitleConflictError(existing?.id);
-    }
-    throw err;
+    throw await toRegisterAgentError(err, input);
   }
 
   return result;
@@ -245,7 +223,6 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
-  await assertOrganizationExists(input);
   await assertNoAddressConflict(input);
 
   let agentId!: number;
@@ -256,13 +233,7 @@ export async function createAgent(
       agentId = agent.id;
     });
   } catch (err) {
-    if (classifyRegisterAgentConflict(err) === "title") {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      throw new AgentTitleConflictError(existing?.id);
-    }
-    throw err;
+    throw await toRegisterAgentError(err, input);
   }
 
   return { agentId };
@@ -370,10 +341,38 @@ export async function joinAgent(
   return { agentId, membershipStatus: status };
 }
 
-export function classifyRegisterAgentConflict(err: unknown): "title" | null {
+async function toRegisterAgentError(
+  err: unknown,
+  input: ApiAgentRegisterNew,
+): Promise<unknown> {
+  switch (classifyRegisterAgentConflict(err)) {
+    case "title": {
+      const existing = await dataSource
+        .getRepository(Agent)
+        .findOne({ where: { title: input.title } });
+      return new AgentTitleConflictError(existing?.id);
+    }
+    case "organization":
+      return new BadRequestError(
+        `Organization (id:${input.organizationId}) not found.`,
+      );
+    default:
+      return err;
+  }
+}
+
+export function classifyRegisterAgentConflict(
+  err: unknown,
+): "title" | "organization" | null {
   const e = err as { code?: string; detail?: string };
-  if (e?.code !== "23505" || !e.detail) {
+  if (!e?.detail) {
     return null;
   }
-  return e.detail.includes("title") ? "title" : null;
+  if (e.code === "23505" && e.detail.includes("title")) {
+    return "title";
+  }
+  if (e.code === "23503" && e.detail.includes("organization_id")) {
+    return "organization";
+  }
+  return null;
 }

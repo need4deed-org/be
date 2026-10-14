@@ -42,7 +42,6 @@ import { getSkipTake } from "../utils";
 import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
-import { attachTaggedAgents } from "../utils/data/attach-tagged-agents";
 import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
 import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
@@ -60,6 +59,7 @@ import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
+import { findTaggedAgents } from "../utils/data/tagged-agents";
 import {
   requestLanguage,
   translateOpportunities,
@@ -197,7 +197,6 @@ export default async function postRoutes(
       await Promise.all([
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
-        attachTaggedAgents(fastify, orderedPosts),
       ]);
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
@@ -255,6 +254,7 @@ export default async function postRoutes(
         authorId: personId,
         agentId: agentPerson?.agentId ?? null,
         taggedPersons,
+        taggedAgents: await findTaggedAgents(fastify, text),
         linkedOpportunities,
       });
 
@@ -262,7 +262,12 @@ export default async function postRoutes(
 
       const full = await fastify.db.postRepository.findOne({
         where: { id: saved.id },
-        relations: ["author", "taggedPersons", "linkedOpportunities"],
+        relations: [
+          "author",
+          "taggedPersons",
+          "taggedAgents",
+          "linkedOpportunities",
+        ],
       });
 
       if (!full) {
@@ -275,10 +280,7 @@ export default async function postRoutes(
         request.authUser!.id,
         full.author,
       );
-      await Promise.all([
-        attachTaggedAgents(fastify, [full]),
-        translateLinkedOpportunities(fastify, [full], request.query),
-      ]);
+      await translateLinkedOpportunities(fastify, [full], request.query);
       return reply
         .status(201)
         .send({ message: "Post created.", data: dtoPost(full) });
@@ -310,7 +312,12 @@ export default async function postRoutes(
 
       const post = await fastify.db.postRepository.findOne({
         where: getRootPostWhere(id),
-        relations: ["author", "taggedPersons", "linkedOpportunities"],
+        relations: [
+          "author",
+          "taggedPersons",
+          "taggedAgents",
+          "linkedOpportunities",
+        ],
       });
       if (!post) {
         throw new NotFoundError(`Post ${id} not found.`);
@@ -329,6 +336,7 @@ export default async function postRoutes(
 
       if (text !== null && text !== undefined) {
         post.text = text;
+        post.taggedAgents = await findTaggedAgents(fastify, text);
       }
       if (taggedPersonIds !== null && taggedPersonIds !== undefined) {
         const found = taggedPersonIds.length
@@ -354,7 +362,6 @@ export default async function postRoutes(
         fastify.db.postRepository.count({ where: { rootId: updated.id } }),
         attachReactionData(fastify, [updated], request.authUser?.personId),
         attachBookmarkData(fastify, [updated], request.authUser?.personId),
-        attachTaggedAgents(fastify, [updated]),
       ]);
       updated.replyCount = replyCount;
 

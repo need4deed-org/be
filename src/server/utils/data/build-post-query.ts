@@ -9,6 +9,8 @@ export function buildPostQuery(
     .createQueryBuilder("post")
     .leftJoinAndSelect("post.author", "author")
     .leftJoinAndSelect("post.taggedPersons", "taggedPerson")
+    .leftJoin("post.taggedAgents", "taggedAgent")
+    .addSelect(["taggedAgent.id", "taggedAgent.title", "taggedAgent.unclaimed"])
     .leftJoinAndSelect("post.linkedOpportunities", "opportunity")
     .loadRelationCountAndMap("post.replyCount", "post.descendantReplies");
 }

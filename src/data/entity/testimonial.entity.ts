@@ -5,7 +5,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
-
 import Person from "./person.entity";
 import Language from "./profile/language.entity";
 
