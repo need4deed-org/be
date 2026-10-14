@@ -5,13 +5,14 @@ import {
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
 import { EntityManager, In } from "typeorm";
-import { BaseError, NotFoundError } from "../../../config";
+import { BadRequestError, BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentLanguage from "../../../data/entity/m2m/agent-language";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { createAddress } from "./for-routes";
@@ -40,6 +41,19 @@ export class AgentTitleConflictError extends BaseError {
       conflict: "title",
       ...(agentId !== undefined ? { agentId } : {}),
     });
+  }
+}
+
+async function assertOrganizationExists({
+  organizationId,
+}: ApiAgentRegisterNew): Promise<void> {
+  if (
+    organizationId !== undefined &&
+    !(await dataSource
+      .getRepository(Organization)
+      .existsBy({ id: organizationId }))
+  ) {
+    throw new BadRequestError(`Organization (id:${organizationId}) not found.`);
   }
 }
 
@@ -76,6 +90,7 @@ async function createBareAgent(
 
   const newAgent = new Agent({
     title: input.title,
+    organizationId: input.organizationId,
     agentTypeId: input.typeId ?? undefined,
     info: input.info ?? undefined,
     website: input.website ?? undefined,
@@ -119,6 +134,7 @@ export async function createAgentForPerson(
   personId: number,
   input: AgentRegisterInput,
 ): Promise<RegisterAgentResult> {
+  await assertOrganizationExists(input);
   await assertNoAddressConflict(input);
 
   let result!: RegisterAgentResult;
@@ -163,6 +179,7 @@ export async function createAgentForPerson(
 export async function createAgent(
   input: ApiAgentRegisterNew,
 ): Promise<{ agentId: number }> {
+  await assertOrganizationExists(input);
   await assertNoAddressConflict(input);
 
   let agentId!: number;

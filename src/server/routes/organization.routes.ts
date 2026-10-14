@@ -5,9 +5,9 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { NotFoundError } from "../../config";
-import { dtoOrganizationGetList } from "../../services";
 import { idParamSchema, responseSchema } from "../schema";
 import { ParamsId, ReplyData } from "../types";
+import { listOrganizations } from "../utils/data/list-organizations";
 
 export default async function organizationRoutes(
   fastify: FastifyInstance,
@@ -20,16 +20,11 @@ export default async function organizationRoutes(
     {
       schema: { response: responseSchema("ApiOrganizationGetList#", true) },
     },
-    async (_request, reply) => {
-      const organizations = await fastify.db.organizationRepository.find({
-        order: { title: "ASC" },
-      });
-
-      return reply.status(200).send({
+    async (_request, reply) =>
+      reply.status(200).send({
         message: "Organizations found.",
-        data: organizations.map(dtoOrganizationGetList),
-      });
-    },
+        data: await listOrganizations(),
+      }),
   );
 
   fastify.patch<{
