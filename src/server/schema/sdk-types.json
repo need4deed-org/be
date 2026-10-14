@@ -1753,6 +1753,20 @@
       },
       "required": ["id", "title"]
     },
+    "ApiOpportunityOtherGetList": {
+      "$id": "ApiOpportunityOtherGetList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "district": {
+          "oneOf": [{ "$ref": "OptionById#" }, { "type": "null" }]
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "district", "createdAt"],
+      "additionalProperties": false
+    },
     "ApiPostLinkedOpportunity": {
       "$id": "ApiPostLinkedOpportunity",
       "type": "object",

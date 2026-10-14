@@ -27,7 +27,9 @@ export type OpportunityAppointmentFilter = Pick<
   | "excludeAccompanying"
 >;
 
-const SEARCH_FIELDS = ["title", "info"] as const;
+type SearchField = "title" | "info";
+
+const SEARCH_FIELDS: readonly SearchField[] = ["title", "info"];
 
 // Mirrors translation/resolve.ts: a translation is only displayed when it is
 // DONE, in the response language, and its sourceHash still matches the
@@ -39,23 +41,27 @@ const TRANSLATION_SEARCH_SQL = (alias: string) => `${alias} IN (
     JOIN opportunity o ON o.id = ft.opportunity_id
    WHERE ft.language_id = :searchLanguageId
      AND ft.status = :searchTranslationStatus
-     AND ft.field_name IN ('title', 'info')
+     AND ft.field_name IN (:...searchFields)
      AND ft.translation ILIKE :searchPattern
      AND ft.source_hash = encode(sha256(convert_to(btrim(
            CASE ft.field_name WHEN 'title' THEN o.title ELSE o.info END,
            :searchTrimChars), 'UTF8')), 'hex'))`;
 
-function getSearchBranches(
+// Matches the original text or its displayed translation in the request
+// language, on the given fields only.
+export function getSearchBranches(
   pattern: string,
   languageId?: number,
+  fields: readonly SearchField[] = SEARCH_FIELDS,
 ): FindOptionsWhere<Opportunity>[] {
-  const branches: FindOptionsWhere<Opportunity>[] = SEARCH_FIELDS.map(
-    (field) => ({ [field]: ILike(pattern) }),
-  );
+  const branches: FindOptionsWhere<Opportunity>[] = fields.map((field) => ({
+    [field]: ILike(pattern),
+  }));
   if (languageId !== undefined) {
     branches.push({
       id: Raw(TRANSLATION_SEARCH_SQL, {
         searchLanguageId: languageId,
+        searchFields: fields,
         searchTranslationStatus: TranslationStatus.DONE,
         searchPattern: pattern,
         searchTrimChars: TRIM_CHARS,

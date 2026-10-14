@@ -18,6 +18,16 @@ export const langQuerySchema = {
   properties: langProp,
 };
 
+export const otherOpportunityListQuerySchema = {
+  type: "object",
+  properties: {
+    ...paginationProps,
+    ...langProp,
+    search: { type: "string", maxLength: 100 },
+  },
+  additionalProperties: false,
+};
+
 export const eventListQuerySchema = {
   type: "object",
   properties: {
