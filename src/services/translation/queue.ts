@@ -5,6 +5,7 @@ import {
   TranslationStatus,
 } from "need4deed-sdk";
 import { EntityManager, FindOptionsWhere } from "typeorm";
+import { NotFoundError } from "../../config";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import { sha256Hex } from "../../data/utils/hash-token";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
@@ -14,8 +15,14 @@ import {
   TranslationFk,
 } from "./registry";
 
+export type SourceEntity = TranslatableEntity & Record<string, unknown>;
+
 export function sourceHashOf(text: string): string {
   return sha256Hex(text);
+}
+
+export function sourceTextOf(value: unknown): string {
+  return String(value ?? "").trim();
 }
 
 function rowsOf(
@@ -38,7 +45,7 @@ export async function enqueue(
   const repository = manager.getRepository(FieldTranslation);
 
   for (const [fieldName, value] of Object.entries(fields)) {
-    const text = value?.trim();
+    const text = sourceTextOf(value);
     if (!text) {
       await repository.delete(rowsOf(fk, entity.id, { fieldName }));
       continue;
@@ -82,7 +89,7 @@ export async function enqueue(
   }
 }
 
-async function loadEntity(
+export async function loadEntity(
   manager: EntityManager,
   entityType: EntityTableName,
   entityId: number,
@@ -91,11 +98,42 @@ async function loadEntity(
   const entry = getMachineEntry(entityType, fieldNames);
   const entity = (await manager.findOneBy(entry.entity, {
     id: entityId,
-  })) as unknown as (TranslatableEntity & Record<string, unknown>) | null;
+  })) as unknown as SourceEntity | null;
   if (!entity) {
-    throw new Error(`${entityType} ${entityId} not found`);
+    throw new NotFoundError(`${entityType} (id:${entityId}) not found.`);
   }
   return { entry, entity };
+}
+
+export async function storeHuman(
+  manager: EntityManager,
+  fk: TranslationFk,
+  entity: SourceEntity,
+  languageId: number,
+  fieldName: string,
+  text: string,
+): Promise<void> {
+  const where = rowsOf(fk, entity.id, { fieldName, languageId });
+  const human = {
+    origin: TranslationOrigin.HUMAN,
+    status: TranslationStatus.DONE,
+    translation: sourceTextOf(text),
+    sourceHash: sourceHashOf(sourceTextOf(entity[fieldName])),
+    attempts: 0,
+    lastErrorCode: null,
+    model: null,
+  };
+
+  const repository = manager.getRepository(FieldTranslation);
+  const existing = await repository.findOneBy(where);
+  if (existing) {
+    await repository.update({ id: existing.id }, human);
+  } else {
+    await repository.insert({
+      ...where,
+      ...human,
+    } as Partial<FieldTranslation>);
+  }
 }
 
 export async function setHuman(
@@ -115,31 +153,7 @@ export async function setHuman(
       `${lang} is the original language of ${entityType} ${entityId}`,
     );
   }
-  const source = String(entity[fieldName] ?? "").trim();
-  const where = rowsOf(entry.fk, entityId, {
-    fieldName,
-    languageId: idOf[lang],
-  });
-  const human = {
-    origin: TranslationOrigin.HUMAN,
-    status: TranslationStatus.DONE,
-    translation: text.trim(),
-    sourceHash: sourceHashOf(source),
-    attempts: 0,
-    lastErrorCode: null,
-    model: null,
-  };
-
-  const repository = manager.getRepository(FieldTranslation);
-  const existing = await repository.findOneBy(where);
-  if (existing) {
-    await repository.update({ id: existing.id }, human);
-  } else {
-    await repository.insert({
-      ...where,
-      ...human,
-    } as Partial<FieldTranslation>);
-  }
+  await storeHuman(manager, entry.fk, entity, idOf[lang], fieldName, text);
 }
 
 export async function setOriginalLanguage(

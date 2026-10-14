@@ -18,6 +18,10 @@ export async function resolveCallerMask(
   return request.callerVisibility;
 }
 
+export function resetCallerMask(request: FastifyRequest): void {
+  request.callerVisibility = undefined;
+}
+
 export async function maskForCaller(
   request: FastifyRequest,
   data: unknown,

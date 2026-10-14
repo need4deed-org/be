@@ -8,17 +8,21 @@ import {
 import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
+  AgentRoleType,
+  ApiAgentAlreadyRegisteredConflict,
   ApiAgentRegister,
   ApiOrganizationGetList,
   UserRole,
 } from "need4deed-sdk";
 import { UnauthenticatedError, UnauthorizedError } from "../../../config";
 import logger from "../../../logger";
+import { dtoAgentRegisterStatus } from "../../../services/dto/dto-agent-register-status";
 import {
   registerAgentBodySchema,
   registerAgentConflictSchema,
   registerAgentQuerySchema,
   registerAgentResponseSchema,
+  registerAgentStatusResponseSchema,
   registerSearchQuerySchema,
   registerSearchResponseSchema,
   responseErrors,
@@ -71,6 +75,39 @@ export default async function agentRegisterRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  const getRegistrationMembership = (personId: number) =>
+    fastify.db.agentPersonRepository.findOne({
+      where: { personId, role: AgentRoleType.VOLUNTEER_COORDINATOR },
+      relations: ["agent"],
+      order: { status: "ASC", id: "ASC" },
+    });
+
+  fastify.get<{ Querystring: { token: string } }>(
+    "/status",
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: {
+        querystring: registerAgentQuerySchema,
+        response: { 200: registerAgentStatusResponseSchema, ...responseErrors },
+      },
+      preHandler: (request, reply) =>
+        authByVerifyToken(fastify, request, reply),
+    },
+    async (request, reply) => {
+      const personId = request.registrant?.personId;
+      if (!personId) {
+        return reply
+          .status(500)
+          .send({ message: "Account is missing a person record." });
+      }
+      const membership = await getRegistrationMembership(personId);
+      return reply.status(200).send({
+        message: "Agent registration status.",
+        data: dtoAgentRegisterStatus(membership),
+      });
+    },
+  );
+
   fastify.get<{
     Querystring: { token: string };
     Reply: ReplyData<ApiOrganizationGetList[]>;
@@ -135,13 +172,9 @@ export default async function agentRegisterRoutes(
         request.registrant?.email ?? "",
         matches.map((a) => a.id),
       );
-      // be#1041: an agent whose title the registrant can't see is returned
-      // (as { id }) only for its exact street and house number. A prefix
-      // match would let a registrant list orgs street by street, and an
-      // addressless agent matches on its title, which would leak it
-      // substring by substring.
       const data = matches
         .filter((a) => joinable.has(a.id) || isExactStreetMatch(a, street))
+        // Address-only matches must not reveal NGO names to untrusted registrants.
         .map((a) =>
           joinable.has(a.id) ? { id: a.id, title: a.title } : { id: a.id },
         );
@@ -177,6 +210,19 @@ export default async function agentRegisterRoutes(
         return reply
           .status(500)
           .send({ message: "Account is missing a person record." });
+      }
+
+      const membership = await getRegistrationMembership(personId);
+      if (membership) {
+        const conflict: ApiAgentAlreadyRegisteredConflict = {
+          conflict: "registered",
+          agentId: membership.agentId,
+          membershipStatus: membership.status,
+        };
+        return reply.status(409).send({
+          message: "Agent registration already completed or awaiting approval.",
+          ...conflict,
+        });
       }
 
       const body = request.body;
