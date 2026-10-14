@@ -5,11 +5,16 @@ import {
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { ILike, In, Not, Raw } from "typeorm";
+import { FindOptionsWhere, In, Not } from "typeorm";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoOpportunityOtherGetList } from "../../../services/dto/dto-opportunity-other";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
+import { getSearchBranches } from "./get-opportunity-where";
 import { escapeLikePattern } from "./person-name-ilike";
-import { translateOpportunities } from "./translate-opportunities";
+import {
+  languageIdOf,
+  translateOpportunities,
+} from "./translate-opportunities";
 
 const OPEN_STATUSES = [
   OpportunityStatusType.NEW,
@@ -33,25 +38,29 @@ export async function getOtherOpportunities(
     return { data: [], count: 0 };
   }
 
-  const [opportunities, count] =
-    await request.server.db.opportunityRepository.findAndCount({
-      where: {
-        status: In(OPEN_STATUSES),
-        type: Not(OpportunityType.ACCOMPANYING),
-        agentId: Raw(
-          (column) =>
-            `${column} IS NOT NULL AND ${column} NOT IN (:...ownAgentIds)`,
-          {
-            ownAgentIds,
-          },
-        ),
-        ...(search ? { title: ILike(`%${escapeLikePattern(search)}%`) } : {}),
-      },
-      relations: ["district", "agent.district"],
-      order: { createdAt: "DESC", id: "DESC" },
-      skip,
-      take,
-    });
+  const repository = request.server.db.opportunityRepository;
+  const base: FindOptionsWhere<Opportunity> = {
+    status: In(OPEN_STATUSES),
+    type: Not(OpportunityType.ACCOMPANYING),
+    // NOT IN is never true for NULL, so NGO-less rows are left out too.
+    agentId: Not(In(ownAgentIds)),
+  };
+  // Title only: the rows show no other text, so searching it would leak.
+  const where = search
+    ? getSearchBranches(
+        `%${escapeLikePattern(search)}%`,
+        await languageIdOf(repository.manager, language),
+        ["title"],
+      ).map((branch) => ({ ...base, ...branch }))
+    : base;
+
+  const [opportunities, count] = await repository.findAndCount({
+    where,
+    relations: ["district", "agent.district"],
+    order: { createdAt: "DESC", id: "DESC" },
+    skip,
+    take,
+  });
 
   await translateOpportunities(request.server, opportunities, language);
 

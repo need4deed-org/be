@@ -60,6 +60,7 @@ import {
   opportunityCreateBodySchema,
   opportunityCreateResponseSchema,
   opportunityListQuerySchema,
+  otherOpportunityListQuerySchema,
   responseSchema,
 } from "../../schema";
 import {
@@ -201,16 +202,7 @@ export default async function opportunityRoutes(
     "/other",
     {
       schema: {
-        querystring: {
-          type: "object",
-          properties: {
-            page: { type: "integer", minimum: 1 },
-            limit: { type: "integer", minimum: 1, maximum: 120 },
-            search: { type: "string", maxLength: 100 },
-            language: { type: "string" },
-          },
-          additionalProperties: false,
-        },
+        querystring: otherOpportunityListQuerySchema,
         response: responseSchema("ApiOpportunityOtherGetList#", true),
       },
     },

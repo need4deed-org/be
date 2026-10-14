@@ -3,13 +3,18 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  Lang,
   OpportunityStatusType,
   OpportunityType,
+  TranslationOrigin,
+  TranslationStatus,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import FieldTranslation from "../../../data/entity/field_translation.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -18,12 +23,22 @@ import User from "../../../data/entity/user.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { languageIdOf } from "../../../server/utils/data/translate-opportunities";
+import { sourceHashOf } from "../../../services/translation/queue";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type Caller = "member" | "volunteer";
-type OpportunityKey = "own" | "otherOpen" | "otherPast" | "otherAccompanying";
+type Caller = "member" | "pendingMember" | "volunteer";
+type OpportunityKey =
+  | "own"
+  | "otherOpen"
+  | "otherPast"
+  | "otherAccompanying"
+  | "orphan";
+
+const TRANSLATED_TITLE = "Homework help";
+const HIDDEN_INFO = "hidden-info-text";
 
 describe("GET /opportunity/other (fe#1052)", () => {
   let fastify: FastifyInstance;
@@ -71,7 +86,11 @@ describe("GET /opportunity/other (fe#1052)", () => {
 
     const setup: Record<
       OpportunityKey,
-      { agent: Agent; status: OpportunityStatusType; type?: OpportunityType }
+      {
+        agent: Agent | null;
+        status: OpportunityStatusType;
+        type?: OpportunityType;
+      }
     > = {
       own: { agent: ownAgent, status: OpportunityStatusType.NEW },
       otherOpen: { agent: otherAgent, status: OpportunityStatusType.SEARCHING },
@@ -81,10 +100,15 @@ describe("GET /opportunity/other (fe#1052)", () => {
         status: OpportunityStatusType.SEARCHING,
         type: OpportunityType.ACCOMPANYING,
       },
+      orphan: { agent: null, status: OpportunityStatusType.SEARCHING },
     };
     for (const [key, { agent, status, type }] of Object.entries(setup) as [
       OpportunityKey,
-      { agent: Agent; status: OpportunityStatusType; type?: OpportunityType },
+      {
+        agent: Agent | null;
+        status: OpportunityStatusType;
+        type?: OpportunityType;
+      },
     ][]) {
       const deal = await fastify.db.dealRepository.save(
         new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
@@ -96,14 +120,25 @@ describe("GET /opportunity/other (fe#1052)", () => {
           type: type ?? OpportunityType.REGULAR,
           status,
           dealId: deal.id,
-          agentId: agent.id,
+          agentId: agent?.id,
+          info: HIDDEN_INFO,
         }),
       );
     }
+    await dataSource.getRepository(FieldTranslation).save({
+      opportunityId: opportunities.otherOpen.id,
+      fieldName: "title",
+      languageId: await languageIdOf(dataSource.manager, Lang.EN),
+      translation: TRANSLATED_TITLE,
+      origin: TranslationOrigin.MACHINE,
+      status: TranslationStatus.DONE,
+      sourceHash: sourceHashOf(opportunities.otherOpen.title),
+    });
 
     const pwHash = await hashPassword(PASSWORD);
     const roles: Record<Caller, UserRole> = {
       member: UserRole.AGENT,
+      pendingMember: UserRole.AGENT,
       volunteer: UserRole.VOLUNTEER,
     };
     for (const caller of Object.keys(roles) as Caller[]) {
@@ -121,13 +156,16 @@ describe("GET /opportunity/other (fe#1052)", () => {
           personId: person.id,
         }),
       );
-      if (caller === "member") {
+      if (caller !== "volunteer") {
         await fastify.db.agentPersonRepository.save(
           new AgentPerson({
             agentId: ownAgent.id,
             personId: person.id,
             role: AgentRoleType.VOLUNTEER_COORDINATOR,
-            status: AgentMembershipStatus.ACTIVE,
+            status:
+              caller === "member"
+                ? AgentMembershipStatus.ACTIVE
+                : AgentMembershipStatus.PENDING,
           }),
         );
       }
@@ -172,7 +210,54 @@ describe("GET /opportunity/other (fe#1052)", () => {
       ["createdAt", "district", "id", "title"].sort(),
     );
     expect(data[0].id).toBe(opportunities.otherOpen.id);
-    expect(data[0].district?.id).toBe(districtId);
+  });
+
+  it("falls back to the NGO's district, titled in German only", async () => {
+    const res = await get(
+      `/opportunity/other?search=${encodeURIComponent(prefix)}`,
+      "member",
+    );
+    const [row] = res.json().data;
+    expect(row.district.id).toBe(districtId);
+    expect(Object.keys(row.district.title)).toEqual(["de"]);
+  });
+
+  it("is empty for an NGO user without an active membership", async () => {
+    const res = await get(
+      `/opportunity/other?search=${encodeURIComponent(prefix)}`,
+      "pendingMember",
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ data: [], count: 0 });
+  });
+
+  it("finds titles by their displayed translation", async () => {
+    const res = await get(
+      `/opportunity/other?language=en&search=${encodeURIComponent(TRANSLATED_TITLE)}`,
+      "member",
+    );
+    const ids = res.json().data.map((row: { id: number }) => row.id);
+    expect(ids).toContain(opportunities.otherOpen.id);
+    const row = res
+      .json()
+      .data.find((r: { id: number }) => r.id === opportunities.otherOpen.id);
+    expect(row.title).toBe(TRANSLATED_TITLE);
+  });
+
+  it("never matches text the rows don't show", async () => {
+    const res = await get(
+      `/opportunity/other?search=${encodeURIComponent(HIDDEN_INFO)}`,
+      "member",
+    );
+    expect(res.json().count).toBe(0);
+  });
+
+  it("treats LIKE wildcards in the search literally", async () => {
+    const res = await get(
+      `/opportunity/other?search=${encodeURIComponent(`${prefix}%`)}`,
+      "member",
+    );
+    expect(res.json().count).toBe(0);
   });
 
   it("is only for NGO users", async () => {

@@ -11,7 +11,7 @@ export function dtoOpportunityOtherGetList(
     id: opportunity.id,
     title: opportunity.title,
     district: districtId
-      ? { id: districtId, title: { de: districtTitle, en: districtTitle } }
+      ? { id: districtId, title: { de: districtTitle } }
       : null,
     createdAt: opportunity.createdAt,
   };
