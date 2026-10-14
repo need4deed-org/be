@@ -77,6 +77,7 @@ import {
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertRoleIn,
+  findAvailabilityDealIds,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
@@ -379,31 +380,33 @@ export default async function opportunityRoutes(
             ? { order: { createdAt: "ASC" } as const }
             : undefined;
 
+      const message = `Opportunities page:${request.query.page}.`;
+
+      const agentIds =
+        request.authUser?.role === UserRole.AGENT
+          ? await getCallerAgentIds(request, request.authUser.personId)
+          : null;
+      if (agentIds?.length === 0) {
+        return reply.status(200).send({
+          message,
+          data: [],
+          count: 0,
+        });
+      }
+
+      const [searchLanguageId, availabilityDealIds] = await Promise.all([
+        request.query.filter?.search
+          ? languageIdOf(dataSource.manager, requestLanguage(request.query))
+          : undefined,
+        findAvailabilityDealIds(request.query.filter?.availability),
+      ]);
       const where = getOpportunityWhere(
         request.query.filter,
         request.query,
-        request.query.filter?.search
-          ? await languageIdOf(
-              dataSource.manager,
-              requestLanguage(request.query),
-            )
-          : undefined,
+        searchLanguageId,
+        availabilityDealIds,
       );
-      const message = `Opportunities page:${request.query.page}.`;
-
-      if (request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          request,
-          request.authUser.personId,
-        );
-
-        if (agentIds.length === 0) {
-          return reply.status(200).send({
-            message,
-            data: [],
-            count: 0,
-          });
-        }
+      if (agentIds) {
         mergeIntoWhere(where, { agent: { id: In(agentIds) } });
       }
 

@@ -68,6 +68,12 @@ export const opportunityListQuerySchema = {
       properties: {
         language: { type: "array", items: { type: "string" } },
         district: { type: "array", items: { type: "string" } },
+        availability: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         type: {
           type: "array",
           items: getRef("OpportunityType#"),
@@ -142,7 +148,12 @@ export const volunteerListQuerySchema = {
             { type: "array", items: { type: "string" } },
           ],
         },
-        availability: { type: "string" },
+        availability: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
+        },
         district: {
           anyOf: [
             { type: "string" },
@@ -211,7 +222,9 @@ export const volunteerOpportunityListQuerySchema = {
     german: { type: "boolean" },
     activity: { type: "string" },
     skill: { type: "string" },
-    availability: { type: "string" },
+    availability: {
+      anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+    },
     district: { type: "string" },
   },
   required: ["type", "status"],

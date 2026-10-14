@@ -14,7 +14,6 @@ import {
   SortOrder,
   TranslatedIntoType,
   TranslationOrigin,
-  VolunteerStateTypeType,
 } from "need4deed-sdk";
 import {
   DataSource,
@@ -29,7 +28,7 @@ import {
 } from "typeorm";
 import { QueryDeepPartialEntity } from "typeorm/query-builder/QueryPartialEntity";
 import { BadRequestError, NotFoundError } from "../../../config";
-import { CDNBaseUrl, defaultPageSize } from "../../../config/constants";
+import { CDNBaseUrl } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
@@ -761,96 +760,6 @@ export async function getGerman(): Promise<Language> {
   }
 
   return german;
-}
-
-function getAvailabilityForFiltering(
-  availabilityQueryParam: string[] | undefined,
-) {
-  if (!availabilityQueryParam?.length) {
-    return;
-  }
-  const availabilityForFiltering = availabilityQueryParam.reduce(
-    (acc, curr) => {
-      const [key, value] = curr.split("~");
-      switch (key) {
-        case "days":
-          acc.days.push(value);
-          break;
-        case "times":
-          acc.times.push(value);
-          break;
-        case "occasional":
-          acc.occasional.push(value);
-          break;
-      }
-      return acc;
-    },
-    { days: [], times: [], occasional: [] },
-  );
-
-  return availabilityForFiltering;
-}
-
-type InputQuery = { [key: string]: string | string[] };
-
-export function parseQueryParams(rawQuery: InputQuery) {
-  const filter: {
-    [key: string]: unknown;
-  } = {};
-
-  for (const key in rawQuery) {
-    if (key.startsWith("filter[")) {
-      const match = key.match(/filter\[(\w+)\]/);
-      if (match) {
-        const filterKey = match[1];
-        const value = rawQuery[key];
-
-        if (
-          key.match(/\[\d+\]$/) ||
-          [
-            "district",
-            "language",
-            "engagement",
-            "availability",
-            "statusType",
-          ].includes(filterKey)
-        ) {
-          if (!filter[filterKey]) {
-            filter[filterKey] = [];
-          }
-          (filter[filterKey] as unknown[]).push(value);
-        } else {
-          filter[filterKey] = value;
-        }
-      }
-    }
-  }
-
-  return {
-    limit: parseInt(rawQuery.limit as string, 10) || defaultPageSize,
-    page: parseInt(rawQuery.page as string, 10) || 1,
-    orderDirection: getOrderDirection(rawQuery.sortOrder as SortOrder),
-    language: rawQuery.language,
-    filter: {
-      accompanying: getPositive(filter.accompanying as string)
-        ? VolunteerStateTypeType.ACCOMPANYING
-        : undefined,
-      german: getPositive(filter.german as string),
-      search: filter.search,
-
-      district: filter.district as string[],
-      languages: filter.language as string[],
-      statusType: filter.statusType as string[],
-      engagement: filter.engagement as string[],
-      availability: getAvailabilityForFiltering(
-        filter.availability as string[],
-      ),
-    },
-  };
-}
-
-function getPositive(arg: string): boolean {
-  return (arg ?? false) !== false && arg !== "0";
 }
 
 export function getOrderDirection(orderDirection: SortOrder): "ASC" | "DESC" {

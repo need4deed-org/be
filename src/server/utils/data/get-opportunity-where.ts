@@ -16,6 +16,7 @@ import {
   QuerystringOpportunityList,
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
+import { dealIdIn } from "./get-availability-deal-ids";
 import { parseDateOnly } from "./parse-date-only";
 import { escapeLikePattern } from "./person-name-ilike";
 
@@ -157,10 +158,12 @@ export function getOpportunityWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   appointment?: OpportunityAppointmentFilter,
   searchLanguageId?: number,
+  availabilityDealIds: number[] | null = null,
 ): FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[] {
   const dealFilter = getDealWhere(filter);
 
   const base = {
+    ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
     ...(hasFilterValue(filter?.status)

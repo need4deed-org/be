@@ -59,7 +59,7 @@ export interface QuerystringOpportunityFiltering {
     german?: boolean;
     activity?: string;
     skill?: string;
-    availability?: string;
+    availability?: string | string[];
     district?: string;
   };
 }
@@ -68,7 +68,8 @@ export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering;
 
 export type QuerystringVolunteerOpportunityGetList =
-  QuerystringPaginationLanguage & QuerystringOpportunityFiltering;
+  QuerystringPaginationLanguage &
+    NonNullable<QuerystringOpportunityFiltering["filter"]>;
 
 export type QuerystringOpportunityList = QuerystringPaginationLanguage &
   QuerystringOpportunityFiltering & {
@@ -101,7 +102,7 @@ export interface QuerystringVolunteerFiltering {
     language?: string | string[];
     activity?: string | string[];
     skill?: string | string[];
-    availability?: string;
+    availability?: string | string[];
     district?: string | string[];
     engagement?: string | string[];
     match?: string | string[];

@@ -3,6 +3,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
+import { dealIdIn } from "./get-availability-deal-ids";
 import { escapeLikePattern } from "./person-name-ilike";
 
 const SEARCH_FIELDS = ["firstName", "lastName", "email", "phone"] as const;
@@ -31,6 +32,7 @@ const NO_OWNER = "none";
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
+  availabilityDealIds: number[] | null = null,
 ): FindOptionsWhere<Volunteer> {
   const where = getVolunteerFilterWhere(filter, visibility);
   const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
@@ -39,6 +41,7 @@ export function getVolunteerWhere(
 
   return {
     ...where,
+    ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
     ...(requested
       ? {
           ownerAgentId: Raw(

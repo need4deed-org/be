@@ -50,6 +50,7 @@ import {
   erasePersonPii,
   ErasePersonPiiSummary,
   fetchVolunteerById,
+  findAvailabilityDealIds,
   getLanguageCode,
   getOrCreateTimeslot,
   getSkipTake,
@@ -234,7 +235,11 @@ export default async function volunteerRoutes(
       const [skip, take] = getSkipTake({ page, limit });
 
       const visibility = await resolveVolunteerVisibility(request);
-      const where = getVolunteerWhere(filter, visibility);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+        await findAvailabilityDealIds(filter?.availability),
+      );
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };
