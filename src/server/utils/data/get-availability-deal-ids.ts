@@ -7,7 +7,6 @@ import {
 } from "need4deed-sdk";
 import { Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
-import { DealType } from "../../../data/types";
 import { ByDayCode, getByDayCode } from "../../../data/utils/by-day-code";
 
 const ISO_DAY_CODES = Object.keys(ByDay) as ByDayCode[];
@@ -111,19 +110,22 @@ function getAvailabilityCondition({
     branches.push("t.occasional::text IN (:...availabilityOccasional)");
     params.availabilityOccasional = occasionalTypes;
   }
-  return [
-    branches.length ? branches.map((b) => `(${b})`).join(" OR ") : "FALSE",
-    params,
-  ];
+  return [branches.map((b) => `(${b})`).join(" OR "), params];
 }
 
 export async function findAvailabilityDealIds(
   input: string | string[] | undefined,
-  dealType: DealType,
 ): Promise<number[] | null> {
   const filter = parseAvailabilityFilter(input);
   if (!filter) {
     return null;
+  }
+  if (
+    !filter.days.length &&
+    !filter.times.length &&
+    !filter.occasional.length
+  ) {
+    return [];
   }
   const [condition, params] = getAvailabilityCondition(filter);
   const rows: { dealId: number }[] = await dataSource
@@ -131,9 +133,7 @@ export async function findAvailabilityDealIds(
     .select("DISTINCT dt.deal_id", "dealId")
     .from("deal_timeslot", "dt")
     .innerJoin("timeslot", "t", "t.id = dt.timeslot_id")
-    .innerJoin("deal", "d", "d.id = dt.deal_id")
-    .where("d.type = :availabilityDealType", { availabilityDealType: dealType })
-    .andWhere(`(${condition})`, params)
+    .where(condition, params)
     .getRawMany();
   return rows.map(({ dealId }) => dealId);
 }

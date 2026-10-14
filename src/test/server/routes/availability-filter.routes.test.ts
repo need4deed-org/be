@@ -104,7 +104,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
           title: `Availability ${key} ${suffix}`,
           type: OpportunityType.REGULAR,
           status: OpportunityStatusType.SEARCHING,
-          dealId: (await dealWith(DealType.OPPORTUNITY, SLOTS[key])).id,
+          dealId: (await dealWith(DealType.VOLUNTEER, SLOTS[key])).id,
           agentId: agent.id,
         }),
       );

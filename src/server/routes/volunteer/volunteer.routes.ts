@@ -27,7 +27,6 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { DealType } from "../../../data/types";
 import { updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerListSerializer } from "../../../services";
@@ -239,7 +238,7 @@ export default async function volunteerRoutes(
       const where = getVolunteerWhere(
         filter,
         visibility,
-        await findAvailabilityDealIds(filter?.availability, DealType.VOLUNTEER),
+        await findAvailabilityDealIds(filter?.availability),
       );
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",

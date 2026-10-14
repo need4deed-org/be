@@ -33,7 +33,6 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { DealType } from "../../../data/types";
 import {
   logMatchChangeSafely,
   updateVolunteerMatching,
@@ -390,10 +389,7 @@ export default async function opportunityRoutes(
               requestLanguage(request.query),
             )
           : undefined,
-        await findAvailabilityDealIds(
-          request.query.filter?.availability,
-          DealType.OPPORTUNITY,
-        ),
+        await findAvailabilityDealIds(request.query.filter?.availability),
       );
       const message = `Opportunities page:${request.query.page}.`;
 
