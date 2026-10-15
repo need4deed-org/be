@@ -9,7 +9,11 @@ import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
-import { appointmentsDue, berlinToday } from "./german-holidays";
+import {
+  appointmentsDue,
+  berlinDayBoundaries,
+  berlinToday,
+} from "./german-holidays";
 import { reportCronFailure } from "./report-cron-failure";
 
 const JOB = "scanAccompanyNotFound";
@@ -52,46 +56,50 @@ export async function scanAccompanyNotFound(
       ),
   );
 
+  const startOfToday = berlinDayBoundaries(berlinToday()).startOfDay;
   for (const opp of candidates) {
-    await notifyAndClose(fastify, opp);
+    await notifyAndClose(fastify, opp, startOfToday);
   }
 }
 
 async function notifyAndClose(
   fastify: FastifyInstance,
   opp: Opportunity,
+  startOfToday: Date,
 ): Promise<void> {
   const item = `opportunity ${opp.id}`;
   const commRepo = fastify.db.communicationRepository;
 
-  const alreadySent = await commRepo.findOne({
+  const emailedToday = await commRepo.findOne({
     where: {
       opportunityId: opp.id,
       communicationType: CommunicationType.ACCOMPANYING_NOT_FOUND,
+      date: MoreThanOrEqual(startOfToday),
     },
   });
+  if (emailedToday) {
+    return;
+  }
 
-  if (!alreadySent) {
+  try {
+    const comm = await logEmailCommunication(
+      commRepo,
+      CommunicationType.ACCOMPANYING_NOT_FOUND,
+      { opportunityId: opp.id },
+    );
     try {
-      const comm = await logEmailCommunication(
-        commRepo,
-        CommunicationType.ACCOMPANYING_NOT_FOUND,
-        { opportunityId: opp.id },
-      );
-      try {
-        await fastify.cronNotify.emailAccompanyNotFound(opp);
-      } catch (sendErr) {
-        await commRepo.remove(comm).catch((removeErr) => {
-          logger.error(
-            `${JOB}: dedup rollback failed (${item}, comm ${comm.id}): ${removeErr}`,
-          );
-        });
-        throw sendErr;
-      }
-    } catch (err) {
-      await reportCronFailure(fastify, JOB, item, err, "not emailed");
-      return;
+      await fastify.cronNotify.emailAccompanyNotFound(opp);
+    } catch (sendErr) {
+      await commRepo.remove(comm).catch((removeErr) => {
+        logger.error(
+          `${JOB}: dedup rollback failed (${item}, comm ${comm.id}): ${removeErr}`,
+        );
+      });
+      throw sendErr;
     }
+  } catch (err) {
+    await reportCronFailure(fastify, JOB, item, err, "not emailed");
+    return;
   }
 
   try {

@@ -36,7 +36,6 @@ import {
   SlackWebhookTransport,
   SmtpEmailTransport,
   TaggedInput,
-  validateEmailMessage,
   ValidatingEmailTransport,
 } from "../../services/notify";
 import { Env, firstEnvValue } from "../utils";
@@ -98,6 +97,7 @@ function buildVerifyEmailTransport(): EmailTransport {
 
 function buildNotifyEmailTransport(): {
   deliverable: EmailTransport;
+  rejecting: EmailTransport;
   raw: EmailTransport;
 } {
   const smtp = new SmtpEmailTransport({
@@ -113,6 +113,12 @@ function buildNotifyEmailTransport(): {
       deliverable,
       smtp,
       errorEmailRecipient,
+    ),
+    rejecting: new ValidatingEmailTransport(
+      deliverable,
+      smtp,
+      errorEmailRecipient,
+      true,
     ),
     raw: smtp,
   };
@@ -180,11 +186,7 @@ export function emailThenRecord(
 ): EmailTransport {
   return {
     send: async (msg) => {
-      const problems = validateEmailMessage(msg);
       await email.send(msg);
-      if (problems.length > 0) {
-        throw new Error(`email suspended: ${problems.join("; ")}`);
-      }
       await record.send(msg).catch((err) => {
         logger.error(
           `notify: email sent but not posted to #cron-notifications: ${err}`,
@@ -196,8 +198,11 @@ export function emailThenRecord(
 
 async function notifyPlugin(fastify: FastifyInstance) {
   const emailVerify = buildVerifyEmailTransport();
-  const { deliverable: emailNotify, raw: emailNotifyRaw } =
-    buildNotifyEmailTransport();
+  const {
+    deliverable: emailNotify,
+    rejecting: emailNotifyRejecting,
+    raw: emailNotifyRaw,
+  } = buildNotifyEmailTransport();
   const slack = buildSlackTransport();
 
   fastify.decorate("notify", {
@@ -230,7 +235,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
   const cronSlack = cronSlackTransport(slack);
   const cronEmail = buildCronEmailTransport(cronSlack);
   const cronEmailSent = emailThenRecord(
-    emailNotify,
+    emailNotifyRejecting,
     buildCronEmailTransport(cronSlack, emailedCronHeader()),
   );
   fastify.decorate("cronNotify", {

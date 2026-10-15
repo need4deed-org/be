@@ -6,7 +6,16 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  Mock,
+  vi,
+} from "vitest";
 import Deal from "../../../data/entity/deal.entity";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -18,347 +27,257 @@ import { DealType } from "../../../data/types";
 import { createServer } from "../../../server";
 import {
   addWorkingDays,
-  berlinDayBoundaries,
-  berlinToday,
+  appointmentsDue,
+  isWorkingDay,
 } from "../../../services/jobs/german-holidays";
 import { scanAccompanyNotFound } from "../../../services/jobs/scan-accompany-not-found";
 import { randomNumericSuffix } from "../../random";
 
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+
+const nextWeekday = (date: Date, weekday: number) => {
+  const result = new Date(date);
+  while (result.getDay() !== weekday) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+};
+
+const nextWorkingDay = (date: Date) => {
+  const result = new Date(date);
+  while (!isWorkingDay(result)) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+};
+
+const suffix = Number(randomNumericSuffix());
+const RUN_DAY = nextWorkingDay(
+  new Date(2040 + (suffix % 10), suffix % 12, 1 + (suffix % 27)),
+);
+const LATER_RUN_DAY = addWorkingDays(RUN_DAY, 5);
+const MONDAY = nextWeekday(new Date(2050 + (suffix % 10), 10, 8), 1);
+
+const dueOn = (runDay: Date, offset = 10 * HOUR) =>
+  new Date(appointmentsDue(runDay, 4).from.getTime() + offset);
+
 describe("scanAccompanyNotFound", () => {
   let fastify: FastifyInstance;
+  let notify: Mock<(opportunity: Opportunity) => Promise<void>>;
   let agent: Agent;
-  let dealInWindow: Deal;
-  let dealOutOfWindow: Deal;
-  let onetimerInWindow: Onetimer;
-  let onetimerOutOfWindow: Onetimer;
-  let oppInWindow: Opportunity;
-  let oppOutOfWindow: Opportunity;
+  let volunteerDeal: Deal;
+  let person: Person;
+  let volunteer: Volunteer;
+  const created: Opportunity[] = [];
+
+  const accompanying = async (date: Date, title: string) => {
+    const onetimer = await fastify.db.onetimerRepository.save(
+      new Onetimer({ date }),
+    );
+    const opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `${title} ${randomNumericSuffix()}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.SEARCHING,
+        agentId: agent.id,
+        onetimerId: onetimer.id,
+      }),
+    );
+    created.push(opportunity);
+    return opportunity;
+  };
+
+  const notifiedIds = () => notify.mock.calls.map(([opp]) => opp.id);
+
+  const statusOf = async (opportunity: Opportunity) =>
+    (
+      await fastify.db.opportunityRepository.findOneByOrFail({
+        id: opportunity.id,
+      })
+    ).status;
+
+  const loggedFor = (opportunity: Opportunity) =>
+    fastify.db.communicationRepository.countBy({
+      opportunityId: opportunity.id,
+      communicationType: CommunicationType.ACCOMPANYING_NOT_FOUND,
+    });
 
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    fastify.cronNotify.emailAccompanyNotFound = vi
-      .fn()
-      .mockResolvedValue(undefined);
+    notify = vi.fn<(opportunity: Opportunity) => Promise<void>>();
+    fastify.cronNotify.emailAccompanyNotFound = notify;
 
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
     });
-
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (scan-not-found) ${suffix}` }),
     );
-
-    const targetDay = addWorkingDays(berlinToday(), 4);
-    const { startOfDay } = berlinDayBoundaries(targetDay);
-    const inWindowDate = new Date(startOfDay.getTime() + 60 * 60 * 1000);
-    const outOfWindowDate = new Date(startOfDay.getTime() - 60 * 60 * 1000);
-
-    onetimerInWindow = await fastify.db.onetimerRepository.save(
-      new Onetimer({ date: inWindowDate }),
+    volunteerDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
-    onetimerOutOfWindow = await fastify.db.onetimerRepository.save(
-      new Onetimer({ date: outOfWindowDate }),
+    person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: `Not found ${suffix}` }),
     );
-
-    dealInWindow = await fastify.db.dealRepository.save(
-      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
-    );
-    dealOutOfWindow = await fastify.db.dealRepository.save(
-      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
-    );
-
-    oppInWindow = await fastify.db.opportunityRepository.save(
-      new Opportunity({
-        title: `Test Accompanying In Window ${suffix}`,
-        type: OpportunityType.ACCOMPANYING,
-        status: OpportunityStatusType.ACTIVE,
-        agentId: agent.id,
-        dealId: dealInWindow.id,
-        onetimerId: onetimerInWindow.id,
-      }),
-    );
-    oppOutOfWindow = await fastify.db.opportunityRepository.save(
-      new Opportunity({
-        title: `Test Accompanying Out of Window ${suffix}`,
-        type: OpportunityType.ACCOMPANYING,
-        status: OpportunityStatusType.ACTIVE,
-        agentId: agent.id,
-        dealId: dealOutOfWindow.id,
-        onetimerId: onetimerOutOfWindow.id,
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({
+        personId: person.id,
+        dealId: volunteerDeal.id,
+        statusEngagement: VolunteerStateEngagementType.AVAILABLE,
       }),
     );
   });
 
+  beforeEach(() => {
+    notify.mockReset();
+    notify.mockResolvedValue(undefined);
+  });
+
   afterAll(async () => {
-    await fastify.db.communicationRepository.delete({
-      opportunityId: oppInWindow.id,
-    });
-    await fastify.db.communicationRepository.delete({
-      opportunityId: oppOutOfWindow.id,
-    });
-    await fastify.db.opportunityRepository.delete({ id: oppInWindow.id });
-    await fastify.db.opportunityRepository.delete({ id: oppOutOfWindow.id });
-    await fastify.db.dealRepository.delete({ id: dealInWindow.id });
-    await fastify.db.dealRepository.delete({ id: dealOutOfWindow.id });
-    await fastify.db.onetimerRepository.delete({ id: onetimerInWindow.id });
-    await fastify.db.onetimerRepository.delete({ id: onetimerOutOfWindow.id });
+    for (const opportunity of created) {
+      await fastify.db.opportunityVolunteerRepository.delete({
+        opportunityId: opportunity.id,
+      });
+      await fastify.db.communicationRepository.delete({
+        opportunityId: opportunity.id,
+      });
+      await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+      await fastify.db.onetimerRepository.delete({
+        id: opportunity.onetimerId!,
+      });
+    }
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.personRepository.delete({ id: person.id });
+    await fastify.db.dealRepository.delete({ id: volunteerDeal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.close();
   });
 
-  it("emails only for opportunities whose onetimer date falls in the target window", async () => {
-    await scanAccompanyNotFound(fastify);
+  it("emails once for an appointment in the window, logs it and sets the opportunity inactive", async () => {
+    const inWindow = await accompanying(dueOn(RUN_DAY), "In window");
+    const outOfWindow = await accompanying(
+      dueOn(RUN_DAY, -HOUR),
+      "Out of window",
+    );
 
-    const calls = (
-      fastify.cronNotify.emailAccompanyNotFound as ReturnType<typeof vi.fn>
-    ).mock.calls;
-    const calledIds = calls.map(([opp]: [Opportunity]) => opp.id);
+    await scanAccompanyNotFound(fastify, RUN_DAY);
 
-    expect(calledIds).toContain(oppInWindow.id);
-    expect(calledIds).not.toContain(oppOutOfWindow.id);
+    expect(notifiedIds()).toContain(inWindow.id);
+    expect(notifiedIds()).not.toContain(outOfWindow.id);
+    expect(await loggedFor(inWindow)).toBe(1);
+    expect(await statusOf(inWindow)).toBe(OpportunityStatusType.INACTIVE);
+    expect(await loggedFor(outOfWindow)).toBe(0);
+    expect(await statusOf(outOfWindow)).toBe(OpportunityStatusType.SEARCHING);
   });
 
-  it("logs the communication and sets the opportunity inactive, so a second run sends nothing", async () => {
-    const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
-      typeof vi.fn
-    >;
-    posted.mockClear();
-
-    await scanAccompanyNotFound(fastify);
-
-    expect(
-      posted.mock.calls.filter(
-        ([opp]: [Opportunity]) => opp.id === oppInWindow.id,
-      ),
-    ).toHaveLength(0);
-    expect(
-      await fastify.db.communicationRepository.countBy({
-        opportunityId: oppInWindow.id,
-        communicationType: CommunicationType.ACCOMPANYING_NOT_FOUND,
-      }),
-    ).toBe(1);
-    const reloaded = await fastify.db.opportunityRepository.findOneByOrFail({
-      id: oppInWindow.id,
-    });
-    expect(reloaded.status).toBe(OpportunityStatusType.INACTIVE);
-  });
-
-  it("does not email again when the communication is logged", async () => {
-    const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
-      typeof vi.fn
-    >;
-    await fastify.db.opportunityRepository.update(oppInWindow.id, {
+  it("on a second run the same day, neither emails again nor closes a reopened opportunity", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Rerun");
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+    await fastify.db.opportunityRepository.update(opportunity.id, {
       status: OpportunityStatusType.SEARCHING,
     });
-    posted.mockClear();
 
-    await scanAccompanyNotFound(fastify);
+    await scanAccompanyNotFound(fastify, RUN_DAY);
 
-    expect(
-      posted.mock.calls.filter(
-        ([opp]: [Opportunity]) => opp.id === oppInWindow.id,
-      ),
-    ).toHaveLength(0);
-    const reloaded = await fastify.db.opportunityRepository.findOneByOrFail({
-      id: oppInWindow.id,
-    });
-    expect(reloaded.status).toBe(OpportunityStatusType.INACTIVE);
+    expect(notifiedIds().filter((id) => id === opportunity.id)).toHaveLength(1);
+    expect(await loggedFor(opportunity)).toBe(1);
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
   });
 
-  describe("with extra opportunities in the window", () => {
-    const created: Opportunity[] = [];
-    let person: Person;
-    let volunteer: Volunteer;
-    let volunteerDeal: Deal;
-
-    const inWindow = async (title: string) => {
-      const { startOfDay } = berlinDayBoundaries(
-        addWorkingDays(berlinToday(), 4),
-      );
-      const onetimer = await fastify.db.onetimerRepository.save(
-        new Onetimer({ date: new Date(startOfDay.getTime() + 2 * 3600_000) }),
-      );
-      const opportunity = await fastify.db.opportunityRepository.save(
-        new Opportunity({
-          title: `${title} ${randomNumericSuffix()}`,
-          type: OpportunityType.ACCOMPANYING,
-          status: OpportunityStatusType.SEARCHING,
-          agentId: agent.id,
-          onetimerId: onetimer.id,
-        }),
-      );
-      created.push(opportunity);
-      return opportunity;
-    };
-
-    beforeAll(async () => {
-      const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-        where: {},
-      });
-      volunteerDeal = await fastify.db.dealRepository.save(
-        new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
-      );
-      person = await fastify.db.personRepository.save(
-        new Person({
-          firstName: "Test",
-          lastName: `Not found ${randomNumericSuffix()}`,
-        }),
-      );
-      volunteer = await fastify.db.volunteerRepository.save(
-        new Volunteer({
-          personId: person.id,
-          dealId: volunteerDeal.id,
-          statusEngagement: VolunteerStateEngagementType.AVAILABLE,
-        }),
-      );
+  it("emails again when a reopened appointment was moved to a later day", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Rescheduled");
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+    await fastify.db.communicationRepository
+      .createQueryBuilder()
+      .update()
+      .set({ date: new Date(Date.now() - 2 * DAY) })
+      .where({ opportunityId: opportunity.id })
+      .execute();
+    await fastify.db.onetimerRepository.update(opportunity.onetimerId!, {
+      date: dueOn(LATER_RUN_DAY),
+    });
+    await fastify.db.opportunityRepository.update(opportunity.id, {
+      status: OpportunityStatusType.SEARCHING,
     });
 
-    afterAll(async () => {
-      for (const opportunity of created) {
-        await fastify.db.opportunityVolunteerRepository.delete({
-          opportunityId: opportunity.id,
-        });
-        await fastify.db.communicationRepository.delete({
-          opportunityId: opportunity.id,
-        });
-        await fastify.db.opportunityRepository.delete({ id: opportunity.id });
-        await fastify.db.onetimerRepository.delete({
-          id: opportunity.onetimerId!,
-        });
-      }
-      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
-      await fastify.db.personRepository.delete({ id: person.id });
-      await fastify.db.dealRepository.delete({ id: volunteerDeal.id });
-    });
+    await scanAccompanyNotFound(fastify, LATER_RUN_DAY);
 
-    it.each([
-      OpportunityVolunteerStatusType.MATCHED,
-      OpportunityVolunteerStatusType.ACTIVE,
-    ])("skips an opportunity with a %s volunteer", async (status) => {
-      const opportunity = await inWindow(`Has ${status}`);
-      await fastify.db.opportunityVolunteerRepository.save(
-        new OpportunityVolunteer({
-          opportunityId: opportunity.id,
-          volunteerId: volunteer.id,
-          status,
-        }),
-      );
-      const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
-        typeof vi.fn
-      >;
-      posted.mockClear();
-
-      await scanAccompanyNotFound(fastify);
-
-      expect(
-        posted.mock.calls.map(([opp]: [Opportunity]) => opp.id),
-      ).not.toContain(opportunity.id);
-      const reloaded = await fastify.db.opportunityRepository.findOneByOrFail({
-        id: opportunity.id,
-      });
-      expect(reloaded.status).toBe(OpportunityStatusType.SEARCHING);
-    });
-
-    it("when the email fails, logs nothing, keeps the status and alerts ops", async () => {
-      const opportunity = await inWindow("Email fails");
-      const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
-        typeof vi.fn
-      >;
-      posted.mockImplementation(async (opp: Opportunity) => {
-        if (opp.id === opportunity.id) {
-          throw new Error("smtp down");
-        }
-      });
-      const opsAlert = vi
-        .spyOn(fastify.notify, "opsAlert")
-        .mockResolvedValue(undefined);
-      try {
-        await scanAccompanyNotFound(fastify);
-
-        expect(opsAlert).toHaveBeenCalledWith(
-          expect.stringContaining(`opportunity ${opportunity.id} not emailed`),
-        );
-        expect(
-          await fastify.db.communicationRepository.countBy({
-            opportunityId: opportunity.id,
-          }),
-        ).toBe(0);
-        const reloaded = await fastify.db.opportunityRepository.findOneByOrFail(
-          {
-            id: opportunity.id,
-          },
-        );
-        expect(reloaded.status).toBe(OpportunityStatusType.SEARCHING);
-      } finally {
-        posted.mockReset();
-        posted.mockResolvedValue(undefined);
-        opsAlert.mockRestore();
-      }
-    });
+    expect(notifiedIds().filter((id) => id === opportunity.id)).toHaveLength(2);
+    expect(await loggedFor(opportunity)).toBe(2);
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.INACTIVE);
   });
 
-  it("on Monday Oct 5, takes Friday to Sunday, leaving Monday for Tuesday", async () => {
-    const at = (day: number, hour: number) =>
-      new Date(
-        berlinDayBoundaries(new Date(2026, 9, day)).startOfDay.getTime() +
-          hour * 60 * 60 * 1000,
-      );
-    const appointments: Record<string, Date> = {
-      thursday: at(8, 10),
-      friday: at(9, 10),
-      saturday: at(10, 10),
-      sunday: at(11, 23),
-      monday: at(12, 9),
-    };
-    const created: Record<string, Opportunity> = {};
-    const onetimers: number[] = [];
+  it.each([
+    OpportunityVolunteerStatusType.MATCHED,
+    OpportunityVolunteerStatusType.ACTIVE,
+  ])("skips an opportunity with a %s volunteer", async (status) => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), `Has ${status}`);
+    await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status,
+      }),
+    );
+
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+
+    expect(notifiedIds()).not.toContain(opportunity.id);
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
+  });
+
+  it("when the email fails, logs nothing, keeps the status and alerts ops", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Email fails");
+    notify.mockImplementation(async (opp: Opportunity) => {
+      if (opp.id === opportunity.id) {
+        throw new Error("smtp down");
+      }
+    });
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
     try {
-      for (const [day, date] of Object.entries(appointments)) {
-        const onetimer = await fastify.db.onetimerRepository.save(
-          new Onetimer({ date }),
-        );
-        onetimers.push(onetimer.id);
-        created[day] = await fastify.db.opportunityRepository.save(
-          new Opportunity({
-            title: `Weekend check ${day} ${Date.now()}`,
-            type: OpportunityType.ACCOMPANYING,
-            status: OpportunityStatusType.SEARCHING,
-            agentId: agent.id,
-            onetimerId: onetimer.id,
-          }),
-        );
-      }
-      const posted = fastify.cronNotify.emailAccompanyNotFound as ReturnType<
-        typeof vi.fn
-      >;
-      const postedOn = async (today: Date) => {
-        posted.mockClear();
-        await scanAccompanyNotFound(fastify, today);
-        return posted.mock.calls.map(([opp]: [Opportunity]) => opp.id);
-      };
+      await scanAccompanyNotFound(fastify, RUN_DAY);
 
-      const monday = await postedOn(new Date(2026, 9, 5));
-      const tuesday = await postedOn(new Date(2026, 9, 6));
-
-      for (const day of ["friday", "saturday", "sunday"]) {
-        expect(monday).toContain(created[day].id);
-        expect(tuesday).not.toContain(created[day].id);
-      }
-      expect(monday).not.toContain(created.thursday.id);
-      expect(monday).not.toContain(created.monday.id);
-      expect(tuesday).toContain(created.monday.id);
+      expect(opsAlert).toHaveBeenCalledWith(
+        expect.stringContaining(`opportunity ${opportunity.id} not emailed`),
+      );
+      expect(await loggedFor(opportunity)).toBe(0);
+      expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
     } finally {
-      for (const opportunity of Object.values(created)) {
-        await fastify.db.communicationRepository.delete({
-          opportunityId: opportunity.id,
-        });
-        await fastify.db.opportunityRepository.delete({ id: opportunity.id });
-      }
-      for (const id of onetimers) {
-        await fastify.db.onetimerRepository.delete({ id });
-      }
+      opsAlert.mockRestore();
     }
+  });
+
+  it("on a Monday, takes Friday to Sunday, leaving Monday for Tuesday", async () => {
+    const at = (daysAfterMonday: number, hour: number) =>
+      new Date(
+        appointmentsDue(MONDAY, 0).from.getTime() +
+          daysAfterMonday * DAY +
+          hour * HOUR,
+      );
+    const appointments = {
+      thursday: await accompanying(at(3, 10), "Thursday"),
+      friday: await accompanying(at(4, 10), "Friday"),
+      saturday: await accompanying(at(5, 10), "Saturday"),
+      sunday: await accompanying(at(6, 23), "Sunday"),
+      monday: await accompanying(at(7, 9), "Monday"),
+    };
+
+    await scanAccompanyNotFound(fastify, MONDAY);
+    const onMonday = notifiedIds();
+    notify.mockClear();
+    await scanAccompanyNotFound(fastify, addWorkingDays(MONDAY, 1));
+    const onTuesday = notifiedIds();
+
+    for (const day of ["friday", "saturday", "sunday"] as const) {
+      expect(onMonday).toContain(appointments[day].id);
+      expect(onTuesday).not.toContain(appointments[day].id);
+    }
+    expect(onMonday).not.toContain(appointments.thursday.id);
+    expect(onMonday).not.toContain(appointments.monday.id);
+    expect(onTuesday).toContain(appointments.monday.id);
   });
 });
