@@ -2,9 +2,14 @@ import { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
-import { buildCronEmailTransport } from "../../../server/plugins/notify";
+import {
+  alsoEmailedHeader,
+  buildCronEmailTransport,
+} from "../../../server/plugins/notify";
 import {
   BrevoEmailTransport,
+  CRON_EMAIL_NOT_SENT,
+  CRON_EMAIL_SENT,
   DryRunSlackTransport,
   SlackEmailTransport,
   SmtpEmailTransport,
@@ -51,7 +56,7 @@ const opportunity = {
 };
 
 // be#1088: the cron jobs' emails are posted to Slack #cron-notifications and
-// never sent.
+// never sent — except accompany-not-found, which is also emailed via SMTP_NOTIFY.
 describe("fastify.cronNotify", () => {
   let fastify: FastifyInstance;
   const fetchMock = vi.fn(async () => new Response("ok"));
@@ -61,6 +66,8 @@ describe("fastify.cronNotify", () => {
   beforeAll(async () => {
     process.env.SLACK_CRON_WEBHOOK_URL = CRON_WEBHOOK;
     process.env.NOTIFY_SLACK_DRY_RUN = "false";
+    process.env.NOTIFY_EMAIL_DRY_RUN = "false";
+    smtpSend.mockResolvedValue(undefined);
     vi.stubGlobal("fetch", fetchMock);
     fastify = await createServer();
     await fastify.ready();
@@ -69,6 +76,8 @@ describe("fastify.cronNotify", () => {
   afterAll(async () => {
     delete process.env.SLACK_CRON_WEBHOOK_URL;
     delete process.env.NOTIFY_SLACK_DRY_RUN;
+    delete process.env.NOTIFY_EMAIL_DRY_RUN;
+    smtpSend.mockReset();
     vi.unstubAllGlobals();
     await fastify.close();
   });
@@ -78,10 +87,6 @@ describe("fastify.cronNotify", () => {
     [
       "emailPostMatchCheckup",
       () => fastify.cronNotify.emailPostMatchCheckup(ov as never),
-    ],
-    [
-      "emailAccompanyNotFound",
-      () => fastify.cronNotify.emailAccompanyNotFound(opportunity as never),
     ],
     [
       "emailRegularUpdate",
@@ -105,6 +110,40 @@ describe("fastify.cronNotify", () => {
     expect(brevoSend).not.toHaveBeenCalled();
   });
 
+  it("emailAccompanyNotFound sends via SMTP_NOTIFY, then posts to #cron-notifications", async () => {
+    fetchMock.mockClear();
+    smtpSend.mockClear();
+    brevoSend.mockClear();
+
+    await fastify.cronNotify.emailAccompanyNotFound(opportunity as never);
+
+    expect(smtpSend).toHaveBeenCalledTimes(1);
+    expect(smtpSend.mock.calls[0][0]).toMatchObject({
+      to: "contact@example.com",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(url).toBe(CRON_WEBHOOK);
+    expect(JSON.parse(init.body).text).toBe(CRON_EMAIL_SENT);
+    expect(smtpSend.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchMock.mock.invocationCallOrder[0],
+    );
+    expect(brevoSend).not.toHaveBeenCalled();
+  });
+
+  it("emailAccompanyNotFound posts nothing when the email fails", async () => {
+    fetchMock.mockClear();
+    smtpSend.mockRejectedValueOnce(new Error("smtp down"));
+
+    await expect(
+      fastify.cronNotify.emailAccompanyNotFound(opportunity as never),
+    ).rejects.toThrow("smtp down");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("no longer offers these emails on fastify.notify", () => {
     for (const name of [
       "emailStale",
@@ -114,6 +153,17 @@ describe("fastify.cronNotify", () => {
     ]) {
       expect(name in fastify.notify).toBe(false);
     }
+  });
+});
+
+describe("alsoEmailedHeader", () => {
+  it.each([
+    ["really sent", { NOTIFY_EMAIL_DRY_RUN: "false" }, CRON_EMAIL_SENT],
+    ["an email dry run", { NOTIFY_EMAIL_DRY_RUN: "true" }, CRON_EMAIL_NOT_SENT],
+    ["no flag outside production", {}, CRON_EMAIL_NOT_SENT],
+    ["no flag in production", { NODE_ENV: "production" }, CRON_EMAIL_SENT],
+  ])("with %s", (_, env, header) => {
+    expect(alsoEmailedHeader(env)).toBe(header);
   });
 });
 

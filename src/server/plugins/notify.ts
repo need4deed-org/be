@@ -6,6 +6,8 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import {
+  CRON_EMAIL_NOT_SENT,
+  CRON_EMAIL_SENT,
   DryRunEmailTransport,
   DryRunSlackTransport,
   EmailTaggedInput,
@@ -158,6 +160,25 @@ export function buildCronEmailTransport(
   return { send: async () => {} };
 }
 
+// The Slack header for a cron email that is also emailed: in an email dry run
+// it was only logged, so it was not sent.
+export function alsoEmailedHeader(env: Env = process.env): string {
+  return isDryRun("EMAIL", env) ? CRON_EMAIL_NOT_SENT : CRON_EMAIL_SENT;
+}
+
+// Sends through each transport in turn; a failure stops the rest.
+export function sendThroughAll(
+  ...transports: EmailTransport[]
+): EmailTransport {
+  return {
+    send: async (msg) => {
+      for (const transport of transports) {
+        await transport.send(msg);
+      }
+    },
+  };
+}
+
 async function notifyPlugin(fastify: FastifyInstance) {
   const emailVerify = buildVerifyEmailTransport();
   const { deliverable: emailNotify, raw: emailNotifyRaw } =
@@ -192,12 +213,20 @@ async function notifyPlugin(fastify: FastifyInstance) {
   });
 
   const cronEmail = buildCronEmailTransport(slack);
+  // Accompany-not-found is emailed (SMTP_NOTIFY) and then posted to
+  // #cron-notifications, when that is configured.
+  const cronEmailSent = sendThroughAll(
+    emailNotify,
+    slack && cronEmail instanceof SlackEmailTransport
+      ? new SlackEmailTransport(slack, alsoEmailedHeader())
+      : cronEmail,
+  );
   fastify.decorate("cronNotify", {
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(cronEmail, ov),
     emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
       sendEmailPostMatchCheckup(cronEmail, ov),
     emailAccompanyNotFound: (opportunity: Opportunity) =>
-      sendEmailAccompanyNotFound(cronEmail, opportunity),
+      sendEmailAccompanyNotFound(cronEmailSent, opportunity),
     emailRegularUpdate: (opportunity: Opportunity) =>
       sendEmailRegularUpdate(cronEmail, opportunity),
   });
