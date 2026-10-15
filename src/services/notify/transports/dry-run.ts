@@ -6,7 +6,7 @@ import type {
   SlackTransport,
 } from "../types";
 
-const DRY_RUN_RECIPIENT = "test@need4deed.org";
+export const DRY_RUN_RECIPIENT = "test@need4deed.org";
 
 function count(addresses: string | string[] | undefined): number {
   if (!addresses) {

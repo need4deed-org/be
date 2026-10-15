@@ -1,22 +1,31 @@
 import type { EmailMessage, EmailTransport, SlackTransport } from "../types";
+import { DRY_RUN_RECIPIENT } from "./dry-run";
 
-const HEADER = "Cron email, not sent";
+export const CRON_EMAIL_NOT_SENT = "Cron email, not sent";
+export const CRON_EMAIL_SENT = "Cron email, also sent by email";
+export const CRON_EMAIL_DRY_RUN = `Cron email, dry run: sent to ${DRY_RUN_RECIPIENT} only`;
 const SECTION_LIMIT = 3000;
 const MAX_BODY_SECTIONS = 47;
 
 export class SlackEmailTransport implements EmailTransport {
-  constructor(private readonly slack: SlackTransport) {}
+  constructor(
+    private readonly slack: SlackTransport,
+    private readonly header: string = CRON_EMAIL_NOT_SENT,
+  ) {}
 
   async send(msg: EmailMessage): Promise<void> {
     await this.slack.send({
       channel: "cron",
-      text: HEADER,
-      blocks: emailBlocks(msg),
+      text: this.header,
+      blocks: emailBlocks(msg, this.header),
     });
   }
 }
 
-export function emailBlocks(msg: EmailMessage): unknown[] {
+export function emailBlocks(
+  msg: EmailMessage,
+  header: string = CRON_EMAIL_NOT_SENT,
+): unknown[] {
   const fields = [
     field("To", list(msg.to)),
     ...(msg.cc ? [field("Cc", list(msg.cc))] : []),
@@ -24,7 +33,7 @@ export function emailBlocks(msg: EmailMessage): unknown[] {
   ];
   const body = msg.text?.trim() || htmlToText(msg.html ?? "") || "(no body)";
   return [
-    { type: "header", text: { type: "plain_text", text: HEADER } },
+    { type: "header", text: { type: "plain_text", text: header } },
     { type: "section", fields },
     ...bodySections(body),
   ];

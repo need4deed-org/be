@@ -27,11 +27,19 @@ function formatReport(msg: EmailMessage, problems: string[]): string {
   ].join("\n");
 }
 
+export class SuspendedEmailError extends Error {
+  constructor(readonly problems: string[]) {
+    super(`email suspended: ${problems.join("; ")}`);
+    this.name = "SuspendedEmailError";
+  }
+}
+
 export class ValidatingEmailTransport implements EmailTransport {
   constructor(
     private readonly deliverable: EmailTransport,
     private readonly errorTransport: EmailTransport,
     private readonly errorRecipient: string,
+    private readonly rejectSuspended = false,
   ) {}
 
   async send(msg: EmailMessage): Promise<void> {
@@ -51,5 +59,9 @@ export class ValidatingEmailTransport implements EmailTransport {
       subject: `[Suspended invalid email] ${msg.subject || "(no subject)"}`,
       text: formatReport(msg, problems),
     });
+
+    if (this.rejectSuspended) {
+      throw new SuspendedEmailError(problems);
+    }
   }
 }

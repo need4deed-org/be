@@ -6,6 +6,8 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import {
+  CRON_EMAIL_DRY_RUN,
+  CRON_EMAIL_SENT,
   DryRunEmailTransport,
   DryRunSlackTransport,
   EmailTaggedInput,
@@ -54,10 +56,12 @@ interface NotifyService {
   emailTagged(input: EmailTaggedInput): Promise<void>;
 }
 
+export type EmailDelivery = "sent" | "dry-run";
+
 interface CronNotifyService {
   emailStale(ov: OpportunityVolunteer): Promise<void>;
   emailPostMatchCheckup(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyNotFound(opportunity: Opportunity): Promise<void>;
+  emailAccompanyNotFound(opportunity: Opportunity): Promise<EmailDelivery>;
   emailRegularUpdate(opportunity: Opportunity): Promise<void>;
 }
 
@@ -94,7 +98,7 @@ function buildVerifyEmailTransport(): EmailTransport {
 }
 
 function buildNotifyEmailTransport(): {
-  deliverable: EmailTransport;
+  validating: (rejectSuspended?: boolean) => EmailTransport;
   raw: EmailTransport;
 } {
   const smtp = new SmtpEmailTransport({
@@ -106,11 +110,13 @@ function buildNotifyEmailTransport(): {
   });
   const deliverable = isDryRun("EMAIL") ? new DryRunEmailTransport(smtp) : smtp;
   return {
-    deliverable: new ValidatingEmailTransport(
-      deliverable,
-      smtp,
-      errorEmailRecipient,
-    ),
+    validating: (rejectSuspended = false) =>
+      new ValidatingEmailTransport(
+        deliverable,
+        smtp,
+        errorEmailRecipient,
+        rejectSuspended,
+      ),
     raw: smtp,
   };
 }
@@ -145,23 +151,53 @@ function buildSlackTransport(): SlackTransport | undefined {
   return new SlackWebhookTransport(urls);
 }
 
-export function buildCronEmailTransport(
+export function cronSlackTransport(
   slack: SlackTransport | undefined,
   env: Env = process.env,
-): EmailTransport {
+): SlackTransport | undefined {
   if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).cron)) {
-    return new SlackEmailTransport(slack);
+    return slack;
   }
   logger.warn(
-    "notify: SLACK_CRON_WEBHOOK_URL unset — the cron jobs' emails are neither posted nor sent (be#1088)",
+    "notify: SLACK_CRON_WEBHOOK_URL unset — cron emails are not posted to #cron-notifications; accompany-not-found is still emailed, with no Slack record",
   );
-  return { send: async () => {} };
+  return undefined;
+}
+
+export function buildCronEmailTransport(
+  cronSlack: SlackTransport | undefined,
+  header?: string,
+): EmailTransport {
+  return cronSlack
+    ? new SlackEmailTransport(cronSlack, header)
+    : { send: async () => {} };
+}
+
+export function emailedCronHeader(env: Env = process.env): string {
+  return isDryRun("EMAIL", env) ? CRON_EMAIL_DRY_RUN : CRON_EMAIL_SENT;
+}
+
+export function emailThenRecord(
+  email: EmailTransport,
+  record: EmailTransport,
+): EmailTransport {
+  return {
+    send: async (msg) => {
+      await email.send(msg);
+      await record.send(msg).catch((err) => {
+        logger.error(
+          `notify: email sent but not posted to #cron-notifications: ${err}`,
+        );
+      });
+    },
+  };
 }
 
 async function notifyPlugin(fastify: FastifyInstance) {
   const emailVerify = buildVerifyEmailTransport();
-  const { deliverable: emailNotify, raw: emailNotifyRaw } =
+  const { validating: validatingNotify, raw: emailNotifyRaw } =
     buildNotifyEmailTransport();
+  const emailNotify = validatingNotify();
   const slack = buildSlackTransport();
 
   fastify.decorate("notify", {
@@ -191,13 +227,21 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailTagged(emailNotify, input),
   });
 
-  const cronEmail = buildCronEmailTransport(slack);
+  const cronSlack = cronSlackTransport(slack);
+  const emailDelivery: EmailDelivery = isDryRun("EMAIL") ? "dry-run" : "sent";
+  const cronEmail = buildCronEmailTransport(cronSlack);
+  const cronEmailSent = emailThenRecord(
+    validatingNotify(true),
+    buildCronEmailTransport(cronSlack, emailedCronHeader()),
+  );
   fastify.decorate("cronNotify", {
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(cronEmail, ov),
     emailPostMatchCheckup: (ov: OpportunityVolunteer) =>
       sendEmailPostMatchCheckup(cronEmail, ov),
-    emailAccompanyNotFound: (opportunity: Opportunity) =>
-      sendEmailAccompanyNotFound(cronEmail, opportunity),
+    emailAccompanyNotFound: async (opportunity: Opportunity) => {
+      await sendEmailAccompanyNotFound(cronEmailSent, opportunity);
+      return emailDelivery;
+    },
     emailRegularUpdate: (opportunity: Opportunity) =>
       sendEmailRegularUpdate(cronEmail, opportunity),
   });

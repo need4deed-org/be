@@ -1,15 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import logger from "../../../logger";
-import { ValidatingEmailTransport } from "../../../services/notify/transports/validating";
+import {
+  SuspendedEmailError,
+  ValidatingEmailTransport,
+} from "../../../services/notify/transports/validating";
 import type { EmailTransport } from "../../../services/notify/types";
 
-function buildTransports() {
+function buildTransports(rejectSuspended = false) {
   const deliverable: EmailTransport = { send: vi.fn() };
   const errorTransport: EmailTransport = { send: vi.fn() };
   const transport = new ValidatingEmailTransport(
     deliverable,
     errorTransport,
     "dev@need4deed.org",
+    rejectSuspended,
   );
   return { deliverable, errorTransport, transport };
 }
@@ -83,6 +87,24 @@ describe("ValidatingEmailTransport", () => {
       expect(logged).toContain("subject has an unresolved placeholder");
       expect(logged).not.toContain("vera-at-example.com");
       expect(logged).not.toContain("Begleitung");
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("with rejectSuspended, reports and then throws a SuspendedEmailError", async () => {
+    const { deliverable, errorTransport, transport } = buildTransports(true);
+    const error = vi.spyOn(logger, "error").mockImplementation(() => logger);
+    try {
+      const sent = transport.send({
+        to: "not-an-address",
+        subject: "Hello",
+        text: "A valid body.",
+      });
+
+      await expect(sent).rejects.toBeInstanceOf(SuspendedEmailError);
+      expect(errorTransport.send).toHaveBeenCalledTimes(1);
+      expect(deliverable.send).not.toHaveBeenCalled();
     } finally {
       error.mockRestore();
     }
