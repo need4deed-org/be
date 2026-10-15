@@ -15,6 +15,7 @@ import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { Centroid } from "../../data/utils/get-district";
 import logger from "../../logger";
+import { isNoMatchFound } from "../../server/utils/data/no-match-found";
 import {
   formatAppointmentDateTime,
   formatDate,
@@ -152,6 +153,7 @@ export function dtoOpportunityGetList(
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
+    noMatchFound: isNoMatchFound(opportunity),
     numberOfVolunteers: opportunity.numberVolunteers,
     createdAt: opportunity.createdAt,
     languages: deal.dealLanguage.filter(Boolean).map((pl) => ({
@@ -288,6 +290,7 @@ export function dtoOpportunityGet(
       : undefined,
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
+    noMatchFound: isNoMatchFound(opportunityComments),
     ...getOpportunityCoordinates(opportunityComments, districtCentroid),
   } as ApiOpportunityGet;
 }

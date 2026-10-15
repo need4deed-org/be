@@ -1,12 +1,10 @@
-import { In } from "typeorm";
+import { And, Equal, In, Raw } from "typeorm";
 import { describe, expect, it } from "vitest";
-import { mergeIntoWhere } from "../../../../server/utils/data/merge-into-where";
+import {
+  andIntoWhere,
+  mergeIntoWhere,
+} from "../../../../server/utils/data/merge-into-where";
 
-// mergeIntoWhere is generic over the entity's FindOptionsWhere shape, but
-// the OR-array case (be#1018) mixes branches with different keys — a
-// realistic where clause, but not one shape a single FindOptionsWhere<T>
-// literal type-checks against. Record<string, unknown> sidesteps that
-// without weakening what the function itself guarantees.
 type Where = Record<string, unknown>;
 
 describe("mergeIntoWhere", () => {
@@ -18,10 +16,6 @@ describe("mergeIntoWhere", () => {
     expect(where).toEqual({ status: "active", agentId: In([1, 2]) });
   });
 
-  // be#1018: a filter-builder can return an array of alternative
-  // FindOptionsWhere (one per OR branch). A scoping condition applied on
-  // top must AND onto every branch, or a scoped caller would see rows that
-  // only match through an unscoped branch.
   it("merges the extra condition onto every branch of an array where", () => {
     const where: Where[] = [
       { districtId: "2" },
@@ -44,10 +38,6 @@ describe("mergeIntoWhere", () => {
     expect(where).toEqual([{ agentId: In([1, 2]) }, { agentId: In([1, 2]) }]);
   });
 
-  // be#1022 review: a shallow Object.assign would silently drop an existing
-  // nested constraint (e.g. deal.dealDistrict) whenever the extra condition
-  // also sets `deal` — the same "silently dropped constraint" bug class
-  // be#1018 fixed, just one level up.
   it("deep-merges a shared key that's a plain object on both sides, instead of overwriting it", () => {
     const where: Where = {
       deal: { dealDistrict: { district: { id: "2" } } },
@@ -77,5 +67,32 @@ describe("mergeIntoWhere", () => {
     expect(where).toEqual({
       deal: { dealLanguage: { language: { id: In(["2"]) } } },
     });
+  });
+});
+
+describe("andIntoWhere", () => {
+  const extra = Raw((alias) => `${alias} > 0`);
+
+  it("sets the key where a branch has none", () => {
+    const where: Where[] = [{ status: "active" }, { title: "x" }];
+
+    andIntoWhere(where, "id", extra);
+
+    expect(where).toEqual([
+      { status: "active", id: extra },
+      { title: "x", id: extra },
+    ]);
+  });
+
+  it("ANDs onto an existing operator or plain value instead of overwriting it", () => {
+    const search = Raw((alias) => `${alias} IN (1)`);
+    const where: Where[] = [{ id: search }, { id: 7 }];
+
+    andIntoWhere(where, "id", extra);
+
+    expect(where).toEqual([
+      { id: And(search, extra) },
+      { id: And(Equal(7), extra) },
+    ]);
   });
 });

@@ -1022,6 +1022,9 @@
         "statusMatch": {
           "$ref": "OpportunityMatchStatusType#"
         },
+        "noMatchFound": {
+          "type": "boolean"
+        },
         "numberOfVolunteers": {
           "type": "integer"
         },
