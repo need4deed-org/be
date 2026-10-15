@@ -210,15 +210,22 @@ export default async function agentRegisterRoutes(
 
       const pending = result.membershipStatus === AgentMembershipStatus.PENDING;
       if (pending) {
-        const agent = await fastify.db.agentRepository.findOne({
-          select: { id: true, title: true },
-          where: { id: result.agentId },
-        });
-        fastify.notify.opsAlert(
-          getMembershipRequestNotificationText(
-            agent?.title ?? `#${result.agentId}`,
-          ),
-        );
+        // The join is already committed: a failed alert must not turn it into a 500.
+        try {
+          const agent = await fastify.db.agentRepository.findOne({
+            select: { id: true, title: true },
+            where: { id: result.agentId },
+          });
+          fastify.notify.opsAlert(
+            getMembershipRequestNotificationText(
+              agent?.title ?? `#${result.agentId}`,
+            ),
+          );
+        } catch (err) {
+          logger.warn(
+            `register-agent: join request alert failed for agent ${result.agentId}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
       }
 
       const message = pending

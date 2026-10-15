@@ -796,6 +796,33 @@ describe("/agent/register", () => {
     }
   });
 
+  it("keeps a committed pending join a 201 when the ops alert fails", async () => {
+    const agent = await makeAgent({ unclaimed: true });
+    const { token } = await makeRegistrant(
+      `untrusted-${randomNumericSuffix()}.example.org`,
+    );
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockImplementation(() => {
+        throw new Error("alert down");
+      });
+
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agentId: agent.id },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().data.membershipStatus).toBe(
+        AgentMembershipStatus.PENDING,
+      );
+    } finally {
+      opsAlert.mockRestore();
+    }
+  });
+
   it("claims an unclaimed agent when the join is auto-approved", async () => {
     const domain = `trusted-${randomNumericSuffix()}.example.org`;
     const trusted = await fastify.db.trustedDomainRepository.save(
