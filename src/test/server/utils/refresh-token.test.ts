@@ -7,16 +7,21 @@ import {
   refreshRateLimitKey,
 } from "../../../server/utils/refresh-token";
 
-// "refresh-<id>-..." verifies as a refresh token, "access-<id>-..." as an
-// access token; anything else fails verification.
+// "refresh-<id>", "legacy-<id>" (no sid/jti) and "access-<id>" verify as such tokens; anything else fails.
 let verifyCalls = 0;
 const verify = (token: string) => {
   verifyCalls += 1;
-  const match = token.match(/^(refresh|access)-(\d+)/);
+  const match = token.match(/^(refresh|legacy|access)-(\d+)/);
   if (!match) {
     throw new Error("invalid");
   }
-  return { id: Number(match[2]), email: "x@example.org", type: match[1] };
+  const claims = { id: Number(match[2]), email: "x@example.org" };
+  if (match[1] === "access") {
+    return { ...claims, type: "access" };
+  }
+  return match[1] === "legacy"
+    ? { ...claims, type: "refresh" }
+    : { ...claims, type: "refresh", sid: "sid", jti: "jti" };
 };
 
 const request = (props: Partial<FastifyRequest>) =>
@@ -51,6 +56,12 @@ describe("refresh token helpers", () => {
       "refresh-ip:10.0.0.1",
     );
     expect(getRefreshPayload(withCookie("access-1"))).toBeNull();
+  });
+
+  it("rejects a pre-rotation token but still keys it per user", () => {
+    const req = withCookie("legacy-7");
+    expect(getRefreshPayload(req)).toBeNull();
+    expect(refreshRateLimitKey(req)).toBe("refresh-user:7");
   });
 
   it("treats an empty body token as missing, like the handler", () => {

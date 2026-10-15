@@ -342,7 +342,7 @@ describe("X-API-Key authentication", () => {
       const base = { id: 42, email: "coordinator@example.com" };
       const token = fastify.jwt.sign(
         type === "refresh"
-          ? { ...base, role: UserRole.COORDINATOR, type }
+          ? { ...base, role: UserRole.COORDINATOR, type, sid: "s", jti: "j" }
           : { ...base, type },
       );
 

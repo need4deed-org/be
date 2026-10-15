@@ -151,6 +151,7 @@ export const emailTemplateFetchTimeoutMs =
   Number(process.env.EMAIL_TEMPLATE_FETCH_TIMEOUT_MS) || 5000;
 
 export const REFRESH_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000;
+export const REFRESH_GRACE_MS = 30 * 1000;
 export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000;
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000;
 export const RESET_LIFESPAN_MS = 60 * 60 * 1000;

@@ -4,6 +4,7 @@ import cron from "node-cron";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { berlinToday, isWorkingDay } from "../../services/jobs/german-holidays";
+import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
 import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
@@ -45,6 +46,10 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                 {
                   name: "scanRegularUpdate",
                   run: () => scanRegularUpdate(fastify),
+                },
+                {
+                  name: "pruneRefreshSessions",
+                  run: () => pruneRefreshSessions(fastify),
                 },
                 ...(isWorkingDay(berlinToday())
                   ? [

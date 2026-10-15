@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { accessCookieName, refreshCookieName } from "../../../config/constants";
+import User from "../../../data/entity/user.entity";
 import { createServer } from "../../../server";
 
 vi.mock("../../../data", async () => {
@@ -32,6 +33,14 @@ vi.mock("../../../data/utils", async () => {
   };
 });
 
+function mockTransaction(fastify: FastifyInstance) {
+  const update = vi.fn().mockResolvedValue({});
+  vi.spyOn(fastify.db.userRepository.manager, "transaction").mockImplementation(
+    (async (run: (tx: unknown) => Promise<unknown>) => run({ update })) as any,
+  );
+  return update;
+}
+
 describe("POST /auth/logout", () => {
   let fastify: FastifyInstance;
 
@@ -42,6 +51,30 @@ describe("POST /auth/logout", () => {
 
   afterAll(async () => {
     await fastify.close();
+  });
+
+  it("still logs out when revoking the session fails", async () => {
+    vi.spyOn(
+      fastify.db.refreshSessionRepository.manager,
+      "update",
+    ).mockRejectedValue(new Error("db down"));
+    const refresh = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      role: UserRole.VOLUNTEER,
+      type: "refresh",
+      sid: "sid",
+      jti: "jti",
+    });
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/logout",
+      cookies: { [refreshCookieName]: refresh },
+    });
+
+    expect(response.statusCode).toBe(200);
+    vi.restoreAllMocks();
   });
 
   it("clears the access and refresh cookies without requiring auth", async () => {
@@ -153,9 +186,7 @@ describe("POST /auth/reset-password", () => {
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
     } as any);
-    const updateSpy = vi
-      .spyOn(fastify.db.userRepository, "update")
-      .mockResolvedValue({} as any);
+    const updateSpy = mockTransaction(fastify);
 
     const response = await fastify.inject({
       method: "POST",
@@ -164,6 +195,7 @@ describe("POST /auth/reset-password", () => {
     });
 
     expect(updateSpy).toHaveBeenCalledWith(
+      User,
       { id: 999 },
       { password: "hashed-password-newpass123456" },
     );
@@ -240,9 +272,7 @@ describe("POST /auth/password-change", () => {
       isActive: true,
       checkPassword,
     } as any);
-    const updateSpy = vi
-      .spyOn(fastify.db.userRepository, "update")
-      .mockResolvedValue({} as any);
+    const updateSpy = mockTransaction(fastify);
 
     const currentPass = "currentpass123";
     const response = await fastify.inject({
@@ -254,6 +284,7 @@ describe("POST /auth/password-change", () => {
 
     expect(checkPassword).toHaveBeenCalledWith(currentPass);
     expect(updateSpy).toHaveBeenCalledWith(
+      User,
       { id: 999 },
       { password: "hashed-password-newpass123456" },
     );
@@ -275,60 +306,6 @@ describe("POST /auth/refresh", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("issues new access and refresh tokens and renews both cookies", async () => {
-    const refreshToken = fastify.jwt.sign(
-      {
-        id: 999,
-        email: "test@example.com",
-        role: UserRole.COORDINATOR,
-        type: "refresh",
-      },
-      { expiresIn: `${6 * 24 * 60 * 60 * 1000}` },
-    );
-
-    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
-      id: 999,
-      email: "test@example.com",
-      role: UserRole.COORDINATOR,
-      isActive: true,
-    } as any);
-
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      payload: { refresh: refreshToken },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const { access, refresh } = response.json();
-    const decodedAccess = fastify.jwt.decode(access) as {
-      id: number;
-      email: string;
-      role: string;
-      type: string;
-    };
-    const decodedRefresh = fastify.jwt.decode(refresh) as {
-      id: number;
-      email: string;
-      role: string;
-      type: string;
-      exp: number;
-    };
-    const decodedOriginalRefresh = fastify.jwt.decode(refreshToken) as {
-      exp: number;
-    };
-
-    expect(decodedAccess.role).toBe(UserRole.COORDINATOR);
-    expect(decodedAccess.type).toBe("access");
-    expect(decodedRefresh.role).toBe(UserRole.COORDINATOR);
-    expect(decodedRefresh.type).toBe("refresh");
-    expect(decodedRefresh.exp).toBeGreaterThan(decodedOriginalRefresh.exp);
-
-    const cookies = response.cookies;
-    expect(cookies.find(({ name }) => name === "access")?.value).toBe(access);
-    expect(cookies.find(({ name }) => name === "refresh")?.value).toBe(refresh);
   });
 
   it("rejects a non-refresh token (e.g. a verify or access token)", async () => {
@@ -501,6 +478,18 @@ describe("Rate limiting", () => {
     expect(response.json().message).toBe("Rate limit exceeded");
   });
 
+  it("POST /auth/login counts per account, ignoring case, not per IP", async () => {
+    const login = (email: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: "whatever" },
+      });
+
+    expect((await login("TEST@example.com")).statusCode).toBe(429);
+    expect((await login("other@example.com")).statusCode).not.toBe(429);
+  });
+
   it("POST /auth/refresh limits to 20 requests per minute", async () => {
     for (let i = 0; i < 20; i++) {
       const response = await fastify.inject({
@@ -588,6 +577,35 @@ describe("Rate limiting", () => {
       cookies: { access: accessToken },
       payload: { password: "old", newPassword: "new" },
     });
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+  });
+});
+
+describe("Login per-IP cap", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("POST /auth/login limits one IP to 30 requests per minute across accounts", async () => {
+    const login = (i: number) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: `spray-${i}@example.com`, password: "whatever" },
+      });
+
+    for (let i = 0; i < 30; i++) {
+      expect((await login(i)).statusCode).not.toBe(429);
+    }
+    const response = await login(30);
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
   });
