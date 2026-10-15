@@ -8,10 +8,8 @@ import {
   noMatchFoundCutoff,
 } from "../../../../server/utils/data/no-match-found";
 
-// Thursday before Easter 2026: Good Friday (3 Apr) and Easter Monday (6 Apr)
-// are holidays, so 4 working days out is Friday 10 Apr.
 const TODAY = new Date(2026, 3, 2);
-const CUTOFF = new Date("2026-04-12T22:00:00Z"); // Mon 13 Apr, 00:00 Berlin
+const CUTOFF = new Date("2026-04-12T22:00:00Z");
 
 const opportunity = (
   date: Date | undefined,
