@@ -1,10 +1,9 @@
-import { OpportunityType } from "need4deed-sdk";
+import { berlinToday, OpportunityType } from "need4deed-sdk";
 import { Raw } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
   appointmentsDue,
   berlinDayBoundaries,
-  berlinToday,
 } from "../../../services/jobs/german-holidays";
 import { ONETIMER_ENGAGED_VOLUNTEER_STATUSES } from "./onetimer-statuses";
 

@@ -1,6 +1,8 @@
 import { FastifyInstance } from "fastify";
 import {
+  addWorkingDays,
   CommunicationType,
+  isWorkingDay,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
@@ -26,11 +28,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { createServer } from "../../../server";
 import type { EmailDelivery } from "../../../server/plugins/notify";
-import {
-  addWorkingDays,
-  appointmentsDue,
-  isWorkingDay,
-} from "../../../services/jobs/german-holidays";
+import { appointmentsDue } from "../../../services/jobs/german-holidays";
 import { scanAccompanyNotFound } from "../../../services/jobs/scan-accompany-not-found";
 import { SuspendedEmailError } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";

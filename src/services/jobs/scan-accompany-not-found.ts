@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  berlinToday,
   CommunicationType,
   OpportunityStatusType,
   OpportunityType,
@@ -13,11 +14,7 @@ import type { EmailDelivery } from "../../server/plugins/notify";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
 import { NO_MATCH_FOUND_WORKING_DAYS } from "../../server/utils/data/no-match-found";
 import { SuspendedEmailError } from "../notify";
-import {
-  appointmentsDue,
-  berlinDayBoundaries,
-  berlinToday,
-} from "./german-holidays";
+import { appointmentsDue, berlinDayBoundaries } from "./german-holidays";
 import { reportCronFailure } from "./report-cron-failure";
 
 const JOB = "scanAccompanyNotFound";

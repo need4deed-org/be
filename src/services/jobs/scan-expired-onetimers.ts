@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
+  addWorkingDays,
+  berlinToday,
   OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
@@ -10,7 +12,6 @@ import {
   ONETIMER_ENGAGED_VOLUNTEER_STATUSES,
   ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
 } from "../../server/utils/data/onetimer-statuses";
-import { addWorkingDays, berlinToday } from "./german-holidays";
 
 export async function scanExpiredOnetimers(
   fastify: FastifyInstance,

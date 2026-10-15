@@ -1,9 +1,9 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
+import { berlinToday, isWorkingDay } from "need4deed-sdk";
 import cron from "node-cron";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
-import { berlinToday, isWorkingDay } from "../../services/jobs/german-holidays";
 import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
 import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";

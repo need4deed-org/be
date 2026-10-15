@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
+  addWorkingDays,
+  berlinToday,
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
@@ -18,11 +20,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import {
-  addWorkingDays,
-  berlinDayBoundaries,
-  berlinToday,
-} from "../../../services/jobs/german-holidays";
+import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -105,7 +103,9 @@ describe("no match found (be#1162)", () => {
       const onetimer = date
         ? await fastify.db.onetimerRepository.save(new Onetimer({ date }))
         : undefined;
-      if (onetimer) {onetimers.push(onetimer);}
+      if (onetimer) {
+        onetimers.push(onetimer);
+      }
       opportunities[key] = await fastify.db.opportunityRepository.save(
         new Opportunity({
           title: `${prefix} ${key}`,
