@@ -77,6 +77,7 @@ import {
   andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
+  assertAppointmentNotTooSoon,
   assertRoleIn,
   getCallerAgentIds,
   getCategoryToDealHandler,
@@ -592,6 +593,10 @@ export default async function opportunityRoutes(
         opportunity.onetimer = new Onetimer({
           date: parseAccompDatetime(legacyBody.accomp_datetime),
         });
+        assertAppointmentNotTooSoon(
+          opportunity.onetimer.date,
+          request.authUser?.role,
+        );
       } else if (opportunity.type === OpportunityType.EVENTS) {
         opportunity.onetimer = new Onetimer({
           date: new Date(legacyBody.onetime_date_time),
@@ -785,6 +790,14 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      if (effectiveType === OpportunityType.ACCOMPANYING && onetimerDate) {
+        const current = opportunity.onetimerId
+          ? await fastify.db.onetimerRepository.findOneBy({
+              id: opportunity.onetimerId,
+            })
+          : null;
+        assertAppointmentNotTooSoon(onetimerDate, role, current?.date);
+      }
       const submitted = {
         title: opportunityObj?.title,
         info: opportunityObj?.info,

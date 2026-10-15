@@ -30,6 +30,7 @@ export * from "./is-staff-role";
 export * from "./is-trusted-domain";
 export * from "./mask-inactive-agent";
 export * from "./merge-into-where";
+export * from "./min-appointment-date";
 export * from "./notify-new-volunteer";
 export * from "./notify-tagged-by-email";
 export * from "./resolve-person-by-email";
