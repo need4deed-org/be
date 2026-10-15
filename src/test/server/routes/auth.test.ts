@@ -156,6 +156,10 @@ describe("POST /auth/reset-password", () => {
     const updateSpy = vi
       .spyOn(fastify.db.userRepository, "update")
       .mockResolvedValue({} as any);
+    vi.spyOn(
+      fastify.db.refreshSessionRepository.manager,
+      "update",
+    ).mockResolvedValue({} as any);
 
     const response = await fastify.inject({
       method: "POST",
@@ -243,6 +247,10 @@ describe("POST /auth/password-change", () => {
     const updateSpy = vi
       .spyOn(fastify.db.userRepository, "update")
       .mockResolvedValue({} as any);
+    vi.spyOn(
+      fastify.db.refreshSessionRepository.manager,
+      "update",
+    ).mockResolvedValue({} as any);
 
     const currentPass = "currentpass123";
     const response = await fastify.inject({

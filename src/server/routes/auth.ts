@@ -26,6 +26,8 @@ import {
 import { ReplyMessage, RoutePrefix } from "../types";
 import {
   createRefreshSession,
+  revokeRefreshSession,
+  revokeUserRefreshSessions,
   rotateRefreshSession,
 } from "../utils/data/refresh-session";
 import { signAccessToken } from "../utils/data/sign-access-token";
@@ -235,9 +237,18 @@ async function authRoutes(
         },
       },
     },
-    async (_request, reply) => {
+    async (request, reply) => {
       reply.clearCookie(accessCookieName, cookieOptions);
       reply.clearCookie(refreshCookieName, cookieOptions);
+
+      const refresh = getRefreshPayload(request);
+      if (refresh) {
+        await revokeRefreshSession(
+          fastify.db.refreshSessionRepository.manager,
+          refresh.id,
+          refresh.sid,
+        );
+      }
 
       return reply.status(200).send({ message: "Logout successful." });
     },
@@ -315,6 +326,10 @@ async function authRoutes(
         { id: user.id },
         { password: await hashPassword(newPassword) },
       );
+      await revokeUserRefreshSessions(
+        fastify.db.refreshSessionRepository.manager,
+        user.id,
+      );
 
       return reply.status(200).send({
         message: "Password has been reset.",
@@ -348,6 +363,12 @@ async function authRoutes(
       await fastify.db.userRepository.update(
         { id: authUser.id },
         { password: await hashPassword(newPassword) },
+      );
+      const refresh = getRefreshPayload(request);
+      await revokeUserRefreshSessions(
+        fastify.db.refreshSessionRepository.manager,
+        authUser.id,
+        refresh?.id === authUser.id ? refresh.sid : undefined,
       );
 
       return reply.status(200).send({
