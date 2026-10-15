@@ -44,6 +44,30 @@ describe("POST /auth/logout", () => {
     await fastify.close();
   });
 
+  it("still logs out when revoking the session fails", async () => {
+    vi.spyOn(
+      fastify.db.refreshSessionRepository.manager,
+      "update",
+    ).mockRejectedValue(new Error("db down"));
+    const refresh = fastify.jwt.sign({
+      id: 999,
+      email: "test@example.com",
+      role: UserRole.VOLUNTEER,
+      type: "refresh",
+      sid: "sid",
+      jti: "jti",
+    });
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/logout",
+      cookies: { [refreshCookieName]: refresh },
+    });
+
+    expect(response.statusCode).toBe(200);
+    vi.restoreAllMocks();
+  });
+
   it("clears the access and refresh cookies without requiring auth", async () => {
     const response = await fastify.inject({
       method: "POST",
@@ -571,7 +595,7 @@ describe("Login per-IP cap", () => {
     await fastify.close();
   });
 
-  it("POST /auth/login limits one IP to 100 requests per minute across accounts", async () => {
+  it("POST /auth/login limits one IP to 30 requests per minute across accounts", async () => {
     const login = (i: number) =>
       fastify.inject({
         method: "POST",
@@ -579,10 +603,10 @@ describe("Login per-IP cap", () => {
         payload: { email: `spray-${i}@example.com`, password: "whatever" },
       });
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 30; i++) {
       expect((await login(i)).statusCode).not.toBe(429);
     }
-    const response = await login(100);
+    const response = await login(30);
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
   });

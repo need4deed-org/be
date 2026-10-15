@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { EntityManager, IsNull, LessThan, Not } from "typeorm";
+import { EntityManager, IsNull, Not } from "typeorm";
 import {
   REFRESH_GRACE_MS,
   REFRESH_LIFESPAN_MS,
@@ -54,28 +54,42 @@ export function decideRotation(
   return { kind: "reuse" };
 }
 
+export async function deleteDeadRefreshSessions(
+  manager: EntityManager,
+  now: Date = new Date(),
+  userId?: number,
+): Promise<number> {
+  const query = manager
+    .createQueryBuilder()
+    .delete()
+    .from(RefreshSession)
+    .where("(expires_at < :now OR revoked_at IS NOT NULL)", { now });
+  if (userId !== undefined) {
+    query.andWhere("user_id = :userId", { userId });
+  }
+  return (await query.execute()).affected ?? 0;
+}
+
 export async function createRefreshSession(
   manager: EntityManager,
   userId: number,
   now: Date = new Date(),
 ): Promise<RefreshSessionIds> {
-  await manager.delete(RefreshSession, {
-    userId,
-    expiresAt: LessThan(now),
+  return manager.transaction(async (tx) => {
+    await deleteDeadRefreshSessions(tx, now, userId);
+    const session = await tx.save(
+      new RefreshSession({
+        id: randomUUID(),
+        userId,
+        currentJti: randomUUID(),
+        previousJti: null,
+        rotatedAt: null,
+        expiresAt: new Date(now.getTime() + REFRESH_LIFESPAN_MS),
+        revokedAt: null,
+      }),
+    );
+    return { sid: session.id, jti: session.currentJti };
   });
-  await manager.delete(RefreshSession, { userId, revokedAt: Not(IsNull()) });
-  const session = await manager.save(
-    new RefreshSession({
-      id: randomUUID(),
-      userId,
-      currentJti: randomUUID(),
-      previousJti: null,
-      rotatedAt: null,
-      expiresAt: new Date(now.getTime() + REFRESH_LIFESPAN_MS),
-      revokedAt: null,
-    }),
-  );
-  return { sid: session.id, jti: session.currentJti };
 }
 
 // The row lock makes exactly one concurrent refresh rotate; the rest hit the grace window.

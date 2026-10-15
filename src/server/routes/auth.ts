@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { FastifyInstance, FastifyPluginOptions, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { ApiAuthRefreshPost, ApiAuthRefreshResponse } from "need4deed-sdk";
 import { BadRequestError } from "../../config";
@@ -39,6 +39,11 @@ import {
   refreshRateLimitKey,
 } from "../utils/refresh-token";
 
+function clearAuthCookies(reply: FastifyReply) {
+  reply.clearCookie(accessCookieName, cookieOptions);
+  reply.clearCookie(refreshCookieName, cookieOptions);
+}
+
 async function authRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
@@ -77,8 +82,7 @@ async function authRoutes(
       },
     },
     async (request, reply) => {
-      reply.clearCookie(accessCookieName, cookieOptions);
-      reply.clearCookie(refreshCookieName, cookieOptions);
+      clearAuthCookies(reply);
 
       const { email, password } = request.body;
 
@@ -172,6 +176,7 @@ async function authRoutes(
       }
       const decoded = getRefreshPayload(request);
       if (!decoded) {
+        clearAuthCookies(reply);
         throw new BadRequestError("Invalid refresh token.");
       }
       const id = decoded.id;
@@ -198,6 +203,7 @@ async function authRoutes(
         );
       }
       if (rotation.kind !== "rotated") {
+        clearAuthCookies(reply);
         throw new BadRequestError("Invalid refresh token.");
       }
 
@@ -243,8 +249,7 @@ async function authRoutes(
       },
     },
     async (request, reply) => {
-      reply.clearCookie(accessCookieName, cookieOptions);
-      reply.clearCookie(refreshCookieName, cookieOptions);
+      clearAuthCookies(reply);
 
       const refresh = getRefreshPayload(request);
       if (refresh) {
@@ -252,7 +257,11 @@ async function authRoutes(
           fastify.db.refreshSessionRepository.manager,
           refresh.id,
           refresh.sid,
-        );
+        ).catch((err) => {
+          logger.error(
+            `Failed to revoke refresh session on logout for user ${refresh.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
       }
 
       return reply.status(200).send({ message: "Logout successful." });

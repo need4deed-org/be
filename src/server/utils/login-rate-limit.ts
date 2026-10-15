@@ -1,7 +1,7 @@
 import { normalizeIP } from "@fastify/rate-limit";
 import { FastifyReply, FastifyRequest } from "fastify";
 
-const LOGIN_IP_MAX = 100;
+const LOGIN_IP_MAX = 30;
 const LOGIN_IP_WINDOW_MS = 60 * 1000;
 const LOGIN_IP_MAX_TRACKED = 5000;
 
@@ -22,17 +22,13 @@ export function createLoginIpCap() {
     reply: FastifyReply,
   ) {
     const now = Date.now();
-    if (windows.size >= LOGIN_IP_MAX_TRACKED) {
-      for (const [ip, window] of windows) {
-        if (now - window.startedAt >= LOGIN_IP_WINDOW_MS) {
-          windows.delete(ip);
-        }
-      }
-    }
-
     const ip = normalizeIP(request.ip, 56);
     const window = windows.get(ip);
     if (!window || now - window.startedAt >= LOGIN_IP_WINDOW_MS) {
+      windows.delete(ip);
+      if (windows.size >= LOGIN_IP_MAX_TRACKED) {
+        windows.delete(windows.keys().next().value!);
+      }
       windows.set(ip, { count: 1, startedAt: now });
       return;
     }

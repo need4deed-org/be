@@ -1,7 +1,9 @@
-import { FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
+import { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  accessCookieName,
   REFRESH_GRACE_MS,
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
@@ -14,6 +16,7 @@ import { createServer } from "../../../server";
 import {
   createRefreshSession,
   decideRotation,
+  deleteDeadRefreshSessions,
   rotateRefreshSession,
 } from "../../../server/utils/data/refresh-session";
 import { signRefreshToken } from "../../../server/utils/data/sign-refresh-token";
@@ -45,6 +48,13 @@ describe("refresh-token rotation", () => {
       url: "/auth/refresh",
       payload: { refresh: token },
     });
+
+  function expectAuthCookiesCleared(response: LightMyRequestResponse) {
+    for (const name of [accessCookieName, refreshCookieName]) {
+      const cookie = response.cookies.find((c) => c.name === name);
+      expect(cookie?.value, `expected ${name} to be cleared`).toBe("");
+    }
+  }
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -158,6 +168,7 @@ describe("refresh-token rotation", () => {
       message: "Invalid refresh token.",
     });
     expect((await session(claims(token).sid)).revokedAt).not.toBeNull();
+    expectAuthCookiesCleared(response);
   });
 
   it("answers a replay within the grace window with the current jti", async () => {
@@ -235,6 +246,7 @@ describe("refresh-token rotation", () => {
     const response = await refresh(legacy);
     expect(response.statusCode).toBe(400);
     expect(response.json().message).toBe("Invalid refresh token.");
+    expectAuthCookiesCleared(response);
   });
 
   it("rejects a token naming another user's session", async () => {
@@ -321,6 +333,55 @@ describe("refresh-token rotation", () => {
     });
     expect(rows.map((r) => r.id)).toEqual([claims(token).sid]);
     expect(rows.map((r) => r.id)).not.toContain(expired.sid);
+  });
+});
+
+describe("deleteDeadRefreshSessions", () => {
+  it("deletes expired and revoked sessions of every user, keeping live ones", async () => {
+    const fastify = await createServer();
+    await fastify.ready();
+    const manager = fastify.db.refreshSessionRepository.manager;
+    const email = `refresh-prune-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+    try {
+      const user = await fastify.db.userRepository.save(
+        new User({
+          email,
+          password: await hashPassword("prune_password"),
+          role: UserRole.VOLUNTEER,
+          isActive: true,
+          person: new Person({ firstName: "Prune", lastName: "User", email }),
+        }),
+      );
+      const live = await createRefreshSession(manager, user.id);
+      const expired = await createRefreshSession(
+        manager,
+        user.id,
+        new Date(Date.now() - REFRESH_LIFESPAN_MS - 1000),
+      );
+      const revoked = await fastify.db.refreshSessionRepository.save(
+        new RefreshSession({
+          id: randomUUID(),
+          userId: user.id,
+          currentJti: randomUUID(),
+          expiresAt: new Date(Date.now() + REFRESH_LIFESPAN_MS),
+          revokedAt: new Date(),
+        }),
+      );
+
+      expect(await deleteDeadRefreshSessions(manager)).toBeGreaterThanOrEqual(
+        2,
+      );
+
+      const left = await fastify.db.refreshSessionRepository.findBy({
+        userId: user.id,
+      });
+      expect(left.map((r) => r.id)).toEqual([live.sid]);
+      expect([expired.sid, revoked.id]).not.toContain(live.sid);
+    } finally {
+      await fastify.db.userRepository.delete({ email });
+      await fastify.db.personRepository.delete({ email });
+      await fastify.close();
+    }
   });
 });
 
