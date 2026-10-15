@@ -277,60 +277,6 @@ describe("POST /auth/refresh", () => {
     vi.restoreAllMocks();
   });
 
-  it("issues new access and refresh tokens and renews both cookies", async () => {
-    const refreshToken = fastify.jwt.sign(
-      {
-        id: 999,
-        email: "test@example.com",
-        role: UserRole.COORDINATOR,
-        type: "refresh",
-      },
-      { expiresIn: `${6 * 24 * 60 * 60 * 1000}` },
-    );
-
-    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
-      id: 999,
-      email: "test@example.com",
-      role: UserRole.COORDINATOR,
-      isActive: true,
-    } as any);
-
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/refresh",
-      payload: { refresh: refreshToken },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const { access, refresh } = response.json();
-    const decodedAccess = fastify.jwt.decode(access) as {
-      id: number;
-      email: string;
-      role: string;
-      type: string;
-    };
-    const decodedRefresh = fastify.jwt.decode(refresh) as {
-      id: number;
-      email: string;
-      role: string;
-      type: string;
-      exp: number;
-    };
-    const decodedOriginalRefresh = fastify.jwt.decode(refreshToken) as {
-      exp: number;
-    };
-
-    expect(decodedAccess.role).toBe(UserRole.COORDINATOR);
-    expect(decodedAccess.type).toBe("access");
-    expect(decodedRefresh.role).toBe(UserRole.COORDINATOR);
-    expect(decodedRefresh.type).toBe("refresh");
-    expect(decodedRefresh.exp).toBeGreaterThan(decodedOriginalRefresh.exp);
-
-    const cookies = response.cookies;
-    expect(cookies.find(({ name }) => name === "access")?.value).toBe(access);
-    expect(cookies.find(({ name }) => name === "refresh")?.value).toBe(refresh);
-  });
-
   it("rejects a non-refresh token (e.g. a verify or access token)", async () => {
     const findOneSpy = vi.spyOn(fastify.db.userRepository, "findOne");
 

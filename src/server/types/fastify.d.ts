@@ -96,7 +96,15 @@ declare module "@fastify/jwt" {
           id: number;
           email: string;
           role: UserRole;
-          type: "access" | "refresh";
+          type: "access";
+        }
+      | {
+          id: number;
+          email: string;
+          role: UserRole;
+          type: "refresh";
+          sid: string;
+          jti: string;
         }
       | {
           id: number;

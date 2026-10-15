@@ -24,6 +24,10 @@ import {
   userLoginSchema,
 } from "../schema/user.schema";
 import { ReplyMessage, RoutePrefix } from "../types";
+import {
+  createRefreshSession,
+  rotateRefreshSession,
+} from "../utils/data/refresh-session";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
 import {
@@ -97,7 +101,11 @@ async function authRoutes(
           throw new Error("No token generated.");
         }
 
-        const refresh = signRefreshToken(fastify, user);
+        const session = await createRefreshSession(
+          fastify.db.refreshSessionRepository.manager,
+          user.id,
+        );
+        const refresh = signRefreshToken(fastify, user, session);
 
         if (!refresh) {
           throw new Error("No token generated.");
@@ -156,6 +164,20 @@ async function authRoutes(
       }
       const id = decoded.id;
 
+      const rotation = await rotateRefreshSession(
+        fastify.db.refreshSessionRepository.manager,
+        id,
+        decoded,
+      );
+      if (rotation.kind === "reuse") {
+        logger.warn(
+          `Refresh token reuse for user ${id}, session ${decoded.sid} revoked`,
+        );
+      }
+      if (rotation.kind !== "rotated") {
+        throw new BadRequestError("Invalid refresh token.");
+      }
+
       try {
         const userRepository = fastify.db.userRepository;
         if (!userRepository) {
@@ -179,7 +201,7 @@ async function authRoutes(
           throw new Error("No token generated.");
         }
 
-        const refresh = signRefreshToken(fastify, user);
+        const refresh = signRefreshToken(fastify, user, rotation.ids);
 
         if (!refresh) {
           throw new Error("No token generated.");
