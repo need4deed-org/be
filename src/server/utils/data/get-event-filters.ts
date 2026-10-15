@@ -1,7 +1,7 @@
 import { SelectQueryBuilder } from "typeorm";
 import EventN4D from "../../../data/entity/event/event.entity";
 import { ResolvedEventTranslation } from "../../../services/dto/dto-event";
-import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
+import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import { QuerystringEventGetList } from "../../types";
 import { parseDateOnly } from "./parse-date-only";
 

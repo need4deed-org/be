@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { isWorkingDay } from "need4deed-sdk";
 import cron from "node-cron";
 import {
   afterAll,
@@ -11,7 +12,6 @@ import {
 } from "vitest";
 import { createServer } from "../../../server";
 import * as activateDueOnetimers from "../../../services/jobs/activate-due-onetimers";
-import * as germanHolidays from "../../../services/jobs/german-holidays";
 import * as scanAccompanyNotFound from "../../../services/jobs/scan-accompany-not-found";
 import * as scanExpiredOnetimers from "../../../services/jobs/scan-expired-onetimers";
 import * as scanPostMatchCheckup from "../../../services/jobs/scan-post-match-checkup";
@@ -20,16 +20,16 @@ import * as scanStalePending from "../../../services/jobs/scan-stale-pending";
 
 const DAILY = "0 6 * * *";
 
-// createServer re-initialises the DB connection: slower than the 5 s default.
+vi.mock("need4deed-sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("need4deed-sdk")>();
+  return { ...actual, isWorkingDay: vi.fn(actual.isWorkingDay) };
+});
+
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
-// be#1077: the daily onetimer status jobs always run. be#1088: the email
-// scans, which now post to Slack, run daily after them; there is no hourly
-// scheduler any more.
 describe("cron schedulers", () => {
   let fastify: FastifyInstance;
   const callbacks = new Map<string, () => Promise<void>>();
-  const isWorkingDay = vi.spyOn(germanHolidays, "isWorkingDay");
 
   const daily = {
     activateDueOnetimers: vi
@@ -75,7 +75,7 @@ describe("cron schedulers", () => {
   });
 
   it("runs the daily status jobs first, then every email scan, on a working day", async () => {
-    isWorkingDay.mockReturnValue(true);
+    vi.mocked(isWorkingDay).mockReturnValue(true);
 
     await callbacks.get(DAILY)?.();
 
@@ -93,7 +93,7 @@ describe("cron schedulers", () => {
   });
 
   it("skips only the accompanying scan on a weekend or holiday", async () => {
-    isWorkingDay.mockReturnValue(false);
+    vi.mocked(isWorkingDay).mockReturnValue(false);
 
     await callbacks.get(DAILY)?.();
 
@@ -105,7 +105,6 @@ describe("cron schedulers", () => {
   });
 
   it("schedules nothing but the daily jobs", () => {
-    // The translation worker is off in tests, so it schedules nothing here.
     expect([...callbacks.keys()]).toEqual([DAILY]);
   });
 });

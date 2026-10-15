@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  berlinToday,
   OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
@@ -7,7 +8,7 @@ import logger from "../../logger";
 import { applyOnetimerTransition } from "../../server/utils/data/apply-onetimer-transition";
 import { buildOnetimerOpportunityQuery } from "../../server/utils/data/build-onetimer-opportunity-query";
 import { ONETIMER_TERMINAL_OPPORTUNITY_STATUSES } from "../../server/utils/data/onetimer-statuses";
-import { berlinDayBoundaries, berlinToday } from "./german-holidays";
+import { berlinDayBoundaries } from "./berlin-dates";
 
 export async function activateDueOnetimers(
   fastify: FastifyInstance,

@@ -10,7 +10,7 @@ import {
   Raw,
 } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
+import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import {
   QuerystringOpportunityFiltering,
   QuerystringOpportunityList,
