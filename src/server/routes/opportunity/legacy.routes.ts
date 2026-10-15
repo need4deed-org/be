@@ -26,6 +26,7 @@ import {
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
 import {
+  assertAppointmentNotTooSoon,
   getAgentByAddress,
   getDistrictToOpportunityHandler,
   getOpportunityNotificationText,
@@ -122,6 +123,10 @@ export default async function opportunityLegacyRoutes(
         opportunity.onetimer = new Onetimer({
           date: parseAccompDatetime(request.body.accomp_datetime),
         });
+        assertAppointmentNotTooSoon(
+          opportunity.onetimer.date,
+          request.authUser?.role,
+        );
       } else if (opportunity.type === OpportunityType.EVENTS) {
         opportunity.onetimer = new Onetimer({
           date: new Date(request.body.onetime_date_time),
