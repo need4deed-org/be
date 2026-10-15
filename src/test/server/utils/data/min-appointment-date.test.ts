@@ -34,6 +34,15 @@ describe("assertAppointmentNotTooSoon", () => {
     ).not.toThrow();
   });
 
+  it.each([UserRole.AGENT, UserRole.COORDINATOR])(
+    "rejects an invalid date for a %s",
+    (role) => {
+      expect(() =>
+        assertAppointmentNotTooSoon(new Date(NaN), role, null, TODAY),
+      ).toThrow("The appointment date is invalid.");
+    },
+  );
+
   it("checks a caller without a role", () => {
     expect(() =>
       assertAppointmentNotTooSoon(JUST_BEFORE, undefined, null, TODAY),

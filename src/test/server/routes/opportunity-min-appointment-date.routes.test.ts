@@ -43,7 +43,7 @@ describe("accompanying appointments are at least 7 working days out", () => {
   const earliest = () => new Date(minAppointmentDate().getTime() + 10 * HOUR);
   const tooSoon = () => new Date(minAppointmentDate().getTime() - 12 * HOUR);
 
-  const create = (as: Caller, appointment: Date) =>
+  const create = (as: Caller, appointment: Date | string) =>
     fastify.inject({
       method: "POST",
       url: "/opportunity/",
@@ -58,7 +58,10 @@ describe("accompanying appointments are at least 7 working days out", () => {
         agent_id: agent.id,
         accomp_address: "Teststraße 1",
         accomp_postcode: postcodeValue,
-        accomp_datetime: appointment.toISOString(),
+        accomp_datetime:
+          typeof appointment === "string"
+            ? appointment
+            : appointment.toISOString(),
         accomp_name: "John Doe",
         accomp_phone: "420-024",
         accomp_translation: "deutsche",
@@ -189,6 +192,13 @@ describe("accompanying appointments are at least 7 working days out", () => {
 
       expect(res.statusCode).toBe(201);
       createdId(res);
+    });
+
+    it("rejects an unparseable appointment date", async () => {
+      const res = await create("agent", "not-a-date");
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().message).toBe("The appointment date is invalid.");
     });
 
     it("lets a coordinator set a sooner appointment", async () => {

@@ -18,6 +18,9 @@ export function assertAppointmentNotTooSoon(
   current?: Date | null,
   today: Date = berlinToday(),
 ): void {
+  if (isNaN(appointment.getTime())) {
+    throw new BadRequestError("The appointment date is invalid.");
+  }
   if (isStaffRole(role)) {
     return;
   }
