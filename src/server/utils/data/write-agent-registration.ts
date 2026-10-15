@@ -17,6 +17,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import logger from "../../../logger";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
+import { claimAgent } from "./claim-agent";
 import { createAddress } from "./for-routes";
 import { isFreeEmailDomain } from "./free-email-domains";
 import { getAgentByAddress } from "./get-agent-by-postcode";
@@ -123,7 +124,7 @@ async function getTitleVisibleToRegistrant(
   registrantEmail: string | undefined,
   manager: DataSource | EntityManager,
 ): Promise<string | undefined> {
-  if (!registrantEmail) {
+  if (!registrantEmail || agent.unclaimed) {
     return undefined;
   }
   try {
@@ -280,13 +281,10 @@ export async function resolveJoinStatus(
   manager: DataSource | EntityManager = dataSource,
 ): Promise<AgentMembershipStatus> {
   const agent = await manager.getRepository(Agent).findOne({
-    select: { id: true, unclaimed: true, engagementStatus: true },
+    select: { id: true, engagementStatus: true },
     where: { id: agentId },
   });
-  if (
-    agent?.unclaimed ||
-    agent?.engagementStatus === AgentEngagementStatusType.INACTIVE
-  ) {
+  if (agent?.engagementStatus === AgentEngagementStatusType.INACTIVE) {
     return AgentMembershipStatus.PENDING;
   }
 
@@ -371,6 +369,9 @@ export async function joinAgent(
         status,
       }),
     );
+    if (status === AgentMembershipStatus.ACTIVE) {
+      await claimAgent(agentId, manager);
+    }
   });
 
   return { agentId, membershipStatus: status };

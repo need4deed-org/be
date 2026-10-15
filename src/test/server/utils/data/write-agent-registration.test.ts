@@ -63,6 +63,7 @@ vi.mock("../../../../data/data-source", () => ({
 }));
 
 const agentSave = vi.fn();
+const agentUpdate = vi.fn();
 const agentPersonSave = vi.fn();
 const agentPersonFind = vi.fn();
 const agentLanguageSave = vi.fn();
@@ -79,6 +80,7 @@ beforeEach(() => {
           save: agentSave,
           find: agentRepoFind,
           findOne: agentRepoFindOne,
+          update: agentUpdate,
         };
       case AgentPerson:
         return { save: agentPersonSave, find: agentPersonFind };
@@ -498,32 +500,27 @@ describe("resolveJoinStatus", () => {
     });
   });
 
-  // A coordinator-created (unclaimed) or inactive NGO is never auto-approved,
-  // and the members lookup is skipped.
-  it.each([
-    ["unclaimed", { id: 33, unclaimed: true }],
-    [
-      "inactive",
-      {
-        id: 33,
-        unclaimed: false,
-        engagementStatus: AgentEngagementStatusType.INACTIVE,
-      },
-    ],
-  ])(
-    "returns PENDING for an %s agent, even on a domain match",
-    async (_l, agent) => {
-      agentRepoFindOne.mockResolvedValueOnce(agent);
-      agentPersonRepoFind.mockResolvedValueOnce([
-        { person: { email: "existing@center.de", users: [] } },
-      ]);
+  it("returns PENDING for an inactive agent, even on a domain match", async () => {
+    agentRepoFindOne.mockResolvedValueOnce({
+      id: 33,
+      engagementStatus: AgentEngagementStatusType.INACTIVE,
+    });
 
-      const status = await resolveJoinStatus(33, "newcomer@center.de");
+    const status = await resolveJoinStatus(33, "newcomer@center.de");
 
-      expect(status).toBe(AgentMembershipStatus.PENDING);
-      expect(agentPersonRepoFind).not.toHaveBeenCalled();
-    },
-  );
+    expect(status).toBe(AgentMembershipStatus.PENDING);
+    expect(agentPersonRepoFind).not.toHaveBeenCalled();
+  });
+
+  it("returns ACTIVE for an unclaimed agent on a trusted domain", async () => {
+    agentRepoFindOne.mockResolvedValueOnce({ id: 33, unclaimed: true });
+    agentPersonRepoFind.mockResolvedValueOnce([]);
+    isEmailDomainTrustedMock.mockResolvedValueOnce(true);
+
+    const status = await resolveJoinStatus(33, "newcomer@center.de");
+
+    expect(status).toBe(AgentMembershipStatus.ACTIVE);
+  });
 
   it("returns ACTIVE when a member's Person.email shares the registrant's domain", async () => {
     agentPersonRepoFind.mockResolvedValueOnce([
@@ -616,6 +613,28 @@ describe("joinAgent", () => {
       agentId: 33,
       membershipStatus: AgentMembershipStatus.PENDING,
     });
+  });
+
+  it("claims the agent when the join is ACTIVE", async () => {
+    agentRepoFindOne.mockResolvedValue({ id: 33, unclaimed: true });
+    isEmailDomainTrustedMock.mockResolvedValueOnce(true);
+
+    const result = await joinAgent(11, 33, "registrant@center.de");
+
+    expect(result.membershipStatus).toBe(AgentMembershipStatus.ACTIVE);
+    expect(agentUpdate).toHaveBeenCalledWith(
+      { id: 33, unclaimed: true },
+      { unclaimed: false },
+    );
+  });
+
+  it("leaves the agent unclaimed when the join is PENDING", async () => {
+    agentRepoFindOne.mockResolvedValue({ id: 33, unclaimed: true });
+
+    const result = await joinAgent(11, 33, "registrant@center.de");
+
+    expect(result.membershipStatus).toBe(AgentMembershipStatus.PENDING);
+    expect(agentUpdate).not.toHaveBeenCalled();
   });
 
   it("throws AgentAlreadyRegisteredError, preferring the ACTIVE membership, before touching the agent", async () => {

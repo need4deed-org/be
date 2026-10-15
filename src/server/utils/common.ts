@@ -114,6 +114,12 @@ export function getOpportunityNotificationText(title: string): string {
   return `New opportunity arrived: "${title}" at ${formatBerlinTimestamp()}`;
 }
 
+export function getMembershipRequestNotificationText(
+  agentTitle: string,
+): string {
+  return `New NGO membership request for "${agentTitle}" is waiting for approval at ${formatBerlinTimestamp()}`;
+}
+
 export type Env = Record<string, string | undefined>;
 
 export function firstEnvValue(env: Env, names: string[]): string | undefined {

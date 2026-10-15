@@ -5,7 +5,7 @@ import {
   AgentRoleType,
   UserRole,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -764,20 +764,92 @@ describe("/agent/register", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("turns joining an unclaimed agent into a pending request", async () => {
+  it("keeps joining an unclaimed agent pending without a domain match, and alerts ops", async () => {
     const agent = await makeAgent({ unclaimed: true });
-    const { token } = await makeRegistrant("test.need4deed.org");
-
-    const res = await fastify.inject({
-      method: "POST",
-      url: `/agent/register?token=${token}`,
-      payload: { agentId: agent.id },
-    });
-
-    expect(res.statusCode).toBe(201);
-    expect(res.json().data.membershipStatus).toBe(
-      AgentMembershipStatus.PENDING,
+    const { token } = await makeRegistrant(
+      `untrusted-${randomNumericSuffix()}.example.org`,
     );
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
+
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agentId: agent.id },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().data.membershipStatus).toBe(
+        AgentMembershipStatus.PENDING,
+      );
+      expect(opsAlert).toHaveBeenCalledWith(
+        expect.stringContaining(agent.title),
+      );
+      const reloaded = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      expect(reloaded.unclaimed).toBe(true);
+    } finally {
+      opsAlert.mockRestore();
+    }
+  });
+
+  it("keeps a committed pending join a 201 when the ops alert fails", async () => {
+    const agent = await makeAgent({ unclaimed: true });
+    const { token } = await makeRegistrant(
+      `untrusted-${randomNumericSuffix()}.example.org`,
+    );
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockImplementation(() => {
+        throw new Error("alert down");
+      });
+
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agentId: agent.id },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().data.membershipStatus).toBe(
+        AgentMembershipStatus.PENDING,
+      );
+    } finally {
+      opsAlert.mockRestore();
+    }
+  });
+
+  it("claims an unclaimed agent when the join is auto-approved", async () => {
+    const domain = `trusted-${randomNumericSuffix()}.example.org`;
+    const trusted = await fastify.db.trustedDomainRepository.save(
+      new TrustedDomain({ domain }),
+    );
+
+    try {
+      const agent = await makeAgent({ unclaimed: true });
+      const { token } = await makeRegistrant(domain);
+
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agentId: agent.id },
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.json().data.membershipStatus).toBe(
+        AgentMembershipStatus.ACTIVE,
+      );
+      const reloaded = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      expect(reloaded.unclaimed).toBe(false);
+    } finally {
+      await fastify.db.trustedDomainRepository.delete({ id: trusted.id });
+    }
   });
 
   it("turns joining an INACTIVE agent into a pending request", async () => {
