@@ -129,7 +129,9 @@ describe("fastify.cronNotify", () => {
   it("emailAccompanyNotFound emails via SMTP_NOTIFY, then posts to #cron-notifications", async () => {
     clearMocks();
 
-    await fastify.cronNotify.emailAccompanyNotFound(opportunity as never);
+    await expect(
+      fastify.cronNotify.emailAccompanyNotFound(opportunity as never),
+    ).resolves.toBe("dry-run");
 
     expect(smtpSend).toHaveBeenCalledTimes(1);
     const sent = smtpSend.mock.calls[0][0];

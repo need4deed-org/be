@@ -25,12 +25,14 @@ import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { createServer } from "../../../server";
+import type { EmailDelivery } from "../../../server/plugins/notify";
 import {
   addWorkingDays,
   appointmentsDue,
   isWorkingDay,
 } from "../../../services/jobs/german-holidays";
 import { scanAccompanyNotFound } from "../../../services/jobs/scan-accompany-not-found";
+import { SuspendedEmailError } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
 
 const HOUR = 60 * 60 * 1000;
@@ -64,7 +66,7 @@ const dueOn = (runDay: Date, offset = 10 * HOUR) =>
 
 describe("scanAccompanyNotFound", () => {
   let fastify: FastifyInstance;
-  let notify: Mock<(opportunity: Opportunity) => Promise<void>>;
+  let notify: Mock<(opportunity: Opportunity) => Promise<EmailDelivery>>;
   let agent: Agent;
   let volunteerDeal: Deal;
   let person: Person;
@@ -106,7 +108,7 @@ describe("scanAccompanyNotFound", () => {
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    notify = vi.fn<(opportunity: Opportunity) => Promise<void>>();
+    notify = vi.fn<(opportunity: Opportunity) => Promise<EmailDelivery>>();
     fastify.cronNotify.emailAccompanyNotFound = notify;
 
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
@@ -132,7 +134,7 @@ describe("scanAccompanyNotFound", () => {
 
   beforeEach(() => {
     notify.mockReset();
-    notify.mockResolvedValue(undefined);
+    notify.mockResolvedValue("sent");
   });
 
   afterAll(async () => {
@@ -234,6 +236,7 @@ describe("scanAccompanyNotFound", () => {
       if (opp.id === opportunity.id) {
         throw new Error("smtp down");
       }
+      return "sent";
     });
     const opsAlert = vi
       .spyOn(fastify.notify, "opsAlert")
@@ -247,6 +250,124 @@ describe("scanAccompanyNotFound", () => {
       expect(await loggedFor(opportunity)).toBe(0);
       expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
     } finally {
+      opsAlert.mockRestore();
+    }
+  });
+
+  it("in an email dry run, neither logs the communication nor closes the opportunity", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Dry run");
+    notify.mockResolvedValue("dry-run");
+
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+
+    expect(notifiedIds()).toContain(opportunity.id);
+    expect(await loggedFor(opportunity)).toBe(0);
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
+  });
+
+  it("when the email is suspended, logs nothing and sends no second ops alert", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Suspended");
+    notify.mockImplementation(async (opp: Opportunity) => {
+      if (opp.id === opportunity.id) {
+        throw new SuspendedEmailError(['"to" is blank']);
+      }
+      return "sent";
+    });
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
+    try {
+      await scanAccompanyNotFound(fastify, RUN_DAY);
+
+      expect(opsAlert).not.toHaveBeenCalledWith(
+        expect.stringContaining(`opportunity ${opportunity.id} `),
+      );
+      expect(await loggedFor(opportunity)).toBe(0);
+      expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
+    } finally {
+      opsAlert.mockRestore();
+    }
+  });
+
+  it("does not close an opportunity matched while the email was being sent", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Matched meanwhile");
+    notify.mockImplementation(async (opp: Opportunity) => {
+      if (opp.id === opportunity.id) {
+        await fastify.db.opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({
+            opportunityId: opportunity.id,
+            volunteerId: volunteer.id,
+            status: OpportunityVolunteerStatusType.MATCHED,
+          }),
+        );
+      }
+      return "sent";
+    });
+
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+
+    expect(await loggedFor(opportunity)).toBe(1);
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.SEARCHING);
+  });
+
+  it("does not overwrite a status changed while the email was being sent", async () => {
+    const opportunity = await accompanying(dueOn(RUN_DAY), "Changed meanwhile");
+    notify.mockImplementation(async (opp: Opportunity) => {
+      if (opp.id === opportunity.id) {
+        await fastify.db.opportunityRepository.update(opportunity.id, {
+          status: OpportunityStatusType.PAST,
+        });
+      }
+      return "sent";
+    });
+
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+
+    expect(await statusOf(opportunity)).toBe(OpportunityStatusType.PAST);
+  });
+
+  it("when the earlier-email lookup fails, alerts ops and carries on with the others", async () => {
+    const first = await accompanying(
+      dueOn(LATER_RUN_DAY, 11 * HOUR),
+      "Lookup fails 1",
+    );
+    const second = await accompanying(
+      dueOn(LATER_RUN_DAY, 12 * HOUR),
+      "Lookup fails 2",
+    );
+    const ours = [first.id, second.id];
+    const findOne = fastify.db.communicationRepository.findOne.bind(
+      fastify.db.communicationRepository,
+    );
+    let failed: number | undefined;
+    const lookup = vi
+      .spyOn(fastify.db.communicationRepository, "findOne")
+      .mockImplementation(async (options) => {
+        const where = options.where as { opportunityId?: number };
+        if (
+          failed === undefined &&
+          where.opportunityId !== undefined &&
+          ours.includes(where.opportunityId)
+        ) {
+          failed = where.opportunityId;
+          throw new Error("db blip");
+        }
+        return findOne(options);
+      });
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
+    try {
+      await scanAccompanyNotFound(fastify, LATER_RUN_DAY);
+
+      expect(opsAlert).toHaveBeenCalledWith(
+        expect.stringContaining(`opportunity ${failed} not emailed`),
+      );
+      const other = ours.find((id) => id !== failed);
+      expect(notifiedIds()).toContain(other);
+      expect(notifiedIds()).not.toContain(failed);
+    } finally {
+      lookup.mockRestore();
       opsAlert.mockRestore();
     }
   });
