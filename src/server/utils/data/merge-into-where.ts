@@ -1,4 +1,4 @@
-import { FindOperator, FindOptionsWhere } from "typeorm";
+import { And, Equal, FindOperator, FindOptionsWhere } from "typeorm";
 
 function isPlainMergeableObject(
   value: unknown,
@@ -32,5 +32,24 @@ export function mergeIntoWhere<T>(
     for (const [key, value] of Object.entries(extra)) {
       target[key] = key in target ? mergeValue(target[key], value) : value;
     }
+  }
+}
+
+export function andIntoWhere<T>(
+  where: FindOptionsWhere<T> | FindOptionsWhere<T>[],
+  key: keyof T & string,
+  operator: FindOperator<unknown>,
+): void {
+  const branches = Array.isArray(where) ? where : [where];
+  for (const branch of branches) {
+    const target = branch as Record<string, unknown>;
+    const existing = target[key];
+    target[key] =
+      existing === undefined
+        ? operator
+        : And(
+            existing instanceof FindOperator ? existing : Equal(existing),
+            operator,
+          );
   }
 }

@@ -74,6 +74,7 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertRoleIn,
@@ -101,6 +102,7 @@ import { addTranslatedFields } from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
@@ -257,6 +259,7 @@ export default async function opportunityRoutes(
         "contactPerson",
         "submittedByPerson.agentPerson",
         "originalLanguage",
+        "opportunityVolunteer",
       ];
 
       const opportunityRepository = fastify.db.opportunityRepository;
@@ -400,6 +403,9 @@ export default async function opportunityRoutes(
       );
       if (agentIds) {
         mergeIntoWhere(where, { agent: { id: In(agentIds) } });
+      }
+      if (request.authUser?.role === UserRole.VOLUNTEER) {
+        andIntoWhere(where, "id", closedForVolunteersIdWhere());
       }
 
       logger.debug(

@@ -1,6 +1,9 @@
-import { In } from "typeorm";
+import { And, Equal, In, Raw } from "typeorm";
 import { describe, expect, it } from "vitest";
-import { mergeIntoWhere } from "../../../../server/utils/data/merge-into-where";
+import {
+  andIntoWhere,
+  mergeIntoWhere,
+} from "../../../../server/utils/data/merge-into-where";
 
 // mergeIntoWhere is generic over the entity's FindOptionsWhere shape, but
 // the OR-array case (be#1018) mixes branches with different keys — a
@@ -77,5 +80,32 @@ describe("mergeIntoWhere", () => {
     expect(where).toEqual({
       deal: { dealLanguage: { language: { id: In(["2"]) } } },
     });
+  });
+});
+
+describe("andIntoWhere", () => {
+  const extra = Raw((alias) => `${alias} > 0`);
+
+  it("sets the key where a branch has none", () => {
+    const where: Where[] = [{ status: "active" }, { title: "x" }];
+
+    andIntoWhere(where, "id", extra);
+
+    expect(where).toEqual([
+      { status: "active", id: extra },
+      { title: "x", id: extra },
+    ]);
+  });
+
+  it("ANDs onto an existing operator or plain value instead of overwriting it", () => {
+    const search = Raw((alias) => `${alias} IN (1)`);
+    const where: Where[] = [{ id: search }, { id: 7 }];
+
+    andIntoWhere(where, "id", extra);
+
+    expect(where).toEqual([
+      { id: And(search, extra) },
+      { id: And(Equal(7), extra) },
+    ]);
   });
 });

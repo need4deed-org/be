@@ -11,6 +11,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import type { EmailDelivery } from "../../server/plugins/notify";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
+import { NO_MATCH_FOUND_WORKING_DAYS } from "../../server/utils/data/no-match-found";
 import { SuspendedEmailError } from "../notify";
 import {
   appointmentsDue,
@@ -34,7 +35,7 @@ export async function scanAccompanyNotFound(
   fastify: FastifyInstance,
   today: Date = berlinToday(),
 ): Promise<void> {
-  const { from, to } = appointmentsDue(today, 4);
+  const { from, to } = appointmentsDue(today, NO_MATCH_FOUND_WORKING_DAYS);
 
   const opps = await fastify.db.opportunityRepository.find({
     where: {
