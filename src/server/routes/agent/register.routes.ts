@@ -35,6 +35,7 @@ import {
   createAgentForPerson,
   findRegistrationMembership,
   getAgentIdsJoinableAsActive,
+  getMembershipRequestNotificationText,
   isExactStreetMatch,
   joinAgent,
   searchAgentCandidates,
@@ -207,10 +208,22 @@ export default async function agentRegisterRoutes(
           ? await joinAgent(personId, body.agentId, email)
           : await createAgentForPerson(personId, body.agent, email);
 
-      const message =
-        result.membershipStatus === AgentMembershipStatus.PENDING
-          ? "Join request submitted — an administrator will review it."
-          : "Agent registration complete.";
+      const pending = result.membershipStatus === AgentMembershipStatus.PENDING;
+      if (pending) {
+        const agent = await fastify.db.agentRepository.findOne({
+          select: { id: true, title: true },
+          where: { id: result.agentId },
+        });
+        fastify.notify.opsAlert(
+          getMembershipRequestNotificationText(
+            agent?.title ?? `#${result.agentId}`,
+          ),
+        );
+      }
+
+      const message = pending
+        ? "Join request submitted — an administrator will review it."
+        : "Agent registration complete.";
 
       return reply.status(201).send({ message, data: result });
     },
