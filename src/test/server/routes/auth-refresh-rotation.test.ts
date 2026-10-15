@@ -16,7 +16,7 @@ import { createServer } from "../../../server";
 import {
   createRefreshSession,
   decideRotation,
-  deleteDeadRefreshSessions,
+  deleteExpiredRefreshSessions,
   rotateRefreshSession,
 } from "../../../server/utils/data/refresh-session";
 import { signRefreshToken } from "../../../server/utils/data/sign-refresh-token";
@@ -95,6 +95,21 @@ describe("refresh-token rotation", () => {
     expect(row.userId).toBe(user.id);
     expect(row.currentJti).toBe(jti);
     expect(row.revokedAt).toBeNull();
+  });
+
+  it("login revokes the session of the refresh cookie it replaces", async () => {
+    const previous = await login();
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password },
+      cookies: { [refreshCookieName]: previous },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect((await session(claims(previous).sid)).revokedAt).not.toBeNull();
+    const fresh = response.json().data.refresh;
+    expect((await session(claims(fresh).sid)).revokedAt).toBeNull();
   });
 
   it("rotates to a new jti in the same session and renews the cookie", async () => {
@@ -313,8 +328,8 @@ describe("refresh-token rotation", () => {
   });
 });
 
-describe("deleteDeadRefreshSessions", () => {
-  it("deletes expired and revoked sessions of every user, keeping live ones", async () => {
+describe("deleteExpiredRefreshSessions", () => {
+  it("deletes expired sessions, keeping live and revoked ones", async () => {
     const fastify = await createServer();
     await fastify.ready();
     const manager = fastify.db.refreshSessionRepository.manager;
@@ -345,15 +360,17 @@ describe("deleteDeadRefreshSessions", () => {
         }),
       );
 
-      expect(await deleteDeadRefreshSessions(manager)).toBeGreaterThanOrEqual(
-        2,
-      );
+      expect(
+        await deleteExpiredRefreshSessions(manager),
+      ).toBeGreaterThanOrEqual(1);
 
       const left = await fastify.db.refreshSessionRepository.findBy({
         userId: user.id,
       });
-      expect(left.map((r) => r.id)).toEqual([live.sid]);
-      expect([expired.sid, revoked.id]).not.toContain(live.sid);
+      expect(left.map((r) => r.id).sort()).toEqual(
+        [live.sid, revoked.id].sort(),
+      );
+      expect(left.map((r) => r.id)).not.toContain(expired.sid);
     } finally {
       await fastify.db.userRepository.delete({ email });
       await fastify.db.personRepository.delete({ email });

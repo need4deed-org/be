@@ -54,7 +54,8 @@ export function decideRotation(
   return { kind: "reuse" };
 }
 
-export async function deleteDeadRefreshSessions(
+// Revoked rows are kept until they expire so a later replay is still logged as reuse.
+export async function deleteExpiredRefreshSessions(
   manager: EntityManager,
   now: Date = new Date(),
 ): Promise<number> {
@@ -62,7 +63,7 @@ export async function deleteDeadRefreshSessions(
     .createQueryBuilder()
     .delete()
     .from(RefreshSession)
-    .where("expires_at < :now OR revoked_at IS NOT NULL", { now })
+    .where("expires_at < :now", { now })
     .execute();
   return result.affected ?? 0;
 }

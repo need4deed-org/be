@@ -1,12 +1,12 @@
 import { FastifyInstance } from "fastify";
 import logger from "../../logger";
-import { deleteDeadRefreshSessions } from "../../server/utils/data/refresh-session";
+import { deleteExpiredRefreshSessions } from "../../server/utils/data/refresh-session";
 
 export async function pruneRefreshSessions(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const deleted = await deleteDeadRefreshSessions(
+  const deleted = await deleteExpiredRefreshSessions(
     fastify.db.refreshSessionRepository.manager,
   );
-  logger.info(`scheduler: pruned ${deleted} dead refresh sessions`);
+  logger.info(`scheduler: pruned ${deleted} expired refresh sessions`);
 }

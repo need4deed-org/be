@@ -118,6 +118,14 @@ async function authRoutes(
           throw new Error("No token generated.");
         }
 
+        const previous = getRefreshPayload(request);
+        if (previous) {
+          await revokeRefreshSession(
+            fastify.db.refreshSessionRepository.manager,
+            user.id,
+            previous.sid,
+          );
+        }
         const session = await createRefreshSession(
           fastify.db.refreshSessionRepository.manager,
           user.id,
