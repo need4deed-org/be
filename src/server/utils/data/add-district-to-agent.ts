@@ -18,6 +18,7 @@ export function getDistrictToAgentHandler(isRepresentative = false) {
         );
         if (district) {
           agent.district = district;
+          agent.districtId = district.id;
           updates.push(agent);
         }
       }

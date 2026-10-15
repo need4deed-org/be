@@ -27,6 +27,7 @@ export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./is-person-referenced";
 export * from "./is-staff-role";
+export * from "./update-backfilled-column";
 export * from "./is-trusted-domain";
 export * from "./mask-inactive-agent";
 export * from "./merge-into-where";

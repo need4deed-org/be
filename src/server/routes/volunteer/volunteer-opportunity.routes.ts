@@ -15,6 +15,7 @@ import {
   getOpportunityListWhere,
   getSkipTake,
   mergeIntoWhere,
+  updateBackfilledColumn,
 } from "../../utils";
 import {
   requestLanguage,
@@ -73,10 +74,11 @@ export default async function volunteerOpportunityRoutes(
         return opportunity;
       });
 
-      if (updates.length > 0) {
-        const dealRepository = fastify.db.dealRepository;
-        await dealRepository.save(updates);
-      }
+      await updateBackfilledColumn(
+        fastify.db.dealRepository,
+        updates,
+        "categoryId",
+      );
 
       await translateOpportunities(
         fastify,
