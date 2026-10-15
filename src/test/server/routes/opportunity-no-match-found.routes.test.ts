@@ -20,7 +20,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { berlinDayBoundaries } from "../../../services/jobs/german-holidays";
+import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";

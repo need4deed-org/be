@@ -4,7 +4,7 @@ import {
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
 import { And, LessThan, MoreThanOrEqual } from "typeorm";
-import { crossedMonthsAgo } from "./german-holidays";
+import { crossedMonthsAgo } from "./berlin-dates";
 import { reportCronFailure } from "./report-cron-failure";
 
 export async function scanStalePending(

@@ -20,10 +20,10 @@ import * as scanStalePending from "../../../services/jobs/scan-stale-pending";
 
 const DAILY = "0 6 * * *";
 
-vi.mock("need4deed-sdk", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("need4deed-sdk")>()),
-  isWorkingDay: vi.fn(),
-}));
+vi.mock("need4deed-sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("need4deed-sdk")>();
+  return { ...actual, isWorkingDay: vi.fn(actual.isWorkingDay) };
+});
 
 vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 

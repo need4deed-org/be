@@ -5,7 +5,7 @@ import {
   berlinDayBoundaries,
   crossedMonthsAgo,
   monthsAgo,
-} from "../../../services/jobs/german-holidays";
+} from "../../../services/jobs/berlin-dates";
 
 describe("crossedMonthsAgo", () => {
   it("ends at the threshold and starts at yesterday's", () => {

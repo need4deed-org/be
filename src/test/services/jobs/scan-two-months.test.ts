@@ -15,7 +15,7 @@ import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { createServer } from "../../../server";
-import { crossedMonthsAgo } from "../../../services/jobs/german-holidays";
+import { crossedMonthsAgo } from "../../../services/jobs/berlin-dates";
 import { scanPostMatchCheckup } from "../../../services/jobs/scan-post-match-checkup";
 import { scanRegularUpdate } from "../../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../../services/jobs/scan-stale-pending";

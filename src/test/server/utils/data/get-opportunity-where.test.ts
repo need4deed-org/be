@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import { QuerystringOpportunityFiltering } from "../../../../server/types";
 import { getOpportunityWhere } from "../../../../server/utils/data/get-opportunity-where";
-import { berlinDayBoundaries } from "../../../../services/jobs/german-holidays";
+import { berlinDayBoundaries } from "../../../../services/jobs/berlin-dates";
 
 // getOpportunityWhere only ever returns an array when filter.district is
 // set (be#1018) — every other test here passes no district, so this just
