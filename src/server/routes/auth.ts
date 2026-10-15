@@ -9,6 +9,7 @@ import {
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../config/constants";
+import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { responseSchema } from "../schema";
@@ -185,10 +186,12 @@ async function authRoutes(
         where: { id },
       });
       if (!user) {
+        clearAuthCookies(reply);
         return reply.status(404).send({ message: "User not found." });
       }
 
       if (!user.isActive) {
+        clearAuthCookies(reply);
         return reply.status(403).send({ message: "User is not active." });
       }
 
@@ -336,14 +339,11 @@ async function authRoutes(
         return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 
-      await fastify.db.userRepository.update(
-        { id: user.id },
-        { password: await hashPassword(newPassword) },
-      );
-      await revokeUserRefreshSessions(
-        fastify.db.refreshSessionRepository.manager,
-        user.id,
-      );
+      const hashed = await hashPassword(newPassword);
+      await fastify.db.userRepository.manager.transaction(async (tx) => {
+        await tx.update(User, { id: user.id }, { password: hashed });
+        await revokeUserRefreshSessions(tx, user.id);
+      });
 
       return reply.status(200).send({
         message: "Password has been reset.",
@@ -374,16 +374,16 @@ async function authRoutes(
           .send({ message: "Current password is incorrect." });
       }
 
-      await fastify.db.userRepository.update(
-        { id: authUser.id },
-        { password: await hashPassword(newPassword) },
-      );
+      const hashed = await hashPassword(newPassword);
       const refresh = getRefreshPayload(request);
-      await revokeUserRefreshSessions(
-        fastify.db.refreshSessionRepository.manager,
-        authUser.id,
-        refresh?.id === authUser.id ? refresh.sid : undefined,
-      );
+      await fastify.db.userRepository.manager.transaction(async (tx) => {
+        await tx.update(User, { id: authUser.id }, { password: hashed });
+        await revokeUserRefreshSessions(
+          tx,
+          authUser.id,
+          refresh?.id === authUser.id ? refresh.sid : undefined,
+        );
+      });
 
       return reply.status(200).send({
         message: "Password has been changed.",

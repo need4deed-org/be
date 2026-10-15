@@ -225,7 +225,9 @@ describe("refresh-token rotation", () => {
       { isActive: false },
     );
     try {
-      expect((await refresh(token)).statusCode).toBe(403);
+      const response = await refresh(token);
+      expect(response.statusCode).toBe(403);
+      expectAuthCookiesCleared(response);
     } finally {
       await fastify.db.userRepository.update(
         { id: user.id },
@@ -308,31 +310,6 @@ describe("refresh-token rotation", () => {
     expect(response.statusCode).toBe(200);
     expect((await session(claims(own).sid)).revokedAt).toBeNull();
     expect((await session(claims(other).sid)).revokedAt).not.toBeNull();
-  });
-
-  it("login prunes the user's expired and revoked sessions", async () => {
-    const expired = await createRefreshSession(
-      manager(),
-      user.id,
-      new Date(Date.now() - REFRESH_LIFESPAN_MS - 1000),
-    );
-    const revoked = await createRefreshSession(manager(), user.id);
-    await fastify.db.refreshSessionRepository.update(
-      { id: revoked.sid },
-      { revokedAt: new Date() },
-    );
-
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email, password },
-    });
-    const token = response.json().data.refresh;
-    const rows = await fastify.db.refreshSessionRepository.findBy({
-      userId: user.id,
-    });
-    expect(rows.map((r) => r.id)).toEqual([claims(token).sid]);
-    expect(rows.map((r) => r.id)).not.toContain(expired.sid);
   });
 });
 

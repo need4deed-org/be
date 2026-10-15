@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { accessCookieName, refreshCookieName } from "../../../config/constants";
+import User from "../../../data/entity/user.entity";
 import { createServer } from "../../../server";
 
 vi.mock("../../../data", async () => {
@@ -31,6 +32,14 @@ vi.mock("../../../data/utils", async () => {
       ),
   };
 });
+
+function mockTransaction(fastify: FastifyInstance) {
+  const update = vi.fn().mockResolvedValue({});
+  vi.spyOn(fastify.db.userRepository.manager, "transaction").mockImplementation(
+    (async (run: (tx: unknown) => Promise<unknown>) => run({ update })) as any,
+  );
+  return update;
+}
 
 describe("POST /auth/logout", () => {
   let fastify: FastifyInstance;
@@ -177,13 +186,7 @@ describe("POST /auth/reset-password", () => {
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
     } as any);
-    const updateSpy = vi
-      .spyOn(fastify.db.userRepository, "update")
-      .mockResolvedValue({} as any);
-    vi.spyOn(
-      fastify.db.refreshSessionRepository.manager,
-      "update",
-    ).mockResolvedValue({} as any);
+    const updateSpy = mockTransaction(fastify);
 
     const response = await fastify.inject({
       method: "POST",
@@ -192,6 +195,7 @@ describe("POST /auth/reset-password", () => {
     });
 
     expect(updateSpy).toHaveBeenCalledWith(
+      User,
       { id: 999 },
       { password: "hashed-password-newpass123456" },
     );
@@ -268,13 +272,7 @@ describe("POST /auth/password-change", () => {
       isActive: true,
       checkPassword,
     } as any);
-    const updateSpy = vi
-      .spyOn(fastify.db.userRepository, "update")
-      .mockResolvedValue({} as any);
-    vi.spyOn(
-      fastify.db.refreshSessionRepository.manager,
-      "update",
-    ).mockResolvedValue({} as any);
+    const updateSpy = mockTransaction(fastify);
 
     const currentPass = "currentpass123";
     const response = await fastify.inject({
@@ -286,6 +284,7 @@ describe("POST /auth/password-change", () => {
 
     expect(checkPassword).toHaveBeenCalledWith(currentPass);
     expect(updateSpy).toHaveBeenCalledWith(
+      User,
       { id: 999 },
       { password: "hashed-password-newpass123456" },
     );

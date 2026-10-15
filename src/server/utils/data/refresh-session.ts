@@ -57,17 +57,14 @@ export function decideRotation(
 export async function deleteDeadRefreshSessions(
   manager: EntityManager,
   now: Date = new Date(),
-  userId?: number,
 ): Promise<number> {
-  const query = manager
+  const result = await manager
     .createQueryBuilder()
     .delete()
     .from(RefreshSession)
-    .where("(expires_at < :now OR revoked_at IS NOT NULL)", { now });
-  if (userId !== undefined) {
-    query.andWhere("user_id = :userId", { userId });
-  }
-  return (await query.execute()).affected ?? 0;
+    .where("expires_at < :now OR revoked_at IS NOT NULL", { now })
+    .execute();
+  return result.affected ?? 0;
 }
 
 export async function createRefreshSession(
@@ -75,21 +72,18 @@ export async function createRefreshSession(
   userId: number,
   now: Date = new Date(),
 ): Promise<RefreshSessionIds> {
-  return manager.transaction(async (tx) => {
-    await deleteDeadRefreshSessions(tx, now, userId);
-    const session = await tx.save(
-      new RefreshSession({
-        id: randomUUID(),
-        userId,
-        currentJti: randomUUID(),
-        previousJti: null,
-        rotatedAt: null,
-        expiresAt: new Date(now.getTime() + REFRESH_LIFESPAN_MS),
-        revokedAt: null,
-      }),
-    );
-    return { sid: session.id, jti: session.currentJti };
-  });
+  const session = await manager.save(
+    new RefreshSession({
+      id: randomUUID(),
+      userId,
+      currentJti: randomUUID(),
+      previousJti: null,
+      rotatedAt: null,
+      expiresAt: new Date(now.getTime() + REFRESH_LIFESPAN_MS),
+      revokedAt: null,
+    }),
+  );
+  return { sid: session.id, jti: session.currentJti };
 }
 
 // The row lock makes exactly one concurrent refresh rotate; the rest hit the grace window.
