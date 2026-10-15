@@ -1,7 +1,9 @@
 import type { EmailMessage, EmailTransport, SlackTransport } from "../types";
+import { DRY_RUN_RECIPIENT } from "./dry-run";
 
 export const CRON_EMAIL_NOT_SENT = "Cron email, not sent";
 export const CRON_EMAIL_SENT = "Cron email, also sent by email";
+export const CRON_EMAIL_DRY_RUN = `Cron email, dry run: sent to ${DRY_RUN_RECIPIENT} only`;
 const SECTION_LIMIT = 3000;
 const MAX_BODY_SECTIONS = 47;
 

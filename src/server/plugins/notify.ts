@@ -6,7 +6,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import {
-  CRON_EMAIL_NOT_SENT,
+  CRON_EMAIL_DRY_RUN,
   CRON_EMAIL_SENT,
   DryRunEmailTransport,
   DryRunSlackTransport,
@@ -36,6 +36,7 @@ import {
   SlackWebhookTransport,
   SmtpEmailTransport,
   TaggedInput,
+  validateEmailMessage,
   ValidatingEmailTransport,
 } from "../../services/notify";
 import { Env, firstEnvValue } from "../utils";
@@ -147,34 +148,48 @@ function buildSlackTransport(): SlackTransport | undefined {
   return new SlackWebhookTransport(urls);
 }
 
-export function buildCronEmailTransport(
+export function cronSlackTransport(
   slack: SlackTransport | undefined,
   env: Env = process.env,
-): EmailTransport {
+): SlackTransport | undefined {
   if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).cron)) {
-    return new SlackEmailTransport(slack);
+    return slack;
   }
   logger.warn(
-    "notify: SLACK_CRON_WEBHOOK_URL unset — the cron jobs' emails are neither posted nor sent (be#1088)",
+    "notify: SLACK_CRON_WEBHOOK_URL unset — cron emails are not posted to #cron-notifications",
   );
-  return { send: async () => {} };
+  return undefined;
 }
 
-// The Slack header for a cron email that is also emailed: in an email dry run
-// it was only logged, so it was not sent.
-export function alsoEmailedHeader(env: Env = process.env): string {
-  return isDryRun("EMAIL", env) ? CRON_EMAIL_NOT_SENT : CRON_EMAIL_SENT;
+export function buildCronEmailTransport(
+  cronSlack: SlackTransport | undefined,
+  header?: string,
+): EmailTransport {
+  return cronSlack
+    ? new SlackEmailTransport(cronSlack, header)
+    : { send: async () => {} };
 }
 
-// Sends through each transport in turn; a failure stops the rest.
-export function sendThroughAll(
-  ...transports: EmailTransport[]
+export function emailedCronHeader(env: Env = process.env): string {
+  return isDryRun("EMAIL", env) ? CRON_EMAIL_DRY_RUN : CRON_EMAIL_SENT;
+}
+
+export function emailThenRecord(
+  email: EmailTransport,
+  record: EmailTransport,
 ): EmailTransport {
   return {
     send: async (msg) => {
-      for (const transport of transports) {
-        await transport.send(msg);
+      const problems = validateEmailMessage(msg);
+      await email.send(msg);
+      if (problems.length > 0) {
+        throw new Error(`email suspended: ${problems.join("; ")}`);
       }
+      await record.send(msg).catch((err) => {
+        logger.error(
+          `notify: email sent but not posted to #cron-notifications: ${err}`,
+        );
+      });
     },
   };
 }
@@ -212,14 +227,11 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailTagged(emailNotify, input),
   });
 
-  const cronEmail = buildCronEmailTransport(slack);
-  // Accompany-not-found is emailed (SMTP_NOTIFY) and then posted to
-  // #cron-notifications, when that is configured.
-  const cronEmailSent = sendThroughAll(
+  const cronSlack = cronSlackTransport(slack);
+  const cronEmail = buildCronEmailTransport(cronSlack);
+  const cronEmailSent = emailThenRecord(
     emailNotify,
-    slack && cronEmail instanceof SlackEmailTransport
-      ? new SlackEmailTransport(slack, alsoEmailedHeader())
-      : cronEmail,
+    buildCronEmailTransport(cronSlack, emailedCronHeader()),
   );
   fastify.decorate("cronNotify", {
     emailStale: (ov: OpportunityVolunteer) => sendEmailStale(cronEmail, ov),
