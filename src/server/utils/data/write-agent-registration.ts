@@ -124,7 +124,7 @@ async function getTitleVisibleToRegistrant(
   registrantEmail: string | undefined,
   manager: DataSource | EntityManager,
 ): Promise<string | undefined> {
-  if (!registrantEmail) {
+  if (!registrantEmail || agent.unclaimed) {
     return undefined;
   }
   try {
