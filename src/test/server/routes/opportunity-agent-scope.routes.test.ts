@@ -26,6 +26,8 @@ import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
+const OWN_AGENT_OPPORTUNITY_COUNT = 3;
+const OTHER_AGENT_OPPORTUNITY_COUNT = 2;
 
 describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   let fastify: FastifyInstance;
@@ -38,10 +40,11 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   let agentCookie: string;
   let personId: number;
 
+  let postcodeId: number;
+  let districtId: number;
+  let otherDistrictId: number;
   let ownAgentId: number;
   let otherAgentId: number;
-  const OWN_AGENT_OPPORTUNITY_COUNT = 3;
-  const OTHER_AGENT_OPPORTUNITY_COUNT = 2;
   const agents: Agent[] = [];
   const deals: Deal[] = [];
   const opportunities: Opportunity[] = [];
@@ -70,13 +73,14 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+    ({ id: postcodeId } = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
-    });
-    const [district]: { id: number }[] =
+    }));
+    const districts: { id: number }[] =
       await fastify.db.agentRepository.manager.query(
-        `SELECT id FROM district ORDER BY id LIMIT 1`,
+        `SELECT id FROM district ORDER BY id LIMIT 2`,
       );
+    [districtId, otherDistrictId] = districts.map(({ id }) => id);
 
     for (const key of ["own", "other"]) {
       agents.push(
@@ -84,7 +88,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
           new Agent({
             title: `${prefix} agent ${key}`,
             engagementStatus: AgentEngagementStatusType.ACTIVE,
-            districtId: district.id,
+            districtId,
           }),
         ),
       );
@@ -98,7 +102,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     for (const [agentId, count] of ownedCounts) {
       for (let i = 0; i < count; i++) {
         const deal = await fastify.db.dealRepository.save(
-          new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+          new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
         );
         deals.push(deal);
         opportunities.push(
@@ -108,7 +112,8 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
               type: OpportunityType.REGULAR,
               agentId,
               dealId: deal.id,
-            } as Partial<Opportunity>),
+              districtId,
+            }),
           ),
         );
       }
@@ -118,7 +123,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
       new Person({ firstName: "Scope", lastName: `Volunteer-${suffix}` }),
     );
     const volunteerDeal = await fastify.db.dealRepository.save(
-      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+      new Deal({ type: DealType.VOLUNTEER, postcodeId }),
     );
     deals.push(volunteerDeal);
     volunteer = await fastify.db.volunteerRepository.save(
@@ -175,25 +180,31 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   });
 
   afterAll(async () => {
-    await fastify.db.opportunityVolunteerRepository.delete({
-      volunteerId: volunteer.id,
-    });
-    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
-    await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    if (volunteer) {
+      await fastify.db.opportunityVolunteerRepository.delete({
+        volunteerId: volunteer.id,
+      });
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    }
+    if (volunteerPerson) {
+      await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    }
     for (const opportunity of opportunities) {
       await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     }
     for (const deal of deals) {
       await fastify.db.dealRepository.delete({ id: deal.id });
     }
-    await fastify.db.agentPersonRepository.delete({ personId });
-    await fastify.db.userRepository.delete({ personId });
-    await fastify.db.personRepository.delete({ id: personId });
+    if (personId) {
+      await fastify.db.agentPersonRepository.delete({ personId });
+      await fastify.db.userRepository.delete({ personId });
+      await fastify.db.personRepository.delete({ id: personId });
+    }
     await fastify.db.userRepository.delete({ email: coordinatorEmail });
     for (const agent of agents) {
       await fastify.db.agentRepository.delete({ id: agent.id });
     }
-    await fastify.close();
+    await fastify?.close();
   });
 
   it("returns only the caller's own agent's opportunities", async () => {
@@ -225,9 +236,6 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   });
 
   it("scopes a district-filtered result to the caller's own agent", async () => {
-    const districtId = 1;
-    const postcodeId = 1;
-
     const dealRepository = fastify.db.dealRepository;
     const ownDeal = await dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
@@ -243,7 +251,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         agentId: ownAgentId,
         dealId: ownDeal.id,
         districtId,
-      } as Partial<Opportunity>),
+      }),
     );
     const otherDistrictOpp = await fastify.db.opportunityRepository.save(
       new Opportunity({
@@ -252,7 +260,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         agentId: otherAgentId,
         dealId: otherDeal.id,
         districtId,
-      } as Partial<Opportunity>),
+      }),
     );
 
     try {
@@ -276,9 +284,6 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   });
 
   it("also scopes a district match found only via deal.dealDistrict", async () => {
-    const districtId = 2;
-    const postcodeId = 1;
-
     const dealRepository = fastify.db.dealRepository;
     const dealDistrictRepository = getRepository(dataSource, DealDistrict);
 
@@ -289,10 +294,10 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
       new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
     );
     await dealDistrictRepository.save(
-      new DealDistrict({ dealId: ownDeal.id, districtId }),
+      new DealDistrict({ dealId: ownDeal.id, districtId: otherDistrictId }),
     );
     await dealDistrictRepository.save(
-      new DealDistrict({ dealId: otherDeal.id, districtId }),
+      new DealDistrict({ dealId: otherDeal.id, districtId: otherDistrictId }),
     );
 
     const ownOpp = await fastify.db.opportunityRepository.save(
@@ -301,7 +306,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         type: OpportunityType.REGULAR,
         agentId: ownAgentId,
         dealId: ownDeal.id,
-      } as Partial<Opportunity>),
+      }),
     );
     const otherOpp = await fastify.db.opportunityRepository.save(
       new Opportunity({
@@ -309,13 +314,13 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         type: OpportunityType.REGULAR,
         agentId: otherAgentId,
         dealId: otherDeal.id,
-      } as Partial<Opportunity>),
+      }),
     );
 
     try {
       const res = await listOpportunities(
         agentCookie,
-        `&filter[district]=${districtId}`,
+        `&filter[district]=${otherDistrictId}`,
       );
 
       expect(res.statusCode).toBe(200);
@@ -335,9 +340,6 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
   });
 
   it("keeps a district-filtered, sortBy=start-date result scoped to the caller's own agent", async () => {
-    const districtId = 1;
-    const postcodeId = 1;
-
     const dealRepository = fastify.db.dealRepository;
     const ownDeal = await dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId }),
@@ -353,7 +355,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         agentId: ownAgentId,
         dealId: ownDeal.id,
         districtId,
-      } as Partial<Opportunity>),
+      }),
     );
     const otherOpp = await fastify.db.opportunityRepository.save(
       new Opportunity({
@@ -362,7 +364,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
         agentId: otherAgentId,
         dealId: otherDeal.id,
         districtId,
-      } as Partial<Opportunity>),
+      }),
     );
 
     try {
