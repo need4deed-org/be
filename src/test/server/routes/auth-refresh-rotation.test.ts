@@ -207,6 +207,25 @@ describe("refresh-token rotation", () => {
     expect((await refresh(phone)).statusCode).toBe(200);
   });
 
+  it("leaves the session untouched when the user is inactive", async () => {
+    const token = await login();
+    await fastify.db.userRepository.update(
+      { id: user.id },
+      { isActive: false },
+    );
+    try {
+      expect((await refresh(token)).statusCode).toBe(403);
+    } finally {
+      await fastify.db.userRepository.update(
+        { id: user.id },
+        { isActive: true },
+      );
+    }
+    const row = await session(claims(token).sid);
+    expect(row.currentJti).toBe(claims(token).jti);
+    expect(row.previousJti).toBeNull();
+  });
+
   it("rejects a pre-rotation token without sid/jti", async () => {
     const legacy = fastify.jwt.sign(
       { id: user.id, email, role: UserRole.VOLUNTEER, type: "refresh" } as any,

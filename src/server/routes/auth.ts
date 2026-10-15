@@ -166,6 +166,17 @@ async function authRoutes(
       }
       const id = decoded.id;
 
+      const user = await fastify.db.userRepository.findOne({
+        where: { id },
+      });
+      if (!user) {
+        return reply.status(404).send({ message: "User not found." });
+      }
+
+      if (!user.isActive) {
+        return reply.status(403).send({ message: "User is not active." });
+      }
+
       const rotation = await rotateRefreshSession(
         fastify.db.refreshSessionRepository.manager,
         id,
@@ -181,22 +192,6 @@ async function authRoutes(
       }
 
       try {
-        const userRepository = fastify.db.userRepository;
-        if (!userRepository) {
-          throw new Error("User repository is not initialized.");
-        }
-
-        const user = await userRepository.findOne({
-          where: { id },
-        });
-        if (!user) {
-          return reply.status(404).send({ message: "User not found." });
-        }
-
-        if (!user.isActive) {
-          return reply.status(403).send({ message: "User is not active." });
-        }
-
         const access = signAccessToken(fastify, user);
 
         if (!access) {
