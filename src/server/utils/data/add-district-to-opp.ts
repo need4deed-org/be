@@ -27,6 +27,7 @@ export function getDistrictToOpportunityHandler() {
         }
         if (district) {
           opportunity.district = district;
+          opportunity.districtId = district.id;
           updates.push(opportunity);
           return opportunity;
         }
@@ -43,6 +44,7 @@ export function getDistrictToOpportunityHandler() {
       );
       if (districtFromAgent) {
         opportunity.district = districtFromAgent;
+        opportunity.districtId = districtFromAgent.id;
         updates.push(opportunity);
       }
       return opportunity;

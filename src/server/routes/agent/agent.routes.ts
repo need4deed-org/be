@@ -56,6 +56,7 @@ import {
   syncAgentDistrictFromPostcode,
   updateAgentLanguages,
   updateAgentServices,
+  updateBackfilledColumn,
 } from "../../utils";
 import { getAgentTagCandidates } from "../../utils/data/get-agent-tag-candidates";
 import { canTagAgents } from "../../utils/data/tag-agents";
@@ -160,9 +161,7 @@ export default async function agentRoutes(
       const agentsDistrict = await Promise.all(agents.map(addDistrictToAgent));
       await addAgentTypeServiceTranslations(agentsDistrict);
 
-      if (updates.length > 0) {
-        await agentRepository.save(updates);
-      }
+      await updateBackfilledColumn(agentRepository, updates, "districtId");
 
       if (visibility) {
         maskPii(agentsDistrict, visibility);
@@ -286,9 +285,7 @@ export default async function agentRoutes(
       const agentComments = await addComments2Entity(agentDistrict);
       await addAgentTypeServiceTranslations([agentComments]);
 
-      if (updates.length > 0) {
-        await agentRepository.save(updates);
-      }
+      await updateBackfilledColumn(agentRepository, updates, "districtId");
 
       await maskForCaller(request, agentComments);
 

@@ -131,6 +131,7 @@ describe("getDistrictToAgentHandler — addDistrictToAgent unchanged", () => {
     const result = await addDistrictToAgent(agent);
 
     expect(result.district).toBe(district);
+    expect(result.districtId).toBe(district.id);
     expect(updates).toContain(agent);
   });
 });

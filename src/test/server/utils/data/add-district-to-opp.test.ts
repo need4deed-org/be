@@ -87,6 +87,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith("54321");
         expect(result.district).toBe(district);
+        expect(result.districtId).toBe(district.id);
         expect(handler.updates).toContain(opportunity);
       });
 
@@ -121,6 +122,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(postcode);
         expect(result.district).toBe(district);
+        expect(result.districtId).toBe(district.id);
         expect(handler.updates).toContain(opportunity);
       });
 
@@ -137,6 +139,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(42);
         expect(result.district).toBe(district);
+        expect(result.districtId).toBe(district.id);
         expect(handler.updates).toContain(opportunity);
       });
 
@@ -175,6 +178,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(mockedGetDistrictFromPostcode).toHaveBeenCalledTimes(2);
         expect(result.district).toBe(district);
+        expect(result.districtId).toBe(district.id);
         expect(handler.updates).toContain(opportunity);
       });
 
@@ -225,6 +229,7 @@ describe("getDistrictToOpportunityHandler", () => {
 
         expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
         expect(result.district).toBe(district);
+        expect(result.districtId).toBe(district.id);
         expect(handler.updates).toContain(opportunity);
       });
 

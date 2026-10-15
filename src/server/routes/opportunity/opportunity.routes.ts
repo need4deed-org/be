@@ -95,6 +95,7 @@ import {
   patchEntity,
   setAgentSearching,
   syncOnetimeTimeslot,
+  updateBackfilledColumn,
   updateOptionList,
   upsertOnetimer,
   writeOpportunityLegacy,
@@ -316,10 +317,11 @@ export default async function opportunityRoutes(
         ),
       );
 
-      if (opportunityUpdates.length) {
-        const opportunityRepository = fastify.db.opportunityRepository;
-        await opportunityRepository.save(opportunityUpdates);
-      }
+      await updateBackfilledColumn(
+        fastify.db.opportunityRepository,
+        opportunityUpdates,
+        "districtId",
+      );
 
       await translateOpportunities(
         fastify,
@@ -485,14 +487,16 @@ export default async function opportunityRoutes(
         }),
       );
 
-      if (dealUpdates.length > 0) {
-        const dealRepository = fastify.db.dealRepository;
-        await dealRepository.save(dealUpdates);
-      }
-
-      if (opportunityUpdates.length > 0) {
-        await opportunityRepository.save(opportunityUpdates);
-      }
+      await updateBackfilledColumn(
+        fastify.db.dealRepository,
+        dealUpdates,
+        "categoryId",
+      );
+      await updateBackfilledColumn(
+        opportunityRepository,
+        opportunityUpdates,
+        "districtId",
+      );
       logger.debug(
         `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
       );
