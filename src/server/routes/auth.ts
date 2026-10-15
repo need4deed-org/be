@@ -32,6 +32,7 @@ import {
 } from "../utils/data/refresh-session";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
+import { createLoginIpCap, loginRateLimitKey } from "../utils/login-rate-limit";
 import {
   getRefreshPayload,
   getRefreshToken,
@@ -57,7 +58,16 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.LOGIN,
     {
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      // Per account: behind the fe proxy all users can share one IP.
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+          hook: "preHandler",
+          keyGenerator: loginRateLimitKey,
+        },
+      },
+      preHandler: createLoginIpCap(),
       schema: {
         body: userLoginSchema,
         response: {
