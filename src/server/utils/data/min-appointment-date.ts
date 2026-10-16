@@ -1,15 +1,16 @@
-import { addWorkingDays, berlinToday, UserRole } from "need4deed-sdk";
+import {
+  berlinToday,
+  MIN_APPOINTMENT_WORKING_DAYS,
+  minAppointmentDay,
+  UserRole,
+} from "need4deed-sdk";
 import { BadRequestError } from "../../../config";
 import { formatOnetimerDate } from "../../../services/dto/utils";
 import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import { isStaffRole } from "./is-staff-role";
 
-export const MIN_APPOINTMENT_WORKING_DAYS = 7;
-
 export function minAppointmentDate(today: Date = berlinToday()): Date {
-  return berlinDayBoundaries(
-    addWorkingDays(today, MIN_APPOINTMENT_WORKING_DAYS),
-  ).startOfDay;
+  return berlinDayBoundaries(minAppointmentDay(today)).startOfDay;
 }
 
 export function assertAppointmentNotTooSoon(
