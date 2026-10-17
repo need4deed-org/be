@@ -10,6 +10,7 @@
     "statusEngagement": "Active",
     "services": ["refugee-accommodation", "tutoring"],
     "postcodes": ["10115", "10117"],
+    "address": { "street": "Musterstraße 1", "postcode": 10115 },
     "person": [
       {
         "firstName": "Maria",
@@ -34,6 +35,7 @@
     "statusEngagement": "Active",
     "services": ["childcare", "youth"],
     "postcodes": ["12047", "12053"],
+    "address": { "street": "Testweg 2", "postcode": 12047 },
     "person": [
       {
         "firstName": "Hans",
@@ -58,6 +60,7 @@
     "statusEngagement": "Active",
     "services": ["tutoring", "consultation"],
     "postcodes": ["10997", "10999"],
+    "address": { "street": "Beispielallee 3", "postcode": 10997 },
     "person": [
       {
         "firstName": "Anna",
@@ -82,6 +85,7 @@
     "statusEngagement": "Unresponsive",
     "services": ["welfare", "sport"],
     "postcodes": ["10627", "10629"],
+    "address": { "street": "Probestraße 4", "postcode": 10627 },
     "person": [
       {
         "firstName": "Thomas",
@@ -115,6 +119,7 @@
     "statusEngagement": "Active",
     "services": ["refugee-accommodation", "job-coaching"],
     "postcodes": ["10317", "10319"],
+    "address": { "street": "Demoweg 5", "postcode": 10317 },
     "person": [
       {
         "firstName": "Lisa",
@@ -139,6 +144,7 @@
     "statusEngagement": "agent-inactive",
     "services": ["childcare"],
     "postcodes": ["10405"],
+    "address": { "street": "Musterplatz 6", "postcode": 10405 },
     "person": [
       {
         "firstName": "Katrin",
@@ -163,6 +169,7 @@
     "statusEngagement": "agent-new",
     "services": ["voluntary-support"],
     "postcodes": ["13591"],
+    "address": { "street": "Testdamm 7", "postcode": 13591 },
     "person": [
       {
         "firstName": "Rainer",
@@ -188,6 +195,7 @@
     "statusEngagement": "Active",
     "services": ["welfare", "consultation"],
     "postcodes": ["12169"],
+    "address": { "street": "Beispielstraße 8", "postcode": 12169 },
     "person": [],
     "opportunityNids": [],
     "unclaimed": true

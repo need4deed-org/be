@@ -104,7 +104,7 @@ export interface AgentJSON {
   statusSearch: string;
   languages: string;
   services: string[];
-  address: object;
+  address?: AddressJSON;
   postcodes: string[];
   phone: string;
   status: string;
