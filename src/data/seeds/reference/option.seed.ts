@@ -9,7 +9,6 @@ import Activity from "../../entity/profile/activity.entity";
 import Language from "../../entity/profile/language.entity";
 import Skill from "../../entity/profile/skill.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
-import { getCount } from "../utils";
 
 interface ContentEnDe {
   en: string;
@@ -110,12 +109,6 @@ export async function seedOptions(dataSource: DataSource): Promise<void> {
 
   const optionRepository = getRepository(dataSource, Option);
 
-  const count = await getCount(optionRepository);
-  if (count !== 0) {
-    logger.info("Skipping seeding options.");
-    return;
-  }
-
   const optionsForInsert: Option[][] = [];
 
   const languageRepository = getRepository(dataSource, Language);
@@ -134,9 +127,15 @@ export async function seedOptions(dataSource: DataSource): Promise<void> {
     );
   }
 
+  const missingOptions = optionsForInsert.flat();
+  if (!missingOptions.length) {
+    logger.info("Skipping seeding options.");
+    return;
+  }
+
   try {
-    await optionRepository.insert(optionsForInsert.flat());
+    await optionRepository.insert(missingOptions);
   } catch (error) {
-    throw new Error(`Error inserting skill translations: ${error.message}`);
+    throw new Error(`Error inserting options: ${error.message}`);
   }
 }
