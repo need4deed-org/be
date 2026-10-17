@@ -15,6 +15,7 @@ import Agent from "../../entity/opportunity/agent.entity";
 import AgentType from "../../entity/profile/agent-type.entity";
 import Service from "../../entity/profile/service.entity";
 import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { getDistrictFromPostcode } from "../../utils/get-district";
 import {
   getAgentEngagement,
   getAgentPersonRole,
@@ -24,6 +25,7 @@ import {
   getAgentType,
   getCount,
   getEnumValue,
+  getOrCreateAddress,
   getOrCreatePerson,
 } from "../utils";
 import { AgentJSON } from "./types";
@@ -55,8 +57,18 @@ export async function seedAgents(dataSource: DataSource): Promise<void> {
       ? await agentTypeRepository.findOneBy({ title: agentTypeTitle })
       : null;
 
+    const address = agentJson.address
+      ? await getOrCreateAddress(agentJson.address, dataSource)
+      : undefined;
+    const district = await getDistrictFromPostcode(
+      address?.postcode,
+      dataSource,
+    );
+
     const agentObj = new Agent({
       title: agentJson.title || agentJson.website || "unknown",
+      address,
+      districtId: district?.id,
       info: agentJson.about,
       website: agentJson.website,
       agentTypeId: agentType?.id,

@@ -198,7 +198,7 @@ export async function getPostcodeGetter(dataSource: DataSource) {
   };
 }
 
-async function getOrCreateAddress(
+export async function getOrCreateAddress(
   addressData: AddressJSON,
   dataSource: DataSource,
 ): Promise<Address> {
