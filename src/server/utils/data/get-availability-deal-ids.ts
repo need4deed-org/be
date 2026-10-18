@@ -5,6 +5,7 @@ import {
   TimeSlot,
 } from "need4deed-sdk";
 import { Raw } from "typeorm";
+import { berlinTimeZone } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import {
   ByDayCode,
@@ -19,7 +20,6 @@ const OCCASIONAL_DAYS: Record<OccasionalType, ByDayCode[]> = {
 const TIME_SLOTS = new Set<string>(Object.values(TimeSlot));
 const OCCASIONAL = new Set<string>(Object.values(OccasionalType));
 const SERVER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const LOCAL_TIME_ZONE = "Europe/Berlin";
 // one-time timeslot starts are absolute instants stored as server-local wall time
 const ONETIME_START =
   "((t.start AT TIME ZONE :availabilityServerTimeZone) AT TIME ZONE :availabilityLocalTimeZone)";
@@ -105,7 +105,7 @@ function getOnetimeConditions(
     params[`availabilityFrom${i}`] = from;
     params[`availabilityTo${i}`] = to;
   });
-  params.availabilityLocalTimeZone = LOCAL_TIME_ZONE;
+  params.availabilityLocalTimeZone = berlinTimeZone;
   return (start) => [
     ...(slotDays.length
       ? [`EXTRACT(ISODOW FROM ${start}) IN (:...availabilityIsoDays)`]

@@ -188,8 +188,10 @@ export const defaultPageSize = 12;
 
 export const titleOrphanageAgent = "Orphanage For Opportunities";
 
+export const berlinTimeZone = "Europe/Berlin";
+
 export const berlinDateTimeFormat = new Intl.DateTimeFormat("sv-SE", {
-  timeZone: "Europe/Berlin",
+  timeZone: berlinTimeZone,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
