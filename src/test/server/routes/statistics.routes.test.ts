@@ -84,6 +84,7 @@ describe("GET /statistics/:metric", () => {
     instant: string,
     statusType: ProfileVolunteeringType | null,
     districtIds: string[],
+    email?: string,
   ) {
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
@@ -100,7 +101,7 @@ describe("GET /statistics/:metric", () => {
         );
     }
     const person = await fastify.db.personRepository.save(
-      new Person({ firstName: "Stats", lastName: "Volunteer" }),
+      new Person({ firstName: "Stats", lastName: "Volunteer", email }),
     );
     createdIds.persons.push(person.id);
     const volunteer = await fastify.db.volunteerRepository.save(
@@ -146,10 +147,18 @@ describe("GET /statistics/:metric", () => {
       ProfileVolunteeringType.ACCOMPANYING,
       [mitteId, pankowId],
     );
+    const repeatEmail = `stats-${randomNumericSuffix()}@test.need4deed.org`;
     await createVolunteer(
       "1985-02-10T12:00:00Z",
       ProfileVolunteeringType.REGULAR,
       [],
+      repeatEmail,
+    );
+    await createVolunteer(
+      "1985-02-20T12:00:00Z",
+      ProfileVolunteeringType.REGULAR,
+      [],
+      repeatEmail,
     );
     await createVolunteer("1985-06-30T22:30:00Z", null, []);
 
@@ -194,7 +203,7 @@ describe("GET /statistics/:metric", () => {
     await fastify.close();
   });
 
-  it("buckets by Berlin month and fills empty periods", async () => {
+  it("buckets by Berlin month, fills empty periods, skips repeat registrations", async () => {
     const data = await getData(
       "/statistics/new-volunteers?granularity=month&from=1985-01-01&to=1985-04-01",
     );
@@ -292,9 +301,18 @@ describe("GET /statistics/:metric", () => {
     expect(data.periods[0].counts).toEqual({ [String(lead.id)]: 2 });
     expect(data.groups.find(({ key }) => key === String(lead.id))).toEqual({
       key: String(lead.id),
-      title: { de: lead.title },
+      title: { en: lead.title, de: lead.title },
     });
     expect(data.totalsBeforeTracking?.[String(lead.id)]).toBe(3);
+  });
+
+  it("returns the totals before tracking only when split by answer", async () => {
+    const data = await getData(
+      "/statistics/lead-from?granularity=month&from=1985-03-01&to=1985-04-01",
+    );
+
+    expect(data.periods[0]).toMatchObject({ counts: { total: 2 }, total: 2 });
+    expect(data.totalsBeforeTracking).toBeUndefined();
   });
 
   it("rejects a groupBy the metric does not support", async () => {
@@ -307,6 +325,20 @@ describe("GET /statistics/:metric", () => {
   it("rejects an empty range", async () => {
     const response = await get(
       "/statistics/requests?granularity=month&from=1985-03-01&to=1985-03-01",
+    );
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a range that starts after the current period", async () => {
+    const response = await get(
+      "/statistics/requests?granularity=month&from=2999-01-01",
+    );
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a range of more than 1000 periods", async () => {
+    const response = await get(
+      "/statistics/requests?granularity=month&from=1000-01-01&to=1985-01-01",
     );
     expect(response.statusCode).toBe(400);
   });

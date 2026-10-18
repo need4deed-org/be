@@ -12,17 +12,13 @@ export default async function statisticsRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  fastify.addHook(
-    "onRequest",
-    fastify.authenticate({ role: UserRole.COORDINATOR }),
-  );
-
   fastify.get<{
     Params: { metric: StatisticsMetric };
     Querystring: ApiStatisticsQuery;
   }>(
     "/:metric",
     {
+      preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: statisticsParamsSchema,
         querystring: statisticsQuerySchema,

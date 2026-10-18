@@ -4,6 +4,7 @@ import {
   ApiStatisticsPeriod,
   ApiStatisticsQuery,
   EntityTableName,
+  Lang,
   OpportunityType,
   OptionTitle,
   ProfileVolunteeringType,
@@ -13,12 +14,11 @@ import {
   StatisticsGroupBy,
   StatisticsMetric,
 } from "need4deed-sdk";
-import { BadRequestError } from "../../../config";
+import { BadRequestError, berlinTimeZone } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
 
-const LOCAL_TIME_ZONE = "Europe/Berlin";
 const MAX_PERIODS = 1000;
 
 const STEP: Record<StatisticsGranularity, string> = {
@@ -51,8 +51,13 @@ const VOLUNTEERING_TYPE_TITLE: Record<ProfileVolunteeringType, OptionTitle> = {
 
 interface MetricSource {
   allowedGroupBy: StatisticsGroupBy[];
-  sql: (groupBy: StatisticsGroupBy) => string;
+  from: string;
+  at: string;
+  where?: string;
+  keys: Partial<Record<StatisticsGroupBy, { join?: string; key: string }>>;
 }
+
+const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
 
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
@@ -61,15 +66,22 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
       StatisticsGroupBy.VOLUNTEER_TYPE,
       StatisticsGroupBy.DISTRICT,
     ],
-    sql: (groupBy) =>
-      groupBy === StatisticsGroupBy.DISTRICT
-        ? `SELECT v.id AS record_id, v.created_at AS at, dd.district_id::text AS key
-           FROM volunteer v LEFT JOIN deal_district dd ON dd.deal_id = v.deal_id`
-        : `SELECT v.id AS record_id, v.created_at AS at, ${
-            groupBy === StatisticsGroupBy.VOLUNTEER_TYPE
-              ? "v.status_type::text"
-              : `'${STATISTICS_TOTAL_KEY}'`
-          } AS key FROM volunteer v`,
+    from: "volunteer r JOIN person p ON p.id = r.person_id",
+    at: "r.created_at",
+    // A repeat registration with the same email or phone is not a new volunteer.
+    where: `NOT EXISTS (
+      SELECT 1 FROM volunteer earlier JOIN person ep ON ep.id = earlier.person_id
+      WHERE (earlier.created_at, earlier.id) < (r.created_at, r.id)
+        AND ((NULLIF(p.email, '') IS NOT NULL AND ep.email = p.email)
+          OR (NULLIF(p.phone, '') IS NOT NULL AND ep.phone = p.phone)))`,
+    keys: {
+      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+      [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.status_type::text" },
+      [StatisticsGroupBy.DISTRICT]: {
+        join: "LEFT JOIN deal_district dd ON dd.deal_id = r.deal_id",
+        key: "dd.district_id::text",
+      },
+    },
   },
   [StatisticsMetric.REQUESTS]: {
     allowedGroupBy: [
@@ -77,33 +89,31 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
       StatisticsGroupBy.OPPORTUNITY_TYPE,
       StatisticsGroupBy.DISTRICT,
     ],
-    sql: (groupBy) =>
-      `SELECT o.id AS record_id, o.created_at AS at, ${
-        {
-          [StatisticsGroupBy.OPPORTUNITY_TYPE]: "o.type::text",
-          [StatisticsGroupBy.DISTRICT]: "o.district_id::text",
-        }[groupBy as string] ?? `'${STATISTICS_TOTAL_KEY}'`
-      } AS key FROM opportunity o`,
+    from: "opportunity r",
+    at: "r.created_at",
+    keys: {
+      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+      [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
+      [StatisticsGroupBy.DISTRICT]: { key: "r.district_id::text" },
+    },
   },
   [StatisticsMetric.LEAD_FROM]: {
     allowedGroupBy: [StatisticsGroupBy.NONE, StatisticsGroupBy.LEAD_FROM],
-    sql: (groupBy) =>
-      `SELECT se.id AS record_id, se.occurred_at AS at, ${
-        groupBy === StatisticsGroupBy.LEAD_FROM
-          ? "se.value_key"
-          : `'${STATISTICS_TOTAL_KEY}'`
-      } AS key FROM statistics_event se WHERE se.metric = '${LEAD_FROM_METRIC}'`,
+    from: "statistics_event r",
+    at: "r.occurred_at",
+    where: `r.metric = '${LEAD_FROM_METRIC}'`,
+    keys: {
+      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+      [StatisticsGroupBy.LEAD_FROM]: { key: "r.value_key" },
+    },
   },
 };
 
-// Columns are `timestamp` holding the session time zone's wall time.
-const localSource = (sql: string) =>
-  `WITH src AS (${sql}),
-   local AS (
-     SELECT record_id, key,
-       (at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${LOCAL_TIME_ZONE}' AS local_at
-     FROM src
-   )`;
+// Columns are `timestamp` filled by the database's now(), i.e. session time zone wall time.
+const toLocal = (column: string) =>
+  `((${column}) AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${berlinTimeZone}'`;
+const fromLocal = (local: string) =>
+  `((${local}) AT TIME ZONE '${berlinTimeZone}') AT TIME ZONE current_setting('TimeZone')`;
 
 async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   const fk = getTranslationFkColumn(EntityTableName.LEAD);
@@ -119,10 +129,10 @@ async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   for (const row of rows) {
     const group = groups.get(row.id) ?? {
       key: String(row.id),
-      title: { de: row.title },
+      title: { en: row.title, de: row.title },
     };
-    if (row.iso) {
-      group.title[row.iso as keyof OptionTitle] = row.t;
+    if (row.iso === Lang.EN || row.iso === Lang.DE) {
+      group.title[row.iso] = row.t;
     }
     groups.set(row.id, group);
   }
@@ -179,80 +189,108 @@ export async function getStatistics(
     groupBy = StatisticsGroupBy.NONE,
   }: ApiStatisticsQuery,
 ): Promise<ApiStatisticsGet> {
-  const { allowedGroupBy, sql } = METRICS[metric];
-  if (!allowedGroupBy.includes(groupBy)) {
+  const source = METRICS[metric];
+  const { allowedGroupBy } = source;
+  const groupKey = source.keys[groupBy];
+  if (!groupKey) {
     throw new BadRequestError(
       `Metric "${metric}" cannot be grouped by "${groupBy}".`,
     );
   }
-  if (from && to && from >= to) {
-    throw new BadRequestError(`"from" must be before "to".`);
+
+  const where = source.where ? `AND ${source.where}` : "";
+  const nowLocal = `(now() AT TIME ZONE '${berlinTimeZone}')`;
+  const [range]: { fromLocal: string; toLocal: string; periodCount: number }[] =
+    await dataSource.query(
+      `WITH bounds AS (
+         SELECT
+           date_trunc($1, COALESCE(
+             $2::timestamp,
+             (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${where}),
+             ${nowLocal}
+           )) AS from_local,
+           date_trunc($1, COALESCE($3::timestamp - interval '1 microsecond', ${nowLocal})) + $4::interval AS to_local
+       )
+       SELECT from_local::text AS "fromLocal", to_local::text AS "toLocal",
+         (SELECT count(*)::int FROM (
+           SELECT 1 FROM generate_series(from_local, to_local - interval '1 microsecond', $4::interval)
+           LIMIT ${MAX_PERIODS + 1}
+         ) s) AS "periodCount"
+       FROM bounds`,
+      [granularity, from ?? null, to ?? null, STEP[granularity]],
+    );
+  if (!range.periodCount) {
+    throw new BadRequestError(`The range from "from" to "to" is empty.`);
   }
-
-  const source = localSource(sql(groupBy));
-  const nowLocal = `(now() AT TIME ZONE '${LOCAL_TIME_ZONE}')`;
-  const [range]: { fromLocal: Date; toLocal: Date }[] = await dataSource.query(
-    `${source}
-     SELECT
-       date_trunc($1, COALESCE($2::timestamp, (SELECT min(local_at) FROM local), ${nowLocal})) AS "fromLocal",
-       date_trunc($1, COALESCE($3::timestamp - interval '1 microsecond', ${nowLocal})) + $4::interval AS "toLocal"`,
-    [granularity, from ?? null, to ?? null, STEP[granularity]],
-  );
-
-  const periodRows: { period: string; start: Date }[] = await dataSource.query(
-    `SELECT to_char(s, $1) AS period, s AT TIME ZONE '${LOCAL_TIME_ZONE}' AS start
-     FROM generate_series($2::timestamp, $3::timestamp - interval '1 microsecond', $4::interval) s
-     ORDER BY s
-     LIMIT ${MAX_PERIODS + 1}`,
-    [
-      PERIOD_FORMAT[granularity],
-      range.fromLocal,
-      range.toLocal,
-      STEP[granularity],
-    ],
-  );
-  if (periodRows.length > MAX_PERIODS) {
+  if (range.periodCount > MAX_PERIODS) {
     throw new BadRequestError(
       `Range spans more than ${MAX_PERIODS} periods; narrow it or use a coarser granularity.`,
     );
   }
 
-  const countRows: {
-    period: string;
-    key: string | null;
-    isTotal: boolean;
-    count: number;
-  }[] = await dataSource.query(
-    `${source}
-     SELECT to_char(date_trunc($1, local_at), $2) AS period,
-       COALESCE(key, '${STATISTICS_UNKNOWN_KEY}') AS key,
-       GROUPING(key) = 1 AS "isTotal",
-       COUNT(DISTINCT record_id)::int AS count
-     FROM local
-     WHERE local_at >= $3 AND local_at < $4
-     GROUP BY GROUPING SETS ((1, key), (1))`,
-    [granularity, PERIOD_FORMAT[granularity], range.fromLocal, range.toLocal],
+  const rowsQuery: Promise<
+    {
+      period: string;
+      start: Date;
+      key: string | null;
+      isTotal: boolean | null;
+      count: number | null;
+    }[]
+  > = dataSource.query(
+    `WITH src AS (
+       SELECT r.id AS record_id, ${toLocal(source.at)} AS local_at, ${groupKey.key} AS key
+       FROM ${source.from} ${groupKey.join ?? ""}
+       WHERE ${source.at} >= ${fromLocal("$2::timestamp")}
+         AND ${source.at} < ${fromLocal("$3::timestamp")} ${where}
+     ),
+     counts AS (
+       SELECT date_trunc($1, local_at) AS bucket,
+         COALESCE(key, '${STATISTICS_UNKNOWN_KEY}') AS key,
+         GROUPING(key) = 1 AS is_total,
+         COUNT(DISTINCT record_id)::int AS count
+       FROM src
+       GROUP BY GROUPING SETS ((1, key), (1))
+     )
+     SELECT to_char(s, $5) AS period, s AT TIME ZONE '${berlinTimeZone}' AS start,
+       c.key, c.is_total AS "isTotal", c.count
+     FROM generate_series($2::timestamp, $3::timestamp - interval '1 microsecond', $4::interval) s
+     LEFT JOIN counts c ON c.bucket = s
+     ORDER BY s`,
+    [
+      granularity,
+      range.fromLocal,
+      range.toLocal,
+      STEP[granularity],
+      PERIOD_FORMAT[granularity],
+    ],
   );
+  const [rows, groups, totalsBeforeTracking] = await Promise.all([
+    rowsQuery,
+    getGroups(groupBy),
+    groupBy === StatisticsGroupBy.LEAD_FROM
+      ? getTotalsBeforeTracking()
+      : undefined,
+  ]);
 
-  const groups = await getGroups(groupBy);
   const knownKeys = new Set(groups.map(({ key }) => key));
-  const periods = new Map<string, ApiStatisticsPeriod>(
-    periodRows.map(({ period, start }) => [
+  const periods = new Map<string, ApiStatisticsPeriod>();
+  for (const { period, start, key, isTotal, count } of rows) {
+    const entry = periods.get(period) ?? {
       period,
-      { period, start, counts: {}, total: 0 },
-    ]),
-  );
-  for (const { period, key, isTotal, count } of countRows) {
-    const entry = periods.get(period);
-    if (!entry) {
+      start,
+      counts: {},
+      total: 0,
+    };
+    periods.set(period, entry);
+    if (count === null) {
       continue;
     }
     if (isTotal) {
       entry.total = count;
       continue;
     }
-    const groupKey = key && knownKeys.has(key) ? key : STATISTICS_UNKNOWN_KEY;
-    entry.counts[groupKey] = (entry.counts[groupKey] ?? 0) + count;
+    const countKey = key && knownKeys.has(key) ? key : STATISTICS_UNKNOWN_KEY;
+    entry.counts[countKey] = (entry.counts[countKey] ?? 0) + count;
   }
 
   const hasUnknown = [...periods.values()].some(
@@ -268,8 +306,6 @@ export async function getStatistics(
       ? [...groups, { key: STATISTICS_UNKNOWN_KEY, title: UNKNOWN_TITLE }]
       : groups,
     periods: [...periods.values()],
-    ...(metric === StatisticsMetric.LEAD_FROM
-      ? { totalsBeforeTracking: await getTotalsBeforeTracking() }
-      : {}),
+    ...(totalsBeforeTracking ? { totalsBeforeTracking } : {}),
   };
 }
