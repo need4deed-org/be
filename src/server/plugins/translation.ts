@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import cron from "node-cron";
+import { berlinTimeZone } from "../../config";
 import { dataSource } from "../../data/data-source";
 import logger from "../../logger";
 import { getTranslationConfig } from "../../services/translation/config";
@@ -114,7 +115,7 @@ async function translationPlugin(fastify: FastifyInstance): Promise<void> {
         );
       }
     },
-    { timezone: "Europe/Berlin" },
+    { timezone: berlinTimeZone },
   );
 
   fastify.addHook("onClose", () => task.stop());

@@ -8,6 +8,7 @@ import {
   TimeSlot,
   TranslatedIntoType,
 } from "need4deed-sdk";
+import { berlinTimeZone } from "../../config";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import { isByDayCode } from "../../data/utils/by-day-code";
@@ -342,7 +343,7 @@ export function formatAccompaniedPersonLanguage(
 export function formatOnetimerDate(date: Date | undefined): string {
   return date
     ? new Date(date).toLocaleDateString("de-DE", {
-        timeZone: "Europe/Berlin",
+        timeZone: berlinTimeZone,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -353,7 +354,7 @@ export function formatOnetimerDate(date: Date | undefined): string {
 export function formatOnetimerTime(date: Date | undefined): string {
   return date
     ? new Date(date).toLocaleTimeString("de-DE", {
-        timeZone: "Europe/Berlin",
+        timeZone: berlinTimeZone,
         hour: "2-digit",
         minute: "2-digit",
       })

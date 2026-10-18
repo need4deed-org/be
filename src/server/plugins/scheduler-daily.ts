@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import { berlinToday, isWorkingDay } from "need4deed-sdk";
 import cron from "node-cron";
+import { berlinTimeZone } from "../../config";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
@@ -68,7 +69,7 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
         logger.error({ err }, "scheduler: unhandled error in cron callback");
       }
     },
-    { timezone: "Europe/Berlin" },
+    { timezone: berlinTimeZone },
   );
 
   fastify.addHook("onClose", () => task.stop());

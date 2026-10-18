@@ -1,4 +1,5 @@
 import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
+import { berlinTimeZone } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import { getPostcode } from "../../data/utils";
 
@@ -16,7 +17,7 @@ export function parseAccompDatetime(value: string | undefined): Date {
   }
 
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Berlin",
+    timeZone: berlinTimeZone,
     year: "numeric",
     month: "numeric",
     day: "numeric",

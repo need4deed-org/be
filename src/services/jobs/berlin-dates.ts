@@ -1,4 +1,5 @@
 import { addWorkingDays } from "need4deed-sdk";
+import { berlinTimeZone } from "../../config";
 
 function addDays(date: Date, n: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
@@ -21,7 +22,7 @@ export function berlinDayBoundaries(berlinDate: Date): {
   const d = berlinDate.getDate();
   const noonUTC = new Date(Date.UTC(y, m, d, 12));
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Berlin",
+    timeZone: berlinTimeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
