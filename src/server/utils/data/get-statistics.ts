@@ -50,8 +50,8 @@ const VOLUNTEERING_TYPE_TITLE: Record<ProfileVolunteeringType, OptionTitle> = {
 };
 
 interface MetricSource {
-  allowedGroupBy: StatisticsGroupBy[];
   from: string;
+  counted?: string;
   at: string;
   filter?: string;
   exclude?: string;
@@ -60,23 +60,17 @@ interface MetricSource {
 
 const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
 
-const earlierVolunteerWith = (match: string) =>
-  `EXISTS (
-     SELECT 1 FROM volunteer earlier JOIN person ep ON ep.id = earlier.person_id
-     WHERE (earlier.created_at, earlier.id) < (r.created_at, r.id) AND ${match}
-   )`;
-
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
-    allowedGroupBy: [
-      StatisticsGroupBy.NONE,
-      StatisticsGroupBy.VOLUNTEER_TYPE,
-      StatisticsGroupBy.DISTRICT,
-    ],
-    from: "volunteer r JOIN person p ON p.id = r.person_id",
+    from: "volunteer r",
+    counted: `(
+      SELECT v.*, NULLIF(p.email, '') IS NOT NULL AND row_number() OVER (
+        PARTITION BY lower(NULLIF(p.email, '')) ORDER BY v.created_at, v.id
+      ) > 1 AS is_repeat
+      FROM volunteer v JOIN person p ON p.id = v.person_id
+    ) r`,
     at: "r.created_at",
-    exclude: `(NULLIF(p.email, '') IS NOT NULL AND ${earlierVolunteerWith("lower(ep.email) = lower(p.email)")})
-      OR (NULLIF(p.phone, '') IS NOT NULL AND ${earlierVolunteerWith("ep.phone = p.phone")})`,
+    exclude: "r.is_repeat",
     keys: {
       [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
       [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.status_type::text" },
@@ -88,11 +82,6 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     },
   },
   [StatisticsMetric.REQUESTS]: {
-    allowedGroupBy: [
-      StatisticsGroupBy.NONE,
-      StatisticsGroupBy.OPPORTUNITY_TYPE,
-      StatisticsGroupBy.DISTRICT,
-    ],
     from: "opportunity r",
     at: "r.created_at",
     keys: {
@@ -106,7 +95,6 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     },
   },
   [StatisticsMetric.LEAD_FROM]: {
-    allowedGroupBy: [StatisticsGroupBy.NONE, StatisticsGroupBy.LEAD_FROM],
     from: "statistics_event r",
     at: "r.occurred_at",
     filter: `r.metric = '${LEAD_FROM_METRIC}'`,
@@ -142,7 +130,7 @@ async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
       key: String(row.id),
       title: { en: row.title, de: row.title },
     };
-    if (row.iso === Lang.EN || row.iso === Lang.DE) {
+    if ((row.iso === Lang.EN || row.iso === Lang.DE) && row.t) {
       group.title[row.iso] = row.t;
     }
     groups.set(row.id, group);
@@ -201,7 +189,7 @@ export async function getStatistics(
   }: ApiStatisticsQuery,
 ): Promise<ApiStatisticsGet> {
   const source = METRICS[metric];
-  const { allowedGroupBy } = source;
+  const allowedGroupBy = Object.keys(source.keys) as StatisticsGroupBy[];
   const groupKey = source.keys[groupBy];
   if (!groupKey) {
     throw new BadRequestError(
@@ -214,7 +202,7 @@ export async function getStatistics(
   }
 
   const filter = source.filter ? `AND ${source.filter}` : "";
-  const exclude = source.exclude ? `AND NOT (${source.exclude})` : "";
+  const exclude = source.exclude ? `AND NOT ${source.exclude}` : "";
   const nowLocal = `(now() AT TIME ZONE '${berlinTimeZone}')`;
   const [range]: { fromLocal: string; toLocal: string; periodCount: number }[] =
     await dataSource.query(
@@ -222,7 +210,10 @@ export async function getStatistics(
          SELECT
            date_trunc($1, COALESCE(
              $2::timestamp,
-             (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
+             LEAST(
+               (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
+               $3::timestamp - interval '1 microsecond'
+             ),
              ${nowLocal}
            )) AS from_local,
            date_trunc($1, COALESCE($3::timestamp - interval '1 microsecond', ${nowLocal})) + $4::interval AS to_local
@@ -255,7 +246,7 @@ export async function getStatistics(
   > = dataSource.query(
     `WITH src AS (
        SELECT r.id AS record_id, ${toLocal(source.at)} AS local_at, ${groupKey.key} AS key
-       FROM ${source.from} ${groupKey.join ?? ""}
+       FROM ${source.counted ?? source.from} ${groupKey.join ?? ""}
        WHERE ${source.at} >= ${fromLocal("$2::timestamp")}
          AND ${source.at} < ${fromLocal("$3::timestamp")} ${filter} ${exclude}
      ),

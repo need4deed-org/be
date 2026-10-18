@@ -366,6 +366,16 @@ describe("GET /statistics/:metric", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('returns the period before "to" when it precedes every record', async () => {
+    const data = await getData(
+      "/statistics/requests?granularity=year&to=1900-01-01",
+    );
+
+    expect(data.periods).toEqual([
+      expect.objectContaining({ period: "1899", counts: {}, total: 0 }),
+    ]);
+  });
+
   it("rejects a range that starts after the current period", async () => {
     const response = await get(
       "/statistics/requests?granularity=month&from=2999-01-01",
