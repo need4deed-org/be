@@ -53,11 +53,18 @@ interface MetricSource {
   allowedGroupBy: StatisticsGroupBy[];
   from: string;
   at: string;
-  where?: string;
+  filter?: string;
+  exclude?: string;
   keys: Partial<Record<StatisticsGroupBy, { join?: string; key: string }>>;
 }
 
 const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
+
+const earlierVolunteerWith = (match: string) =>
+  `EXISTS (
+     SELECT 1 FROM volunteer earlier JOIN person ep ON ep.id = earlier.person_id
+     WHERE (earlier.created_at, earlier.id) < (r.created_at, r.id) AND ${match}
+   )`;
 
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
@@ -68,18 +75,15 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     ],
     from: "volunteer r JOIN person p ON p.id = r.person_id",
     at: "r.created_at",
-    // A repeat registration with the same email or phone is not a new volunteer.
-    where: `NOT EXISTS (
-      SELECT 1 FROM volunteer earlier JOIN person ep ON ep.id = earlier.person_id
-      WHERE (earlier.created_at, earlier.id) < (r.created_at, r.id)
-        AND ((NULLIF(p.email, '') IS NOT NULL AND ep.email = p.email)
-          OR (NULLIF(p.phone, '') IS NOT NULL AND ep.phone = p.phone)))`,
+    exclude: `(NULLIF(p.email, '') IS NOT NULL AND ${earlierVolunteerWith("lower(ep.email) = lower(p.email)")})
+      OR (NULLIF(p.phone, '') IS NOT NULL AND ${earlierVolunteerWith("ep.phone = p.phone")})`,
     keys: {
       [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
       [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.status_type::text" },
       [StatisticsGroupBy.DISTRICT]: {
-        join: "LEFT JOIN deal_district dd ON dd.deal_id = r.deal_id",
-        key: "dd.district_id::text",
+        join: `LEFT JOIN deal_district dd ON dd.deal_id = r.deal_id
+               LEFT JOIN district d ON d.id = dd.district_id`,
+        key: "d.id::text",
       },
     },
   },
@@ -94,17 +98,24 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     keys: {
       [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
       [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
-      [StatisticsGroupBy.DISTRICT]: { key: "r.district_id::text" },
+      [StatisticsGroupBy.DISTRICT]: {
+        join: `LEFT JOIN agent a ON a.id = r.agent_id
+               LEFT JOIN district d ON d.id = COALESCE(r.district_id, a.district_id)`,
+        key: "d.id::text",
+      },
     },
   },
   [StatisticsMetric.LEAD_FROM]: {
     allowedGroupBy: [StatisticsGroupBy.NONE, StatisticsGroupBy.LEAD_FROM],
     from: "statistics_event r",
     at: "r.occurred_at",
-    where: `r.metric = '${LEAD_FROM_METRIC}'`,
+    filter: `r.metric = '${LEAD_FROM_METRIC}'`,
     keys: {
       [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
-      [StatisticsGroupBy.LEAD_FROM]: { key: "r.value_key" },
+      [StatisticsGroupBy.LEAD_FROM]: {
+        join: "LEFT JOIN lead_from lf ON lf.id::text = r.value_key",
+        key: "lf.id::text",
+      },
     },
   },
 };
@@ -198,7 +209,12 @@ export async function getStatistics(
     );
   }
 
-  const where = source.where ? `AND ${source.where}` : "";
+  if (from && to && from >= to) {
+    throw new BadRequestError(`"from" must be before "to".`);
+  }
+
+  const filter = source.filter ? `AND ${source.filter}` : "";
+  const exclude = source.exclude ? `AND NOT (${source.exclude})` : "";
   const nowLocal = `(now() AT TIME ZONE '${berlinTimeZone}')`;
   const [range]: { fromLocal: string; toLocal: string; periodCount: number }[] =
     await dataSource.query(
@@ -206,7 +222,7 @@ export async function getStatistics(
          SELECT
            date_trunc($1, COALESCE(
              $2::timestamp,
-             (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${where}),
+             (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
              ${nowLocal}
            )) AS from_local,
            date_trunc($1, COALESCE($3::timestamp - interval '1 microsecond', ${nowLocal})) + $4::interval AS to_local
@@ -241,7 +257,7 @@ export async function getStatistics(
        SELECT r.id AS record_id, ${toLocal(source.at)} AS local_at, ${groupKey.key} AS key
        FROM ${source.from} ${groupKey.join ?? ""}
        WHERE ${source.at} >= ${fromLocal("$2::timestamp")}
-         AND ${source.at} < ${fromLocal("$3::timestamp")} ${where}
+         AND ${source.at} < ${fromLocal("$3::timestamp")} ${filter} ${exclude}
      ),
      counts AS (
        SELECT date_trunc($1, local_at) AS bucket,
@@ -272,7 +288,6 @@ export async function getStatistics(
       : undefined,
   ]);
 
-  const knownKeys = new Set(groups.map(({ key }) => key));
   const periods = new Map<string, ApiStatisticsPeriod>();
   for (const { period, start, key, isTotal, count } of rows) {
     const entry = periods.get(period) ?? {
@@ -289,8 +304,7 @@ export async function getStatistics(
       entry.total = count;
       continue;
     }
-    const countKey = key && knownKeys.has(key) ? key : STATISTICS_UNKNOWN_KEY;
-    entry.counts[countKey] = (entry.counts[countKey] ?? 0) + count;
+    entry.counts[key ?? STATISTICS_UNKNOWN_KEY] = count;
   }
 
   const hasUnknown = [...periods.values()].some(

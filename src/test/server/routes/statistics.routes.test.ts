@@ -12,6 +12,7 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import LeadFrom from "../../../data/entity/lead.entity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import StatisticsEvent, {
@@ -42,6 +43,7 @@ describe("GET /statistics/:metric", () => {
   let mitteId: string;
   let pankowId: string;
   let lead: LeadFrom;
+  let agent: Agent;
   const createdIds = {
     users: [] as number[],
     persons: [] as number[],
@@ -158,7 +160,7 @@ describe("GET /statistics/:metric", () => {
       "1985-02-20T12:00:00Z",
       ProfileVolunteeringType.REGULAR,
       [],
-      repeatEmail,
+      repeatEmail.toUpperCase(),
     );
     await createVolunteer("1985-06-30T22:30:00Z", null, []);
 
@@ -170,6 +172,22 @@ describe("GET /statistics/:metric", () => {
     );
     createdIds.opportunities.push(opportunity.id);
     await backdate("opportunity", opportunity.id, "1985-05-05T10:00:00Z");
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Stats agent ${randomNumericSuffix()}`,
+        districtId: Number(pankowId),
+      }),
+    );
+    const agentOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Stats ${randomNumericSuffix()}`,
+        type: OpportunityType.REGULAR,
+        agentId: agent.id,
+      }),
+    );
+    createdIds.opportunities.push(agentOpportunity.id);
+    await backdate("opportunity", agentOpportunity.id, "1985-05-06T10:00:00Z");
 
     lead = await dataSource
       .getRepository(LeadFrom)
@@ -196,6 +214,7 @@ describe("GET /statistics/:metric", () => {
     await remove("statistics_event", createdIds.events);
     await remove("lead_from", lead ? [lead.id] : []);
     await remove("opportunity", createdIds.opportunities);
+    await remove("agent", agent ? [agent.id] : []);
     await remove("volunteer", createdIds.volunteers);
     await remove("deal", createdIds.deals);
     await remove("user", createdIds.users);
@@ -284,13 +303,24 @@ describe("GET /statistics/:metric", () => {
       {
         period: "1985",
         start: "1984-12-31T23:00:00.000Z",
-        counts: { [OpportunityType.EVENTS]: 1 },
-        total: 1,
+        counts: { [OpportunityType.EVENTS]: 1, [OpportunityType.REGULAR]: 1 },
+        total: 2,
       },
     ]);
     expect(data.groups.map(({ key }) => key)).toEqual(
       Object.values(OpportunityType),
     );
+  });
+
+  it("falls back to the agent's district for a request without one", async () => {
+    const data = await getData(
+      "/statistics/requests?granularity=year&from=1985-01-01&to=1986-01-01&groupBy=district",
+    );
+
+    expect(data.periods[0]).toMatchObject({
+      counts: { [pankowId]: 1, [STATISTICS_UNKNOWN_KEY]: 1 },
+      total: 2,
+    });
   });
 
   it("counts heard-about-us answers and the totals before tracking", async () => {
@@ -325,6 +355,13 @@ describe("GET /statistics/:metric", () => {
   it("rejects an empty range", async () => {
     const response = await get(
       "/statistics/requests?granularity=month&from=1985-03-01&to=1985-03-01",
+    );
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects an empty range inside one period", async () => {
+    const response = await get(
+      "/statistics/requests?granularity=month&from=1985-03-15&to=1985-03-15",
     );
     expect(response.statusCode).toBe(400);
   });
