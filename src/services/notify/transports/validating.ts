@@ -2,13 +2,15 @@ import logger from "../../../logger";
 import type { EmailMessage, EmailTransport } from "../types";
 import { validateEmailMessage } from "../validate-email-message";
 
+function joinAddresses(addresses: string | string[] | undefined) {
+  return Array.isArray(addresses) ? addresses.join(", ") : addresses;
+}
+
 function formatReport(msg: EmailMessage, problems: string[]): string {
-  const to = Array.isArray(msg.to) ? msg.to.join(", ") : msg.to;
-  const cc = msg.cc
-    ? Array.isArray(msg.cc)
-      ? msg.cc.join(", ")
-      : msg.cc
-    : undefined;
+  const to = joinAddresses(msg.to);
+  const cc = joinAddresses(msg.cc);
+  const replyTo = joinAddresses(msg.replyTo);
+  const attachments = msg.attachments?.map((a) => a.filename).join(", ");
 
   return [
     "An outbound email was suspended because it failed content validation:",
@@ -19,7 +21,9 @@ function formatReport(msg: EmailMessage, problems: string[]): string {
     `From: ${msg.from ?? "(default)"}`,
     `To: ${to}`,
     ...(cc ? [`Cc: ${cc}`] : []),
+    ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
     `Subject: ${msg.subject}`,
+    ...(attachments ? [`Attachments: ${attachments}`] : []),
     "",
     "Text:",
     msg.text ?? "(none)",
@@ -53,12 +57,21 @@ export class ValidatingEmailTransport implements EmailTransport {
       `[notify] suspended invalid outbound email: ${problems.join("; ")}`,
     );
 
-    await this.errorTransport.send({
-      to: this.errorRecipient,
-      from: msg.from,
-      subject: `[Suspended invalid email] ${msg.subject || "(no subject)"}`,
-      text: formatReport(msg, problems),
-    });
+    try {
+      await this.errorTransport.send({
+        to: this.errorRecipient,
+        from: msg.from,
+        subject: `[Suspended invalid email] ${msg.subject || "(no subject)"}`,
+        text: formatReport(msg, problems),
+      });
+    } catch (err) {
+      logger.error(
+        `[notify] suspended email report not sent: ${err instanceof Error ? err.name : "error"}`,
+      );
+      if (!this.rejectSuspended) {
+        throw err;
+      }
+    }
 
     if (this.rejectSuspended) {
       throw new SuspendedEmailError(problems);

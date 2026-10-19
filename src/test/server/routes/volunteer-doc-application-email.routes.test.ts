@@ -23,6 +23,25 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
+const { failLog } = vi.hoisted(() => ({ failLog: { on: false } }));
+vi.mock(
+  "../../../server/utils/data/log-email-communication",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("../../../server/utils/data/log-email-communication")
+      >();
+    return {
+      logEmailCommunication: (
+        ...args: Parameters<typeof actual.logEmailCommunication>
+      ) =>
+        failLog.on
+          ? Promise.reject(new Error("db blip"))
+          : actual.logEmailCommunication(...args),
+    };
+  },
+);
+
 describe("POST /volunteer/:id/doc/application-email", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
@@ -133,6 +152,7 @@ describe("POST /volunteer/:id/doc/application-email", () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
+    failLog.on = false;
     emailCgcApplication = vi
       .spyOn(fastify.notify, "emailCgcApplication")
       .mockResolvedValue(undefined);
@@ -189,6 +209,23 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     expect(res.statusCode).toBe(502);
     expect(res.json().message).toBe("Application email not sent");
     expect(await communications(volunteer.id)).toHaveLength(0);
+  });
+
+  it("reports success and alerts ops when the email went out but was not logged", async () => {
+    failLog.on = true;
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValue(undefined);
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().data.sentAt).toEqual(expect.any(String));
+    expect(opsAlert).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `volunteer ${volunteer.id} was sent but not logged`,
+      ),
+    );
   });
 
   it("says why when the email failed validation", async () => {

@@ -51,6 +51,7 @@ describe("sendEmailCgcApplication", () => {
     expect(msg.text).toMatch(/All the best,\nCora, Need4Deed$/);
     expect(msg.text).toContain(`${urlApp}/en/data-privacy`);
     expect(msg.text).toContain(`${urlApp}/en/agreement`);
+    expect(msg.text).toContain(`(${emailFromCommunity}) is copied`);
     expect(msg.text).not.toMatch(/\{\{/);
   });
 
@@ -89,15 +90,25 @@ describe("sendEmailCgcApplication", () => {
     expect(send.mock.calls[0][0].text).toMatch(/^Hi there,/);
   });
 
-  it("links the pages in the language the manifest falls back to", async () => {
+  it("uses the English builtin over a German-only manifest for an English volunteer", async () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue({
-      de: { subject: "EFZ", text: "{{ dataPrivacyUrl }} {{ agreementUrl }}" },
+      de: { subject: "EFZ", text: "Hallo" },
     });
 
     await sendEmailCgcApplication(email, input);
 
+    expect(send.mock.calls[0][0].text).toMatch(/^Hi Vera,/);
+  });
+
+  it("links the pages in the language the manifest falls back to", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      en: { subject: "EFZ", text: "{{ dataPrivacyUrl }} {{ agreementUrl }}" },
+    });
+
+    await sendEmailCgcApplication(email, { ...input, language: "de" });
+
     expect(send.mock.calls[0][0].text).toBe(
-      `${urlApp}/de/data-privacy ${urlApp}/de/agreement`,
+      `${urlApp}/en/data-privacy ${urlApp}/en/agreement`,
     );
   });
 

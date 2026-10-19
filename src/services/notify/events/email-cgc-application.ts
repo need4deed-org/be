@@ -74,11 +74,12 @@ export async function sendEmailCgcApplication(
       volunteerName: volunteerName.trim() || NO_NAME,
       coordinatorName: name || TEAM_SIGNATURE,
       signature: name ? `${name}, Need4Deed` : TEAM_SIGNATURE,
+      communityEmail: emailFromCommunity,
       dataPrivacyUrl: pageUrls("data-privacy"),
       agreementUrl: pageUrls("agreement"),
     },
     locale,
-    { escapeHtmlValues: true },
+    { escapeHtmlValues: true, fallbackLocale: Lang.EN },
   );
 
   await email.send({

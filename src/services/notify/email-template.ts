@@ -117,16 +117,17 @@ function pickContent(
   manifest: Manifest | null,
   locale: Lang,
   builtin: Record<Lang, LocaleContent>,
+  fallback: Lang = DEFAULT_LOCALE,
 ): { content: LocaleContent; lang?: Lang } {
   const fromBuiltin = (): { content: LocaleContent; lang: Lang } =>
     builtin[locale]
       ? { content: builtin[locale], lang: locale }
-      : { content: builtin[DEFAULT_LOCALE], lang: DEFAULT_LOCALE };
+      : { content: builtin[fallback], lang: fallback };
 
   if (manifest && isFlatContent(manifest)) {
     return isValid(manifest) ? { content: manifest } : fromBuiltin();
   }
-  for (const lang of [locale, DEFAULT_LOCALE]) {
+  for (const lang of [locale, fallback]) {
     const content = manifest?.[lang];
     if (isValid(content)) {
       return { content, lang };
@@ -163,16 +164,19 @@ export function renderEmail(
   builtin: LocaleContent | Record<Lang, LocaleContent>,
   vars: TemplateVars,
   locale: Lang = DEFAULT_LOCALE,
-  { escapeHtmlValues = false }: { escapeHtmlValues?: boolean } = {},
+  {
+    escapeHtmlValues = false,
+    fallbackLocale = DEFAULT_LOCALE,
+  }: { escapeHtmlValues?: boolean; fallbackLocale?: Lang } = {},
 ): FillResult {
   const pickBuiltin = (): { content: LocaleContent; lang?: Lang } =>
     isFlatBuiltin(builtin)
       ? { content: builtin }
-      : pickContent(null, locale, builtin);
+      : pickContent(null, locale, builtin, fallbackLocale);
 
   const picked = isFlatBuiltin(builtin)
     ? { content: resolveFlatContent(manifest, builtin) }
-    : pickContent(manifest, locale, builtin);
+    : pickContent(manifest, locale, builtin, fallbackLocale);
 
   const { result, ambiguous } = fill(
     picked.content,

@@ -106,63 +106,79 @@ export default async function volunteerDocRoutes(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
       )[0];
 
-      const commRepo = fastify.db.communicationRepository;
-      let comm: Communication | undefined;
-      const acquired = await runWithAdvisoryLock(async () => {
-        const justSent = await commRepo.existsBy({
-          volunteerId: id,
-          communicationType: CommunicationType.CGC_APPLICATION_EMAIL,
-          date: Raw(
-            (alias) =>
-              `${alias} > LOCALTIMESTAMP - make_interval(secs => :secs)`,
-            { secs: cgcApplicationResendGuardMs / 1000 },
-          ),
-        });
-        if (justSent) {
-          throw new ConflictError(
-            `Application email to volunteer ${id} was just sent`,
-          );
-        }
+      const coordinatorPersonId = request.authUser?.personId;
+      const coordinator = coordinatorPersonId
+        ? await fastify.db.personRepository.findOneBy({
+            id: coordinatorPersonId,
+          })
+        : null;
 
-        const coordinatorPersonId = request.authUser?.personId;
-        const coordinator = coordinatorPersonId
-          ? await fastify.db.personRepository.findOneBy({
-              id: coordinatorPersonId,
-            })
-          : null;
-
-        try {
-          await fastify.notify.emailCgcApplication({
-            volunteerEmail,
-            volunteerName: volunteer.person.name,
-            language: latestUser?.language,
-            coordinatorName: coordinator?.name,
-            coordinatorEmail: request.authUser?.email,
+      let sentAt: Date | undefined;
+      const acquired = await runWithAdvisoryLock(
+        async (manager) => {
+          const commRepo = manager.getRepository(Communication);
+          const justSent = await commRepo.existsBy({
+            volunteerId: id,
+            communicationType: CommunicationType.CGC_APPLICATION_EMAIL,
+            date: Raw(
+              (alias) =>
+                `${alias} > LOCALTIMESTAMP - make_interval(secs => :secs)`,
+              { secs: cgcApplicationResendGuardMs / 1000 },
+            ),
           });
-        } catch (sendErr) {
-          logger.error(
-            `application email to volunteer ${id} not sent: ${sendErr}`,
-          );
-          throw new EmailNotSentError(
-            sendErr instanceof SuspendedEmailError
-              ? `Application email not sent: ${sendErr.problems.join("; ")}`
-              : "Application email not sent",
-          );
-        }
+          if (justSent) {
+            throw new ConflictError(
+              `Application email to volunteer ${id} was just sent`,
+            );
+          }
 
-        comm = await logEmailCommunication(
-          commRepo,
-          CommunicationType.CGC_APPLICATION_EMAIL,
-          { volunteerId: id, userId: request.authUser?.id },
-        );
-      }, [CGC_APPLICATION_LOCK_NAMESPACE, id]);
-      if (!acquired || !comm) {
+          try {
+            await fastify.notify.emailCgcApplication({
+              volunteerEmail,
+              volunteerName: volunteer.person.name,
+              language: latestUser?.language,
+              coordinatorName: coordinator?.name,
+              coordinatorEmail: request.authUser?.email,
+            });
+          } catch (sendErr) {
+            logger.error(
+              `application email to volunteer ${id} not sent: ${sendErr}`,
+            );
+            throw new EmailNotSentError(
+              sendErr instanceof SuspendedEmailError
+                ? `Application email not sent: ${sendErr.problems.join("; ")}`
+                : "Application email not sent",
+            );
+          }
+
+          try {
+            const comm = await logEmailCommunication(
+              commRepo,
+              CommunicationType.CGC_APPLICATION_EMAIL,
+              { volunteerId: id, userId: request.authUser?.id },
+            );
+            sentAt = comm.date;
+          } catch (logErr) {
+            logger.error(
+              `application email to volunteer ${id} sent but not logged: ${logErr}`,
+            );
+            fastify.notify
+              .opsAlert(
+                `Application email to volunteer ${id} was sent but not logged in the communication log: ${logErr}`,
+              )
+              .catch((err) => logger.error(err));
+            sentAt = new Date();
+          }
+        },
+        [CGC_APPLICATION_LOCK_NAMESPACE, id],
+      );
+      if (!acquired || !sentAt) {
         throw new ConflictError(
           `Application email to volunteer ${id} is already being sent`,
         );
       }
 
-      const data: ApiVolunteerApplicationEmailPost = { sentAt: comm.date };
+      const data: ApiVolunteerApplicationEmailPost = { sentAt };
       return reply.status(201).send({
         message: `Application email sent to volunteer ${id}`,
         data,
