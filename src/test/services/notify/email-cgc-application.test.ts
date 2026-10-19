@@ -1,0 +1,92 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cgcApplicationFormFileName,
+  emailFromCommunity,
+  urlApp,
+} from "../../../config/constants";
+import { fetchFileFromUrl, fetchJsonFromUrl } from "../../../data/utils";
+import {
+  resetCgcApplicationTemplateCache,
+  sendEmailCgcApplication,
+} from "../../../services/notify/events/email-cgc-application";
+
+vi.mock("../../../data/utils", () => ({
+  fetchJsonFromUrl: vi.fn(),
+  fetchFileFromUrl: vi.fn(),
+}));
+
+const send = vi.fn();
+const email = { send };
+const form = Buffer.from("%PDF-1.4");
+const input = {
+  volunteerEmail: "vera@example.com",
+  volunteerName: "Vera",
+  coordinatorName: "Cora",
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetCgcApplicationTemplateCache();
+  vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no manifest"));
+  vi.mocked(fetchFileFromUrl).mockResolvedValue(form);
+});
+
+describe("sendEmailCgcApplication", () => {
+  it("emails the volunteer the form, cc community@, signed by the coordinator", async () => {
+    await sendEmailCgcApplication(email, input);
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.to).toBe("vera@example.com");
+    expect(msg.cc).toBe(emailFromCommunity);
+    expect(msg.attachments).toEqual([
+      {
+        filename: cgcApplicationFormFileName,
+        content: form,
+        contentType: "application/pdf",
+      },
+    ]);
+    expect(msg.text).toContain("Hi Vera,");
+    expect(msg.text).toContain("All the best,\nCora");
+    expect(msg.text).toContain(`${urlApp}/en/data-privacy`);
+    expect(msg.text).toContain(`${urlApp}/en/agreement`);
+    expect(msg.text).not.toMatch(/\{\{/);
+  });
+
+  it("writes German for a German-speaking volunteer", async () => {
+    await sendEmailCgcApplication(email, { ...input, language: "de" });
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toContain("Hallo Vera,");
+    expect(msg.text).toContain(`${urlApp}/de/data-privacy`);
+  });
+
+  it("defaults to English when the language is unknown", async () => {
+    await sendEmailCgcApplication(email, { ...input, language: "fr" });
+
+    expect(send.mock.calls[0][0].text).toContain("Hi Vera,");
+  });
+
+  it("uses the CDN manifest when it has the locale", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      en: {
+        subject: "EFZ",
+        text: "Dear {{ volunteerName }}, {{ coordinatorName }}",
+      },
+    });
+
+    await sendEmailCgcApplication(email, input);
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.subject).toBe("EFZ");
+    expect(msg.text).toBe("Dear Vera, Cora");
+  });
+
+  it("does not send without the form", async () => {
+    vi.mocked(fetchFileFromUrl).mockRejectedValue(new Error("CDN down"));
+
+    await expect(sendEmailCgcApplication(email, input)).rejects.toThrow(
+      "CDN down",
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+});

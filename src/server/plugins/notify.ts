@@ -6,6 +6,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import User from "../../data/entity/user.entity";
 import logger from "../../logger";
 import {
+  CgcApplicationEmailInput,
   CRON_EMAIL_DRY_RUN,
   CRON_EMAIL_SENT,
   DryRunEmailTransport,
@@ -16,6 +17,7 @@ import {
   sendEmailAccompanyMatch,
   sendEmailAccompanyMatchVolunteer,
   sendEmailAccompanyNotFound,
+  sendEmailCgcApplication,
   sendEmailIntroduction,
   sendEmailNewAccompanying,
   sendEmailNewRegular,
@@ -54,6 +56,7 @@ interface NotifyService {
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
   emailTagged(input: EmailTaggedInput): Promise<void>;
+  emailCgcApplication(input: CgcApplicationEmailInput): Promise<void>;
 }
 
 export type EmailDelivery = "sent" | "dry-run";
@@ -198,6 +201,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
   const { validating: validatingNotify, raw: emailNotifyRaw } =
     buildNotifyEmailTransport();
   const emailNotify = validatingNotify();
+  const emailNotifyRejecting = validatingNotify(true);
   const slack = buildSlackTransport();
 
   fastify.decorate("notify", {
@@ -225,6 +229,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailRegistration(emailNotify, volunteer),
     emailTagged: (input: EmailTaggedInput) =>
       sendEmailTagged(emailNotify, input),
+    emailCgcApplication: (input: CgcApplicationEmailInput) =>
+      sendEmailCgcApplication(emailNotifyRejecting, input),
   });
 
   const cronSlack = cronSlackTransport(slack);
