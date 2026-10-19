@@ -32,6 +32,7 @@ export class SmtpEmailTransport implements EmailTransport {
       subject: msg.subject,
       text: msg.text,
       html: msg.html,
+      ...(msg.attachments?.length ? { attachments: msg.attachments } : {}),
     });
   }
 }
