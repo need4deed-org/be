@@ -18,7 +18,7 @@ import Communication from "../../../data/entity/communication.entity";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
 import { SuspendedEmailError } from "../../../services/notify";
-import { tryCatch } from "../../../services/utils";
+import { errorName, tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
   idTypeParamSchema,
@@ -36,10 +36,6 @@ import {
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
 const CGC_APPLICATION_LOCK_NAMESPACE = "cgc-application-email";
-
-function errorName(err: unknown): string {
-  return err instanceof Error ? err.name : "error";
-}
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
@@ -113,10 +109,16 @@ export default async function volunteerDocRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
-      const volunteer = await fastify.db.volunteerRepository.findOneOrFail({
-        where: { id },
-        relations: ["person", "person.users"],
-      });
+      const coordinatorPersonId = request.authUser?.personId;
+      const [volunteer, coordinator] = await Promise.all([
+        fastify.db.volunteerRepository.findOneOrFail({
+          where: { id },
+          relations: ["person", "person.users"],
+        }),
+        coordinatorPersonId
+          ? fastify.db.personRepository.findOneBy({ id: coordinatorPersonId })
+          : null,
+      ]);
       const volunteerEmail = volunteer.person?.email;
       if (!volunteerEmail) {
         throw new BadRequestError(`Volunteer ${id} has no email address`);
@@ -124,13 +126,6 @@ export default async function volunteerDocRoutes(
       const latestUser = [...(volunteer.person.users ?? [])].sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
       )[0];
-
-      const coordinatorPersonId = request.authUser?.personId;
-      const coordinator = coordinatorPersonId
-        ? await fastify.db.personRepository.findOneBy({
-            id: coordinatorPersonId,
-          })
-        : null;
 
       let comm: Communication | undefined;
       const acquired = await runWithAdvisoryLock(
@@ -147,7 +142,7 @@ export default async function volunteerDocRoutes(
           });
           if (justSent) {
             throw new ConflictError(
-              `Application email to volunteer ${id} was just sent`,
+              `Application email to volunteer ${id} is being sent or was just sent`,
             );
           }
           comm = await logEmailCommunication(

@@ -73,7 +73,7 @@ describe("sendEmailCgcApplication", () => {
     vi.mocked(fetchJsonFromUrl).mockResolvedValue({
       en: {
         subject: "EFZ",
-        text: "Dear {{ volunteerName }}, {{ coordinatorName }}",
+        text: "Dear {{ volunteerName }}, {{ signature }}",
       },
     });
 
@@ -81,7 +81,7 @@ describe("sendEmailCgcApplication", () => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("EFZ");
-    expect(msg.text).toBe("Dear Vera, Cora");
+    expect(msg.text).toBe("Dear Vera, Cora, Need4Deed");
   });
 
   it("greets without a name when the volunteer has none", async () => {
@@ -155,6 +155,14 @@ describe("sendEmailCgcApplication", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not re-fetch a missing manifest on every send", async () => {
+    await sendEmailCgcApplication(email, input);
+    await sendEmailCgcApplication(email, input);
+
+    expect(fetchJsonFromUrl).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[1][0].text).toMatch(/^Hi Vera,/);
   });
 
   it("rejects a form that is not a PDF", async () => {

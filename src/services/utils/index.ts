@@ -128,3 +128,7 @@ export const formatAppointmentDateTime = (
   appointmentDate: date ? formatDate(date) : null,
   appointmentTime: date ? formatTime(date) : null,
 });
+
+export function errorName(err: unknown): string {
+  return err instanceof Error ? err.name : "error";
+}

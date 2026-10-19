@@ -1,4 +1,5 @@
 import logger from "../../../logger";
+import { errorName } from "../../utils";
 import type { EmailMessage, EmailTransport } from "../types";
 import { validateEmailMessage } from "../validate-email-message";
 
@@ -66,7 +67,7 @@ export class ValidatingEmailTransport implements EmailTransport {
       });
     } catch (err) {
       logger.error(
-        `[notify] suspended email report not sent: ${err instanceof Error ? err.name : "error"}`,
+        `[notify] suspended email report not sent: ${errorName(err)}`,
       );
       if (!this.rejectSuspended) {
         throw err;

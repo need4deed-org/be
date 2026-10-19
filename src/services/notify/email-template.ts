@@ -258,11 +258,9 @@ function createCachedLoader<T>(
         logger.warn(
           `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
         );
-        if (!cache) {
-          return onColdFailure(err);
-        }
-        cache.expires = now + emailTemplateRetryMs;
-        return cache.value;
+        const value = cache ? cache.value : onColdFailure(err);
+        cache = { value, expires: now + emailTemplateRetryMs };
+        return value;
       }
     },
   };
@@ -286,7 +284,7 @@ export function createManifestLoader(url: string): {
 
 export function createFileLoader(
   url: string,
-  isValid: (file: Buffer) => boolean = () => true,
+  isValidFile: (file: Buffer) => boolean = () => true,
 ): {
   load(): Promise<Buffer>;
   resetCache(): void;
@@ -296,7 +294,7 @@ export function createFileLoader(
     url,
     async () => {
       const file = await fetchFileFromUrl(url, emailTemplateFetchTimeoutMs);
-      if (!isValid(file)) {
+      if (!isValidFile(file)) {
         throw new Error("unexpected file content");
       }
       return file;
