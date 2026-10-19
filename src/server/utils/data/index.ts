@@ -7,6 +7,7 @@ export * from "./agent-membership";
 export * from "./assert-agent-owns-opportunity";
 export * from "./assert-agent-visible";
 export * from "./assert-email-available";
+export * from "./commute-where";
 export * from "./create-agent-contact";
 export * from "./erase-person-pii";
 export * from "./for-routes";

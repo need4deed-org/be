@@ -1,4 +1,8 @@
-import { OpportunitySortField, SortOrder } from "need4deed-sdk";
+import {
+  OpportunitySortField,
+  QueryParamsKeys,
+  SortOrder,
+} from "need4deed-sdk";
 import { getRef } from "../utils";
 
 const paginationProps = {
@@ -45,6 +49,20 @@ const sortOrderProps = {
   },
 };
 
+const commuteFilterProps = {
+  [QueryParamsKeys.COMMUTE_POSTCODE]: { type: "string", pattern: "^[0-9]{5}$" },
+  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: {
+    type: "integer",
+    minimum: 1,
+    maximum: 600,
+  },
+};
+
+const commuteFilterDependencies = {
+  [QueryParamsKeys.COMMUTE_POSTCODE]: [QueryParamsKeys.MAX_COMMUTE_MINUTES],
+  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: [QueryParamsKeys.COMMUTE_POSTCODE],
+};
+
 const sortByProps = {
   sortBy: {
     type: "string",
@@ -82,7 +100,9 @@ export const opportunityListQuerySchema = {
           type: "array",
           items: getRef("OpportunityStatusType#"),
         },
+        ...commuteFilterProps,
       },
+      dependencies: commuteFilterDependencies,
     },
     additionalProperties: false,
   },
@@ -181,7 +201,9 @@ export const volunteerListQuerySchema = {
             { type: "array", items: { type: "string" } },
           ],
         },
+        ...commuteFilterProps,
       },
+      dependencies: commuteFilterDependencies,
       additionalProperties: false,
     },
   },
