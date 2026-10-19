@@ -306,7 +306,7 @@ function printReport(report: FillPostcodeCommuteReport, dryRun: boolean) {
   }
   if (report.stoppedEarly) {
     logger.error(
-      `Stopped after ${report.failed.length} consecutive failed pair(s); check VBB, then re-run to resume.`,
+      `Stopped after ${MAX_CONSECUTIVE_FAILURES} consecutive failed pair(s); check VBB, then re-run to resume.`,
     );
   }
 }
