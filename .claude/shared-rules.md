@@ -40,7 +40,7 @@ Before altering the database schema:
 - Confirm it is **semantically correct** — names and structure must match existing modeling
   conventions and clearly express what the data represents.
 
-Surface the proposed change and your reasoning *before* writing a migration. Schema changes are
+Surface the proposed change and your reasoning _before_ writing a migration. Schema changes are
 deliberate decisions, not incidental side effects of a feature.
 
 ## Clean up processes you launch
@@ -53,9 +53,15 @@ orphaned processes running — e.g. stray `next-server`/node instances piling up
 
 Default to **no comments**. Name things so the code explains itself.
 
-- Allowed: a rare one-line comment for a non-obvious *why* (e.g. a security or data-protection
+- Allowed: a rare one-line comment for a non-obvious _why_ (e.g. a security or data-protection
   gotcha), and tool directives (`eslint-disable`, `@ts-expect-error`).
 - Not allowed: issue/PR references (`fe#123`, `be#456`), change history, review discussion,
   explanations of what the code does, multi-line rationale. That belongs in the commit message or
   PR description.
 - Don't copy the comment style of surrounding code; remove such comments when you touch it.
+
+## Cases for names
+
+- all TypeScript names are in camelCase
+- all SQL names are in snake_case
+- all enum values, file names, etc. are in kebab-case
