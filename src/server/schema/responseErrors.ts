@@ -23,6 +23,10 @@ export const responseErrors = {
     type: "object",
     properties: { error: { type: "string" }, message: { type: "string" } },
   },
+  502: {
+    type: "object",
+    properties: { error: { type: "string" }, message: { type: "string" } },
+  },
   500: {
     type: "object",
     properties: { error: { type: "string" }, message: { type: "string" } },

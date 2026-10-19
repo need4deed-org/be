@@ -34,14 +34,17 @@ describe("fetchJsonFromUrl", () => {
   });
 
   it("fetches JSON from a URL", async () => {
-    const mockFetch = vi.fn().mockResolvedValueOnce({
-      json: () => Promise.resolve({ remote: true }),
-    });
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ remote: true })));
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await fetchJsonFromUrl("https://example.com/data.json");
     expect(result).toEqual({ remote: true });
-    expect(mockFetch).toHaveBeenCalledWith("https://example.com/data.json");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://example.com/data.json",
+      undefined,
+    );
 
     vi.unstubAllGlobals();
   });

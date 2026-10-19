@@ -197,6 +197,30 @@ describe("resolveLocale", () => {
     expect(resolveLocale("fr")).toBe(Lang.DE);
     expect(resolveLocale(undefined)).toBe(Lang.DE);
   });
+  it("uses the given fallback for unknown languages", () => {
+    expect(resolveLocale(undefined, Lang.EN)).toBe(Lang.EN);
+    expect(resolveLocale("de", Lang.EN)).toBe(Lang.DE);
+  });
+});
+
+describe("renderEmail fallbackLocale", () => {
+  const localized: Record<Lang, LocaleContent> = {
+    [Lang.EN]: { subject: "EN", text: "en" },
+    [Lang.DE]: { subject: "DE", text: "de" },
+  };
+
+  it("falls back to DE by default when the manifest lacks the locale", () => {
+    const manifest = { de: { subject: "M-DE", text: "m-de" } };
+    expect(renderEmail(manifest, localized, {}, Lang.EN).subject).toBe("M-DE");
+  });
+
+  it("uses the given fallback instead", () => {
+    const manifest = { de: { subject: "M-DE", text: "m-de" } };
+    expect(
+      renderEmail(manifest, localized, {}, Lang.EN, { fallbackLocale: Lang.EN })
+        .subject,
+    ).toBe("EN");
+  });
 });
 
 // ─── resolveContent ──────────────────────────────────────────────────────────

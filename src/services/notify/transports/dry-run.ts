@@ -25,13 +25,21 @@ export class DryRunEmailTransport implements EmailTransport {
         ? msg.cc.join(", ")
         : msg.cc
       : undefined;
-    const prefix = originalCc
-      ? `[TO: ${originalTo} CC: ${originalCc}]`
-      : `[TO: ${originalTo}]`;
+    const originalReplyTo = msg.replyTo
+      ? Array.isArray(msg.replyTo)
+        ? msg.replyTo.join(", ")
+        : msg.replyTo
+      : undefined;
+    const prefix = `[${[
+      `TO: ${originalTo}`,
+      ...(originalCc ? [`CC: ${originalCc}`] : []),
+      ...(originalReplyTo ? [`REPLY-TO: ${originalReplyTo}`] : []),
+    ].join(" ")}]`;
     const redirected: EmailMessage = {
       ...msg,
       to: DRY_RUN_RECIPIENT,
       cc: undefined,
+      replyTo: undefined,
       subject: `${prefix} ${msg.subject}`,
     };
     logger.info(

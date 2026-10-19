@@ -1,9 +1,10 @@
 import { Lang } from "need4deed-sdk";
 import {
   emailTemplateFetchTimeoutMs,
+  emailTemplateRetryMs,
   emailTemplateTtlMs,
 } from "../../config/constants";
-import { fetchJsonFromUrl } from "../../data/utils";
+import { fetchFileFromUrl, fetchJsonFromUrl } from "../../data/utils";
 import logger from "../../logger";
 
 export interface LocaleContent {
@@ -94,12 +95,15 @@ export function fillTemplate(
   return result;
 }
 
-export function resolveLocale(language: string | undefined): Lang {
+export function resolveLocale(
+  language: string | undefined,
+  fallback: Lang = DEFAULT_LOCALE,
+): Lang {
   return language === Lang.DE
     ? Lang.DE
     : language === Lang.EN
       ? Lang.EN
-      : DEFAULT_LOCALE;
+      : fallback;
 }
 
 function isValid(content: LocaleContent | undefined): content is LocaleContent {
@@ -114,16 +118,17 @@ function pickContent(
   manifest: Manifest | null,
   locale: Lang,
   builtin: Record<Lang, LocaleContent>,
+  fallback: Lang = DEFAULT_LOCALE,
 ): { content: LocaleContent; lang?: Lang } {
   const fromBuiltin = (): { content: LocaleContent; lang: Lang } =>
     builtin[locale]
       ? { content: builtin[locale], lang: locale }
-      : { content: builtin[DEFAULT_LOCALE], lang: DEFAULT_LOCALE };
+      : { content: builtin[fallback], lang: fallback };
 
   if (manifest && isFlatContent(manifest)) {
     return isValid(manifest) ? { content: manifest } : fromBuiltin();
   }
-  for (const lang of [locale, DEFAULT_LOCALE]) {
+  for (const lang of [locale, fallback]) {
     const content = manifest?.[lang];
     if (isValid(content)) {
       return { content, lang };
@@ -160,16 +165,19 @@ export function renderEmail(
   builtin: LocaleContent | Record<Lang, LocaleContent>,
   vars: TemplateVars,
   locale: Lang = DEFAULT_LOCALE,
-  { escapeHtmlValues = false }: { escapeHtmlValues?: boolean } = {},
+  {
+    escapeHtmlValues = false,
+    fallbackLocale = DEFAULT_LOCALE,
+  }: { escapeHtmlValues?: boolean; fallbackLocale?: Lang } = {},
 ): FillResult {
   const pickBuiltin = (): { content: LocaleContent; lang?: Lang } =>
     isFlatBuiltin(builtin)
       ? { content: builtin }
-      : pickContent(null, locale, builtin);
+      : pickContent(null, locale, builtin, fallbackLocale);
 
   const picked = isFlatBuiltin(builtin)
     ? { content: resolveFlatContent(manifest, builtin) }
-    : pickContent(manifest, locale, builtin);
+    : pickContent(manifest, locale, builtin, fallbackLocale);
 
   const { result, ambiguous } = fill(
     picked.content,
@@ -225,34 +233,74 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
-export function createManifestLoader(url: string): {
-  load(): Promise<Manifest | null>;
-  resetCache(): void;
-} {
-  let cache: { value: Manifest; expires: number } | null = null;
+function createCachedLoader<T>(
+  label: string,
+  url: string,
+  fetchValue: () => Promise<T>,
+  onColdFailure: (err: unknown) => T,
+): { load(): Promise<T>; resetCache(): void } {
+  let cache: { value: T; expires: number } | null = null;
 
   return {
     resetCache() {
       cache = null;
     },
-    async load(): Promise<Manifest | null> {
+    async load(): Promise<T> {
       const now = Date.now();
       if (cache && now < cache.expires) {
         return cache.value;
       }
       try {
-        const value = (await withTimeout(
-          fetchJsonFromUrl(url),
-          emailTemplateFetchTimeoutMs,
-        )) as Manifest;
+        const value = await fetchValue();
         cache = { value, expires: now + emailTemplateTtlMs };
         return value;
       } catch (err) {
         logger.warn(
-          `email manifest fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+          `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
         );
-        return cache?.value ?? null;
+        const value = cache ? cache.value : onColdFailure(err);
+        cache = { value, expires: now + emailTemplateRetryMs };
+        return value;
       }
     },
   };
+}
+
+export function createManifestLoader(url: string): {
+  load(): Promise<Manifest | null>;
+  resetCache(): void;
+} {
+  return createCachedLoader<Manifest | null>(
+    "manifest",
+    url,
+    async () =>
+      (await withTimeout(
+        fetchJsonFromUrl(url),
+        emailTemplateFetchTimeoutMs,
+      )) as Manifest,
+    () => null,
+  );
+}
+
+export function createFileLoader(
+  url: string,
+  isValidFile: (file: Buffer) => boolean = () => true,
+): {
+  load(): Promise<Buffer>;
+  resetCache(): void;
+} {
+  return createCachedLoader(
+    "attachment",
+    url,
+    async () => {
+      const file = await fetchFileFromUrl(url, emailTemplateFetchTimeoutMs);
+      if (!isValidFile(file)) {
+        throw new Error("unexpected file content");
+      }
+      return file;
+    },
+    (err) => {
+      throw err;
+    },
+  );
 }

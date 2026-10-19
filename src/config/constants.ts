@@ -131,6 +131,12 @@ export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
 
 export const emailTaggedManifestUrl = CDNBaseUrl + "/emails/tagged.json";
+export const emailCgcApplicationManifestUrl =
+  CDNBaseUrl + "/emails/cgcapplication.json";
+export const cgcApplicationResendGuardMs = 60 * 1000;
+export const cgcApplicationFormFileName = "EFZ_Antrag_V.pdf";
+export const cgcApplicationFormUrl =
+  CDNBaseUrl + "/emails/" + cgcApplicationFormFileName;
 
 export const emailFromVolunteer =
   process.env.EMAIL_FROM_VOLUNTEER || "volunteer@need4deed.org";
@@ -138,6 +144,8 @@ export const emailFromContact =
   process.env.EMAIL_FROM_CONTACT || "contact@need4deed.org";
 export const emailFromAccompanying =
   process.env.EMAIL_FROM_ACCOMPANYING || "accompanying@need4deed.org";
+export const emailFromCommunity =
+  process.env.EMAIL_FROM_COMMUNITY || "community@need4deed.org";
 export const emailFromNotify =
   process.env.EMAIL_FROM_NOTIFY || "coordinators@need4deed.org";
 
@@ -147,6 +155,7 @@ export const errorEmailRecipient =
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
 
+export const emailTemplateRetryMs = 60 * 1000;
 export const emailTemplateFetchTimeoutMs =
   Number(process.env.EMAIL_TEMPLATE_FETCH_TIMEOUT_MS) || 5000;
 

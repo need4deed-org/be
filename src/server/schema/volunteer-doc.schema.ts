@@ -41,3 +41,16 @@ export const volunteerDocSchemaUploadMeta = {
   },
   required: ["mimeType", "originalName", "type"],
 };
+
+export const volunteerDocSchemaApplicationEmail201 = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+    data: {
+      type: "object",
+      properties: { sentAt: { type: "string", format: "date-time" } },
+      required: ["sentAt"],
+    },
+  },
+  required: ["message", "data"],
+};

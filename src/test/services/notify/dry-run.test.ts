@@ -34,6 +34,43 @@ describe("dry-run transports", () => {
     }
   });
 
+  it("keeps attachments on a redirected email", async () => {
+    const real = { send: vi.fn() };
+    const attachments = [
+      {
+        filename: "form.pdf",
+        content: Buffer.from("%PDF-1.4"),
+        contentType: "application/pdf",
+      },
+    ];
+
+    await new DryRunEmailTransport(real).send({
+      to: "vera@example.com",
+      subject: "Form",
+      text: "Attached.",
+      attachments,
+    });
+
+    expect(real.send.mock.calls[0][0].attachments).toBe(attachments);
+  });
+
+  it("drops reply-to on a redirected email, keeping it in the subject", async () => {
+    const real = { send: vi.fn() };
+
+    await new DryRunEmailTransport(real).send({
+      to: "vera@example.com",
+      replyTo: ["cora@example.com", "team@example.com"],
+      subject: "Form",
+      text: "Attached.",
+    });
+
+    const redirected = real.send.mock.calls[0][0];
+    expect(redirected.replyTo).toBeUndefined();
+    expect(redirected.subject).toBe(
+      "[TO: vera@example.com REPLY-TO: cora@example.com, team@example.com] Form",
+    );
+  });
+
   it("suppresses a Slack message, logging the channel but not the text", async () => {
     await new DryRunSlackTransport().send({
       channel: "comments",

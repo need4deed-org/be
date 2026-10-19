@@ -59,6 +59,39 @@ describe("ValidatingEmailTransport", () => {
     expect(report.text).toContain("some body");
   });
 
+  it("reports reply-to and attachment names", async () => {
+    const { errorTransport, transport } = buildTransports();
+
+    await transport.send({
+      to: "person@example.com",
+      replyTo: ["cora@example.com", "team@example.com"],
+      subject: "",
+      text: "x",
+      attachments: [
+        {
+          filename: "form.pdf",
+          content: Buffer.from("%PDF"),
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    const report = vi.mocked(errorTransport.send).mock.calls[0][0];
+    expect(report.text).toContain(
+      "Reply-To: cora@example.com, team@example.com",
+    );
+    expect(report.text).toContain("Attachments: form.pdf");
+  });
+
+  it("still rejects with the problems when the report itself fails", async () => {
+    const { errorTransport, transport } = buildTransports(true);
+    vi.mocked(errorTransport.send).mockRejectedValue(new Error("smtp down"));
+
+    await expect(
+      transport.send({ to: "person@example.com", subject: "", text: "x" }),
+    ).rejects.toBeInstanceOf(SuspendedEmailError);
+  });
+
   it("reports a blank subject with a placeholder fallback in the report subject line", async () => {
     const { errorTransport, transport } = buildTransports();
 
