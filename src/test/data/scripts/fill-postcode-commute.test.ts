@@ -123,7 +123,28 @@ describe("shortestJourneyMinutes", () => {
     ).toBe(25);
   });
 
-  it("falls back to planned times and skips journeys without times", () => {
+  it("uses planned times over realtime ones", () => {
+    expect(
+      shortestJourneyMinutes({
+        journeys: [
+          {
+            legs: [
+              {
+                departure: "2026-10-20T10:00:00+02:00",
+                plannedDeparture: "2026-10-20T10:00:00+02:00",
+              },
+              {
+                arrival: "2026-10-20T10:55:00+02:00",
+                plannedArrival: "2026-10-20T10:30:00+02:00",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe(30);
+  });
+
+  it("falls back to realtime times and skips journeys without times", () => {
     expect(
       shortestJourneyMinutes({
         journeys: [
@@ -131,10 +152,10 @@ describe("shortestJourneyMinutes", () => {
           {
             legs: [
               {
-                departure: null,
-                plannedDeparture: "2026-10-20T10:00:00+02:00",
+                departure: "2026-10-20T10:00:00+02:00",
+                plannedDeparture: null,
               },
-              { arrival: null, plannedArrival: "2026-10-20T10:40:00+02:00" },
+              { arrival: "2026-10-20T10:40:00+02:00", plannedArrival: null },
             ],
           },
         ],
@@ -202,10 +223,12 @@ describe("runFill", () => {
   ];
   const deps = (
     fetchJourneys: (url: string) => Promise<VbbJourneysResponse>,
+    maxConsecutiveFailures = 10,
   ) => ({
     fetchJourneys,
     sleep: () => Promise.resolve(),
     departure: new Date("2026-10-20T08:00:00.000Z"),
+    maxConsecutiveFailures,
   });
   const commuteRows = () =>
     dataSource.getRepository(PostcodeCommute).find({
@@ -328,6 +351,37 @@ describe("runFill", () => {
       failed: [
         { from: postcodes[0].value, to: postcodes[2].value, error: "HTTP 500" },
       ],
+      stoppedEarly: false,
     });
+  });
+
+  it("stops after too many consecutive failed pairs", async () => {
+    const fetchJourneys = vi.fn().mockRejectedValue(new Error("HTTP 503"));
+
+    const report = await runFill(
+      dataSource,
+      { refresh: true, dryRun: false, postcodes: values() },
+      deps(fetchJourneys, 2),
+    );
+    expect(fetchJourneys).toHaveBeenCalledTimes(2);
+    expect(report).toMatchObject({ pending: 6, saved: 0, stoppedEarly: true });
+    expect(report.failed).toHaveLength(2);
+  });
+
+  it("counts only consecutive failures towards the stop", async () => {
+    const fetchJourneys = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("HTTP 503"))
+      .mockResolvedValueOnce(answer(20))
+      .mockRejectedValueOnce(new Error("HTTP 503"))
+      .mockResolvedValue(answer(20));
+
+    const report = await runFill(
+      dataSource,
+      { refresh: true, dryRun: false, postcodes: values() },
+      deps(fetchJourneys, 2),
+    );
+    expect(report).toMatchObject({ pending: 6, saved: 4, stoppedEarly: false });
+    expect(report.failed).toHaveLength(2);
   });
 });

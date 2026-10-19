@@ -51,7 +51,11 @@ const sortOrderProps = {
 
 const commuteFilterProps = {
   [QueryParamsKeys.COMMUTE_POSTCODE]: { type: "string", pattern: "^[0-9]{5}$" },
-  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: { type: "integer", minimum: 1 },
+  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: {
+    type: "integer",
+    minimum: 1,
+    maximum: 600,
+  },
 };
 
 const commuteFilterDependencies = {

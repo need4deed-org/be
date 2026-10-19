@@ -15,6 +15,7 @@ const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 const PROGRESS_EVERY = 100;
+const MAX_CONSECUTIVE_FAILURES = 10;
 
 export interface FillPostcodeCommuteOptions {
   refresh: boolean;
@@ -44,6 +45,7 @@ export interface FillPostcodeCommuteDeps {
   fetchJourneys: (url: string) => Promise<VbbJourneysResponse>;
   sleep: (ms: number) => Promise<void>;
   departure: Date;
+  maxConsecutiveFailures: number;
 }
 
 export interface FillPostcodeCommuteReport {
@@ -51,6 +53,7 @@ export interface FillPostcodeCommuteReport {
   saved: number;
   noJourney: { from: string; to: string }[];
   failed: { from: string; to: string; error: string }[];
+  stoppedEarly: boolean;
 }
 
 export function parseArgs(argv: string[]): FillPostcodeCommuteOptions {
@@ -126,8 +129,8 @@ export function shortestJourneyMinutes(
   const durations = (response.journeys ?? []).flatMap(({ legs }) => {
     const first = legs[0];
     const last = legs[legs.length - 1];
-    const departure = first?.departure ?? first?.plannedDeparture;
-    const arrival = last?.arrival ?? last?.plannedArrival;
+    const departure = first?.plannedDeparture ?? first?.departure;
+    const arrival = last?.plannedArrival ?? last?.arrival;
     if (!departure || !arrival) {
       return [];
     }
@@ -226,6 +229,7 @@ export async function runFill(
     saved: 0,
     noJourney: [],
     failed: [],
+    stoppedEarly: false,
   };
   logger.info(
     `${pairs.length} of ${points.length * (points.length - 1)} pair(s) to fetch, departure ${deps.departure.toISOString()}`,
@@ -237,6 +241,7 @@ export async function runFill(
   const repository = ds.getRepository(PostcodeCommute);
   const intervalMs = 60_000 / REQUESTS_PER_MINUTE;
   let lastRequestAt = 0;
+  let consecutiveFailures = 0;
 
   for (const [index, [from, to]] of pairs.entries()) {
     const wait = lastRequestAt + intervalMs - Date.now();
@@ -249,6 +254,7 @@ export async function runFill(
       const minutes = shortestJourneyMinutes(
         await deps.fetchJourneys(journeysUrl(from, to, deps.departure)),
       );
+      consecutiveFailures = 0;
       if (minutes === null) {
         report.noJourney.push({ from: from.value, to: to.value });
       } else {
@@ -269,6 +275,10 @@ export async function runFill(
         to: to.value,
         error: (err as Error).message,
       });
+      if (++consecutiveFailures >= deps.maxConsecutiveFailures) {
+        report.stoppedEarly = true;
+        break;
+      }
     }
 
     if ((index + 1) % PROGRESS_EVERY === 0) {
@@ -294,6 +304,11 @@ function printReport(report: FillPostcodeCommuteReport, dryRun: boolean) {
   for (const { from, to, error } of report.failed) {
     logger.info(`  failed: ${from} -> ${to} (${error}), re-run to retry`);
   }
+  if (report.stoppedEarly) {
+    logger.error(
+      `Stopped after ${report.failed.length} consecutive failed pair(s); check VBB, then re-run to resume.`,
+    );
+  }
 }
 
 async function main() {
@@ -305,6 +320,7 @@ async function main() {
       fetchJourneys: (url) => fetchVbbJourneys(url),
       sleep: defaultSleep,
       departure: nextTuesdayDeparture(),
+      maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
     });
     printReport(report, options.dryRun);
   } finally {
