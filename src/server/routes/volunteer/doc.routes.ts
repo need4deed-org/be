@@ -35,12 +35,31 @@ import {
 } from "../../utils";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
-const CGC_APPLICATION_LOCK_NAMESPACE = 20261019;
+const CGC_APPLICATION_LOCK_NAMESPACE = "cgc-application-email";
+
+function errorName(err: unknown): string {
+  return err instanceof Error ? err.name : "error";
+}
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  async function removeUnsentLog(comm: Communication): Promise<void> {
+    try {
+      await fastify.db.communicationRepository.remove(comm);
+    } catch (removeErr) {
+      logger.error(
+        `unsent application email still logged (communication ${comm.id}): ${errorName(removeErr)}`,
+      );
+      fastify.notify
+        .opsAlert(
+          `Application email to volunteer ${comm.volunteerId} was not sent, but communication ${comm.id} could not be removed — delete it by hand.`,
+        )
+        .catch((err) => logger.error(err));
+    }
+  }
+
   fastify.get<{ Params: { id: number } }>(
     "/",
     {
@@ -113,7 +132,7 @@ export default async function volunteerDocRoutes(
           })
         : null;
 
-      let sentAt: Date | undefined;
+      let comm: Communication | undefined;
       const acquired = await runWithAdvisoryLock(
         async (manager) => {
           const commRepo = manager.getRepository(Communication);
@@ -131,54 +150,41 @@ export default async function volunteerDocRoutes(
               `Application email to volunteer ${id} was just sent`,
             );
           }
-
-          try {
-            await fastify.notify.emailCgcApplication({
-              volunteerEmail,
-              volunteerName: volunteer.person.name,
-              language: latestUser?.language,
-              coordinatorName: coordinator?.name,
-              coordinatorEmail: request.authUser?.email,
-            });
-          } catch (sendErr) {
-            logger.error(
-              `application email to volunteer ${id} not sent: ${sendErr}`,
-            );
-            throw new EmailNotSentError(
-              sendErr instanceof SuspendedEmailError
-                ? `Application email not sent: ${sendErr.problems.join("; ")}`
-                : "Application email not sent",
-            );
-          }
-
-          try {
-            const comm = await logEmailCommunication(
-              commRepo,
-              CommunicationType.CGC_APPLICATION_EMAIL,
-              { volunteerId: id, userId: request.authUser?.id },
-            );
-            sentAt = comm.date;
-          } catch (logErr) {
-            logger.error(
-              `application email to volunteer ${id} sent but not logged: ${logErr}`,
-            );
-            fastify.notify
-              .opsAlert(
-                `Application email to volunteer ${id} was sent but not logged in the communication log: ${logErr}`,
-              )
-              .catch((err) => logger.error(err));
-            sentAt = new Date();
-          }
+          comm = await logEmailCommunication(
+            commRepo,
+            CommunicationType.CGC_APPLICATION_EMAIL,
+            { volunteerId: id, userId: request.authUser?.id },
+          );
         },
         [CGC_APPLICATION_LOCK_NAMESPACE, id],
       );
-      if (!acquired || !sentAt) {
+      if (!acquired || !comm) {
         throw new ConflictError(
           `Application email to volunteer ${id} is already being sent`,
         );
       }
 
-      const data: ApiVolunteerApplicationEmailPost = { sentAt };
+      try {
+        await fastify.notify.emailCgcApplication({
+          volunteerEmail,
+          volunteerName: volunteer.person.name,
+          language: latestUser?.language,
+          coordinatorName: coordinator?.name,
+          coordinatorEmail: request.authUser?.email,
+        });
+      } catch (sendErr) {
+        logger.error(
+          `application email to volunteer ${id} not sent: ${errorName(sendErr)}`,
+        );
+        await removeUnsentLog(comm);
+        throw new EmailNotSentError(
+          sendErr instanceof SuspendedEmailError
+            ? `Application email not sent: ${sendErr.problems.join("; ")}`
+            : "Application email not sent",
+        );
+      }
+
+      const data: ApiVolunteerApplicationEmailPost = { sentAt: comm.date };
       return reply.status(201).send({
         message: `Application email sent to volunteer ${id}`,
         data,

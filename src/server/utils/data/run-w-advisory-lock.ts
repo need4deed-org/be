@@ -4,29 +4,35 @@ import logger from "../../../logger";
 
 export async function runWithAdvisoryLock(
   fn: (manager: EntityManager) => Promise<void>,
-  lockId: number | [number, number],
+  lockId: number | [namespace: string, id: number],
 ): Promise<boolean> {
-  const key = Array.isArray(lockId) ? lockId : [lockId];
-  const placeholders = key.map((_, i) => `$${i + 1}`).join(", ");
   const qr = dataSource.createQueryRunner();
   try {
     await qr.connect();
-    const [row] = await qr.query(
-      `SELECT pg_try_advisory_lock(${placeholders}) AS acquired`,
-      key,
-    );
+    await qr.startTransaction();
+    const [row] = Array.isArray(lockId)
+      ? await qr.query(
+          "SELECT pg_try_advisory_xact_lock(hashtext($1), $2) AS acquired",
+          lockId,
+        )
+      : await qr.query("SELECT pg_try_advisory_xact_lock($1) AS acquired", [
+          lockId,
+        ]);
     if (!row?.acquired) {
-      logger.debug(`advisory lock ${key.join(":")} is held — skipping`);
+      logger.debug(
+        `advisory lock ${[lockId].flat().join(":")} is held — skipping`,
+      );
+      await qr.rollbackTransaction();
       return false;
     }
-    try {
-      await fn(qr.manager);
-    } finally {
-      await qr
-        .query(`SELECT pg_advisory_unlock(${placeholders})`, key)
-        .catch((err) => logger.error(err));
-    }
+    await fn(qr.manager);
+    await qr.commitTransaction();
     return true;
+  } catch (err) {
+    await qr
+      .rollbackTransaction()
+      .catch((rollbackErr) => logger.error(rollbackErr));
+    throw err;
   } finally {
     await qr.release();
   }

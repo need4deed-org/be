@@ -211,20 +211,29 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     expect(await communications(volunteer.id)).toHaveLength(0);
   });
 
-  it("reports success and alerts ops when the email went out but was not logged", async () => {
+  it("sends nothing when the send cannot be logged", async () => {
     failLog.on = true;
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(500);
+    expect(emailCgcApplication).not.toHaveBeenCalled();
+  });
+
+  it("alerts ops when a failed send's log entry cannot be removed", async () => {
+    emailCgcApplication.mockRejectedValue(new Error("smtp down"));
+    vi.spyOn(fastify.db.communicationRepository, "remove").mockRejectedValue(
+      new Error("db blip"),
+    );
     const opsAlert = vi
       .spyOn(fastify.notify, "opsAlert")
       .mockResolvedValue(undefined);
 
     const res = await send(volunteer.id, coordinatorCookie);
 
-    expect(res.statusCode).toBe(201);
-    expect(res.json().data.sentAt).toEqual(expect.any(String));
+    expect(res.statusCode).toBe(502);
     expect(opsAlert).toHaveBeenCalledWith(
-      expect.stringContaining(
-        `volunteer ${volunteer.id} was sent but not logged`,
-      ),
+      expect.stringContaining("could not be removed"),
     );
   });
 

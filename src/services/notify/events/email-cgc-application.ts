@@ -18,7 +18,9 @@ import {
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailCgcApplicationManifestUrl);
-const formLoader = createFileLoader(cgcApplicationFormUrl);
+const formLoader = createFileLoader(cgcApplicationFormUrl, (file) =>
+  file.subarray(0, 5).equals(Buffer.from("%PDF-")),
+);
 
 export function resetCgcApplicationTemplateCache(): void {
   loader.resetCache();

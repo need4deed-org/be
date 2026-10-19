@@ -1,6 +1,7 @@
 import { Lang } from "need4deed-sdk";
 import {
   emailTemplateFetchTimeoutMs,
+  emailTemplateRetryMs,
   emailTemplateTtlMs,
 } from "../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../data/utils";
@@ -257,7 +258,11 @@ function createCachedLoader<T>(
         logger.warn(
           `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
         );
-        return cache ? cache.value : onColdFailure(err);
+        if (!cache) {
+          return onColdFailure(err);
+        }
+        cache.expires = now + emailTemplateRetryMs;
+        return cache.value;
       }
     },
   };
@@ -279,14 +284,23 @@ export function createManifestLoader(url: string): {
   );
 }
 
-export function createFileLoader(url: string): {
+export function createFileLoader(
+  url: string,
+  isValid: (file: Buffer) => boolean = () => true,
+): {
   load(): Promise<Buffer>;
   resetCache(): void;
 } {
   return createCachedLoader(
     "attachment",
     url,
-    () => fetchFileFromUrl(url, emailTemplateFetchTimeoutMs),
+    async () => {
+      const file = await fetchFileFromUrl(url, emailTemplateFetchTimeoutMs);
+      if (!isValid(file)) {
+        throw new Error("unexpected file content");
+      }
+      return file;
+    },
     (err) => {
       throw err;
     },

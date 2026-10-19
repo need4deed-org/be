@@ -157,6 +157,32 @@ describe("sendEmailCgcApplication", () => {
     }
   });
 
+  it("rejects a form that is not a PDF", async () => {
+    vi.mocked(fetchFileFromUrl).mockResolvedValue(Buffer.from("<html>"));
+
+    await expect(sendEmailCgcApplication(email, input)).rejects.toThrow(
+      "unexpected file content",
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("waits before retrying the CDN after a failed refresh", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await sendEmailCgcApplication(email, input);
+      vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
+      vi.mocked(fetchFileFromUrl).mockRejectedValue(new Error("CDN down"));
+
+      await sendEmailCgcApplication(email, input);
+      await sendEmailCgcApplication(email, input);
+
+      expect(fetchFileFromUrl).toHaveBeenCalledTimes(2);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not send without the form", async () => {
     vi.mocked(fetchFileFromUrl).mockRejectedValue(new Error("CDN down"));
 

@@ -155,6 +155,7 @@ export const errorEmailRecipient =
 export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
 
+export const emailTemplateRetryMs = 60 * 1000;
 export const emailTemplateFetchTimeoutMs =
   Number(process.env.EMAIL_TEMPLATE_FETCH_TIMEOUT_MS) || 5000;
 
