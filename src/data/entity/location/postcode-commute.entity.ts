@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
@@ -24,6 +25,7 @@ export default class PostcodeCommute {
   fromPostcode: Postcode;
 
   @PrimaryColumn()
+  @Index()
   toPostcodeId: number;
 
   @ManyToOne(() => Postcode, { onDelete: "CASCADE" })

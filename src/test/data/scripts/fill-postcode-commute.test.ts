@@ -187,7 +187,7 @@ describe("fetchVbbJourneys", () => {
     const sleep = vi.fn().mockResolvedValue(undefined);
 
     await expect(fetchVbbJourneys("u", sleep, fetchFn)).rejects.toThrow(
-      "TypeError",
+      "TypeError: fetch failed",
     );
     expect(fetchFn).toHaveBeenCalledTimes(5);
   });

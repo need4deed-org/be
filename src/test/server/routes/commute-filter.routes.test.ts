@@ -81,6 +81,8 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
   let coordinator: Person;
   let agent: Agent;
   const postcodes = {} as Record<PostcodeKey, Postcode>;
+  const extraPostcodes: Postcode[] = [];
+  let withoutCoordinates: Postcode;
   const volunteers = {} as Record<VolunteerKey, Volunteer>;
   const opportunities = {} as Record<OpportunityKey, Opportunity>;
   const persons: Person[] = [];
@@ -108,13 +110,23 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
     await fastify.ready();
 
     const values = new Set<string>();
-    while (values.size < 4) {
+    while (values.size < 5) {
       values.add(`8${randomNumericSuffix(4)}`);
     }
-    const [origin, near, far, unmatched] = await getRepository(
-      dataSource,
-      Postcode,
-    ).save([...values].map((value) => new Postcode({ value })));
+    const [originValue, ...otherValues] = [...values];
+    const located = (value: string, i: number) =>
+      new Postcode({ value, latitude: 52.5 + i / 100, longitude: 13.4 });
+    const postcodeRepository = getRepository(dataSource, Postcode);
+    const originDuplicateFirst = await postcodeRepository.save(
+      located(originValue, 0),
+    );
+    const [origin, near, far, unmatched] = await postcodeRepository.save(
+      [originValue, ...otherValues.slice(0, 3)].map(located),
+    );
+    withoutCoordinates = await postcodeRepository.save(
+      new Postcode({ value: otherValues[3] }),
+    );
+    extraPostcodes.push(originDuplicateFirst, withoutCoordinates);
     Object.assign(postcodes, { origin, near, far, unmatched });
     await getRepository(dataSource, PostcodeCommute).save(
       COMMUTES.map(
@@ -228,7 +240,7 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
     await fastify.db.personRepository.delete({ id: ids(persons) });
     await getRepository(dataSource, Address).delete({ id: ids(addresses) });
     await getRepository(dataSource, Postcode).delete({
-      id: ids(Object.values(postcodes)),
+      id: ids([...Object.values(postcodes), ...extraPostcodes]),
     });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.db.userRepository.delete({ personId: coordinator.id });
@@ -278,7 +290,18 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
       expect(res.statusCode).toBe(400);
       expect(res.json().message).toBe('Unknown commute postcode "00000".');
     });
+
+    it("rejects a postcode without coordinates with 400", async () => {
+      const res = await get(
+        `${list}?filter[commute-postcode]=${withoutCoordinates.value}&filter[max-commute-minutes]=30`,
+      );
+      expect(res.statusCode).toBe(400);
+      expect(res.json().message).toBe(
+        `Commute postcode "${withoutCoordinates.value}" has no coordinates.`,
+      );
+    });
   });
+
   const own = (
     entities: Record<string, { id: number }>,
     res: { json: () => { data: { id: number }[] } },

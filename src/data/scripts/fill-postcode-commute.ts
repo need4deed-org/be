@@ -161,7 +161,8 @@ export async function fetchVbbJourneys(
         break;
       }
     } catch (err) {
-      lastError = (err as Error).name;
+      const { name, message } = err as Error;
+      lastError = `${name}: ${message}`;
     }
     if (attempt < MAX_ATTEMPTS) {
       await sleep(RETRY_BASE_MS * attempt);
