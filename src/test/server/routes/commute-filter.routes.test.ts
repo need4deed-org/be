@@ -1,21 +1,100 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  OpportunityStatusType,
+  OpportunityType,
+  UserRole,
+} from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
+import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import PostcodeCommute from "../../../data/entity/location/postcode-commute.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
+import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
+import Agent from "../../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
-import { hashPassword } from "../../../data/utils";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { DealType } from "../../../data/types";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 const LISTS = ["/volunteer", "/opportunity"];
 
+type PostcodeKey = "origin" | "near" | "far" | "unmatched";
+
+// Asymmetric on purpose, so measuring the wrong direction fails the tests.
+const COMMUTES: [PostcodeKey, PostcodeKey, number][] = [
+  ["near", "origin", 20],
+  ["far", "origin", 50],
+  ["origin", "near", 50],
+  ["origin", "far", 20],
+];
+
+type VolunteerKey =
+  | "from20"
+  | "from50"
+  | "unmatched"
+  | "noAddress"
+  | "sameAsOrigin";
+
+const VOLUNTEER_ADDRESS: Record<VolunteerKey, PostcodeKey | null> = {
+  from20: "near",
+  from50: "far",
+  unmatched: "unmatched",
+  noAddress: null,
+  sameAsOrigin: "origin",
+};
+
+type OpportunityKey =
+  | "deal20"
+  | "deal50"
+  | "accompanying20Deal50"
+  | "accompanying50Deal20"
+  | "accompanyingWithoutPostcodeDeal50"
+  | "dealUnmatched"
+  | "noDeal";
+
+const OPPORTUNITY_PLACE: Record<
+  OpportunityKey,
+  { deal: PostcodeKey | null; accompanying?: PostcodeKey | null }
+> = {
+  deal20: { deal: "far" },
+  deal50: { deal: "near" },
+  accompanying20Deal50: { deal: "near", accompanying: "far" },
+  accompanying50Deal20: { deal: "far", accompanying: "near" },
+  accompanyingWithoutPostcodeDeal50: { deal: "near", accompanying: null },
+  dealUnmatched: { deal: "unmatched" },
+  noDeal: { deal: null },
+};
+
 describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunteer and GET /opportunity", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
   let cookie: string;
   let coordinator: Person;
+  let agent: Agent;
+  const postcodes = {} as Record<PostcodeKey, Postcode>;
+  const volunteers = {} as Record<VolunteerKey, Volunteer>;
+  const opportunities = {} as Record<OpportunityKey, Opportunity>;
+  const persons: Person[] = [];
+  const addresses: Address[] = [];
+  const deals: Deal[] = [];
+  const accompanyings: Accompanying[] = [];
+
+  async function dealAt(key: PostcodeKey) {
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcodes[key].id }),
+    );
+    deals.push(deal);
+    return deal;
+  }
 
   const get = (url: string) =>
     fastify.inject({
@@ -27,6 +106,89 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
+
+    const values = new Set<string>();
+    while (values.size < 4) {
+      values.add(`8${randomNumericSuffix(4)}`);
+    }
+    const [origin, near, far, unmatched] = await getRepository(
+      dataSource,
+      Postcode,
+    ).save([...values].map((value) => new Postcode({ value })));
+    Object.assign(postcodes, { origin, near, far, unmatched });
+    await getRepository(dataSource, PostcodeCommute).save(
+      COMMUTES.map(
+        ([from, to, minutes]) =>
+          new PostcodeCommute({
+            fromPostcodeId: postcodes[from].id,
+            toPostcodeId: postcodes[to].id,
+            minutes,
+          }),
+      ),
+    );
+
+    for (const [key, place] of Object.entries(VOLUNTEER_ADDRESS)) {
+      const address = place
+        ? await getRepository(dataSource, Address).save(
+            new Address({ postcodeId: postcodes[place].id }),
+          )
+        : null;
+      if (address) {
+        addresses.push(address);
+      }
+      const person = await fastify.db.personRepository.save(
+        new Person({
+          firstName: key,
+          lastName: `Commute${suffix}`,
+          addressId: address?.id,
+        }),
+      );
+      persons.push(person);
+      volunteers[key as VolunteerKey] =
+        await fastify.db.volunteerRepository.save(
+          new Volunteer({
+            dealId: (await dealAt("near")).id,
+            personId: person.id,
+          }),
+        );
+    }
+
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Commute Agent ${suffix}`,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+    for (const [key, place] of Object.entries(OPPORTUNITY_PLACE)) {
+      const accompanying =
+        place.accompanying === undefined
+          ? null
+          : await getRepository(dataSource, Accompanying).save(
+              new Accompanying({
+                name: "Commute",
+                address: "Commute",
+                postcodeId: place.accompanying
+                  ? postcodes[place.accompanying].id
+                  : undefined,
+              }),
+            );
+      if (accompanying) {
+        accompanyings.push(accompanying);
+      }
+      opportunities[key as OpportunityKey] =
+        await fastify.db.opportunityRepository.save(
+          new Opportunity({
+            title: `Commute ${key} ${suffix}`,
+            type: accompanying
+              ? OpportunityType.ACCOMPANYING
+              : OpportunityType.REGULAR,
+            status: OpportunityStatusType.SEARCHING,
+            dealId: place.deal ? (await dealAt(place.deal)).id : undefined,
+            accompanyingId: accompanying?.id,
+            agentId: agent.id,
+          }),
+        );
+    }
 
     coordinator = await fastify.db.personRepository.save(
       new Person({ firstName: "Commute", lastName: `Coord${suffix}` }),
@@ -51,6 +213,24 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
   });
 
   afterAll(async () => {
+    const ids = (entities: { id: number }[]) =>
+      In(entities.map(({ id }) => id));
+    await fastify.db.opportunityRepository.delete({
+      id: ids(Object.values(opportunities)),
+    });
+    await getRepository(dataSource, Accompanying).delete({
+      id: ids(accompanyings),
+    });
+    await fastify.db.volunteerRepository.delete({
+      id: ids(Object.values(volunteers)),
+    });
+    await fastify.db.dealRepository.delete({ id: ids(deals) });
+    await fastify.db.personRepository.delete({ id: ids(persons) });
+    await getRepository(dataSource, Address).delete({ id: ids(addresses) });
+    await getRepository(dataSource, Postcode).delete({
+      id: ids(Object.values(postcodes)),
+    });
+    await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.db.userRepository.delete({ personId: coordinator.id });
     await fastify.db.personRepository.delete({ id: coordinator.id });
     await fastify.close();
@@ -99,4 +279,64 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
       expect(res.json().message).toBe('Unknown commute postcode "00000".');
     });
   });
+  const own = (
+    entities: Record<string, { id: number }>,
+    res: { json: () => { data: { id: number }[] } },
+  ) =>
+    Object.entries(entities)
+      .filter(([, entity]) =>
+        res.json().data.some(({ id }) => id === entity.id),
+      )
+      .map(([key]) => key)
+      .sort();
+  const commuteQuery = (max?: number) =>
+    max === undefined
+      ? ""
+      : `&filter[commute-postcode]=${postcodes.origin.value}&filter[max-commute-minutes]=${max}`;
+  const listVolunteers = (max?: number) =>
+    get(
+      `/volunteer?limit=50&filter[search]=Commute${suffix}${commuteQuery(max)}`,
+    );
+  const listOpportunities = (max?: number) =>
+    get(`/opportunity?limit=100&filter[search]=${suffix}${commuteQuery(max)}`);
+
+  const ALL_VOLUNTEERS = Object.keys(VOLUNTEER_ADDRESS).sort();
+  const ALL_OPPORTUNITIES = Object.keys(OPPORTUNITY_PLACE).sort();
+
+  it.each([
+    ["no commute filter", undefined, ALL_VOLUNTEERS],
+    ["60 minutes", 60, ALL_VOLUNTEERS],
+    ["30 minutes", 30, ["from20", "noAddress", "sameAsOrigin", "unmatched"]],
+    [
+      "20 minutes, inclusive",
+      20,
+      ["from20", "noAddress", "sameAsOrigin", "unmatched"],
+    ],
+    ["10 minutes", 10, ["noAddress", "sameAsOrigin", "unmatched"]],
+  ])(
+    "filters volunteers by their address postcode's commute to the origin: %s",
+    async (_, max, expected) => {
+      const res = await listVolunteers(max);
+      expect(res.statusCode).toBe(200);
+      expect(own(volunteers, res)).toEqual([...expected].sort());
+    },
+  );
+
+  it.each([
+    ["no commute filter", undefined, ALL_OPPORTUNITIES],
+    ["60 minutes", 60, ALL_OPPORTUNITIES],
+    [
+      "30 minutes",
+      30,
+      ["accompanying20Deal50", "deal20", "dealUnmatched", "noDeal"],
+    ],
+    ["10 minutes", 10, ["dealUnmatched", "noDeal"]],
+  ])(
+    "filters opportunities by the commute from the origin to the appointment, else deal, postcode: %s",
+    async (_, max, expected) => {
+      const res = await listOpportunities(max);
+      expect(res.statusCode).toBe(200);
+      expect(own(opportunities, res)).toEqual([...expected].sort());
+    },
+  );
 });
