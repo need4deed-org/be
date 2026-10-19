@@ -45,6 +45,7 @@ import {
   VolunteerListType,
 } from "../../types";
 import {
+  andIntoWhere,
   buildEraseSummaryMessage,
   createAddress,
   erasePersonPii,
@@ -59,7 +60,9 @@ import {
   isStaffRole,
   patchEntity,
   patchOrReplaceAddress,
+  resolveCommuteFilter,
   updateOptionList,
+  volunteerCommuteIdWhere,
 } from "../../utils";
 import { maskPii } from "../../utils/pii/mask";
 import {
@@ -234,11 +237,15 @@ export default async function volunteerRoutes(
       );
       const [skip, take] = getSkipTake({ page, limit });
 
-      const [visibility, availabilityDealIds] = await Promise.all([
+      const [visibility, availabilityDealIds, commute] = await Promise.all([
         resolveVolunteerVisibility(request),
         findAvailabilityDealIds(filter?.availability),
+        resolveCommuteFilter(filter),
       ]);
       const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
+      if (commute) {
+        andIntoWhere(where, "id", volunteerCommuteIdWhere(commute));
+      }
       const order: FindOptionsOrder<Volunteer> = {
         id: sortOrder === SortOrder.OldToNew ? "ASC" : "DESC",
       };
