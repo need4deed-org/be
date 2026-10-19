@@ -60,6 +60,7 @@
     "create-api-key": "ts-node src/data/scripts/create-api-key.ts",
     "revoke-api-key": "ts-node src/data/scripts/revoke-api-key.ts",
     "dedupe-shared-address": "ts-node src/data/scripts/dedupe-shared-address.ts",
+    "fill-postcode-commute": "ts-node src/data/scripts/fill-postcode-commute.ts",
     "dev": "nodemon",
     "typeorm": "typeorm-ts-node-commonjs -d src/data/data-source.ts",
     "migration:generate": "yarn typeorm migration:generate",
