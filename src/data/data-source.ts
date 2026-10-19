@@ -13,6 +13,7 @@ import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
 import Address from "./entity/location/address.entity";
 import District from "./entity/location/district.entity";
+import PostcodeCommute from "./entity/location/postcode-commute.entity";
 import Postcode from "./entity/location/postcode.entity";
 import ActivityLog from "./entity/m2m/activity-log.entity";
 import AgentLanguage from "./entity/m2m/agent-language";
@@ -111,6 +112,7 @@ export const dataSource = new DataSource({
     Person,
     Post,
     Postcode,
+    PostcodeCommute,
     PostBookmark,
     PostReaction,
     Option,
