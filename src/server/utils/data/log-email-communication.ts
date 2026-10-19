@@ -9,7 +9,12 @@ import Communication from "../../../data/entity/communication.entity";
 export async function logEmailCommunication(
   repo: Repository<Communication>,
   communicationType: CommunicationType,
-  ids: { volunteerId?: number; opportunityId?: number; agentId?: number },
+  ids: {
+    volunteerId?: number;
+    opportunityId?: number;
+    agentId?: number;
+    userId?: number;
+  },
 ): Promise<Communication> {
   return repo.save(
     new Communication({

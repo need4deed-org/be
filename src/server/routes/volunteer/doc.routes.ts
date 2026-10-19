@@ -1,7 +1,12 @@
 import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { DocumentType, UserRole } from "need4deed-sdk";
-import { UnauthorizedError } from "../../../config";
+import {
+  ApiVolunteerApplicationEmailPost,
+  CommunicationType,
+  DocumentType,
+  UserRole,
+} from "need4deed-sdk";
+import { BadRequestError, UnauthorizedError } from "../../../config";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
@@ -9,11 +14,13 @@ import {
   idParamSchema,
   idTypeParamSchema,
   responseErrors,
+  volunteerDocSchemaApplicationEmail201,
   volunteerDocSchemaGet200,
   volunteerDocSchemaGetMeta200,
   volunteerDocSchemaUploadMeta,
 } from "../../schema";
 import { getVolunteerDocuments, isStaffRole } from "../../utils";
+import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
@@ -54,6 +61,61 @@ export default async function volunteerDocRoutes(
       return reply.send({
         message: `Documents for volunteer ${id}`,
         data: documents,
+      });
+    },
+  );
+
+  fastify.post<{ Params: { id: number } }>(
+    "/application-email",
+    {
+      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        response: {
+          201: volunteerDocSchemaApplicationEmail201,
+          ...responseErrors,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const volunteer = await fastify.db.volunteerRepository.findOneOrFail({
+        where: { id },
+        relations: ["person", "person.users"],
+      });
+      const volunteerEmail = volunteer.person?.email;
+      if (!volunteerEmail) {
+        throw new BadRequestError(`Volunteer ${id} has no email address`);
+      }
+      const coordinatorPersonId = request.authUser?.personId;
+      const coordinator = coordinatorPersonId
+        ? await fastify.db.personRepository.findOneBy({
+            id: coordinatorPersonId,
+          })
+        : null;
+
+      const commRepo = fastify.db.communicationRepository;
+      const comm = await logEmailCommunication(
+        commRepo,
+        CommunicationType.CGC_APPLICATION_EMAIL,
+        { volunteerId: id, userId: request.authUser?.id },
+      );
+      try {
+        await fastify.notify.emailCgcApplication({
+          volunteerEmail,
+          volunteerName: volunteer.person.name,
+          language: volunteer.person.users?.[0]?.language,
+          coordinatorName: coordinator?.name ?? "",
+        });
+      } catch (sendErr) {
+        await commRepo.remove(comm).catch(logger.error);
+        throw sendErr;
+      }
+
+      const data: ApiVolunteerApplicationEmailPost = { sentAt: comm.date };
+      return reply.status(201).send({
+        message: `Application email sent to volunteer ${id}`,
+        data,
       });
     },
   );
