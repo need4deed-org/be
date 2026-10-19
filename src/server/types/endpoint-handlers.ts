@@ -2,6 +2,7 @@ import {
   ApiPostListQuery,
   Lang,
   OpportunitySortField,
+  QueryParamsKeys,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -49,6 +50,11 @@ export interface QuerystringEventGet {
   language?: Lang;
 }
 
+export interface QuerystringCommuteFiltering {
+  [QueryParamsKeys.COMMUTE_POSTCODE]?: string;
+  [QueryParamsKeys.MAX_COMMUTE_MINUTES]?: number;
+}
+
 export interface QuerystringOpportunityFiltering {
   filter?: {
     type: string;
@@ -60,7 +66,7 @@ export interface QuerystringOpportunityFiltering {
     skill?: string;
     availability?: string | string[];
     district?: string;
-  };
+  } & QuerystringCommuteFiltering;
 }
 
 export type QuerystringOpportunityGetList = QuerystringPaginationLanguage &
@@ -106,7 +112,7 @@ export interface QuerystringVolunteerFiltering {
     engagement?: string | string[];
     match?: string | string[];
     ownerAgent?: string | string[];
-  };
+  } & QuerystringCommuteFiltering;
 }
 export type VolunteerListType = "card" | "table";
 
