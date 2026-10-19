@@ -48,7 +48,7 @@ describe("sendEmailCgcApplication", () => {
       },
     ]);
     expect(msg.text).toContain("Hi Vera,");
-    expect(msg.text).toMatch(/All the best,\nCora\nNeed4Deed$/);
+    expect(msg.text).toMatch(/All the best,\nCora, Need4Deed$/);
     expect(msg.text).toContain(`${urlApp}/en/data-privacy`);
     expect(msg.text).toContain(`${urlApp}/en/agreement`);
     expect(msg.text).not.toMatch(/\{\{/);
@@ -81,6 +81,24 @@ describe("sendEmailCgcApplication", () => {
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("EFZ");
     expect(msg.text).toBe("Dear Vera, Cora");
+  });
+
+  it("greets without a name when the volunteer has none", async () => {
+    await sendEmailCgcApplication(email, { ...input, volunteerName: "" });
+
+    expect(send.mock.calls[0][0].text).toMatch(/^Hi there,/);
+  });
+
+  it("links the pages in the language the manifest falls back to", async () => {
+    vi.mocked(fetchJsonFromUrl).mockResolvedValue({
+      de: { subject: "EFZ", text: "{{ dataPrivacyUrl }} {{ agreementUrl }}" },
+    });
+
+    await sendEmailCgcApplication(email, input);
+
+    expect(send.mock.calls[0][0].text).toBe(
+      `${urlApp}/de/data-privacy ${urlApp}/de/agreement`,
+    );
   });
 
   it("signs as the team when the coordinator has no name", async () => {

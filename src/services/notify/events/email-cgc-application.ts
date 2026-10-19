@@ -11,6 +11,7 @@ import { CGC_APPLICATION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createFileLoader,
   createManifestLoader,
+  LocalizedValue,
   renderEmail,
   resolveLocale,
 } from "../email-template";
@@ -24,10 +25,22 @@ export function resetCgcApplicationTemplateCache(): void {
   formLoader.resetCache();
 }
 
-const TEAM_SIGNATURE: Record<Lang, string> = {
+const TEAM_SIGNATURE: LocalizedValue = {
   [Lang.EN]: "The Need4Deed Team",
   [Lang.DE]: "Dein Need4Deed-Team",
 };
+
+const NO_NAME: LocalizedValue = {
+  [Lang.EN]: "there",
+  [Lang.DE]: "zusammen",
+};
+
+function pageUrls(page: string): LocalizedValue {
+  return {
+    [Lang.EN]: `${urlApp}/${Lang.EN}/${page}`,
+    [Lang.DE]: `${urlApp}/${Lang.DE}/${page}`,
+  };
+}
 
 export interface CgcApplicationEmailInput {
   volunteerEmail: string;
@@ -58,11 +71,11 @@ export async function sendEmailCgcApplication(
     manifest,
     BUILTIN,
     {
-      volunteerName,
-      coordinatorName: name || TEAM_SIGNATURE[locale],
-      signature: name ? `${name}\nNeed4Deed` : TEAM_SIGNATURE[locale],
-      dataPrivacyUrl: `${urlApp}/${locale}/data-privacy`,
-      agreementUrl: `${urlApp}/${locale}/agreement`,
+      volunteerName: volunteerName.trim() || NO_NAME,
+      coordinatorName: name || TEAM_SIGNATURE,
+      signature: name ? `${name}, Need4Deed` : TEAM_SIGNATURE,
+      dataPrivacyUrl: pageUrls("data-privacy"),
+      agreementUrl: pageUrls("agreement"),
     },
     locale,
     { escapeHtmlValues: true },

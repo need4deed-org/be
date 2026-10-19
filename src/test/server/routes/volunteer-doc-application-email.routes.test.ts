@@ -18,6 +18,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { SuspendedEmailError } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -180,13 +181,46 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     expect(await communications(volunteer.id)).toHaveLength(2);
   });
 
-  it("removes the log entry when the send fails", async () => {
+  it("returns 502 and logs nothing when the send fails", async () => {
     emailCgcApplication.mockRejectedValue(new Error("smtp down"));
 
     const res = await send(volunteer.id, coordinatorCookie);
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(502);
+    expect(res.json().message).toBe("Application email not sent");
     expect(await communications(volunteer.id)).toHaveLength(0);
+  });
+
+  it("says why when the email failed validation", async () => {
+    emailCgcApplication.mockRejectedValue(
+      new SuspendedEmailError(["subject is blank"]),
+    );
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json().message).toBe(
+      "Application email not sent: subject is blank",
+    );
+  });
+
+  it("sends once when two requests arrive together", async () => {
+    emailCgcApplication.mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 200)),
+    );
+
+    const statuses = (
+      await Promise.all([
+        send(volunteer.id, coordinatorCookie),
+        send(volunteer.id, coordinatorCookie),
+      ])
+    )
+      .map((res) => res.statusCode)
+      .sort();
+
+    expect(statuses).toEqual([201, 409]);
+    expect(emailCgcApplication).toHaveBeenCalledTimes(1);
+    expect(await communications(volunteer.id)).toHaveLength(1);
   });
 
   it("rejects a volunteer without an email address", async () => {

@@ -228,66 +228,63 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
-export function createManifestLoader(url: string): {
-  load(): Promise<Manifest | null>;
-  resetCache(): void;
-} {
-  let cache: { value: Manifest; expires: number } | null = null;
+function createCachedLoader<T>(
+  label: string,
+  url: string,
+  fetchValue: () => Promise<T>,
+  onColdFailure: (err: unknown) => T,
+): { load(): Promise<T>; resetCache(): void } {
+  let cache: { value: T; expires: number } | null = null;
 
   return {
     resetCache() {
       cache = null;
     },
-    async load(): Promise<Manifest | null> {
+    async load(): Promise<T> {
       const now = Date.now();
       if (cache && now < cache.expires) {
         return cache.value;
       }
       try {
-        const value = (await withTimeout(
-          fetchJsonFromUrl(url),
-          emailTemplateFetchTimeoutMs,
-        )) as Manifest;
+        const value = await fetchValue();
         cache = { value, expires: now + emailTemplateTtlMs };
         return value;
       } catch (err) {
         logger.warn(
-          `email manifest fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+          `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
         );
-        return cache?.value ?? null;
+        return cache ? cache.value : onColdFailure(err);
       }
     },
   };
+}
+
+export function createManifestLoader(url: string): {
+  load(): Promise<Manifest | null>;
+  resetCache(): void;
+} {
+  return createCachedLoader<Manifest | null>(
+    "manifest",
+    url,
+    async () =>
+      (await withTimeout(
+        fetchJsonFromUrl(url),
+        emailTemplateFetchTimeoutMs,
+      )) as Manifest,
+    () => null,
+  );
 }
 
 export function createFileLoader(url: string): {
   load(): Promise<Buffer>;
   resetCache(): void;
 } {
-  let cache: { value: Buffer; expires: number } | null = null;
-
-  return {
-    resetCache() {
-      cache = null;
+  return createCachedLoader(
+    "attachment",
+    url,
+    () => fetchFileFromUrl(url, emailTemplateFetchTimeoutMs),
+    (err) => {
+      throw err;
     },
-    async load(): Promise<Buffer> {
-      const now = Date.now();
-      if (cache && now < cache.expires) {
-        return cache.value;
-      }
-      try {
-        const value = await fetchFileFromUrl(url, emailTemplateFetchTimeoutMs);
-        cache = { value, expires: now + emailTemplateTtlMs };
-        return value;
-      } catch (err) {
-        logger.warn(
-          `email attachment fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
-        );
-        if (cache) {
-          return cache.value;
-        }
-        throw err;
-      }
-    },
-  };
+  );
 }

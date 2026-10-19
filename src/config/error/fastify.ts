@@ -18,6 +18,12 @@ export class UnauthorizedError extends BaseError {
   }
 }
 
+export class EmailNotSentError extends BaseError {
+  constructor(message = "Email not sent") {
+    super(message, 502);
+  }
+}
+
 export class NotFoundError extends BaseError {
   constructor(message = "Resource not found") {
     super(message, 404);
