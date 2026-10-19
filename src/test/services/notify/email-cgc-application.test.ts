@@ -22,6 +22,7 @@ const input = {
   volunteerEmail: "vera@example.com",
   volunteerName: "Vera",
   coordinatorName: "Cora",
+  coordinatorEmail: "cora@need4deed.org",
 };
 
 beforeEach(() => {
@@ -38,6 +39,7 @@ describe("sendEmailCgcApplication", () => {
     const msg = send.mock.calls[0][0];
     expect(msg.to).toBe("vera@example.com");
     expect(msg.cc).toBe(emailFromCommunity);
+    expect(msg.replyTo).toEqual(["cora@need4deed.org", emailFromCommunity]);
     expect(msg.attachments).toEqual([
       {
         filename: cgcApplicationFormFileName,
@@ -46,7 +48,7 @@ describe("sendEmailCgcApplication", () => {
       },
     ]);
     expect(msg.text).toContain("Hi Vera,");
-    expect(msg.text).toContain("All the best,\nCora");
+    expect(msg.text).toMatch(/All the best,\nCora\nNeed4Deed$/);
     expect(msg.text).toContain(`${urlApp}/en/data-privacy`);
     expect(msg.text).toContain(`${urlApp}/en/agreement`);
     expect(msg.text).not.toMatch(/\{\{/);
@@ -79,6 +81,51 @@ describe("sendEmailCgcApplication", () => {
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("EFZ");
     expect(msg.text).toBe("Dear Vera, Cora");
+  });
+
+  it("signs as the team when the coordinator has no name", async () => {
+    await sendEmailCgcApplication(email, {
+      ...input,
+      coordinatorName: " ",
+      coordinatorEmail: undefined,
+    });
+
+    const msg = send.mock.calls[0][0];
+    expect(msg.text).toMatch(/All the best,\nThe Need4Deed Team$/);
+    expect(msg.replyTo).toBe(emailFromCommunity);
+  });
+
+  it("signs as the team in German too", async () => {
+    await sendEmailCgcApplication(email, {
+      ...input,
+      language: "de",
+      coordinatorName: undefined,
+    });
+
+    expect(send.mock.calls[0][0].text).toMatch(/Dein Need4Deed-Team$/);
+  });
+
+  it("downloads the form once and reuses it", async () => {
+    await sendEmailCgcApplication(email, input);
+    await sendEmailCgcApplication(email, input);
+
+    expect(fetchFileFromUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the last good form when the CDN fails after the TTL", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await sendEmailCgcApplication(email, input);
+      vi.setSystemTime(Date.now() + 24 * 60 * 60 * 1000);
+      vi.mocked(fetchFileFromUrl).mockRejectedValue(new Error("CDN down"));
+
+      await sendEmailCgcApplication(email, input);
+
+      expect(fetchFileFromUrl).toHaveBeenCalledTimes(2);
+      expect(send.mock.calls[1][0].attachments[0].content).toBe(form);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not send without the form", async () => {

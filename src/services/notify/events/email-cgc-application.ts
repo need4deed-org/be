@@ -5,29 +5,36 @@ import {
   emailCgcApplicationManifestUrl,
   emailFromCommunity,
   emailFromNotify,
-  emailTemplateFetchTimeoutMs,
   urlApp,
 } from "../../../config/constants";
-import { fetchFileFromUrl } from "../../../data/utils";
 import { CGC_APPLICATION_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmail } from "../email-template";
+import {
+  createFileLoader,
+  createManifestLoader,
+  renderEmail,
+  resolveLocale,
+} from "../email-template";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailCgcApplicationManifestUrl);
+const formLoader = createFileLoader(cgcApplicationFormUrl);
 
 export function resetCgcApplicationTemplateCache(): void {
   loader.resetCache();
+  formLoader.resetCache();
 }
+
+const TEAM_SIGNATURE: Record<Lang, string> = {
+  [Lang.EN]: "The Need4Deed Team",
+  [Lang.DE]: "Dein Need4Deed-Team",
+};
 
 export interface CgcApplicationEmailInput {
   volunteerEmail: string;
   volunteerName: string;
   language?: string;
-  coordinatorName: string;
-}
-
-function resolveCgcApplicationLocale(language: string | undefined): Lang {
-  return language === Lang.DE ? Lang.DE : Lang.EN;
+  coordinatorName?: string;
+  coordinatorEmail?: string;
 }
 
 export async function sendEmailCgcApplication(
@@ -37,20 +44,23 @@ export async function sendEmailCgcApplication(
     volunteerName,
     language,
     coordinatorName,
+    coordinatorEmail,
   }: CgcApplicationEmailInput,
 ): Promise<void> {
-  const locale = resolveCgcApplicationLocale(language);
-  const form = await fetchFileFromUrl(
-    cgcApplicationFormUrl,
-    emailTemplateFetchTimeoutMs,
-  );
+  const locale = resolveLocale(language, Lang.EN);
+  const name = coordinatorName?.trim();
+  const [form, manifest] = await Promise.all([
+    formLoader.load(),
+    loader.load(),
+  ]);
 
   const { subject, text, html } = renderEmail(
-    await loader.load(),
+    manifest,
     BUILTIN,
     {
       volunteerName,
-      coordinatorName,
+      coordinatorName: name || TEAM_SIGNATURE[locale],
+      signature: name ? `${name}\nNeed4Deed` : TEAM_SIGNATURE[locale],
       dataPrivacyUrl: `${urlApp}/${locale}/data-privacy`,
       agreementUrl: `${urlApp}/${locale}/agreement`,
     },
@@ -61,6 +71,9 @@ export async function sendEmailCgcApplication(
   await email.send({
     to: volunteerEmail,
     cc: emailFromCommunity,
+    replyTo: coordinatorEmail
+      ? [coordinatorEmail, emailFromCommunity]
+      : emailFromCommunity,
     from: emailFromNotify,
     subject,
     ...(text !== undefined ? { text } : {}),

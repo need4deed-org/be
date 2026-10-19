@@ -197,6 +197,10 @@ describe("resolveLocale", () => {
     expect(resolveLocale("fr")).toBe(Lang.DE);
     expect(resolveLocale(undefined)).toBe(Lang.DE);
   });
+  it("uses the given fallback for unknown languages", () => {
+    expect(resolveLocale(undefined, Lang.EN)).toBe(Lang.EN);
+    expect(resolveLocale("de", Lang.EN)).toBe(Lang.DE);
+  });
 });
 
 // ─── resolveContent ──────────────────────────────────────────────────────────

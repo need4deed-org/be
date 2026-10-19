@@ -6,7 +6,13 @@ import {
   DocumentType,
   UserRole,
 } from "need4deed-sdk";
-import { BadRequestError, UnauthorizedError } from "../../../config";
+import { MoreThan } from "typeorm";
+import {
+  BadRequestError,
+  cgcApplicationResendGuardMs,
+  ConflictError,
+  UnauthorizedError,
+} from "../../../config";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
 import { tryCatch } from "../../../services/utils";
@@ -95,6 +101,20 @@ export default async function volunteerDocRoutes(
         : null;
 
       const commRepo = fastify.db.communicationRepository;
+      const justSent = await commRepo.existsBy({
+        volunteerId: id,
+        communicationType: CommunicationType.CGC_APPLICATION_EMAIL,
+        date: MoreThan(new Date(Date.now() - cgcApplicationResendGuardMs)),
+      });
+      if (justSent) {
+        throw new ConflictError(
+          `Application email to volunteer ${id} was just sent`,
+        );
+      }
+      const latestUser = [...(volunteer.person.users ?? [])].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      )[0];
+
       const comm = await logEmailCommunication(
         commRepo,
         CommunicationType.CGC_APPLICATION_EMAIL,
@@ -104,11 +124,12 @@ export default async function volunteerDocRoutes(
         await fastify.notify.emailCgcApplication({
           volunteerEmail,
           volunteerName: volunteer.person.name,
-          language: volunteer.person.users?.[0]?.language,
-          coordinatorName: coordinator?.name ?? "",
+          language: latestUser?.language,
+          coordinatorName: coordinator?.name,
+          coordinatorEmail: request.authUser?.email,
         });
       } catch (sendErr) {
-        await commRepo.remove(comm).catch(logger.error);
+        await commRepo.remove(comm).catch((err) => logger.error(err));
         throw sendErr;
       }
 

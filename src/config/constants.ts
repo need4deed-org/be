@@ -133,6 +133,7 @@ export const emailNewAccompanyingManifestUrl =
 export const emailTaggedManifestUrl = CDNBaseUrl + "/emails/tagged.json";
 export const emailCgcApplicationManifestUrl =
   CDNBaseUrl + "/emails/cgcapplication.json";
+export const cgcApplicationResendGuardMs = 60 * 1000;
 export const cgcApplicationFormFileName = "EFZ_Antrag_V.pdf";
 export const cgcApplicationFormUrl =
   CDNBaseUrl + "/emails/" + cgcApplicationFormFileName;

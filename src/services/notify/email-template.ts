@@ -3,7 +3,7 @@ import {
   emailTemplateFetchTimeoutMs,
   emailTemplateTtlMs,
 } from "../../config/constants";
-import { fetchJsonFromUrl } from "../../data/utils";
+import { fetchFileFromUrl, fetchJsonFromUrl } from "../../data/utils";
 import logger from "../../logger";
 
 export interface LocaleContent {
@@ -94,12 +94,15 @@ export function fillTemplate(
   return result;
 }
 
-export function resolveLocale(language: string | undefined): Lang {
+export function resolveLocale(
+  language: string | undefined,
+  fallback: Lang = DEFAULT_LOCALE,
+): Lang {
   return language === Lang.DE
     ? Lang.DE
     : language === Lang.EN
       ? Lang.EN
-      : DEFAULT_LOCALE;
+      : fallback;
 }
 
 function isValid(content: LocaleContent | undefined): content is LocaleContent {
@@ -252,6 +255,38 @@ export function createManifestLoader(url: string): {
           `email manifest fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
         );
         return cache?.value ?? null;
+      }
+    },
+  };
+}
+
+export function createFileLoader(url: string): {
+  load(): Promise<Buffer>;
+  resetCache(): void;
+} {
+  let cache: { value: Buffer; expires: number } | null = null;
+
+  return {
+    resetCache() {
+      cache = null;
+    },
+    async load(): Promise<Buffer> {
+      const now = Date.now();
+      if (cache && now < cache.expires) {
+        return cache.value;
+      }
+      try {
+        const value = await fetchFileFromUrl(url, emailTemplateFetchTimeoutMs);
+        cache = { value, expires: now + emailTemplateTtlMs };
+        return value;
+      } catch (err) {
+        logger.warn(
+          `email attachment fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+        );
+        if (cache) {
+          return cache.value;
+        }
+        throw err;
       }
     },
   };

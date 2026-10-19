@@ -38,6 +38,20 @@ describe("SmtpEmailTransport", () => {
     );
   });
 
+  it("passes replyTo through to nodemailer", async () => {
+    await transport.send({
+      to: "vera@example.com",
+      replyTo: ["cora@example.com", "team@example.com"],
+      subject: "Hi",
+      text: "Hello",
+    });
+
+    expect(sendMail.mock.calls[0][0].replyTo).toEqual([
+      "cora@example.com",
+      "team@example.com",
+    ]);
+  });
+
   it("sends no attachments key when there are none", async () => {
     await transport.send({
       to: "vera@example.com",

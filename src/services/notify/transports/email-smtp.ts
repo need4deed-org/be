@@ -29,6 +29,7 @@ export class SmtpEmailTransport implements EmailTransport {
       from: msg.from ?? this.from,
       to: msg.to,
       ...(msg.cc !== undefined ? { cc: msg.cc } : {}),
+      ...(msg.replyTo !== undefined ? { replyTo: msg.replyTo } : {}),
       subject: msg.subject,
       text: msg.text,
       html: msg.html,

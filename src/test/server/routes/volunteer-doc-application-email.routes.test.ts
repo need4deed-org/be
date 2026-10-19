@@ -149,6 +149,7 @@ describe("POST /volunteer/:id/doc/application-email", () => {
       volunteerName: `Vera Efz${suffix}`,
       language: "de",
       coordinatorName: `Cora Efz${suffix}`,
+      coordinatorEmail: coordinatorUser.email,
     });
     const [comm] = await communications(volunteer.id);
     expect(comm.userId).toBe(coordinatorUser.id);
@@ -157,10 +158,25 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     );
   });
 
-  it("logs every resend", async () => {
+  it("refuses an immediate resend", async () => {
     await send(volunteer.id, coordinatorCookie);
-    await send(volunteer.id, coordinatorCookie);
+    const res = await send(volunteer.id, coordinatorCookie);
 
+    expect(res.statusCode).toBe(409);
+    expect(emailCgcApplication).toHaveBeenCalledTimes(1);
+    expect(await communications(volunteer.id)).toHaveLength(1);
+  });
+
+  it("allows a resend after the guard window", async () => {
+    await send(volunteer.id, coordinatorCookie);
+    const [comm] = await communications(volunteer.id);
+    await fastify.db.communicationRepository.update(comm.id, {
+      date: new Date(Date.now() - 2 * 60 * 1000),
+    });
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(201);
     expect(await communications(volunteer.id)).toHaveLength(2);
   });
 
