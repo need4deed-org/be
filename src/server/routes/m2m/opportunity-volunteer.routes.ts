@@ -12,6 +12,7 @@ import {
 import {
   BadRequestError,
   ConflictError,
+  EmailAlreadySentError,
   NotFoundError,
   UnauthorizedError,
 } from "../../../config";
@@ -94,6 +95,14 @@ async function triggerEmailSuggestion(
   }
 }
 
+function matchedCommunicationType(
+  opportunityType: ProfileVolunteeringType | undefined,
+): CommunicationType {
+  return opportunityType === ProfileVolunteeringType.ACCOMPANYING
+    ? CommunicationType.ACCOMPANYING_MATCHED
+    : CommunicationType.MATCHED;
+}
+
 function emailCommunicationType(
   status: OpportunityVolunteerStatusType,
   opportunityType: ProfileVolunteeringType | undefined,
@@ -102,9 +111,7 @@ function emailCommunicationType(
     return CommunicationType.FIRST_INQUIRY;
   }
   if (status === OpportunityVolunteerStatusType.MATCHED) {
-    return opportunityType === ProfileVolunteeringType.ACCOMPANYING
-      ? CommunicationType.ACCOMPANYING_MATCHED
-      : CommunicationType.MATCHED;
+    return matchedCommunicationType(opportunityType);
   }
   return undefined;
 }
@@ -118,12 +125,13 @@ async function assertEmailNoteDeliverable(
   if (!emailNote?.trim()) {
     return;
   }
-  const opportunity = emailStatus
-    ? await fastify.db.opportunityRepository.findOne({
-        select: { id: true, type: true },
-        where: { id: match.opportunityId },
-      })
-    : null;
+  const opportunity =
+    emailStatus === OpportunityVolunteerStatusType.MATCHED
+      ? await fastify.db.opportunityRepository.findOne({
+          select: { id: true, type: true },
+          where: { id: match.opportunityId },
+        })
+      : null;
   const communicationType =
     emailStatus && emailCommunicationType(emailStatus, opportunity?.type);
   if (!communicationType) {
@@ -139,7 +147,7 @@ async function assertEmailNoteDeliverable(
     },
   });
   if (alreadySent) {
-    throw new ConflictError(
+    throw new EmailAlreadySentError(
       "That email was already sent for this match, so the note would not be delivered.",
     );
   }
@@ -227,15 +235,6 @@ export default async function m2mOpportunityVolunteerRoutes(
       const { emailNote, ...body } = request.body;
       const { opportunityId, volunteerId } = body;
 
-      await assertEmailNoteDeliverable(
-        fastify,
-        emailNote,
-        { opportunityId, volunteerId },
-        body.status === OpportunityVolunteerStatusType.PENDING
-          ? body.status
-          : undefined,
-      );
-
       if (
         await opportunityVolunteerRepository.findOneBy({
           opportunityId,
@@ -246,6 +245,15 @@ export default async function m2mOpportunityVolunteerRoutes(
           `A match already exists for opportunityId:${opportunityId}, volunteerId:${volunteerId}.`,
         );
       }
+
+      await assertEmailNoteDeliverable(
+        fastify,
+        emailNote,
+        { opportunityId, volunteerId },
+        body.status === OpportunityVolunteerStatusType.PENDING
+          ? body.status
+          : undefined,
+      );
 
       const opportunityVolunteer = new OpportunityVolunteer(body);
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
@@ -358,10 +366,7 @@ export default async function m2mOpportunityVolunteerRoutes(
               );
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-              const commType = emailCommunicationType(
-                OpportunityVolunteerStatusType.MATCHED,
-                ov.opportunity?.type,
-              );
+              const commType = matchedCommunicationType(ov.opportunity?.type);
               const alreadySent = await commRepo.findOne({
                 where: {
                   volunteerId: ov.volunteerId,
@@ -373,14 +378,10 @@ export default async function m2mOpportunityVolunteerRoutes(
                 return;
               }
               if (isAccompany) {
-                const comm = await logEmailCommunication(
-                  commRepo,
-                  CommunicationType.ACCOMPANYING_MATCHED,
-                  {
-                    volunteerId: ov.volunteerId,
-                    opportunityId: ov.opportunityId,
-                  },
-                );
+                const comm = await logEmailCommunication(commRepo, commType, {
+                  volunteerId: ov.volunteerId,
+                  opportunityId: ov.opportunityId,
+                });
                 try {
                   await fastify.notify.emailAccompanyMatch(ov, emailNote);
                 } catch (sendErr) {
@@ -403,14 +404,10 @@ export default async function m2mOpportunityVolunteerRoutes(
                     .catch(logger.error);
                 }
               } else {
-                const comm = await logEmailCommunication(
-                  commRepo,
-                  CommunicationType.MATCHED,
-                  {
-                    volunteerId: ov.volunteerId,
-                    opportunityId: ov.opportunityId,
-                  },
-                );
+                const comm = await logEmailCommunication(commRepo, commType, {
+                  volunteerId: ov.volunteerId,
+                  opportunityId: ov.opportunityId,
+                });
                 try {
                   await fastify.notify.emailIntroduction(ov, emailNote);
                 } catch (sendErr) {

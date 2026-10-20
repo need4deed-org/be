@@ -678,14 +678,12 @@ describe("coordinator's email note on suggest / match", () => {
         })
       ).statusCode,
     ).toBe(400);
-    expect(
-      (
-        await patch({
-          status: OpportunityVolunteerStatusType.PENDING,
-          emailNote: "Suggestion already sent",
-        })
-      ).statusCode,
-    ).toBe(409);
+    const alreadySent = await patch({
+      status: OpportunityVolunteerStatusType.PENDING,
+      emailNote: "Suggestion already sent",
+    });
+    expect(alreadySent.statusCode).toBe(409);
+    expect(alreadySent.json().message).toContain("already sent");
     expect((await patch({ emailNote: "No status" })).statusCode).toBe(400);
     expect(
       (
@@ -711,6 +709,36 @@ describe("coordinator's email note on suggest / match", () => {
         volunteerId: volunteer.id + 1_000_000,
         status: OpportunityVolunteerStatusType.MATCHED,
         emailNote: "Nobody gets this",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("reports an existing match before judging the note", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "Again",
+      },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("ConflictError");
+  });
+
+  it("400s a POST without opportunityId or volunteerId", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "Missing volunteer",
       },
     });
     expect(res.statusCode).toBe(400);

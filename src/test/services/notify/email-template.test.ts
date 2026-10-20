@@ -578,4 +578,42 @@ describe("withEmailNote", () => {
       ).html,
     ).toBe("<html><body><div>Bye</div><p>Note</p></BODY></html>");
   });
+
+  it("fills every slot, in the template's line endings", () => {
+    const filled = fillTemplate(
+      {
+        subject: "Hi",
+        text: "EN\r\n\r\n{{ emailNote }}\r\n\r\nDE\r\n\r\n{{ emailNote }}\r\n\r\nBye",
+      },
+      { emailNote: EMAIL_NOTE_SLOT },
+    );
+
+    expect(withEmailNote(filled, "One\nTwo").text).toBe(
+      "EN\r\n\r\nOne\r\nTwo\r\n\r\nDE\r\n\r\nOne\r\nTwo\r\n\r\nBye",
+    );
+    expect(withEmailNote(filled, undefined).text).toBe(
+      "EN\r\n\r\nDE\r\n\r\nBye",
+    );
+  });
+
+  it("drops an empty html slot together with its styled wrapper", () => {
+    const filled = fillTemplate(
+      {
+        subject: "Hi",
+        html: '<p>Body</p><div style="margin:0">{{ emailNote }}</div><p>Bye</p>',
+      },
+      { emailNote: EMAIL_NOTE_SLOT },
+    );
+
+    expect(withEmailNote(filled, undefined).html).toBe("<p>Body</p><p>Bye</p>");
+  });
+
+  it("leaves the word emailNote in data alone", () => {
+    expect(
+      withEmailNote(
+        { subject: "emailNote tips", text: "About emailNote.\n\nBye" },
+        undefined,
+      ),
+    ).toEqual({ subject: "emailNote tips", text: "About emailNote.\n\nBye" });
+  });
 });

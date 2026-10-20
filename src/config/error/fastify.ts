@@ -51,3 +51,9 @@ export class AlreadyUsedTokenError extends BaseError {
     super(message, 409);
   }
 }
+
+export class EmailAlreadySentError extends BaseError {
+  constructor(message = "Email already sent") {
+    super(message, 409);
+  }
+}

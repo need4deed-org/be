@@ -44,21 +44,27 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
-export const EMAIL_NOTE_SLOT = "emailNote";
+const SLOT_MARK = String.fromCharCode(0xe000);
+export const EMAIL_NOTE_SLOT = `${SLOT_MARK}emailNote${SLOT_MARK}`;
 
 const PARAGRAPH_BREAK_RE = /\r?\n[ \t]*\r?\n/g;
 const HTML_PARAGRAPH_RE = /<p[\s>]/gi;
 const HTML_BODY_END_RE = /<\/body\s*>/gi;
-const TEXT_SLOT_RE = new RegExp(`${EMAIL_NOTE_SLOT}(?:\\r?\\n[ \\t]*\\r?\\n)?`);
-const HTML_SLOT_RE = new RegExp(`<p>\\s*${EMAIL_NOTE_SLOT}\\s*</p>`, "i");
+const TEXT_SLOT_RE = new RegExp(
+  `${EMAIL_NOTE_SLOT}(?:\\r?\\n[ \\t]*\\r?\\n)?`,
+  "g",
+);
+const HTML_SLOT_RE = new RegExp(
+  `<(p|div|td|span)\\b[^>]*>\\s*${EMAIL_NOTE_SLOT}\\s*</\\1\\s*>`,
+  "gi",
+);
 
 function lastIndexOf(source: string, re: RegExp): number | undefined {
   return [...source.matchAll(re)].at(-1)?.index;
 }
 
-function insertBeforeLastParagraph(text: string, note: string): string {
+function insertBeforeLastParagraph(text: string, paragraph: string): string {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const paragraph = note.replace(/\n/g, eol);
   const body = text.trimEnd();
   const tail = text.slice(body.length);
   const lastBreak = [...body.matchAll(PARAGRAPH_BREAK_RE)].at(-1);
@@ -88,20 +94,21 @@ function insertBeforeLastHtmlParagraph(
 }
 
 function withTextNote(text: string, note: string): string {
+  const paragraph = note.replace(/\n/g, text.includes("\r\n") ? "\r\n" : "\n");
   if (text.includes(EMAIL_NOTE_SLOT)) {
     return note
-      ? text.replace(EMAIL_NOTE_SLOT, () => note)
+      ? text.replaceAll(EMAIL_NOTE_SLOT, () => paragraph)
       : text.replace(TEXT_SLOT_RE, "");
   }
-  return note ? insertBeforeLastParagraph(text, note) : text;
+  return note ? insertBeforeLastParagraph(text, paragraph) : text;
 }
 
 function withHtmlNote(html: string, note: string): string {
   const escaped = escapeHtml(note).replace(/\n/g, "<br>");
   if (html.includes(EMAIL_NOTE_SLOT)) {
     return note
-      ? html.replace(EMAIL_NOTE_SLOT, () => escaped)
-      : html.replace(HTML_SLOT_RE, "").replace(EMAIL_NOTE_SLOT, "");
+      ? html.replaceAll(EMAIL_NOTE_SLOT, () => escaped)
+      : html.replace(HTML_SLOT_RE, "").replaceAll(EMAIL_NOTE_SLOT, "");
   }
   return note ? insertBeforeLastHtmlParagraph(html, `<p>${escaped}</p>`) : html;
 }
@@ -113,7 +120,7 @@ export function withEmailNote(
   const note = emailNote?.replace(/\r\n?/g, "\n").trim() ?? "";
   return {
     ...result,
-    subject: result.subject.replace(EMAIL_NOTE_SLOT, ""),
+    subject: result.subject.replaceAll(EMAIL_NOTE_SLOT, ""),
     ...(result.text !== undefined
       ? { text: withTextNote(result.text, note) }
       : {}),
