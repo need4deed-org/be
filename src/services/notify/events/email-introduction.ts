@@ -15,6 +15,7 @@ import {
 import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
+  EMAIL_NOTE_SLOT,
   fillTemplate,
   resolveFlatContent,
   withEmailNote,
@@ -154,6 +155,7 @@ export async function sendEmailIntroduction(
       agentAddress,
       agentTitle,
       statmentOnCertificates,
+      emailNote: EMAIL_NOTE_SLOT,
     }),
     emailNote,
   );

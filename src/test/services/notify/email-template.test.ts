@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   createManifestLoader,
+  EMAIL_NOTE_SLOT,
   escapeHtml,
   fillTemplate,
   renderEmail,
@@ -531,5 +532,50 @@ describe("withEmailNote", () => {
     ).toBe(
       "<p>Body</p><p>&lt;b&gt;&quot;x&quot; &amp; y&lt;/b&gt;<br>z</p><p>Bye</p>",
     );
+  });
+
+  it("puts the note where the template's {{ emailNote }} slot is", () => {
+    const content = {
+      subject: "Hi{{ emailNote }}",
+      text: "Body.\n\n{{ emailNote }}\n\nBye\n\nP.S. footer",
+      html: "<p>Body</p><P>{{ emailNote }}</P><p>Bye</p>",
+    };
+    const filled = fillTemplate(content, { emailNote: EMAIL_NOTE_SLOT });
+
+    expect(withEmailNote(filled, "<Note> $&")).toEqual({
+      subject: "Hi",
+      text: "Body.\n\n<Note> $&\n\nBye\n\nP.S. footer",
+      html: "<p>Body</p><P>&lt;Note&gt; $&amp;</P><p>Bye</p>",
+    });
+    expect(withEmailNote(filled, undefined)).toEqual({
+      subject: "Hi",
+      text: "Body.\n\nBye\n\nP.S. footer",
+      html: "<p>Body</p><p>Bye</p>",
+    });
+  });
+
+  it("finds the closing in a CRLF template and keeps its line endings", () => {
+    expect(
+      withEmailNote(
+        { subject: "Hi", text: "Body.\r\n\r\nViele Grüße\r\nNeed4Deed" },
+        "One\nTwo",
+      ).text,
+    ).toBe("Body.\r\n\r\nOne\r\nTwo\r\n\r\nViele Grüße\r\nNeed4Deed");
+    expect(
+      withEmailNote({ subject: "Hi", text: "Body." }, "One\nTwo").text,
+    ).toBe("Body.\n\nOne\nTwo");
+  });
+
+  it("matches html paragraphs case-insensitively and falls back to before </body>", () => {
+    expect(
+      withEmailNote({ subject: "Hi", html: "<P>Body</P><P>Bye</P>" }, "Note")
+        .html,
+    ).toBe("<P>Body</P><p>Note</p><P>Bye</P>");
+    expect(
+      withEmailNote(
+        { subject: "Hi", html: "<html><body><div>Bye</div></BODY></html>" },
+        "Note",
+      ).html,
+    ).toBe("<html><body><div>Bye</div><p>Note</p></BODY></html>");
   });
 });

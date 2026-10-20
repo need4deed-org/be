@@ -3,6 +3,7 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  EMAIL_NOTE_MAX_LENGTH,
   OpportunityMatchStatusType,
   OpportunityStatusType,
   OpportunityType,
@@ -577,7 +578,7 @@ describe("coordinator's email note on suggest / match", () => {
     await fastify.close();
   });
 
-  it("400s a note over 1000 characters", async () => {
+  it("400s a note over EMAIL_NOTE_MAX_LENGTH characters", async () => {
     const res = await fastify.inject({
       method: "POST",
       url: "/opportunity-volunteer",
@@ -586,7 +587,7 @@ describe("coordinator's email note on suggest / match", () => {
         opportunityId: opportunity.id,
         volunteerId: volunteer.id,
         status: OpportunityVolunteerStatusType.PENDING,
-        emailNote: "x".repeat(1001),
+        emailNote: "x".repeat(EMAIL_NOTE_MAX_LENGTH + 1),
       },
     });
     expect(res.statusCode).toBe(400);
@@ -646,5 +647,72 @@ describe("coordinator's email note on suggest / match", () => {
         })
       ).status,
     ).toBe(OpportunityVolunteerStatusType.MATCHED);
+  });
+
+  it("rejects a note that no email would carry, leaving the match unchanged", async () => {
+    const ov = await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+      opportunityId: opportunity.id,
+      volunteerId: volunteer.id,
+    });
+    const patch = (payload: Record<string, unknown>) =>
+      fastify.inject({
+        method: "PATCH",
+        url: `/opportunity-volunteer/${ov.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload,
+      });
+
+    expect(
+      (
+        await patch({
+          status: OpportunityVolunteerStatusType.MATCHED,
+          emailNote: "Same status",
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await patch({
+          status: OpportunityVolunteerStatusType.ACTIVE,
+          emailNote: "No email for active",
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await patch({
+          status: OpportunityVolunteerStatusType.PENDING,
+          emailNote: "Suggestion already sent",
+        })
+      ).statusCode,
+    ).toBe(409);
+    expect((await patch({ emailNote: "No status" })).statusCode).toBe(400);
+    expect(
+      (
+        await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+          id: ov.id,
+        })
+      ).status,
+    ).toBe(OpportunityVolunteerStatusType.MATCHED);
+
+    expect(
+      (await patch({ status: OpportunityVolunteerStatusType.ACTIVE }))
+        .statusCode,
+    ).toBe(204);
+  });
+
+  it("400s a note on a POST that creates a match without a suggestion email", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id + 1_000_000,
+        status: OpportunityVolunteerStatusType.MATCHED,
+        emailNote: "Nobody gets this",
+      },
+    });
+    expect(res.statusCode).toBe(400);
   });
 });

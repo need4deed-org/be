@@ -767,19 +767,17 @@
     },
     "OpportunityVolunteer": {
       "$id": "ApiOpportunityVolunteerPatch",
-      "allOf": [
-        {
-          "$ref": "VolunteerOpportunity#"
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "OpportunityVolunteerStatusType#"
         },
-        {
-          "type": "object",
-          "properties": {
-            "emailNote": {
-              "$ref": "EmailNote#"
-            }
-          }
+        "emailNote": {
+          "$ref": "EmailNote#"
         }
-      ]
+      },
+      "required": ["status"],
+      "additionalProperties": false
     },
     "EmailNote": {
       "$id": "EmailNote",

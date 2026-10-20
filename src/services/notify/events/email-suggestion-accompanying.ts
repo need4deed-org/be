@@ -8,6 +8,7 @@ import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
+  EMAIL_NOTE_SLOT,
   renderEmail,
   withEmailNote,
 } from "../email-template";
@@ -59,6 +60,7 @@ export async function sendEmailSuggestionAccompanying(
       appointmentDate,
       appointmentTime,
       accompaniedpersonLanguage,
+      emailNote: EMAIL_NOTE_SLOT,
     }),
     emailNote,
   );

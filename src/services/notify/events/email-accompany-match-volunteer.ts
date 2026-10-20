@@ -9,6 +9,7 @@ import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
+  EMAIL_NOTE_SLOT,
   renderEmail,
   withEmailNote,
 } from "../email-template";
@@ -74,6 +75,7 @@ export async function sendEmailAccompanyMatchVolunteer(
       contactpersonName,
       contactpersonEmail,
       contactpersonPhone,
+      emailNote: EMAIL_NOTE_SLOT,
     }),
     emailNote,
   );

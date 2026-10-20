@@ -10,6 +10,7 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
   UnauthorizedError,
@@ -90,6 +91,57 @@ async function triggerEmailSuggestion(
     }
   } catch (err) {
     logger.error(`emailSuggestion side-effect failed (ov ${id}): ${err}`);
+  }
+}
+
+function emailCommunicationType(
+  status: OpportunityVolunteerStatusType,
+  opportunityType: ProfileVolunteeringType | undefined,
+): CommunicationType | undefined {
+  if (status === OpportunityVolunteerStatusType.PENDING) {
+    return CommunicationType.FIRST_INQUIRY;
+  }
+  if (status === OpportunityVolunteerStatusType.MATCHED) {
+    return opportunityType === ProfileVolunteeringType.ACCOMPANYING
+      ? CommunicationType.ACCOMPANYING_MATCHED
+      : CommunicationType.MATCHED;
+  }
+  return undefined;
+}
+
+async function assertEmailNoteDeliverable(
+  fastify: FastifyInstance,
+  emailNote: string | undefined,
+  match: { opportunityId: number; volunteerId: number },
+  emailStatus: OpportunityVolunteerStatusType | undefined,
+): Promise<void> {
+  if (!emailNote?.trim()) {
+    return;
+  }
+  const opportunity = emailStatus
+    ? await fastify.db.opportunityRepository.findOne({
+        select: { id: true, type: true },
+        where: { id: match.opportunityId },
+      })
+    : null;
+  const communicationType =
+    emailStatus && emailCommunicationType(emailStatus, opportunity?.type);
+  if (!communicationType) {
+    throw new BadRequestError(
+      "emailNote is only sent when the match becomes pending or matched.",
+    );
+  }
+  const alreadySent = await fastify.db.communicationRepository.exists({
+    where: {
+      opportunityId: match.opportunityId,
+      volunteerId: match.volunteerId,
+      communicationType,
+    },
+  });
+  if (alreadySent) {
+    throw new ConflictError(
+      "That email was already sent for this match, so the note would not be delivered.",
+    );
   }
 }
 
@@ -175,6 +227,15 @@ export default async function m2mOpportunityVolunteerRoutes(
       const { emailNote, ...body } = request.body;
       const { opportunityId, volunteerId } = body;
 
+      await assertEmailNoteDeliverable(
+        fastify,
+        emailNote,
+        { opportunityId, volunteerId },
+        body.status === OpportunityVolunteerStatusType.PENDING
+          ? body.status
+          : undefined,
+      );
+
       if (
         await opportunityVolunteerRepository.findOneBy({
           opportunityId,
@@ -242,6 +303,12 @@ export default async function m2mOpportunityVolunteerRoutes(
         opportunityVolunteer,
         nextStatus,
       );
+      await assertEmailNoteDeliverable(
+        fastify,
+        emailNote,
+        opportunityVolunteer,
+        nextStatus !== prevStatus ? nextStatus : undefined,
+      );
 
       const isAgent = request.authUser?.role === UserRole.AGENT;
       opportunityVolunteerRepository.merge(
@@ -291,9 +358,10 @@ export default async function m2mOpportunityVolunteerRoutes(
               );
               const isAccompany =
                 ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-              const commType = isAccompany
-                ? CommunicationType.ACCOMPANYING_MATCHED
-                : CommunicationType.MATCHED;
+              const commType = emailCommunicationType(
+                OpportunityVolunteerStatusType.MATCHED,
+                ov.opportunity?.type,
+              );
               const alreadySent = await commRepo.findOne({
                 where: {
                   volunteerId: ov.volunteerId,

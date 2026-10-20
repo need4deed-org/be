@@ -9,6 +9,7 @@ import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
+  EMAIL_NOTE_SLOT,
   renderEmail,
   withEmailNote,
 } from "../email-template";
@@ -75,6 +76,7 @@ export async function sendEmailSuggestion(
       opportunitySchedule,
       schedule: opportunitySchedule,
       scheduleNote,
+      emailNote: EMAIL_NOTE_SLOT,
     }),
     emailNote,
   );

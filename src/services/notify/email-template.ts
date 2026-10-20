@@ -44,15 +44,26 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
-const PARAGRAPH_BREAK_RE = /\n[ \t]*\n/g;
-const HTML_PARAGRAPH_RE = /<p[\s>]/g;
+export const EMAIL_NOTE_SLOT = "emailNote";
 
-function insertBeforeLastParagraph(text: string, paragraph: string): string {
+const PARAGRAPH_BREAK_RE = /\r?\n[ \t]*\r?\n/g;
+const HTML_PARAGRAPH_RE = /<p[\s>]/gi;
+const HTML_BODY_END_RE = /<\/body\s*>/gi;
+const TEXT_SLOT_RE = new RegExp(`${EMAIL_NOTE_SLOT}(?:\\r?\\n[ \\t]*\\r?\\n)?`);
+const HTML_SLOT_RE = new RegExp(`<p>\\s*${EMAIL_NOTE_SLOT}\\s*</p>`, "i");
+
+function lastIndexOf(source: string, re: RegExp): number | undefined {
+  return [...source.matchAll(re)].at(-1)?.index;
+}
+
+function insertBeforeLastParagraph(text: string, note: string): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const paragraph = note.replace(/\n/g, eol);
   const body = text.trimEnd();
   const tail = text.slice(body.length);
   const lastBreak = [...body.matchAll(PARAGRAPH_BREAK_RE)].at(-1);
   if (lastBreak?.index === undefined) {
-    return `${body}\n\n${paragraph}${tail}`;
+    return `${body}${eol}${eol}${paragraph}${tail}`;
   }
   const [separator] = lastBreak;
   return (
@@ -69,37 +80,45 @@ function insertBeforeLastHtmlParagraph(
   html: string,
   paragraph: string,
 ): string {
-  const lastParagraph = [...html.matchAll(HTML_PARAGRAPH_RE)].at(-1);
-  if (lastParagraph?.index === undefined) {
-    return `${html}${paragraph}`;
+  const at =
+    lastIndexOf(html, HTML_PARAGRAPH_RE) ?? lastIndexOf(html, HTML_BODY_END_RE);
+  return at === undefined
+    ? `${html}${paragraph}`
+    : html.slice(0, at) + paragraph + html.slice(at);
+}
+
+function withTextNote(text: string, note: string): string {
+  if (text.includes(EMAIL_NOTE_SLOT)) {
+    return note
+      ? text.replace(EMAIL_NOTE_SLOT, () => note)
+      : text.replace(TEXT_SLOT_RE, "");
   }
-  return (
-    html.slice(0, lastParagraph.index) +
-    paragraph +
-    html.slice(lastParagraph.index)
-  );
+  return note ? insertBeforeLastParagraph(text, note) : text;
+}
+
+function withHtmlNote(html: string, note: string): string {
+  const escaped = escapeHtml(note).replace(/\n/g, "<br>");
+  if (html.includes(EMAIL_NOTE_SLOT)) {
+    return note
+      ? html.replace(EMAIL_NOTE_SLOT, () => escaped)
+      : html.replace(HTML_SLOT_RE, "").replace(EMAIL_NOTE_SLOT, "");
+  }
+  return note ? insertBeforeLastHtmlParagraph(html, `<p>${escaped}</p>`) : html;
 }
 
 export function withEmailNote(
   result: FillResult,
   emailNote: string | undefined,
 ): FillResult {
-  const note = emailNote?.replace(/\r\n?/g, "\n").trim();
-  if (!note) {
-    return result;
-  }
+  const note = emailNote?.replace(/\r\n?/g, "\n").trim() ?? "";
   return {
     ...result,
+    subject: result.subject.replace(EMAIL_NOTE_SLOT, ""),
     ...(result.text !== undefined
-      ? { text: insertBeforeLastParagraph(result.text, note) }
+      ? { text: withTextNote(result.text, note) }
       : {}),
     ...(result.html !== undefined
-      ? {
-          html: insertBeforeLastHtmlParagraph(
-            result.html,
-            `<p>${escapeHtml(note).replace(/\n/g, "<br>")}</p>`,
-          ),
-        }
+      ? { html: withHtmlNote(result.html, note) }
       : {}),
   };
 }
