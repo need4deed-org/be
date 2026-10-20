@@ -20,7 +20,7 @@ import logger from "../../../logger";
 import {
   accompanyingForType,
   accompanyingParserOpportunity,
-  parseAccompDatetime,
+  parseBerlinDatetime,
   parseFormData,
   parseOpportunityLegacy,
 } from "../../../services";
@@ -121,7 +121,7 @@ export default async function opportunityLegacyRoutes(
           request.body,
         );
         opportunity.onetimer = new Onetimer({
-          date: parseAccompDatetime(request.body.accomp_datetime),
+          date: parseBerlinDatetime(request.body.accomp_datetime),
         });
         assertAppointmentNotTooSoon(
           opportunity.onetimer.date,
@@ -129,7 +129,7 @@ export default async function opportunityLegacyRoutes(
         );
       } else if (opportunity.type === OpportunityType.EVENTS) {
         opportunity.onetimer = new Onetimer({
-          date: new Date(request.body.onetime_date_time),
+          date: parseBerlinDatetime(request.body.onetime_date_time),
         });
       }
 

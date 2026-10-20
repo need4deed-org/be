@@ -3,7 +3,7 @@ import { berlinTimeZone } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import { getPostcode } from "../../data/utils";
 
-export function parseAccompDatetime(value: string | undefined): Date {
+export function parseBerlinDatetime(value: string | undefined): Date {
   if (!value) {
     return new Date(NaN);
   }

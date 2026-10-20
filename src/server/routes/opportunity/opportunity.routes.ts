@@ -47,7 +47,7 @@ import {
   dtoOpportunityGet,
   dtoOpportunityGetList,
   getOpportunityDistrictIdNeedingCentroid,
-  parseAccompDatetime,
+  parseBerlinDatetime,
   parseOpportunity,
   parseOpportunityLegacy,
 } from "../../../services";
@@ -595,7 +595,7 @@ export default async function opportunityRoutes(
         opportunity.accompanying =
           await accompanyingParserOpportunity(legacyBody);
         opportunity.onetimer = new Onetimer({
-          date: parseAccompDatetime(legacyBody.accomp_datetime),
+          date: parseBerlinDatetime(legacyBody.accomp_datetime),
         });
         assertAppointmentNotTooSoon(
           opportunity.onetimer.date,
@@ -603,7 +603,7 @@ export default async function opportunityRoutes(
         );
       } else if (opportunity.type === OpportunityType.EVENTS) {
         opportunity.onetimer = new Onetimer({
-          date: new Date(legacyBody.onetime_date_time),
+          date: parseBerlinDatetime(legacyBody.onetime_date_time),
         });
       }
 
