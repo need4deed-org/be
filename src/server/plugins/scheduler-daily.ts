@@ -61,19 +61,31 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
           SCHEDULER_LOCK_ID,
         );
       } catch (err) {
-        logger.error({ err }, "scheduler: unhandled error in cron callback");
+        logger.error(
+          { err },
+          "scheduler: unhandled error in daily cron callback",
+        );
       }
     },
     { timezone: berlinTimeZone },
   );
 
+  if (!cron.validate(CRON_SCHEDULE_ACCOMPANY_NOT_FOUND)) {
+    logger.error(
+      { schedule: CRON_SCHEDULE_ACCOMPANY_NOT_FOUND },
+      "scheduler: CRON_SCHEDULE_ACCOMPANY_NOT_FOUND is not a valid cron expression — accompany-not-found scan not scheduled",
+    );
+    fastify.addHook("onClose", () => task.stop());
+    return;
+  }
+
   const accompanyNotFoundTask = cron.schedule(
     CRON_SCHEDULE_ACCOMPANY_NOT_FOUND,
     async () => {
-      if (!isWorkingDay(berlinToday())) {
-        return;
-      }
       try {
+        if (!isWorkingDay(berlinToday())) {
+          return;
+        }
         await runWithAdvisoryLock(
           () =>
             runNamedCronJobs([
@@ -85,7 +97,10 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
           ACCOMPANY_NOT_FOUND_LOCK_ID,
         );
       } catch (err) {
-        logger.error({ err }, "scheduler: unhandled error in cron callback");
+        logger.error(
+          { err },
+          "scheduler: unhandled error in accompany-not-found cron callback",
+        );
       }
     },
     { timezone: berlinTimeZone },

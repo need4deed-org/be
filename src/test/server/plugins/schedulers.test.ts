@@ -55,6 +55,12 @@ describe("cron schedulers", () => {
     .spyOn(scanAccompanyNotFound, "scanAccompanyNotFound")
     .mockResolvedValue(undefined);
 
+  const run = (expression: string) => {
+    const callback = callbacks.get(expression);
+    expect(callback).toBeDefined();
+    return callback!();
+  };
+
   beforeAll(async () => {
     const schedule = vi.spyOn(cron, "schedule");
     fastify = await createServer();
@@ -82,7 +88,7 @@ describe("cron schedulers", () => {
   it("runs the daily status jobs first, then the email scans, at 06:00", async () => {
     vi.mocked(isWorkingDay).mockReturnValue(true);
 
-    await callbacks.get(DAILY)?.();
+    await run(DAILY);
 
     expect(daily.activateDueOnetimers).toHaveBeenCalledTimes(1);
     expect(daily.scanExpiredOnetimers).toHaveBeenCalledTimes(1);
@@ -101,7 +107,7 @@ describe("cron schedulers", () => {
   it("runs only the accompanying scan at 10:00 on a working day", async () => {
     vi.mocked(isWorkingDay).mockReturnValue(true);
 
-    await callbacks.get(ACCOMPANY_NOT_FOUND)?.();
+    await run(ACCOMPANY_NOT_FOUND);
 
     expect(accompanyNotFound).toHaveBeenCalledTimes(1);
     for (const spy of [...Object.values(daily), ...Object.values(scans)]) {
@@ -112,8 +118,8 @@ describe("cron schedulers", () => {
   it("skips the accompanying scan on a weekend or holiday", async () => {
     vi.mocked(isWorkingDay).mockReturnValue(false);
 
-    await callbacks.get(ACCOMPANY_NOT_FOUND)?.();
-    await callbacks.get(DAILY)?.();
+    await run(ACCOMPANY_NOT_FOUND);
+    await run(DAILY);
 
     expect(accompanyNotFound).not.toHaveBeenCalled();
     expect(scans.scanStalePending).toHaveBeenCalledTimes(1);
