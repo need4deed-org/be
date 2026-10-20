@@ -1,6 +1,6 @@
 import type { EmailMessage } from "./types";
 
-const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+(?:\.\w+)?\s*\}\}/;
+export const UNRESOLVED_PLACEHOLDER_RE = /\{\{\s*\w+(?:\.\w+)?\s*\}\}/;
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim();

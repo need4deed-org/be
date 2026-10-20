@@ -22,6 +22,7 @@ import {
   updateVolunteerMatching,
 } from "../../../data/utils";
 import logger from "../../../logger";
+import { UNRESOLVED_PLACEHOLDER_RE } from "../../../services/notify/validate-email-message";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
@@ -125,6 +126,11 @@ async function assertEmailNoteDeliverable(
   if (!emailNote?.trim()) {
     return;
   }
+  if (UNRESOLVED_PLACEHOLDER_RE.test(emailNote)) {
+    throw new BadRequestError(
+      "emailNote can't contain {{ … }}: the email would be held back as an unfilled template.",
+    );
+  }
   const opportunity =
     emailStatus === OpportunityVolunteerStatusType.MATCHED
       ? await fastify.db.opportunityRepository.findOne({
@@ -136,7 +142,7 @@ async function assertEmailNoteDeliverable(
     emailStatus && emailCommunicationType(emailStatus, opportunity?.type);
   if (!communicationType) {
     throw new BadRequestError(
-      "emailNote is only sent when the match becomes pending or matched.",
+      "emailNote is only accepted when the request sends an email: a POST creating a pending match, or a PATCH changing the status to pending or matched.",
     );
   }
   const alreadySent = await fastify.db.communicationRepository.exists({
@@ -328,7 +334,7 @@ export default async function m2mOpportunityVolunteerRoutes(
         data: { actorUserId: request.authUser?.id },
       });
 
-      if (nextStatus && nextStatus !== prevStatus) {
+      if (nextStatus !== prevStatus) {
         const commRepo = fastify.db.communicationRepository;
 
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {

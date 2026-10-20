@@ -743,4 +743,64 @@ describe("coordinator's email note on suggest / match", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  it("400s a note with {{ … }}, which the email validator would hold back", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id + 1_000_000,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "Bitte {{ Datum }} bestätigen",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("ignores an id in the POST body instead of overwriting that match", async () => {
+    const existing =
+      await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+      });
+    const otherDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
+    );
+    const otherPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Other", lastName: "Volunteer" }),
+    );
+    const otherVolunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity-volunteer",
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          id: existing.id,
+          opportunityId: opportunity.id,
+          volunteerId: otherVolunteer.id,
+          status: OpportunityVolunteerStatusType.MATCHED,
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      expect(
+        (
+          await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+            id: existing.id,
+          })
+        ).volunteerId,
+      ).toBe(volunteer.id);
+    } finally {
+      await fastify.db.opportunityVolunteerRepository.delete({
+        volunteerId: otherVolunteer.id,
+      });
+      await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
+      await fastify.db.dealRepository.delete({ id: otherDeal.id });
+      await fastify.db.personRepository.delete({ id: otherPerson.id });
+    }
+  });
 });

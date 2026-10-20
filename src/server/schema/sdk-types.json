@@ -984,7 +984,8 @@
           "$ref": "EmailNote#"
         }
       },
-      "required": ["opportunityId", "volunteerId", "status"]
+      "required": ["opportunityId", "volunteerId", "status"],
+      "additionalProperties": false
     },
     "OpportunityType": {
       "$id": "OpportunityType",
