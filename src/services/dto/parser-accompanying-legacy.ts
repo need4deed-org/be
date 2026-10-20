@@ -16,6 +16,11 @@ export function parseBerlinDatetime(value: string | undefined): Date {
     return asIfUtc;
   }
 
+  const guess = new Date(asIfUtc.getTime() - berlinOffsetMs(asIfUtc));
+  return new Date(asIfUtc.getTime() - berlinOffsetMs(guess));
+}
+
+function berlinOffsetMs(instant: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: berlinTimeZone,
     year: "numeric",
@@ -25,7 +30,7 @@ export function parseBerlinDatetime(value: string | undefined): Date {
     minute: "numeric",
     second: "numeric",
     hour12: false,
-  }).formatToParts(asIfUtc);
+  }).formatToParts(instant);
   const get = (type: string) =>
     Number(parts.find((p) => p.type === type)?.value ?? 0);
   const berlinAsUtcMs = Date.UTC(
@@ -36,7 +41,7 @@ export function parseBerlinDatetime(value: string | undefined): Date {
     get("minute"),
     get("second"),
   );
-  return new Date(asIfUtc.getTime() - (berlinAsUtcMs - asIfUtc.getTime()));
+  return berlinAsUtcMs - instant.getTime();
 }
 
 export async function accompanyingParserOpportunity(

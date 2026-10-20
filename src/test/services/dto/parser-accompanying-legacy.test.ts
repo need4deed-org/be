@@ -46,6 +46,9 @@ describe("accompanyingParserOpportunity", () => {
   it.each([
     ["2026-10-22T10:00:00", "2026-10-22T08:00:00.000Z"],
     ["2026-10-28T10:00:00", "2026-10-28T09:00:00.000Z"],
+    ["2026-10-25T01:30:00", "2026-10-24T23:30:00.000Z"],
+    ["2026-03-29T01:30:00", "2026-03-29T00:30:00.000Z"],
+    ["2026-03-29T03:30:00", "2026-03-29T01:30:00.000Z"],
   ])("parseBerlinDatetime reads %s as Berlin time", (value, expected) => {
     expect(parseBerlinDatetime(value).toISOString()).toBe(expected);
   });
