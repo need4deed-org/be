@@ -767,7 +767,24 @@
     },
     "OpportunityVolunteer": {
       "$id": "ApiOpportunityVolunteerPatch",
-      "$ref": "VolunteerOpportunity#"
+      "allOf": [
+        {
+          "$ref": "VolunteerOpportunity#"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "emailNote": {
+              "$ref": "EmailNote#"
+            }
+          }
+        }
+      ]
+    },
+    "EmailNote": {
+      "$id": "EmailNote",
+      "type": "string",
+      "maxLength": 1000
     },
     "ApiVolunteerOpportunityGet": {
       "$id": "ApiVolunteerOpportunityGet",
@@ -964,6 +981,9 @@
         },
         "status": {
           "$ref": "OpportunityVolunteerStatusType#"
+        },
+        "emailNote": {
+          "$ref": "EmailNote#"
         }
       },
       "required": ["status"]

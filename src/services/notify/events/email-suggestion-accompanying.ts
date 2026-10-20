@@ -6,7 +6,11 @@ import {
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmail } from "../email-template";
+import {
+  createManifestLoader,
+  renderEmail,
+  withEmailNote,
+} from "../email-template";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
@@ -21,6 +25,7 @@ export async function sendEmailSuggestionAccompanying(
   email: EmailTransport,
   ov: OpportunityVolunteer,
   errorTransport: EmailTransport = email,
+  emailNote?: string,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -45,15 +50,18 @@ export async function sendEmailSuggestionAccompanying(
     `sendEmailSuggestionAccompanying, ov ${ov.id}`,
   );
 
-  const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
-    volunteerName,
-    appointmentTitle,
-    appointmentAddress,
-    appointmentPlz,
-    appointmentDate,
-    appointmentTime,
-    accompaniedpersonLanguage,
-  });
+  const { subject, text, html } = withEmailNote(
+    renderEmail(await loader.load(), BUILTIN, {
+      volunteerName,
+      appointmentTitle,
+      appointmentAddress,
+      appointmentPlz,
+      appointmentDate,
+      appointmentTime,
+      accompaniedpersonLanguage,
+    }),
+    emailNote,
+  );
 
   await email.send({
     to: volunteerEmail,

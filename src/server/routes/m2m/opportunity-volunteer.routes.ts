@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
   AgentEngagementStatusType,
+  ApiOpportunityVolunteerPatch,
+  ApiOpportunityVolunteerPost,
   CommunicationType,
   Lang,
   OpportunityVolunteerStatusType,
@@ -29,6 +31,7 @@ import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 async function triggerEmailSuggestion(
   fastify: FastifyInstance,
   id: number,
+  emailNote?: string,
 ): Promise<void> {
   const opportunityVolunteerRepository =
     fastify.db.opportunityVolunteerRepository;
@@ -76,9 +79,9 @@ async function triggerEmailSuggestion(
     try {
       if (isAccompany) {
         await addTranslatedFields([ov.opportunity], Lang.DE);
-        await fastify.notify.emailSuggestionAccompanying(ov);
+        await fastify.notify.emailSuggestionAccompanying(ov, emailNote);
       } else {
-        await fastify.notify.emailSuggestion(ov);
+        await fastify.notify.emailSuggestion(ov, emailNote);
       }
       logger.debug(`emailSuggestion side-effect succeeded (ov ${id})`);
     } catch (sendErr) {
@@ -154,7 +157,7 @@ export default async function m2mOpportunityVolunteerRoutes(
   fastify.addHook("onRequest", fastify.authenticate());
 
   fastify.post<{
-    Body: Omit<OpportunityVolunteer, "opportunity" | "volunteer">;
+    Body: ApiOpportunityVolunteerPost;
     Reply: ReplyMessage;
   }>(
     "/",
@@ -169,7 +172,8 @@ export default async function m2mOpportunityVolunteerRoutes(
       const opportunityVolunteerRepository =
         fastify.db.opportunityVolunteerRepository;
 
-      const { opportunityId, volunteerId } = request.body;
+      const { emailNote, ...body } = request.body;
+      const { opportunityId, volunteerId } = body;
 
       if (
         await opportunityVolunteerRepository.findOneBy({
@@ -182,7 +186,7 @@ export default async function m2mOpportunityVolunteerRoutes(
         );
       }
 
-      const opportunityVolunteer = new OpportunityVolunteer(request.body);
+      const opportunityVolunteer = new OpportunityVolunteer(body);
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         data: { actorUserId: request.authUser?.id },
       });
@@ -190,7 +194,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       if (
         opportunityVolunteer.status === OpportunityVolunteerStatusType.PENDING
       ) {
-        triggerEmailSuggestion(fastify, opportunityVolunteer.id);
+        triggerEmailSuggestion(fastify, opportunityVolunteer.id, emailNote);
       }
 
       return reply.status(201).send({
@@ -202,7 +206,7 @@ export default async function m2mOpportunityVolunteerRoutes(
   fastify.patch<{
     Params: ParamsId;
     Reply: null;
-    Body: { status: OpportunityVolunteerStatusType };
+    Body: ApiOpportunityVolunteerPatch;
   }>(
     "/:id",
     {
@@ -228,8 +232,9 @@ export default async function m2mOpportunityVolunteerRoutes(
         throw new NotFoundError(`There's no M2M relation id:${id}`);
       }
 
+      const { emailNote, ...body } = request.body;
       const prevStatus = opportunityVolunteer.status;
-      const nextStatus = request.body.status;
+      const nextStatus = body.status;
 
       await assertCanChangeMatch(
         fastify,
@@ -241,7 +246,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       const isAgent = request.authUser?.role === UserRole.AGENT;
       opportunityVolunteerRepository.merge(
         opportunityVolunteer,
-        isAgent ? { status: nextStatus } : request.body,
+        isAgent ? { status: nextStatus } : body,
       );
       await opportunityVolunteerRepository.save(opportunityVolunteer, {
         reload: true,
@@ -252,7 +257,7 @@ export default async function m2mOpportunityVolunteerRoutes(
         const commRepo = fastify.db.communicationRepository;
 
         if (nextStatus === OpportunityVolunteerStatusType.PENDING) {
-          triggerEmailSuggestion(fastify, id);
+          triggerEmailSuggestion(fastify, id, emailNote);
         } else if (nextStatus === OpportunityVolunteerStatusType.MATCHED) {
           (async () => {
             try {
@@ -309,13 +314,16 @@ export default async function m2mOpportunityVolunteerRoutes(
                   },
                 );
                 try {
-                  await fastify.notify.emailAccompanyMatch(ov);
+                  await fastify.notify.emailAccompanyMatch(ov, emailNote);
                 } catch (sendErr) {
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;
                 }
                 try {
-                  await fastify.notify.emailAccompanyMatchVolunteer(ov);
+                  await fastify.notify.emailAccompanyMatchVolunteer(
+                    ov,
+                    emailNote,
+                  );
                 } catch (volunteerSendErr) {
                   logger.error(
                     `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
@@ -336,7 +344,7 @@ export default async function m2mOpportunityVolunteerRoutes(
                   },
                 );
                 try {
-                  await fastify.notify.emailIntroduction(ov);
+                  await fastify.notify.emailIntroduction(ov, emailNote);
                 } catch (sendErr) {
                   await commRepo.remove(comm).catch(logger.error);
                   throw sendErr;

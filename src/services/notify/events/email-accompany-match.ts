@@ -11,6 +11,7 @@ import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
+  withEmailNote,
 } from "../email-template";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
@@ -37,6 +38,7 @@ export async function sendEmailAccompanyMatch(
   email: EmailTransport,
   ov: OpportunityVolunteer,
   errorTransport: EmailTransport = email,
+  emailNote?: string,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
   const contactPersonEmail = contactPerson?.email;
@@ -91,17 +93,20 @@ export async function sendEmailAccompanyMatch(
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
-    contactpersonName,
-    volunteerName,
-    volunteerLanguage,
-    clientName,
-    appointmentDate,
-    appointmentDistrict,
-    volunteerEmail,
-    volunteerPhone,
-    contactSharing,
-  });
+  const { subject, text, html } = withEmailNote(
+    fillTemplate(content, {
+      contactpersonName,
+      volunteerName,
+      volunteerLanguage,
+      clientName,
+      appointmentDate,
+      appointmentDistrict,
+      volunteerEmail,
+      volunteerPhone,
+      contactSharing,
+    }),
+    emailNote,
+  );
 
   await email.send({
     to: contactPersonEmail,

@@ -7,7 +7,11 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmail } from "../email-template";
+import {
+  createManifestLoader,
+  renderEmail,
+  withEmailNote,
+} from "../email-template";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
@@ -22,6 +26,7 @@ export async function sendEmailAccompanyMatchVolunteer(
   email: EmailTransport,
   ov: OpportunityVolunteer,
   errorTransport: EmailTransport = email,
+  emailNote?: string,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   if (!volunteerEmail) {
@@ -54,21 +59,24 @@ export async function sendEmailAccompanyMatchVolunteer(
   const contactpersonEmail = contactPerson?.email ?? "";
   const contactpersonPhone = contactPerson?.phone ?? "";
 
-  const { subject, text, html } = renderEmail(await loader.load(), BUILTIN, {
-    volunteerName,
-    appointmentTitle,
-    appointmentAddress,
-    appointmentPlz,
-    appointmentDate,
-    appointmentTime,
-    accompaniedpersonName,
-    accompaniedpersonPhone,
-    accompaniedpersonLanguage,
-    appointmentComment,
-    contactpersonName,
-    contactpersonEmail,
-    contactpersonPhone,
-  });
+  const { subject, text, html } = withEmailNote(
+    renderEmail(await loader.load(), BUILTIN, {
+      volunteerName,
+      appointmentTitle,
+      appointmentAddress,
+      appointmentPlz,
+      appointmentDate,
+      appointmentTime,
+      accompaniedpersonName,
+      accompaniedpersonPhone,
+      accompaniedpersonLanguage,
+      appointmentComment,
+      contactpersonName,
+      contactpersonEmail,
+      contactpersonPhone,
+    }),
+    emailNote,
+  );
 
   await email.send({
     to: volunteerEmail,

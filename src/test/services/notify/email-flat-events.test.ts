@@ -412,6 +412,64 @@ describe("sendEmailSuggestion one-of-these-times note", () => {
   });
 });
 
+describe("coordinator's email note", () => {
+  const NOTE = "Please bring <your> ID & arrive early.";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetSuggestionTemplateCache();
+    resetIntroductionTemplateCache();
+    resetAccompanyMatchTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  it.each([
+    {
+      name: "sendEmailSuggestion",
+      closing: "Das Need4Deed-Team :)\nvolunteer@need4deed.org",
+      sendWith: (note?: string) =>
+        sendEmailSuggestion(
+          email,
+          ov() as unknown as Parameters<typeof sendEmailSuggestion>[1],
+          email,
+          note,
+        ),
+    },
+    {
+      name: "sendEmailIntroduction",
+      closing: "Viele Grüße\nNeed4Deed\ncontact@need4deed.org",
+      sendWith: (note?: string) =>
+        sendEmailIntroduction(
+          email,
+          ov() as unknown as Parameters<typeof sendEmailIntroduction>[1],
+          email,
+          note,
+        ),
+    },
+    {
+      name: "sendEmailAccompanyMatch",
+      closing: "Viele Grüße\nNeed4Deed",
+      sendWith: (note?: string) =>
+        sendEmailAccompanyMatch(
+          email,
+          ov() as unknown as Parameters<typeof sendEmailAccompanyMatch>[1],
+          email,
+          note,
+        ),
+    },
+  ])("$name puts the note above the closing", async ({ closing, sendWith }) => {
+    await sendWith();
+    await sendWith(NOTE);
+
+    const [without, withNote] = send.mock.calls.map(([msg]) => msg.text);
+    expect(without).not.toContain(NOTE);
+    expect(without.endsWith(closing)).toBe(true);
+    const beforeClosing = without.slice(0, -closing.length);
+    const [separator] = beforeClosing.match(/\n[ ]?\n$/) ?? [""];
+    expect(withNote).toBe(`${beforeClosing}${NOTE}${separator}${closing}`);
+  });
+});
+
 describe("language/skill fallback for malformed dealLanguage/dealSkill data (be#942)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

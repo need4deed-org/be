@@ -11,7 +11,7 @@ import {
   VolunteerStateEngagementType,
   VolunteerStateMatchType,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
@@ -497,5 +497,154 @@ describe("NGO member changing a match on their own opportunity", () => {
     expect(entries[0].detail).toContain("Linked to opportunity");
     expect(entries.at(-1)?.detail).toContain("Removed from opportunity");
     expect(entries.at(-1)?.actorUserId).toBe(memberUserId);
+  });
+});
+
+describe("coordinator's email note on suggest / match", () => {
+  let fastify: FastifyInstance;
+
+  let deal: Deal;
+  let volunteerPerson: Person;
+  let volunteer: Volunteer;
+  let opportunityDeal: Deal;
+  let opportunity: Opportunity;
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    volunteerPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Volunteer" }),
+    );
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: volunteerPerson.id }),
+    );
+    opportunityDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Opportunity (email note) ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        dealId: opportunityDeal.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const email = `coordinator-m2m-note-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.opportunityVolunteerRepository.delete({
+      opportunityId: opportunity.id,
+    });
+    await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.dealRepository.delete({ id: deal.id });
+    await fastify.db.personRepository.delete({ id: volunteerPerson.id });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
+    await fastify.close();
+  });
+
+  it("400s a note over 1000 characters", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "x".repeat(1001),
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("passes the note to the suggestion and then the introduction email", async () => {
+    const suggestion = vi
+      .spyOn(fastify.notify, "emailSuggestion")
+      .mockResolvedValue(undefined);
+    const introduction = vi
+      .spyOn(fastify.notify, "emailIntroduction")
+      .mockResolvedValue(undefined);
+
+    const created = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "Suggest note",
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    await vi.waitFor(() =>
+      expect(suggestion).toHaveBeenCalledWith(
+        expect.objectContaining({ volunteerId: volunteer.id }),
+        "Suggest note",
+      ),
+    );
+
+    const ov = await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+      opportunityId: opportunity.id,
+      volunteerId: volunteer.id,
+    });
+    const matched = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity-volunteer/${ov.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        status: OpportunityVolunteerStatusType.MATCHED,
+        emailNote: "Match note",
+      },
+    });
+    expect(matched.statusCode).toBe(204);
+    await vi.waitFor(() =>
+      expect(introduction).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ov.id }),
+        "Match note",
+      ),
+    );
+    expect(
+      (
+        await fastify.db.opportunityVolunteerRepository.findOneByOrFail({
+          id: ov.id,
+        })
+      ).status,
+    ).toBe(OpportunityVolunteerStatusType.MATCHED);
   });
 });

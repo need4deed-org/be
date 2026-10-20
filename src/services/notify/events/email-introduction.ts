@@ -17,6 +17,7 @@ import {
   createManifestLoader,
   fillTemplate,
   resolveFlatContent,
+  withEmailNote,
 } from "../email-template";
 import { opportunityTitleIn } from "../opportunity-title";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
@@ -63,6 +64,7 @@ export async function sendEmailIntroduction(
   email: EmailTransport,
   ov: OpportunityVolunteer,
   errorTransport: EmailTransport = email,
+  emailNote?: string,
 ): Promise<void> {
   const volunteerEmail = ov.volunteer?.person?.email;
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
@@ -137,21 +139,24 @@ export async function sendEmailIntroduction(
   );
 
   const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
-    contactpersonName,
-    volunteerName,
-    volunteeringopportunityName,
-    volunteerSkills,
-    volSchedule,
-    volunteerLanguage,
-    volunteerEmail,
-    volunteerPhone: volunteer.person.phone ?? "",
-    contactpersonEmail: contactPersonEmail,
-    contactpersonPhone: contactPerson.phone ?? "",
-    agentAddress,
-    agentTitle,
-    statmentOnCertificates,
-  });
+  const { subject, text, html } = withEmailNote(
+    fillTemplate(content, {
+      contactpersonName,
+      volunteerName,
+      volunteeringopportunityName,
+      volunteerSkills,
+      volSchedule,
+      volunteerLanguage,
+      volunteerEmail,
+      volunteerPhone: volunteer.person.phone ?? "",
+      contactpersonEmail: contactPersonEmail,
+      contactpersonPhone: contactPerson.phone ?? "",
+      agentAddress,
+      agentTitle,
+      statmentOnCertificates,
+    }),
+    emailNote,
+  );
 
   await email.send({
     to: [volunteerEmail, contactPersonEmail],

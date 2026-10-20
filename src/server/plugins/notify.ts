@@ -47,11 +47,23 @@ interface NotifyService {
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   tagged(input: TaggedInput): Promise<void>;
-  emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
-  emailSuggestionAccompanying(ov: OpportunityVolunteer): Promise<void>;
-  emailIntroduction(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyMatchVolunteer(ov: OpportunityVolunteer): Promise<void>;
+  emailSuggestion(ov: OpportunityVolunteer, emailNote?: string): Promise<void>;
+  emailSuggestionAccompanying(
+    ov: OpportunityVolunteer,
+    emailNote?: string,
+  ): Promise<void>;
+  emailIntroduction(
+    ov: OpportunityVolunteer,
+    emailNote?: string,
+  ): Promise<void>;
+  emailAccompanyMatch(
+    ov: OpportunityVolunteer,
+    emailNote?: string,
+  ): Promise<void>;
+  emailAccompanyMatchVolunteer(
+    ov: OpportunityVolunteer,
+    emailNote?: string,
+  ): Promise<void>;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
@@ -211,16 +223,32 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     tagged: (input: TaggedInput) => sendTagged({ slack }, input),
-    emailSuggestion: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
-    emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestionAccompanying(emailNotify, ov, emailNotifyRaw),
-    emailIntroduction: (ov: OpportunityVolunteer) =>
-      sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),
-    emailAccompanyMatch: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
-    emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
+    emailSuggestion: (ov: OpportunityVolunteer, emailNote?: string) =>
+      sendEmailSuggestion(emailNotify, ov, emailNotifyRaw, emailNote),
+    emailSuggestionAccompanying: (
+      ov: OpportunityVolunteer,
+      emailNote?: string,
+    ) =>
+      sendEmailSuggestionAccompanying(
+        emailNotify,
+        ov,
+        emailNotifyRaw,
+        emailNote,
+      ),
+    emailIntroduction: (ov: OpportunityVolunteer, emailNote?: string) =>
+      sendEmailIntroduction(emailNotify, ov, emailNotifyRaw, emailNote),
+    emailAccompanyMatch: (ov: OpportunityVolunteer, emailNote?: string) =>
+      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw, emailNote),
+    emailAccompanyMatchVolunteer: (
+      ov: OpportunityVolunteer,
+      emailNote?: string,
+    ) =>
+      sendEmailAccompanyMatchVolunteer(
+        emailNotify,
+        ov,
+        emailNotifyRaw,
+        emailNote,
+      ),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>

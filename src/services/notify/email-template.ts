@@ -44,6 +44,66 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
+const PARAGRAPH_BREAK_RE = /\n[ \t]*\n/g;
+const HTML_PARAGRAPH_RE = /<p[\s>]/g;
+
+function insertBeforeLastParagraph(text: string, paragraph: string): string {
+  const body = text.trimEnd();
+  const tail = text.slice(body.length);
+  const lastBreak = [...body.matchAll(PARAGRAPH_BREAK_RE)].at(-1);
+  if (lastBreak?.index === undefined) {
+    return `${body}\n\n${paragraph}${tail}`;
+  }
+  const [separator] = lastBreak;
+  return (
+    body.slice(0, lastBreak.index) +
+    separator +
+    paragraph +
+    separator +
+    body.slice(lastBreak.index + separator.length) +
+    tail
+  );
+}
+
+function insertBeforeLastHtmlParagraph(
+  html: string,
+  paragraph: string,
+): string {
+  const lastParagraph = [...html.matchAll(HTML_PARAGRAPH_RE)].at(-1);
+  if (lastParagraph?.index === undefined) {
+    return `${html}${paragraph}`;
+  }
+  return (
+    html.slice(0, lastParagraph.index) +
+    paragraph +
+    html.slice(lastParagraph.index)
+  );
+}
+
+export function withEmailNote(
+  result: FillResult,
+  emailNote: string | undefined,
+): FillResult {
+  const note = emailNote?.replace(/\r\n?/g, "\n").trim();
+  if (!note) {
+    return result;
+  }
+  return {
+    ...result,
+    ...(result.text !== undefined
+      ? { text: insertBeforeLastParagraph(result.text, note) }
+      : {}),
+    ...(result.html !== undefined
+      ? {
+          html: insertBeforeLastHtmlParagraph(
+            result.html,
+            `<p>${escapeHtml(note).replace(/\n/g, "<br>")}</p>`,
+          ),
+        }
+      : {}),
+  };
+}
+
 function fill(
   content: LocaleContent,
   vars: TemplateVars,

@@ -113,4 +113,17 @@ describe("sendEmailSuggestionAccompanying", () => {
     expect(msg.text).toContain("Address: Main street 1, 10115");
     expect(msg.text).not.toContain("Neukölln");
   });
+
+  it("puts the coordinator's note above the closing", async () => {
+    await sendEmailSuggestionAccompanying(
+      email,
+      buildOv(),
+      email,
+      "See you there!",
+    );
+
+    expect(send.mock.calls[0][0].text).toMatch(
+      /\n\nSee you there!\n\nDas Need4Deed-Team :\)\naccompanying@need4deed\.org$/,
+    );
+  });
 });

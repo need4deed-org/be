@@ -9,6 +9,7 @@ import {
   resolveContent,
   resolveFlatContent,
   resolveLocale,
+  withEmailNote,
   type LocaleContent,
 } from "../../../services/notify/email-template";
 
@@ -483,5 +484,52 @@ describe("createManifestLoader", () => {
     vi.advanceTimersByTime(11 * 60 * 1000); // past default 10-min TTL
     const result = await loader.load(); // fetch fails → returns stale
     expect(result).toEqual(manifest);
+  });
+});
+
+describe("withEmailNote", () => {
+  const rendered = {
+    subject: "Hi",
+    text: "Hello Vera,\n \nSome body.\n \nViele Grüße\nNeed4Deed",
+  };
+
+  it("leaves the email unchanged without a note", () => {
+    expect(withEmailNote(rendered, undefined)).toEqual(rendered);
+    expect(withEmailNote(rendered, "  \n ")).toEqual(rendered);
+  });
+
+  it("inserts the note as its own paragraph above the closing", () => {
+    expect(withEmailNote(rendered, " Bring your ID.\r\nThanks! ").text).toBe(
+      "Hello Vera,\n \nSome body.\n \nBring your ID.\nThanks!\n \nViele Grüße\nNeed4Deed",
+    );
+  });
+
+  it("ignores trailing blank lines when finding the closing", () => {
+    expect(
+      withEmailNote({ subject: "Hi", text: "Body.\n\nBye\n\n" }, "Note").text,
+    ).toBe("Body.\n\nNote\n\nBye\n\n");
+  });
+
+  it("appends the note when the email has a single paragraph", () => {
+    expect(withEmailNote({ subject: "Hi", text: "Body." }, "Note").text).toBe(
+      "Body.\n\nNote",
+    );
+  });
+
+  it("does not resolve placeholders in the note", () => {
+    expect(withEmailNote(rendered, "{{ volunteerName }}").text).toContain(
+      "\n \n{{ volunteerName }}\n \nViele Grüße",
+    );
+  });
+
+  it("escapes the note into an html paragraph above the last one", () => {
+    expect(
+      withEmailNote(
+        { subject: "Hi", html: "<p>Body</p><p>Bye</p>" },
+        '<b>"x" & y</b>\nz',
+      ).html,
+    ).toBe(
+      "<p>Body</p><p>&lt;b&gt;&quot;x&quot; &amp; y&lt;/b&gt;<br>z</p><p>Bye</p>",
+    );
   });
 });
