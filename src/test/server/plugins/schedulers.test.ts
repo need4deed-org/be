@@ -19,6 +19,7 @@ import * as scanRegularUpdate from "../../../services/jobs/scan-regular-update";
 import * as scanStalePending from "../../../services/jobs/scan-stale-pending";
 
 const DAILY = "0 6 * * *";
+const ACCOMPANY_NOT_FOUND = "0 10 * * *";
 
 vi.mock("need4deed-sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof import("need4deed-sdk")>();
@@ -49,10 +50,10 @@ describe("cron schedulers", () => {
     scanRegularUpdate: vi
       .spyOn(scanRegularUpdate, "scanRegularUpdate")
       .mockResolvedValue(undefined),
-    scanAccompanyNotFound: vi
-      .spyOn(scanAccompanyNotFound, "scanAccompanyNotFound")
-      .mockResolvedValue(undefined),
   };
+  const accompanyNotFound = vi
+    .spyOn(scanAccompanyNotFound, "scanAccompanyNotFound")
+    .mockResolvedValue(undefined);
 
   beforeAll(async () => {
     const schedule = vi.spyOn(cron, "schedule");
@@ -64,7 +65,11 @@ describe("cron schedulers", () => {
   });
 
   beforeEach(() => {
-    for (const spy of [...Object.values(daily), ...Object.values(scans)]) {
+    for (const spy of [
+      ...Object.values(daily),
+      ...Object.values(scans),
+      accompanyNotFound,
+    ]) {
       spy.mockClear();
     }
   });
@@ -74,7 +79,7 @@ describe("cron schedulers", () => {
     await fastify?.close();
   });
 
-  it("runs the daily status jobs first, then every email scan, on a working day", async () => {
+  it("runs the daily status jobs first, then the email scans, at 06:00", async () => {
     vi.mocked(isWorkingDay).mockReturnValue(true);
 
     await callbacks.get(DAILY)?.();
@@ -90,21 +95,34 @@ describe("cron schedulers", () => {
         daily.scanExpiredOnetimers.mock.invocationCallOrder[0],
       );
     }
+    expect(accompanyNotFound).not.toHaveBeenCalled();
   });
 
-  it("skips only the accompanying scan on a weekend or holiday", async () => {
+  it("runs only the accompanying scan at 10:00 on a working day", async () => {
+    vi.mocked(isWorkingDay).mockReturnValue(true);
+
+    await callbacks.get(ACCOMPANY_NOT_FOUND)?.();
+
+    expect(accompanyNotFound).toHaveBeenCalledTimes(1);
+    for (const spy of [...Object.values(daily), ...Object.values(scans)]) {
+      expect(spy).not.toHaveBeenCalled();
+    }
+  });
+
+  it("skips the accompanying scan on a weekend or holiday", async () => {
     vi.mocked(isWorkingDay).mockReturnValue(false);
 
+    await callbacks.get(ACCOMPANY_NOT_FOUND)?.();
     await callbacks.get(DAILY)?.();
 
-    expect(scans.scanAccompanyNotFound).not.toHaveBeenCalled();
+    expect(accompanyNotFound).not.toHaveBeenCalled();
     expect(scans.scanStalePending).toHaveBeenCalledTimes(1);
-    expect(scans.scanPostMatchCheckup).toHaveBeenCalledTimes(1);
-    expect(scans.scanRegularUpdate).toHaveBeenCalledTimes(1);
     expect(daily.activateDueOnetimers).toHaveBeenCalledTimes(1);
   });
 
-  it("schedules nothing but the daily jobs", () => {
-    expect([...callbacks.keys()]).toEqual([DAILY]);
+  it("schedules only the daily jobs and the accompanying scan", () => {
+    expect([...callbacks.keys()].sort()).toEqual(
+      [DAILY, ACCOMPANY_NOT_FOUND].sort(),
+    );
   });
 });
