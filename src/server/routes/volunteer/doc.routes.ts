@@ -2,6 +2,7 @@ import { Readable } from "stream";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiVolunteerApplicationEmailPost,
+  ApplicationEmailFailureReason,
   CommunicationType,
   DocumentType,
   UserRole,
@@ -17,13 +18,17 @@ import {
 import Communication from "../../../data/entity/communication.entity";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
-import { SuspendedEmailError } from "../../../services/notify";
-import { errorName, tryCatch } from "../../../services/utils";
+import {
+  AttachmentUnavailableError,
+  SuspendedEmailError,
+} from "../../../services/notify";
+import { errorName, errorSummary, tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
   idTypeParamSchema,
   responseErrors,
   volunteerDocSchemaApplicationEmail201,
+  volunteerDocSchemaApplicationEmail502,
   volunteerDocSchemaGet200,
   volunteerDocSchemaGetMeta200,
   volunteerDocSchemaUploadMeta,
@@ -36,6 +41,20 @@ import {
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 
 const CGC_APPLICATION_LOCK_NAMESPACE = "cgc-application-email";
+
+function applicationEmailNotSent(err: unknown): EmailNotSentError {
+  const notSent = (message: string, reason: ApplicationEmailFailureReason) =>
+    new EmailNotSentError(`Application email not sent: ${message}`, {
+      reason,
+    });
+  if (err instanceof AttachmentUnavailableError) {
+    return notSent("application form unavailable", "attachment-unavailable");
+  }
+  if (err instanceof SuspendedEmailError) {
+    return notSent(err.problems.join("; "), "email-invalid");
+  }
+  return notSent("mail server did not accept it", "send-failed");
+}
 
 export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
@@ -104,6 +123,7 @@ export default async function volunteerDocRoutes(
         response: {
           201: volunteerDocSchemaApplicationEmail201,
           ...responseErrors,
+          502: volunteerDocSchemaApplicationEmail502,
         },
       },
     },
@@ -169,14 +189,10 @@ export default async function volunteerDocRoutes(
         });
       } catch (sendErr) {
         logger.error(
-          `application email to volunteer ${id} not sent: ${errorName(sendErr)}`,
+          `application email to volunteer ${id} not sent: ${errorSummary(sendErr)}`,
         );
         await removeUnsentLog(comm);
-        throw new EmailNotSentError(
-          sendErr instanceof SuspendedEmailError
-            ? `Application email not sent: ${sendErr.problems.join("; ")}`
-            : "Application email not sent",
-        );
+        throw applicationEmailNotSent(sendErr);
       }
 
       const data: ApiVolunteerApplicationEmailPost = { sentAt: comm.date };

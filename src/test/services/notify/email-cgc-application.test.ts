@@ -6,6 +6,7 @@ import {
 } from "../../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../../data/utils";
 import {
+  AttachmentUnavailableError,
   resetCgcApplicationTemplateCache,
   sendEmailCgcApplication,
 } from "../../../services/notify/events/email-cgc-application";
@@ -194,9 +195,10 @@ describe("sendEmailCgcApplication", () => {
   it("does not send without the form", async () => {
     vi.mocked(fetchFileFromUrl).mockRejectedValue(new Error("CDN down"));
 
-    await expect(sendEmailCgcApplication(email, input)).rejects.toThrow(
-      "CDN down",
-    );
+    const sent = sendEmailCgcApplication(email, input);
+
+    await expect(sent).rejects.toBeInstanceOf(AttachmentUnavailableError);
+    await expect(sent).rejects.toThrow("CDN down");
     expect(send).not.toHaveBeenCalled();
   });
 });

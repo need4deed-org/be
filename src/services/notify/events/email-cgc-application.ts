@@ -22,6 +22,16 @@ const formLoader = createFileLoader(cgcApplicationFormUrl, (file) =>
   file.subarray(0, 5).equals(Buffer.from("%PDF-")),
 );
 
+export class AttachmentUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `application form unavailable: ${cause instanceof Error ? cause.message : cause}`,
+      { cause },
+    );
+    this.name = "AttachmentUnavailableError";
+  }
+}
+
 export function resetCgcApplicationTemplateCache(): void {
   loader.resetCache();
   formLoader.resetCache();
@@ -65,7 +75,9 @@ export async function sendEmailCgcApplication(
   const locale = resolveLocale(language, Lang.EN);
   const name = coordinatorName?.trim();
   const [form, manifest] = await Promise.all([
-    formLoader.load(),
+    formLoader.load().catch((err: unknown) => {
+      throw new AttachmentUnavailableError(err);
+    }),
     loader.load(),
   ]);
 

@@ -4,6 +4,7 @@ import { BadRequestError } from "../../../config/error";
 import { BaseError } from "../../../config/error/base";
 import {
   deepMerge,
+  errorSummary,
   getDateObj,
   getErrorStatusCode,
   isObject,
@@ -355,5 +356,35 @@ describe("getErrorStatusCode", () => {
   it("returns 500 for null/undefined input", () => {
     expect(getErrorStatusCode(null as any)).toBe(500);
     expect(getErrorStatusCode(undefined as any)).toBe(500);
+  });
+});
+
+describe("errorSummary", () => {
+  it("names the error and the codes along its cause chain", () => {
+    const refused = Object.assign(
+      new Error("connect ECONNREFUSED 1.2.3.4:443"),
+      {
+        code: "ECONNREFUSED",
+      },
+    );
+    const fetchFailed = new TypeError("fetch failed", { cause: refused });
+
+    expect(errorSummary(new Error("wrapped", { cause: fetchFailed }))).toBe(
+      "Error (ECONNREFUSED)",
+    );
+  });
+
+  it("includes an SMTP response code but not the response text", () => {
+    const smtp = Object.assign(new Error("550 <vera@example.com> rejected"), {
+      code: "EENVELOPE",
+      responseCode: 550,
+    });
+
+    expect(errorSummary(smtp)).toBe("Error (EENVELOPE 550)");
+  });
+
+  it("is just the name without codes", () => {
+    expect(errorSummary(new RangeError("x"))).toBe("RangeError");
+    expect(errorSummary("x")).toBe("error");
   });
 });

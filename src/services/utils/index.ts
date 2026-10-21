@@ -132,3 +132,34 @@ export const formatAppointmentDateTime = (
 export function errorName(err: unknown): string {
   return err instanceof Error ? err.name : "error";
 }
+
+const MAX_CAUSE_DEPTH = 5;
+
+export function errorCodes(err: unknown): string[] {
+  const codes: string[] = [];
+  let current = err;
+  for (
+    let depth = 0;
+    current instanceof Error && depth < MAX_CAUSE_DEPTH;
+    depth++
+  ) {
+    const { code, responseCode } = current as {
+      code?: unknown;
+      responseCode?: unknown;
+    };
+    for (const value of [code, responseCode]) {
+      if (typeof value === "string" || typeof value === "number") {
+        codes.push(String(value));
+      }
+    }
+    current = current.cause;
+  }
+  return codes;
+}
+
+export function errorSummary(err: unknown): string {
+  const codes = errorCodes(err);
+  return codes.length
+    ? `${errorName(err)} (${codes.join(" ")})`
+    : errorName(err);
+}

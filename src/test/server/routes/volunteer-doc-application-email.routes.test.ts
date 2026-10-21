@@ -18,7 +18,10 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { SuspendedEmailError } from "../../../services/notify";
+import {
+  AttachmentUnavailableError,
+  SuspendedEmailError,
+} from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -207,7 +210,25 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     const res = await send(volunteer.id, coordinatorCookie);
 
     expect(res.statusCode).toBe(502);
-    expect(res.json().message).toBe("Application email not sent");
+    expect(res.json()).toMatchObject({
+      message: "Application email not sent: mail server did not accept it",
+      reason: "send-failed",
+    });
+    expect(await communications(volunteer.id)).toHaveLength(0);
+  });
+
+  it("says when the application form could not be loaded", async () => {
+    emailCgcApplication.mockRejectedValue(
+      new AttachmentUnavailableError(new Error("fetch failed")),
+    );
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({
+      message: "Application email not sent: application form unavailable",
+      reason: "attachment-unavailable",
+    });
     expect(await communications(volunteer.id)).toHaveLength(0);
   });
 
@@ -245,9 +266,10 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     const res = await send(volunteer.id, coordinatorCookie);
 
     expect(res.statusCode).toBe(502);
-    expect(res.json().message).toBe(
-      "Application email not sent: subject is blank",
-    );
+    expect(res.json()).toMatchObject({
+      message: "Application email not sent: subject is blank",
+      reason: "email-invalid",
+    });
   });
 
   it("sends once when two requests arrive together", async () => {

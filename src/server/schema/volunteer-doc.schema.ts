@@ -54,3 +54,16 @@ export const volunteerDocSchemaApplicationEmail201 = {
   },
   required: ["message", "data"],
 };
+
+export const volunteerDocSchemaApplicationEmail502 = {
+  type: "object",
+  properties: {
+    error: { type: "string" },
+    message: { type: "string" },
+    reason: {
+      type: "string",
+      enum: ["attachment-unavailable", "email-invalid", "send-failed"],
+    },
+  },
+  required: ["error", "message", "reason"],
+};
