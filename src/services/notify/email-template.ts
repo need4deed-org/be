@@ -45,19 +45,22 @@ export function escapeHtml(value: string): string {
 }
 
 const SLOT_MARK = String.fromCharCode(0xe000);
-export const EMAIL_NOTE_SLOT = `${SLOT_MARK}emailNote${SLOT_MARK}`;
+const EMAIL_NOTE_SLOT = `${SLOT_MARK}emailNote${SLOT_MARK}`;
 
 const PARAGRAPH_BREAK_RE = /\r?\n[ \t]*\r?\n/g;
 const HTML_PARAGRAPH_RE = /<p[\s>]/gi;
 const HTML_BODY_END_RE = /<\/body\s*>/gi;
 const TEXT_SLOT_RE = new RegExp(
-  `${EMAIL_NOTE_SLOT}(?:\\r?\\n[ \\t]*\\r?\\n)?`,
+  `[^\\r\\n]*${EMAIL_NOTE_SLOT}[^\\r\\n]*(?:\\r?\\n[ \\t]*\\r?\\n|\\r?\\n|$)`,
   "g",
 );
 const HTML_SLOT_RE = new RegExp(
-  `<(p|div|td|span)\\b[^>]*>\\s*${EMAIL_NOTE_SLOT}\\s*</\\1\\s*>`,
+  `<(p|div|li|span)\\b[^>]*>[^<]*${EMAIL_NOTE_SLOT}[^<]*</\\1\\s*>`,
   "gi",
 );
+const EMAIL_NOTE_VAR = Object.fromEntries(
+  Object.values(Lang).map((lang) => [lang, EMAIL_NOTE_SLOT]),
+) as LocalizedValue;
 
 function lastIndexOf(source: string, re: RegExp): number | undefined {
   return [...source.matchAll(re)].at(-1)?.index;
@@ -143,11 +146,13 @@ function fill(
       let resolved: string | number | null | undefined;
       if (isLocalizedValue(value)) {
         const pick = lang ?? locale;
-        if (pick === undefined) {
+        const [first, ...rest] = Object.values(value);
+        if (pick === undefined && rest.some((v) => v !== first)) {
           ambiguous.push(key);
           return match;
         }
-        resolved = isLang(pick) ? value[pick] : undefined;
+        resolved =
+          pick === undefined ? first : isLang(pick) ? value[pick] : undefined;
       } else {
         resolved = lang === undefined ? value : undefined;
       }
@@ -302,6 +307,18 @@ export function renderEmail(
     );
   }
   return fromBuiltin.result;
+}
+
+export function renderEmailWithNote(
+  manifest: Manifest | null,
+  builtin: LocaleContent | Record<Lang, LocaleContent>,
+  vars: TemplateVars,
+  emailNote: string | undefined,
+): FillResult {
+  return withEmailNote(
+    renderEmail(manifest, builtin, { ...vars, emailNote: EMAIL_NOTE_VAR }),
+    emailNote,
+  );
 }
 
 function formatKeys(keys: string[]): string {

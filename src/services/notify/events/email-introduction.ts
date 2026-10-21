@@ -13,13 +13,7 @@ import {
   getOptionItems,
 } from "../../dto/utils";
 import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  EMAIL_NOTE_SLOT,
-  fillTemplate,
-  resolveFlatContent,
-  withEmailNote,
-} from "../email-template";
+import { createManifestLoader, renderEmailWithNote } from "../email-template";
 import { opportunityTitleIn } from "../opportunity-title";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
@@ -139,9 +133,10 @@ export async function sendEmailIntroduction(
     volunteer.statusVaccination,
   );
 
-  const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = withEmailNote(
-    fillTemplate(content, {
+  const { subject, text, html } = renderEmailWithNote(
+    await loader.load(),
+    BUILTIN,
+    {
       contactpersonName,
       volunteerName,
       volunteeringopportunityName,
@@ -155,8 +150,7 @@ export async function sendEmailIntroduction(
       agentAddress,
       agentTitle,
       statmentOnCertificates,
-      emailNote: EMAIL_NOTE_SLOT,
-    }),
+    },
     emailNote,
   );
 

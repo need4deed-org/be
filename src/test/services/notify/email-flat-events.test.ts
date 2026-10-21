@@ -419,7 +419,6 @@ describe("coordinator's email note", () => {
     vi.clearAllMocks();
     resetSuggestionTemplateCache();
     resetIntroductionTemplateCache();
-    resetAccompanyMatchTemplateCache();
     vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
   });
 
@@ -442,17 +441,6 @@ describe("coordinator's email note", () => {
         sendEmailIntroduction(
           email,
           ov() as unknown as Parameters<typeof sendEmailIntroduction>[1],
-          email,
-          note,
-        ),
-    },
-    {
-      name: "sendEmailAccompanyMatch",
-      closing: "Viele Grüße\nNeed4Deed",
-      sendWith: (note?: string) =>
-        sendEmailAccompanyMatch(
-          email,
-          ov() as unknown as Parameters<typeof sendEmailAccompanyMatch>[1],
           email,
           note,
         ),

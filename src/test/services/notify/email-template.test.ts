@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import {
   createManifestLoader,
-  EMAIL_NOTE_SLOT,
   escapeHtml,
   fillTemplate,
   renderEmail,
+  renderEmailWithNote,
   resolveContent,
   resolveFlatContent,
   resolveLocale,
@@ -535,21 +535,53 @@ describe("withEmailNote", () => {
   });
 
   it("puts the note where the template's {{ emailNote }} slot is", () => {
-    const content = {
-      subject: "Hi{{ emailNote }}",
+    const builtin = {
+      subject: "Hi",
       text: "Body.\n\n{{ emailNote }}\n\nBye\n\nP.S. footer",
       html: "<p>Body</p><P>{{ emailNote }}</P><p>Bye</p>",
     };
-    const filled = fillTemplate(content, { emailNote: EMAIL_NOTE_SLOT });
 
-    expect(withEmailNote(filled, "<Note> $&")).toEqual({
+    expect(renderEmailWithNote(null, builtin, {}, "<Note> $&")).toEqual({
       subject: "Hi",
       text: "Body.\n\n<Note> $&\n\nBye\n\nP.S. footer",
       html: "<p>Body</p><P>&lt;Note&gt; $&amp;</P><p>Bye</p>",
     });
-    expect(withEmailNote(filled, undefined)).toEqual({
+    expect(renderEmailWithNote(null, builtin, {}, undefined)).toEqual({
       subject: "Hi",
       text: "Body.\n\nBye\n\nP.S. footer",
+      html: "<p>Body</p><p>Bye</p>",
+    });
+  });
+
+  it("resolves a per-language {{ emailNote.de }} slot like the other bilingual placeholders", () => {
+    const builtin = {
+      subject: "Hi",
+      text: "EN body.\n\n{{ emailNote.en }}\n\nDE body.\n\n{{ emailNote.de }}\n\nBye",
+    };
+
+    expect(renderEmailWithNote(null, builtin, {}, "Note").text).toBe(
+      "EN body.\n\nNote\n\nDE body.\n\nNote\n\nBye",
+    );
+    expect(renderEmailWithNote(null, builtin, {}, undefined).text).toBe(
+      "EN body.\n\nDE body.\n\nBye",
+    );
+  });
+
+  it("drops a labelled slot line when there is no note", () => {
+    expect(
+      renderEmailWithNote(
+        null,
+        {
+          subject: "Hi",
+          text: "Body.\nHinweis: {{ emailNote }}\nBye",
+          html: "<p>Body</p><p>Hinweis: {{ emailNote }}</p><p>Bye</p>",
+        },
+        {},
+        undefined,
+      ),
+    ).toEqual({
+      subject: "Hi",
+      text: "Body.\nBye",
       html: "<p>Body</p><p>Bye</p>",
     });
   });
@@ -580,32 +612,28 @@ describe("withEmailNote", () => {
   });
 
   it("fills every slot, in the template's line endings", () => {
-    const filled = fillTemplate(
-      {
-        subject: "Hi",
-        text: "EN\r\n\r\n{{ emailNote }}\r\n\r\nDE\r\n\r\n{{ emailNote }}\r\n\r\nBye",
-      },
-      { emailNote: EMAIL_NOTE_SLOT },
-    );
+    const builtin = {
+      subject: "Hi",
+      text: "EN\r\n\r\n{{ emailNote }}\r\n\r\nDE\r\n\r\n{{ emailNote }}\r\n\r\nBye",
+    };
 
-    expect(withEmailNote(filled, "One\nTwo").text).toBe(
+    expect(renderEmailWithNote(null, builtin, {}, "One\nTwo").text).toBe(
       "EN\r\n\r\nOne\r\nTwo\r\n\r\nDE\r\n\r\nOne\r\nTwo\r\n\r\nBye",
     );
-    expect(withEmailNote(filled, undefined).text).toBe(
+    expect(renderEmailWithNote(null, builtin, {}, undefined).text).toBe(
       "EN\r\n\r\nDE\r\n\r\nBye",
     );
   });
 
   it("drops an empty html slot together with its styled wrapper", () => {
-    const filled = fillTemplate(
-      {
-        subject: "Hi",
-        html: '<p>Body</p><div style="margin:0">{{ emailNote }}</div><p>Bye</p>',
-      },
-      { emailNote: EMAIL_NOTE_SLOT },
-    );
+    const builtin = {
+      subject: "Hi",
+      html: '<p>Body</p><div style="margin:0">{{ emailNote }}</div><p>Bye</p>',
+    };
 
-    expect(withEmailNote(filled, undefined).html).toBe("<p>Body</p><p>Bye</p>");
+    expect(renderEmailWithNote(null, builtin, {}, undefined).html).toBe(
+      "<p>Body</p><p>Bye</p>",
+    );
   });
 
   it("leaves the word emailNote in data alone", () => {

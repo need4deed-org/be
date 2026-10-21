@@ -7,12 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { ACCOMPANY_MATCH_VOLUNTEER_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  EMAIL_NOTE_SLOT,
-  renderEmail,
-  withEmailNote,
-} from "../email-template";
+import { createManifestLoader, renderEmailWithNote } from "../email-template";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
@@ -60,8 +55,10 @@ export async function sendEmailAccompanyMatchVolunteer(
   const contactpersonEmail = contactPerson?.email ?? "";
   const contactpersonPhone = contactPerson?.phone ?? "";
 
-  const { subject, text, html } = withEmailNote(
-    renderEmail(await loader.load(), BUILTIN, {
+  const { subject, text, html } = renderEmailWithNote(
+    await loader.load(),
+    BUILTIN,
+    {
       volunteerName,
       appointmentTitle,
       appointmentAddress,
@@ -75,8 +72,7 @@ export async function sendEmailAccompanyMatchVolunteer(
       contactpersonName,
       contactpersonEmail,
       contactpersonPhone,
-      emailNote: EMAIL_NOTE_SLOT,
-    }),
+    },
     emailNote,
   );
 

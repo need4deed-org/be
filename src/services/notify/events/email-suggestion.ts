@@ -7,12 +7,7 @@ import {
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  EMAIL_NOTE_SLOT,
-  renderEmail,
-  withEmailNote,
-} from "../email-template";
+import { createManifestLoader, renderEmailWithNote } from "../email-template";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import {
   OPPORTUNITY_SCHEDULE_LABELS,
@@ -68,16 +63,17 @@ export async function sendEmailSuggestion(
       ? ONE_OF_THESE_TIMES_NOTE
       : NO_NOTE;
 
-  const { subject, text, html } = withEmailNote(
-    renderEmail(await loader.load(), BUILTIN, {
+  const { subject, text, html } = renderEmailWithNote(
+    await loader.load(),
+    BUILTIN,
+    {
       volunteerName,
       opportunityName,
       plz,
       opportunitySchedule,
       schedule: opportunitySchedule,
       scheduleNote,
-      emailNote: EMAIL_NOTE_SLOT,
-    }),
+    },
     emailNote,
   );
 

@@ -31,7 +31,7 @@ export const INTRODUCTION_BUILTIN: LocaleContent = {
 export const ACCOMPANY_MATCH_BUILTIN: LocaleContent = {
   subject:
     "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-  text: `Hallo {{ contactpersonName }},\n \n{{ volunteerName }} übernimmt gerne die Unterstützung bei dem Termin am {{ appointmentDate }}. {{ volunteerName }} spricht {{ volunteerLanguage }}.\n \n{{ volunteerName }} hat schon die Kontaktdaten von {{ clientName }} bekommen und meldet sich zeitnah bei der Person.\n \n{{ contactSharing }}\n \n{{ emailNote }}\n \nViele Grüße\nNeed4Deed`,
+  text: `Hallo {{ contactpersonName }},\n \n{{ volunteerName }} übernimmt gerne die Unterstützung bei dem Termin am {{ appointmentDate }}. {{ volunteerName }} spricht {{ volunteerLanguage }}.\n \n{{ volunteerName }} hat schon die Kontaktdaten von {{ clientName }} bekommen und meldet sich zeitnah bei der Person.\n \n{{ contactSharing }}\n \nViele Grüße\nNeed4Deed`,
 };
 
 export const SUGGESTION_BUILTIN: LocaleContent = {

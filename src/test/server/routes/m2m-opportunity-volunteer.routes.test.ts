@@ -803,4 +803,56 @@ describe("coordinator's email note on suggest / match", () => {
       await fastify.db.personRepository.delete({ id: otherPerson.id });
     }
   });
+
+  it("502s when the email with the note fails, and doesn't record it as sent", async () => {
+    const otherDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
+    );
+    const otherPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Unlucky", lastName: "Volunteer" }),
+    );
+    const otherVolunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
+    );
+    vi.spyOn(fastify.notify, "emailSuggestion").mockRejectedValueOnce(
+      new Error("SMTP down"),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity-volunteer",
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          opportunityId: opportunity.id,
+          volunteerId: otherVolunteer.id,
+          status: OpportunityVolunteerStatusType.PENDING,
+          emailNote: "Lost?",
+        },
+      });
+
+      expect(res.statusCode).toBe(502);
+      expect(res.json().message).toContain("email with your note was not sent");
+      expect(
+        await fastify.db.opportunityVolunteerRepository.findOneBy({
+          opportunityId: opportunity.id,
+          volunteerId: otherVolunteer.id,
+        }),
+      ).not.toBeNull();
+      expect(
+        await fastify.db.communicationRepository.exists({
+          where: {
+            opportunityId: opportunity.id,
+            volunteerId: otherVolunteer.id,
+          },
+        }),
+      ).toBe(false);
+    } finally {
+      await fastify.db.opportunityVolunteerRepository.delete({
+        volunteerId: otherVolunteer.id,
+      });
+      await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
+      await fastify.db.dealRepository.delete({ id: otherDeal.id });
+      await fastify.db.personRepository.delete({ id: otherPerson.id });
+    }
+  });
 });

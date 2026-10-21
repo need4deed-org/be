@@ -35,6 +35,7 @@ import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import workerRoutes from "./routes/worker.routes";
+import { emailNoteSchema } from "./schema/email-note.schema";
 import entityTypesSchema from "./schema/entity-types.json";
 import optionListsSchema from "./schema/option-lists.json";
 import sdkTypesSchema from "./schema/sdk-types.json";
@@ -91,6 +92,7 @@ export async function createServer(): Promise<FastifyInstance> {
     $id: "entity-types",
     ...entityTypesSchema,
   });
+  await fastifyInstance.addSchema(emailNoteSchema);
   await fastifyInstance.addSchema({
     $id: "sdk-types",
     ...sdkTypesSchema,

@@ -55,7 +55,7 @@ interface NotifyService {
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
   emailIntroduction: MatchEmail;
-  emailAccompanyMatch: MatchEmail;
+  emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
   emailAccompanyMatchVolunteer: MatchEmail;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
@@ -211,7 +211,12 @@ async function notifyPlugin(fastify: FastifyInstance) {
   const matchEmail =
     (send: typeof sendEmailSuggestion): MatchEmail =>
     (ov, emailNote) =>
-      send(emailNotify, ov, emailNotifyRaw, emailNote);
+      send(
+        emailNote ? emailNotifyRejecting : emailNotify,
+        ov,
+        emailNotifyRaw,
+        emailNote,
+      );
 
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
@@ -223,7 +228,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),
     emailIntroduction: matchEmail(sendEmailIntroduction),
-    emailAccompanyMatch: matchEmail(sendEmailAccompanyMatch),
+    emailAccompanyMatch: (ov: OpportunityVolunteer) =>
+      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
     emailAccompanyMatchVolunteer: matchEmail(sendEmailAccompanyMatchVolunteer),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
