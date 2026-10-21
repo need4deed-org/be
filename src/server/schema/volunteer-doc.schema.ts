@@ -1,3 +1,5 @@
+import { ApplicationEmailFailureReason } from "need4deed-sdk";
+
 export const volunteerDocSchemaGet200 = {
   type: "object",
   properties: {
@@ -55,15 +57,19 @@ export const volunteerDocSchemaApplicationEmail201 = {
   required: ["message", "data"],
 };
 
+const applicationEmailFailureReasons = [
+  "attachment-unavailable",
+  "email-invalid",
+  "render-failed",
+  "send-failed",
+] satisfies readonly ApplicationEmailFailureReason[];
+
 export const volunteerDocSchemaApplicationEmail502 = {
   type: "object",
   properties: {
     error: { type: "string" },
     message: { type: "string" },
-    reason: {
-      type: "string",
-      enum: ["attachment-unavailable", "email-invalid", "send-failed"],
-    },
+    reason: { type: "string", enum: applicationEmailFailureReasons },
   },
-  required: ["error", "message", "reason"],
+  required: ["error", "message"],
 };

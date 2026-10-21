@@ -39,6 +39,13 @@ export class SuspendedEmailError extends Error {
   }
 }
 
+export class EmailSendError extends Error {
+  constructor(cause: unknown) {
+    super(`email not accepted: ${errorName(cause)}`, { cause });
+    this.name = "EmailSendError";
+  }
+}
+
 export class ValidatingEmailTransport implements EmailTransport {
   constructor(
     private readonly deliverable: EmailTransport,

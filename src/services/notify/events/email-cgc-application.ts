@@ -15,22 +15,13 @@ import {
   renderEmail,
   resolveLocale,
 } from "../email-template";
+import { EmailSendError, SuspendedEmailError } from "../transports/validating";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailCgcApplicationManifestUrl);
 const formLoader = createFileLoader(cgcApplicationFormUrl, (file) =>
   file.subarray(0, 5).equals(Buffer.from("%PDF-")),
 );
-
-export class AttachmentUnavailableError extends Error {
-  constructor(cause: unknown) {
-    super(
-      `application form unavailable: ${cause instanceof Error ? cause.message : cause}`,
-      { cause },
-    );
-    this.name = "AttachmentUnavailableError";
-  }
-}
 
 export function resetCgcApplicationTemplateCache(): void {
   loader.resetCache();
@@ -75,9 +66,7 @@ export async function sendEmailCgcApplication(
   const locale = resolveLocale(language, Lang.EN);
   const name = coordinatorName?.trim();
   const [form, manifest] = await Promise.all([
-    formLoader.load().catch((err: unknown) => {
-      throw new AttachmentUnavailableError(err);
-    }),
+    formLoader.load(),
     loader.load(),
   ]);
 
@@ -95,22 +84,29 @@ export async function sendEmailCgcApplication(
     { escapeHtmlValues: true, fallbackLocale: Lang.EN },
   );
 
-  await email.send({
-    to: volunteerEmail,
-    cc: emailFromCommunity,
-    replyTo: coordinatorEmail
-      ? [coordinatorEmail, emailFromCommunity]
-      : emailFromCommunity,
-    from: emailFromNotify,
-    subject,
-    ...(text !== undefined ? { text } : {}),
-    ...(html !== undefined ? { html } : {}),
-    attachments: [
-      {
-        filename: cgcApplicationFormFileName,
-        content: form,
-        contentType: "application/pdf",
-      },
-    ],
-  });
+  try {
+    await email.send({
+      to: volunteerEmail,
+      cc: emailFromCommunity,
+      replyTo: coordinatorEmail
+        ? [coordinatorEmail, emailFromCommunity]
+        : emailFromCommunity,
+      from: emailFromNotify,
+      subject,
+      ...(text !== undefined ? { text } : {}),
+      ...(html !== undefined ? { html } : {}),
+      attachments: [
+        {
+          filename: cgcApplicationFormFileName,
+          content: form,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  } catch (err) {
+    if (err instanceof SuspendedEmailError) {
+      throw err;
+    }
+    throw new EmailSendError(err);
+  }
 }

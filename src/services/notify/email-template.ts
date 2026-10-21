@@ -284,6 +284,16 @@ export function createManifestLoader(url: string): {
   );
 }
 
+export class AttachmentUnavailableError extends Error {
+  constructor(url: string, cause: unknown) {
+    super(
+      `attachment unavailable (${url}): ${cause instanceof Error ? cause.message : cause}`,
+      { cause },
+    );
+    this.name = "AttachmentUnavailableError";
+  }
+}
+
 export function createFileLoader(
   url: string,
   isValidFile: (file: Buffer) => boolean = () => true,
@@ -302,7 +312,7 @@ export function createFileLoader(
       return file;
     },
     (err) => {
-      throw err;
+      throw new AttachmentUnavailableError(url, err);
     },
   );
 }

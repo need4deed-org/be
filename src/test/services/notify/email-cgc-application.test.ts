@@ -5,8 +5,9 @@ import {
   urlApp,
 } from "../../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../../data/utils";
+import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
+import { AttachmentUnavailableError } from "../../../services/notify/email-template";
 import {
-  AttachmentUnavailableError,
   resetCgcApplicationTemplateCache,
   sendEmailCgcApplication,
 } from "../../../services/notify/events/email-cgc-application";
@@ -200,5 +201,20 @@ describe("sendEmailCgcApplication", () => {
     await expect(sent).rejects.toBeInstanceOf(AttachmentUnavailableError);
     await expect(sent).rejects.toThrow("CDN down");
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("wraps a mail server failure in EmailSendError", async () => {
+    send.mockRejectedValueOnce(new Error("smtp down"));
+
+    await expect(sendEmailCgcApplication(email, input)).rejects.toBeInstanceOf(
+      EmailSendError,
+    );
+  });
+
+  it("passes a suspended email through as is", async () => {
+    const suspended = new SuspendedEmailError(["subject is blank"]);
+    send.mockRejectedValueOnce(suspended);
+
+    await expect(sendEmailCgcApplication(email, input)).rejects.toBe(suspended);
   });
 });

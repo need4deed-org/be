@@ -18,10 +18,8 @@ import {
 import Communication from "../../../data/entity/communication.entity";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
-import {
-  AttachmentUnavailableError,
-  SuspendedEmailError,
-} from "../../../services/notify";
+import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
+import { AttachmentUnavailableError } from "../../../services/notify/email-template";
 import { errorName, errorSummary, tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
@@ -53,7 +51,10 @@ function applicationEmailNotSent(err: unknown): EmailNotSentError {
   if (err instanceof SuspendedEmailError) {
     return notSent(err.problems.join("; "), "email-invalid");
   }
-  return notSent("mail server did not accept it", "send-failed");
+  if (err instanceof EmailSendError) {
+    return notSent("mail server did not accept it", "send-failed");
+  }
+  return notSent("email could not be built", "render-failed");
 }
 
 export default async function volunteerDocRoutes(

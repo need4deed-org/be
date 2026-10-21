@@ -18,10 +18,8 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import {
-  AttachmentUnavailableError,
-  SuspendedEmailError,
-} from "../../../services/notify";
+import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
+import { AttachmentUnavailableError } from "../../../services/notify/email-template";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -205,7 +203,9 @@ describe("POST /volunteer/:id/doc/application-email", () => {
   });
 
   it("returns 502 and logs nothing when the send fails", async () => {
-    emailCgcApplication.mockRejectedValue(new Error("smtp down"));
+    emailCgcApplication.mockRejectedValue(
+      new EmailSendError(new Error("smtp down")),
+    );
 
     const res = await send(volunteer.id, coordinatorCookie);
 
@@ -219,7 +219,10 @@ describe("POST /volunteer/:id/doc/application-email", () => {
 
   it("says when the application form could not be loaded", async () => {
     emailCgcApplication.mockRejectedValue(
-      new AttachmentUnavailableError(new Error("fetch failed")),
+      new AttachmentUnavailableError(
+        "https://cdn.example/form.pdf",
+        new Error("fetch failed"),
+      ),
     );
 
     const res = await send(volunteer.id, coordinatorCookie);
@@ -256,6 +259,18 @@ describe("POST /volunteer/:id/doc/application-email", () => {
     expect(opsAlert).toHaveBeenCalledWith(
       expect.stringContaining("could not be removed"),
     );
+  });
+
+  it("does not blame the mail server when the email could not be built", async () => {
+    emailCgcApplication.mockRejectedValue(new TypeError("bad template"));
+
+    const res = await send(volunteer.id, coordinatorCookie);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.json()).toMatchObject({
+      message: "Application email not sent: email could not be built",
+      reason: "render-failed",
+    });
   });
 
   it("says why when the email failed validation", async () => {
