@@ -1,4 +1,5 @@
 import { ByDay, OccasionalType } from "need4deed-sdk";
+import { BadRequestError } from "../../config";
 import { dataSource } from "../../data/data-source";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import Timeslot from "../../data/entity/time/timeslot.entity";
@@ -10,6 +11,7 @@ import {
 } from "../../data/utils";
 import logger from "../../logger";
 import { getTimeslot } from "../../server/utils";
+import { parseBerlinDatetime } from "./parser-accompanying-legacy";
 
 // index = ISO weekday (1 = Monday)
 export const WEEKDAYS: readonly ("" | ByDay)[] = [
@@ -40,7 +42,10 @@ export async function buildDealTimeslots(
 
   if (onetimeDateTime) {
     const timeslotRepository = getRepository(dataSource, Timeslot);
-    const start = new Date(onetimeDateTime);
+    const start = parseBerlinDatetime(onetimeDateTime);
+    if (isNaN(start.getTime())) {
+      throw new BadRequestError("Invalid event date and time.");
+    }
     const info = `One-time event on ${onetimeDateTime}`;
     const timeslot = await getTimeslot({ start, info });
 

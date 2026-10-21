@@ -2,7 +2,7 @@ import { OpportunityLegacyFormData, TranslatedIntoType } from "need4deed-sdk";
 import { describe, expect, it, vi } from "vitest";
 import {
   accompanyingParserOpportunity,
-  parseAccompDatetime,
+  parseBerlinDatetime,
 } from "../../../services/dto/parser-accompanying-legacy";
 
 const { mockPostcode, getPostcodeMock } = vi.hoisted(() => {
@@ -36,11 +36,21 @@ describe("accompanyingParserOpportunity", () => {
     expect(result.languageToTranslate).toBe(TranslatedIntoType.DEUTSCHE);
   });
 
-  it("parseAccompDatetime parses accomp_datetime into a valid Date", () => {
-    const date = parseAccompDatetime(baseBody.accomp_datetime);
+  it("parseBerlinDatetime parses accomp_datetime into a valid Date", () => {
+    const date = parseBerlinDatetime(baseBody.accomp_datetime);
 
     expect(date).toBeInstanceOf(Date);
     expect(isNaN(date.getTime())).toBe(false);
+  });
+
+  it.each([
+    ["2026-10-22T10:00:00", "2026-10-22T08:00:00.000Z"],
+    ["2026-10-28T10:00:00", "2026-10-28T09:00:00.000Z"],
+    ["2026-10-25T01:30:00", "2026-10-24T23:30:00.000Z"],
+    ["2026-03-29T01:30:00", "2026-03-29T00:30:00.000Z"],
+    ["2026-03-29T03:30:00", "2026-03-29T01:30:00.000Z"],
+  ])("parseBerlinDatetime reads %s as Berlin time", (value, expected) => {
+    expect(parseBerlinDatetime(value).toISOString()).toBe(expected);
   });
 
   it("resolves and assigns postcode entity when accomp_postcode is provided", async () => {

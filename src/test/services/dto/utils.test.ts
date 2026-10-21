@@ -6,6 +6,7 @@ import { getNameFields } from "../../../services/dto";
 import {
   formatScheduleDe,
   formatScheduleLocalized,
+  getAvailability,
 } from "../../../services/dto/utils";
 
 describe("getNameFields", () => {
@@ -277,5 +278,30 @@ describe("formatScheduleDe / formatScheduleLocalized", () => {
     expect(() => formatScheduleDe(dealTimeslot)).toThrow(
       "Timeslot has a weekly rrule with no recognizable BYDAY",
     );
+  });
+});
+
+describe("getAvailability one-time slot", () => {
+  const ORIGINAL_TZ = process.env.TZ;
+
+  beforeAll(() => {
+    process.env.TZ = "UTC";
+  });
+
+  afterAll(() => {
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  it.each([
+    ["2026-10-22T08:00:00Z", "22. Okt. 2026, 10:00"],
+    ["2026-10-28T09:00:00Z", "28. Okt. 2026, 10:00"],
+  ])("shows %s in Berlin time", (start, expected) => {
+    const [slot] = getAvailability([
+      new DealTimeslot({
+        timeslot: new Timeslot({ id: 1, start: new Date(start) }),
+      }),
+    ]);
+
+    expect(slot.daytime).toBe(expected);
   });
 });

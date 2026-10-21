@@ -35,6 +35,7 @@ export function getAvailability(
       return {
         id: timeslot.id,
         daytime: new Date(timeslot.start).toLocaleString("de-DE", {
+          timeZone: berlinTimeZone,
           year: "numeric",
           month: "short",
           day: "2-digit",
