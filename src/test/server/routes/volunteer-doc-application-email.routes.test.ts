@@ -18,8 +18,11 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
-import { AttachmentUnavailableError } from "../../../services/notify/email-template";
+import {
+  AttachmentUnavailableError,
+  EmailSendError,
+  SuspendedEmailError,
+} from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -271,6 +274,7 @@ describe("POST /volunteer/:id/doc/application-email", () => {
       message: "Application email not sent: email could not be built",
       reason: "render-failed",
     });
+    expect(await communications(volunteer.id)).toHaveLength(0);
   });
 
   it("says why when the email failed validation", async () => {

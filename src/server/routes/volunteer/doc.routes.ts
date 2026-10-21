@@ -18,8 +18,11 @@ import {
 import Communication from "../../../data/entity/communication.entity";
 import Document from "../../../data/entity/document.entity";
 import logger from "../../../logger";
-import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
-import { AttachmentUnavailableError } from "../../../services/notify/email-template";
+import {
+  AttachmentUnavailableError,
+  EmailSendError,
+  SuspendedEmailError,
+} from "../../../services/notify";
 import { errorName, errorSummary, tryCatch } from "../../../services/utils";
 import {
   idParamSchema,

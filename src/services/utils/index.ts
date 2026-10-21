@@ -135,7 +135,7 @@ export function errorName(err: unknown): string {
 
 const MAX_CAUSE_DEPTH = 5;
 
-export function errorCodes(err: unknown): string[] {
+function errorCodes(err: unknown): string[] {
   const codes: string[] = [];
   let current = err;
   for (
@@ -157,9 +157,11 @@ export function errorCodes(err: unknown): string[] {
   return codes;
 }
 
-export function errorSummary(err: unknown): string {
+export function withErrorCodes(text: string, err: unknown): string {
   const codes = errorCodes(err);
-  return codes.length
-    ? `${errorName(err)} (${codes.join(" ")})`
-    : errorName(err);
+  return codes.length ? `${text} (${codes.join(" ")})` : text;
+}
+
+export function errorSummary(err: unknown): string {
+  return withErrorCodes(errorName(err), err);
 }

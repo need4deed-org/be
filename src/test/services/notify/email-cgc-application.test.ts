@@ -5,8 +5,11 @@ import {
   urlApp,
 } from "../../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../../data/utils";
-import { EmailSendError, SuspendedEmailError } from "../../../services/notify";
-import { AttachmentUnavailableError } from "../../../services/notify/email-template";
+import {
+  AttachmentUnavailableError,
+  EmailSendError,
+  SuspendedEmailError,
+} from "../../../services/notify";
 import {
   resetCgcApplicationTemplateCache,
   sendEmailCgcApplication,

@@ -57,12 +57,12 @@ export const volunteerDocSchemaApplicationEmail201 = {
   required: ["message", "data"],
 };
 
-const applicationEmailFailureReasons = [
-  "attachment-unavailable",
-  "email-invalid",
-  "render-failed",
-  "send-failed",
-] satisfies readonly ApplicationEmailFailureReason[];
+const applicationEmailFailureReasons = Object.keys({
+  "attachment-unavailable": true,
+  "email-invalid": true,
+  "render-failed": true,
+  "send-failed": true,
+} satisfies Record<ApplicationEmailFailureReason, true>);
 
 export const volunteerDocSchemaApplicationEmail502 = {
   type: "object",
@@ -71,5 +71,5 @@ export const volunteerDocSchemaApplicationEmail502 = {
     message: { type: "string" },
     reason: { type: "string", enum: applicationEmailFailureReasons },
   },
-  required: ["error", "message"],
+  required: ["error", "message", "reason"],
 };

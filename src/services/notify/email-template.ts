@@ -6,7 +6,7 @@ import {
 } from "../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../data/utils";
 import logger from "../../logger";
-import { errorCodes } from "../utils";
+import { withErrorCodes } from "../utils";
 
 export interface LocaleContent {
   subject: string;
@@ -256,9 +256,11 @@ function createCachedLoader<T>(
         cache = { value, expires: now + emailTemplateTtlMs };
         return value;
       } catch (err) {
-        const codes = errorCodes(err);
         logger.warn(
-          `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}${codes.length ? ` (${codes.join(" ")})` : ""}`,
+          withErrorCodes(
+            `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+            err,
+          ),
         );
         const value = cache ? cache.value : onColdFailure(err);
         cache = { value, expires: now + emailTemplateRetryMs };
