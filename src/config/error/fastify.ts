@@ -19,8 +19,8 @@ export class UnauthorizedError extends BaseError {
 }
 
 export class EmailNotSentError extends BaseError {
-  constructor(message = "Email not sent") {
-    super(message, 502);
+  constructor(message = "Email not sent", details?: Record<string, unknown>) {
+    super(message, 502, true, details);
   }
 }
 

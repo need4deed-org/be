@@ -6,6 +6,7 @@ import {
 } from "../../config/constants";
 import { fetchFileFromUrl, fetchJsonFromUrl } from "../../data/utils";
 import logger from "../../logger";
+import { withErrorCodes } from "../utils";
 
 export interface LocaleContent {
   subject: string;
@@ -256,7 +257,10 @@ function createCachedLoader<T>(
         return value;
       } catch (err) {
         logger.warn(
-          `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+          withErrorCodes(
+            `email ${label} fetch failed (${url}): ${err instanceof Error ? err.message : err}`,
+            err,
+          ),
         );
         const value = cache ? cache.value : onColdFailure(err);
         cache = { value, expires: now + emailTemplateRetryMs };
@@ -282,6 +286,16 @@ export function createManifestLoader(url: string): {
   );
 }
 
+export class AttachmentUnavailableError extends Error {
+  constructor(url: string, cause: unknown) {
+    super(
+      `attachment unavailable (${url}): ${cause instanceof Error ? cause.message : cause}`,
+      { cause },
+    );
+    this.name = "AttachmentUnavailableError";
+  }
+}
+
 export function createFileLoader(
   url: string,
   isValidFile: (file: Buffer) => boolean = () => true,
@@ -300,7 +314,7 @@ export function createFileLoader(
       return file;
     },
     (err) => {
-      throw err;
+      throw new AttachmentUnavailableError(url, err);
     },
   );
 }

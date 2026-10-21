@@ -7,6 +7,7 @@ export * from "./transports/slack-webhook";
 export * from "./transports/dry-run";
 export * from "./transports/validating";
 export * from "./validate-email-message";
+export { AttachmentUnavailableError } from "./email-template";
 export * from "./events/email-verification";
 export * from "./events/ops-alert";
 export * from "./events/tagged";

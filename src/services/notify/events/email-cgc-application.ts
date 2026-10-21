@@ -15,6 +15,7 @@ import {
   renderEmail,
   resolveLocale,
 } from "../email-template";
+import { EmailSendError, SuspendedEmailError } from "../transports/validating";
 import type { EmailTransport } from "../types";
 
 const loader = createManifestLoader(emailCgcApplicationManifestUrl);
@@ -83,22 +84,29 @@ export async function sendEmailCgcApplication(
     { escapeHtmlValues: true, fallbackLocale: Lang.EN },
   );
 
-  await email.send({
-    to: volunteerEmail,
-    cc: emailFromCommunity,
-    replyTo: coordinatorEmail
-      ? [coordinatorEmail, emailFromCommunity]
-      : emailFromCommunity,
-    from: emailFromNotify,
-    subject,
-    ...(text !== undefined ? { text } : {}),
-    ...(html !== undefined ? { html } : {}),
-    attachments: [
-      {
-        filename: cgcApplicationFormFileName,
-        content: form,
-        contentType: "application/pdf",
-      },
-    ],
-  });
+  try {
+    await email.send({
+      to: volunteerEmail,
+      cc: emailFromCommunity,
+      replyTo: coordinatorEmail
+        ? [coordinatorEmail, emailFromCommunity]
+        : emailFromCommunity,
+      from: emailFromNotify,
+      subject,
+      ...(text !== undefined ? { text } : {}),
+      ...(html !== undefined ? { html } : {}),
+      attachments: [
+        {
+          filename: cgcApplicationFormFileName,
+          content: form,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+  } catch (err) {
+    if (err instanceof SuspendedEmailError) {
+      throw err;
+    }
+    throw new EmailSendError(err);
+  }
 }
