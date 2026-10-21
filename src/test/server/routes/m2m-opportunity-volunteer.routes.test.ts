@@ -855,4 +855,58 @@ describe("coordinator's email note on suggest / match", () => {
       await fastify.db.personRepository.delete({ id: otherPerson.id });
     }
   });
+  it("sends the accompanying match note only to the agent", async () => {
+    const accompanyingOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Accompanying (email note) ${Date.now()}`,
+        type: OpportunityType.ACCOMPANYING,
+        status: OpportunityStatusType.NEW,
+        dealId: opportunityDeal.id,
+      }),
+    );
+    const agentEmail = vi
+      .spyOn(fastify.notify, "emailAccompanyMatch")
+      .mockResolvedValue(undefined);
+    const volunteerEmail = vi
+      .spyOn(fastify.notify, "emailAccompanyMatchVolunteer")
+      .mockResolvedValue(undefined);
+
+    try {
+      const ov = await fastify.db.opportunityVolunteerRepository.save(
+        new OpportunityVolunteer({
+          opportunityId: accompanyingOpportunity.id,
+          volunteerId: volunteer.id,
+          status: OpportunityVolunteerStatusType.PENDING,
+        }),
+      );
+
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/opportunity-volunteer/${ov.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          status: OpportunityVolunteerStatusType.MATCHED,
+          emailNote: "Agent note",
+        },
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(agentEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ov.id }),
+        "Agent note",
+      );
+      expect(volunteerEmail).toHaveBeenCalledTimes(1);
+      expect(volunteerEmail.mock.calls[0]).toHaveLength(1);
+    } finally {
+      await fastify.db.communicationRepository.delete({
+        opportunityId: accompanyingOpportunity.id,
+      });
+      await fastify.db.opportunityVolunteerRepository.delete({
+        opportunityId: accompanyingOpportunity.id,
+      });
+      await fastify.db.opportunityRepository.delete({
+        id: accompanyingOpportunity.id,
+      });
+    }
+  });
 });

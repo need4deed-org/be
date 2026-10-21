@@ -55,8 +55,8 @@ interface NotifyService {
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
   emailIntroduction: MatchEmail;
-  emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyMatchVolunteer: MatchEmail;
+  emailAccompanyMatch: MatchEmail;
+  emailAccompanyMatchVolunteer(ov: OpportunityVolunteer): Promise<void>;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
@@ -228,9 +228,9 @@ async function notifyPlugin(fastify: FastifyInstance) {
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),
     emailIntroduction: matchEmail(sendEmailIntroduction),
-    emailAccompanyMatch: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
-    emailAccompanyMatchVolunteer: matchEmail(sendEmailAccompanyMatchVolunteer),
+    emailAccompanyMatch: matchEmail(sendEmailAccompanyMatch),
+    emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
+      sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
     emailNewRegular: (opportunity: Opportunity) =>
       sendEmailNewRegular(emailNotify, opportunity),
     emailNewAccompanying: (opportunity: Opportunity) =>

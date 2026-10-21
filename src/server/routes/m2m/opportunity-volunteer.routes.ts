@@ -209,13 +209,13 @@ async function sendMatchedEmails(
       opportunityId: ov.opportunityId,
     });
     try {
-      await fastify.notify.emailAccompanyMatch(ov);
+      await fastify.notify.emailAccompanyMatch(ov, emailNote);
     } catch (sendErr) {
       await commRepo.remove(comm).catch(logger.error);
       throw sendErr;
     }
     try {
-      await fastify.notify.emailAccompanyMatchVolunteer(ov, emailNote);
+      await fastify.notify.emailAccompanyMatchVolunteer(ov);
     } catch (volunteerSendErr) {
       logger.error(
         `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
@@ -225,9 +225,6 @@ async function sendMatchedEmails(
           `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
         )
         .catch(logger.error);
-      if (emailNote) {
-        throw volunteerSendErr;
-      }
     }
   } else {
     const comm = await logEmailCommunication(commRepo, commType, {

@@ -92,17 +92,4 @@ describe("sendEmailAccompanyMatchVolunteer", () => {
 
     expect(send.mock.calls[0][0].text).toContain("Legacy details");
   });
-
-  it("puts the coordinator's note above the closing", async () => {
-    await sendEmailAccompanyMatchVolunteer(
-      email,
-      buildOv(),
-      email,
-      "See you there!",
-    );
-
-    expect(send.mock.calls[0][0].text).toMatch(
-      /\n\nSee you there!\n\nDas Need4Deed-Team :\)$/,
-    );
-  });
 });
