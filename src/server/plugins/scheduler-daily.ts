@@ -14,8 +14,11 @@ import { scanStalePending } from "../../services/jobs/scan-stale-pending";
 import { runNamedCronJobs, runWithAdvisoryLock } from "../utils";
 
 const SCHEDULER_LOCK_ID = 20240707;
+const ACCOMPANY_NOT_FOUND_LOCK_ID = 20261020;
 
 const CRON_SCHEDULE_DAILY = process.env.CRON_SCHEDULE_DAILY || "0 6 * * *";
+const CRON_SCHEDULE_ACCOMPANY_NOT_FOUND =
+  process.env.CRON_SCHEDULE_ACCOMPANY_NOT_FOUND || "0 10 * * *";
 
 async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
   const task = cron.schedule(
@@ -52,27 +55,61 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   name: "pruneRefreshSessions",
                   run: () => pruneRefreshSessions(fastify),
                 },
-                ...(isWorkingDay(berlinToday())
-                  ? [
-                      {
-                        name: "scanAccompanyNotFound",
-                        run: () => scanAccompanyNotFound(fastify),
-                      },
-                    ]
-                  : []),
               ],
               { sequential: true },
             ),
           SCHEDULER_LOCK_ID,
         );
       } catch (err) {
-        logger.error({ err }, "scheduler: unhandled error in cron callback");
+        logger.error(
+          { err },
+          "scheduler: unhandled error in daily cron callback",
+        );
       }
     },
     { timezone: berlinTimeZone },
   );
 
-  fastify.addHook("onClose", () => task.stop());
+  if (!cron.validate(CRON_SCHEDULE_ACCOMPANY_NOT_FOUND)) {
+    logger.error(
+      { schedule: CRON_SCHEDULE_ACCOMPANY_NOT_FOUND },
+      "scheduler: CRON_SCHEDULE_ACCOMPANY_NOT_FOUND is not a valid cron expression — accompany-not-found scan not scheduled",
+    );
+    fastify.addHook("onClose", () => task.stop());
+    return;
+  }
+
+  const accompanyNotFoundTask = cron.schedule(
+    CRON_SCHEDULE_ACCOMPANY_NOT_FOUND,
+    async () => {
+      try {
+        if (!isWorkingDay(berlinToday())) {
+          return;
+        }
+        await runWithAdvisoryLock(
+          () =>
+            runNamedCronJobs([
+              {
+                name: "scanAccompanyNotFound",
+                run: () => scanAccompanyNotFound(fastify),
+              },
+            ]),
+          ACCOMPANY_NOT_FOUND_LOCK_ID,
+        );
+      } catch (err) {
+        logger.error(
+          { err },
+          "scheduler: unhandled error in accompany-not-found cron callback",
+        );
+      }
+    },
+    { timezone: berlinTimeZone },
+  );
+
+  fastify.addHook("onClose", () => {
+    task.stop();
+    accompanyNotFoundTask.stop();
+  });
 }
 
 export default fp(schedulerDailyPlugin, {
