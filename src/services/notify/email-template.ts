@@ -44,6 +44,95 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 }
 
+const SLOT_MARK = String.fromCharCode(0xe000);
+const EMAIL_NOTE_SLOT = `${SLOT_MARK}emailNote${SLOT_MARK}`;
+
+const PARAGRAPH_BREAK_RE = /\r?\n[ \t]*\r?\n/g;
+const HTML_PARAGRAPH_RE = /<p[\s>]/gi;
+const HTML_BODY_END_RE = /<\/body\s*>/gi;
+const TEXT_SLOT_RE = new RegExp(
+  `[^\\r\\n]*${EMAIL_NOTE_SLOT}[^\\r\\n]*(?:\\r?\\n[ \\t]*\\r?\\n|\\r?\\n|$)`,
+  "g",
+);
+const HTML_SLOT_RE = new RegExp(
+  `<(p|div|li|span)\\b[^>]*>[^<]*${EMAIL_NOTE_SLOT}[^<]*</\\1\\s*>`,
+  "gi",
+);
+const EMAIL_NOTE_VAR = Object.fromEntries(
+  Object.values(Lang).map((lang) => [lang, EMAIL_NOTE_SLOT]),
+) as LocalizedValue;
+
+function lastIndexOf(source: string, re: RegExp): number | undefined {
+  return [...source.matchAll(re)].at(-1)?.index;
+}
+
+function insertBeforeLastParagraph(text: string, paragraph: string): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const body = text.trimEnd();
+  const tail = text.slice(body.length);
+  const lastBreak = [...body.matchAll(PARAGRAPH_BREAK_RE)].at(-1);
+  if (lastBreak?.index === undefined) {
+    return `${body}${eol}${eol}${paragraph}${tail}`;
+  }
+  const [separator] = lastBreak;
+  return (
+    body.slice(0, lastBreak.index) +
+    separator +
+    paragraph +
+    separator +
+    body.slice(lastBreak.index + separator.length) +
+    tail
+  );
+}
+
+function insertBeforeLastHtmlParagraph(
+  html: string,
+  paragraph: string,
+): string {
+  const at =
+    lastIndexOf(html, HTML_PARAGRAPH_RE) ?? lastIndexOf(html, HTML_BODY_END_RE);
+  return at === undefined
+    ? `${html}${paragraph}`
+    : html.slice(0, at) + paragraph + html.slice(at);
+}
+
+function withTextNote(text: string, note: string): string {
+  const paragraph = note.replace(/\n/g, text.includes("\r\n") ? "\r\n" : "\n");
+  if (text.includes(EMAIL_NOTE_SLOT)) {
+    return note
+      ? text.replaceAll(EMAIL_NOTE_SLOT, () => paragraph)
+      : text.replace(TEXT_SLOT_RE, "");
+  }
+  return note ? insertBeforeLastParagraph(text, paragraph) : text;
+}
+
+function withHtmlNote(html: string, note: string): string {
+  const escaped = escapeHtml(note).replace(/\n/g, "<br>");
+  if (html.includes(EMAIL_NOTE_SLOT)) {
+    return note
+      ? html.replaceAll(EMAIL_NOTE_SLOT, () => escaped)
+      : html.replace(HTML_SLOT_RE, "").replaceAll(EMAIL_NOTE_SLOT, "");
+  }
+  return note ? insertBeforeLastHtmlParagraph(html, `<p>${escaped}</p>`) : html;
+}
+
+export function withEmailNote(
+  result: FillResult,
+  emailNote: string | undefined,
+): FillResult {
+  const note = emailNote?.replace(/\r\n?/g, "\n").trim() ?? "";
+  return {
+    ...result,
+    subject: result.subject.replaceAll(EMAIL_NOTE_SLOT, ""),
+    ...(result.text !== undefined
+      ? { text: withTextNote(result.text, note) }
+      : {}),
+    ...(result.html !== undefined
+      ? { html: withHtmlNote(result.html, note) }
+      : {}),
+  };
+}
+
 function fill(
   content: LocaleContent,
   vars: TemplateVars,
@@ -57,11 +146,13 @@ function fill(
       let resolved: string | number | null | undefined;
       if (isLocalizedValue(value)) {
         const pick = lang ?? locale;
-        if (pick === undefined) {
+        const [first, ...rest] = Object.values(value);
+        if (pick === undefined && rest.some((v) => v !== first)) {
           ambiguous.push(key);
           return match;
         }
-        resolved = isLang(pick) ? value[pick] : undefined;
+        resolved =
+          pick === undefined ? first : isLang(pick) ? value[pick] : undefined;
       } else {
         resolved = lang === undefined ? value : undefined;
       }
@@ -216,6 +307,18 @@ export function renderEmail(
     );
   }
   return fromBuiltin.result;
+}
+
+export function renderEmailWithNote(
+  manifest: Manifest | null,
+  builtin: LocaleContent | Record<Lang, LocaleContent>,
+  vars: TemplateVars,
+  emailNote: string | undefined,
+): FillResult {
+  return withEmailNote(
+    renderEmail(manifest, builtin, { ...vars, emailNote: EMAIL_NOTE_VAR }),
+    emailNote,
+  );
 }
 
 function formatKeys(keys: string[]): string {

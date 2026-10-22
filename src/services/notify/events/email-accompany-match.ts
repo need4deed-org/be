@@ -7,11 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, getLanguages } from "../../dto/utils";
 import { ACCOMPANY_MATCH_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { createManifestLoader, renderEmailWithNote } from "../email-template";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
@@ -37,6 +33,7 @@ export async function sendEmailAccompanyMatch(
   email: EmailTransport,
   ov: OpportunityVolunteer,
   errorTransport: EmailTransport = email,
+  emailNote?: string,
 ): Promise<void> {
   const contactPerson = getOpportunityRepresentativePerson(ov.opportunity);
   const contactPersonEmail = contactPerson?.email;
@@ -90,18 +87,22 @@ export async function sendEmailAccompanyMatch(
     volunteerPhone,
   );
 
-  const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, {
-    contactpersonName,
-    volunteerName,
-    volunteerLanguage,
-    clientName,
-    appointmentDate,
-    appointmentDistrict,
-    volunteerEmail,
-    volunteerPhone,
-    contactSharing,
-  });
+  const { subject, text, html } = renderEmailWithNote(
+    await loader.load(),
+    BUILTIN,
+    {
+      contactpersonName,
+      volunteerName,
+      volunteerLanguage,
+      clientName,
+      appointmentDate,
+      appointmentDistrict,
+      volunteerEmail,
+      volunteerPhone,
+      contactSharing,
+    },
+    emailNote,
+  );
 
   await email.send({
     to: contactPersonEmail,

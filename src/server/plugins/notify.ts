@@ -42,15 +42,20 @@ import {
 } from "../../services/notify";
 import { Env, firstEnvValue } from "../utils";
 
+type MatchEmail = (
+  ov: OpportunityVolunteer,
+  emailNote?: string,
+) => Promise<void>;
+
 interface NotifyService {
   emailVerification(user: User): Promise<void>;
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   tagged(input: TaggedInput): Promise<void>;
-  emailSuggestion(ov: OpportunityVolunteer): Promise<void>;
-  emailSuggestionAccompanying(ov: OpportunityVolunteer): Promise<void>;
-  emailIntroduction(ov: OpportunityVolunteer): Promise<void>;
-  emailAccompanyMatch(ov: OpportunityVolunteer): Promise<void>;
+  emailSuggestion: MatchEmail;
+  emailSuggestionAccompanying: MatchEmail;
+  emailIntroduction: MatchEmail;
+  emailAccompanyMatch: MatchEmail;
   emailAccompanyMatchVolunteer(ov: OpportunityVolunteer): Promise<void>;
   emailNewRegular(opportunity: Opportunity): Promise<void>;
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
@@ -203,6 +208,15 @@ async function notifyPlugin(fastify: FastifyInstance) {
   const emailNotify = validatingNotify();
   const emailNotifyRejecting = validatingNotify(true);
   const slack = buildSlackTransport();
+  const matchEmail =
+    (send: typeof sendEmailSuggestion): MatchEmail =>
+    (ov, emailNote) =>
+      send(
+        emailNote ? emailNotifyRejecting : emailNotify,
+        ov,
+        emailNotifyRaw,
+        emailNote,
+      );
 
   fastify.decorate("notify", {
     emailVerification: (user: User) =>
@@ -211,14 +225,10 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     tagged: (input: TaggedInput) => sendTagged({ slack }, input),
-    emailSuggestion: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestion(emailNotify, ov, emailNotifyRaw),
-    emailSuggestionAccompanying: (ov: OpportunityVolunteer) =>
-      sendEmailSuggestionAccompanying(emailNotify, ov, emailNotifyRaw),
-    emailIntroduction: (ov: OpportunityVolunteer) =>
-      sendEmailIntroduction(emailNotify, ov, emailNotifyRaw),
-    emailAccompanyMatch: (ov: OpportunityVolunteer) =>
-      sendEmailAccompanyMatch(emailNotify, ov, emailNotifyRaw),
+    emailSuggestion: matchEmail(sendEmailSuggestion),
+    emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),
+    emailIntroduction: matchEmail(sendEmailIntroduction),
+    emailAccompanyMatch: matchEmail(sendEmailAccompanyMatch),
     emailAccompanyMatchVolunteer: (ov: OpportunityVolunteer) =>
       sendEmailAccompanyMatchVolunteer(emailNotify, ov, emailNotifyRaw),
     emailNewRegular: (opportunity: Opportunity) =>
