@@ -1,4 +1,8 @@
-import { berlinToday, OpportunityType } from "need4deed-sdk";
+import {
+  berlinToday,
+  OpportunityType,
+  OpportunityVolunteerStatusType,
+} from "need4deed-sdk";
 import { Raw } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
@@ -8,6 +12,11 @@ import {
 import { ONETIMER_ENGAGED_VOLUNTEER_STATUSES } from "./onetimer-statuses";
 
 export const NO_MATCH_FOUND_WORKING_DAYS = 4;
+
+const MATCHED_VOLUNTEER_STATUSES = [
+  ...ONETIMER_ENGAGED_VOLUNTEER_STATUSES,
+  OpportunityVolunteerStatusType.PAST,
+];
 
 export function noMatchFoundCutoff(today: Date = berlinToday()): Date {
   return appointmentsDue(today, NO_MATCH_FOUND_WORKING_DAYS).to;
@@ -27,7 +36,7 @@ export function isNoMatchFound(
   return (
     appointment < noMatchFoundCutoff(today) &&
     !opportunity.opportunityVolunteer.some((ov) =>
-      ONETIMER_ENGAGED_VOLUNTEER_STATUSES.includes(ov.status),
+      MATCHED_VOLUNTEER_STATUSES.includes(ov.status),
     )
   );
 }

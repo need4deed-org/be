@@ -46,6 +46,7 @@ describe("isNoMatchFound", () => {
   it.each([
     OpportunityVolunteerStatusType.MATCHED,
     OpportunityVolunteerStatusType.ACTIVE,
+    OpportunityVolunteerStatusType.PAST,
   ])("is false once a volunteer is %s", (status) => {
     expect(
       isNoMatchFound(
