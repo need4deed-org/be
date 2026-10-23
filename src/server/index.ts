@@ -19,6 +19,7 @@ import appreciationRoutes from "./routes/appreciation.routes";
 import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
+import districtGeometryRoutes from "./routes/district-geometry.routes";
 import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
 import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
@@ -231,6 +232,9 @@ export async function createServer(): Promise<FastifyInstance> {
   });
   await fastifyInstance.register(opportunityEventRegistrationRoutes, {
     prefix: RoutePrefix.EVENT_REGISTRATION,
+  });
+  await fastifyInstance.register(districtGeometryRoutes, {
+    prefix: RoutePrefix.DISTRICT_GEOMETRIES,
   });
 
   await fastifyInstance.ready();
