@@ -4,7 +4,6 @@ import { UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   accessCookieName,
-  REFRESH_GRACE_MS,
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../../config/constants";
@@ -40,6 +39,14 @@ describe("refresh-token rotation", () => {
       user,
       await createRefreshSession(manager(), user.id),
     );
+  }
+
+  async function rotateTwice(token: string) {
+    const first = await rotateRefreshSession(manager(), user.id, claims(token));
+    if (first.kind !== "rotated") {
+      throw new Error("expected a rotation");
+    }
+    return rotateRefreshSession(manager(), user.id, first.ids);
   }
 
   const refresh = (token: string) =>
@@ -133,19 +140,13 @@ describe("refresh-token rotation", () => {
     expect(row.previousJti).toBe(claims(token).jti);
   });
 
-  it("revokes the session when a rotated token is replayed after the grace window", async () => {
+  it("revokes the session when a token two rotations old is replayed", async () => {
     const token = await login();
     const { sid } = claims(token);
-    const rotated = await rotateRefreshSession(
-      manager(),
-      user.id,
-      claims(token),
-    );
-    expect(rotated.kind).toBe("rotated");
+    const rotated = await rotateTwice(token);
 
-    const later = new Date(Date.now() + REFRESH_GRACE_MS + 1000);
     expect(
-      await rotateRefreshSession(manager(), user.id, claims(token), later),
+      await rotateRefreshSession(manager(), user.id, claims(token)),
     ).toEqual({ kind: "reuse" });
     expect((await session(sid)).revokedAt).not.toBeNull();
 
@@ -170,11 +171,7 @@ describe("refresh-token rotation", () => {
 
   it("rejects a replayed token over HTTP with the unchanged 400", async () => {
     const token = await login();
-    await rotateRefreshSession(manager(), user.id, claims(token));
-    await fastify.db.refreshSessionRepository.update(
-      { id: claims(token).sid },
-      { rotatedAt: new Date(Date.now() - REFRESH_GRACE_MS - 1000) },
-    );
+    await rotateTwice(token);
 
     const response = await refresh(token);
     expect(response.statusCode).toBe(400);
@@ -186,7 +183,7 @@ describe("refresh-token rotation", () => {
     expectAuthCookiesCleared(response);
   });
 
-  it("answers a replay within the grace window with the current jti", async () => {
+  it("answers the previous jti with the current one, however late", async () => {
     const token = await login();
     const rotated = await rotateRefreshSession(
       manager(),
@@ -197,10 +194,27 @@ describe("refresh-token rotation", () => {
       throw new Error("expected a rotation");
     }
 
-    const soon = new Date(Date.now() + REFRESH_GRACE_MS - 1000);
+    const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
     expect(
-      await rotateRefreshSession(manager(), user.id, claims(token), soon),
+      await rotateRefreshSession(manager(), user.id, claims(token), nextDay),
     ).toEqual(rotated);
+    expect((await session(claims(token).sid)).revokedAt).toBeNull();
+  });
+
+  it("recovers a client that lost the rotated cookie over HTTP", async () => {
+    const token = await login();
+    const lost = await refresh(token);
+    expect(lost.statusCode).toBe(200);
+    await fastify.db.refreshSessionRepository.update(
+      { id: claims(token).sid },
+      { rotatedAt: new Date(Date.now() - 60 * 60 * 1000) },
+    );
+
+    const response = await refresh(token);
+    expect(response.statusCode).toBe(200);
+    expect(claims(response.json().refresh).jti).toBe(
+      claims(lost.json().refresh).jti,
+    );
     expect((await session(claims(token).sid)).revokedAt).toBeNull();
   });
 
@@ -225,9 +239,8 @@ describe("refresh-token rotation", () => {
     const phone = await login();
     expect(claims(laptop).sid).not.toBe(claims(phone).sid);
 
+    await rotateTwice(laptop);
     await rotateRefreshSession(manager(), user.id, claims(laptop));
-    const later = new Date(Date.now() + REFRESH_GRACE_MS + 1000);
-    await rotateRefreshSession(manager(), user.id, claims(laptop), later);
     expect((await session(claims(laptop).sid)).revokedAt).not.toBeNull();
 
     expect((await refresh(phone)).statusCode).toBe(200);
@@ -404,16 +417,13 @@ describe("decideRotation", () => {
     });
   });
 
-  it("allows the previous jti only within the grace window", () => {
+  it("allows the previous jti however long ago the rotation was", () => {
     expect(decideRotation(live, 1, "previous", now)).toEqual({
       kind: "grace",
     });
-    const stale = {
-      ...live,
-      rotatedAt: new Date(now.getTime() - REFRESH_GRACE_MS - 1),
-    };
-    expect(decideRotation(stale, 1, "previous", now)).toEqual({
-      kind: "reuse",
+    const longAgo = { ...live, rotatedAt: new Date(now.getTime() - 86400000) };
+    expect(decideRotation(longAgo, 1, "previous", now)).toEqual({
+      kind: "grace",
     });
   });
 
