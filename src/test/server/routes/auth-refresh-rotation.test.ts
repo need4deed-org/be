@@ -4,6 +4,7 @@ import { UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   accessCookieName,
+  REFRESH_GRACE_MS,
   REFRESH_LIFESPAN_MS,
   refreshCookieName,
 } from "../../../config/constants";
@@ -183,7 +184,7 @@ describe("refresh-token rotation", () => {
     expectAuthCookiesCleared(response);
   });
 
-  it("answers the previous jti with the current one, however late", async () => {
+  it("answers the previous jti within the grace window with the current jti", async () => {
     const token = await login();
     const rotated = await rotateRefreshSession(
       manager(),
@@ -194,20 +195,31 @@ describe("refresh-token rotation", () => {
       throw new Error("expected a rotation");
     }
 
-    const nextDay = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const soon = new Date(Date.now() + REFRESH_GRACE_MS - 1000);
     expect(
-      await rotateRefreshSession(manager(), user.id, claims(token), nextDay),
+      await rotateRefreshSession(manager(), user.id, claims(token), soon),
     ).toEqual(rotated);
     expect((await session(claims(token).sid)).revokedAt).toBeNull();
   });
 
-  it("recovers a client that lost the rotated cookie over HTTP", async () => {
+  it("revokes the session when the previous jti comes after the grace window", async () => {
+    const token = await login();
+    await rotateRefreshSession(manager(), user.id, claims(token));
+
+    const later = new Date(Date.now() + REFRESH_GRACE_MS + 1000);
+    expect(
+      await rotateRefreshSession(manager(), user.id, claims(token), later),
+    ).toEqual({ kind: "reuse" });
+    expect((await session(claims(token).sid)).revokedAt).not.toBeNull();
+  });
+
+  it("recovers a client that lost the rotated cookie hours ago over HTTP", async () => {
     const token = await login();
     const lost = await refresh(token);
     expect(lost.statusCode).toBe(200);
     await fastify.db.refreshSessionRepository.update(
       { id: claims(token).sid },
-      { rotatedAt: new Date(Date.now() - 60 * 60 * 1000) },
+      { rotatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000) },
     );
 
     const response = await refresh(token);
@@ -417,13 +429,20 @@ describe("decideRotation", () => {
     });
   });
 
-  it("allows the previous jti however long ago the rotation was", () => {
-    expect(decideRotation(live, 1, "previous", now)).toEqual({
+  it("allows the previous jti only within the grace window", () => {
+    const edge = {
+      ...live,
+      rotatedAt: new Date(now.getTime() - REFRESH_GRACE_MS),
+    };
+    expect(decideRotation(edge, 1, "previous", now)).toEqual({
       kind: "grace",
     });
-    const longAgo = { ...live, rotatedAt: new Date(now.getTime() - 86400000) };
-    expect(decideRotation(longAgo, 1, "previous", now)).toEqual({
-      kind: "grace",
+    const stale = {
+      ...live,
+      rotatedAt: new Date(now.getTime() - REFRESH_GRACE_MS - 1),
+    };
+    expect(decideRotation(stale, 1, "previous", now)).toEqual({
+      kind: "reuse",
     });
   });
 

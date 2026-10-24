@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { EntityManager, IsNull, Not } from "typeorm";
-import { REFRESH_LIFESPAN_MS } from "../../../config/constants";
+import {
+  REFRESH_GRACE_MS,
+  REFRESH_LIFESPAN_MS,
+} from "../../../config/constants";
 import RefreshSession from "../../../data/entity/refresh-session.entity";
 
 export type RefreshSessionIds = { sid: string; jti: string };
@@ -41,7 +44,11 @@ export function decideRotation(
   if (jti === session.currentJti) {
     return { kind: "rotate" };
   }
-  if (jti === session.previousJti) {
+  if (
+    jti === session.previousJti &&
+    session.rotatedAt &&
+    now.getTime() - session.rotatedAt.getTime() <= REFRESH_GRACE_MS
+  ) {
     return { kind: "grace" };
   }
   return { kind: "reuse" };
