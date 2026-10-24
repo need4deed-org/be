@@ -213,7 +213,15 @@ async function authRoutes(
           `Refresh token reuse for user ${id}, session ${decoded.sid} revoked`,
         );
       }
-      if (rotation.kind !== "rotated") {
+      if (rotation.kind === "grace") {
+        const secondsSinceRotation = Math.round(
+          (Date.now() - rotation.rotatedAt.getTime()) / 1000,
+        );
+        logger.info(
+          `Refresh grace for user ${id}, session ${decoded.sid}, ${secondsSinceRotation}s after rotation`,
+        );
+      }
+      if (rotation.kind !== "rotated" && rotation.kind !== "grace") {
         clearAuthCookies(reply);
         throw new BadRequestError("Invalid refresh token.");
       }

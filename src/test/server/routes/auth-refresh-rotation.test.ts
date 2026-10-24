@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   accessCookieName,
   REFRESH_GRACE_MS,
@@ -12,6 +20,7 @@ import Person from "../../../data/entity/person.entity";
 import RefreshSession from "../../../data/entity/refresh-session.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
+import logger from "../../../logger";
 import { createServer } from "../../../server";
 import {
   createRefreshSession,
@@ -198,7 +207,7 @@ describe("refresh-token rotation", () => {
     const soon = new Date(Date.now() + REFRESH_GRACE_MS - 1000);
     expect(
       await rotateRefreshSession(manager(), user.id, claims(token), soon),
-    ).toEqual(rotated);
+    ).toEqual({ kind: "grace", ids: rotated.ids, rotatedAt: expect.any(Date) });
     expect((await session(claims(token).sid)).revokedAt).toBeNull();
   });
 
@@ -214,6 +223,7 @@ describe("refresh-token rotation", () => {
   });
 
   it("recovers a client that lost the rotated cookie hours ago over HTTP", async () => {
+    const info = vi.spyOn(logger, "info");
     const token = await login();
     const lost = await refresh(token);
     expect(lost.statusCode).toBe(200);
@@ -228,6 +238,14 @@ describe("refresh-token rotation", () => {
       claims(lost.json().refresh).jti,
     );
     expect((await session(claims(token).sid)).revokedAt).toBeNull();
+    expect(info).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(
+          `^Refresh grace for user ${user.id}, session ${claims(token).sid}, 2880\\ds after rotation$`,
+        ),
+      ),
+    );
+    info.mockRestore();
   });
 
   it("serves concurrent refreshes of one token without revoking", async () => {
