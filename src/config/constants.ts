@@ -88,18 +88,16 @@ export const seedEventsFile = path.join(
   "nid-events.json",
 );
 
+export const urlApp = process.env.URL_APP || "https://need4deed.org";
+
 export const urlEmailVerification =
-  process.env.URL_EMAIL_VERIFICATION ||
-  "https://app.need4deed.org/verify-email";
+  process.env.URL_EMAIL_VERIFICATION || `${urlApp}/verify-email`;
 
 export const urlPasswordReset =
-  process.env.URL_PASSWORD_RESET || "https://app.need4deed.org/reset-password";
+  process.env.URL_PASSWORD_RESET || `${urlApp}/reset-password`;
 
 export const urlCoordinatorInvite =
-  process.env.URL_COORDINATOR_INVITE ||
-  "https://app.need4deed.org/register-with-invite";
-
-export const urlApp = process.env.URL_APP || "https://need4deed.org";
+  process.env.URL_COORDINATOR_INVITE || `${urlApp}/register-with-invite`;
 
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
