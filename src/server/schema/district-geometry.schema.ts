@@ -70,7 +70,7 @@ export const districtGeometrySchema = {
   },
 };
 
-export const districtGeometrySchemaResponseSchema = {
+export const districtGeometryResponseSchema = {
   200: {
     type: "object",
     properties: {

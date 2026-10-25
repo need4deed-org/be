@@ -1,8 +1,14 @@
 import { FastifyInstance } from "fastify";
-import type { ApiDistrictGeometryCollection } from "need4deed-sdk";
+import type {
+  ApiDistrictGeometry,
+  ApiDistrictGeometryCollection,
+} from "need4deed-sdk";
 import { In } from "typeorm";
 import districtGeometry from "../../../public/data/district-geometry.json";
-import { districtGeometrySchemaResponseSchema } from "../schema/district-geometry.schema";
+import logger from "../../logger";
+import { districtGeometryResponseSchema } from "../schema/district-geometry.schema";
+
+let cachedFeatures: ApiDistrictGeometryCollection["features"] | undefined;
 
 export default async function districtGeometryRoutes(fastify: FastifyInstance) {
   fastify.get<{
@@ -14,49 +20,66 @@ export default async function districtGeometryRoutes(fastify: FastifyInstance) {
     "/",
     {
       schema: {
-        response: districtGeometrySchemaResponseSchema,
+        response: districtGeometryResponseSchema,
       },
     },
     async (_request, reply) => {
-      const titles = districtGeometry.features.map(
-        ({ properties }) => properties.title,
-      );
+      let features = cachedFeatures;
 
-      const districts = await fastify.db.districtRepository.find({
-        where: { title: In(titles) },
-        select: { id: true, title: true },
-      });
+      if (!features) {
+        const titles = districtGeometry.features.map(
+          ({ properties }) => properties.title,
+        );
 
-      const districtIdsByTitle = new Map(
-        districts.map(({ title, id }) => [title, id]),
-      );
+        const districts = await fastify.db.districtRepository.find({
+          where: { title: In(titles) },
+          select: { id: true, title: true },
+        });
 
-      const features = districtGeometry.features.map((feature) => {
-        const districtId = districtIdsByTitle.get(feature.properties.title);
+        const districtIdsByTitle = new Map(
+          districts.map(({ title, id }) => [title, id]),
+        );
+        const resolvedFeatures: ApiDistrictGeometryCollection["features"] = [];
+        let hasMissingDistricts = false;
 
-        if (districtId === undefined) {
-          throw new Error(
-            `No district found for "${feature.properties.title}"`,
-          );
+        for (const feature of districtGeometry.features) {
+          const districtId = districtIdsByTitle.get(feature.properties.title);
+
+          if (districtId === undefined) {
+            logger.warn(
+              `District geometry skipped: no district found for "${feature.properties.title}"`,
+            );
+            hasMissingDistricts = true;
+            continue;
+          }
+
+          resolvedFeatures.push({
+            ...feature,
+            type: "Feature",
+            geometry: feature.geometry as ApiDistrictGeometry,
+            properties: {
+              ...feature.properties,
+              districtId,
+            },
+          });
         }
 
-        return {
-          ...feature,
-          properties: {
-            ...feature.properties,
-            districtId,
-          },
-        };
-      });
+        if (!hasMissingDistricts) {
+          cachedFeatures = resolvedFeatures;
+        }
 
-      const data = {
+        features = resolvedFeatures;
+      }
+
+      const data: ApiDistrictGeometryCollection = {
         ...districtGeometry,
+        type: "FeatureCollection",
         features,
-      } as ApiDistrictGeometryCollection;
+      };
 
-      reply.status(200).send({
+      reply.header("Cache-Control", "public, max-age=3600").status(200).send({
         message: "District geometry",
-        data: data,
+        data,
       });
     },
   );

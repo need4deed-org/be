@@ -6,7 +6,7 @@ export const RoutePrefix = {
   COMMENT: "/comment",
   COMMUNICATION: "/communication",
   CONTACT: "/contact",
-  DISTRICT_GEOMETRIES: "/district-geometry",
+  DISTRICT_GEOMETRY: "/district-geometry",
   DOC: "/doc",
   EVENT: "/event",
   EVENT_REGISTRATION: "/event-registration",

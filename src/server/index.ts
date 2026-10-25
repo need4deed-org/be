@@ -234,7 +234,7 @@ export async function createServer(): Promise<FastifyInstance> {
     prefix: RoutePrefix.EVENT_REGISTRATION,
   });
   await fastifyInstance.register(districtGeometryRoutes, {
-    prefix: RoutePrefix.DISTRICT_GEOMETRIES,
+    prefix: RoutePrefix.DISTRICT_GEOMETRY,
   });
 
   await fastifyInstance.ready();
