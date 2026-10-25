@@ -223,7 +223,6 @@ describe("refresh-token rotation", () => {
   });
 
   it("recovers a client that lost the rotated cookie hours ago over HTTP", async () => {
-    const info = vi.spyOn(logger, "info");
     const token = await login();
     const lost = await refresh(token);
     expect(lost.statusCode).toBe(200);
@@ -232,20 +231,23 @@ describe("refresh-token rotation", () => {
       { rotatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000) },
     );
 
+    const info = vi.spyOn(logger, "info");
     const response = await refresh(token);
+    const logged = info.mock.calls.flat().map(String);
+    info.mockRestore();
+
     expect(response.statusCode).toBe(200);
     expect(claims(response.json().refresh).jti).toBe(
       claims(lost.json().refresh).jti,
     );
     expect((await session(claims(token).sid)).revokedAt).toBeNull();
-    expect(info).toHaveBeenCalledWith(
+    expect(logged).toContainEqual(
       expect.stringMatching(
         new RegExp(
           `^Refresh grace for user ${user.id}, session ${claims(token).sid}, 2880\\ds after rotation$`,
         ),
       ),
     );
-    info.mockRestore();
   });
 
   it("serves concurrent refreshes of one token without revoking", async () => {

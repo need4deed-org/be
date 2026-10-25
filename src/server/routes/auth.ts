@@ -221,7 +221,7 @@ async function authRoutes(
           `Refresh grace for user ${id}, session ${decoded.sid}, ${secondsSinceRotation}s after rotation`,
         );
       }
-      if (rotation.kind !== "rotated" && rotation.kind !== "grace") {
+      if (rotation.kind === "reuse" || rotation.kind === "invalid") {
         clearAuthCookies(reply);
         throw new BadRequestError("Invalid refresh token.");
       }
