@@ -52,11 +52,4 @@ export default class SnakeCaseNamingStrategy extends DefaultNamingStrategy {
       tableName + "_" + (columnName ? columnName : propertyName),
     );
   }
-
-  classTableInheritanceParentColumnName(
-    parentTableName: any,
-    parentTableIdPropertyName: any,
-  ): string {
-    return snakeCase(`${parentTableName}_${parentTableIdPropertyName}`);
-  }
 }

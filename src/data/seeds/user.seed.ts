@@ -116,7 +116,7 @@ export async function seedUser(dataSource: DataSource) {
       coordinatorUser3,
       userUser,
     ]);
-  } catch (_error) {
+  } catch {
     logger.info("Skipping seeding users as they already seeded.");
   }
 }
