@@ -1,5 +1,5 @@
 import { BaseError, ConflictError, NotFoundError } from "../../config";
-import { isUniqueViolation } from "../../data/utils/is-unique-violation";
+import { isUniqueViolation } from "../../data/utils";
 
 type HandledError = Error & {
   statusCode?: number;
