@@ -1,5 +1,6 @@
 import { normalizeIP } from "@fastify/rate-limit";
 import { FastifyReply, FastifyRequest } from "fastify";
+import logger from "../../logger";
 
 const LOGIN_IP_MAX = 30;
 const LOGIN_IP_WINDOW_MS = 60 * 1000;
@@ -34,6 +35,7 @@ export function createLoginIpCap() {
     }
     window.count += 1;
     if (window.count > LOGIN_IP_MAX) {
+      logger.warn("Login failed: rate-limited-ip");
       const retryAfterMs = window.startedAt + LOGIN_IP_WINDOW_MS - now;
       return reply
         .header("retry-after", Math.ceil(retryAfterMs / 1000))

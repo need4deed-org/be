@@ -71,6 +71,7 @@ async function authRoutes(
           timeWindow: "1 minute",
           hook: "preHandler",
           keyGenerator: loginRateLimitKey,
+          onExceeded: () => logger.warn("Login failed: rate-limited-account"),
         },
       },
       preHandler: createLoginIpCap(),
@@ -155,7 +156,7 @@ async function authRoutes(
           data: { access, refresh },
         });
       } catch (error) {
-        logger.error(`Authentication error: ${error.message}`);
+        logger.error(`Login failed: server-error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -356,6 +357,7 @@ async function authRoutes(
         await tx.update(User, { id: user.id }, { password: hashed });
         await revokeUserRefreshSessions(tx, user.id);
       });
+      logger.info(`Password set for user ${user.id} via reset-password`);
 
       return reply.status(200).send({
         message: "Password has been reset.",
@@ -396,6 +398,7 @@ async function authRoutes(
           refresh?.id === authUser.id ? refresh.sid : undefined,
         );
       });
+      logger.info(`Password set for user ${authUser.id} via change-password`);
 
       return reply.status(200).send({
         message: "Password has been changed.",

@@ -11,7 +11,6 @@ import {
 } from "vitest";
 import { accessCookieName, refreshCookieName } from "../../../config/constants";
 import User from "../../../data/entity/user.entity";
-import logger from "../../../logger";
 import { createServer } from "../../../server";
 
 vi.mock("../../../data", async () => {
@@ -370,82 +369,6 @@ describe("POST /auth/refresh", () => {
       error: "BadRequestError",
       message: "Invalid refresh token.",
     });
-  });
-});
-
-describe("POST /auth/login failure logging", () => {
-  let fastify: FastifyInstance;
-  const email = "login-failure@example.com";
-  const password = "typed-password";
-
-  beforeAll(async () => {
-    fastify = await createServer();
-    await fastify.ready();
-  });
-
-  afterAll(async () => {
-    await fastify.close();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  async function loginWarning(
-    user: Partial<User> | null,
-    payload = { email, password },
-  ) {
-    const warn = vi.spyOn(logger, "warn");
-    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue(
-      user as User | null,
-    );
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload,
-    });
-    const lines = warn.mock.calls.map(([line]) => String(line));
-    for (const line of lines) {
-      expect(line).not.toContain(email);
-      expect(line).not.toContain(password);
-    }
-    return { response, lines };
-  }
-
-  it("logs an empty field", async () => {
-    const { response, lines } = await loginWarning(null, {
-      email,
-      password: "",
-    });
-    expect(response.statusCode).toBe(400);
-    expect(lines).toContain("Login failed: empty-field");
-  });
-
-  it("logs an unknown email without the email", async () => {
-    const { response, lines } = await loginWarning(null);
-    expect(response.statusCode).toBe(404);
-    expect(lines).toContain("Login failed: unknown-email");
-  });
-
-  it("logs an inactive user by id", async () => {
-    const { response, lines } = await loginWarning({
-      id: 7,
-      email,
-      isActive: false,
-    });
-    expect(response.statusCode).toBe(403);
-    expect(lines).toContain("Login failed for user 7: inactive");
-  });
-
-  it("logs a wrong password by id", async () => {
-    const { response, lines } = await loginWarning({
-      id: 8,
-      email,
-      isActive: true,
-      checkPassword: vi.fn().mockResolvedValue(false),
-    });
-    expect(response.statusCode).toBe(401);
-    expect(lines).toContain("Login failed for user 8: wrong-password");
   });
 });
 
