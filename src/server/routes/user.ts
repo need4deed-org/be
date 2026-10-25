@@ -455,6 +455,7 @@ export default async function userRoutes(
           errors: result.errors,
         });
       }
+      logger.info(`Password set for user ${result.user.id} via register`);
 
       fastify.notify.emailVerification(result.user).catch((err) => {
         logger.error(
@@ -536,6 +537,7 @@ export default async function userRoutes(
           errors: result.errors,
         });
       }
+      logger.info(`Password set for user ${result.user.id} via admin-create`);
 
       return reply.status(201).send(result.user);
     },
@@ -643,6 +645,9 @@ export default async function userRoutes(
           errors: result.errors,
         });
       }
+      logger.info(
+        `Password set for user ${result.user.id} via register-with-invite`,
+      );
 
       return reply.status(201).send(result.user);
     },
