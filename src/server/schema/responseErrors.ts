@@ -1,3 +1,5 @@
+export type ApiErrorReply = { message: string; errors?: string[] };
+
 export const responseErrors = {
   400: {
     type: "object",
