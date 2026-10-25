@@ -1,3 +1,5 @@
+import { responseErrors } from "./responseErrors";
+
 export const positionSchema = {
   type: "array",
   items: { type: "number" },
@@ -66,4 +68,16 @@ export const districtGeometrySchema = {
       },
     },
   },
+};
+
+export const districtGeometrySchemaResponseSchema = {
+  200: {
+    type: "object",
+    properties: {
+      message: { type: "string" },
+      data: districtGeometrySchema,
+    },
+    required: ["message", "data"],
+  },
+  ...responseErrors,
 };
