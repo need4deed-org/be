@@ -379,7 +379,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | { message: string; errors?: any };
+    Reply: User | { message: string; errors?: string[] };
   }>(
     "/",
     {
@@ -469,7 +469,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | { message: string; errors?: any };
+    Reply: User | { message: string; errors?: string[] };
   }>(
     "/admin",
     {
@@ -545,7 +545,9 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiCoordinatorInvitePost;
-    Reply: ApiCoordinatorInviteResponse | { message: string; errors?: any };
+    Reply:
+      | ApiCoordinatorInviteResponse
+      | { message: string; errors?: string[] };
   }>(
     "/admin/coordinator-invite",
     {
@@ -580,7 +582,7 @@ export default async function userRoutes(
   fastify.post<{
     Body: ApiCoordinatorRegisterWithInvite;
     Querystring: { token: string };
-    Reply: User | { message: string; errors?: any };
+    Reply: User | { message: string; errors?: string[] };
   }>(
     "/register-with-invite",
     {
