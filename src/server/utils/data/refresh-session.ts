@@ -16,6 +16,7 @@ export type RotationDecision =
 
 export type RotationResult =
   | { kind: "rotated"; ids: RefreshSessionIds }
+  | { kind: "grace"; ids: RefreshSessionIds; rotatedAt: Date }
   | { kind: "reuse" }
   | { kind: "invalid" };
 
@@ -108,8 +109,9 @@ export async function rotateRefreshSession(
         return { kind: "reuse" };
       case "grace":
         return {
-          kind: "rotated",
+          kind: "grace",
           ids: { sid, jti: session!.currentJti },
+          rotatedAt: session!.rotatedAt!,
         };
       case "rotate": {
         const nextJti = randomUUID();
