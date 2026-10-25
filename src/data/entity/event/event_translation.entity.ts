@@ -46,7 +46,7 @@ export default class EventTranslation {
   additionalTitle?: string;
 
   @Column({ type: "jsonb", nullable: true })
-  additionalInfo?: any;
+  additionalInfo?: unknown;
 
   @Column({ type: "text", nullable: true })
   outro?: string;
