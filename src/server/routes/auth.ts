@@ -59,7 +59,6 @@ async function authRoutes(
     Reply: {
       message: string;
       data?: { access: string; refresh: string };
-      errors?: string[];
     };
   }>(
     prefixedPath + RoutePrefix.LOGIN,
@@ -164,7 +163,7 @@ async function authRoutes(
 
   fastify.post<{
     Body: ApiAuthRefreshPost;
-    Reply: ApiAuthRefreshResponse | { message: string; errors?: string[] };
+    Reply: ApiAuthRefreshResponse | { message: string };
   }>(
     prefixedPath + RoutePrefix.REFRESH,
     {

@@ -6,7 +6,7 @@ import Address from "../entity/location/address.entity";
 import Postcode from "../entity/location/postcode.entity";
 import Person from "../entity/person.entity";
 import User from "../entity/user.entity";
-import { getRepository, hashPassword } from "../utils";
+import { getRepository, hashPassword, isUniqueViolation } from "../utils";
 import { getCount } from "./utils";
 
 export async function seedUser(dataSource: DataSource) {
@@ -116,7 +116,10 @@ export async function seedUser(dataSource: DataSource) {
       coordinatorUser3,
       userUser,
     ]);
-  } catch {
+  } catch (error) {
+    if (!isUniqueViolation(error)) {
+      throw error;
+    }
     logger.info("Skipping seeding users as they already seeded.");
   }
 }
