@@ -88,6 +88,7 @@ async function authRoutes(
       const { email, password } = request.body;
 
       if (!email || !password) {
+        logger.warn("Login failed: empty-field");
         return reply.status(400).send({ message: "Bad credentials." });
       }
 
@@ -101,14 +102,17 @@ async function authRoutes(
           where: { email },
         });
         if (!user) {
+          logger.warn("Login failed: unknown-email");
           return reply.status(404).send({ message: "User not found." });
         }
 
         if (!user.isActive) {
+          logger.warn(`Login failed for user ${user.id}: inactive`);
           return reply.status(403).send({ message: "User is not active." });
         }
 
         if (!(await user.checkPassword(password))) {
+          logger.warn(`Login failed for user ${user.id}: wrong-password`);
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
