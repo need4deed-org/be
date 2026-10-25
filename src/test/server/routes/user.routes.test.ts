@@ -10,6 +10,7 @@ import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getPostcode, hashPassword } from "../../../data/utils";
+import logger from "../../../logger";
 import { createServer } from "../../../server";
 
 // Regression coverage for two things landed together:
@@ -269,6 +270,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
   it("still creates a new Person for a genuinely new email (agent flow unaffected)", async () => {
     const email = `brand-new-${suffix}@example.com`;
+    const info = vi.spyOn(logger, "info");
 
     const res = await fastify.inject({
       method: "POST",
@@ -280,10 +282,15 @@ describe("POST /user — links existing Person by email instead of duplicating (
         person: { firstName: "Brand", lastName: "New" },
       },
     });
+    const logged = info.mock.calls.flat();
+    info.mockRestore();
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
     createdPersonIds.push(res.json().person.id);
+    expect(logged).toContain(
+      `Password set for user ${res.json().id} via register`,
+    );
   });
 
   it("be#983: rejects linking to an existing Person by id and leaves that Person untouched", async () => {
@@ -1274,9 +1281,15 @@ describe("POST /user/admin — reclaims a pending User (be#1012)", () => {
       person: new Person({ firstName: "Squat", lastName: "Ter", email }),
     });
 
+    const info = vi.spyOn(logger, "info");
     const res = await createAsAdmin(email);
+    const logged = info.mock.calls.flat();
+    info.mockRestore();
 
     expect(res.statusCode).toBe(201);
+    expect(logged).toContain(
+      `Password set for user ${res.json().id} via admin-create`,
+    );
     expect(res.json().id).not.toBe(pendingUser.id);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([res.json().id]);
@@ -1431,14 +1444,20 @@ describe("POST /user/register-with-invite", () => {
     const email = `invitee-${suffix}@example.com`;
     const token = makeInviteToken(email);
 
+    const info = vi.spyOn(logger, "info");
     const res = await fastify.inject({
       method: "POST",
       url: `/user/register-with-invite?token=${token}`,
       payload: { password: "chosen_password" },
     });
+    const logged = info.mock.calls.flat();
+    info.mockRestore();
 
     expect(res.statusCode).toBe(201);
     const body = res.json();
+    expect(logged).toContain(
+      `Password set for user ${body.id} via register-with-invite`,
+    );
     createdUserIds.push(body.id);
     createdPersonIds.push(body.person.id);
     expect(body.email).toBe(email);

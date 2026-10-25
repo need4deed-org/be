@@ -71,6 +71,7 @@ async function authRoutes(
           timeWindow: "1 minute",
           hook: "preHandler",
           keyGenerator: loginRateLimitKey,
+          onExceeded: () => logger.warn("Login failed: rate-limited-account"),
         },
       },
       preHandler: createLoginIpCap(),
@@ -88,6 +89,7 @@ async function authRoutes(
       const { email, password } = request.body;
 
       if (!email || !password) {
+        logger.warn("Login failed: empty-field");
         return reply.status(400).send({ message: "Bad credentials." });
       }
 
@@ -101,14 +103,17 @@ async function authRoutes(
           where: { email },
         });
         if (!user) {
+          logger.warn("Login failed: unknown-email");
           return reply.status(404).send({ message: "User not found." });
         }
 
         if (!user.isActive) {
+          logger.warn(`Login failed for user ${user.id}: inactive`);
           return reply.status(403).send({ message: "User is not active." });
         }
 
         if (!(await user.checkPassword(password))) {
+          logger.warn(`Login failed for user ${user.id}: wrong-password`);
           return reply.status(401).send({ message: "Bad credentials." });
         }
 
@@ -151,7 +156,7 @@ async function authRoutes(
           data: { access, refresh },
         });
       } catch (error) {
-        logger.error(`Authentication error: ${error.message}`);
+        logger.error(`Login failed: server-error: ${error.message}`);
         return reply.status(500).send({ message: "Internal server error." });
       }
     },
@@ -360,6 +365,7 @@ async function authRoutes(
         await tx.update(User, { id: user.id }, { password: hashed });
         await revokeUserRefreshSessions(tx, user.id);
       });
+      logger.info(`Password set for user ${user.id} via reset-password`);
 
       return reply.status(200).send({
         message: "Password has been reset.",
@@ -400,6 +406,7 @@ async function authRoutes(
           refresh?.id === authUser.id ? refresh.sid : undefined,
         );
       });
+      logger.info(`Password set for user ${authUser.id} via change-password`);
 
       return reply.status(200).send({
         message: "Password has been changed.",
