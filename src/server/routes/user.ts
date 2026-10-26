@@ -33,7 +33,7 @@ import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
 import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
-import { responseErrors } from "../schema/responseErrors";
+import { ApiErrorReply, responseErrors } from "../schema/responseErrors";
 import {
   coordinatorInviteBodySchema,
   coordinatorInviteResponseSchema,
@@ -379,7 +379,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | { message: string; errors?: string[] };
+    Reply: User | ApiErrorReply;
   }>(
     "/",
     {
@@ -469,7 +469,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | { message: string; errors?: string[] };
+    Reply: User | ApiErrorReply;
   }>(
     "/admin",
     {
@@ -545,9 +545,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiCoordinatorInvitePost;
-    Reply:
-      | ApiCoordinatorInviteResponse
-      | { message: string; errors?: string[] };
+    Reply: ApiCoordinatorInviteResponse | ApiErrorReply;
   }>(
     "/admin/coordinator-invite",
     {
@@ -582,7 +580,7 @@ export default async function userRoutes(
   fastify.post<{
     Body: ApiCoordinatorRegisterWithInvite;
     Querystring: { token: string };
-    Reply: User | { message: string; errors?: string[] };
+    Reply: User | ApiErrorReply;
   }>(
     "/register-with-invite",
     {

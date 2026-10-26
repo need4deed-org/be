@@ -1,4 +1,5 @@
 import { BaseError, ConflictError, NotFoundError } from "../../config";
+import { isUniqueViolation } from "../../data/utils";
 
 type HandledError = Error & {
   statusCode?: number;
@@ -9,8 +10,6 @@ type HandledError = Error & {
 
 type ErrorReply = { statusCode: number; body: Record<string, unknown> };
 
-const PG_UNIQUE_VIOLATION = "23505";
-
 function toBaseError(error: HandledError): BaseError | undefined {
   if (error instanceof BaseError) {
     return error;
@@ -18,7 +17,7 @@ function toBaseError(error: HandledError): BaseError | undefined {
   if (error.name === "EntityNotFoundError") {
     return new NotFoundError();
   }
-  if (error.name === "QueryFailedError" && error.code === PG_UNIQUE_VIOLATION) {
+  if (isUniqueViolation(error)) {
     return new ConflictError(error.detail ?? "");
   }
   return undefined;

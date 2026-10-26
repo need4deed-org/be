@@ -10,6 +10,7 @@ export * from "./getLoggingForDataSource";
 export * from "./getRRULE";
 export * from "./getStartEndDates";
 export * from "./hash-token";
+export * from "./is-unique-violation";
 export * from "./log-match-change";
 export * from "./passwd";
 export * from "./remove-data";
