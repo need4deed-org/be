@@ -9,6 +9,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import EventN4D from "../../data/entity/event/event.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
+import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
@@ -74,6 +75,7 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       refreshSessionRepository: dataSource.getRepository(RefreshSession),
       trustedDomainRepository: dataSource.getRepository(TrustedDomain),
       volunteerAuditLogRepository: dataSource.getRepository(VolunteerAuditLog),
+      districtRepository: dataSource.getRepository(District),
     });
 
     if (!fastify.db.userRepository || !fastify.db.personRepository) {

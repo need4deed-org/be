@@ -11,6 +11,7 @@ import Deal from "../../data/entity/deal.entity";
 import Document from "../../data/entity/document.entity";
 import EventN4D from "../../data/entity/event/event.entity";
 import FieldTranslation from "../../data/entity/field_translation.entity";
+import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
@@ -67,6 +68,7 @@ declare module "fastify" {
       refreshSessionRepository: Repository<RefreshSession>;
       trustedDomainRepository: Repository<TrustedDomain>;
       volunteerAuditLogRepository: Repository<VolunteerAuditLog>;
+      districtRepository: Repository<District>;
     };
     jwt: JWT;
     authenticate(opts?: AuthOptions): onRequestHookHandler;
