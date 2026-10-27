@@ -33,7 +33,11 @@ import {
 } from "../utils/data/refresh-session";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
-import { createLoginIpCap, loginRateLimitKey } from "../utils/login-rate-limit";
+import {
+  createLoginAccountCap,
+  createLoginIpCap,
+  loginRateLimitKey,
+} from "../utils/login-rate-limit";
 import {
   getRefreshPayload,
   getRefreshToken,
@@ -63,17 +67,16 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.LOGIN,
     {
-      // Per account: behind the fe proxy all users can share one IP.
       config: {
         rateLimit: {
           max: 10,
           timeWindow: "1 minute",
-          hook: "preHandler",
+          hook: "preValidation",
           keyGenerator: loginRateLimitKey,
-          onExceeded: () => logger.warn("Login failed: rate-limited-account"),
+          onExceeded: () => logger.warn("Login failed: rate-limited-email-ip"),
         },
       },
-      preHandler: createLoginIpCap(),
+      preHandler: [createLoginIpCap(), createLoginAccountCap()],
       schema: {
         body: userLoginSchema,
         response: {
@@ -378,7 +381,15 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.CHANGE_PASSWORD,
     {
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: "1 minute",
+          hook: "preHandler",
+          keyGenerator: (request) =>
+            `password-change-user:${request.authUser!.id}`,
+        },
+      },
       onRequest: [fastify.authenticate()],
       schema: {
         body: changePasswordSchema,

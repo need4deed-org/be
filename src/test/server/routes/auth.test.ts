@@ -478,16 +478,20 @@ describe("Rate limiting", () => {
     expect(response.json().message).toBe("Rate limit exceeded");
   });
 
-  it("POST /auth/login counts per account, ignoring case, not per IP", async () => {
-    const login = (email: string) =>
+  it("POST /auth/login counts per account and IP, ignoring case", async () => {
+    const login = (email: string, remoteAddress?: string) =>
       fastify.inject({
         method: "POST",
         url: "/auth/login",
         payload: { email, password: "whatever" },
+        remoteAddress,
       });
 
     expect((await login("TEST@example.com")).statusCode).toBe(429);
     expect((await login("other@example.com")).statusCode).not.toBe(429);
+    expect(
+      (await login("test@example.com", "203.0.113.7")).statusCode,
+    ).not.toBe(429);
   });
 
   it("POST /auth/refresh limits to 20 requests per minute", async () => {
@@ -526,6 +530,14 @@ describe("Rate limiting", () => {
     });
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
+
+    const otherIp = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+      remoteAddress: "203.0.113.8",
+    });
+    expect(otherIp.statusCode).not.toBe(429);
   });
 
   it("POST /auth/password-reset limits to 10 requests per minute", async () => {
@@ -559,6 +571,7 @@ describe("Rate limiting", () => {
       id: 999,
       role: "volunteer",
       isActive: true,
+      checkPassword: async () => false,
     } as any);
 
     for (let i = 0; i < 20; i++) {
@@ -566,19 +579,54 @@ describe("Rate limiting", () => {
         method: "POST",
         url: "/auth/password-change",
         cookies: { access: accessToken },
-        payload: { password: "old", newPassword: "new" },
+        payload: { password: "old", newPassword: "new_password" },
       });
-      expect(response.statusCode).not.toBe(429);
+      expect(response.statusCode).toBe(400);
     }
 
     const response = await fastify.inject({
       method: "POST",
       url: "/auth/password-change",
       cookies: { access: accessToken },
-      payload: { password: "old", newPassword: "new" },
+      payload: { password: "old", newPassword: "new_password" },
     });
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/password-change counts per user, not per IP", async () => {
+    vi.spyOn(fastify.db.userRepository, "findOne").mockImplementation(
+      async (options) =>
+        ({
+          id: (options.where as { id: number }).id,
+          role: UserRole.VOLUNTEER,
+          isActive: true,
+          checkPassword: async () => false,
+        }) as unknown as User,
+    );
+    const changePassword = (id: number, remoteAddress: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/password-change",
+        cookies: {
+          access: fastify.jwt.sign({
+            id,
+            email: `user-${id}@example.com`,
+            role: UserRole.VOLUNTEER,
+            type: "access",
+          }),
+        },
+        payload: { password: "old", newPassword: "new_password" },
+        remoteAddress,
+      });
+
+    for (let i = 0; i < 20; i++) {
+      expect((await changePassword(1001, `198.51.100.${i}`)).statusCode).toBe(
+        400,
+      );
+    }
+    expect((await changePassword(1001, "198.51.100.99")).statusCode).toBe(429);
+    expect((await changePassword(1002, "198.51.100.0")).statusCode).toBe(400);
   });
 });
 
@@ -608,5 +656,56 @@ describe("Login per-IP cap", () => {
     const response = await login(30);
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
+  });
+});
+
+describe("Login per-account cap", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("POST /auth/login limits one account to 50 requests per minute across IPs", async () => {
+    const login = (email: string, i: number) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: "whatever" },
+        remoteAddress: `198.51.100.${i}`,
+      });
+
+    for (let i = 0; i < 50; i++) {
+      expect((await login("distributed@example.com", i)).statusCode).not.toBe(
+        429,
+      );
+    }
+    const response = await login("distributed@example.com", 50);
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+    expect((await login("other@example.com", 50)).statusCode).not.toBe(429);
+  });
+
+  it("POST /auth/login doesn't count logins rejected per email and IP toward the account", async () => {
+    const attempt = (remoteAddress: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "victim@example.com", password: "whatever" },
+        remoteAddress,
+      });
+
+    for (const ip of ["192.0.2.1", "192.0.2.2"]) {
+      for (let i = 0; i < 30; i++) {
+        await attempt(ip);
+      }
+      expect((await attempt(ip)).statusCode).toBe(429);
+    }
+    expect((await attempt("192.0.2.3")).statusCode).not.toBe(429);
   });
 });

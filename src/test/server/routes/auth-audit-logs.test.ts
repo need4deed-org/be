@@ -116,7 +116,7 @@ describe("auth audit logs", () => {
     expectNoSecrets(lines(), email, typed);
   });
 
-  it("logs logins rejected by the per-account limit", async () => {
+  it("logs logins rejected by the per-email-and-IP limit", async () => {
     const limited = `auth-audit-limited-${suffix}@example.com`;
     for (let i = 0; i < 10; i++) {
       await login({ email: limited, password });
@@ -124,7 +124,7 @@ describe("auth audit logs", () => {
     const lines = captureLogs();
     const response = await login({ email: limited, password });
     expect(response.statusCode).toBe(429);
-    expect(lines()).toContain("Login failed: rate-limited-account");
+    expect(lines()).toContain("Login failed: rate-limited-email-ip");
     expectNoSecrets(lines(), limited, password);
   });
 
@@ -168,7 +168,7 @@ describe("auth audit logs", () => {
   });
 });
 
-describe("auth audit logs: per-IP login cap", () => {
+describe("auth audit logs: login caps", () => {
   let fastify: FastifyInstance;
 
   beforeAll(async () => {
@@ -202,5 +202,24 @@ describe("auth audit logs: per-IP login cap", () => {
     const response = await login(30);
     expect(response.statusCode).toBe(429);
     expect(lines()).toContain("Login failed: rate-limited-ip");
+  });
+
+  it("logs logins rejected by the per-account cap", async () => {
+    const email = `auth-audit-account-${randomNumericSuffix()}@example.com`;
+    const login = (i: number) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: "audit_password" },
+        remoteAddress: `198.51.100.${i}`,
+      });
+    for (let i = 0; i < 50; i++) {
+      await login(i);
+    }
+    const lines = captureLogs();
+    const response = await login(50);
+    expect(response.statusCode).toBe(429);
+    expect(lines()).toContain("Login failed: rate-limited-account");
+    expect(lines().join("\n")).not.toContain(email);
   });
 });
