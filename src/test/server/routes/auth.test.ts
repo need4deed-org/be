@@ -614,3 +614,36 @@ describe("Login per-IP cap", () => {
     expect(response.json().message).toBe("Rate limit exceeded");
   });
 });
+
+describe("Login per-account cap", () => {
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("POST /auth/login limits one account to 50 requests per minute across IPs", async () => {
+    const login = (email: string, i: number) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: "whatever" },
+        remoteAddress: `198.51.100.${i}`,
+      });
+
+    for (let i = 0; i < 50; i++) {
+      expect((await login("distributed@example.com", i)).statusCode).not.toBe(
+        429,
+      );
+    }
+    const response = await login("distributed@example.com", 50);
+    expect(response.statusCode).toBe(429);
+    expect(response.json().message).toBe("Rate limit exceeded");
+    expect((await login("other@example.com", 50)).statusCode).not.toBe(429);
+  });
+});

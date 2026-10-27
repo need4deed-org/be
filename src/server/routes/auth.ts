@@ -33,7 +33,11 @@ import {
 } from "../utils/data/refresh-session";
 import { signAccessToken } from "../utils/data/sign-access-token";
 import { signRefreshToken } from "../utils/data/sign-refresh-token";
-import { createLoginIpCap, loginRateLimitKey } from "../utils/login-rate-limit";
+import {
+  createLoginAccountCap,
+  createLoginIpCap,
+  loginRateLimitKey,
+} from "../utils/login-rate-limit";
 import {
   getRefreshPayload,
   getRefreshToken,
@@ -73,7 +77,7 @@ async function authRoutes(
             logger.warn("Login failed: rate-limited-account-ip"),
         },
       },
-      preHandler: createLoginIpCap(),
+      preHandler: [createLoginIpCap(), createLoginAccountCap()],
       schema: {
         body: userLoginSchema,
         response: {

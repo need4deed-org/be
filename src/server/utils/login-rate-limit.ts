@@ -3,6 +3,7 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import logger from "../../logger";
 
 const LOGIN_IP_MAX = 30;
+const LOGIN_ACCOUNT_MAX = 50;
 const LOGIN_WINDOW_MS = 60 * 1000;
 const LOGIN_MAX_TRACKED = 5000;
 
@@ -62,3 +63,6 @@ function createLoginCap(
 
 export const createLoginIpCap = () =>
   createLoginCap(LOGIN_IP_MAX, clientIp, "rate-limited-ip");
+
+export const createLoginAccountCap = () =>
+  createLoginCap(LOGIN_ACCOUNT_MAX, loginEmail, "rate-limited-account");
