@@ -530,6 +530,14 @@ describe("Rate limiting", () => {
     });
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
+
+    const otherIp = await fastify.inject({
+      method: "POST",
+      url: "/auth/request-reset",
+      payload: { email: "test@example.com" },
+      remoteAddress: "203.0.113.8",
+    });
+    expect(otherIp.statusCode).not.toBe(429);
   });
 
   it("POST /auth/password-reset limits to 10 requests per minute", async () => {
