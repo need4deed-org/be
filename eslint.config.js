@@ -72,6 +72,16 @@ module.exports = [
       ],
 
       "sort-keys": "off",
+      // unbound-method misses pino: its log methods are typed as properties
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression > MemberExpression.arguments[property.name=/^(trace|debug|info|warn|error|fatal)$/]:matches([object.name=/^(logger|log)$/], [object.property.name=/^(logger|log)$/])",
+          message:
+            "Pass a bound logger call, e.g. `(err) => logger.error(err)`: an unbound pino method throws when called.",
+        },
+      ],
     },
   },
 ];

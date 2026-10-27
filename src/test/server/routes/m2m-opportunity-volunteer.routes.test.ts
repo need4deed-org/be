@@ -855,6 +855,57 @@ describe("coordinator's email note on suggest / match", () => {
       await fastify.db.personRepository.delete({ id: otherPerson.id });
     }
   });
+
+  it("alerts ops when a failed email's log entry cannot be removed", async () => {
+    const otherDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
+    );
+    const otherPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Stuck", lastName: "Volunteer" }),
+    );
+    const otherVolunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
+    );
+    vi.spyOn(fastify.notify, "emailSuggestion").mockRejectedValueOnce(
+      new Error("SMTP down"),
+    );
+    vi.spyOn(
+      fastify.db.communicationRepository,
+      "remove",
+    ).mockRejectedValueOnce(new Error("db down"));
+    const opsAlert = vi
+      .spyOn(fastify.notify, "opsAlert")
+      .mockResolvedValueOnce(undefined);
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity-volunteer",
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          opportunityId: opportunity.id,
+          volunteerId: otherVolunteer.id,
+          status: OpportunityVolunteerStatusType.PENDING,
+          emailNote: "Stuck?",
+        },
+      });
+
+      expect(res.statusCode).toBe(502);
+      expect(opsAlert).toHaveBeenCalledWith(
+        expect.stringContaining("could not be removed"),
+      );
+    } finally {
+      await fastify.db.communicationRepository.delete({
+        volunteerId: otherVolunteer.id,
+      });
+      await fastify.db.opportunityVolunteerRepository.delete({
+        volunteerId: otherVolunteer.id,
+      });
+      await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
+      await fastify.db.dealRepository.delete({ id: otherDeal.id });
+      await fastify.db.personRepository.delete({ id: otherPerson.id });
+    }
+  });
+
   it("sends the accompanying match note only to the agent", async () => {
     const accompanyingOpportunity = await fastify.db.opportunityRepository.save(
       new Opportunity({
