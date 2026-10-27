@@ -68,7 +68,6 @@ export function getRefreshPayload(
     : null;
 }
 
-// Per user, since behind the fe proxy all users can share one IP; pre-rotation tokens too, so their post-deploy rejections don't exhaust one shared bucket.
 export function refreshRateLimitKey(request: FastifyRequest): string {
   const id = verifyRefreshToken(request)?.id;
   return id
