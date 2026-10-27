@@ -690,4 +690,22 @@ describe("Login per-account cap", () => {
     expect(response.json().message).toBe("Rate limit exceeded");
     expect((await login("other@example.com", 50)).statusCode).not.toBe(429);
   });
+
+  it("POST /auth/login doesn't count logins rejected per email and IP toward the account", async () => {
+    const attempt = (remoteAddress: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "victim@example.com", password: "whatever" },
+        remoteAddress,
+      });
+
+    for (const ip of ["192.0.2.1", "192.0.2.2"]) {
+      for (let i = 0; i < 30; i++) {
+        await attempt(ip);
+      }
+      expect((await attempt(ip)).statusCode).toBe(429);
+    }
+    expect((await attempt("192.0.2.3")).statusCode).not.toBe(429);
+  });
 });

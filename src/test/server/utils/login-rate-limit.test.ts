@@ -56,7 +56,7 @@ describe("login rate limit", () => {
     expect(await attempt(cap, "10.0.0.2")).toBe(200);
   });
 
-  it("stays bounded by evicting the oldest tracked IP", async () => {
+  it("stays bounded by evicting the least recently used IP", async () => {
     const cap = createLoginIpCap();
     for (let i = 0; i < 31; i++) {
       await attempt(cap, "10.0.0.1");
@@ -67,6 +67,20 @@ describe("login rate limit", () => {
       await attempt(cap, `10.1.${Math.floor(i / 256)}.${i % 256}`);
     }
     expect(await attempt(cap, "10.0.0.1")).toBe(200);
+  });
+
+  it("keeps a key that is still being hit while others flood in", async () => {
+    const cap = createLoginIpCap();
+    for (let i = 0; i < 31; i++) {
+      await attempt(cap, "10.0.0.1");
+    }
+    for (let i = 0; i < 5000; i++) {
+      await attempt(cap, `10.1.${Math.floor(i / 256)}.${i % 256}`);
+      if (i % 1000 === 0) {
+        await attempt(cap, "10.0.0.1");
+      }
+    }
+    expect(await attempt(cap, "10.0.0.1")).toBe(429);
   });
 
   it("caps an account at 50 per window across IPs, ignoring case", async () => {

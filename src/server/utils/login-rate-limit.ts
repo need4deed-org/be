@@ -22,7 +22,7 @@ export function loginRateLimitKey(request: FastifyRequest): string {
   return email ? `login-email-ip:${email}:${ip}` : `login-ip:${ip}`;
 }
 
-// @fastify/rate-limit runs one limiter per route, so extra caps count separately.
+// @fastify/rate-limit runs only one limiter per request, so these caps count separately.
 function createLoginCap(
   max: number,
   keyOf: (request: FastifyRequest) => string | undefined,
@@ -45,6 +45,8 @@ function createLoginCap(
       windows.set(key, { count: 1, startedAt: now });
       return;
     }
+    windows.delete(key);
+    windows.set(key, window);
     window.count += 1;
     if (window.count > max) {
       logger.warn(`Login failed: ${reason}`);

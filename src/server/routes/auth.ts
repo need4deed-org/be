@@ -71,10 +71,9 @@ async function authRoutes(
         rateLimit: {
           max: 10,
           timeWindow: "1 minute",
-          hook: "preHandler",
+          hook: "preValidation",
           keyGenerator: loginRateLimitKey,
-          onExceeded: () =>
-            logger.warn("Login failed: rate-limited-account-ip"),
+          onExceeded: () => logger.warn("Login failed: rate-limited-email-ip"),
         },
       },
       preHandler: [createLoginIpCap(), createLoginAccountCap()],
