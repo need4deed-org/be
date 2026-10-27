@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, LightMyRequestResponse } from "fastify";
 import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
@@ -25,6 +25,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -856,55 +857,106 @@ describe("coordinator's email note on suggest / match", () => {
     }
   });
 
-  it("alerts ops when a failed email's log entry cannot be removed", async () => {
-    const otherDeal = await fastify.db.dealRepository.save(
-      new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
-    );
-    const otherPerson = await fastify.db.personRepository.save(
-      new Person({ firstName: "Stuck", lastName: "Volunteer" }),
-    );
-    const otherVolunteer = await fastify.db.volunteerRepository.save(
-      new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
-    );
-    vi.spyOn(fastify.notify, "emailSuggestion").mockRejectedValueOnce(
-      new Error("SMTP down"),
-    );
-    vi.spyOn(
-      fastify.db.communicationRepository,
-      "remove",
-    ).mockRejectedValueOnce(new Error("db down"));
-    const opsAlert = vi
-      .spyOn(fastify.notify, "opsAlert")
-      .mockResolvedValueOnce(undefined);
-    try {
-      const res = await fastify.inject({
-        method: "POST",
-        url: "/opportunity-volunteer",
-        cookies: { [accessCookieName]: coordinatorCookie },
-        payload: {
-          opportunityId: opportunity.id,
-          volunteerId: otherVolunteer.id,
-          status: OpportunityVolunteerStatusType.PENDING,
-          emailNote: "Stuck?",
-        },
-      });
-
-      expect(res.statusCode).toBe(502);
-      expect(opsAlert).toHaveBeenCalledWith(
-        expect.stringContaining("could not be removed"),
+  it.each([
+    {
+      email: "emailSuggestion" as const,
+      type: OpportunityType.REGULAR,
+      status: OpportunityVolunteerStatusType.PENDING,
+    },
+    {
+      email: "emailAccompanyMatch" as const,
+      type: OpportunityType.ACCOMPANYING,
+      status: OpportunityVolunteerStatusType.MATCHED,
+    },
+    {
+      email: "emailIntroduction" as const,
+      type: OpportunityType.REGULAR,
+      status: OpportunityVolunteerStatusType.MATCHED,
+    },
+  ])(
+    "alerts ops when a failed $email's log entry cannot be removed",
+    async ({ email, type, status }) => {
+      const otherDeal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
       );
-    } finally {
-      await fastify.db.communicationRepository.delete({
-        volunteerId: otherVolunteer.id,
-      });
-      await fastify.db.opportunityVolunteerRepository.delete({
-        volunteerId: otherVolunteer.id,
-      });
-      await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
-      await fastify.db.dealRepository.delete({ id: otherDeal.id });
-      await fastify.db.personRepository.delete({ id: otherPerson.id });
-    }
-  });
+      const otherPerson = await fastify.db.personRepository.save(
+        new Person({ firstName: "Stuck", lastName: "Volunteer" }),
+      );
+      const otherVolunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
+      );
+      const otherOpportunity = await fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Test Opportunity (stuck ${email}) ${randomNumericSuffix()}`,
+          type,
+          status: OpportunityStatusType.NEW,
+          dealId: opportunityDeal.id,
+        }),
+      );
+      vi.spyOn(fastify.notify, email).mockRejectedValueOnce(
+        new Error("SMTP down"),
+      );
+      vi.spyOn(
+        fastify.db.communicationRepository,
+        "remove",
+      ).mockRejectedValueOnce(new Error("db down"));
+      const opsAlert = vi
+        .spyOn(fastify.notify, "opsAlert")
+        .mockResolvedValueOnce(undefined);
+      try {
+        const pair = {
+          opportunityId: otherOpportunity.id,
+          volunteerId: otherVolunteer.id,
+        };
+        let res: LightMyRequestResponse;
+        if (status === OpportunityVolunteerStatusType.PENDING) {
+          res = await fastify.inject({
+            method: "POST",
+            url: "/opportunity-volunteer",
+            cookies: { [accessCookieName]: coordinatorCookie },
+            payload: { ...pair, status, emailNote: "Stuck?" },
+          });
+        } else {
+          const pending = await fastify.db.opportunityVolunteerRepository.save(
+            new OpportunityVolunteer({
+              ...pair,
+              status: OpportunityVolunteerStatusType.PENDING,
+            }),
+          );
+          res = await fastify.inject({
+            method: "PATCH",
+            url: `/opportunity-volunteer/${pending.id}`,
+            cookies: { [accessCookieName]: coordinatorCookie },
+            payload: { status, emailNote: "Stuck?" },
+          });
+        }
+
+        expect(res.statusCode).toBe(502);
+        const ov =
+          await fastify.db.opportunityVolunteerRepository.findOneByOrFail(pair);
+        const stuck =
+          await fastify.db.communicationRepository.findOneByOrFail(pair);
+        const [alert] = opsAlert.mock.lastCall ?? [];
+        expect(alert).toContain(`ov ${ov.id},`);
+        expect(alert).toContain(
+          `communication ${stuck.id} could not be removed`,
+        );
+      } finally {
+        await fastify.db.communicationRepository.delete({
+          volunteerId: otherVolunteer.id,
+        });
+        await fastify.db.opportunityVolunteerRepository.delete({
+          volunteerId: otherVolunteer.id,
+        });
+        await fastify.db.opportunityRepository.delete({
+          id: otherOpportunity.id,
+        });
+        await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
+        await fastify.db.dealRepository.delete({ id: otherDeal.id });
+        await fastify.db.personRepository.delete({ id: otherPerson.id });
+      }
+    },
+  );
 
   it("sends the accompanying match note only to the agent", async () => {
     const accompanyingOpportunity = await fastify.db.opportunityRepository.save(

@@ -36,6 +36,7 @@ vi.mock(
         typeof import("../../../server/utils/data/log-email-communication")
       >();
     return {
+      ...actual,
       logEmailCommunication: (
         ...args: Parameters<typeof actual.logEmailCommunication>
       ) =>
