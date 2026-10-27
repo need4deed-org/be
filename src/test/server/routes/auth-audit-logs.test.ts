@@ -116,7 +116,7 @@ describe("auth audit logs", () => {
     expectNoSecrets(lines(), email, typed);
   });
 
-  it("logs logins rejected by the per-account limit", async () => {
+  it("logs logins rejected by the per-account-and-IP limit", async () => {
     const limited = `auth-audit-limited-${suffix}@example.com`;
     for (let i = 0; i < 10; i++) {
       await login({ email: limited, password });
@@ -124,7 +124,7 @@ describe("auth audit logs", () => {
     const lines = captureLogs();
     const response = await login({ email: limited, password });
     expect(response.statusCode).toBe(429);
-    expect(lines()).toContain("Login failed: rate-limited-account");
+    expect(lines()).toContain("Login failed: rate-limited-account-ip");
     expectNoSecrets(lines(), limited, password);
   });
 

@@ -63,14 +63,14 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.LOGIN,
     {
-      // Per account: behind the fe proxy all users can share one IP.
       config: {
         rateLimit: {
           max: 10,
           timeWindow: "1 minute",
           hook: "preHandler",
           keyGenerator: loginRateLimitKey,
-          onExceeded: () => logger.warn("Login failed: rate-limited-account"),
+          onExceeded: () =>
+            logger.warn("Login failed: rate-limited-account-ip"),
         },
       },
       preHandler: createLoginIpCap(),

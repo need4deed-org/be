@@ -28,9 +28,14 @@ async function attempt(cap: ReturnType<typeof createLoginIpCap>, ip: string) {
 }
 
 describe("login rate limit", () => {
-  it("keys by normalized email, else by IP", () => {
+  it("keys by normalized email and IP, else by IP", () => {
     expect(loginRateLimitKey(request("10.0.0.1", { email: " A@X.org " }))).toBe(
-      "login-email:a@x.org",
+      "login-email-ip:a@x.org:10.0.0.1",
+    );
+    expect(
+      loginRateLimitKey(request("2001:db8:aa:bb00::1", { email: "a@x.org" })),
+    ).toBe(
+      loginRateLimitKey(request("2001:db8:aa:bbff::2", { email: "a@x.org" })),
     );
     expect(loginRateLimitKey(request("10.0.0.1", {}))).toBe(
       "login-ip:10.0.0.1",

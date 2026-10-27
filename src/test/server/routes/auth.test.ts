@@ -478,16 +478,20 @@ describe("Rate limiting", () => {
     expect(response.json().message).toBe("Rate limit exceeded");
   });
 
-  it("POST /auth/login counts per account, ignoring case, not per IP", async () => {
-    const login = (email: string) =>
+  it("POST /auth/login counts per account and IP, ignoring case", async () => {
+    const login = (email: string, remoteAddress?: string) =>
       fastify.inject({
         method: "POST",
         url: "/auth/login",
         payload: { email, password: "whatever" },
+        remoteAddress,
       });
 
     expect((await login("TEST@example.com")).statusCode).toBe(429);
     expect((await login("other@example.com")).statusCode).not.toBe(429);
+    expect(
+      (await login("test@example.com", "203.0.113.7")).statusCode,
+    ).not.toBe(429);
   });
 
   it("POST /auth/refresh limits to 20 requests per minute", async () => {

@@ -8,9 +8,10 @@ const LOGIN_IP_MAX_TRACKED = 5000;
 
 export function loginRateLimitKey(request: FastifyRequest): string {
   const email = (request.body as { email?: unknown } | undefined)?.email;
+  const ip = normalizeIP(request.ip, 56);
   return typeof email === "string" && email.trim()
-    ? `login-email:${email.trim().toLowerCase()}`
-    : `login-ip:${normalizeIP(request.ip, 56)}`;
+    ? `login-email-ip:${email.trim().toLowerCase()}:${ip}`
+    : `login-ip:${ip}`;
 }
 
 // @fastify/rate-limit runs only one limiter per request, so this per-IP cap
