@@ -563,6 +563,7 @@ describe("Rate limiting", () => {
       id: 999,
       role: "volunteer",
       isActive: true,
+      checkPassword: async () => false,
     } as any);
 
     for (let i = 0; i < 20; i++) {
@@ -570,19 +571,54 @@ describe("Rate limiting", () => {
         method: "POST",
         url: "/auth/password-change",
         cookies: { access: accessToken },
-        payload: { password: "old", newPassword: "new" },
+        payload: { password: "old", newPassword: "new_password" },
       });
-      expect(response.statusCode).not.toBe(429);
+      expect(response.statusCode).toBe(400);
     }
 
     const response = await fastify.inject({
       method: "POST",
       url: "/auth/password-change",
       cookies: { access: accessToken },
-      payload: { password: "old", newPassword: "new" },
+      payload: { password: "old", newPassword: "new_password" },
     });
     expect(response.statusCode).toBe(429);
     expect(response.json().message).toBe("Rate limit exceeded");
+  });
+
+  it("POST /auth/password-change counts per user, not per IP", async () => {
+    vi.spyOn(fastify.db.userRepository, "findOne").mockImplementation(
+      async (options) =>
+        ({
+          id: (options.where as { id: number }).id,
+          role: UserRole.VOLUNTEER,
+          isActive: true,
+          checkPassword: async () => false,
+        }) as unknown as User,
+    );
+    const changePassword = (id: number, remoteAddress: string) =>
+      fastify.inject({
+        method: "POST",
+        url: "/auth/password-change",
+        cookies: {
+          access: fastify.jwt.sign({
+            id,
+            email: `user-${id}@example.com`,
+            role: UserRole.VOLUNTEER,
+            type: "access",
+          }),
+        },
+        payload: { password: "old", newPassword: "new_password" },
+        remoteAddress,
+      });
+
+    for (let i = 0; i < 20; i++) {
+      expect((await changePassword(1001, `198.51.100.${i}`)).statusCode).toBe(
+        400,
+      );
+    }
+    expect((await changePassword(1001, "198.51.100.99")).statusCode).toBe(429);
+    expect((await changePassword(1002, "198.51.100.0")).statusCode).toBe(400);
   });
 });
 

@@ -382,7 +382,15 @@ async function authRoutes(
   }>(
     prefixedPath + RoutePrefix.CHANGE_PASSWORD,
     {
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: "1 minute",
+          hook: "preHandler",
+          keyGenerator: (request) =>
+            `password-change-user:${request.authUser!.id}`,
+        },
+      },
       onRequest: [fastify.authenticate()],
       schema: {
         body: changePasswordSchema,
