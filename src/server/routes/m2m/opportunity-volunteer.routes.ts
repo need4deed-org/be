@@ -90,7 +90,7 @@ async function sendSuggestionEmail(
     }
     logger.debug(`emailSuggestion side-effect succeeded (ov ${id})`);
   } catch (sendErr) {
-    await commRepo.remove(comm).catch(logger.error);
+    await commRepo.remove(comm).catch((err) => logger.error(err));
     throw sendErr;
   }
   return true;
@@ -211,7 +211,7 @@ async function sendMatchedEmails(
     try {
       await fastify.notify.emailAccompanyMatch(ov, emailNote);
     } catch (sendErr) {
-      await commRepo.remove(comm).catch(logger.error);
+      await commRepo.remove(comm).catch((err) => logger.error(err));
       throw sendErr;
     }
     try {
@@ -224,7 +224,7 @@ async function sendMatchedEmails(
         .opsAlert(
           `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
         )
-        .catch(logger.error);
+        .catch((err) => logger.error(err));
     }
   } else {
     const comm = await logEmailCommunication(commRepo, commType, {
@@ -234,7 +234,7 @@ async function sendMatchedEmails(
     try {
       await fastify.notify.emailIntroduction(ov, emailNote);
     } catch (sendErr) {
-      await commRepo.remove(comm).catch(logger.error);
+      await commRepo.remove(comm).catch((err) => logger.error(err));
       throw sendErr;
     }
   }
