@@ -8,16 +8,19 @@ import { Repository } from "typeorm";
 import Communication from "../../../data/entity/communication.entity";
 import logger from "../../../logger";
 import { errorSummary } from "../../../services/utils";
+import { runWithAdvisoryLock } from "./run-w-advisory-lock";
+
+type CommunicationIds = {
+  volunteerId?: number;
+  opportunityId?: number;
+  agentId?: number;
+  userId?: number;
+};
 
 export async function logEmailCommunication(
   repo: Repository<Communication>,
   communicationType: CommunicationType,
-  ids: {
-    volunteerId?: number;
-    opportunityId?: number;
-    agentId?: number;
-    userId?: number;
-  },
+  ids: CommunicationIds,
 ): Promise<Communication> {
   return repo.save(
     new Communication({
@@ -27,6 +30,25 @@ export async function logEmailCommunication(
       ...ids,
     }),
   );
+}
+
+export async function claimEmailCommunication(
+  communicationType: CommunicationType,
+  ids: CommunicationIds,
+  lockId: number,
+): Promise<Communication | undefined> {
+  let comm: Communication | undefined;
+  await runWithAdvisoryLock(
+    async (manager) => {
+      const repo = manager.getRepository(Communication);
+      if (await repo.existsBy({ ...ids, communicationType })) {
+        return;
+      }
+      comm = await logEmailCommunication(repo, communicationType, ids);
+    },
+    [`email:${communicationType}`, lockId],
+  );
+  return comm;
 }
 
 export async function removeUnsentEmailLog(

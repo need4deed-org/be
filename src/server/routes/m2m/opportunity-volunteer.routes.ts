@@ -32,6 +32,7 @@ import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-o
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
+  claimEmailCommunication,
   logEmailCommunication,
   removeUnsentEmailLog,
 } from "../../utils/data/log-email-communication";
@@ -44,7 +45,6 @@ async function sendSuggestionEmail(
 ): Promise<boolean> {
   const opportunityVolunteerRepository =
     fastify.db.opportunityVolunteerRepository;
-  const commRepo = fastify.db.communicationRepository;
 
   logger.debug(`emailSuggestion side-effect triggered (ov ${id})`);
   const ov = await opportunityVolunteerRepository.findOne({
@@ -66,24 +66,14 @@ async function sendSuggestionEmail(
   }
   const isAccompany =
     ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-  const alreadySent = await commRepo.findOne({
-    where: {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-      communicationType: CommunicationType.FIRST_INQUIRY,
-    },
-  });
-  if (alreadySent) {
+  const comm = await claimEmailCommunication(
+    CommunicationType.FIRST_INQUIRY,
+    { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
+    id,
+  );
+  if (!comm) {
     return false;
   }
-  const comm = await logEmailCommunication(
-    commRepo,
-    CommunicationType.FIRST_INQUIRY,
-    {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    },
-  );
   try {
     if (isAccompany) {
       await addTranslatedFields([ov.opportunity], Lang.DE);
