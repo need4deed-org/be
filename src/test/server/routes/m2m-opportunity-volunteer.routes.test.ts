@@ -866,6 +866,18 @@ describe("coordinator's email note on suggest / match", () => {
       from: OpportunityVolunteerStatusType.PAST,
       to: OpportunityVolunteerStatusType.PENDING,
     },
+    {
+      email: "emailAccompanyMatch" as const,
+      type: OpportunityType.ACCOMPANYING,
+      from: OpportunityVolunteerStatusType.PENDING,
+      to: OpportunityVolunteerStatusType.MATCHED,
+    },
+    {
+      email: "emailIntroduction" as const,
+      type: OpportunityType.REGULAR,
+      from: OpportunityVolunteerStatusType.PENDING,
+      to: OpportunityVolunteerStatusType.MATCHED,
+    },
   ])(
     "sends $email once when two requests arrive together",
     async ({ email, type, from, to }) => {
@@ -896,6 +908,9 @@ describe("coordinator's email note on suggest / match", () => {
           () => new Promise((resolve) => setTimeout(resolve, 200)),
         );
       sent.mockClear();
+      const volunteerEmail = vi
+        .spyOn(fastify.notify, "emailAccompanyMatchVolunteer")
+        .mockResolvedValue(undefined);
       const save = Repository.prototype.save;
       const slowCommunicationSave = vi
         .spyOn(Repository.prototype, "save")
@@ -929,6 +944,7 @@ describe("coordinator's email note on suggest / match", () => {
         expect(await fastify.db.communicationRepository.countBy(pair)).toBe(1);
       } finally {
         slowCommunicationSave.mockRestore();
+        volunteerEmail.mockRestore();
         sent.mockReset();
         await fastify.db.communicationRepository.delete({
           volunteerId: otherVolunteer.id,

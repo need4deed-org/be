@@ -33,7 +33,6 @@ import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
   claimEmailCommunication,
-  logEmailCommunication,
   removeUnsentEmailLog,
 } from "../../utils/data/log-email-communication";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
@@ -157,7 +156,6 @@ async function sendMatchedEmails(
   id: number,
   emailNote: string | undefined,
 ): Promise<boolean> {
-  const commRepo = fastify.db.communicationRepository;
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
     relations: [
@@ -186,21 +184,15 @@ async function sendMatchedEmails(
   const isAccompany =
     ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
   const commType = matchedCommunicationType(ov.opportunity?.type);
-  const alreadySent = await commRepo.findOne({
-    where: {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-      communicationType: commType,
-    },
-  });
-  if (alreadySent) {
+  const comm = await claimEmailCommunication(
+    commType,
+    { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
+    id,
+  );
+  if (!comm) {
     return false;
   }
   if (isAccompany) {
-    const comm = await logEmailCommunication(commRepo, commType, {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    });
     try {
       await fastify.notify.emailAccompanyMatch(ov, emailNote);
     } catch (sendErr) {
@@ -218,10 +210,6 @@ async function sendMatchedEmails(
       );
     }
   } else {
-    const comm = await logEmailCommunication(commRepo, commType, {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    });
     try {
       await fastify.notify.emailIntroduction(ov, emailNote);
     } catch (sendErr) {
