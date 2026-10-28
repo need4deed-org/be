@@ -23,11 +23,36 @@ describe("communication routes", () => {
   const suffix = randomNumericSuffix();
 
   let agent: Agent;
-  let person: Person;
-  let otherPerson: Person;
+  const persons: Person[] = [];
   let user: User;
   let otherUser: User;
   let cookie: string;
+  let adminCookie: string;
+
+  const createUser = async (lastName: string, role: UserRole) => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Communication", lastName }),
+    );
+    persons.push(person);
+    const email = `communication-${lastName.toLowerCase()}-${suffix}@test.need4deed.org`;
+    const created = await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: PASSWORD },
+    });
+    const userCookie = res.cookies.find((c) => c.name === accessCookieName)
+      ?.value as string;
+    return { user: created, cookie: userCookie };
+  };
 
   const createOther = (userId?: number) =>
     fastify.db.communicationRepository.save(
@@ -40,12 +65,19 @@ describe("communication routes", () => {
       }),
     );
 
-  const patch = (id: number, payload: object) =>
+  const patch = (id: number, payload: object, as = cookie) =>
     fastify.inject({
       method: "PATCH",
       url: `/communication/${id}`,
       payload,
-      cookies: { [accessCookieName]: cookie },
+      cookies: { [accessCookieName]: as },
+    });
+
+  const remove = (id: number, as = cookie) =>
+    fastify.inject({
+      method: "DELETE",
+      url: `/communication/${id}`,
+      cookies: { [accessCookieName]: as },
     });
 
   beforeAll(async () => {
@@ -58,43 +90,14 @@ describe("communication routes", () => {
         engagementStatus: AgentEngagementStatusType.ACTIVE,
       }),
     );
-    person = await fastify.db.personRepository.save(
-      new Person({ firstName: "Communication", lastName: "Coordinator" }),
-    );
-    const email = `communication-coordinator-${suffix}@test.need4deed.org`;
-    user = await fastify.db.userRepository.save(
-      new User({
-        email,
-        password: await hashPassword(PASSWORD),
-        role: UserRole.COORDINATOR,
-        isActive: true,
-        personId: person.id,
-      }),
-    );
-    otherPerson = await fastify.db.personRepository.save(
-      new Person({ firstName: "Communication", lastName: "Other" }),
-    );
-    otherUser = await fastify.db.userRepository.save(
-      new User({
-        email: `communication-other-${suffix}@test.need4deed.org`,
-        password: await hashPassword(PASSWORD),
-        role: UserRole.COORDINATOR,
-        isActive: true,
-        personId: otherPerson.id,
-      }),
-    );
-    const res = await fastify.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email, password: PASSWORD },
-    });
-    cookie = res.cookies.find((c) => c.name === accessCookieName)
-      ?.value as string;
+    ({ user, cookie } = await createUser("Coordinator", UserRole.COORDINATOR));
+    ({ user: otherUser } = await createUser("Other", UserRole.COORDINATOR));
+    ({ cookie: adminCookie } = await createUser("Admin", UserRole.ADMIN));
   });
 
   afterAll(async () => {
     await fastify.db.communicationRepository.delete({ agentId: agent.id });
-    for (const { id } of [person, otherPerson]) {
+    for (const { id } of persons) {
       await fastify.db.userRepository.delete({ personId: id });
       await fastify.db.personRepository.delete({ id });
     }
@@ -189,6 +192,26 @@ describe("communication routes", () => {
       id: communication.id,
     });
     expect(stored.communicationType).toBe(CommunicationType.STATUS_UPDATE);
+  });
+
+  it("forbids deleting another coordinator's entry", async () => {
+    const communication = await createOther(otherUser.id);
+
+    expect((await remove(communication.id)).statusCode).toBe(403);
+  });
+
+  it("lets an admin edit and delete another coordinator's entry", async () => {
+    const communication = await createOther(otherUser.id);
+
+    const patched = await patch(
+      communication.id,
+      { communicationType: null },
+      adminCookie,
+    );
+    const removed = await remove(communication.id, adminCookie);
+
+    expect(patched.statusCode).toBe(200);
+    expect(removed.statusCode).toBe(200);
   });
 
   it("POST /agent/:id/communication responds with the created entry", async () => {

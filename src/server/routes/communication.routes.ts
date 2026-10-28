@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPatch, UserRole } from "need4deed-sdk";
 import { dtoCommunication } from "../../services/dto/dto-communication";
 import { idParamSchema } from "../schema";
+import { assertCommunicationAuthor } from "../utils";
 
 export default async function communicationRoutes(
   fastify: FastifyInstance,
@@ -47,14 +48,7 @@ export default async function communicationRoutes(
         });
       }
 
-      if (
-        communication.userId !== null &&
-        communication.userId !== request.user.id
-      ) {
-        return reply.status(403).send({
-          message: `You do not have permission to update communication with id:${id}.`,
-        });
-      }
+      assertCommunicationAuthor(communication, request.user, "update");
 
       const updatedCommunication = await communicationRepository.save({
         ...communication,
@@ -98,14 +92,7 @@ export default async function communicationRoutes(
         });
       }
 
-      if (
-        communication.userId !== null &&
-        communication.userId !== request.user.id
-      ) {
-        return reply.status(403).send({
-          message: `You do not have permission to delete communication with id:${id}.`,
-        });
-      }
+      assertCommunicationAuthor(communication, request.user, "delete");
 
       await communicationRepository.remove(communication);
 
