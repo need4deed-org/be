@@ -1,6 +1,7 @@
 import {
   ApiOpportunityVolunteerGet,
   ApiVolunteerOpportunityGet,
+  volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
 import { getAvailability, getLanguages, getOptionItems } from "./utils";
@@ -37,6 +38,9 @@ export function opportunityOpportunityVolunteerDTO(
     name: opportunityVolunteer.volunteer.person.name,
     avatarUrl: opportunityVolunteer.volunteer.person.avatarUrl,
     volunteeringType: opportunityVolunteer.volunteer.statusType,
+    volunteeringTypes: volunteerTypesFromStatusType(
+      opportunityVolunteer.volunteer.statusType,
+    ),
     engagement: opportunityVolunteer.volunteer.statusEngagement,
     communication: opportunityVolunteer.volunteer.statusCommunication,
     activities: getOptionItems(

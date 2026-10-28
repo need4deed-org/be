@@ -835,6 +835,10 @@
             "volunteeringType": {
               "$ref": "VolunteerStateTypeType#"
             },
+            "volunteeringTypes": {
+              "type": "array",
+              "items": { "$ref": "OpportunityType#" }
+            },
             "engagement": {
               "$ref": "VolunteerStateEngagementType#"
             },

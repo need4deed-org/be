@@ -4,6 +4,7 @@ import {
   ApiVolunteerGet,
   ApiVolunteerGetList,
   TimedText,
+  volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Timeline from "../../data/entity/timeline.entity";
@@ -45,6 +46,7 @@ export function volunteerListSerializer(
       ownerAgentId: volunteer.ownerAgentId ?? null,
       statusEngagement,
       statusType,
+      statusTypes: volunteerTypesFromStatusType(statusType),
       statusMatch,
       statusCommunication,
       name,
@@ -139,6 +141,7 @@ export function volunteerSerializer(
     statusCommunication: volunteer.statusCommunication,
     statusAppreciation: volunteer.statusAppreciation,
     statusType: volunteer.statusType,
+    statusTypes: volunteerTypesFromStatusType(volunteer.statusType),
     statusMatch: volunteer.statusMatch,
     statusCgcProcess: volunteer.statusCgcProcess,
     dateReturn: volunteer.dateReturn,
