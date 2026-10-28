@@ -262,6 +262,52 @@ describe("communication routes", () => {
     expect(res.json().data).not.toHaveProperty("agentId");
   });
 
+  it("updates the contact date", async () => {
+    const communication = await createOther();
+    const date = "2026-01-15T09:30:00.000Z";
+
+    const res = await patch(communication.id, { date });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.date).toBe(date);
+    const stored = await fastify.db.communicationRepository.findOneByOrFail({
+      id: communication.id,
+    });
+    expect(stored.date.toISOString()).toBe(date);
+  });
+
+  it("defaults the contact date to now", async () => {
+    const before = Date.now();
+
+    const communication = await createOther();
+
+    const stored = await fastify.db.communicationRepository.findOneByOrFail({
+      id: communication.id,
+    });
+    expect(stored.date.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it("POST /agent/:id/communication stores the given contact date", async () => {
+    const date = "2026-02-01T12:00:00.000Z";
+
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/${agent.id}/communication`,
+      payload: {
+        contactType: ContactType.CALL,
+        contactMethod: ContactMethodType.PHONE,
+        date,
+      },
+      cookies: { [accessCookieName]: cookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const stored = await fastify.db.communicationRepository.findOneByOrFail({
+      id: res.json().data.id,
+    });
+    expect(stored.date.toISOString()).toBe(date);
+  });
+
   it("POST /agent/:id/communication responds with the created entry", async () => {
     const res = await fastify.inject({
       method: "POST",
