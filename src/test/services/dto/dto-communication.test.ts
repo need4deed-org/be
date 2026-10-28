@@ -38,4 +38,18 @@ describe("dtoCommunication", () => {
 
     expect(result).not.toHaveProperty("secretField");
   });
+
+  it("leaves out nullable columns that are null", () => {
+    const result = dtoCommunication({
+      id: 1,
+      communicationType: null,
+      volunteerId: null,
+      opportunityId: null,
+      agentId: 2,
+    } as any);
+
+    expect(result.communicationType).toBeUndefined();
+    expect(result.volunteerId).toBeUndefined();
+    expect(result.opportunityId).toBeUndefined();
+  });
 });

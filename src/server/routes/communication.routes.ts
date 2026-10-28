@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommunicationPatch, UserRole } from "need4deed-sdk";
+import { dtoCommunication } from "../../services/dto/dto-communication";
 import { idParamSchema } from "../schema";
 
 export default async function communicationRoutes(
@@ -53,7 +54,7 @@ export default async function communicationRoutes(
 
       return reply.status(200).send({
         message: `Communication with id:${id} updated.`,
-        data: updatedCommunication,
+        data: dtoCommunication(updatedCommunication),
       });
     },
   );
