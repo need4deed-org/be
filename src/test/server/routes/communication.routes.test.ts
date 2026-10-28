@@ -140,6 +140,9 @@ describe("communication routes", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    expect(res.json().data.communicationType).toBe(
+      CommunicationType.STATUS_UPDATE,
+    );
     const stored = await fastify.db.communicationRepository.findOneByOrFail({
       id: communication.id,
     });
