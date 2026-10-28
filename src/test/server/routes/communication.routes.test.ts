@@ -128,4 +128,25 @@ describe("PATCH /communication/:id", () => {
     expect(stored.contactMethod).toBe(ContactMethodType.PHONE);
     expect(stored.communicationType).toBe(CommunicationType.STATUS_UPDATE);
   });
+
+  it("ignores fields outside ApiCommunicationPatch", async () => {
+    const communication = await createOther();
+
+    const res = await patch(communication.id, {
+      contactMethod: ContactMethodType.PHONE,
+      id: communication.id + 1,
+      agentId: null,
+      volunteerId: 1,
+      userId: 1,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const stored = await fastify.db.communicationRepository.findOneByOrFail({
+      id: communication.id,
+    });
+    expect(stored.contactMethod).toBe(ContactMethodType.PHONE);
+    expect(stored.agentId).toBe(agent.id);
+    expect(stored.volunteerId).toBeNull();
+    expect(stored.userId).toBeNull();
+  });
 });

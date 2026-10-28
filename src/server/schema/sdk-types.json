@@ -684,19 +684,22 @@
       "type": "object",
       "properties": {
         "contactType": {
-          "$ref": "ContactType#"
+          "$ref": "ApiCommunication#/properties/contactType"
         },
         "contactMethod": {
-          "$ref": "ContactMethodType#"
+          "$ref": "ApiCommunication#/properties/contactMethod"
         },
         "communicationType": {
-          "anyOf": [{ "$ref": "CommunicationType#" }, { "type": "null" }]
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "ApiCommunication#/properties/communicationType" }
+          ]
         },
         "date": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "ApiCommunication#/properties/date"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "AppreciationStatusType": {
       "$id": "AppreciationStatusType",
