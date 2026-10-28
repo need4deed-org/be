@@ -675,7 +675,22 @@
     },
     "ApiCommunicationPatch": {
       "$id": "ApiCommunicationPatch",
-      "$ref": "ApiCommunication#"
+      "type": "object",
+      "properties": {
+        "contactType": {
+          "$ref": "ContactType#"
+        },
+        "contactMethod": {
+          "$ref": "ContactMethodType#"
+        },
+        "communicationType": {
+          "anyOf": [{ "$ref": "CommunicationType#" }, { "type": "null" }]
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "AppreciationStatusType": {
       "$id": "AppreciationStatusType",
