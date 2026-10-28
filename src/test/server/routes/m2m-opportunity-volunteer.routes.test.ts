@@ -939,7 +939,7 @@ describe("coordinator's email note on suggest / match", () => {
           .map((res) => res.statusCode)
           .sort();
 
-        expect(statuses).toEqual([204, 502]);
+        expect(statuses).toEqual([204, 409]);
         expect(sent).toHaveBeenCalledTimes(1);
         expect(await fastify.db.communicationRepository.countBy(pair)).toBe(1);
       } finally {

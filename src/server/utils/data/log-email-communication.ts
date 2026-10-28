@@ -5,10 +5,10 @@ import {
   ContactType,
 } from "need4deed-sdk";
 import { Repository } from "typeorm";
+import { dataSource } from "../../../data/data-source";
 import Communication from "../../../data/entity/communication.entity";
 import logger from "../../../logger";
 import { errorSummary } from "../../../services/utils";
-import { runWithAdvisoryLock } from "./run-w-advisory-lock";
 
 type CommunicationIds = {
   volunteerId?: number;
@@ -35,20 +35,17 @@ export async function logEmailCommunication(
 export async function claimEmailCommunication(
   communicationType: CommunicationType,
   ids: CommunicationIds,
-  lockId: number,
 ): Promise<Communication | undefined> {
-  let comm: Communication | undefined;
-  await runWithAdvisoryLock(
-    async (manager) => {
-      const repo = manager.getRepository(Communication);
-      if (await repo.existsBy({ ...ids, communicationType })) {
-        return;
-      }
-      comm = await logEmailCommunication(repo, communicationType, ids);
-    },
-    [`email:${communicationType}`, lockId],
-  );
-  return comm;
+  return dataSource.transaction(async (manager) => {
+    await manager.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `email:${communicationType}:${JSON.stringify(ids)}`,
+    ]);
+    const repo = manager.getRepository(Communication);
+    if (await repo.existsBy({ ...ids, communicationType })) {
+      return undefined;
+    }
+    return logEmailCommunication(repo, communicationType, ids);
+  });
 }
 
 export async function removeUnsentEmailLog(
