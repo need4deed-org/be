@@ -122,6 +122,21 @@ describe("communication routes", () => {
     expect(stored.communicationType).toBeNull();
   });
 
+  it.each(["", false, 0])(
+    "rejects communicationType %j instead of clearing it",
+    async (value) => {
+      const communication = await createOther();
+
+      const res = await patch(communication.id, { communicationType: value });
+
+      expect(res.statusCode).toBe(400);
+      const stored = await fastify.db.communicationRepository.findOneByOrFail({
+        id: communication.id,
+      });
+      expect(stored.communicationType).toBe(CommunicationType.STATUS_UPDATE);
+    },
+  );
+
   it("sets any CommunicationType the sdk defines", async () => {
     const communication = await createOther();
 

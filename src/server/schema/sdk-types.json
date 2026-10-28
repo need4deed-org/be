@@ -691,7 +691,7 @@
         },
         "communicationType": {
           "anyOf": [
-            { "type": "null" },
+            { "const": null },
             { "$ref": "ApiCommunication#/properties/communicationType" }
           ]
         },
