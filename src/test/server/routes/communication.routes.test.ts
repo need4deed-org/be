@@ -24,12 +24,16 @@ describe("PATCH /communication/:id", () => {
 
   let agent: Agent;
   let person: Person;
+  let otherPerson: Person;
+  let user: User;
+  let otherUser: User;
   let cookie: string;
 
-  const createOther = () =>
+  const createOther = (userId?: number) =>
     fastify.db.communicationRepository.save(
       new Communication({
         agentId: agent.id,
+        userId,
         contactType: ContactType.OTHER,
         contactMethod: ContactMethodType.EMAIL,
         communicationType: CommunicationType.STATUS_UPDATE,
@@ -58,13 +62,25 @@ describe("PATCH /communication/:id", () => {
       new Person({ firstName: "Communication", lastName: "Coordinator" }),
     );
     const email = `communication-coordinator-${suffix}@test.need4deed.org`;
-    await fastify.db.userRepository.save(
+    user = await fastify.db.userRepository.save(
       new User({
         email,
         password: await hashPassword(PASSWORD),
         role: UserRole.COORDINATOR,
         isActive: true,
         personId: person.id,
+      }),
+    );
+    otherPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Communication", lastName: "Other" }),
+    );
+    otherUser = await fastify.db.userRepository.save(
+      new User({
+        email: `communication-other-${suffix}@test.need4deed.org`,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: otherPerson.id,
       }),
     );
     const res = await fastify.inject({
@@ -78,8 +94,10 @@ describe("PATCH /communication/:id", () => {
 
   afterAll(async () => {
     await fastify.db.communicationRepository.delete({ agentId: agent.id });
-    await fastify.db.userRepository.delete({ personId: person.id });
-    await fastify.db.personRepository.delete({ id: person.id });
+    for (const { id } of [person, otherPerson]) {
+      await fastify.db.userRepository.delete({ personId: id });
+      await fastify.db.personRepository.delete({ id });
+    }
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.close();
   });
@@ -148,5 +166,25 @@ describe("PATCH /communication/:id", () => {
     expect(stored.agentId).toBe(agent.id);
     expect(stored.volunteerId).toBeNull();
     expect(stored.userId).toBeNull();
+  });
+
+  it("lets the author edit their own entry", async () => {
+    const communication = await createOther(user.id);
+
+    const res = await patch(communication.id, { communicationType: null });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("forbids editing another coordinator's entry", async () => {
+    const communication = await createOther(otherUser.id);
+
+    const res = await patch(communication.id, { communicationType: null });
+
+    expect(res.statusCode).toBe(403);
+    const stored = await fastify.db.communicationRepository.findOneByOrFail({
+      id: communication.id,
+    });
+    expect(stored.communicationType).toBe(CommunicationType.STATUS_UPDATE);
   });
 });

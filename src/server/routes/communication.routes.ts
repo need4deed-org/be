@@ -47,6 +47,15 @@ export default async function communicationRoutes(
         });
       }
 
+      if (
+        communication.userId !== null &&
+        communication.userId !== request.user.id
+      ) {
+        return reply.status(403).send({
+          message: `You do not have permission to update communication with id:${id}.`,
+        });
+      }
+
       const updatedCommunication = await communicationRepository.save({
         ...communication,
         ...request.body,
