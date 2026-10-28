@@ -607,7 +607,13 @@
         "first-inquiry-sent",
         "opportunity-list-sent",
         "status-update",
-        "post-match-followup"
+        "post-match-followup",
+        "accompanying-matched",
+        "matched",
+        "opportunity-confirmation",
+        "accompanying-not-found",
+        "opportunity-updated",
+        "cgc-application-email"
       ]
     },
     "ApiCommunication": {

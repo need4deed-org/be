@@ -101,6 +101,19 @@ describe("PATCH /communication/:id", () => {
     expect(stored.communicationType).toBeNull();
   });
 
+  it("sets any CommunicationType the sdk defines", async () => {
+    const communication = await createOther();
+
+    const res = await patch(communication.id, {
+      communicationType: CommunicationType.CGC_APPLICATION_EMAIL,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.communicationType).toBe(
+      CommunicationType.CGC_APPLICATION_EMAIL,
+    );
+  });
+
   it("keeps communicationType when it's left out", async () => {
     const communication = await createOther();
 
