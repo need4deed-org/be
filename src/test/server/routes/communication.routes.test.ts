@@ -4,12 +4,15 @@ import {
   CommunicationType,
   ContactMethodType,
   ContactType,
+  OpportunityStatusType,
+  OpportunityType,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Communication from "../../../data/entity/communication.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -23,6 +26,7 @@ describe("communication routes", () => {
   const suffix = randomNumericSuffix();
 
   let agent: Agent;
+  let opportunity: Opportunity;
   const persons: Person[] = [];
   let user: User;
   let otherUser: User;
@@ -90,6 +94,14 @@ describe("communication routes", () => {
         engagementStatus: AgentEngagementStatusType.ACTIVE,
       }),
     );
+    opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Communication Opportunity ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.NEW,
+        agentId: agent.id,
+      }),
+    );
     ({ user, cookie } = await createUser("Coordinator", UserRole.COORDINATOR));
     ({ user: otherUser } = await createUser("Other", UserRole.COORDINATOR));
     ({ cookie: adminCookie } = await createUser("Admin", UserRole.ADMIN));
@@ -97,6 +109,10 @@ describe("communication routes", () => {
 
   afterAll(async () => {
     await fastify.db.communicationRepository.delete({ agentId: agent.id });
+    await fastify.db.communicationRepository.delete({
+      opportunityId: opportunity.id,
+    });
+    await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     for (const { id } of persons) {
       await fastify.db.userRepository.delete({ personId: id });
       await fastify.db.personRepository.delete({ id });
@@ -227,6 +243,23 @@ describe("communication routes", () => {
 
     expect(patched.statusCode).toBe(200);
     expect(removed.statusCode).toBe(200);
+  });
+
+  it("edits an entry linked only to an opportunity", async () => {
+    const communication = await fastify.db.communicationRepository.save(
+      new Communication({
+        opportunityId: opportunity.id,
+        contactType: ContactType.TEXT_EMAIL,
+        contactMethod: ContactMethodType.EMAIL,
+        communicationType: CommunicationType.OPPORTUNITY_UPDATED,
+      }),
+    );
+
+    const res = await patch(communication.id, { communicationType: null });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toMatchObject({ opportunityId: opportunity.id });
+    expect(res.json().data).not.toHaveProperty("agentId");
   });
 
   it("POST /agent/:id/communication responds with the created entry", async () => {

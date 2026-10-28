@@ -660,17 +660,18 @@
             "volunteerId": {
               "type": "integer",
               "minimum": 1
+            },
+            "opportunityId": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         }
       ],
-      "oneOf": [
-        {
-          "required": ["agentId"]
-        },
-        {
-          "required": ["volunteerId"]
-        }
+      "anyOf": [
+        { "required": ["agentId"] },
+        { "required": ["volunteerId"] },
+        { "required": ["opportunityId"] }
       ],
       "required": ["id", "contactType", "contactMethod", "date", "userId"]
     },
