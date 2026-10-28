@@ -31,7 +31,10 @@ import { ParamsId, ReplyMessage } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
-import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import {
+  logEmailCommunication,
+  removeUnsentEmailLog,
+} from "../../utils/data/log-email-communication";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 
 async function sendSuggestionEmail(
@@ -90,7 +93,7 @@ async function sendSuggestionEmail(
     }
     logger.debug(`emailSuggestion side-effect succeeded (ov ${id})`);
   } catch (sendErr) {
-    await commRepo.remove(comm).catch(logger.error);
+    await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
     throw sendErr;
   }
   return true;
@@ -211,7 +214,7 @@ async function sendMatchedEmails(
     try {
       await fastify.notify.emailAccompanyMatch(ov, emailNote);
     } catch (sendErr) {
-      await commRepo.remove(comm).catch(logger.error);
+      await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
       throw sendErr;
     }
     try {
@@ -220,11 +223,9 @@ async function sendMatchedEmails(
       logger.error(
         `emailAccompanyMatchVolunteer failed (ov ${id}): ${volunteerSendErr}`,
       );
-      fastify.notify
-        .opsAlert(
-          `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
-        )
-        .catch(logger.error);
+      fastify.notify.opsAlert(
+        `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
+      );
     }
   } else {
     const comm = await logEmailCommunication(commRepo, commType, {
@@ -234,7 +235,7 @@ async function sendMatchedEmails(
     try {
       await fastify.notify.emailIntroduction(ov, emailNote);
     } catch (sendErr) {
-      await commRepo.remove(comm).catch(logger.error);
+      await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
       throw sendErr;
     }
   }

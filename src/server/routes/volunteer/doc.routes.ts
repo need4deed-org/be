@@ -23,7 +23,7 @@ import {
   EmailSendError,
   SuspendedEmailError,
 } from "../../../services/notify";
-import { errorName, errorSummary, tryCatch } from "../../../services/utils";
+import { errorSummary, tryCatch } from "../../../services/utils";
 import {
   idParamSchema,
   idTypeParamSchema,
@@ -39,7 +39,10 @@ import {
   isStaffRole,
   runWithAdvisoryLock,
 } from "../../utils";
-import { logEmailCommunication } from "../../utils/data/log-email-communication";
+import {
+  logEmailCommunication,
+  removeUnsentEmailLog,
+} from "../../utils/data/log-email-communication";
 
 const CGC_APPLICATION_LOCK_NAMESPACE = "cgc-application-email";
 
@@ -64,21 +67,6 @@ export default async function volunteerDocRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  async function removeUnsentLog(comm: Communication): Promise<void> {
-    try {
-      await fastify.db.communicationRepository.remove(comm);
-    } catch (removeErr) {
-      logger.error(
-        `unsent application email still logged (communication ${comm.id}): ${errorName(removeErr)}`,
-      );
-      fastify.notify
-        .opsAlert(
-          `Application email to volunteer ${comm.volunteerId} was not sent, but communication ${comm.id} could not be removed — delete it by hand.`,
-        )
-        .catch((err) => logger.error(err));
-    }
-  }
-
   fastify.get<{ Params: { id: number } }>(
     "/",
     {
@@ -195,7 +183,7 @@ export default async function volunteerDocRoutes(
         logger.error(
           `application email to volunteer ${id} not sent: ${errorSummary(sendErr)}`,
         );
-        await removeUnsentLog(comm);
+        await removeUnsentEmailLog(fastify, comm);
         throw applicationEmailNotSent(sendErr);
       }
 
