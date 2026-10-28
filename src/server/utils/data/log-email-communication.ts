@@ -5,19 +5,22 @@ import {
   ContactType,
 } from "need4deed-sdk";
 import { Repository } from "typeorm";
+import { dataSource } from "../../../data/data-source";
 import Communication from "../../../data/entity/communication.entity";
 import logger from "../../../logger";
 import { errorSummary } from "../../../services/utils";
 
+type CommunicationIds = {
+  volunteerId?: number;
+  opportunityId?: number;
+  agentId?: number;
+  userId?: number;
+};
+
 export async function logEmailCommunication(
   repo: Repository<Communication>,
   communicationType: CommunicationType,
-  ids: {
-    volunteerId?: number;
-    opportunityId?: number;
-    agentId?: number;
-    userId?: number;
-  },
+  ids: CommunicationIds,
 ): Promise<Communication> {
   return repo.save(
     new Communication({
@@ -27,6 +30,22 @@ export async function logEmailCommunication(
       ...ids,
     }),
   );
+}
+
+export async function claimEmailCommunication(
+  communicationType: CommunicationType,
+  ids: CommunicationIds,
+): Promise<Communication | undefined> {
+  return dataSource.transaction(async (manager) => {
+    await manager.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `email:${communicationType}:${JSON.stringify(ids)}`,
+    ]);
+    const repo = manager.getRepository(Communication);
+    if (await repo.existsBy({ ...ids, communicationType })) {
+      return undefined;
+    }
+    return logEmailCommunication(repo, communicationType, ids);
+  });
 }
 
 export async function removeUnsentEmailLog(

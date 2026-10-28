@@ -12,8 +12,10 @@ import {
   VolunteerStateEngagementType,
   VolunteerStateMatchType,
 } from "need4deed-sdk";
+import { Repository } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import Communication from "../../../data/entity/communication.entity";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
@@ -856,6 +858,109 @@ describe("coordinator's email note on suggest / match", () => {
       await fastify.db.personRepository.delete({ id: otherPerson.id });
     }
   });
+
+  it.each([
+    {
+      email: "emailSuggestion" as const,
+      type: OpportunityType.REGULAR,
+      from: OpportunityVolunteerStatusType.PAST,
+      to: OpportunityVolunteerStatusType.PENDING,
+    },
+    {
+      email: "emailAccompanyMatch" as const,
+      type: OpportunityType.ACCOMPANYING,
+      from: OpportunityVolunteerStatusType.PENDING,
+      to: OpportunityVolunteerStatusType.MATCHED,
+    },
+    {
+      email: "emailIntroduction" as const,
+      type: OpportunityType.REGULAR,
+      from: OpportunityVolunteerStatusType.PENDING,
+      to: OpportunityVolunteerStatusType.MATCHED,
+    },
+  ])(
+    "sends $email once when two requests arrive together",
+    async ({ email, type, from, to }) => {
+      const otherDeal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: deal.postcodeId }),
+      );
+      const otherPerson = await fastify.db.personRepository.save(
+        new Person({ firstName: "Twice", lastName: "Volunteer" }),
+      );
+      const otherVolunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ dealId: otherDeal.id, personId: otherPerson.id }),
+      );
+      const otherOpportunity = await fastify.db.opportunityRepository.save(
+        new Opportunity({
+          title: `Test Opportunity (twice ${email}) ${randomNumericSuffix()}`,
+          type,
+          status: OpportunityStatusType.NEW,
+          dealId: opportunityDeal.id,
+        }),
+      );
+      const pair = {
+        opportunityId: otherOpportunity.id,
+        volunteerId: otherVolunteer.id,
+      };
+      const sent = vi
+        .spyOn(fastify.notify, email)
+        .mockImplementation(
+          () => new Promise((resolve) => setTimeout(resolve, 200)),
+        );
+      sent.mockClear();
+      const volunteerEmail = vi
+        .spyOn(fastify.notify, "emailAccompanyMatchVolunteer")
+        .mockResolvedValue(undefined);
+      const save = Repository.prototype.save;
+      const slowCommunicationSave = vi
+        .spyOn(Repository.prototype, "save")
+        .mockImplementation(async function (
+          this: Repository<Communication>,
+          ...args: Parameters<typeof save>
+        ) {
+          if (args[0] instanceof Communication) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          return save.apply(this, args);
+        } as typeof save);
+      try {
+        const ov = await fastify.db.opportunityVolunteerRepository.save(
+          new OpportunityVolunteer({ ...pair, status: from }),
+        );
+        const patch = () =>
+          fastify.inject({
+            method: "PATCH",
+            url: `/opportunity-volunteer/${ov.id}`,
+            cookies: { [accessCookieName]: coordinatorCookie },
+            payload: { status: to, emailNote: "Twice?" },
+          });
+
+        const statuses = (await Promise.all([patch(), patch()]))
+          .map((res) => res.statusCode)
+          .sort();
+
+        expect(statuses).toEqual([204, 409]);
+        expect(sent).toHaveBeenCalledTimes(1);
+        expect(await fastify.db.communicationRepository.countBy(pair)).toBe(1);
+      } finally {
+        slowCommunicationSave.mockRestore();
+        volunteerEmail.mockRestore();
+        sent.mockReset();
+        await fastify.db.communicationRepository.delete({
+          volunteerId: otherVolunteer.id,
+        });
+        await fastify.db.opportunityVolunteerRepository.delete({
+          volunteerId: otherVolunteer.id,
+        });
+        await fastify.db.opportunityRepository.delete({
+          id: otherOpportunity.id,
+        });
+        await fastify.db.volunteerRepository.delete({ id: otherVolunteer.id });
+        await fastify.db.dealRepository.delete({ id: otherDeal.id });
+        await fastify.db.personRepository.delete({ id: otherPerson.id });
+      }
+    },
+  );
 
   it.each([
     {

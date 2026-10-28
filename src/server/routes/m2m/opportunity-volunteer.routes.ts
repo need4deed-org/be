@@ -32,19 +32,23 @@ import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-o
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
-  logEmailCommunication,
+  claimEmailCommunication,
   removeUnsentEmailLog,
 } from "../../utils/data/log-email-communication";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
+
+type MatchEmailOutcome = "sent" | "already-sent" | "no-match";
+
+const emailAlreadySentMessage =
+  "That email was already sent for this match, so the note would not be delivered.";
 
 async function sendSuggestionEmail(
   fastify: FastifyInstance,
   id: number,
   emailNote: string | undefined,
-): Promise<boolean> {
+): Promise<MatchEmailOutcome> {
   const opportunityVolunteerRepository =
     fastify.db.opportunityVolunteerRepository;
-  const commRepo = fastify.db.communicationRepository;
 
   logger.debug(`emailSuggestion side-effect triggered (ov ${id})`);
   const ov = await opportunityVolunteerRepository.findOne({
@@ -62,28 +66,17 @@ async function sendSuggestionEmail(
     ],
   });
   if (!ov) {
-    return false;
+    return "no-match";
   }
   const isAccompany =
     ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-  const alreadySent = await commRepo.findOne({
-    where: {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-      communicationType: CommunicationType.FIRST_INQUIRY,
-    },
+  const comm = await claimEmailCommunication(CommunicationType.FIRST_INQUIRY, {
+    volunteerId: ov.volunteerId,
+    opportunityId: ov.opportunityId,
   });
-  if (alreadySent) {
-    return false;
+  if (!comm) {
+    return "already-sent";
   }
-  const comm = await logEmailCommunication(
-    commRepo,
-    CommunicationType.FIRST_INQUIRY,
-    {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    },
-  );
   try {
     if (isAccompany) {
       await addTranslatedFields([ov.opportunity], Lang.DE);
@@ -96,7 +89,7 @@ async function sendSuggestionEmail(
     await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
     throw sendErr;
   }
-  return true;
+  return "sent";
 }
 
 function matchedCommunicationType(
@@ -156,9 +149,7 @@ async function assertEmailNoteDeliverable(
     },
   });
   if (alreadySent) {
-    throw new EmailAlreadySentError(
-      "That email was already sent for this match, so the note would not be delivered.",
-    );
+    throw new EmailAlreadySentError(emailAlreadySentMessage);
   }
 }
 
@@ -166,8 +157,7 @@ async function sendMatchedEmails(
   fastify: FastifyInstance,
   id: number,
   emailNote: string | undefined,
-): Promise<boolean> {
-  const commRepo = fastify.db.communicationRepository;
+): Promise<MatchEmailOutcome> {
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
     relations: [
@@ -190,33 +180,29 @@ async function sendMatchedEmails(
     ],
   });
   if (!ov) {
-    return false;
+    return "no-match";
   }
-  await addTranslatedFields([ov.volunteer, ov.opportunity], Lang.DE);
   const isAccompany =
     ov.opportunity?.type === ProfileVolunteeringType.ACCOMPANYING;
-  const commType = matchedCommunicationType(ov.opportunity?.type);
-  const alreadySent = await commRepo.findOne({
-    where: {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-      communicationType: commType,
-    },
-  });
-  if (alreadySent) {
-    return false;
+  const comm = await claimEmailCommunication(
+    matchedCommunicationType(ov.opportunity?.type),
+    { volunteerId: ov.volunteerId, opportunityId: ov.opportunityId },
+  );
+  if (!comm) {
+    return "already-sent";
+  }
+  try {
+    await addTranslatedFields([ov.volunteer, ov.opportunity], Lang.DE);
+    if (isAccompany) {
+      await fastify.notify.emailAccompanyMatch(ov, emailNote);
+    } else {
+      await fastify.notify.emailIntroduction(ov, emailNote);
+    }
+  } catch (sendErr) {
+    await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
+    throw sendErr;
   }
   if (isAccompany) {
-    const comm = await logEmailCommunication(commRepo, commType, {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    });
-    try {
-      await fastify.notify.emailAccompanyMatch(ov, emailNote);
-    } catch (sendErr) {
-      await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
-      throw sendErr;
-    }
     try {
       await fastify.notify.emailAccompanyMatchVolunteer(ov);
     } catch (volunteerSendErr) {
@@ -227,26 +213,15 @@ async function sendMatchedEmails(
         `emailAccompanyMatchVolunteer failed for ov ${id} (volunteer ${ov.volunteerId}, opportunity ${ov.opportunityId}) — the volunteer was not sent their appointment details: ${volunteerSendErr}`,
       );
     }
-  } else {
-    const comm = await logEmailCommunication(commRepo, commType, {
-      volunteerId: ov.volunteerId,
-      opportunityId: ov.opportunityId,
-    });
-    try {
-      await fastify.notify.emailIntroduction(ov, emailNote);
-    } catch (sendErr) {
-      await removeUnsentEmailLog(fastify, comm, `ov ${id}`);
-      throw sendErr;
-    }
   }
-  return true;
+  return "sent";
 }
 
 async function deliverMatchEmail(
   label: string,
   id: number,
   emailNote: string | undefined,
-  send: (emailNote: string | undefined) => Promise<boolean>,
+  send: (emailNote: string | undefined) => Promise<MatchEmailOutcome>,
 ): Promise<void> {
   if (!emailNote?.trim()) {
     send(undefined).catch((err) =>
@@ -256,9 +231,9 @@ async function deliverMatchEmail(
   }
   const notSent =
     "The status was saved, but the email with your note was not sent";
-  let sent: boolean;
+  let outcome: MatchEmailOutcome;
   try {
-    sent = await send(emailNote);
+    outcome = await send(emailNote);
   } catch (err) {
     logger.error(`${label} with a note failed (ov ${id}): ${errorName(err)}`);
     throw new EmailNotSentError(
@@ -267,7 +242,10 @@ async function deliverMatchEmail(
         : `${notSent}.`,
     );
   }
-  if (!sent) {
+  if (outcome === "already-sent") {
+    throw new EmailAlreadySentError(emailAlreadySentMessage);
+  }
+  if (outcome === "no-match") {
     throw new EmailNotSentError(`${notSent}.`);
   }
 }
