@@ -18,7 +18,7 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-describe("PATCH /communication/:id", () => {
+describe("communication routes", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
 
@@ -186,5 +186,28 @@ describe("PATCH /communication/:id", () => {
       id: communication.id,
     });
     expect(stored.communicationType).toBe(CommunicationType.STATUS_UPDATE);
+  });
+
+  it("POST /agent/:id/communication responds with the created entry", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: `/agent/${agent.id}/communication`,
+      payload: {
+        contactType: ContactType.TEXT_EMAIL,
+        contactMethod: ContactMethodType.EMAIL,
+        date: new Date().toISOString(),
+      },
+      cookies: { [accessCookieName]: cookie },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    expect(data).toMatchObject({
+      contactType: ContactType.TEXT_EMAIL,
+      agentId: agent.id,
+      userId: user.id,
+    });
+    expect(data).not.toHaveProperty("communicationType");
+    expect(data).not.toHaveProperty("volunteerId");
   });
 });
