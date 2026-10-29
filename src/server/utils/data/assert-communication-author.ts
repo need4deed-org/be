@@ -1,4 +1,4 @@
-import { UserRole } from "need4deed-sdk";
+import { canModifyCommunication, UserRole } from "need4deed-sdk";
 import { UnauthorizedError } from "../../../config/error/fastify";
 import Communication from "../../../data/entity/communication.entity";
 
@@ -7,11 +7,7 @@ export function assertCommunicationAuthor(
   user: { id: number; role: UserRole },
   action: "update" | "delete",
 ): void {
-  if (
-    user.role !== UserRole.ADMIN &&
-    communication.userId !== null &&
-    communication.userId !== user.id
-  ) {
+  if (!canModifyCommunication(communication, user)) {
     throw new UnauthorizedError(
       `You do not have permission to ${action} communication with id:${communication.id}.`,
     );
