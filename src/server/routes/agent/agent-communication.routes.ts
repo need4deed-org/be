@@ -71,7 +71,7 @@ export default function agentCommunicationRoutes(
 
       return reply.status(200).send({
         message: `Communication created for agent_id:${agentId}`,
-        data: communication,
+        data: dtoCommunication(communication),
       });
     },
   );

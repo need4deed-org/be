@@ -607,7 +607,13 @@
         "first-inquiry-sent",
         "opportunity-list-sent",
         "status-update",
-        "post-match-followup"
+        "post-match-followup",
+        "accompanying-matched",
+        "matched",
+        "opportunity-confirmation",
+        "accompanying-not-found",
+        "opportunity-updated",
+        "cgc-application-email"
       ]
     },
     "ApiCommunication": {
@@ -654,17 +660,18 @@
             "volunteerId": {
               "type": "integer",
               "minimum": 1
+            },
+            "opportunityId": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         }
       ],
-      "oneOf": [
-        {
-          "required": ["agentId"]
-        },
-        {
-          "required": ["volunteerId"]
-        }
+      "anyOf": [
+        { "required": ["agentId"] },
+        { "required": ["volunteerId"] },
+        { "required": ["opportunityId"] }
       ],
       "required": ["id", "contactType", "contactMethod", "date", "userId"]
     },
@@ -675,7 +682,25 @@
     },
     "ApiCommunicationPatch": {
       "$id": "ApiCommunicationPatch",
-      "$ref": "ApiCommunication#"
+      "type": "object",
+      "properties": {
+        "contactType": {
+          "$ref": "ApiCommunication#/properties/contactType"
+        },
+        "contactMethod": {
+          "$ref": "ApiCommunication#/properties/contactMethod"
+        },
+        "communicationType": {
+          "anyOf": [
+            { "const": null },
+            { "$ref": "ApiCommunication#/properties/communicationType" }
+          ]
+        },
+        "date": {
+          "$ref": "ApiCommunication#/properties/date"
+        }
+      },
+      "additionalProperties": false
     },
     "AppreciationStatusType": {
       "$id": "AppreciationStatusType",
@@ -819,6 +844,10 @@
             },
             "volunteeringType": {
               "$ref": "VolunteerStateTypeType#"
+            },
+            "volunteeringTypes": {
+              "type": "array",
+              "items": { "$ref": "OpportunityType#" }
             },
             "engagement": {
               "$ref": "VolunteerStateEngagementType#"

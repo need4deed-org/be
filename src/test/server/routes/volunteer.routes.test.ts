@@ -6,6 +6,7 @@ import {
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
+  ProfileVolunteeringType,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
@@ -387,6 +388,27 @@ describe("GET /volunteer", () => {
     expect(body.data[0].lon).toBe(LON);
     expect(typeof body.data[0].lat).toBe("number");
     expect(typeof body.data[0].lon).toBe("number");
+  });
+
+  it("serializes statusTypes in the list and single responses", async () => {
+    await fastify.db.volunteerRepository.update(volunteer.id, {
+      statusType: ProfileVolunteeringType.REGULAR_ACCOMPANYING,
+    });
+
+    const list = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[search]=${encodeURIComponent(lastName)}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    const single = await fastify.inject({
+      method: "GET",
+      url: `/volunteer/${volunteer.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    const expected = [OpportunityType.REGULAR, OpportunityType.ACCOMPANYING];
+    expect(list.json().data[0].statusTypes).toEqual(expected);
+    expect(single.json().data.statusTypes).toEqual(expected);
   });
 
   it("returns null lat/lon for listType=table, which doesn't load the postcode relation", async () => {

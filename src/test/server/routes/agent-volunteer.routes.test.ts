@@ -211,6 +211,7 @@ describe("GET /agent/:id/volunteer-linked", () => {
     expect(item.name).toBe("Test Volunteer");
     expect(item.avatarUrl).toBe("https://cdn.need4deed.org/test-avatar.png");
     expect(item.volunteeringType).toBe(ProfileVolunteeringType.REGULAR);
+    expect(item.volunteeringTypes).toEqual([OpportunityType.REGULAR]);
     expect(item.engagement).toBe(VolunteerStateEngagementType.ACTIVE);
     expect(item.communication).toBe(VolunteerStateCommunicationType.CALLED);
     expect(item.activities).toEqual([]);

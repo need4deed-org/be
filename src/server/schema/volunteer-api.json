@@ -28,6 +28,10 @@
         "statusType": {
           "$ref": "VolunteerStateTypeType#"
         },
+        "statusTypes": {
+          "type": "array",
+          "items": { "$ref": "OpportunityType#" }
+        },
         "statusMatch": {
           "oneOf": [{ "$ref": "VolunteerStateMatchType#" }, { "type": "null" }]
         },

@@ -8,11 +8,11 @@ export function dtoCommunication(
     id: communication.id,
     contactType: communication.contactType,
     contactMethod: communication.contactMethod,
-    communicationType: communication.communicationType,
+    communicationType: communication.communicationType ?? undefined,
     date: communication.date,
-    volunteerId: communication.volunteerId,
-    opportunityId: communication.opportunityId,
-    agentId: communication.agentId,
+    volunteerId: communication.volunteerId ?? undefined,
+    opportunityId: communication.opportunityId ?? undefined,
+    agentId: communication.agentId ?? undefined,
     userId: communication.userId,
   };
 }
