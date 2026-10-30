@@ -56,6 +56,7 @@ import {
   getOrCreateTimeslot,
   getSkipTake,
   getVolunteerPatchData,
+  getVolunteerSelfEditNotificationText,
   getVolunteerWhere,
   isStaffRole,
   patchEntity,
@@ -586,6 +587,12 @@ export default async function volunteerRoutes(
                 occurredAt,
               }),
           ),
+        );
+      }
+
+      if (isSelf) {
+        fastify.notify.opsAlert(
+          getVolunteerSelfEditNotificationText(ownPerson?.name ?? "", id),
         );
       }
 
