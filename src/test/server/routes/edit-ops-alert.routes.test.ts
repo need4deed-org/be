@@ -191,6 +191,18 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     expect(text).toContain(`id:${volunteer.id}`);
   });
 
+  it("does not alert when a volunteer's patch writes nothing", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { statusEngagement: VolunteerStateEngagementType.INACTIVE },
+    });
+    expect(res.statusCode).toBe(200);
+
+    expect(opsAlert).not.toHaveBeenCalled();
+  });
+
   it("does not alert when a coordinator edits a volunteer", async () => {
     const res = await fastify.inject({
       method: "PATCH",

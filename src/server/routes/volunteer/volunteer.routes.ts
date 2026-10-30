@@ -590,9 +590,24 @@ export default async function volunteerRoutes(
         );
       }
 
-      if (isSelf) {
+      const wroteChanges = Boolean(
+        volunteerData ||
+          personData ||
+          addressData ||
+          languages ||
+          availability ||
+          activities ||
+          skills ||
+          locations,
+      );
+      if (isSelf && wroteChanges) {
+        const editedName = Object.assign(
+          new Person(),
+          ownPerson,
+          personData,
+        ).name;
         fastify.notify.opsAlert(
-          getVolunteerSelfEditNotificationText(ownPerson?.name ?? "", id),
+          getVolunteerSelfEditNotificationText(editedName, id),
         );
       }
 

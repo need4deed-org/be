@@ -118,15 +118,16 @@ export function getVolunteerSelfEditNotificationText(
   name: string,
   id: number,
 ): string {
-  return `Volunteer ${name} (id:${id}) edited their profile at ${formatBerlinTimestamp()}`;
+  return `Volunteer ${name ? `${name} ` : ""}(id:${id}) edited their profile at ${formatBerlinTimestamp()}`;
 }
 
 export function getAgentOpportunityEditNotificationText(
   title: string,
   id: number,
   agentTitle: string,
+  movedToAgent = false,
 ): string {
-  return `Opportunity "${title}" (id:${id}) was edited by NGO "${agentTitle}" at ${formatBerlinTimestamp()}`;
+  return `Opportunity "${title}" (id:${id}) was ${movedToAgent ? "moved to" : "edited by"} NGO "${agentTitle}" at ${formatBerlinTimestamp()}`;
 }
 
 export function getMembershipRequestNotificationText(
