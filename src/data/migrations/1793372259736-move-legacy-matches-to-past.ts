@@ -2,7 +2,6 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 import {
   applyLegacyMatchChanges,
   LegacyMatchChange,
-  revertLegacyMatchChanges,
 } from "../utils/legacy-match-changes";
 
 const LEGACY_MATCH_CHANGES: LegacyMatchChange[] = [
@@ -147,8 +146,6 @@ export class MoveLegacyMatchesToPast1793372259736
     );
   }
 
-  // Original timestamps aren't kept, so down() only restores the status.
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await revertLegacyMatchChanges(queryRunner, LEGACY_MATCH_CHANGES);
-  }
+  // Data correction: the overwritten statuses and timestamps aren't kept.
+  public async down(): Promise<void> {}
 }

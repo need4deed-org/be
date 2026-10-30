@@ -2,6 +2,7 @@ import {
   OpportunityMatchStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
+  VolunteerStateMatchType,
 } from "need4deed-sdk";
 import { QueryRunner } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,7 +13,6 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   applyLegacyMatchChanges,
   LegacyMatchChange,
-  revertLegacyMatchChanges,
 } from "../../../data/utils/legacy-match-changes";
 import { randomNumericSuffix } from "../../random";
 import { createOpportunity, createVolunteer } from "../match-fixtures";
@@ -27,6 +27,7 @@ describe("MoveLegacyMatchesToPast migration", () => {
   let accompanying: Opportunity;
   let dated: Opportunity;
   let mismatched: Opportunity;
+  let alreadyPast: Opportunity;
   let changes: LegacyMatchChange[];
   let result: { changed: number; skipped: string[] };
 
@@ -59,6 +60,7 @@ describe("MoveLegacyMatchesToPast migration", () => {
     );
     dated = await createOpportunity(manager, `Legacy dated ${suffix}`);
     mismatched = await createOpportunity(manager, `Legacy mismatch ${suffix}`);
+    alreadyPast = await createOpportunity(manager, `Legacy already ${suffix}`);
 
     await manager.query(`UPDATE volunteer SET created_at = $2 WHERE id = $1`, [
       volunteer.id,
@@ -79,6 +81,7 @@ describe("MoveLegacyMatchesToPast migration", () => {
       [accompanying, MATCHED],
       [dated, PENDING],
       [mismatched, MATCHED],
+      [alreadyPast, PAST],
     ];
     for (const [opportunity, status] of links) {
       await manager.save(
@@ -95,6 +98,7 @@ describe("MoveLegacyMatchesToPast migration", () => {
       [volunteer.id, accompanying.id, MATCHED, PAST],
       [volunteer.id, dated.id, PENDING, MATCHED, "2024-08-16"],
       [volunteer.id, mismatched.id, PENDING, PAST],
+      [volunteer.id, alreadyPast.id, PENDING, PAST],
       [volunteer.id, 0, PENDING, PAST],
     ];
     result = await applyLegacyMatchChanges(queryRunner, changes);
@@ -123,15 +127,20 @@ describe("MoveLegacyMatchesToPast migration", () => {
     const row = await link(dated);
     expect(row.status).toBe(MATCHED);
     expect(row.createdAt.toISOString().slice(0, 10)).toBe("2024-08-16");
+    expect(row.updatedAt.toISOString()).toBe(row.createdAt.toISOString());
   });
 
   it("skips rows whose current status doesn't match, and missing rows", async () => {
     expect((await link(mismatched)).status).toBe(MATCHED);
     expect(result.changed).toBe(3);
-    expect(result.skipped).toEqual([
-      `${volunteer.id}/${mismatched.id}:${MATCHED}`,
-      `${volunteer.id}/0:missing`,
-    ]);
+    expect(result.skipped).toHaveLength(3);
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        `${volunteer.id}/${mismatched.id}:${MATCHED}`,
+        `${volunteer.id}/${alreadyPast.id}:already-done`,
+        `${volunteer.id}/0:missing`,
+      ]),
+    );
   });
 
   it("recomputes the opportunity match status", async () => {
@@ -143,11 +152,10 @@ describe("MoveLegacyMatchesToPast migration", () => {
     );
   });
 
-  it("restores the previous status on revert", async () => {
-    await revertLegacyMatchChanges(queryRunner, changes);
-    expect((await link(regular)).status).toBe(PENDING);
-    expect((await link(accompanying)).status).toBe(MATCHED);
-    expect((await link(dated)).status).toBe(PENDING);
-    expect((await link(mismatched)).status).toBe(MATCHED);
+  it("recomputes the volunteer match status", async () => {
+    const updated = await queryRunner.manager.findOneByOrFail(Volunteer, {
+      id: volunteer.id,
+    });
+    expect(updated.statusMatch).toBe(VolunteerStateMatchType.MATCHED);
   });
 });

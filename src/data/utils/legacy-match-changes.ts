@@ -8,9 +8,6 @@ export type LegacyMatchChange = [
   matchedOn?: string,
 ];
 
-const PAST = "opp-past";
-const MATCHED = "opp-matched";
-
 const recomputeStatusMatch = (
   table: "volunteer" | "opportunity",
   prefix: "vol" | "opp-vol",
@@ -64,87 +61,79 @@ async function recomputeMatchStatuses(
   );
 }
 
-interface MatchRow {
-  id: number;
-  status: string;
-  createdAt: Date;
-  opportunityCreatedAt: Date;
-  volunteerCreatedAt: Date;
-}
+const CHANGES_RECORDSET = `jsonb_to_recordset($1::jsonb) AS c(
+  "volunteerId" int, "opportunityId" int, "from" text, "to" text, "matchedOn" date
+)`;
 
-const latest = (...dates: Date[]) =>
-  new Date(Math.max(...dates.map((d) => d.getTime())));
-const earliest = (...dates: Date[]) =>
-  new Date(Math.min(...dates.map((d) => d.getTime())));
+interface SkippedRow {
+  volunteerId: number;
+  opportunityId: number;
+  status: string | null;
+  to: string;
+}
 
 export async function applyLegacyMatchChanges(
   queryRunner: QueryRunner,
   changes: LegacyMatchChange[],
 ): Promise<{ changed: number; skipped: string[] }> {
-  const skipped: string[] = [];
-  let changed = 0;
-  const volunteerIds = new Set<number>();
-  const opportunityIds = new Set<number>();
+  const recordset = JSON.stringify(
+    changes.map(([volunteerId, opportunityId, from, to, matchedOn]) => ({
+      volunteerId,
+      opportunityId,
+      from,
+      to,
+      matchedOn: matchedOn ?? null,
+    })),
+  );
 
-  for (const [volunteerId, opportunityId, from, to, matchedOn] of changes) {
-    const [row]: MatchRow[] = await queryRunner.query(
-      `SELECT ov.id, ov.status, ov.created_at AS "createdAt",
-              o.created_at AS "opportunityCreatedAt",
-              v.created_at AS "volunteerCreatedAt"
-         FROM opportunity_volunteer ov
+  const skippedRows: SkippedRow[] = await queryRunner.query(
+    `SELECT c."volunteerId", c."opportunityId", ov.status::text AS status, c."to"
+       FROM ${CHANGES_RECORDSET}
+       LEFT JOIN opportunity_volunteer ov
+         ON ov.volunteer_id = c."volunteerId" AND ov.opportunity_id = c."opportunityId"
+      WHERE ov.id IS NULL OR ov.status::text <> c."from"`,
+    [recordset],
+  );
+
+  await queryRunner.query(
+    `WITH target AS (
+       SELECT ov.id, c."to", c."matchedOn" IS NOT NULL AS dated,
+              COALESCE(c."matchedOn" + time '12:00', GREATEST(o.created_at, v.created_at)) AS changed_on
+         FROM ${CHANGES_RECORDSET}
+         JOIN opportunity_volunteer ov
+           ON ov.volunteer_id = c."volunteerId" AND ov.opportunity_id = c."opportunityId"
+          AND ov.status::text = c."from"
          JOIN opportunity o ON o.id = ov.opportunity_id
          JOIN volunteer v ON v.id = ov.volunteer_id
-        WHERE ov.volunteer_id = $1 AND ov.opportunity_id = $2`,
-      [volunteerId, opportunityId],
-    );
-    if (!row || row.status !== from) {
-      skipped.push(
-        `${volunteerId}/${opportunityId}:${row ? row.status : "missing"}`,
-      );
-      continue;
-    }
+     )
+     UPDATE opportunity_volunteer ov
+        SET status = target."to"::opportunity_volunteer_status_enum,
+            created_at = CASE WHEN target.dated THEN target.changed_on
+                              ELSE LEAST(ov.created_at, target.changed_on) END,
+            updated_at = target.changed_on
+       FROM target
+      WHERE ov.id = target.id`,
+    [recordset],
+  );
 
-    const changedOn = matchedOn
-      ? new Date(`${matchedOn}T12:00:00Z`)
-      : latest(row.opportunityCreatedAt, row.volunteerCreatedAt);
-    const matchedAt =
-      to === PAST && from === MATCHED
-        ? earliest(row.createdAt, changedOn)
-        : changedOn;
-
-    await queryRunner.query(
-      `UPDATE opportunity_volunteer
-          SET status = $2, created_at = $3, updated_at = $4
-        WHERE id = $1`,
-      [row.id, to, matchedAt, changedOn],
-    );
-    changed++;
-    volunteerIds.add(volunteerId);
-    opportunityIds.add(opportunityId);
-  }
-
+  const skippedPairs = new Set(
+    skippedRows.map((row) => `${row.volunteerId}/${row.opportunityId}`),
+  );
+  const changedPairs = changes.filter(
+    ([volunteerId, opportunityId]) =>
+      !skippedPairs.has(`${volunteerId}/${opportunityId}`),
+  );
   await recomputeMatchStatuses(
     queryRunner,
-    [...volunteerIds],
-    [...opportunityIds],
+    changedPairs.map(([volunteerId]) => volunteerId),
+    changedPairs.map(([, opportunityId]) => opportunityId),
   );
-  return { changed, skipped };
-}
 
-export async function revertLegacyMatchChanges(
-  queryRunner: QueryRunner,
-  changes: LegacyMatchChange[],
-): Promise<void> {
-  for (const [volunteerId, opportunityId, from, to] of changes) {
-    await queryRunner.query(
-      `UPDATE opportunity_volunteer SET status = $3
-        WHERE volunteer_id = $1 AND opportunity_id = $2 AND status = $4`,
-      [volunteerId, opportunityId, from, to],
-    );
-  }
-  await recomputeMatchStatuses(
-    queryRunner,
-    changes.map(([volunteerId]) => volunteerId),
-    changes.map(([, opportunityId]) => opportunityId),
-  );
+  return {
+    changed: changedPairs.length,
+    skipped: skippedRows.map(
+      ({ volunteerId, opportunityId, status, to }) =>
+        `${volunteerId}/${opportunityId}:${status === null ? "missing" : status === to ? "already-done" : status}`,
+    ),
+  };
 }
