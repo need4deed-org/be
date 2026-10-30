@@ -10,6 +10,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -27,6 +28,7 @@ import AgentType from "../profile/agent-type.entity";
 import Opportunity from "./opportunity.entity";
 
 @Entity()
+@Index(["unclaimed", "engagementStatus"])
 export default class Agent {
   constructor(agent?: Partial<Agent>) {
     if (agent) {
