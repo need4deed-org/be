@@ -24,6 +24,11 @@ const TIME = new RegExp(
   "gi",
 );
 const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
+const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
+const HOUR_RANGE_START = new RegExp(
+  `(?<![.:\\d])\\b(\\d{1,2})(?![.:]\\d)\\s*(?:-|–|—|bis|und|to|until|till|and)\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${MERIDIEM}))`,
+  "gi",
+);
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
 const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
 
@@ -85,6 +90,10 @@ function timePresent(output: string, hour: number, minutes: string): boolean {
   );
 }
 
+function hourPresent(output: string, hour: number): boolean {
+  return hourVariants(hour).some((h) => hasNumber(output, h));
+}
+
 function numberPresent(output: string, value: number): boolean {
   return (
     hasNumber(output, String(value)) ||
@@ -124,12 +133,24 @@ function tokensPreserved(source: string, output: string): boolean {
   if (!datesPreserved) {
     return false;
   }
+  for (const [, hour, meridiem] of rest.matchAll(HOUR_RANGE_START)) {
+    if (!hourPresent(output, hour24(Number(hour), meridiem))) {
+      return false;
+    }
+  }
+  rest = rest.replace(HOUR_RANGE_START, " ");
   for (const [, hour, minutes, meridiem] of rest.matchAll(TIME)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), minutes)) {
       return false;
     }
   }
   rest = rest.replace(TIME, " ");
+  for (const [, hour] of rest.matchAll(H_HOUR)) {
+    if (!hourPresent(output, Number(hour))) {
+      return false;
+    }
+  }
+  rest = rest.replace(H_HOUR, " ");
   for (const [, hour, meridiem] of rest.matchAll(FULL_HOUR)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), "00")) {
       return false;
