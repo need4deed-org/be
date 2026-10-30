@@ -79,6 +79,7 @@ import {
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
   assertRoleIn,
+  getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
@@ -841,8 +842,9 @@ export default async function opportunityRoutes(
         }
       }
 
+      let linkedAgent: Agent | null = null;
       if (agentLinkId !== undefined) {
-        const linkedAgent = await fastify.db.agentRepository.findOne({
+        linkedAgent = await fastify.db.agentRepository.findOne({
           where: { id: agentLinkId },
         });
         if (!linkedAgent) {
@@ -1105,6 +1107,26 @@ export default async function opportunityRoutes(
             `Skills for opportunity (deal_id:${dealId}) not updated.`,
           );
         }
+      }
+
+      if (
+        role === UserRole.AGENT &&
+        effectiveAgentId &&
+        Object.keys(request.body ?? {}).length
+      ) {
+        const editingAgent =
+          linkedAgent ??
+          (await fastify.db.agentRepository.findOneBy({
+            id: effectiveAgentId,
+          }));
+        fastify.notify.opsAlert(
+          getAgentOpportunityEditNotificationText(
+            opportunityObj?.title ?? opportunity.title,
+            opportunity.id,
+            editingAgent?.title ?? `id:${effectiveAgentId}`,
+            effectiveAgentId !== opportunity.agentId,
+          ),
+        );
       }
 
       return reply.status(204).send();
