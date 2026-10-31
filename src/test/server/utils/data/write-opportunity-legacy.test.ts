@@ -1,6 +1,7 @@
-import { OpportunityStatusType } from "need4deed-sdk";
+import { Lang, OpportunityStatusType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
+import { languageIdOf } from "../../../../server/utils/data/translate-opportunities";
 import { writeOpportunityLegacy } from "../../../../server/utils/data/write-opportunity-legacy";
 
 const setAgentSearchingMock = vi.fn();
@@ -76,5 +77,25 @@ describe("writeOpportunityLegacy cascades Agent.volunteerSearch (be#862/be#868)"
     await expect(writeOpportunityLegacy(opportunity)).resolves.toBe(1);
 
     expect(setAgentSearchingMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeOpportunityLegacy original language", () => {
+  const GERMAN_INFO =
+    "Wir suchen eine ehrenamtliche Person, die mit den Jungs am Nachmittag eine Tischtennisrunde in unserem Jugendraum machen kann.";
+  const ENGLISH_INFO =
+    "Volunteers are needed to accompany groups of children to a swimming class during the autumn break.";
+
+  it.each([
+    ["German text from an English UI", GERMAN_INFO, Lang.EN, Lang.DE],
+    ["English text from a German UI", ENGLISH_INFO, Lang.DE, Lang.EN],
+    ["a text too short to tell", "Tischtennis", Lang.EN, Lang.EN],
+  ])("detects it for %s", async (_, info, requestLang, expected) => {
+    await writeOpportunityLegacy(
+      makeOpportunity({ title: "Tischtennis", info }),
+      requestLang,
+    );
+
+    expect(languageIdOf).toHaveBeenCalledWith(txnManager, expected);
   });
 });
