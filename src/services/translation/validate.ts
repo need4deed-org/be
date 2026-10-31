@@ -18,12 +18,20 @@ const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const URL = /https?:\/\/[^\s)]+/g;
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
+const GERMAN_AM_FOLLOWERS =
+  "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|wochenende|vormittag|nachmittag|abend|morgen";
+const MERIDIEM = `(a\\.m\\.|p\\.m\\.|am(?!\\s+(?:${GERMAN_AM_FOLLOWERS})\\b)|pm)(?![a-z])`;
 const TIME = new RegExp(
   `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
   "gi",
 );
 const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
+const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
+const RANGE_CONNECTOR = "(?:-|–|—|bis|und|to|until|till|and)";
+const HOUR_RANGE_START = new RegExp(
+  `(?<![.:,\\d])\\b(\\d{1,2})(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${MERIDIEM}))`,
+  "gi",
+);
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
 const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
 
@@ -92,6 +100,20 @@ function numberPresent(output: string, value: number): boolean {
   );
 }
 
+function hourPresent(output: string, hour: number): boolean {
+  return hourVariants(hour).some((h) => numberPresent(output, Number(h)));
+}
+
+function rangeStartPresent(output: string, hour: number): boolean {
+  return hourVariants(hour).some((h) => {
+    const forms = [`0?${h}(?:[.:]00)?`, ...(NUMBER_WORDS[Number(h)] ?? [])];
+    return new RegExp(
+      `(^|[^\\p{L}\\d])(?:${forms.join("|")})\\s*(?:a\\.m\\.|p\\.m\\.|am|pm|uhr)?\\s*${RANGE_CONNECTOR}(?!\\p{L})`,
+      "iu",
+    ).test(output);
+  });
+}
+
 function tokensPreserved(source: string, output: string): boolean {
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
@@ -124,12 +146,24 @@ function tokensPreserved(source: string, output: string): boolean {
   if (!datesPreserved) {
     return false;
   }
+  for (const [, hour, meridiem] of rest.matchAll(HOUR_RANGE_START)) {
+    if (!rangeStartPresent(output, hour24(Number(hour), meridiem))) {
+      return false;
+    }
+  }
+  rest = rest.replace(HOUR_RANGE_START, " ");
   for (const [, hour, minutes, meridiem] of rest.matchAll(TIME)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), minutes)) {
       return false;
     }
   }
   rest = rest.replace(TIME, " ");
+  for (const [, hour] of rest.matchAll(H_HOUR)) {
+    if (!hourPresent(output, Number(hour))) {
+      return false;
+    }
+  }
+  rest = rest.replace(H_HOUR, " ");
   for (const [, hour, meridiem] of rest.matchAll(FULL_HOUR)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), "00")) {
       return false;

@@ -126,6 +126,40 @@ describe("validateTranslation", () => {
       "Treffen um 17 Uhr im Garten",
       Lang.DE,
     ).toEqual(ok);
+    for (const [source, output, target] of [
+      ["Donnerstags von 17 bis 19 Uhr", "Thursdays from 5 to 7 pm", Lang.EN],
+      ["Montags von 16-18 Uhr", "Mondays from 4-6 pm", Lang.EN],
+      ["Zwischen 14 und 18 Uhr", "Between 2 and 6 p.m.", Lang.EN],
+      ["Zeit: 10-12Uhr", "Time: 10 am-12 pm", Lang.EN],
+      ["Zeit: 14-16h", "Time: 2-4 pm", Lang.EN],
+      ["From 5 to 7 pm", "Von 17 bis 19 Uhr", Lang.DE],
+      ["Jeden Montag, 16:30–18:00 Uhr", "Every Monday, 4:30–6:00 PM", Lang.EN],
+      ["Ab ca. 16h für zwei Stunden", "From about 4 pm for two hours", Lang.EN],
+      ["Dauer ca. 2h", "Takes about 2 hours", Lang.EN],
+      ["Dauer ca. 2h", "Takes about two hours", Lang.EN],
+      ["Dauer 2-3h", "Takes two to three hours", Lang.EN],
+      ["Dauer 1,5-2h", "Takes 1.5-2 hours", Lang.EN],
+      ["Zwischen 6 und 10 am Montag", "Between 6 and 10 on Monday", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 5 pm until 7 pm", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17:00 to 19:00", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toEqual(ok);
+    }
+    expectCode(
+      "Donnerstags von 17 bis 19 Uhr",
+      "Thursdays from 6 to 7 pm",
+      Lang.EN,
+    ).toMatchObject({ code: "token_missing" });
+    expectCode(
+      "Donnerstags von 17 bis 19 Uhr",
+      "Thursdays from 6 to 7 pm, 5 volunteers",
+      Lang.EN,
+    ).toMatchObject({ code: "token_missing" });
+    expectCode(
+      "Ab ca. 16h für zwei Stunden",
+      "From about 5 pm for two hours",
+      Lang.EN,
+    ).toMatchObject({ code: "token_missing" });
     // "am" at the start of a word isn't a time.
     expectCode(
       "We need 5 amazing volunteers",
