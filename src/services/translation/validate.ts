@@ -18,15 +18,18 @@ const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const URL = /https?:\/\/[^\s)]+/g;
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
+const GERMAN_AM_FOLLOWERS =
+  "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|wochenende|vormittag|nachmittag|abend|morgen";
+const MERIDIEM = `(a\\.m\\.|p\\.m\\.|am(?!\\s+(?:${GERMAN_AM_FOLLOWERS})\\b)|pm)(?![a-z])`;
 const TIME = new RegExp(
   `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
   "gi",
 );
 const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
+const RANGE_CONNECTOR = "(?:-|–|—|bis|und|to|until|till|and)";
 const HOUR_RANGE_START = new RegExp(
-  `(?<![.:\\d])\\b(\\d{1,2})(?![.:]\\d)\\s*(?:-|–|—|bis|und|to|until|till|and)\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${MERIDIEM}))`,
+  `(?<![.:,\\d])\\b(\\d{1,2})(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${MERIDIEM}))`,
   "gi",
 );
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
@@ -90,15 +93,25 @@ function timePresent(output: string, hour: number, minutes: string): boolean {
   );
 }
 
-function hourPresent(output: string, hour: number): boolean {
-  return hourVariants(hour).some((h) => hasNumber(output, h));
-}
-
 function numberPresent(output: string, value: number): boolean {
   return (
     hasNumber(output, String(value)) ||
     (NUMBER_WORDS[value] ?? []).some((word) => hasWord(output, word))
   );
+}
+
+function hourPresent(output: string, hour: number): boolean {
+  return hourVariants(hour).some((h) => numberPresent(output, Number(h)));
+}
+
+function rangeStartPresent(output: string, hour: number): boolean {
+  return hourVariants(hour).some((h) => {
+    const forms = [`0?${h}(?:[.:]00)?`, ...(NUMBER_WORDS[Number(h)] ?? [])];
+    return new RegExp(
+      `(^|[^\\p{L}\\d])(?:${forms.join("|")})\\s*(?:a\\.m\\.|p\\.m\\.|am|pm|uhr)?\\s*${RANGE_CONNECTOR}(?!\\p{L})`,
+      "iu",
+    ).test(output);
+  });
 }
 
 function tokensPreserved(source: string, output: string): boolean {
@@ -134,7 +147,7 @@ function tokensPreserved(source: string, output: string): boolean {
     return false;
   }
   for (const [, hour, meridiem] of rest.matchAll(HOUR_RANGE_START)) {
-    if (!hourPresent(output, hour24(Number(hour), meridiem))) {
+    if (!rangeStartPresent(output, hour24(Number(hour), meridiem))) {
       return false;
     }
   }
