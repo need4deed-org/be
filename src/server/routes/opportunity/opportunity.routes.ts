@@ -82,6 +82,7 @@ import {
   getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
   getCategoryToDealHandler,
+  getEntitySnapshot,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
   getOpportunityListWhere,
@@ -750,6 +751,21 @@ export default async function opportunityRoutes(
         throw new Error(`Opportunity id:${id} is lacking a deal.`);
       }
 
+      const snapshotRelations = [
+        "agent",
+        "accompanying",
+        "onetimer",
+        "deal.dealLanguage",
+        "deal.dealActivity",
+        "deal.dealSkill",
+        "deal.dealDistrict",
+        "deal.dealTimeslot",
+      ];
+      const snapshotBefore =
+        role === UserRole.AGENT
+          ? await getEntitySnapshot(Opportunity, id, snapshotRelations)
+          : null;
+
       await assertValidMainCommunicationLanguages(
         request.body.languagesMain,
         fastify.db.languageRepository,
@@ -1110,9 +1126,10 @@ export default async function opportunityRoutes(
       }
 
       if (
-        role === UserRole.AGENT &&
+        snapshotBefore !== null &&
         effectiveAgentId &&
-        Object.keys(request.body ?? {}).length
+        snapshotBefore !==
+          (await getEntitySnapshot(Opportunity, id, snapshotRelations))
       ) {
         const editingAgent =
           linkedAgent ??

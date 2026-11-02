@@ -191,6 +191,18 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     expect(text).toContain(`id:${volunteer.id}`);
   });
 
+  it("does not alert when a volunteer re-saves unchanged values", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { infoAbout: "Updated by the volunteer" },
+    });
+    expect(res.statusCode).toBe(200);
+
+    expect(opsAlert).not.toHaveBeenCalled();
+  });
+
   it("does not alert when a volunteer's patch writes nothing", async () => {
     const res = await fastify.inject({
       method: "PATCH",
@@ -229,6 +241,18 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     expect(text).toContain(opportunityTitle);
     expect(text).toContain(`id:${opportunity.id}`);
     expect(text).toContain(agentTitle);
+  });
+
+  it("does not alert when an agent re-saves unchanged values", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { statusOpportunity: OpportunityStatusType.SEARCHING },
+    });
+    expect(res.statusCode).toBe(204);
+
+    expect(opsAlert).not.toHaveBeenCalled();
   });
 
   it("does not alert when an agent's patch is empty", async () => {

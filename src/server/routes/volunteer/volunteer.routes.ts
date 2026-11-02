@@ -52,6 +52,7 @@ import {
   ErasePersonPiiSummary,
   fetchVolunteerById,
   findAvailabilityDealIds,
+  getEntitySnapshot,
   getLanguageCode,
   getOrCreateTimeslot,
   getSkipTake,
@@ -424,6 +425,18 @@ export default async function volunteerRoutes(
         };
       }
 
+      const snapshotRelations = [
+        "person.address",
+        "deal.dealLanguage",
+        "deal.dealTimeslot",
+        "deal.dealActivity",
+        "deal.dealSkill",
+        "deal.dealDistrict",
+      ];
+      const snapshotBefore = isSelf
+        ? await getEntitySnapshot(Volunteer, id, snapshotRelations)
+        : null;
+
       const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
       if (
         volunteerData?.statusEngagement !== undefined &&
@@ -590,17 +603,11 @@ export default async function volunteerRoutes(
         );
       }
 
-      const wroteChanges = Boolean(
-        volunteerData ||
-          personData ||
-          addressData ||
-          languages ||
-          availability ||
-          activities ||
-          skills ||
-          locations,
-      );
-      if (isSelf && wroteChanges) {
+      if (
+        snapshotBefore !== null &&
+        snapshotBefore !==
+          (await getEntitySnapshot(Volunteer, id, snapshotRelations))
+      ) {
         const editedName = Object.assign(
           new Person(),
           ownPerson,
