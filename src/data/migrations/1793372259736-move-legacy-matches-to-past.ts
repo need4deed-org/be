@@ -141,7 +141,8 @@ export class MoveLegacyMatchesToPast1793372259736
       queryRunner,
       LEGACY_MATCH_CHANGES,
     );
-    console.warn(
+    queryRunner.connection.logger.log(
+      "info",
       `[legacy-matches] changed ${changed}, skipped ${skipped.length}${skipped.length ? `: ${skipped.join(", ")}` : ""}`,
     );
   }

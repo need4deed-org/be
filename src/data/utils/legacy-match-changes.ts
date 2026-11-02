@@ -65,6 +65,11 @@ const CHANGES_RECORDSET = `jsonb_to_recordset($1::jsonb) AS c(
   "volunteerId" int, "opportunityId" int, "from" text, "to" text, "matchedOn" date
 )`;
 
+interface ChangedRow {
+  volunteerId: number;
+  opportunityId: number;
+}
+
 interface SkippedRow {
   volunteerId: number;
   opportunityId: number;
@@ -86,16 +91,7 @@ export async function applyLegacyMatchChanges(
     })),
   );
 
-  const skippedRows: SkippedRow[] = await queryRunner.query(
-    `SELECT c."volunteerId", c."opportunityId", ov.status::text AS status, c."to"
-       FROM ${CHANGES_RECORDSET}
-       LEFT JOIN opportunity_volunteer ov
-         ON ov.volunteer_id = c."volunteerId" AND ov.opportunity_id = c."opportunityId"
-      WHERE ov.id IS NULL OR ov.status::text <> c."from"`,
-    [recordset],
-  );
-
-  await queryRunner.query(
+  const [updated]: [ChangedRow[], number] = await queryRunner.query(
     `WITH target AS (
        SELECT ov.id, c."to", c."matchedOn" IS NOT NULL AS dated,
               COALESCE(c."matchedOn" + time '12:00', GREATEST(o.created_at, v.created_at)) AS changed_on
@@ -112,25 +108,31 @@ export async function applyLegacyMatchChanges(
                               ELSE LEAST(ov.created_at, target.changed_on) END,
             updated_at = target.changed_on
        FROM target
-      WHERE ov.id = target.id`,
+      WHERE ov.id = target.id
+  RETURNING ov.volunteer_id AS "volunteerId", ov.opportunity_id AS "opportunityId"`,
     [recordset],
   );
 
-  const skippedPairs = new Set(
-    skippedRows.map((row) => `${row.volunteerId}/${row.opportunityId}`),
+  const changedPairs = new Set(
+    updated.map((row) => `${row.volunteerId}/${row.opportunityId}`),
   );
-  const changedPairs = changes.filter(
-    ([volunteerId, opportunityId]) =>
-      !skippedPairs.has(`${volunteerId}/${opportunityId}`),
+  const skippedRows: SkippedRow[] = await queryRunner.query(
+    `SELECT c."volunteerId", c."opportunityId", ov.status::text AS status, c."to"
+       FROM ${CHANGES_RECORDSET}
+       LEFT JOIN opportunity_volunteer ov
+         ON ov.volunteer_id = c."volunteerId" AND ov.opportunity_id = c."opportunityId"
+      WHERE NOT (c."volunteerId" || '/' || c."opportunityId" = ANY($2))`,
+    [recordset, [...changedPairs]],
   );
+
   await recomputeMatchStatuses(
     queryRunner,
-    changedPairs.map(([volunteerId]) => volunteerId),
-    changedPairs.map(([, opportunityId]) => opportunityId),
+    updated.map(({ volunteerId }) => volunteerId),
+    updated.map(({ opportunityId }) => opportunityId),
   );
 
   return {
-    changed: changedPairs.length,
+    changed: updated.length,
     skipped: skippedRows.map(
       ({ volunteerId, opportunityId, status, to }) =>
         `${volunteerId}/${opportunityId}:${status === null ? "missing" : status === to ? "already-done" : status}`,
