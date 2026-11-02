@@ -231,6 +231,18 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     expect(text).toContain(agentTitle);
   });
 
+  it("does not alert when an agent's patch is empty", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(204);
+
+    expect(opsAlert).not.toHaveBeenCalled();
+  });
+
   it("does not alert when a coordinator edits an opportunity", async () => {
     const res = await fastify.inject({
       method: "PATCH",
