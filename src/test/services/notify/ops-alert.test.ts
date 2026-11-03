@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  sendArrival,
-  sendOpsAlert,
-} from "../../../services/notify/events/ops-alert";
+import { sendArrival } from "../../../services/notify/events/arrival";
+import { sendOpsAlert } from "../../../services/notify/events/ops-alert";
 import type { SlackTransport } from "../../../services/notify/types";
 
 describe.each([

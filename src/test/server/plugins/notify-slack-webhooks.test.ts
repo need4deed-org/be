@@ -3,6 +3,7 @@ import {
   dryRunEnvNames,
   isDryRun,
   slackWebhookUrls,
+  slackWebhookWarnings,
 } from "../../../server/plugins/notify";
 import { firstEnvValue } from "../../../server/utils";
 
@@ -24,9 +25,55 @@ describe("slackWebhookUrls", () => {
   it("leaves out channels without a webhook", () => {
     expect(
       slackWebhookUrls({
+        SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
+      }),
+    ).toEqual({ arrivals: "https://hooks.example/arrivals" });
+  });
+});
+
+describe("slackWebhookUrls before the be-secret reseal", () => {
+  it("falls back to the ops and cron webhooks", () => {
+    expect(
+      slackWebhookUrls({
+        SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
+        SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
+      }),
+    ).toEqual({
+      ops: "https://hooks.example/ops",
+      arrivals: "https://hooks.example/ops",
+      activity: "https://hooks.example/cron",
+    });
+  });
+});
+
+describe("slackWebhookWarnings", () => {
+  const live = { NOTIFY_SLACK_DRY_RUN: "false" };
+
+  it("is quiet when every channel has its own webhook", () => {
+    expect(
+      slackWebhookWarnings({
+        ...live,
+        SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
+        SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
+        SLACK_ACTIVITY_WEBHOOK_URL: "https://hooks.example/activity",
+      }),
+    ).toEqual([]);
+  });
+
+  it("names each channel that falls back or has no webhook", () => {
+    expect(
+      slackWebhookWarnings({
+        ...live,
         SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
       }),
-    ).toEqual({ ops: "https://hooks.example/ops" });
+    ).toEqual([
+      "notify: SLACK_ARRIVALS_WEBHOOK_URL unset — arrivals Slack notices use SLACK_OPS_WEBHOOK_URL",
+      "notify: SLACK_ACTIVITY_WEBHOOK_URL unset — activity Slack notices are dropped",
+    ]);
+  });
+
+  it("is quiet in a Slack dry run", () => {
+    expect(slackWebhookWarnings({ NOTIFY_SLACK_DRY_RUN: "true" })).toEqual([]);
   });
 });
 

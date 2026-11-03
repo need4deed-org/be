@@ -5,7 +5,7 @@ import {
   OpportunityLegacyType,
   UserRole,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
@@ -213,6 +213,9 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
   });
 
   it("saves the deal's activities/skills/languages given numeric option ids", async () => {
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
+      .mockResolvedValue(undefined);
     const res = await fastify.inject({
       method: "POST",
       url: "/opportunity/",
@@ -233,6 +236,12 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
 
     expect(res.statusCode).toBe(201);
     createdOpportunityId = res.json().data.id;
+    expect(arrival).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `New opportunity arrived: "Test Opportunity ${suffix}"`,
+      ),
+    );
+    arrival.mockRestore();
 
     const opportunityRepository = getRepository(dataSource, Opportunity);
     const saved = await opportunityRepository.findOneOrFail({
