@@ -84,6 +84,7 @@ describe("auth audit logs", () => {
     const lines = captureLogs();
     const response = await login({ email, password: "" });
     expect(response.statusCode).toBe(400);
+    expect(response.json().message).toBe("Email and password are required.");
     expect(lines()).toContain("Login failed: empty-field");
     expectNoSecrets(lines(), email);
   });
@@ -110,6 +111,7 @@ describe("auth audit logs", () => {
     const lines = captureLogs();
     const response = await login({ email, password: typed });
     expect(response.statusCode).toBe(401);
+    expect(response.json().message).toBe("Bad credentials.");
     expect(lines()).toContain(
       `Login failed for user ${active.id}: wrong-password`,
     );
