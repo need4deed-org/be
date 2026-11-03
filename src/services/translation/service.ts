@@ -60,21 +60,23 @@ export class TranslationService {
         : { status: "retry", reason: result.kind };
     }
 
-    const output = {
-      text: result.text.trim(),
-      model: result.model,
-      usage: result.usage,
-    };
-    const validation = validateTranslation(text, result.text, targetLang);
+    const output = result.text.replaceAll("\u0000", "");
+    const validation = validateTranslation(text, output, targetLang);
     if (validation.status === "invalid") {
       return {
         status: "failed",
         code: validation.code,
-        ...output,
-        text: output.text || undefined,
+        model: result.model,
+        usage: result.usage,
+        ...(output.trim() && { text: output.trim() }),
       };
     }
-    return { status: "done", ...output };
+    return {
+      status: "done",
+      text: output.trim(),
+      model: result.model,
+      usage: result.usage,
+    };
   }
 
   private async currentGlossary(): Promise<readonly GlossaryEntry[]> {

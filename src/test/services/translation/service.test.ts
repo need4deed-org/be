@@ -88,13 +88,26 @@ describe("TranslationService.translateField", () => {
       model: "m",
     });
 
-    expect(await service.translateField("Kinderbetreuung", Lang.EN)).toEqual({
+    const result = await service.translateField("Kinderbetreuung", Lang.EN);
+
+    expect(result).toMatchObject({
       status: "failed",
       code: "empty",
-      text: undefined,
       model: "m",
-      usage: undefined,
     });
+    expect(result).not.toHaveProperty("text");
+  });
+
+  it("drops NUL characters, which Postgres can't store", async () => {
+    const { service } = serviceAnswering({
+      status: "ok",
+      text: "Child\u0000care",
+      model: "m",
+    });
+
+    expect(
+      await service.translateField("Kinderbetreuung", Lang.EN),
+    ).toMatchObject({ status: "done", text: "Childcare" });
   });
 
   it("retries transient provider errors, fails bad responses", async () => {
