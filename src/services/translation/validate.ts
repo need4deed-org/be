@@ -18,20 +18,30 @@ const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const URL = /https?:\/\/[^\s)]+/g;
 const PHONE = /(?:\+|\b0)\d[\d /-]{6,}\d/g;
 const DATE = /\b(\d{1,2})\.(\d{1,2})\.(\d{2,4})?/g;
-const GERMAN_AM_FOLLOWERS =
-  "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|wochenende|vormittag|nachmittag|abend|morgen";
-const MERIDIEM = `(a\\.m\\.|p\\.m\\.|am(?!\\s+(?:${GERMAN_AM_FOLLOWERS})\\b)|pm)(?![a-z])`;
-const TIME = new RegExp(
-  `\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${MERIDIEM})?`,
-  "gi",
-);
-const FULL_HOUR = new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${MERIDIEM})`, "gi");
+const MERIDIEM = "(a\\.m\\.|p\\.m\\.|am|pm)(?![a-z])";
+// German "am" is a preposition ("am Montag"), so German sources have no meridiem.
+const NO_MERIDIEM = "((?!))";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
-const RANGE_CONNECTOR = "(?:-|–|—|bis|und|to|until|till|and)";
-const HOUR_RANGE_START = new RegExp(
-  `(?<![.:,\\d])\\b(\\d{1,2})(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${MERIDIEM}))`,
-  "gi",
-);
+const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)";
+
+function sourceTimePatterns(meridiem: string) {
+  return {
+    time: new RegExp(`\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${meridiem})?`, "gi"),
+    fullHour: new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${meridiem})`, "gi"),
+    hourRangeStart: new RegExp(
+      `(?<![.:,\\d])\\b(\\d{1,2})(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${meridiem}))`,
+      "gi",
+    ),
+  };
+}
+
+const SOURCE_TIME_PATTERNS: Record<
+  Lang,
+  ReturnType<typeof sourceTimePatterns>
+> = {
+  [Lang.EN]: sourceTimePatterns(MERIDIEM),
+  [Lang.DE]: sourceTimePatterns(NO_MERIDIEM),
+};
 const GROUPED_NUMBER = /\b\d{1,3}(?:[.,\u00a0]\d{3})+\b/g;
 const SPACE_GROUPED = /\b\d{1,3}(?: \d{3})+\b/g;
 
@@ -101,7 +111,7 @@ function numberPresent(output: string, value: number): boolean {
 }
 
 function hourPresent(output: string, hour: number): boolean {
-  return hourVariants(hour).some((h) => numberPresent(output, Number(h)));
+  return numberPresent(output, hour) || timePresent(output, hour, "00");
 }
 
 function rangeStartPresent(output: string, hour: number): boolean {
@@ -114,7 +124,12 @@ function rangeStartPresent(output: string, hour: number): boolean {
   });
 }
 
-function tokensPreserved(source: string, output: string): boolean {
+function tokensPreserved(
+  source: string,
+  output: string,
+  sourceLang: Lang,
+): boolean {
+  const { time, fullHour, hourRangeStart } = SOURCE_TIME_PATTERNS[sourceLang];
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
 
@@ -146,31 +161,31 @@ function tokensPreserved(source: string, output: string): boolean {
   if (!datesPreserved) {
     return false;
   }
-  for (const [, hour, meridiem] of rest.matchAll(HOUR_RANGE_START)) {
+  for (const [, hour, meridiem] of rest.matchAll(hourRangeStart)) {
     if (!rangeStartPresent(output, hour24(Number(hour), meridiem))) {
       return false;
     }
   }
-  rest = rest.replace(HOUR_RANGE_START, " ");
-  for (const [, hour, minutes, meridiem] of rest.matchAll(TIME)) {
+  rest = rest.replace(hourRangeStart, " ");
+  for (const [, hour, minutes, meridiem] of rest.matchAll(time)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), minutes)) {
       return false;
     }
   }
-  rest = rest.replace(TIME, " ");
+  rest = rest.replace(time, " ");
   for (const [, hour] of rest.matchAll(H_HOUR)) {
     if (!hourPresent(output, Number(hour))) {
       return false;
     }
   }
   rest = rest.replace(H_HOUR, " ");
-  for (const [, hour, meridiem] of rest.matchAll(FULL_HOUR)) {
+  for (const [, hour, meridiem] of rest.matchAll(fullHour)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), "00")) {
       return false;
     }
   }
   const numbersOutput = collapseGrouping(output);
-  rest = collapseGrouping(rest.replace(FULL_HOUR, " ")).replace(
+  rest = collapseGrouping(rest.replace(fullHour, " ")).replace(
     SPACE_GROUPED,
     (grouped) =>
       hasNumber(numbersOutput, grouped.replace(/\D/g, "")) ? " " : grouped,
@@ -204,7 +219,8 @@ export function validateTranslation(
       return invalid("length_ratio");
     }
   }
-  if (!tokensPreserved(src, out)) {
+  const sourceLang = targetLang === Lang.DE ? Lang.EN : Lang.DE;
+  if (!tokensPreserved(src, out, sourceLang)) {
     return invalid("token_missing");
   }
   const words = wordCount(src);
