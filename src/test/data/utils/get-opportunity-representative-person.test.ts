@@ -1,5 +1,20 @@
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
-import { getOpportunityRepresentativePerson } from "../../../data/utils/get-opportunity-representative-person";
+import Agent from "../../../data/entity/opportunity/agent.entity";
+import {
+  getAgentContactPerson,
+  getOpportunityRepresentativePerson,
+} from "../../../data/utils/get-opportunity-representative-person";
+
+const member = (
+  id: number,
+  email: string | undefined,
+  role = AgentRoleType.VOLUNTEER_COORDINATOR,
+  status = AgentMembershipStatus.ACTIVE,
+) => ({ role, status, person: { id, email } });
+
+const agentOf = (...agentPerson: ReturnType<typeof member>[]) =>
+  new Agent({ agentPerson } as unknown as Partial<Agent>);
 
 describe("getOpportunityRepresentativePerson", () => {
   it("prefers the stored contactPerson over submittedByPerson (be#833)", () => {
@@ -63,5 +78,54 @@ describe("getOpportunityRepresentativePerson", () => {
     const result = getOpportunityRepresentativePerson(opportunity as any);
 
     expect(result?.id).toBe(1);
+  });
+
+  it("leaves the submitter out when asked to", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: { id: 2, email: "submitter@center.de" },
+      agent: agentOf(member(3, "rep@center.de")),
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any, {
+      includeSubmitter: false,
+    });
+
+    expect(result?.id).toBe(3);
+  });
+});
+
+describe("getAgentContactPerson", () => {
+  it("takes the representative when they have an email", () => {
+    expect(
+      getAgentContactPerson(
+        agentOf(member(1, "rep@center.de"), member(2, "other@center.de")),
+      )?.id,
+    ).toBe(1);
+  });
+
+  it("takes another active member with an email when the representative has none", () => {
+    expect(
+      getAgentContactPerson(
+        agentOf(
+          member(1, undefined),
+          member(
+            2,
+            "pending@center.de",
+            AgentRoleType.VOLUNTEER_COORDINATOR,
+            AgentMembershipStatus.PENDING,
+          ),
+          member(3, "member@center.de"),
+        ),
+      )?.id,
+    ).toBe(3);
+  });
+
+  it("falls back to the representative when no member has an email", () => {
+    expect(getAgentContactPerson(agentOf(member(1, undefined)))?.id).toBe(1);
+  });
+
+  it("is undefined without an agent", () => {
+    expect(getAgentContactPerson(undefined)).toBeUndefined();
   });
 });

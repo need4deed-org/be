@@ -16,7 +16,7 @@ export function notifyNewVolunteer(
 ): void {
   getVolunteerClones({ id, email, phone })
     .then((volunteerCloneIds) => {
-      fastify.notify.opsAlert(
+      fastify.notify.arrival(
         getVolunteerNotificationText(
           email || "No email",
           name,

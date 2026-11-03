@@ -12,12 +12,12 @@ describe("sendTagged", () => {
   it.each([
     ["comment", "a comment"],
     ["post", "a post"],
-  ] as const)("posts a %s tag to the comments channel", async (kind, label) => {
+  ] as const)("posts a %s tag to the activity channel", async (kind, label) => {
     const send = vi.fn();
     await sendTagged({ slack: { send } }, { kind, ...input });
 
     expect(send).toHaveBeenCalledWith({
-      channel: "comments",
+      channel: "activity",
       text: `🏷️ *Alex* tagged Cora, Dan in ${label}:\n> please check`,
     });
   });
