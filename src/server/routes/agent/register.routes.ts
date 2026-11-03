@@ -216,7 +216,7 @@ export default async function agentRegisterRoutes(
             select: { id: true, title: true },
             where: { id: result.agentId },
           });
-          fastify.notify.opsAlert(
+          fastify.notify.arrival(
             getMembershipRequestNotificationText(
               agent?.title ?? `#${result.agentId}`,
             ),

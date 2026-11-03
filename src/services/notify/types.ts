@@ -15,7 +15,7 @@ export interface EmailMessage {
   attachments?: EmailAttachment[];
 }
 
-export type SlackChannel = "ops" | "comments" | "cron";
+export type SlackChannel = "ops" | "arrivals" | "activity";
 
 export interface SlackMessage {
   channel: SlackChannel;

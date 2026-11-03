@@ -73,11 +73,11 @@ describe("dry-run transports", () => {
 
   it("suppresses a Slack message, logging the channel but not the text", async () => {
     await new DryRunSlackTransport().send({
-      channel: "comments",
-      text: "Vera Volunteer tagged you",
+      channel: "ops",
+      text: "Vera Volunteer failed",
     });
 
-    expect(logged()).toContain("channel: comments");
+    expect(logged()).toContain("channel: ops");
     expect(logged()).not.toContain("Vera");
   });
 });

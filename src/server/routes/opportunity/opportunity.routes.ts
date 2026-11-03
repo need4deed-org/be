@@ -627,9 +627,7 @@ export default async function opportunityRoutes(
         requestLanguage(request.body),
       );
 
-      fastify.notify.opsAlert(
-        getOpportunityNotificationText(opportunity.title),
-      );
+      fastify.notify.arrival(getOpportunityNotificationText(opportunity.title));
 
       if (body.opportunity_type === OpportunityLegacyType.VOLUNTEERING) {
         (async () => {
