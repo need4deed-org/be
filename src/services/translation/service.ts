@@ -19,7 +19,13 @@ export type FieldTranslationResult =
       model: string;
       usage?: TranslationUsage;
     }
-  | { status: "failed"; code: TranslationErrorCode }
+  | {
+      status: "failed";
+      code: TranslationErrorCode;
+      text?: string;
+      model?: string;
+      usage?: TranslationUsage;
+    }
   | {
       status: "retry";
       reason: "rate_limited" | "misconfigured" | "unavailable";
@@ -54,13 +60,20 @@ export class TranslationService {
         : { status: "retry", reason: result.kind };
     }
 
-    const validation = validateTranslation(text, result.text, targetLang);
+    const output = result.text.replaceAll("\u0000", "");
+    const validation = validateTranslation(text, output, targetLang);
     if (validation.status === "invalid") {
-      return { status: "failed", code: validation.code };
+      return {
+        status: "failed",
+        code: validation.code,
+        model: result.model,
+        usage: result.usage,
+        ...(output.trim() && { text: output.trim() }),
+      };
     }
     return {
       status: "done",
-      text: result.text.trim(),
+      text: output.trim(),
       model: result.model,
       usage: result.usage,
     };
