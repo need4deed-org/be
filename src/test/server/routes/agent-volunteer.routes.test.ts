@@ -191,6 +191,41 @@ describe("GET /agent/:id/volunteer-linked", () => {
     await fastify.close();
   });
 
+  it("still lists the agent's volunteers when one of them has no deal", async () => {
+    const dealless = await fastify.db.volunteerRepository.save(
+      new Volunteer({
+        personId: (
+          await fastify.db.personRepository.save(
+            new Person({ firstName: "No", lastName: "Deal" }),
+          )
+        ).id,
+      }),
+    );
+    const link = await fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: dealless.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agent.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+
+    await fastify.db.opportunityVolunteerRepository.delete({ id: link.id });
+    await fastify.db.volunteerRepository.delete({ id: dealless.id });
+    await fastify.db.personRepository.delete({ id: dealless.personId });
+
+    expect(res.statusCode).toBe(200);
+    const ids = res.json().data.map((row: { id: number }) => row.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([opportunityVolunteer.id, link.id]),
+    );
+  });
+
   it("returns the full volunteer shape for a volunteer matched via the agent's opportunity", async () => {
     const res = await fastify.inject({
       method: "GET",

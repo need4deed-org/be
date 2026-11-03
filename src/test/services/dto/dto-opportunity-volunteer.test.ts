@@ -81,6 +81,31 @@ describe("opportunityOpportunityVolunteerDTO", () => {
     expect(result.locations).toBeDefined();
   });
 
+  it("returns the match without details when the volunteer has no person", () => {
+    const ov = makeOV({
+      volunteer: { statusType: "regular", person: null, deal: null } as any,
+    });
+    const result = opportunityOpportunityVolunteerDTO(ov);
+
+    expect(result.id).toBe(1);
+    expect(result.name).toBe("");
+    expect(result.avatarUrl).toBeNull();
+  });
+
+  it("returns the match without details when the volunteer has no deal", () => {
+    const ov = makeOV({
+      volunteer: {
+        statusType: "regular",
+        person: { name: "Jane Doe", avatarUrl: null },
+        deal: null,
+      } as any,
+    });
+    const result = opportunityOpportunityVolunteerDTO(ov);
+
+    expect(result.name).toBe("Jane Doe");
+    expect(result.volunteeringType).toBe("regular");
+  });
+
   it("throws when the input is not an OpportunityVolunteer instance", () => {
     expect(() => opportunityOpportunityVolunteerDTO({} as any)).toThrow(
       "Wrong opportunity-volunteer format.",
