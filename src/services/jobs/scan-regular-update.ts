@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
+import { AGENT_CONTACT_RELATIONS } from "../../data/utils";
 import { crossedMonthsAgo } from "./berlin-dates";
 import { reportCronFailure } from "./report-cron-failure";
 
@@ -20,14 +21,7 @@ export async function scanRegularUpdate(
       ]),
       updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
     },
-    relations: [
-      "contactPerson",
-      "contactPerson.users",
-      "submittedByPerson",
-      "agent",
-      "agent.agentPerson",
-      "agent.agentPerson.person",
-    ],
+    relations: ["contactPerson", ...AGENT_CONTACT_RELATIONS],
   });
 
   for (const opp of opps) {

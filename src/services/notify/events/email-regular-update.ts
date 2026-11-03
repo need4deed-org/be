@@ -25,11 +25,13 @@ export async function sendEmailRegularUpdate(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPerson = getOpportunityRepresentativePerson(opportunity);
+  const contactPerson = getOpportunityRepresentativePerson(opportunity, {
+    includeSubmitter: false,
+  });
   const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
-      `sendEmailRegularUpdate: missing contact email for opportunity ${opportunity.id}`,
+      `sendEmailRegularUpdate: no email for the contact person or NGO of opportunity ${opportunity.id}`,
     );
   }
 

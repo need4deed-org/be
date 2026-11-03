@@ -226,18 +226,18 @@ describe("2-month scans", () => {
     expect(await communicationsOf({ opportunityId: edges.atFrom.id })).toBe(0);
   });
 
-  it("loads who a regular update can fall back to", async () => {
+  it("loads the NGO's members, whom a regular update falls back to", async () => {
     const mock = fastify.cronNotify.emailRegularUpdate as ReturnType<
       typeof vi.fn
     >;
     await scanRegularUpdate(fastify, NOW);
-    const [opp] = mock.mock.calls.find(
+    const call = mock.mock.calls.find(
       ([row]: [Opportunity]) => row.id === edges.atFrom.id,
-    ) as [Opportunity];
+    );
     mock.mockClear();
 
-    expect(opp.agent?.agentPerson).toEqual(expect.any(Array));
-    expect(opp).toHaveProperty("submittedByPerson");
+    expect(call).toBeDefined();
+    expect(call![0].agent?.agentPerson).toEqual(expect.any(Array));
   });
 
   // be#982: an opportunity comes up on one run only, so a post that fails —
@@ -259,7 +259,9 @@ describe("2-month scans", () => {
       expect(send).not.toHaveBeenCalled();
       expect(opsAlert).toHaveBeenCalledTimes(1);
       expect(opsAlert.mock.calls[0][0]).toContain(`opportunity ${failed}`);
-      expect(opsAlert.mock.calls[0][0]).toContain("missing contact email");
+      expect(opsAlert.mock.calls[0][0]).toContain(
+        "no email for the contact person or NGO",
+      );
       expect(others.length).toBeGreaterThan(0);
     } finally {
       opsAlert.mockRestore();

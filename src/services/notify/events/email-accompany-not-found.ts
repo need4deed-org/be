@@ -24,11 +24,13 @@ export async function sendEmailAccompanyNotFound(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPerson = getOpportunityRepresentativePerson(opportunity);
+  const contactPerson = getOpportunityRepresentativePerson(opportunity, {
+    includeSubmitter: false,
+  });
   const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
-      `sendEmailAccompanyNotFound: missing contact email for opportunity ${opportunity.id}`,
+      `sendEmailAccompanyNotFound: no email for the contact person or NGO of opportunity ${opportunity.id}`,
     );
   }
 

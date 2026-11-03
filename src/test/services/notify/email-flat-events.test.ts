@@ -1,5 +1,7 @@
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { errorEmailRecipient } from "../../../config/constants";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import logger from "../../../logger";
 import {
@@ -285,14 +287,17 @@ describe.each([
   ["sendEmailRegularUpdate", sendEmailRegularUpdate],
   ["sendEmailAccompanyNotFound", sendEmailAccompanyNotFound],
 ] as const)("%s without a contact email", (_, sendEmail) => {
-  const representative = person({
-    name: "Rita Rep",
-    email: "rep@example.com",
+  const member = (name: string, email?: string) => ({
+    role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    status: AgentMembershipStatus.ACTIVE,
+    person: person({ name, email }),
   });
-  const withoutContact = (over: Record<string, unknown> = {}) =>
+  const ngo = (...agentPerson: ReturnType<typeof member>[]) =>
+    new Agent({ agentPerson } as unknown as Partial<Agent>);
+  const withoutContactEmail = (over: Record<string, unknown> = {}) =>
     opportunity({
-      contactPerson: undefined,
-      agent: { representative: { person: representative } },
+      contactPerson: person({ email: null }),
+      agent: ngo(member("Rita Rep", "rep@example.com")),
       ...over,
     }) as unknown as Parameters<typeof sendEmail>[1];
 
@@ -304,27 +309,38 @@ describe.each([
   });
 
   it("writes to the NGO's representative", async () => {
-    await sendEmail(email, withoutContact());
+    await sendEmail(email, withoutContactEmail());
 
     expect(send.mock.calls[0][0].to).toBe("rep@example.com");
     expect(send.mock.calls[0][0].text).toContain("Rita Rep");
   });
 
-  it("prefers the submitter over the representative", async () => {
+  it("writes to another NGO member when the representative has no email", async () => {
     await sendEmail(
       email,
-      withoutContact({
-        submittedByPerson: person({ email: "submitter@example.com" }),
+      withoutContactEmail({
+        agent: ngo(member("Rita Rep"), member("Mo Member", "mo@example.com")),
       }),
     );
 
-    expect(send.mock.calls[0][0].to).toBe("submitter@example.com");
+    expect(send.mock.calls[0][0].to).toBe("mo@example.com");
   });
 
-  it("throws when nobody has an email", async () => {
+  it("never writes to the submitter, who may be our own staff", async () => {
+    await sendEmail(
+      email,
+      withoutContactEmail({
+        submittedByPerson: person({ email: "coordinator@need4deed.org" }),
+      }),
+    );
+
+    expect(send.mock.calls[0][0].to).toBe("rep@example.com");
+  });
+
+  it("throws when neither the contact person nor the NGO has an email", async () => {
     await expect(
-      sendEmail(email, withoutContact({ agent: undefined })),
-    ).rejects.toThrow("missing contact email");
+      sendEmail(email, withoutContactEmail({ agent: ngo(member("Rita Rep")) })),
+    ).rejects.toThrow("no email for the contact person or NGO");
     expect(send).not.toHaveBeenCalled();
   });
 });
