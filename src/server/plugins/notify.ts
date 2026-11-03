@@ -14,6 +14,7 @@ import {
   EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
+  sendArrival,
   sendEmailAccompanyMatch,
   sendEmailAccompanyMatchVolunteer,
   sendEmailAccompanyNotFound,
@@ -51,6 +52,7 @@ interface NotifyService {
   emailVerification(user: User): Promise<void>;
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
+  arrival(text: string): Promise<void>;
   tagged(input: TaggedInput): Promise<void>;
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
@@ -129,22 +131,39 @@ function buildNotifyEmailTransport(): {
   };
 }
 
+const ACTIVITY_CHANNEL_NAME = "#n4d-be-activity";
+
 const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
   ops: "SLACK_OPS_WEBHOOK_URL",
-  comments: "SLACK_COMMENTS_WEBHOOK_URL",
-  cron: "SLACK_CRON_WEBHOOK_URL",
+  arrivals: "SLACK_ARRIVALS_WEBHOOK_URL",
+  activity: "SLACK_ACTIVITY_WEBHOOK_URL",
 };
+
+const slackChannels = Object.keys(SLACK_WEBHOOK_ENV) as SlackChannel[];
 
 export function slackWebhookUrls(
   env: Env = process.env,
 ): Partial<Record<SlackChannel, string>> {
   const urls: Partial<Record<SlackChannel, string>> = {};
-  for (const [channel, name] of Object.entries(SLACK_WEBHOOK_ENV)) {
-    if (env[name]) {
-      urls[channel as SlackChannel] = env[name];
+  for (const channel of slackChannels) {
+    const url = env[SLACK_WEBHOOK_ENV[channel]];
+    if (url) {
+      urls[channel] = url;
     }
   }
   return urls;
+}
+
+export function slackWebhookWarnings(env: Env = process.env): string[] {
+  if (isDryRun("SLACK", env)) {
+    return [];
+  }
+  return slackChannels
+    .filter((channel) => !env[SLACK_WEBHOOK_ENV[channel]])
+    .map(
+      (channel) =>
+        `notify: ${SLACK_WEBHOOK_ENV[channel]} unset — ${channel} Slack notices are dropped`,
+    );
 }
 
 function buildSlackTransport(): SlackTransport | undefined {
@@ -163,13 +182,9 @@ export function cronSlackTransport(
   slack: SlackTransport | undefined,
   env: Env = process.env,
 ): SlackTransport | undefined {
-  if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).cron)) {
-    return slack;
-  }
-  logger.warn(
-    "notify: SLACK_CRON_WEBHOOK_URL unset — cron emails are not posted to #cron-notifications; accompany-not-found is still emailed, with no Slack record",
-  );
-  return undefined;
+  return slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).activity)
+    ? slack
+    : undefined;
 }
 
 export function buildCronEmailTransport(
@@ -194,7 +209,7 @@ export function emailThenRecord(
       await email.send(msg);
       await record.send(msg).catch((err) => {
         logger.error(
-          `notify: email sent but not posted to #cron-notifications: ${err}`,
+          `notify: email sent but not posted to ${ACTIVITY_CHANNEL_NAME}: ${err}`,
         );
       });
     },
@@ -208,6 +223,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
   const emailNotify = validatingNotify();
   const emailNotifyRejecting = validatingNotify(true);
   const slack = buildSlackTransport();
+  slackWebhookWarnings().forEach((warning) => logger.warn(warning));
   const matchEmail =
     (send: typeof sendEmailSuggestion): MatchEmail =>
     (ov, emailNote) =>
@@ -224,6 +240,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
     passwordReset: (user: User) =>
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
+    arrival: (text: string) => sendArrival({ slack }, text),
     tagged: (input: TaggedInput) => sendTagged({ slack }, input),
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),

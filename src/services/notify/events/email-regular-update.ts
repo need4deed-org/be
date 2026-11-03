@@ -5,6 +5,7 @@ import {
   emailRegularUpdateManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { REGULAR_UPDATE_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createManifestLoader,
@@ -24,14 +25,17 @@ export async function sendEmailRegularUpdate(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPersonEmail = opportunity.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(opportunity, {
+    includeSubmitter: false,
+  });
+  const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
-      `sendEmailRegularUpdate: missing contact email for opportunity ${opportunity.id}`,
+      `sendEmailRegularUpdate: no email for the contact person or NGO of opportunity ${opportunity.id}`,
     );
   }
 
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
   const volunteeringopportunityName = await opportunityTitleIn(
     opportunity,
     Lang.DE,

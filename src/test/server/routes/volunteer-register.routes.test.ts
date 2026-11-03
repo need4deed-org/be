@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -116,6 +116,9 @@ describe("POST /volunteer/register", () => {
 
   it("creates a Volunteer linked to the registrant's own Person, minimal payload", async () => {
     const { person, token } = await makeRegistrant();
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
+      .mockResolvedValue(undefined);
 
     const res = await fastify.inject({
       method: "POST",
@@ -137,6 +140,12 @@ describe("POST /volunteer/register", () => {
     expect(res.statusCode).toBe(201);
     const volunteerId = res.json().data.id;
     createdVolunteerIds.push(volunteerId);
+    await vi.waitFor(() =>
+      expect(arrival).toHaveBeenCalledWith(
+        expect.stringContaining("New volunteer arrived: Test Volunteer ("),
+      ),
+    );
+    arrival.mockRestore();
 
     const volunteer = await fastify.db.volunteerRepository.findOneByOrFail({
       id: volunteerId,
