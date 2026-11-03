@@ -35,7 +35,7 @@ export function opportunityOpportunityVolunteerDTO(
   const deal = volunteer?.deal;
   if (!person || !deal) {
     logger.warn(
-      `Opportunity-volunteer ${opportunityVolunteer.id}: volunteer ${opportunityVolunteer.volunteerId} is missing ${!person ? "person" : "deal"}.`,
+      `Opportunity-volunteer ${opportunityVolunteer.id}: volunteer ${opportunityVolunteer.volunteerId} is missing ${[!person && "person", !deal && "deal"].filter(Boolean).join(" and ")}.`,
     );
   }
   return {
