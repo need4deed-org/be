@@ -6,7 +6,7 @@ export async function reportCronFailure(
   job: string,
   item: string,
   err: unknown,
-  outcome = "not posted to #cron-notifications",
+  outcome = "not posted",
 ): Promise<void> {
   const reason = err instanceof Error ? err.message : String(err);
   logger.error(`${job}: ${item} failed: ${reason}`);

@@ -1,9 +1,4 @@
-import logger from "../../../logger";
-import type { SlackTransport } from "../types";
-
-export interface TaggedDeps {
-  slack?: SlackTransport;
-}
+import { postSlackNotice, type SlackNoticeDeps } from "./slack-notice";
 
 export interface TaggedInput {
   kind: "comment" | "post";
@@ -18,19 +13,13 @@ const KIND_LABEL: Record<TaggedInput["kind"], string> = {
 };
 
 export async function sendTagged(
-  { slack }: TaggedDeps,
+  deps: SlackNoticeDeps,
   { kind, authorName, taggedNames, text }: TaggedInput,
 ): Promise<void> {
-  if (!slack) {
-    return;
-  }
   const tagged = taggedNames.length > 0 ? taggedNames.join(", ") : "someone";
-  const message = `🏷️ *${authorName}* tagged ${tagged} in ${KIND_LABEL[kind]}:\n> ${text}`;
-  try {
-    await slack.send({ channel: "comments", text: message });
-  } catch (err) {
-    logger.warn(
-      `tagged (${kind}) slack notification failed: ${err instanceof Error ? err.message : err}`,
-    );
-  }
+  await postSlackNotice(
+    deps,
+    "activity",
+    `🏷️ *${authorName}* tagged ${tagged} in ${KIND_LABEL[kind]}:\n> ${text}`,
+  );
 }

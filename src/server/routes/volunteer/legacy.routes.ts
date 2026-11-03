@@ -69,7 +69,7 @@ export default async function volunteerLegacyRoutes(
         : "";
 
       if (id) {
-        fastify.notify.opsAlert(
+        fastify.notify.arrival(
           getVolunteerNotificationText(
             volunteer.person.email || "No email",
             volunteer.person.name,

@@ -15,7 +15,7 @@ export class SlackEmailTransport implements EmailTransport {
 
   async send(msg: EmailMessage): Promise<void> {
     await this.slack.send({
-      channel: "cron",
+      channel: "activity",
       text: this.header,
       blocks: emailBlocks(msg, this.header),
     });

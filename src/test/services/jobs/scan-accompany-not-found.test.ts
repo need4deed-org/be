@@ -172,6 +172,16 @@ describe("scanAccompanyNotFound", () => {
     expect(await statusOf(outOfWindow)).toBe(OpportunityStatusType.SEARCHING);
   });
 
+  it("loads the NGO's members, whom the email falls back to", async () => {
+    const inWindow = await accompanying(dueOn(RUN_DAY), "NGO members");
+
+    await scanAccompanyNotFound(fastify, RUN_DAY);
+
+    const call = notify.mock.calls.find(([opp]) => opp.id === inWindow.id);
+    expect(call).toBeDefined();
+    expect(call![0].agent?.agentPerson).toEqual(expect.any(Array));
+  });
+
   it("on a second run the same day, neither emails again nor closes a reopened opportunity", async () => {
     const opportunity = await accompanying(dueOn(RUN_DAY), "Rerun");
     await scanAccompanyNotFound(fastify, RUN_DAY);

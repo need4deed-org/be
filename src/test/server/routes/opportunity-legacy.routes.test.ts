@@ -4,7 +4,7 @@ import {
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import District from "../../../data/entity/location/district.entity";
@@ -258,6 +258,9 @@ describe("POST /opportunity/legacy resolves district for a brand-new agent", () 
     // No berlin_locations, so parseOpportunityLegacy's own (title-based)
     // district guess resolves to nothing and addDistrictToOpportunity's
     // agent-based fallback is what has to do the work.
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
+      .mockResolvedValue(undefined);
     const res = await fastify.inject({
       method: "POST",
       url: "/opportunity/legacy",
@@ -278,6 +281,12 @@ describe("POST /opportunity/legacy resolves district for a brand-new agent", () 
 
     expect(res.statusCode).toBe(200);
     createdOpportunityId = res.json().data.id;
+    expect(arrival).toHaveBeenCalledWith(
+      expect.stringContaining(
+        `New opportunity arrived: "Test Opportunity (legacy-new-agent) ${suffix}"`,
+      ),
+    );
+    arrival.mockRestore();
 
     const opportunityRepository = getRepository(dataSource, Opportunity);
     const saved = await opportunityRepository.findOneOrFail({
