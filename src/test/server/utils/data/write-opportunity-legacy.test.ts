@@ -1,4 +1,4 @@
-import { Lang, OpportunityStatusType } from "need4deed-sdk";
+import { Lang, OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import { languageIdOf } from "../../../../server/utils/data/translate-opportunities";
@@ -16,10 +16,14 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
 }));
 
 // The translation queue has its own tests; here it only must not need a DB.
-vi.mock("../../../../server/utils/data/translate-opportunities", () => ({
-  languageIdOf: vi.fn(async () => 1),
-  queueOpportunityTranslation: vi.fn(),
-}));
+vi.mock(
+  "../../../../server/utils/data/translate-opportunities",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    languageIdOf: vi.fn(async () => 1),
+    queueOpportunityTranslation: vi.fn(),
+  }),
+);
 
 const txnManager: any = {
   getRepository: () => ({ save: vi.fn().mockResolvedValue(undefined) }),
@@ -87,12 +91,37 @@ describe("writeOpportunityLegacy original language", () => {
     "Volunteers are needed to accompany groups of children to a swimming class during the autumn break.";
 
   it.each([
-    ["German text from an English UI", GERMAN_INFO, Lang.EN, Lang.DE],
-    ["English text from a German UI", ENGLISH_INFO, Lang.DE, Lang.EN],
-    ["a text too short to tell", "Tischtennis", Lang.EN, Lang.EN],
-  ])("detects it for %s", async (_, info, requestLang, expected) => {
+    [
+      "German text from an English UI",
+      OpportunityType.REGULAR,
+      GERMAN_INFO,
+      Lang.EN,
+      Lang.DE,
+    ],
+    [
+      "English text from a German UI",
+      OpportunityType.EVENTS,
+      ENGLISH_INFO,
+      Lang.DE,
+      Lang.EN,
+    ],
+    [
+      "a text too short to tell",
+      OpportunityType.REGULAR,
+      "Tischtennis",
+      Lang.EN,
+      Lang.EN,
+    ],
+    [
+      "a type whose info is not translated",
+      OpportunityType.ACCOMPANYING,
+      GERMAN_INFO,
+      Lang.EN,
+      Lang.EN,
+    ],
+  ])("detects it for %s", async (_, type, info, requestLang, expected) => {
     await writeOpportunityLegacy(
-      makeOpportunity({ title: "Tischtennis", info }),
+      makeOpportunity({ title: "Tischtennis", type, info }),
       requestLang,
     );
 

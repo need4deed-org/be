@@ -57,6 +57,17 @@ export async function languageIdOf(
   return (await languageIds(manager)).idOf[lang];
 }
 
+export function translatedOpportunityFields(
+  opportunity: Pick<Opportunity, "title" | "info" | "type">,
+): Pick<Opportunity, "title" | "info"> {
+  return {
+    title: opportunity.title,
+    info: TRANSLATED_INFO_TYPES.includes(opportunity.type)
+      ? opportunity.info
+      : null,
+  };
+}
+
 export async function queueOpportunityTranslation(
   manager: EntityManager,
   opportunity: Pick<
@@ -64,12 +75,12 @@ export async function queueOpportunityTranslation(
     "id" | "title" | "info" | "type" | "originalLanguageId"
   >,
 ): Promise<void> {
-  await enqueue(manager, EntityTableName.OPPORTUNITY, opportunity, {
-    title: opportunity.title,
-    info: TRANSLATED_INFO_TYPES.includes(opportunity.type)
-      ? opportunity.info
-      : null,
-  });
+  await enqueue(
+    manager,
+    EntityTableName.OPPORTUNITY,
+    opportunity,
+    translatedOpportunityFields(opportunity),
+  );
 }
 
 export async function divertTranslatedEdits(

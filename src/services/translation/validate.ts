@@ -29,7 +29,7 @@ function sourceTimePatterns(meridiem: string) {
     time: new RegExp(`\\b(\\d{1,2})[.:](\\d{2})\\b(?:\\s*${meridiem})?`, "gi"),
     fullHour: new RegExp(`\\b(\\d{1,2})\\s*(?:uhr\\b|${meridiem})`, "gi"),
     hourRangeStart: new RegExp(
-      `(?<![.:,\\d])\\b(\\d{1,2})(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${meridiem}))`,
+      `(?<![.:,\\d])\\b(\\d{1,2})(?:[.:](\\d{2}))?(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=\\d{1,2}(?:[.:]\\d{2})?\\s*(?:uhr\\b|h\\b|${meridiem}))`,
       "gi",
     ),
   };
@@ -114,14 +114,27 @@ function hourPresent(output: string, hour: number): boolean {
   return numberPresent(output, hour) || timePresent(output, hour, "00");
 }
 
+const rangeStartPatterns = new Map<number, RegExp>();
+
+function rangeStartPattern(hour: number): RegExp {
+  let pattern = rangeStartPatterns.get(hour);
+  if (!pattern) {
+    const forms = [`0?${hour}(?:[.:]00)?`, ...(NUMBER_WORDS[hour] ?? [])];
+    pattern = new RegExp(
+      `(?<![\\p{L}\\d])(?:${forms.join("|")})\\s*(?:(a\\.m\\.|p\\.m\\.|am|pm)|uhr|o['’]clock)?\\s*${RANGE_CONNECTOR}(?!\\p{L})`,
+      "giu",
+    );
+    rangeStartPatterns.set(hour, pattern);
+  }
+  return pattern;
+}
+
 function rangeStartPresent(output: string, hour: number): boolean {
-  return hourVariants(hour).some((h) => {
-    const forms = [`0?${h}(?:[.:]00)?`, ...(NUMBER_WORDS[Number(h)] ?? [])];
-    return new RegExp(
-      `(^|[^\\p{L}\\d])(?:${forms.join("|")})\\s*(?:a\\.m\\.|p\\.m\\.|am|pm|uhr)?\\s*${RANGE_CONNECTOR}(?!\\p{L})`,
-      "iu",
-    ).test(output);
-  });
+  return hourVariants(hour).some((h) =>
+    [...output.matchAll(rangeStartPattern(Number(h)))].some(
+      ([, meridiem]) => !meridiem || hour24(Number(h), meridiem) === hour,
+    ),
+  );
 }
 
 function tokensPreserved(
@@ -161,8 +174,13 @@ function tokensPreserved(
   if (!datesPreserved) {
     return false;
   }
-  for (const [, hour, meridiem] of rest.matchAll(hourRangeStart)) {
-    if (!rangeStartPresent(output, hour24(Number(hour), meridiem))) {
+  for (const [, hour, minutes, meridiem] of rest.matchAll(hourRangeStart)) {
+    const start = hour24(Number(hour), meridiem);
+    if (
+      minutes
+        ? !timePresent(output, start, minutes)
+        : !rangeStartPresent(output, start)
+    ) {
       return false;
     }
   }

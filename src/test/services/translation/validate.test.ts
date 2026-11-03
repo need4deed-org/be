@@ -148,6 +148,9 @@ describe("validateTranslation", () => {
       ["Treffen um 10 am Eingang", "Meeting at 10 at the entrance", Lang.EN],
       ["Dauer 2-3h", "Takes 2 or 3 hours", Lang.EN],
       ["Insgesamt 16h im Monat", "A total of 16 hours a month", Lang.EN],
+      ["5:30 to 7 pm", "17:30 bis 19 Uhr", Lang.DE],
+      ["Von 17 bis 19 Uhr", "From 5 o'clock to 7 pm", Lang.EN],
+      ["Von 9 bis 17 Uhr", "From 9 am to 5 pm", Lang.EN],
       ["Von 17 bis 19 Uhr", "From 5 pm until 7 pm", Lang.EN],
       ["Von 17 bis 19 Uhr", "From 17:00 to 19:00", Lang.EN],
     ] as const) {
@@ -163,6 +166,16 @@ describe("validateTranslation", () => {
       "Thursdays from 6 to 7 pm, 5 volunteers",
       Lang.EN,
     ).toMatchObject({ code: "token_missing" });
+    for (const [source, output] of [
+      ["Von 9 bis 17 Uhr", "From 9 pm to 5 pm"],
+      ["Termin 3 und 17 Uhr", "Appointment 3 pm and 5 pm"],
+      ["Ab 16h, 4 Personen", "From 5 pm, 4 people"],
+      ["Dauer 14h", "Takes 2 hours"],
+    ]) {
+      expectCode(source, output, Lang.EN).toMatchObject({
+        code: "token_missing",
+      });
+    }
     expectCode(
       "Insgesamt 16h im Monat",
       "A total of 4 hours a month",
