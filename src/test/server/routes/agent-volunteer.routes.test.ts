@@ -191,6 +191,58 @@ describe("GET /agent/:id/volunteer-linked", () => {
     await fastify.close();
   });
 
+  it("still lists the agent's volunteers when one has no deal or no person", async () => {
+    const dealless = await fastify.db.volunteerRepository.save(
+      new Volunteer({
+        personId: (
+          await fastify.db.personRepository.save(
+            new Person({ firstName: "No", lastName: "Deal" }),
+          )
+        ).id,
+      }),
+    );
+    const personless = await fastify.db.volunteerRepository.save(
+      new Volunteer({}),
+    );
+    const links = await fastify.db.opportunityVolunteerRepository.save(
+      [dealless, personless].map(
+        ({ id }) =>
+          new OpportunityVolunteer({
+            opportunityId: opportunity.id,
+            volunteerId: id,
+            status: OpportunityVolunteerStatusType.PENDING,
+          }),
+      ),
+    );
+
+    const responses = await Promise.all(
+      [coordinatorCookie, agentRoleCookie].map((cookie) =>
+        fastify.inject({
+          method: "GET",
+          url: `/agent/${agent.id}/volunteer-linked`,
+          cookies: { [accessCookieName]: cookie },
+        }),
+      ),
+    );
+
+    await fastify.db.opportunityVolunteerRepository.delete(
+      links.map(({ id }) => id),
+    );
+    await fastify.db.volunteerRepository.delete([dealless.id, personless.id]);
+    await fastify.db.personRepository.delete({ id: dealless.personId });
+
+    for (const res of responses) {
+      expect(res.statusCode).toBe(200);
+      const ids = res.json().data.map((row: { id: number }) => row.id);
+      expect(ids).toEqual(
+        expect.arrayContaining([
+          opportunityVolunteer.id,
+          ...links.map(({ id }) => id),
+        ]),
+      );
+    }
+  });
+
   it("returns the full volunteer shape for a volunteer matched via the agent's opportunity", async () => {
     const res = await fastify.inject({
       method: "GET",
