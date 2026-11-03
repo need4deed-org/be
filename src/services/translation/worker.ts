@@ -118,6 +118,11 @@ export async function runTranslationBatch(
         })
         .execute();
 
+    if (result.status !== "retry") {
+      stats.promptTokens += result.usage?.promptTokens ?? 0;
+      stats.completionTokens += result.usage?.completionTokens ?? 0;
+    }
+
     if (result.status === "done") {
       const { affected } = await guarded({
         translation: result.text,
@@ -128,14 +133,14 @@ export async function runTranslationBatch(
       });
       if (affected) {
         stats.done++;
-        stats.promptTokens += result.usage?.promptTokens ?? 0;
-        stats.completionTokens += result.usage?.completionTokens ?? 0;
       } else {
         stats.stale++;
       }
     } else if (result.status === "failed") {
       const { affected } = await guarded({
+        translation: result.text ?? null,
         status: TranslationStatus.FAILED,
+        model: result.model ?? null,
         lastErrorCode: result.code,
       });
       if (affected) {
