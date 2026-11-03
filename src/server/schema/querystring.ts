@@ -49,19 +49,19 @@ const sortOrderProps = {
   },
 };
 
-const commuteFilterProps = {
-  [QueryParamsKeys.COMMUTE_POSTCODE]: { type: "string", pattern: "^[0-9]{5}$" },
+const commuteFilterProps = (idKey: QueryParamsKeys) => ({
+  [idKey]: { type: "integer", minimum: 1 },
   [QueryParamsKeys.MAX_COMMUTE_MINUTES]: {
     type: "integer",
     minimum: 1,
     maximum: 600,
   },
-};
+});
 
-const commuteFilterDependencies = {
-  [QueryParamsKeys.COMMUTE_POSTCODE]: [QueryParamsKeys.MAX_COMMUTE_MINUTES],
-  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: [QueryParamsKeys.COMMUTE_POSTCODE],
-};
+const commuteFilterDependencies = (idKey: QueryParamsKeys) => ({
+  [idKey]: [QueryParamsKeys.MAX_COMMUTE_MINUTES],
+  [QueryParamsKeys.MAX_COMMUTE_MINUTES]: [idKey],
+});
 
 const sortByProps = {
   sortBy: {
@@ -100,9 +100,11 @@ export const opportunityListQuerySchema = {
           type: "array",
           items: getRef("OpportunityStatusType#"),
         },
-        ...commuteFilterProps,
+        ...commuteFilterProps(QueryParamsKeys.COMMUTE_VOLUNTEER_ID),
       },
-      dependencies: commuteFilterDependencies,
+      dependencies: commuteFilterDependencies(
+        QueryParamsKeys.COMMUTE_VOLUNTEER_ID,
+      ),
     },
     additionalProperties: false,
   },
@@ -201,9 +203,11 @@ export const volunteerListQuerySchema = {
             { type: "array", items: { type: "string" } },
           ],
         },
-        ...commuteFilterProps,
+        ...commuteFilterProps(QueryParamsKeys.COMMUTE_OPPORTUNITY_ID),
       },
-      dependencies: commuteFilterDependencies,
+      dependencies: commuteFilterDependencies(
+        QueryParamsKeys.COMMUTE_OPPORTUNITY_ID,
+      ),
       additionalProperties: false,
     },
   },

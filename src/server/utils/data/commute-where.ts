@@ -3,6 +3,8 @@ import { Raw } from "typeorm";
 import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringCommuteFiltering } from "../../types";
 
 export interface CommuteFilter {
@@ -11,31 +13,67 @@ export interface CommuteFilter {
 }
 
 export async function resolveCommuteFilter(
-  filter?: QuerystringCommuteFiltering,
+  filter: QuerystringCommuteFiltering | undefined,
+  sourceKey:
+    | QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
+    | QueryParamsKeys.COMMUTE_VOLUNTEER_ID,
 ): Promise<CommuteFilter | null> {
-  const value = filter?.[QueryParamsKeys.COMMUTE_POSTCODE];
+  const sourceId = filter?.[sourceKey];
   const maxMinutes = filter?.[QueryParamsKeys.MAX_COMMUTE_MINUTES];
-  if (value === undefined || maxMinutes === undefined) {
+  if (sourceId === undefined || maxMinutes === undefined) {
     return null;
   }
-  const postcodes = await dataSource.getRepository(Postcode).find({
-    select: { id: true, latitude: true, longitude: true },
-    where: { value },
-  });
-  if (!postcodes.length) {
-    throw new BadRequestError(`Unknown commute postcode "${value}".`);
+
+  const sourceName =
+    sourceKey === QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
+      ? "opportunity"
+      : "volunteer";
+  const sourceQuery =
+    sourceKey === QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
+      ? dataSource
+          .getRepository(Opportunity)
+          .createQueryBuilder("o")
+          .select(
+            "COALESCE(ac.postcodeId, d.postcodeId, a.postcodeId)",
+            "postcodeId",
+          )
+          .leftJoin("o.accompanying", "ac")
+          .leftJoin("o.deal", "d")
+          .leftJoin("o.agent", "ag")
+          .leftJoin("ag.address", "a")
+          .where("o.id = :sourceId", { sourceId })
+      : dataSource
+          .getRepository(Volunteer)
+          .createQueryBuilder("v")
+          .select("COALESCE(a.postcodeId, d.postcodeId)", "postcodeId")
+          .leftJoin("v.person", "p")
+          .leftJoin("p.address", "a")
+          .leftJoin("v.deal", "d")
+          .where("v.id = :sourceId", { sourceId });
+  const source = await sourceQuery.getRawOne<{ postcodeId: number | null }>();
+  if (!source) {
+    throw new BadRequestError(`Unknown commute ${sourceName} "${sourceId}".`);
   }
-  if (
-    !postcodes.some(
-      ({ latitude, longitude }) =>
-        Number.isFinite(latitude) && Number.isFinite(longitude),
-    )
-  ) {
+  const postcodeId = source.postcodeId;
+  if (postcodeId === null) {
     throw new BadRequestError(
-      `Commute postcode "${value}" has no coordinates.`,
+      `Commute ${sourceName} "${sourceId}" has no postcode.`,
     );
   }
-  return { postcodeIds: postcodes.map(({ id }) => id), maxMinutes };
+  const postcode = await dataSource.getRepository(Postcode).findOne({
+    select: { id: true, value: true, latitude: true, longitude: true },
+    where: { id: postcodeId },
+  });
+  if (
+    !postcode ||
+    !Number.isFinite(postcode.latitude) ||
+    !Number.isFinite(postcode.longitude)
+  ) {
+    throw new BadRequestError(
+      `Commute postcode "${postcode?.value ?? postcodeId}" has no coordinates.`,
+    );
+  }
+  return { postcodeIds: [postcode.id], maxMinutes };
 }
 
 const commuteParams = ({ postcodeIds, maxMinutes }: CommuteFilter) => ({

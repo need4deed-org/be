@@ -51,7 +51,8 @@ export interface QuerystringEventGet {
 }
 
 export interface QuerystringCommuteFiltering {
-  [QueryParamsKeys.COMMUTE_POSTCODE]?: string;
+  [QueryParamsKeys.COMMUTE_OPPORTUNITY_ID]?: number;
+  [QueryParamsKeys.COMMUTE_VOLUNTEER_ID]?: number;
   [QueryParamsKeys.MAX_COMMUTE_MINUTES]?: number;
 }
 
