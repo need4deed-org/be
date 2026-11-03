@@ -9,6 +9,7 @@ import {
 import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
 import Communication from "../../data/entity/communication.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import { AGENT_CONTACT_RELATIONS } from "../../data/utils";
 import logger from "../../logger";
 import type { EmailDelivery } from "../../server/plugins/notify";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
@@ -45,7 +46,7 @@ export async function scanAccompanyNotFound(
       "accompanying.postcode",
       "onetimer",
       "contactPerson",
-      "contactPerson.users",
+      ...AGENT_CONTACT_RELATIONS,
       "district",
       "opportunityVolunteer",
     ],

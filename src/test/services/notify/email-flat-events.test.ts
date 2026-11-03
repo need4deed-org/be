@@ -1,5 +1,7 @@
+import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { errorEmailRecipient } from "../../../config/constants";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import { fetchJsonFromUrl } from "../../../data/utils";
 import logger from "../../../logger";
 import {
@@ -278,6 +280,68 @@ describe.each(CASES)("$name", ({ resetCache, send: doSend }) => {
 
     const msg = send.mock.calls[0][0];
     expect(msg.subject).toBe("MANIFEST SUBJECT MARKER");
+  });
+});
+
+describe.each([
+  ["sendEmailRegularUpdate", sendEmailRegularUpdate],
+  ["sendEmailAccompanyNotFound", sendEmailAccompanyNotFound],
+] as const)("%s without a contact email", (_, sendEmail) => {
+  const member = (name: string, email?: string) => ({
+    role: AgentRoleType.VOLUNTEER_COORDINATOR,
+    status: AgentMembershipStatus.ACTIVE,
+    person: person({ name, email }),
+  });
+  const ngo = (...agentPerson: ReturnType<typeof member>[]) =>
+    new Agent({ agentPerson } as unknown as Partial<Agent>);
+  const withoutContactEmail = (over: Record<string, unknown> = {}) =>
+    opportunity({
+      contactPerson: person({ email: null }),
+      agent: ngo(member("Rita Rep", "rep@example.com")),
+      ...over,
+    }) as unknown as Parameters<typeof sendEmail>[1];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetRegularUpdateTemplateCache();
+    resetAccompanyNotFoundTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  it("writes to the NGO's representative", async () => {
+    await sendEmail(email, withoutContactEmail());
+
+    expect(send.mock.calls[0][0].to).toBe("rep@example.com");
+    expect(send.mock.calls[0][0].text).toContain("Rita Rep");
+  });
+
+  it("writes to another NGO member when the representative has no email", async () => {
+    await sendEmail(
+      email,
+      withoutContactEmail({
+        agent: ngo(member("Rita Rep"), member("Mo Member", "mo@example.com")),
+      }),
+    );
+
+    expect(send.mock.calls[0][0].to).toBe("mo@example.com");
+  });
+
+  it("never writes to the submitter, who may be our own staff", async () => {
+    await sendEmail(
+      email,
+      withoutContactEmail({
+        submittedByPerson: person({ email: "coordinator@need4deed.org" }),
+      }),
+    );
+
+    expect(send.mock.calls[0][0].to).toBe("rep@example.com");
+  });
+
+  it("throws when neither the contact person nor the NGO has an email", async () => {
+    await expect(
+      sendEmail(email, withoutContactEmail({ agent: ngo(member("Rita Rep")) })),
+    ).rejects.toThrow("no email for the contact person or NGO");
+    expect(send).not.toHaveBeenCalled();
   });
 });
 
