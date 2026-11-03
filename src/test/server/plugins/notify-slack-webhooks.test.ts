@@ -12,11 +12,13 @@ describe("slackWebhookUrls", () => {
     expect(
       slackWebhookUrls({
         SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
+        SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
         SLACK_COMMENTS_WEBHOOK_URL: "https://hooks.example/comments",
         SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
       }),
     ).toEqual({
       ops: "https://hooks.example/ops",
+      arrivals: "https://hooks.example/arrivals",
       comments: "https://hooks.example/comments",
       cron: "https://hooks.example/cron",
     });

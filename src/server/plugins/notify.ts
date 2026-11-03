@@ -14,6 +14,7 @@ import {
   EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
+  sendArrival,
   sendEmailAccompanyMatch,
   sendEmailAccompanyMatchVolunteer,
   sendEmailAccompanyNotFound,
@@ -51,6 +52,7 @@ interface NotifyService {
   emailVerification(user: User): Promise<void>;
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
+  arrival(text: string): Promise<void>;
   tagged(input: TaggedInput): Promise<void>;
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
@@ -131,6 +133,7 @@ function buildNotifyEmailTransport(): {
 
 const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
   ops: "SLACK_OPS_WEBHOOK_URL",
+  arrivals: "SLACK_ARRIVALS_WEBHOOK_URL",
   comments: "SLACK_COMMENTS_WEBHOOK_URL",
   cron: "SLACK_CRON_WEBHOOK_URL",
 };
@@ -167,7 +170,7 @@ export function cronSlackTransport(
     return slack;
   }
   logger.warn(
-    "notify: SLACK_CRON_WEBHOOK_URL unset — cron emails are not posted to #cron-notifications; accompany-not-found is still emailed, with no Slack record",
+    "notify: SLACK_CRON_WEBHOOK_URL unset — cron emails are not posted to #n4d-be-ops; accompany-not-found is still emailed, with no Slack record",
   );
   return undefined;
 }
@@ -194,7 +197,7 @@ export function emailThenRecord(
       await email.send(msg);
       await record.send(msg).catch((err) => {
         logger.error(
-          `notify: email sent but not posted to #cron-notifications: ${err}`,
+          `notify: email sent but not posted to #n4d-be-ops: ${err}`,
         );
       });
     },
@@ -224,6 +227,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
     passwordReset: (user: User) =>
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
+    arrival: (text: string) => sendArrival({ slack }, text),
     tagged: (input: TaggedInput) => sendTagged({ slack }, input),
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),

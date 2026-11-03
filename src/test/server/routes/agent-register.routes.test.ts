@@ -764,13 +764,13 @@ describe("/agent/register", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("keeps joining an unclaimed agent pending without a domain match, and alerts ops", async () => {
+  it("keeps joining an unclaimed agent pending without a domain match, and posts the arrival", async () => {
     const agent = await makeAgent({ unclaimed: true });
     const { token } = await makeRegistrant(
       `untrusted-${randomNumericSuffix()}.example.org`,
     );
-    const opsAlert = vi
-      .spyOn(fastify.notify, "opsAlert")
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
       .mockResolvedValue(undefined);
 
     try {
@@ -784,7 +784,7 @@ describe("/agent/register", () => {
       expect(res.json().data.membershipStatus).toBe(
         AgentMembershipStatus.PENDING,
       );
-      expect(opsAlert).toHaveBeenCalledWith(
+      expect(arrival).toHaveBeenCalledWith(
         expect.stringContaining(agent.title),
       );
       const reloaded = await fastify.db.agentRepository.findOneByOrFail({
@@ -792,17 +792,17 @@ describe("/agent/register", () => {
       });
       expect(reloaded.unclaimed).toBe(true);
     } finally {
-      opsAlert.mockRestore();
+      arrival.mockRestore();
     }
   });
 
-  it("keeps a committed pending join a 201 when the ops alert fails", async () => {
+  it("keeps a committed pending join a 201 when the arrival post fails", async () => {
     const agent = await makeAgent({ unclaimed: true });
     const { token } = await makeRegistrant(
       `untrusted-${randomNumericSuffix()}.example.org`,
     );
-    const opsAlert = vi
-      .spyOn(fastify.notify, "opsAlert")
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
       .mockImplementation(() => {
         throw new Error("alert down");
       });
@@ -819,7 +819,7 @@ describe("/agent/register", () => {
         AgentMembershipStatus.PENDING,
       );
     } finally {
-      opsAlert.mockRestore();
+      arrival.mockRestore();
     }
   });
 

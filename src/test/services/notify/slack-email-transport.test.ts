@@ -25,7 +25,7 @@ async function post(msg: Parameters<SlackEmailTransport["send"]>[0]) {
 const bodyOf = (blocks: Block[]) =>
   blocks.filter((b) => b.type === "section" && b.text).map((b) => b.text!.text);
 
-// be#1088: cron emails are posted to #cron-notifications, not sent.
+// be#1088: cron emails are posted to #n4d-be-ops, not sent.
 describe("SlackEmailTransport", () => {
   it("posts header, To/Cc/Subject and the text body to the cron channel", async () => {
     const { message, blocks } = await post({

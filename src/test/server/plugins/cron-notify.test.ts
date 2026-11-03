@@ -93,7 +93,7 @@ describe("fastify.cronNotify", () => {
       "emailRegularUpdate",
       () => fastify.cronNotify.emailRegularUpdate(opportunity as never),
     ],
-  ])("%s posts to #cron-notifications and sends no email", async (_, run) => {
+  ])("%s posts to #n4d-be-ops and sends no email", async (_, run) => {
     fetchMock.mockClear();
     smtpSend.mockClear();
     brevoSend.mockClear();
@@ -126,7 +126,7 @@ describe("fastify.cronNotify", () => {
     brevoSend.mockClear();
   };
 
-  it("emailAccompanyNotFound emails via SMTP_NOTIFY, then posts to #cron-notifications", async () => {
+  it("emailAccompanyNotFound emails via SMTP_NOTIFY, then posts to #n4d-be-ops", async () => {
     clearMocks();
 
     await expect(
@@ -181,7 +181,7 @@ describe("fastify.cronNotify", () => {
 
       expect(smtpSend).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining("not posted to #cron-notifications"),
+        expect.stringContaining("not posted to #n4d-be-ops"),
       );
     } finally {
       error.mockRestore();
