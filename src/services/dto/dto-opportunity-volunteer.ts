@@ -4,6 +4,7 @@ import {
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import logger from "../../logger";
 import { getAvailability, getLanguages, getOptionItems } from "./utils";
 
 export function volunteerOpportunityVolunteerDTO(
@@ -29,35 +30,30 @@ export function opportunityOpportunityVolunteerDTO(
   if (!(opportunityVolunteer instanceof OpportunityVolunteer)) {
     throw new Error("Wrong opportunity-volunteer format.");
   }
+  const { volunteer } = opportunityVolunteer;
+  const person = volunteer?.person;
+  const deal = volunteer?.deal;
+  if (!person || !deal) {
+    logger.warn(
+      `Opportunity-volunteer ${opportunityVolunteer.id}: volunteer ${opportunityVolunteer.volunteerId} is missing ${[!person && "person", !deal && "deal"].filter(Boolean).join(" and ")}.`,
+    );
+  }
   return {
     id: opportunityVolunteer.id,
     status: opportunityVolunteer.status,
     volunteerId: opportunityVolunteer.volunteerId,
     opportunityId: opportunityVolunteer.opportunityId,
     updatedAt: opportunityVolunteer.updatedAt,
-    name: opportunityVolunteer.volunteer.person.name,
-    avatarUrl: opportunityVolunteer.volunteer.person.avatarUrl,
-    volunteeringType: opportunityVolunteer.volunteer.statusType,
-    volunteeringTypes: volunteerTypesFromStatusType(
-      opportunityVolunteer.volunteer.statusType,
-    ),
-    engagement: opportunityVolunteer.volunteer.statusEngagement,
-    communication: opportunityVolunteer.volunteer.statusCommunication,
-    activities: getOptionItems(
-      opportunityVolunteer.volunteer.deal.dealActivity,
-      "activity",
-    ),
-    skills: getOptionItems(
-      opportunityVolunteer.volunteer.deal.dealSkill,
-      "skill",
-    ),
-    languages: getLanguages(opportunityVolunteer.volunteer.deal.dealLanguage),
-    availability: getAvailability(
-      opportunityVolunteer.volunteer.deal.dealTimeslot,
-    ),
-    locations: getOptionItems(
-      opportunityVolunteer.volunteer.deal.dealDistrict,
-      "district",
-    ),
+    name: person?.name ?? "",
+    avatarUrl: person?.avatarUrl ?? null,
+    volunteeringType: volunteer?.statusType ?? null,
+    volunteeringTypes: volunteerTypesFromStatusType(volunteer?.statusType),
+    engagement: volunteer?.statusEngagement ?? null,
+    communication: volunteer?.statusCommunication ?? null,
+    activities: getOptionItems(deal?.dealActivity ?? [], "activity"),
+    skills: getOptionItems(deal?.dealSkill ?? [], "skill"),
+    languages: getLanguages(deal?.dealLanguage ?? []),
+    availability: getAvailability(deal?.dealTimeslot ?? []),
+    locations: getOptionItems(deal?.dealDistrict ?? [], "district"),
   };
 }

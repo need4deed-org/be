@@ -923,6 +923,27 @@ describe("coordinator's email note on suggest / match", () => {
           }
           return save.apply(this, args);
         } as typeof save);
+      // Without the overlap the later request sees no status change: a 400.
+      const repository = fastify.db.opportunityVolunteerRepository;
+      const findOne = repository.findOne.bind(repository);
+      let reads = 0;
+      let releaseReads = () => {};
+      const bothRead = new Promise<void>((resolve) => {
+        releaseReads = resolve;
+      });
+      const heldReads = vi
+        .spyOn(repository, "findOne")
+        .mockImplementation(async (options) => {
+          const row = await findOne(options);
+          reads += 1;
+          if (reads === 2) {
+            releaseReads();
+          }
+          if (reads <= 2) {
+            await bothRead;
+          }
+          return row;
+        });
       try {
         const ov = await fastify.db.opportunityVolunteerRepository.save(
           new OpportunityVolunteer({ ...pair, status: from }),
@@ -943,6 +964,7 @@ describe("coordinator's email note on suggest / match", () => {
         expect(sent).toHaveBeenCalledTimes(1);
         expect(await fastify.db.communicationRepository.countBy(pair)).toBe(1);
       } finally {
+        heldReads.mockRestore();
         slowCommunicationSave.mockRestore();
         volunteerEmail.mockRestore();
         sent.mockReset();
