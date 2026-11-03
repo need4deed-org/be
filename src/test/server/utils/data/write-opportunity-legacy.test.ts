@@ -1,6 +1,7 @@
-import { OpportunityStatusType } from "need4deed-sdk";
+import { Lang, OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
+import { languageIdOf } from "../../../../server/utils/data/translate-opportunities";
 import { writeOpportunityLegacy } from "../../../../server/utils/data/write-opportunity-legacy";
 
 const setAgentSearchingMock = vi.fn();
@@ -15,10 +16,14 @@ vi.mock("../../../../server/utils/data/for-routes", () => ({
 }));
 
 // The translation queue has its own tests; here it only must not need a DB.
-vi.mock("../../../../server/utils/data/translate-opportunities", () => ({
-  languageIdOf: vi.fn(async () => 1),
-  queueOpportunityTranslation: vi.fn(),
-}));
+vi.mock(
+  "../../../../server/utils/data/translate-opportunities",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    languageIdOf: vi.fn(async () => 1),
+    queueOpportunityTranslation: vi.fn(),
+  }),
+);
 
 const txnManager: any = {
   getRepository: () => ({ save: vi.fn().mockResolvedValue(undefined) }),
@@ -76,5 +81,50 @@ describe("writeOpportunityLegacy cascades Agent.volunteerSearch (be#862/be#868)"
     await expect(writeOpportunityLegacy(opportunity)).resolves.toBe(1);
 
     expect(setAgentSearchingMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeOpportunityLegacy original language", () => {
+  const GERMAN_INFO =
+    "Wir suchen eine ehrenamtliche Person, die mit den Jungs am Nachmittag eine Tischtennisrunde in unserem Jugendraum machen kann.";
+  const ENGLISH_INFO =
+    "Volunteers are needed to accompany groups of children to a swimming class during the autumn break.";
+
+  it.each([
+    [
+      "German text from an English UI",
+      OpportunityType.REGULAR,
+      GERMAN_INFO,
+      Lang.EN,
+      Lang.DE,
+    ],
+    [
+      "English text from a German UI",
+      OpportunityType.EVENTS,
+      ENGLISH_INFO,
+      Lang.DE,
+      Lang.EN,
+    ],
+    [
+      "a text too short to tell",
+      OpportunityType.REGULAR,
+      "Tischtennis",
+      Lang.EN,
+      Lang.EN,
+    ],
+    [
+      "a type whose info is not translated",
+      OpportunityType.ACCOMPANYING,
+      GERMAN_INFO,
+      Lang.EN,
+      Lang.EN,
+    ],
+  ])("detects it for %s", async (_, type, info, requestLang, expected) => {
+    await writeOpportunityLegacy(
+      makeOpportunity({ title: "Tischtennis", type, info }),
+      requestLang,
+    );
+
+    expect(languageIdOf).toHaveBeenCalledWith(txnManager, expected);
   });
 });
