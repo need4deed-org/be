@@ -148,6 +148,11 @@ describe("runTranslationBatch", () => {
 
   it("retries transient errors after a backoff, then gives up", async () => {
     const { row } = await queued();
+    await manager().update(
+      FieldTranslation,
+      { id: row.id },
+      { translation: "rejected earlier", model: "m" },
+    );
     const { service, provider } = worker(() => ({
       status: "error",
       kind: "unavailable",
@@ -177,6 +182,8 @@ describe("runTranslationBatch", () => {
     expect(provider.requests).toHaveLength(config.maxAttempts);
     expect(await reload(row.id)).toMatchObject({
       status: TranslationStatus.FAILED,
+      translation: null,
+      model: null,
       lastErrorCode: "provider_unavailable",
       attempts: config.maxAttempts,
     });

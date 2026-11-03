@@ -164,7 +164,9 @@ export async function runTranslationBatch(
         attempts,
         ...(exhausted
           ? {
+              translation: null,
               status: TranslationStatus.FAILED,
+              model: null,
               lastErrorCode: "provider_unavailable",
             }
           : {}),
