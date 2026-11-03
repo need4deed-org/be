@@ -29,7 +29,7 @@ vi.mock("../../../data/utils", async (importOriginal) => {
 
 vi.setConfig({ testTimeout: 30_000 });
 
-const OPS_WEBHOOK = "https://hooks.example/ops";
+const ACTIVITY_WEBHOOK = "https://hooks.example/activity";
 
 const person = (name: string, email: string) => ({
   name,
@@ -65,7 +65,7 @@ describe("fastify.cronNotify", () => {
   const brevoSend = vi.spyOn(BrevoEmailTransport.prototype, "send");
 
   beforeAll(async () => {
-    process.env.SLACK_OPS_WEBHOOK_URL = OPS_WEBHOOK;
+    process.env.SLACK_ACTIVITY_WEBHOOK_URL = ACTIVITY_WEBHOOK;
     process.env.NOTIFY_SLACK_DRY_RUN = "false";
     process.env.NOTIFY_EMAIL_DRY_RUN = "true";
     smtpSend.mockResolvedValue(undefined);
@@ -75,7 +75,7 @@ describe("fastify.cronNotify", () => {
   });
 
   afterAll(async () => {
-    delete process.env.SLACK_OPS_WEBHOOK_URL;
+    delete process.env.SLACK_ACTIVITY_WEBHOOK_URL;
     delete process.env.NOTIFY_SLACK_DRY_RUN;
     delete process.env.NOTIFY_EMAIL_DRY_RUN;
     smtpSend.mockReset();
@@ -93,7 +93,7 @@ describe("fastify.cronNotify", () => {
       "emailRegularUpdate",
       () => fastify.cronNotify.emailRegularUpdate(opportunity as never),
     ],
-  ])("%s posts to #n4d-be-ops and sends no email", async (_, run) => {
+  ])("%s posts to #n4d-be-activity and sends no email", async (_, run) => {
     fetchMock.mockClear();
     smtpSend.mockClear();
     brevoSend.mockClear();
@@ -105,7 +105,7 @@ describe("fastify.cronNotify", () => {
       string,
       { body: string },
     ];
-    expect(url).toBe(OPS_WEBHOOK);
+    expect(url).toBe(ACTIVITY_WEBHOOK);
     expect(JSON.parse(init.body).text).toBe("Cron email, not sent");
     expect(smtpSend).not.toHaveBeenCalled();
     expect(brevoSend).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("fastify.cronNotify", () => {
       string,
       { body: string },
     ];
-    expect(url).toBe(OPS_WEBHOOK);
+    expect(url).toBe(ACTIVITY_WEBHOOK);
     return JSON.parse(init.body).text;
   };
 
@@ -126,7 +126,7 @@ describe("fastify.cronNotify", () => {
     brevoSend.mockClear();
   };
 
-  it("emailAccompanyNotFound emails via SMTP_NOTIFY, then posts to #n4d-be-ops", async () => {
+  it("emailAccompanyNotFound emails via SMTP_NOTIFY, then posts to #n4d-be-activity", async () => {
     clearMocks();
 
     await expect(
@@ -181,7 +181,7 @@ describe("fastify.cronNotify", () => {
 
       expect(smtpSend).toHaveBeenCalledTimes(1);
       expect(error).toHaveBeenCalledWith(
-        expect.stringContaining("not posted to #n4d-be-ops"),
+        expect.stringContaining("not posted to #n4d-be-activity"),
       );
     } finally {
       error.mockRestore();
@@ -212,12 +212,12 @@ describe("emailedCronHeader", () => {
 });
 
 describe("cronSlackTransport", () => {
-  it("uses Slack when the ops webhook is set", () => {
+  it("uses Slack when the activity webhook is set", () => {
     const slack = { send: vi.fn() };
     expect(
       cronSlackTransport(slack, {
         NOTIFY_SLACK_DRY_RUN: "false",
-        SLACK_OPS_WEBHOOK_URL: OPS_WEBHOOK,
+        SLACK_ACTIVITY_WEBHOOK_URL: ACTIVITY_WEBHOOK,
       }),
     ).toBe(slack);
   });
@@ -231,7 +231,7 @@ describe("cronSlackTransport", () => {
 
   it.each([
     ["no Slack at all", undefined],
-    ["Slack without the ops webhook", { send: vi.fn() }],
+    ["Slack without the activity webhook", { send: vi.fn() }],
   ])("with %s, warns once and returns nothing", (_, slack) => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
     try {
@@ -257,7 +257,7 @@ describe("buildCronEmailTransport", () => {
     await transport.send({ to: "a@example.com", subject: "s", text: "t" });
 
     expect(slack.send).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "ops", text: CRON_EMAIL_SENT }),
+      expect.objectContaining({ channel: "activity", text: CRON_EMAIL_SENT }),
     );
   });
 
@@ -274,7 +274,7 @@ describe("buildCronEmailTransport", () => {
     );
   });
 
-  it("drops the emails without an ops Slack transport", async () => {
+  it("drops the emails without an activity Slack transport", async () => {
     await expect(
       buildCronEmailTransport(undefined).send({
         to: "a@example.com",

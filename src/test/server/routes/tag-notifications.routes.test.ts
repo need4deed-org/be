@@ -35,6 +35,7 @@ describe("tag notifications (be#1075)", () => {
   const emails: Record<string, string> = {};
 
   let emailTagged: MockInstance<FastifyInstance["notify"]["emailTagged"]>;
+  let tagged: MockInstance<FastifyInstance["notify"]["tagged"]>;
 
   async function makeUser(key: string, role?: UserRole): Promise<void> {
     const person = await fastify.db.personRepository.save(
@@ -108,6 +109,7 @@ describe("tag notifications (be#1075)", () => {
     emailTagged = vi
       .spyOn(fastify.notify, "emailTagged")
       .mockResolvedValue(undefined);
+    tagged = vi.spyOn(fastify.notify, "tagged").mockResolvedValue(undefined);
   });
 
   async function postComment(as: string, taggedKeys: string[]) {
@@ -163,6 +165,12 @@ describe("tag notifications (be#1075)", () => {
           entityId: 4242,
         },
       });
+      expect(tagged).toHaveBeenCalledTimes(1);
+      expect(tagged.mock.calls[0][0]).toMatchObject({
+        kind: "comment",
+        authorName: `Cora Tag${suffix}`,
+        text: `comment ${suffix}`,
+      });
     });
 
     it("PATCH notifies only the tags the edit adds", async () => {
@@ -170,6 +178,7 @@ describe("tag notifications (be#1075)", () => {
       const { id } = created.json().data;
       await waitForEmailTo("Colin");
       emailTagged.mockClear();
+      tagged.mockClear();
 
       const res = await fastify.inject({
         method: "PATCH",
@@ -181,6 +190,10 @@ describe("tag notifications (be#1075)", () => {
 
       await waitForEmailTo("Cleo");
       expect(recipients()).toEqual([emails.Cleo]);
+      expect(tagged).toHaveBeenCalledTimes(1);
+      expect(tagged.mock.calls[0][0].taggedNames).toEqual([
+        `Cleo Tag${suffix}`,
+      ]);
     });
 
     it("PATCH without taggedPersonIds notifies nobody", async () => {
@@ -188,6 +201,7 @@ describe("tag notifications (be#1075)", () => {
       const { id } = created.json().data;
       await waitForEmailTo("Colin");
       emailTagged.mockClear();
+      tagged.mockClear();
 
       const res = await fastify.inject({
         method: "PATCH",
@@ -199,6 +213,7 @@ describe("tag notifications (be#1075)", () => {
 
       await settle();
       expect(emailTagged).not.toHaveBeenCalled();
+      expect(tagged).not.toHaveBeenCalled();
     });
 
     it("a failing email never affects the response", async () => {
@@ -222,6 +237,11 @@ describe("tag notifications (be#1075)", () => {
         authorName: `Ada Tag${suffix}`,
         where: { kind: "post" },
       });
+      expect(tagged).toHaveBeenCalledTimes(1);
+      expect(tagged.mock.calls[0][0]).toMatchObject({
+        kind: "post",
+        authorName: `Ada Tag${suffix}`,
+      });
     });
 
     it("PATCH by the author notifies only the tags the edit adds", async () => {
@@ -229,6 +249,7 @@ describe("tag notifications (be#1075)", () => {
       const { id } = created.json().data;
       await waitForEmailTo("Colin");
       emailTagged.mockClear();
+      tagged.mockClear();
 
       const res = await fastify.inject({
         method: "PATCH",
@@ -240,6 +261,9 @@ describe("tag notifications (be#1075)", () => {
 
       await waitForEmailTo("Cleo");
       expect(recipients()).toEqual([emails.Cleo]);
+      expect(tagged.mock.calls[0][0].taggedNames).toEqual([
+        `Cleo Tag${suffix}`,
+      ]);
     });
 
     it("PATCH by a coordinator names the coordinator as the tagger", async () => {
@@ -258,6 +282,7 @@ describe("tag notifications (be#1075)", () => {
       // The coordinator tagged themself too — never emailed.
       expect(recipients()).toEqual([emails.Colin]);
       expect(emailTagged.mock.calls[0][0].authorName).toBe(`Cora Tag${suffix}`);
+      expect(tagged.mock.calls[0][0].authorName).toBe(`Cora Tag${suffix}`);
     });
   });
 });

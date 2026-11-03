@@ -12,10 +12,12 @@ describe("slackWebhookUrls", () => {
       slackWebhookUrls({
         SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
         SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
+        SLACK_ACTIVITY_WEBHOOK_URL: "https://hooks.example/activity",
       }),
     ).toEqual({
       ops: "https://hooks.example/ops",
       arrivals: "https://hooks.example/arrivals",
+      activity: "https://hooks.example/activity",
     });
   });
 

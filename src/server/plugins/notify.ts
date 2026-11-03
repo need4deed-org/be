@@ -32,11 +32,13 @@ import {
   sendEmailVerification,
   sendOpsAlert,
   sendPasswordReset,
+  sendTagged,
   SlackChannel,
   SlackEmailTransport,
   SlackTransport,
   SlackWebhookTransport,
   SmtpEmailTransport,
+  TaggedInput,
   ValidatingEmailTransport,
 } from "../../services/notify";
 import { Env, firstEnvValue } from "../utils";
@@ -51,6 +53,7 @@ interface NotifyService {
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   arrival(text: string): Promise<void>;
+  tagged(input: TaggedInput): Promise<void>;
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
   emailIntroduction: MatchEmail;
@@ -131,6 +134,7 @@ function buildNotifyEmailTransport(): {
 const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
   ops: "SLACK_OPS_WEBHOOK_URL",
   arrivals: "SLACK_ARRIVALS_WEBHOOK_URL",
+  activity: "SLACK_ACTIVITY_WEBHOOK_URL",
 };
 
 export function slackWebhookUrls(
@@ -161,11 +165,11 @@ export function cronSlackTransport(
   slack: SlackTransport | undefined,
   env: Env = process.env,
 ): SlackTransport | undefined {
-  if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).ops)) {
+  if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).activity)) {
     return slack;
   }
   logger.warn(
-    "notify: SLACK_OPS_WEBHOOK_URL unset — cron emails are not posted to #n4d-be-ops; accompany-not-found is still emailed, with no Slack record",
+    "notify: SLACK_ACTIVITY_WEBHOOK_URL unset — cron emails are not posted to #n4d-be-activity; accompany-not-found is still emailed, with no Slack record",
   );
   return undefined;
 }
@@ -192,7 +196,7 @@ export function emailThenRecord(
       await email.send(msg);
       await record.send(msg).catch((err) => {
         logger.error(
-          `notify: email sent but not posted to #n4d-be-ops: ${err}`,
+          `notify: email sent but not posted to #n4d-be-activity: ${err}`,
         );
       });
     },
@@ -223,6 +227,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     arrival: (text: string) => sendArrival({ slack }, text),
+    tagged: (input: TaggedInput) => sendTagged({ slack }, input),
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),
     emailIntroduction: matchEmail(sendEmailIntroduction),

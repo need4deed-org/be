@@ -90,6 +90,12 @@ function notifyPostTags(
   if (added.length === 0) {
     return;
   }
+  fastify.notify.tagged({
+    kind: "post",
+    authorName: tagger?.name ?? "Someone",
+    taggedNames: added.map((p) => p.name).filter(Boolean),
+    text: post.text,
+  });
   void notifyTaggedByEmail(fastify, {
     personIds: added.map((p) => p.id),
     author: { userId: taggerUserId, personId: tagger?.id, name: tagger?.name },

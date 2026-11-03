@@ -148,20 +148,13 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     });
   });
 
-  const nearbyMemberEmail = () =>
-    `tag-nearbymember-${suffix}@test.need4deed.org`;
-  const spyEmailTagged = () =>
-    vi.spyOn(fastify.notify, "emailTagged").mockResolvedValue(undefined);
-  const notifiedEmails = (spy: ReturnType<typeof spyEmailTagged>) =>
-    spy.mock.calls.map(([input]) => input.recipient.email);
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
-  const waitForNearbyMemberEmail = (spy: ReturnType<typeof spyEmailTagged>) =>
-    vi.waitFor(() =>
-      expect(notifiedEmails(spy)).toContain(nearbyMemberEmail()),
+  const notifiedNames = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.flatMap(
+      ([event]) => (event as { taggedNames: string[] }).taggedNames,
     );
 
   it("tags an NGO, notifies its active members, and keeps them out of taggedPersons", async () => {
-    const spy = spyEmailTagged();
+    const spy = vi.spyOn(fastify.notify, "tagged");
     const res = await request("POST", "/post", "member", {
       text: `Hello <@agent:${agents.nearby.id}>`,
       taggedAgentIds: [agents.nearby.id],
@@ -173,7 +166,7 @@ describe("tagging NGOs in posts (fe#1053)", () => {
       { id: agents.nearby.id, title: agents.nearby.title },
     ]);
     expect(post.taggedPersons).toEqual([]);
-    await waitForNearbyMemberEmail(spy);
+    expect(notifiedNames(spy).join(" ")).toContain(`nearbyMember${suffix}`);
     spy.mockRestore();
   });
 
@@ -204,7 +197,6 @@ describe("tagging NGOs in posts (fe#1053)", () => {
 
   it("on PATCH notifies only newly tagged NGOs and keeps direct tags when an NGO is removed", async () => {
     const text = `Event <@agent:${agents.nearby.id}>`;
-    const spy = spyEmailTagged();
     const created = await request("POST", "/post", "member", {
       text,
       taggedAgentIds: [agents.nearby.id],
@@ -213,15 +205,13 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     expect(created.statusCode).toBe(201);
     const postId = created.json().data.id;
     postIds.push(postId);
-    await waitForNearbyMemberEmail(spy);
-    spy.mockClear();
 
+    const spy = vi.spyOn(fastify.notify, "tagged");
     const typo = await request("PATCH", `/post/${postId}`, "member", {
       text: `${text} (fixed)`,
       taggedAgentIds: [agents.nearby.id],
     });
     expect(typo.statusCode).toBe(200);
-    await settle();
     expect(spy).not.toHaveBeenCalled();
 
     const removed = await request("PATCH", `/post/${postId}`, "member", {
@@ -314,24 +304,21 @@ describe("tagging NGOs in posts (fe#1053)", () => {
         status: AgentMembershipStatus.ACTIVE,
       }),
     );
-    const spy = spyEmailTagged();
     const created = await request("POST", "/post", "member", {
       text: `Both <@agent:${agents.nearby.id}>`,
       taggedAgentIds: [agents.nearby.id],
     });
     const postId = created.json().data.id;
     postIds.push(postId);
-    await waitForNearbyMemberEmail(spy);
-    spy.mockClear();
 
+    const spy = vi.spyOn(fastify.notify, "tagged");
     const res = await request("PATCH", `/post/${postId}`, "member", {
       text: `Both <@agent:${agents.nearby.id}> <@agent:${agents.far.id}>`,
       taggedAgentIds: [agents.nearby.id, agents.far.id],
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().data.taggedAgents).toHaveLength(2);
-    await settle();
-    expect(notifiedEmails(spy)).not.toContain(nearbyMemberEmail());
+    expect(notifiedNames(spy).join(" ")).not.toContain(`nearbyMember${suffix}`);
     spy.mockRestore();
     await fastify.db.agentPersonRepository.delete({
       agentId: agents.far.id,

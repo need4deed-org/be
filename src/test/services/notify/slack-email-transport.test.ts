@@ -26,7 +26,7 @@ const bodyOf = (blocks: Block[]) =>
   blocks.filter((b) => b.type === "section" && b.text).map((b) => b.text!.text);
 
 describe("SlackEmailTransport", () => {
-  it("posts header, To/Cc/Subject and the text body to the ops channel", async () => {
+  it("posts header, To/Cc/Subject and the text body to the activity channel", async () => {
     const { message, blocks } = await post({
       to: ["vera@example.com", "max@example.com"],
       cc: "team@example.com",
@@ -35,7 +35,7 @@ describe("SlackEmailTransport", () => {
       html: "<p>ignored</p>",
     });
 
-    expect(message.channel).toBe("ops");
+    expect(message.channel).toBe("activity");
     expect(blocks[0]).toEqual({
       type: "header",
       text: { type: "plain_text", text: "Cron email, not sent" },
