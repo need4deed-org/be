@@ -182,13 +182,9 @@ export function cronSlackTransport(
   slack: SlackTransport | undefined,
   env: Env = process.env,
 ): SlackTransport | undefined {
-  if (slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).activity)) {
-    return slack;
-  }
-  logger.warn(
-    `notify: SLACK_ACTIVITY_WEBHOOK_URL unset — cron emails are not posted to ${ACTIVITY_CHANNEL_NAME}; accompany-not-found is still emailed, with no Slack record`,
-  );
-  return undefined;
+  return slack && (isDryRun("SLACK", env) || slackWebhookUrls(env).activity)
+    ? slack
+    : undefined;
 }
 
 export function buildCronEmailTransport(

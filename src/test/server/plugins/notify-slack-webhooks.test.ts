@@ -29,6 +29,15 @@ describe("slackWebhookUrls", () => {
       }),
     ).toEqual({ arrivals: "https://hooks.example/arrivals" });
   });
+
+  it("ignores the retired webhook names", () => {
+    expect(
+      slackWebhookUrls({
+        SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
+        SLACK_COMMENTS_WEBHOOK_URL: "https://hooks.example/comments",
+      }),
+    ).toEqual({});
+  });
 });
 
 describe("slackWebhookWarnings", () => {
@@ -55,15 +64,6 @@ describe("slackWebhookWarnings", () => {
       "notify: SLACK_ARRIVALS_WEBHOOK_URL unset — arrivals Slack notices are dropped",
       "notify: SLACK_ACTIVITY_WEBHOOK_URL unset — activity Slack notices are dropped",
     ]);
-  });
-
-  it("ignores the retired webhook names", () => {
-    expect(
-      slackWebhookUrls({
-        SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
-        SLACK_COMMENTS_WEBHOOK_URL: "https://hooks.example/comments",
-      }),
-    ).toEqual({});
   });
 
   it("is quiet in a Slack dry run", () => {

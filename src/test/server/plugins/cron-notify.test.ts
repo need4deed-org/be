@@ -232,7 +232,7 @@ describe("cronSlackTransport", () => {
   it.each([
     ["no Slack at all", undefined],
     ["Slack without the activity webhook", { send: vi.fn() }],
-  ])("with %s, warns once and returns nothing", (_, slack) => {
+  ])("with %s, returns nothing", (_, slack) => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
     try {
       expect(
@@ -241,7 +241,7 @@ describe("cronSlackTransport", () => {
           SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
         }),
       ).toBeUndefined();
-      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
     }
