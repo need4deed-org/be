@@ -20,7 +20,14 @@ export async function scanRegularUpdate(
       ]),
       updatedAt: And(MoreThanOrEqual(from), LessThan(to)),
     },
-    relations: ["contactPerson", "contactPerson.users"],
+    relations: [
+      "contactPerson",
+      "contactPerson.users",
+      "submittedByPerson",
+      "agent",
+      "agent.agentPerson",
+      "agent.agentPerson.person",
+    ],
   });
 
   for (const opp of opps) {

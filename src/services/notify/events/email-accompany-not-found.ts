@@ -4,6 +4,7 @@ import {
   emailFromNotify,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate } from "../../dto/utils";
 import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
 import {
@@ -23,14 +24,15 @@ export async function sendEmailAccompanyNotFound(
   email: EmailTransport,
   opportunity: Opportunity,
 ): Promise<void> {
-  const contactPersonEmail = opportunity.contactPerson?.email;
+  const contactPerson = getOpportunityRepresentativePerson(opportunity);
+  const contactPersonEmail = contactPerson?.email;
   if (!contactPersonEmail) {
     throw new Error(
       `sendEmailAccompanyNotFound: missing contact email for opportunity ${opportunity.id}`,
     );
   }
 
-  const contactpersonName = opportunity.contactPerson!.name;
+  const contactpersonName = contactPerson.name;
   const accompanying = opportunity.accompanying;
   const appointmentDate = formatOnetimerDate(opportunity.onetimer?.date);
   const appointmentDistrict =

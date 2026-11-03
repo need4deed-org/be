@@ -226,6 +226,20 @@ describe("2-month scans", () => {
     expect(await communicationsOf({ opportunityId: edges.atFrom.id })).toBe(0);
   });
 
+  it("loads who a regular update can fall back to", async () => {
+    const mock = fastify.cronNotify.emailRegularUpdate as ReturnType<
+      typeof vi.fn
+    >;
+    await scanRegularUpdate(fastify, NOW);
+    const [opp] = mock.mock.calls.find(
+      ([row]: [Opportunity]) => row.id === edges.atFrom.id,
+    ) as [Opportunity];
+    mock.mockClear();
+
+    expect(opp.agent?.agentPerson).toEqual(expect.any(Array));
+    expect(opp).toHaveProperty("submittedByPerson");
+  });
+
   // be#982: an opportunity comes up on one run only, so a post that fails —
   // here the real event, for a contact person without an email — alerts ops.
   it("alerts ops when a regular update can't be posted, and goes on", async () => {

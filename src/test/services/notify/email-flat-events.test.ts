@@ -281,6 +281,54 @@ describe.each(CASES)("$name", ({ resetCache, send: doSend }) => {
   });
 });
 
+describe.each([
+  ["sendEmailRegularUpdate", sendEmailRegularUpdate],
+  ["sendEmailAccompanyNotFound", sendEmailAccompanyNotFound],
+] as const)("%s without a contact email", (_, sendEmail) => {
+  const representative = person({
+    name: "Rita Rep",
+    email: "rep@example.com",
+  });
+  const withoutContact = (over: Record<string, unknown> = {}) =>
+    opportunity({
+      contactPerson: undefined,
+      agent: { representative: { person: representative } },
+      ...over,
+    }) as unknown as Parameters<typeof sendEmail>[1];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetRegularUpdateTemplateCache();
+    resetAccompanyNotFoundTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  it("writes to the NGO's representative", async () => {
+    await sendEmail(email, withoutContact());
+
+    expect(send.mock.calls[0][0].to).toBe("rep@example.com");
+    expect(send.mock.calls[0][0].text).toContain("Rita Rep");
+  });
+
+  it("prefers the submitter over the representative", async () => {
+    await sendEmail(
+      email,
+      withoutContact({
+        submittedByPerson: person({ email: "submitter@example.com" }),
+      }),
+    );
+
+    expect(send.mock.calls[0][0].to).toBe("submitter@example.com");
+  });
+
+  it("throws when nobody has an email", async () => {
+    await expect(
+      sendEmail(email, withoutContact({ agent: undefined })),
+    ).rejects.toThrow("missing contact email");
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
 describe("schedule fallback for malformed Timeslot data (be#932)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
