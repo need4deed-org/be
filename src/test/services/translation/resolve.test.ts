@@ -94,12 +94,16 @@ describe("resolve", () => {
     expect(loaded.title).toBe(opportunity.title);
   });
 
-  it("falls back to the original while pending or failed", async () => {
+  it("falls back to the original while pending or failed, even with a rejected text", async () => {
     const opportunity = await opportunityWith(Lang.DE, { title: "Childcare" });
     await manager().update(
       FieldTranslation,
       { opportunityId: opportunity.id, fieldName: "info" },
-      { status: TranslationStatus.FAILED, lastErrorCode: "length_ratio" },
+      {
+        status: TranslationStatus.FAILED,
+        translation: "We look for volunteers at 9 pm",
+        lastErrorCode: "token_missing",
+      },
     );
     const loaded = await fresh(opportunity.id);
 
