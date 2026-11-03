@@ -140,6 +140,7 @@ export async function runTranslationBatch(
       const { affected } = await guarded({
         translation: result.text ?? null,
         status: TranslationStatus.FAILED,
+        sourceHash: sourceHashOf(source),
         model: result.model ?? null,
         lastErrorCode: result.code,
       });
