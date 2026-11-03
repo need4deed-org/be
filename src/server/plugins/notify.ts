@@ -133,28 +133,22 @@ function buildNotifyEmailTransport(): {
 
 const ACTIVITY_CHANNEL_NAME = "#n4d-be-activity";
 
-// The second name is what each webhook was called before the be-secret reseal,
-// so a be deployed ahead of it keeps posting.
-const SLACK_WEBHOOK_ENV: Record<SlackChannel, [string, string?]> = {
-  ops: ["SLACK_OPS_WEBHOOK_URL"],
-  arrivals: ["SLACK_ARRIVALS_WEBHOOK_URL", "SLACK_OPS_WEBHOOK_URL"],
-  activity: ["SLACK_ACTIVITY_WEBHOOK_URL", "SLACK_CRON_WEBHOOK_URL"],
+const SLACK_WEBHOOK_ENV: Record<SlackChannel, string> = {
+  ops: "SLACK_OPS_WEBHOOK_URL",
+  arrivals: "SLACK_ARRIVALS_WEBHOOK_URL",
+  activity: "SLACK_ACTIVITY_WEBHOOK_URL",
 };
 
 const slackChannels = Object.keys(SLACK_WEBHOOK_ENV) as SlackChannel[];
-
-function webhookEnvName(channel: SlackChannel, env: Env): string | undefined {
-  return SLACK_WEBHOOK_ENV[channel].find((name) => name && env[name]);
-}
 
 export function slackWebhookUrls(
   env: Env = process.env,
 ): Partial<Record<SlackChannel, string>> {
   const urls: Partial<Record<SlackChannel, string>> = {};
   for (const channel of slackChannels) {
-    const name = webhookEnvName(channel, env);
-    if (name) {
-      urls[channel] = env[name];
+    const url = env[SLACK_WEBHOOK_ENV[channel]];
+    if (url) {
+      urls[channel] = url;
     }
   }
   return urls;
@@ -164,21 +158,12 @@ export function slackWebhookWarnings(env: Env = process.env): string[] {
   if (isDryRun("SLACK", env)) {
     return [];
   }
-  return slackChannels.flatMap((channel) => {
-    const [primary] = SLACK_WEBHOOK_ENV[channel];
-    const name = webhookEnvName(channel, env);
-    if (!name) {
-      return [
-        `notify: ${primary} unset — ${channel} Slack notices are dropped`,
-      ];
-    }
-    if (name !== primary) {
-      return [
-        `notify: ${primary} unset — ${channel} Slack notices use ${name}`,
-      ];
-    }
-    return [];
-  });
+  return slackChannels
+    .filter((channel) => !env[SLACK_WEBHOOK_ENV[channel]])
+    .map(
+      (channel) =>
+        `notify: ${SLACK_WEBHOOK_ENV[channel]} unset — ${channel} Slack notices are dropped`,
+    );
 }
 
 function buildSlackTransport(): SlackTransport | undefined {

@@ -31,21 +31,6 @@ describe("slackWebhookUrls", () => {
   });
 });
 
-describe("slackWebhookUrls before the be-secret reseal", () => {
-  it("falls back to the ops and cron webhooks", () => {
-    expect(
-      slackWebhookUrls({
-        SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
-        SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
-      }),
-    ).toEqual({
-      ops: "https://hooks.example/ops",
-      arrivals: "https://hooks.example/ops",
-      activity: "https://hooks.example/cron",
-    });
-  });
-});
-
 describe("slackWebhookWarnings", () => {
   const live = { NOTIFY_SLACK_DRY_RUN: "false" };
 
@@ -60,16 +45,25 @@ describe("slackWebhookWarnings", () => {
     ).toEqual([]);
   });
 
-  it("names each channel that falls back or has no webhook", () => {
+  it("names each channel without a webhook", () => {
     expect(
       slackWebhookWarnings({
         ...live,
         SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
       }),
     ).toEqual([
-      "notify: SLACK_ARRIVALS_WEBHOOK_URL unset — arrivals Slack notices use SLACK_OPS_WEBHOOK_URL",
+      "notify: SLACK_ARRIVALS_WEBHOOK_URL unset — arrivals Slack notices are dropped",
       "notify: SLACK_ACTIVITY_WEBHOOK_URL unset — activity Slack notices are dropped",
     ]);
+  });
+
+  it("ignores the retired webhook names", () => {
+    expect(
+      slackWebhookUrls({
+        SLACK_CRON_WEBHOOK_URL: "https://hooks.example/cron",
+        SLACK_COMMENTS_WEBHOOK_URL: "https://hooks.example/comments",
+      }),
+    ).toEqual({});
   });
 
   it("is quiet in a Slack dry run", () => {
