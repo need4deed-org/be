@@ -9,10 +9,12 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { languageHint } from "../../../services/translation/language-hint";
 import { impliesAgentSearching, setAgentSearching } from "./for-routes";
 import {
   languageIdOf,
   queueOpportunityTranslation,
+  translatedOpportunityFields,
 } from "./translate-opportunities";
 
 export async function writeOpportunityLegacy(
@@ -73,9 +75,11 @@ export async function writeOpportunityLegacy(
       await onetimerRepository.save(opportunity.onetimer);
     }
 
+    const { title, info } = translatedOpportunityFields(opportunity);
     opportunity.originalLanguageId = await languageIdOf(
       transactionalEntityManager,
-      originalLanguage,
+      languageHint([title, info].filter(Boolean).join("\n")) ??
+        originalLanguage,
     );
     await opportunityRepository.save(opportunity);
     await queueOpportunityTranslation(transactionalEntityManager, opportunity);
