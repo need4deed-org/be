@@ -19,7 +19,13 @@ export type FieldTranslationResult =
       model: string;
       usage?: TranslationUsage;
     }
-  | { status: "failed"; code: TranslationErrorCode }
+  | {
+      status: "failed";
+      code: TranslationErrorCode;
+      text?: string;
+      model?: string;
+      usage?: TranslationUsage;
+    }
   | {
       status: "retry";
       reason: "rate_limited" | "misconfigured" | "unavailable";
@@ -54,16 +60,21 @@ export class TranslationService {
         : { status: "retry", reason: result.kind };
     }
 
-    const validation = validateTranslation(text, result.text, targetLang);
-    if (validation.status === "invalid") {
-      return { status: "failed", code: validation.code };
-    }
-    return {
-      status: "done",
+    const output = {
       text: result.text.trim(),
       model: result.model,
       usage: result.usage,
     };
+    const validation = validateTranslation(text, result.text, targetLang);
+    if (validation.status === "invalid") {
+      return {
+        status: "failed",
+        code: validation.code,
+        ...output,
+        text: output.text || undefined,
+      };
+    }
+    return { status: "done", ...output };
   }
 
   private async currentGlossary(): Promise<readonly GlossaryEntry[]> {

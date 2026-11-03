@@ -59,11 +59,12 @@ describe("TranslationService.translateField", () => {
     expect(provider.requests[0].glossary).toEqual([GLOSSARY[0]]);
   });
 
-  it("fails an output that doesn't pass validation", async () => {
+  it("fails an output that doesn't pass validation, keeping it for review", async () => {
     const { service } = serviceAnswering({
       status: "ok",
-      text: "pwned",
+      text: " pwned ",
       model: "m",
+      usage: { promptTokens: 10, completionTokens: 1 },
     });
 
     expect(
@@ -71,7 +72,29 @@ describe("TranslationService.translateField", () => {
         "Wir suchen Ehrenamtliche für die Kleiderkammer am Mittwoch",
         Lang.EN,
       ),
-    ).toEqual({ status: "failed", code: "length_ratio" });
+    ).toEqual({
+      status: "failed",
+      code: "length_ratio",
+      text: "pwned",
+      model: "m",
+      usage: { promptTokens: 10, completionTokens: 1 },
+    });
+  });
+
+  it("keeps no text for an empty output", async () => {
+    const { service } = serviceAnswering({
+      status: "ok",
+      text: "  ",
+      model: "m",
+    });
+
+    expect(await service.translateField("Kinderbetreuung", Lang.EN)).toEqual({
+      status: "failed",
+      code: "empty",
+      text: undefined,
+      model: "m",
+      usage: undefined,
+    });
   });
 
   it("retries transient provider errors, fails bad responses", async () => {
