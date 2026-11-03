@@ -168,7 +168,6 @@ describe("read endpoints are scoped to the caller", () => {
 
     it("404s a single comment for a non-staff caller it tags", async () => {
       vi.spyOn(fastify.notify, "emailTagged").mockResolvedValue(undefined);
-      vi.spyOn(fastify.notify, "tagged").mockResolvedValue(undefined);
       const created = await fastify.inject({
         method: "POST",
         url: "/comment",

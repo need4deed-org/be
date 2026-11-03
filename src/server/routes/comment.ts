@@ -22,19 +22,13 @@ function notifyCommentTags(
   if (personIds.length === 0) {
     return;
   }
-  const authorName = tagger.person?.name;
-  fastify.notify.tagged({
-    kind: "comment",
-    authorName: authorName ?? "Someone",
-    taggedNames: (comment.commentPerson ?? [])
-      .filter((cp) => personIds.includes(cp.personId))
-      .map((cp) => cp.person?.name)
-      .filter((n): n is string => Boolean(n)),
-    text: comment.text,
-  });
   void notifyTaggedByEmail(fastify, {
     personIds,
-    author: { userId: tagger.id, personId: tagger.personId, name: authorName },
+    author: {
+      userId: tagger.id,
+      personId: tagger.personId,
+      name: tagger.person?.name,
+    },
     allowedRoles: COMMENT_READER_ROLES,
     text: comment.text,
     where: {

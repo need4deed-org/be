@@ -29,7 +29,7 @@ vi.mock("../../../data/utils", async (importOriginal) => {
 
 vi.setConfig({ testTimeout: 30_000 });
 
-const CRON_WEBHOOK = "https://hooks.example/cron";
+const OPS_WEBHOOK = "https://hooks.example/ops";
 
 const person = (name: string, email: string) => ({
   name,
@@ -65,7 +65,7 @@ describe("fastify.cronNotify", () => {
   const brevoSend = vi.spyOn(BrevoEmailTransport.prototype, "send");
 
   beforeAll(async () => {
-    process.env.SLACK_CRON_WEBHOOK_URL = CRON_WEBHOOK;
+    process.env.SLACK_OPS_WEBHOOK_URL = OPS_WEBHOOK;
     process.env.NOTIFY_SLACK_DRY_RUN = "false";
     process.env.NOTIFY_EMAIL_DRY_RUN = "true";
     smtpSend.mockResolvedValue(undefined);
@@ -75,7 +75,7 @@ describe("fastify.cronNotify", () => {
   });
 
   afterAll(async () => {
-    delete process.env.SLACK_CRON_WEBHOOK_URL;
+    delete process.env.SLACK_OPS_WEBHOOK_URL;
     delete process.env.NOTIFY_SLACK_DRY_RUN;
     delete process.env.NOTIFY_EMAIL_DRY_RUN;
     smtpSend.mockReset();
@@ -105,7 +105,7 @@ describe("fastify.cronNotify", () => {
       string,
       { body: string },
     ];
-    expect(url).toBe(CRON_WEBHOOK);
+    expect(url).toBe(OPS_WEBHOOK);
     expect(JSON.parse(init.body).text).toBe("Cron email, not sent");
     expect(smtpSend).not.toHaveBeenCalled();
     expect(brevoSend).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("fastify.cronNotify", () => {
       string,
       { body: string },
     ];
-    expect(url).toBe(CRON_WEBHOOK);
+    expect(url).toBe(OPS_WEBHOOK);
     return JSON.parse(init.body).text;
   };
 
@@ -212,12 +212,12 @@ describe("emailedCronHeader", () => {
 });
 
 describe("cronSlackTransport", () => {
-  it("uses Slack when the cron webhook is set", () => {
+  it("uses Slack when the ops webhook is set", () => {
     const slack = { send: vi.fn() };
     expect(
       cronSlackTransport(slack, {
         NOTIFY_SLACK_DRY_RUN: "false",
-        SLACK_CRON_WEBHOOK_URL: CRON_WEBHOOK,
+        SLACK_OPS_WEBHOOK_URL: OPS_WEBHOOK,
       }),
     ).toBe(slack);
   });
@@ -231,14 +231,14 @@ describe("cronSlackTransport", () => {
 
   it.each([
     ["no Slack at all", undefined],
-    ["Slack without the cron webhook", { send: vi.fn() }],
+    ["Slack without the ops webhook", { send: vi.fn() }],
   ])("with %s, warns once and returns nothing", (_, slack) => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
     try {
       expect(
         cronSlackTransport(slack, {
           NOTIFY_SLACK_DRY_RUN: "false",
-          SLACK_OPS_WEBHOOK_URL: "https://hooks.example/ops",
+          SLACK_ARRIVALS_WEBHOOK_URL: "https://hooks.example/arrivals",
         }),
       ).toBeUndefined();
       expect(warn).toHaveBeenCalledTimes(1);
@@ -257,7 +257,7 @@ describe("buildCronEmailTransport", () => {
     await transport.send({ to: "a@example.com", subject: "s", text: "t" });
 
     expect(slack.send).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "cron", text: CRON_EMAIL_SENT }),
+      expect.objectContaining({ channel: "ops", text: CRON_EMAIL_SENT }),
     );
   });
 
@@ -274,7 +274,7 @@ describe("buildCronEmailTransport", () => {
     );
   });
 
-  it("drops the emails without a cron Slack transport", async () => {
+  it("drops the emails without an ops Slack transport", async () => {
     await expect(
       buildCronEmailTransport(undefined).send({
         to: "a@example.com",
