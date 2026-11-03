@@ -2981,10 +2981,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-need4deed-sdk@0.0.191:
-  version "0.0.191"
-  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.191.tgz#c829fad1b4d997510fd67d0c4abec72975a551e9"
-  integrity sha512-fanoXfGmJw5rlsRdTXLt/ExdLs+SfjQfTiWyk95PR46aUIZxyZmNalllikzFhw/sCJHnhOaBl1qLnRgRdYbYPA==
+need4deed-sdk@0.0.193:
+  version "0.0.193"
+  resolved "https://registry.yarnpkg.com/need4deed-sdk/-/need4deed-sdk-0.0.193.tgz#544303b7153341d779537740d0b4e2e11cdc927c"
+  integrity sha512-G5gEyYTpOz2yrpD9ZDnGJ/S076QFzvOD93kObEJ7IlpJUZ2IIzlSctdu/b99OrUFcBhZFjQ+fb85DPo9Df2VGA==
   dependencies:
     "@types/geojson" "^7946.0.16"
 
