@@ -92,7 +92,9 @@ async function authRoutes(
 
       if (!email || !password) {
         logger.warn("Login failed: empty-field");
-        return reply.status(400).send({ message: "Bad credentials." });
+        return reply
+          .status(400)
+          .send({ message: "Email and password are required." });
       }
 
       try {
