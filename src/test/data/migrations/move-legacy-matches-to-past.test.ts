@@ -5,11 +5,12 @@ import {
   VolunteerStateMatchType,
 } from "need4deed-sdk";
 import { QueryRunner } from "typeorm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { MoveLegacyMatchesToPast1793372259736 } from "../../../data/migrations/1793372259736-move-legacy-matches-to-past";
 import {
   applyLegacyMatchChanges,
   LegacyMatchChange,
@@ -157,5 +158,17 @@ describe("MoveLegacyMatchesToPast migration", () => {
       id: volunteer.id,
     });
     expect(updated.statusMatch).toBe(VolunteerStateMatchType.MATCHED);
+  });
+
+  it("does not touch the database outside prod", async () => {
+    const query = vi.fn();
+    const runner = {
+      query,
+      connection: { logger: { log: vi.fn() } },
+    } as unknown as QueryRunner;
+
+    await new MoveLegacyMatchesToPast1793372259736().up(runner);
+
+    expect(query).not.toHaveBeenCalled();
   });
 });

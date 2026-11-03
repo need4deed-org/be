@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
+import { isProd } from "../../config/constants";
 import {
   applyLegacyMatchChanges,
   LegacyMatchChange,
@@ -137,6 +138,13 @@ export class MoveLegacyMatchesToPast1793372259736
   name = "MoveLegacyMatchesToPast1793372259736";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    if (!isProd) {
+      queryRunner.connection.logger.log(
+        "info",
+        "[legacy-matches] skipped: the pairs are prod ids",
+      );
+      return;
+    }
     const { changed, skipped } = await applyLegacyMatchChanges(
       queryRunner,
       LEGACY_MATCH_CHANGES,
