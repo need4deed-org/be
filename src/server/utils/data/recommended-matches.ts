@@ -3,6 +3,7 @@ import {
   LangPurpose,
   OpportunityType,
   ProfileVolunteeringType,
+  TimeSlot,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import { berlinTimeZone } from "../../../config";
@@ -15,7 +16,8 @@ import {
 import { getAvailability } from "../../../services/dto/utils";
 
 const GERMAN_SUPPORT_CATEGORY = "de-lng-support";
-const GERMAN_MENTION = /\b(german(?!y)|deutsch(?!land))/i;
+const GERMAN_MENTION =
+  /\b(german|deutsch|deutsch(kurs|unterricht|nachhilfe|lernen)\w*)\b/i;
 const GERMAN_ISO_CODE = "de";
 const FLUENT_GERMAN = new Set<string>([
   LangProficiency.FLUENT,
@@ -24,27 +26,30 @@ const FLUENT_GERMAN = new Set<string>([
 
 const WEIGHT = { district: 3, language: 2, activity: 1, availability: 1 };
 
-const berlinWeekday = new Intl.DateTimeFormat("en-US", {
+const berlinWeekdayHour = new Intl.DateTimeFormat("en-US", {
   timeZone: berlinTimeZone,
   weekday: "long",
+  hour: "numeric",
+  hourCycle: "h23",
 });
+
+function appointmentSlot(date: Date) {
+  const parts = berlinWeekdayHour.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  const hour = Number(part("hour"));
+  const daytime = Object.values(TimeSlot).find((slot) => {
+    const [from, to] = slot.split("-").map(Number);
+    return from <= hour && hour < to;
+  });
+  return { day: part("weekday"), daytime };
+}
 
 export const recommendationVolunteerRelations = [
   "deal.dealActivity",
   "deal.dealLanguage.language",
   "deal.dealTimeslot.timeslot",
   "deal.dealDistrict",
-];
-
-export const recommendedVolunteerRelations = [
-  "person",
-  "person.address.postcode",
-  "deal",
-  "deal.dealActivity.activity",
-  "deal.dealSkill.skill",
-  "deal.dealLanguage.language",
-  "deal.dealTimeslot.timeslot",
-  "deal.dealDistrict.district",
 ];
 
 export const recommendationOpportunityRelations = [
@@ -94,16 +99,14 @@ export function volunteerStatusTypesFor(
   );
 }
 
-export function volunteerFitsOpportunity(
-  volunteer: Volunteer,
-  opportunity: Opportunity,
-): boolean {
-  const fitsType = volunteerTypesFromStatusType(volunteer.statusType).includes(
-    opportunity.type,
+function appointmentOverlap(appointment: Date, availability: Set<string>) {
+  const { day, daytime } = appointmentSlot(appointment);
+  const freeThatDay = [...availability].some((key) =>
+    key.startsWith(`${day}|`),
   );
   return (
-    fitsType &&
-    (!isGermanOpportunity(opportunity) || speaksFluentGerman(volunteer))
+    Number(freeThatDay) +
+    Number(!!daytime && availability.has(`${day}|${daytime}`))
   );
 }
 
@@ -154,11 +157,8 @@ export function matchScore(
 
   const volunteerAvailability = availabilityKeys(volunteer);
   const appointment = opportunity.onetimer?.date;
-  const appointmentDay =
-    appointment && `${berlinWeekday.format(new Date(appointment))}|`;
-  const availabilityOverlap = appointmentDay
-    ? [...volunteerAvailability].filter((key) => key.startsWith(appointmentDay))
-        .length
+  const availabilityOverlap = appointment
+    ? appointmentOverlap(new Date(appointment), volunteerAvailability)
     : overlap(availabilityKeys(opportunity), volunteerAvailability);
 
   return (

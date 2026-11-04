@@ -11,7 +11,7 @@ import { In } from "typeorm";
 import { NotFoundError } from "../../../config";
 import {
   idParamSchema,
-  recommendedMatchesQuerySchema,
+  recommendedOpportunitiesQuerySchema,
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
@@ -20,11 +20,12 @@ import {
   loadOpportunityList,
 } from "../../utils/data/opportunity-list";
 import {
+  isGermanOpportunity,
   matchScore,
   recommendationOpportunityRelations,
   recommendationVolunteerRelations,
+  speaksFluentGerman,
   topRanked,
-  volunteerFitsOpportunity,
 } from "../../utils/data/recommended-matches";
 import { requestLanguage } from "../../utils/data/translate-opportunities";
 
@@ -42,7 +43,7 @@ export default function volunteerRecommendedOpportunityRoutes(
       onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
-        querystring: recommendedMatchesQuerySchema,
+        querystring: recommendedOpportunitiesQuerySchema,
         response: responseSchema("ApiOpportunityGetList#", true, false),
       },
     },
@@ -52,6 +53,7 @@ export default function volunteerRecommendedOpportunityRoutes(
       const volunteer = await fastify.db.volunteerRepository.findOne({
         where: { id },
         relations: recommendationVolunteerRelations,
+        relationLoadStrategy: "query",
       });
       if (!volunteer) {
         throw new NotFoundError(`Volunteer (id:${id}) not found.`);
@@ -72,6 +74,7 @@ export default function volunteerRecommendedOpportunityRoutes(
         linked.map(({ opportunityId }) => opportunityId),
       );
 
+      const fluentGerman = speaksFluentGerman(volunteer);
       const candidates = types.length
         ? (
             await fastify.db.opportunityRepository.find({
@@ -85,7 +88,7 @@ export default function volunteerRecommendedOpportunityRoutes(
           ).filter(
             (opportunity) =>
               !linkedOpportunityIds.has(opportunity.id) &&
-              volunteerFitsOpportunity(volunteer, opportunity),
+              (fluentGerman || !isGermanOpportunity(opportunity)),
           )
         : [];
 

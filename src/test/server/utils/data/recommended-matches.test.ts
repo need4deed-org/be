@@ -6,12 +6,12 @@ import {
   volunteerStatusTypesFor,
 } from "../../../../server/utils/data/recommended-matches";
 
-const slot = (rrule: string) => ({
+const slot = (rrule: string, from = 8, to = 11) => ({
   timeslot: {
     id: 1,
     rrule,
-    start: new Date(2026, 0, 5, 8),
-    end: new Date(2026, 0, 5, 11),
+    start: new Date(2026, 0, 5, from),
+    end: new Date(2026, 0, 5, to),
   },
 });
 
@@ -19,6 +19,7 @@ describe("isGermanOpportunity", () => {
   it.each([
     ["title", { title: "Deutschkurs am Abend" }],
     ["description", { title: "Treffen", info: "We practise German together" }],
+    ["compound", { title: "Treffen", info: "Deutschunterricht für Kinder" }],
   ])("detects German mentioned in the %s", (_, fields) => {
     const opportunity = {
       type: OpportunityType.REGULAR,
@@ -39,13 +40,14 @@ describe("isGermanOpportunity", () => {
     expect(isGermanOpportunity(opportunity as any)).toBe(false);
   });
 
-  it.each(["Neu in Deutschland", "Refugees newly arrived in Germany"])(
-    "ignores the country in %s",
-    (title) => {
-      const opportunity = { type: OpportunityType.REGULAR, title, deal: null };
-      expect(isGermanOpportunity(opportunity as any)).toBe(false);
-    },
-  );
+  it.each([
+    "Neu in Deutschland",
+    "Refugees newly arrived in Germany",
+    "Begleitung zum deutschen Jobcenter",
+  ])("ignores the country in %s", (title) => {
+    const opportunity = { type: OpportunityType.REGULAR, title, deal: null };
+    expect(isGermanOpportunity(opportunity as any)).toBe(false);
+  });
 
   it("ignores a word that only contains the letters", () => {
     const opportunity = {
@@ -88,7 +90,11 @@ describe("matchScore", () => {
     const tuesdayVolunteer = {
       deal: { dealTimeslot: [slot("FREQ=WEEKLY;BYDAY=TU")] },
     };
+    const mondayNoonVolunteer = {
+      deal: { dealTimeslot: [slot("FREQ=WEEKLY;BYDAY=MO", 11, 14)] },
+    };
     expect(matchScore(opportunity as any, mondayVolunteer as any)).toBe(1);
+    expect(matchScore(opportunity as any, mondayNoonVolunteer as any)).toBe(2);
     expect(matchScore(opportunity as any, tuesdayVolunteer as any)).toBe(0);
   });
 });

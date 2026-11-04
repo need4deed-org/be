@@ -8,11 +8,10 @@ import {
 } from "need4deed-sdk";
 import { In, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
-import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { volunteerListSerializer } from "../../../services/dto/dto-volunteer";
 import {
   idParamSchema,
-  recommendedMatchesQuerySchema,
+  recommendedVolunteersQuerySchema,
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
@@ -22,15 +21,17 @@ import {
   assertRoleIn,
   getVolunteerWhere,
 } from "../../utils";
+import { orderByIds } from "../../utils/data/order-by-ids";
 import {
+  isGermanOpportunity,
   matchScore,
   recommendationOpportunityRelations,
   recommendationVolunteerRelations,
-  recommendedVolunteerRelations,
+  speaksFluentGerman,
   topRanked,
-  volunteerFitsOpportunity,
   volunteerStatusTypesFor,
 } from "../../utils/data/recommended-matches";
+import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import { resolveVolunteerVisibility } from "../../utils/pii/volunteer-visibility";
 
@@ -47,7 +48,7 @@ export default function opportunityRecommendedVolunteerRoutes(
     {
       schema: {
         params: idParamSchema,
-        querystring: recommendedMatchesQuerySchema,
+        querystring: recommendedVolunteersQuerySchema,
         response: responseSchema("volunteer-api#", true, false),
       },
     },
@@ -59,6 +60,7 @@ export default function opportunityRecommendedVolunteerRoutes(
       const opportunity = await fastify.db.opportunityRepository.findOne({
         where: { id },
         relations: recommendationOpportunityRelations,
+        relationLoadStrategy: "query",
       });
       if (!opportunity) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
@@ -90,6 +92,7 @@ export default function opportunityRecommendedVolunteerRoutes(
             ),
       );
 
+      const germanOnly = isGermanOpportunity(opportunity);
       const candidates = (
         await fastify.db.volunteerRepository.find({
           where,
@@ -100,7 +103,7 @@ export default function opportunityRecommendedVolunteerRoutes(
         (volunteer) =>
           volunteer.personId &&
           volunteer.deal &&
-          volunteerFitsOpportunity(volunteer, opportunity),
+          (!germanOnly || speaksFluentGerman(volunteer)),
       );
 
       const rankedIds = topRanked(
@@ -112,14 +115,11 @@ export default function opportunityRecommendedVolunteerRoutes(
       const loaded = rankedIds.length
         ? await fastify.db.volunteerRepository.find({
             where: { id: In(rankedIds) },
-            relations: recommendedVolunteerRelations,
+            relations: volunteerListRelations("card"),
             relationLoadStrategy: "query",
           })
         : [];
-      const loadedById = new Map(loaded.map((v) => [v.id, v]));
-      const recommended = rankedIds
-        .map((volunteerId) => loadedById.get(volunteerId))
-        .filter((v): v is Volunteer => v !== undefined);
+      const recommended = orderByIds(rankedIds, loaded);
       if (visibility) {
         maskPii(recommended, visibility);
       }

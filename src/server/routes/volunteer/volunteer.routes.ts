@@ -42,7 +42,6 @@ import {
   QuerystringVolunteerGetList,
   ReplyMessage,
   RoutePrefix,
-  VolunteerListType,
 } from "../../types";
 import {
   alertOnChange,
@@ -67,6 +66,7 @@ import {
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
+import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import {
   resetCallerMask,
@@ -101,23 +101,6 @@ export default async function volunteerRoutes(
     "deal.dealTimeslot.timeslot",
     "deal.dealDistrict.district",
   ];
-
-  const listRelationsCommon = [
-    "person",
-    "deal",
-    "deal.dealLanguage.language",
-    "deal.dealDistrict.district",
-  ];
-  const listRelationsCardExtra = [
-    "deal.dealActivity.activity",
-    "deal.dealSkill.skill",
-    "deal.dealTimeslot.timeslot",
-    "person.address.postcode",
-  ];
-  const getListRelations = (listType: VolunteerListType) =>
-    listType === "table"
-      ? listRelationsCommon
-      : [...listRelationsCommon, ...listRelationsCardExtra];
 
   fastify.addHook("onRequest", fastify.authenticate());
   fastify.addHook("preHandler", async (request) => {
@@ -272,7 +255,7 @@ export default async function volunteerRoutes(
       const volunteers = ids.length
         ? await volunteerRepository.find({
             where: { id: In(ids) },
-            relations: getListRelations(listType ?? "card"),
+            relations: volunteerListRelations(listType ?? "card"),
             relationLoadStrategy: "query",
             order,
           })

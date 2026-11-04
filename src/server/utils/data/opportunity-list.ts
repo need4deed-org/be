@@ -11,6 +11,7 @@ import {
 import { maskForCaller } from "../pii/pre-serialization";
 import { getCategoryToDealHandler } from "./add-category-to-deal";
 import { getDistrictToOpportunityHandler } from "./add-district-to-opp";
+import { orderByIds } from "./order-by-ids";
 import { translateOpportunities } from "./translate-opportunities";
 import { updateBackfilledColumn } from "./update-backfilled-column";
 
@@ -39,10 +40,7 @@ export async function loadOpportunityList(
         relationLoadStrategy: "query",
       })
     : [];
-  const loadedById = new Map(loaded.map((o) => [o.id, o]));
-  return ids
-    .map((id) => loadedById.get(id))
-    .filter((o): o is Opportunity => o !== undefined);
+  return orderByIds(ids, loaded);
 }
 
 export async function dtoOpportunityListForCaller(
