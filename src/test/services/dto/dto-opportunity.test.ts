@@ -4,6 +4,8 @@ import {
   dtoOpportunityGetList,
   dtoVolunteerOpportunityGetList,
   getOpportunityContact,
+  getOpportunityDistrictIdNeedingCentroid,
+  getOpportunityLocation,
 } from "../../../services/dto/dto-opportunity";
 
 const representativePerson = {
@@ -125,6 +127,124 @@ describe("getOpportunityContact", () => {
     const result = getOpportunityContact(opportunity as any);
 
     expect(result.id).toBe(100);
+  });
+});
+
+describe("getOpportunityLocation", () => {
+  const ngoPostcode = { id: 1, value: "10115" };
+  const appointmentPostcode = {
+    id: 2,
+    value: "12043",
+    districtPostcode: [
+      { id: 9, districtId: 8 },
+      { id: 4, districtId: 6 },
+    ],
+  };
+
+  it("uses the appointment postcode and its district for an accompanying opportunity", () => {
+    const opportunity = {
+      type: "accompanying",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: appointmentPostcode },
+    };
+    expect(getOpportunityLocation(opportunity as any)).toEqual({
+      postcode: "12043",
+      districtId: 6,
+    });
+  });
+
+  it("falls back to the stored district when the appointment postcode has no district link", () => {
+    const opportunity = {
+      type: "accompanying",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: { id: 2, value: "12043" } },
+    };
+    expect(getOpportunityLocation(opportunity as any)).toEqual({
+      postcode: "12043",
+      districtId: 5,
+    });
+  });
+
+  it("returns a null postcode, not the NGO's, when the appointment postcode is masked", () => {
+    const opportunity = {
+      type: "accompanying",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: { ...appointmentPostcode, value: null } },
+    };
+    expect(getOpportunityLocation(opportunity as any)).toEqual({
+      postcode: null,
+      districtId: 6,
+    });
+  });
+
+  it("uses the NGO's postcode and the stored district for an accompanying opportunity without an appointment postcode", () => {
+    const opportunity = {
+      type: "accompanying",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: null },
+    };
+    expect(getOpportunityLocation(opportunity as any)).toEqual({
+      postcode: "10115",
+      districtId: 5,
+    });
+  });
+
+  it("ignores a stale accompanying row on a non-accompanying opportunity", () => {
+    const opportunity = {
+      type: "regular",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: appointmentPostcode },
+    };
+    expect(getOpportunityLocation(opportunity as any)).toEqual({
+      postcode: "10115",
+      districtId: 5,
+    });
+  });
+
+  it("gives list and detail DTOs the same postcode and district", () => {
+    const opportunity = {
+      id: 1,
+      type: "accompanying",
+      districtId: 5,
+      agentId: 42,
+      agent: { id: 42, title: "Center X", district: { id: 1 } },
+      deal: {
+        postcode: ngoPostcode,
+        dealLanguage: [],
+        dealActivity: [],
+        dealSkill: [],
+        dealDistrict: [],
+        dealTimeslot: [],
+      },
+      accompanying: { postcode: appointmentPostcode },
+      comments: [],
+      opportunityVolunteer: [],
+    };
+    const expected = { postcode: "12043", district: { id: 6 } };
+    expect(dtoOpportunityGetList(opportunity as any)).toMatchObject(expected);
+    expect(dtoOpportunityGet(opportunity as any)).toMatchObject({
+      ...expected,
+      accompanyingDetails: { appointmentDistrict: { id: 6 } },
+    });
+    expect(dtoVolunteerOpportunityGetList(opportunity as any)).toMatchObject(
+      expected,
+    );
+  });
+
+  it("centers the map-pin fallback on the same district it reports", () => {
+    const opportunity = {
+      type: "accompanying",
+      status: "opp-searching",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: appointmentPostcode },
+    };
+    expect(getOpportunityDistrictIdNeedingCentroid(opportunity as any)).toBe(6);
   });
 });
 

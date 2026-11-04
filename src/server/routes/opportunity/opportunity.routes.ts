@@ -74,15 +74,18 @@ import {
 import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
+  alertOnChange,
   andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
   assertRoleIn,
+  getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
   getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
+  getEntitySnapshot,
   getOpportunityListWhere,
   getOpportunityNotificationText,
   getOpportunityOrphanageAgent,
@@ -168,6 +171,10 @@ async function clearStaleAccompanying(
   await manager.update(Opportunity, opportunity.id, {
     accompanyingId: null,
     ...(alsoClearOnetimer ? { onetimerId: null } : {}),
+    // the stored district was the appointment's; let the backfill re-derive it
+    ...(opportunity.type === OpportunityType.ACCOMPANYING
+      ? { districtId: null }
+      : {}),
   });
   if (opportunity.accompanyingId) {
     await manager.delete(Accompanying, opportunity.accompanyingId);
@@ -175,6 +182,26 @@ async function clearStaleAccompanying(
   if (alsoClearOnetimer && opportunity.onetimerId) {
     await manager.delete(Onetimer, opportunity.onetimerId);
   }
+}
+
+// The stored district follows the appointment postcode (be#1210); a postcode
+// without a district link leaves it to the backfill.
+async function syncAppointmentDistrict(
+  manager: EntityManager,
+  opportunityId: number,
+): Promise<void> {
+  const opportunity = await manager.findOne(Opportunity, {
+    where: { id: opportunityId },
+    relations: ["accompanying"],
+  });
+  const postcodeId = opportunity?.accompanying?.postcodeId;
+  if (!postcodeId) {
+    return;
+  }
+  const district = await getDistrictFromPostcode(postcodeId, manager);
+  await manager.update(Opportunity, opportunityId, {
+    districtId: district?.id ?? null,
+  });
 }
 
 export default async function opportunityRoutes(
@@ -251,8 +278,8 @@ export default async function opportunityRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
-        "accompanying",
-        "accompanying.postcode",
+        "accompanying.postcode.districtPostcode",
+        "deal.postcode",
         "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
@@ -304,22 +331,11 @@ export default async function opportunityRoutes(
         await agentRepository.save(districtUpdates);
       }
 
-      const accompanyingDistrict =
-        opportunityComments.type === OpportunityType.ACCOMPANYING &&
-        opportunityComments.accompanying?.postcode
-          ? await getDistrictFromPostcode(
-              opportunityComments.accompanying.postcode,
-            )
-          : null;
-
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
       Object.assign(
         opportunityComments,
-        await addDistrictToOpportunity(
-          opportunityComments,
-          accompanyingDistrict,
-        ),
+        await addDistrictToOpportunity(opportunityComments),
       );
 
       await updateBackfilledColumn(
@@ -346,11 +362,7 @@ export default async function opportunityRoutes(
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {
-        ...dtoOpportunityGet(
-          opportunityComments,
-          accompanyingDistrict,
-          districtCentroid,
-        ),
+        ...dtoOpportunityGet(opportunityComments, districtCentroid),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
       if (
@@ -428,7 +440,7 @@ export default async function opportunityRoutes(
         "deal.postcode",
         "agent",
         "agent.address.postcode",
-        "accompanying",
+        "accompanying.postcode.districtPostcode",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
         "originalLanguage",
@@ -844,8 +856,9 @@ export default async function opportunityRoutes(
         }
       }
 
+      let linkedAgent: Agent | null = null;
       if (agentLinkId !== undefined) {
-        const linkedAgent = await fastify.db.agentRepository.findOne({
+        linkedAgent = await fastify.db.agentRepository.findOne({
           where: { id: agentLinkId },
         });
         if (!linkedAgent) {
@@ -868,244 +881,321 @@ export default async function opportunityRoutes(
         }
       }
 
-      await dataSource.manager.transaction(async (manager) => {
-        if (opportunityObj) {
-          await divertTranslatedEdits(
-            manager,
-            opportunity,
-            opportunityObj,
-            submitted,
-            effectiveType,
-            editLanguage(request.query),
-          );
-          const success = await patchEntity(
-            Opportunity,
-            opportunityObj,
-            opportunity.id,
-            manager,
-          );
-          if (!success) {
-            throw new Error("Patching opportunity failed.");
-          }
-          await queueOpportunityTranslation(manager, {
-            id: opportunity.id,
-            originalLanguageId: opportunity.originalLanguageId,
-            type: effectiveType,
-            title: opportunityObj.title ?? opportunity.title,
-            info:
-              opportunityObj.info !== undefined
-                ? opportunityObj.info
-                : opportunity.info,
-          });
+      const snapshotRelations = [
+        "agent",
+        "accompanying",
+        "onetimer",
+        "deal.dealLanguage",
+        "deal.dealActivity",
+        "deal.dealSkill",
+        "deal.dealDistrict",
+        "deal.dealTimeslot",
+      ];
+      const takeSnapshot = () =>
+        getEntitySnapshot(Opportunity, id, snapshotRelations, ["searchStatus"]);
+      const snapshotBefore =
+        role === UserRole.AGENT && effectiveAgentId
+          ? await takeSnapshot()
+          : null;
+      let translatedEdits = 0;
 
-          if (
-            effectiveAgentId &&
-            opportunityObj.status &&
-            impliesAgentSearching(opportunityObj.status)
-          ) {
-            await setAgentSearching(effectiveAgentId, manager);
-          }
-        }
+      try {
+        translatedEdits = await dataSource.manager.transaction(
+          async (manager) => {
+            let written = 0;
+            if (opportunityObj) {
+              written = await divertTranslatedEdits(
+                manager,
+                opportunity,
+                opportunityObj,
+                submitted,
+                effectiveType,
+                editLanguage(request.query),
+              );
+              const success = await patchEntity(
+                Opportunity,
+                opportunityObj,
+                opportunity.id,
+                manager,
+              );
+              if (!success) {
+                throw new Error("Patching opportunity failed.");
+              }
+              await queueOpportunityTranslation(manager, {
+                id: opportunity.id,
+                originalLanguageId: opportunity.originalLanguageId,
+                type: effectiveType,
+                title: opportunityObj.title ?? opportunity.title,
+                info:
+                  opportunityObj.info !== undefined
+                    ? opportunityObj.info
+                    : opportunity.info,
+              });
 
-        if (agentLinkId !== undefined) {
-          const contactReset: Partial<Opportunity> =
-            contactLinkId !== undefined
-              ? {}
-              : {
-                  contactPersonId:
-                    request.authUser?.role === UserRole.AGENT
-                      ? (request.authUser.personId ?? null)
-                      : null,
-                };
-          const success = await patchEntity(
-            Opportunity,
-            { agentId: agentLinkId, ...contactReset } as Partial<Opportunity>,
-            opportunity.id,
-            manager,
-          );
-          if (!success) {
-            throw new BadRequestError("Relinking opportunity agent failed.");
-          }
-        } else if (agent) {
-          const success = await patchEntity(
-            Agent,
-            agent,
-            opportunity.agentId,
-            manager,
-          );
-          if (!success) {
-            throw new Error(
-              "Patching agent failed while patching opportunity.",
-            );
-          }
-        }
+              if (
+                effectiveAgentId &&
+                opportunityObj.status &&
+                impliesAgentSearching(opportunityObj.status)
+              ) {
+                await setAgentSearching(effectiveAgentId, manager);
+              }
+            }
 
-        if (contactLinkId !== undefined) {
-          const success = await patchEntity(
-            Opportunity,
-            { contactPersonId: contactLinkId } as Partial<Opportunity>,
-            opportunity.id,
-            manager,
-          );
-          if (!success) {
-            throw new BadRequestError("Relinking opportunity contact failed.");
-          }
-        }
-      });
+            if (agentLinkId !== undefined) {
+              const contactReset: Partial<Opportunity> =
+                contactLinkId !== undefined
+                  ? {}
+                  : {
+                      contactPersonId:
+                        request.authUser?.role === UserRole.AGENT
+                          ? (request.authUser.personId ?? null)
+                          : null,
+                    };
+              const success = await patchEntity(
+                Opportunity,
+                {
+                  agentId: agentLinkId,
+                  ...contactReset,
+                } as Partial<Opportunity>,
+                opportunity.id,
+                manager,
+              );
+              if (!success) {
+                throw new BadRequestError(
+                  "Relinking opportunity agent failed.",
+                );
+              }
+            } else if (agent) {
+              const success = await patchEntity(
+                Agent,
+                agent,
+                opportunity.agentId,
+                manager,
+              );
+              if (!success) {
+                throw new Error(
+                  "Patching agent failed while patching opportunity.",
+                );
+              }
+            }
 
-      if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
-        const appointmentPostcodeValue =
-          request.body.accompanyingDetails?.appointmentPostcode;
-        if (appointmentPostcodeValue !== undefined) {
-          const postcode = await getPostcode(appointmentPostcodeValue);
-          if (!postcode) {
-            throw new BadRequestError(
-              `Postcode "${appointmentPostcodeValue}" not found.`,
-            );
-          }
-          accompanying.postcodeId = postcode.id;
-        }
+            if (contactLinkId !== undefined) {
+              const success = await patchEntity(
+                Opportunity,
+                { contactPersonId: contactLinkId } as Partial<Opportunity>,
+                opportunity.id,
+                manager,
+              );
+              if (!success) {
+                throw new BadRequestError(
+                  "Relinking opportunity contact failed.",
+                );
+              }
+            }
+            return written;
+          },
+        );
 
-        if (opportunity.accompanyingId) {
-          const success = await patchEntity(
-            Accompanying,
-            accompanying,
-            opportunity.accompanyingId,
-          );
-          if (!success) {
-            throw new BadRequestError(
-              "Patching accompanying failed while patching opportunity.",
-            );
+        const switchedToAccompanying =
+          request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+          opportunity.type !== OpportunityType.ACCOMPANYING;
+        if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
+          const appointmentPostcodeValue =
+            request.body.accompanyingDetails?.appointmentPostcode;
+          if (appointmentPostcodeValue !== undefined) {
+            const postcode = await getPostcode(appointmentPostcodeValue);
+            if (!postcode) {
+              throw new BadRequestError(
+                `Postcode "${appointmentPostcodeValue}" not found.`,
+              );
+            }
+            accompanying.postcodeId = postcode.id;
           }
-        } else if (
-          request.body.opportunity_type === OpportunityType.ACCOMPANYING
-        ) {
-          const newAccompanying = Object.assign(
-            new Accompanying(),
-            accompanying,
-          );
-          try {
-            await fastify.db.accompanyingRepository.manager.transaction(
+
+          if (opportunity.accompanyingId) {
+            const accompanyingId = opportunity.accompanyingId;
+            const success = await dataSource.manager.transaction(
               async (manager) => {
-                await manager.save(Accompanying, newAccompanying);
-                await manager.update(Opportunity, opportunity.id, {
-                  accompanyingId: newAccompanying.id,
-                });
+                const patched = await patchEntity(
+                  Accompanying,
+                  accompanying,
+                  accompanyingId,
+                  manager,
+                );
+                if (
+                  patched &&
+                  (accompanying.postcodeId || switchedToAccompanying)
+                ) {
+                  await syncAppointmentDistrict(manager, opportunity.id);
+                }
+                return patched;
               },
             );
-          } catch {
-            throw new BadRequestError("Saving new accompanying failed");
+            if (!success) {
+              throw new BadRequestError(
+                "Patching accompanying failed while patching opportunity.",
+              );
+            }
+          } else if (
+            request.body.opportunity_type === OpportunityType.ACCOMPANYING
+          ) {
+            const newAccompanying = Object.assign(
+              new Accompanying(),
+              accompanying,
+            );
+            try {
+              await fastify.db.accompanyingRepository.manager.transaction(
+                async (manager) => {
+                  await manager.save(Accompanying, newAccompanying);
+                  await manager.update(Opportunity, opportunity.id, {
+                    accompanyingId: newAccompanying.id,
+                  });
+                  await syncAppointmentDistrict(manager, opportunity.id);
+                },
+              );
+            } catch {
+              throw new BadRequestError("Saving new accompanying failed");
+            }
           }
+        } else if (switchedToAccompanying && opportunity.accompanyingId) {
+          // switched to accompanying, reusing the existing appointment
+          await syncAppointmentDistrict(dataSource.manager, opportunity.id);
         }
-      }
 
-      const resolvedOnetimerDate =
-        effectiveType === OpportunityType.EVENTS
-          ? request.body.event?.date && request.body.event?.time
-            ? getDateObj(request.body.event.date, request.body.event.time)
-            : undefined
-          : effectiveType === OpportunityType.ACCOMPANYING
-            ? onetimerDate
-            : undefined;
+        const resolvedOnetimerDate =
+          effectiveType === OpportunityType.EVENTS
+            ? request.body.event?.date && request.body.event?.time
+              ? getDateObj(request.body.event.date, request.body.event.time)
+              : undefined
+            : effectiveType === OpportunityType.ACCOMPANYING
+              ? onetimerDate
+              : undefined;
 
-      if (resolvedOnetimerDate) {
-        await dataSource.manager.transaction(async (manager) => {
-          const onetimer = await upsertOnetimer(
-            opportunity.onetimerId,
-            resolvedOnetimerDate,
-            manager,
-          );
-          if (!opportunity.onetimerId) {
-            await patchEntity(
-              Opportunity,
-              { onetimerId: onetimer.id } as Partial<Opportunity>,
-              opportunity.id,
+        if (resolvedOnetimerDate) {
+          await dataSource.manager.transaction(async (manager) => {
+            const onetimer = await upsertOnetimer(
+              opportunity.onetimerId,
+              resolvedOnetimerDate,
               manager,
             );
-            opportunity.onetimerId = onetimer.id;
-          }
-          // a schedule in the body replaces the deal's timeslots below
-          if (effectiveType === OpportunityType.EVENTS && !schedule) {
-            await syncOnetimeTimeslot(dealId, resolvedOnetimerDate, manager);
-          }
-        });
-      }
+            if (!opportunity.onetimerId) {
+              await patchEntity(
+                Opportunity,
+                { onetimerId: onetimer.id } as Partial<Opportunity>,
+                opportunity.id,
+                manager,
+              );
+              opportunity.onetimerId = onetimer.id;
+            }
+            // a schedule in the body replaces the deal's timeslots below
+            if (effectiveType === OpportunityType.EVENTS && !schedule) {
+              await syncOnetimeTimeslot(dealId, resolvedOnetimerDate, manager);
+            }
+          });
+        }
 
-      if (
-        effectiveType === OpportunityType.REGULAR &&
-        opportunity.type !== OpportunityType.REGULAR &&
-        (opportunity.accompanyingId || opportunity.onetimerId)
-      ) {
-        await dataSource.manager.transaction((manager) =>
-          clearStaleAccompanying(manager, opportunity, {
-            alsoClearOnetimer: true,
-          }),
-        );
-      }
-
-      if (
-        effectiveType === OpportunityType.EVENTS &&
-        opportunity.type !== OpportunityType.EVENTS &&
-        opportunity.accompanyingId
-      ) {
-        await dataSource.manager.transaction((manager) =>
-          clearStaleAccompanying(manager, opportunity, {
-            alsoClearOnetimer: false,
-          }),
-        );
-      }
-
-      if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
-        await updateOptionList(dealId, DealTimeslot, []);
-      }
-
-      if (schedule) {
-        const success = await updateOptionList(
-          dealId,
-          DealTimeslot,
-          await Promise.all(
-            schedule.map((scheduleObject) => {
-              if (scheduleObject.id) {
-                return { id: scheduleObject.id };
-              }
-              return getOrCreateTimeslot(scheduleObject);
+        if (
+          effectiveType === OpportunityType.REGULAR &&
+          opportunity.type !== OpportunityType.REGULAR &&
+          (opportunity.accompanyingId || opportunity.onetimerId)
+        ) {
+          await dataSource.manager.transaction((manager) =>
+            clearStaleAccompanying(manager, opportunity, {
+              alsoClearOnetimer: true,
             }),
-          ),
-        );
-        if (!success) {
-          throw new BadRequestError(
-            `Availability for volunteer (id=${id}) not updated.`,
           );
         }
-      }
 
-      if (languages) {
-        const success = await updateOptionList(dealId, DealLanguage, languages);
-        if (!success) {
-          throw new BadRequestError(
-            `Languages for opportunity (deal_id:${dealId}) not updated.`,
+        if (
+          effectiveType === OpportunityType.EVENTS &&
+          opportunity.type !== OpportunityType.EVENTS &&
+          opportunity.accompanyingId
+        ) {
+          await dataSource.manager.transaction((manager) =>
+            clearStaleAccompanying(manager, opportunity, {
+              alsoClearOnetimer: false,
+            }),
           );
         }
-      }
 
-      if (activities) {
-        const success = await updateOptionList(
-          dealId,
-          DealActivity,
-          activities,
-        );
-        if (!success) {
-          throw new BadRequestError(
-            `Activities for opportunity (deal_id:${dealId}) not updated.`,
-          );
+        if (request.body.opportunity_type === OpportunityType.ACCOMPANYING) {
+          await updateOptionList(dealId, DealTimeslot, []);
         }
-      }
 
-      if (skills) {
-        const success = await updateOptionList(dealId, DealSkill, skills);
-        if (!success) {
-          throw new BadRequestError(
-            `Skills for opportunity (deal_id:${dealId}) not updated.`,
+        if (schedule) {
+          const success = await updateOptionList(
+            dealId,
+            DealTimeslot,
+            await Promise.all(
+              schedule.map((scheduleObject) => {
+                if (scheduleObject.id) {
+                  return { id: scheduleObject.id };
+                }
+                return getOrCreateTimeslot(scheduleObject);
+              }),
+            ),
+          );
+          if (!success) {
+            throw new BadRequestError(
+              `Availability for volunteer (id=${id}) not updated.`,
+            );
+          }
+        }
+
+        if (languages) {
+          const success = await updateOptionList(
+            dealId,
+            DealLanguage,
+            languages,
+          );
+          if (!success) {
+            throw new BadRequestError(
+              `Languages for opportunity (deal_id:${dealId}) not updated.`,
+            );
+          }
+        }
+
+        if (activities) {
+          const success = await updateOptionList(
+            dealId,
+            DealActivity,
+            activities,
+          );
+          if (!success) {
+            throw new BadRequestError(
+              `Activities for opportunity (deal_id:${dealId}) not updated.`,
+            );
+          }
+        }
+
+        if (skills) {
+          const success = await updateOptionList(dealId, DealSkill, skills);
+          if (!success) {
+            throw new BadRequestError(
+              `Skills for opportunity (deal_id:${dealId}) not updated.`,
+            );
+          }
+        }
+      } finally {
+        if (snapshotBefore !== null && effectiveAgentId) {
+          await alertOnChange(
+            async () =>
+              translatedEdits > 0 || snapshotBefore !== (await takeSnapshot()),
+            async () => {
+              const editingAgent =
+                linkedAgent ??
+                (await fastify.db.agentRepository.findOneBy({
+                  id: effectiveAgentId,
+                }));
+              fastify.notify.opsAlert(
+                getAgentOpportunityEditNotificationText(
+                  opportunityObj?.title ?? opportunity.title,
+                  opportunity.id,
+                  editingAgent?.title ?? `id:${effectiveAgentId}`,
+                  effectiveAgentId !== opportunity.agentId,
+                ),
+              );
+            },
           );
         }
       }

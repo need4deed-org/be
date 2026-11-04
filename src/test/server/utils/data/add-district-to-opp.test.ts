@@ -5,7 +5,10 @@ import type Opportunity from "../../../../data/entity/opportunity/opportunity.en
 import { getDistrictFromPostcode } from "../../../../data/utils/get-district";
 import { getDistrictToOpportunityHandler } from "../../../../server/utils";
 
-vi.mock("../../../../data/utils/get-district", () => ({
+vi.mock("../../../../data/utils/get-district", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../../../data/utils/get-district")
+  >()),
   getDistrictFromPostcode: vi.fn(),
 }));
 
@@ -213,38 +216,38 @@ describe("getDistrictToOpportunityHandler", () => {
       });
     });
 
-    describe("precomputed accompanyingDistrict (caller already resolved it)", () => {
-      it("reuses a truthy precomputed district instead of querying again", async () => {
+    describe("district links already loaded with the appointment postcode", () => {
+      it("takes the lowest district_postcode id without querying", async () => {
         const handler = getDistrictToOpportunityHandler();
-        const district = makeDistrict({ id: 404 });
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          accompanying: { postcode: { id: 7 } } as any,
+          accompanying: {
+            postcode: {
+              id: 7,
+              districtPostcode: [
+                { id: 9, districtId: 8 },
+                { id: 4, districtId: 404 },
+              ],
+            },
+          } as any,
         });
 
-        const result = await handler.addDistrictToOpportunity(
-          opportunity,
-          district as any,
-        );
+        const result = await handler.addDistrictToOpportunity(opportunity);
 
         expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
-        expect(result.district).toBe(district);
-        expect(result.districtId).toBe(district.id);
+        expect(result.districtId).toBe(404);
         expect(handler.updates).toContain(opportunity);
       });
 
-      it("treats an explicit null as 'already tried, nothing found' and falls back to the agent", async () => {
+      it("falls back to the agent when the postcode has no district link", async () => {
         const handler = getDistrictToOpportunityHandler();
         const opportunity = makeOpportunity({
           type: OpportunityType.ACCOMPANYING,
-          accompanying: { postcode: { id: 7 } } as any,
+          accompanying: { postcode: { id: 7, districtPostcode: [] } } as any,
           agent: { districtId: 99 } as any,
         });
 
-        const result = await handler.addDistrictToOpportunity(
-          opportunity,
-          null,
-        );
+        const result = await handler.addDistrictToOpportunity(opportunity);
 
         expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
         expect(result.districtId).toBe(99);

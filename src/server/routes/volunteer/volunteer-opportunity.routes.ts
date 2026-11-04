@@ -45,6 +45,7 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
         "deal.postcode",
+        "accompanying.postcode.districtPostcode",
       ];
 
       const { page, limit, language, agentId, ...filter } = request.query;
