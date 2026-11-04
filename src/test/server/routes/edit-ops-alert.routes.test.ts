@@ -3,6 +3,7 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  AgentVolunteerSearchType,
   OpportunityStatusType,
   OpportunityType,
   UserRole,
@@ -265,6 +266,69 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     expect(res.statusCode).toBe(204);
 
     expect(opsAlert).not.toHaveBeenCalled();
+  });
+
+  it("alerts when a volunteer's edit was saved before a later step failed", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: {
+        infoAbout: "Saved before the failure",
+        activities: [{ id: 999999999, title: "Missing activity" }],
+      },
+    });
+    expect(res.statusCode).toBe(400);
+
+    await vi.waitFor(() => expect(opsAlert).toHaveBeenCalledTimes(1));
+  });
+
+  it("alerts when an agent edits the title in a language other than the original", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}?language=en`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { title: `EditAlert English title ${suffix}` },
+    });
+    expect(res.statusCode).toBe(204);
+
+    expect(opsAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not alert when only the side effect on the agent's search status changes", async () => {
+    await fastify.db.agentRepository.update(
+      { id: agent.id },
+      { searchStatus: AgentVolunteerSearchType.NOT_NEEDED },
+    );
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: { statusOpportunity: OpportunityStatusType.SEARCHING },
+    });
+    expect(res.statusCode).toBe(204);
+
+    expect(
+      (await fastify.db.agentRepository.findOneByOrFail({ id: agent.id }))
+        .searchStatus,
+    ).toBe(AgentVolunteerSearchType.SEARCHING);
+    expect(opsAlert).not.toHaveBeenCalled();
+  });
+
+  it("alerts when an agent's edit was saved before a later step failed", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunity.id}`,
+      cookies: { [accessCookieName]: agentCookie },
+      payload: {
+        statusOpportunity: OpportunityStatusType.ACTIVE,
+        activities: [{ id: 999999999, title: "Missing activity" }],
+      },
+    });
+    expect(res.statusCode).toBe(400);
+
+    expect(opsAlert).toHaveBeenCalledTimes(1);
   });
 
   it("does not alert when a coordinator edits an opportunity", async () => {
