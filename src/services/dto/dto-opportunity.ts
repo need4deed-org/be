@@ -40,12 +40,14 @@ function resolveMapPin(opportunity: Opportunity): MapPinResolution {
     return { lat: null, lon: null };
   }
 
-  const agentCoordinates = getCoordinates(opportunity.agent?.address?.postcode);
-  if (
-    agentCoordinates.latitude !== null &&
-    agentCoordinates.longitude !== null
-  ) {
-    return { lat: agentCoordinates.latitude, lon: agentCoordinates.longitude };
+  // an accompanying pin sits at the appointment, like its postcode and district
+  // (be#1272); masked appointment coordinates fall back to the district centroid
+  const coordinates = getCoordinates(
+    accompanyingForType(opportunity)?.postcode ??
+      opportunity.agent?.address?.postcode,
+  );
+  if (coordinates.latitude !== null && coordinates.longitude !== null) {
+    return { lat: coordinates.latitude, lon: coordinates.longitude };
   }
 
   return {
