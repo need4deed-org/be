@@ -7,14 +7,17 @@ import {
   VolunteerStateEngagementType,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
-import { In } from "typeorm";
+import { FindOptionsWhere, In, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
   idParamSchema,
   recommendedOpportunitiesQuerySchema,
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
+import { andIntoWhere } from "../../utils";
+import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import {
   dtoOpportunityListForCaller,
   loadOpportunityList,
@@ -66,29 +69,27 @@ export default function volunteerRecommendedOpportunityRoutes(
       }
 
       const types = volunteerTypesFromStatusType(volunteer.statusType);
-      const linked = await fastify.db.opportunityVolunteerRepository.find({
-        select: { opportunityId: true },
-        where: { volunteerId: id },
-      });
-      const linkedOpportunityIds = new Set(
-        linked.map(({ opportunityId }) => opportunityId),
-      );
+      const where: FindOptionsWhere<Opportunity> = {
+        status: OpportunityStatusType.SEARCHING,
+        type: In(types),
+        id: Raw(
+          (column) =>
+            `${column} NOT IN (SELECT opportunity_id FROM opportunity_volunteer WHERE volunteer_id = :volunteerId)`,
+          { volunteerId: id },
+        ),
+      };
+      andIntoWhere(where, "id", closedForVolunteersIdWhere());
 
       const fluentGerman = speaksFluentGerman(volunteer);
       const candidates = types.length
         ? (
             await fastify.db.opportunityRepository.find({
-              where: {
-                status: OpportunityStatusType.SEARCHING,
-                type: In(types),
-              },
+              where,
               relations: recommendationOpportunityRelations,
               relationLoadStrategy: "query",
             })
           ).filter(
-            (opportunity) =>
-              !linkedOpportunityIds.has(opportunity.id) &&
-              (fluentGerman || !isGermanOpportunity(opportunity)),
+            (opportunity) => fluentGerman || !isGermanOpportunity(opportunity),
           )
         : [];
 

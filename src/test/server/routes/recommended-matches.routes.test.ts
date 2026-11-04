@@ -24,6 +24,7 @@ import DealLanguage from "../../../data/entity/m2m/deal-language";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import Activity from "../../../data/entity/profile/activity.entity";
@@ -66,6 +67,7 @@ describe("recommended matches (be#1184)", () => {
   const opportunities: Record<string, Opportunity> = {};
   const links: OpportunityVolunteer[] = [];
   const accompanyings: Accompanying[] = [];
+  const onetimers: Onetimer[] = [];
   const cookies = {} as Record<Caller, string>;
 
   const get = (url: string, as: Caller) =>
@@ -153,8 +155,17 @@ describe("recommended matches (be#1184)", () => {
       agentId?: number;
       activity?: number;
       appointmentPostcodeId?: number;
+      date?: Date;
     } = {},
   ) => {
+    const onetimer = options.date
+      ? await fastify.db.onetimerRepository.save(
+          new Onetimer({ date: options.date }),
+        )
+      : undefined;
+    if (onetimer) {
+      onetimers.push(onetimer);
+    }
     const accompanying = options.appointmentPostcodeId
       ? await fastify.db.accompanyingRepository.save(
           new Accompanying({
@@ -181,6 +192,7 @@ describe("recommended matches (be#1184)", () => {
         dealId: deal.id,
         districtId: accompanying ? undefined : districtId,
         accompanyingId: accompanying?.id,
+        onetimerId: onetimer?.id,
         agentId: options.agentId ?? agent.id,
       }),
     );
@@ -271,6 +283,10 @@ describe("recommended matches (be#1184)", () => {
       status: OpportunityStatusType.ACTIVE,
     });
     await saveOpportunity("event", { type: OpportunityType.EVENTS });
+    await saveOpportunity("pastEvent", {
+      type: OpportunityType.EVENTS,
+      date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    });
     await saveOpportunity("accompanying", {
       type: OpportunityType.ACCOMPANYING,
       agentId: otherAgent.id,
@@ -312,6 +328,10 @@ describe("recommended matches (be#1184)", () => {
       languages: 3,
       district: true,
       activity: true,
+    });
+    await saveVolunteer("events", {
+      languages: 3,
+      type: ProfileVolunteeringType.EVENTS,
     });
     await saveVolunteer("weakGerman", {
       languages: 3,
@@ -377,6 +397,11 @@ describe("recommended matches (be#1184)", () => {
     await fastify.db.dealRepository.delete({
       id: In(deals.map(({ id }) => id)),
     });
+    if (onetimers.length) {
+      await fastify.db.onetimerRepository.delete({
+        id: In(onetimers.map(({ id }) => id)),
+      });
+    }
     if (accompanyings.length) {
       await fastify.db.accompanyingRepository.delete({
         id: In(accompanyings.map(({ id }) => id)),
@@ -454,6 +479,12 @@ describe("recommended matches (be#1184)", () => {
       expect(regularAccompanying.email).not.toContain("@");
     });
 
+    it("recommends nobody for an event that is already over", async () => {
+      const res = await recommend("pastEvent", "coordinator");
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([]);
+    });
+
     it("recommends nobody for an opportunity that is not searching", async () => {
       const res = await recommend("notSearching", "coordinator");
       expect(res.statusCode).toBe(200);
@@ -495,6 +526,13 @@ describe("recommended matches (be#1184)", () => {
         );
       expect(item.postcode).toBe(appointmentPostcode.value);
       expect(item.district.id).toBe(districtId);
+    });
+
+    it("skips events that are already over", async () => {
+      const res = await recommend("events", "coordinator");
+      const ours = oursIn(res.json().data, opportunities);
+      expect(ours).toContain("event");
+      expect(ours).not.toContain("pastEvent");
     });
 
     it("recommends nothing to a volunteer who is not available", async () => {

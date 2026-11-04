@@ -6,8 +6,9 @@ import {
   UserRole,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { In, Raw } from "typeorm";
+import { FindOptionsWhere, In, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { volunteerListSerializer } from "../../../services/dto/dto-volunteer";
 import {
   idParamSchema,
@@ -21,6 +22,7 @@ import {
   assertRoleIn,
   getVolunteerWhere,
 } from "../../utils";
+import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import { orderByIds } from "../../utils/data/order-by-ids";
 import {
   isGermanOpportunity,
@@ -67,7 +69,12 @@ export default function opportunityRecommendedVolunteerRoutes(
       }
       await assertAgentOwnsOpportunity(request, id, opportunity.agentId);
 
-      if (opportunity.status !== OpportunityStatusType.SEARCHING) {
+      const openWhere: FindOptionsWhere<Opportunity> = { id };
+      andIntoWhere(openWhere, "id", closedForVolunteersIdWhere());
+      if (
+        opportunity.status !== OpportunityStatusType.SEARCHING ||
+        !(await fastify.db.opportunityRepository.exists({ where: openWhere }))
+      ) {
         return reply.status(200).send({ message, data: [] });
       }
 

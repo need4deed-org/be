@@ -9,15 +9,16 @@ import {
 import { berlinTimeZone } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import logger from "../../../logger";
 import {
   getOpportunityDescription,
   getOpportunityLocation,
 } from "../../../services/dto/dto-opportunity";
 import { getAvailability } from "../../../services/dto/utils";
+import { tryCatchFn } from "../../../services/utils";
 
 const GERMAN_SUPPORT_CATEGORY = "de-lng-support";
-const GERMAN_MENTION =
-  /\b(german|deutsch|deutsch(kurs|unterricht|nachhilfe|lernen)\w*)\b/i;
+const GERMAN_MENTION = /\b(german(?!y\b)|deutsch(?!(e|em|en|er|es)\b|land))/i;
 const GERMAN_ISO_CODE = "de";
 const FLUENT_GERMAN = new Set<string>([
   LangProficiency.FLUENT,
@@ -65,11 +66,17 @@ export const recommendationOpportunityRelations = [
 const overlap = <T>(a: Set<T>, b: Set<T>) =>
   [...a].filter((item) => b.has(item)).length;
 
+const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
+  logger.error(`Error getting availability for a recommendation: ${error}`);
+});
+
 const availabilityKeys = (opportunityOrVolunteer: Opportunity | Volunteer) =>
   new Set(
-    getAvailability(opportunityOrVolunteer.deal?.dealTimeslot ?? []).map(
-      ({ day, daytime }) => `${day}|${daytime}`,
-    ),
+    (
+      getAvailabilityTryCatch(
+        opportunityOrVolunteer.deal?.dealTimeslot ?? [],
+      ) ?? []
+    ).map(({ day, daytime }) => `${day}|${daytime}`),
   );
 
 export function isGermanOpportunity(opportunity: Opportunity): boolean {

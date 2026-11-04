@@ -20,6 +20,7 @@ describe("isGermanOpportunity", () => {
     ["title", { title: "Deutschkurs am Abend" }],
     ["description", { title: "Treffen", info: "We practise German together" }],
     ["compound", { title: "Treffen", info: "Deutschunterricht für Kinder" }],
+    ["other compound", { title: "Deutschtraining für Frauen" }],
   ])("detects German mentioned in the %s", (_, fields) => {
     const opportunity = {
       type: OpportunityType.REGULAR,
@@ -44,6 +45,7 @@ describe("isGermanOpportunity", () => {
     "Neu in Deutschland",
     "Refugees newly arrived in Germany",
     "Begleitung zum deutschen Jobcenter",
+    "Ämter Deutschlands",
   ])("ignores the country in %s", (title) => {
     const opportunity = { type: OpportunityType.REGULAR, title, deal: null };
     expect(isGermanOpportunity(opportunity as any)).toBe(false);
