@@ -275,6 +275,7 @@ export function getLanguages(dealLanguage: DealLanguage[]) {
     id: pl.language.id,
     title: pl.language.translation || pl.language.title,
     proficiency: pl.proficiency,
+    purpose: pl.purpose,
   }));
 }
 

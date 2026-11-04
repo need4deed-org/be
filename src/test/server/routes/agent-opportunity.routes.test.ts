@@ -3,6 +3,8 @@ import {
   AgentEngagementStatusType,
   AgentMembershipStatus,
   AgentRoleType,
+  LangProficiency,
+  LangPurpose,
   OpportunityType,
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
@@ -10,16 +12,20 @@ import {
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealLanguage from "../../../data/entity/m2m/deal-language";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import Activity from "../../../data/entity/profile/activity.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
 const PASSWORD = "test_password";
@@ -192,6 +198,69 @@ describe("GET /agent/:id/opportunity-linked", () => {
     const [item] = res.json().data;
     expect(item.title).toBe(opportunity.title);
     expect(item.volunteers[0].name).toBe("Test Volunteer");
+  });
+
+  it("returns type, district, languages and activities for the NGO home cards", async () => {
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const district = await fastify.db.districtRepository.findOneOrFail({
+      where: {},
+    });
+    const language = await fastify.db.languageRepository.findOneByOrFail({
+      isoCode: "en",
+    });
+    const activity = await getRepository(dataSource, Activity).findOneOrFail({
+      where: {},
+    });
+    const cardDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    await getRepository(dataSource, DealLanguage).save(
+      new DealLanguage({
+        dealId: cardDeal.id,
+        languageId: language.id,
+        purpose: LangPurpose.GENERAL,
+        proficiency: LangProficiency.FLUENT,
+      }),
+    );
+    await getRepository(dataSource, DealActivity).save(
+      new DealActivity({ dealId: cardDeal.id, activityId: activity.id }),
+    );
+    const cardOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Card Opportunity ${Date.now()}`,
+        type: OpportunityType.REGULAR,
+        agentId: agent.id,
+        dealId: cardDeal.id,
+        districtId: district.id,
+      }),
+    );
+
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/agent/${agent.id}/opportunity-linked`,
+      cookies: { [accessCookieName]: agentRoleCookie },
+    });
+
+    await fastify.db.opportunityRepository.delete({ id: cardOpportunity.id });
+    await fastify.db.dealRepository.delete({ id: cardDeal.id });
+
+    expect(res.statusCode).toBe(200);
+    const item = res
+      .json()
+      .data.find((row: { id: number }) => row.id === cardOpportunity.id);
+    expect(item.volunteerType).toBe(OpportunityType.REGULAR);
+    expect(item.district).toEqual({ id: district.id });
+    expect(item.languages).toEqual([
+      expect.objectContaining({
+        id: language.id,
+        purpose: LangPurpose.GENERAL,
+      }),
+    ]);
+    expect(item.activities).toEqual([{ id: activity.id }]);
+    expect(item.availability).toEqual([]);
+    expect(item.location).toEqual([]);
   });
 
   it("masks title and volunteer identity for a non-coordinator once the agent is INACTIVE", async () => {
