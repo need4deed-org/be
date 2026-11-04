@@ -1,7 +1,9 @@
 import { OpportunityType } from "need4deed-sdk";
-import District from "../../../data/entity/location/district.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { getDistrictFromPostcode } from "../../../data/utils/get-district";
+import {
+  firstDistrictPostcode,
+  getDistrictFromPostcode,
+} from "../../../data/utils/get-district";
 
 export function getDistrictToOpportunityHandler() {
   const updates: Opportunity[] = [];
@@ -9,27 +11,33 @@ export function getDistrictToOpportunityHandler() {
   return {
     async addDistrictToOpportunity(
       opportunity: Opportunity,
-      accompanyingDistrict?: District | null,
     ): Promise<Opportunity> {
       if (opportunity.districtId) {
         return opportunity;
       }
 
       if (opportunity.type === OpportunityType.ACCOMPANYING) {
-        let district: District | null;
-        if (accompanyingDistrict !== undefined) {
-          district = accompanyingDistrict;
+        const postcode = opportunity.accompanying?.postcode;
+        if (postcode?.districtPostcode) {
+          const districtId = firstDistrictPostcode(
+            postcode.districtPostcode,
+          )?.districtId;
+          if (districtId) {
+            opportunity.districtId = districtId;
+            updates.push(opportunity);
+            return opportunity;
+          }
         } else {
-          const postcode =
-            opportunity.accompanying?.postcode ??
-            opportunity.accompanying?.postcodeId;
-          district = postcode ? await getDistrictFromPostcode(postcode) : null;
-        }
-        if (district) {
-          opportunity.district = district;
-          opportunity.districtId = district.id;
-          updates.push(opportunity);
-          return opportunity;
+          const postcodeOrId = postcode ?? opportunity.accompanying?.postcodeId;
+          const district = postcodeOrId
+            ? await getDistrictFromPostcode(postcodeOrId)
+            : null;
+          if (district) {
+            opportunity.district = district;
+            opportunity.districtId = district.id;
+            updates.push(opportunity);
+            return opportunity;
+          }
         }
       }
 

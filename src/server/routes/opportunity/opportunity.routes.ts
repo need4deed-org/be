@@ -299,22 +299,11 @@ export default async function opportunityRoutes(
         await agentRepository.save(districtUpdates);
       }
 
-      const accompanyingDistrict =
-        opportunityComments.type === OpportunityType.ACCOMPANYING &&
-        opportunityComments.accompanying?.postcode
-          ? await getDistrictFromPostcode(
-              opportunityComments.accompanying.postcode,
-            )
-          : null;
-
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
       Object.assign(
         opportunityComments,
-        await addDistrictToOpportunity(
-          opportunityComments,
-          accompanyingDistrict,
-        ),
+        await addDistrictToOpportunity(opportunityComments),
       );
 
       await updateBackfilledColumn(
@@ -341,11 +330,7 @@ export default async function opportunityRoutes(
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {
-        ...dtoOpportunityGet(
-          opportunityComments,
-          accompanyingDistrict,
-          districtCentroid,
-        ),
+        ...dtoOpportunityGet(opportunityComments, districtCentroid),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
       if (
@@ -949,6 +934,7 @@ export default async function opportunityRoutes(
       });
 
       if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
+        let appointmentDistrictId: number | undefined;
         const appointmentPostcodeValue =
           request.body.accompanyingDetails?.appointmentPostcode;
         if (appointmentPostcodeValue !== undefined) {
@@ -959,6 +945,7 @@ export default async function opportunityRoutes(
             );
           }
           accompanying.postcodeId = postcode.id;
+          appointmentDistrictId = (await getDistrictFromPostcode(postcode))?.id;
         }
 
         if (opportunity.accompanyingId) {
@@ -991,6 +978,18 @@ export default async function opportunityRoutes(
           } catch {
             throw new BadRequestError("Saving new accompanying failed");
           }
+        }
+
+        // the stored district follows the appointment postcode (be#1210)
+        if (
+          appointmentDistrictId &&
+          appointmentDistrictId !== opportunity.districtId
+        ) {
+          await patchEntity(
+            Opportunity,
+            { districtId: appointmentDistrictId } as Partial<Opportunity>,
+            opportunity.id,
+          );
         }
       }
 

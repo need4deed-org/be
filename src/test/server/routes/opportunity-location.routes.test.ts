@@ -72,6 +72,11 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
         all.findIndex((other) => other.districtId === link.districtId) ===
         index,
     );
+    if (!ngoLink || !appointmentLink) {
+      throw new Error(
+        "Fixture needs seeded postcodes in at least two districts (district_postcode).",
+      );
+    }
     ngoPostcode = ngoLink.postcode;
     ngoDistrictId = ngoLink.districtId;
     appointmentPostcode = appointmentLink.postcode;
@@ -181,5 +186,34 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     const row = await listed("volunteer", opportunities.accompanying.id);
     expect(row.postcode).toBeNull();
     expect(row.district).toEqual({ id: appointmentDistrictId });
+  });
+
+  it("returns the same postcode on the volunteer-facing list", async () => {
+    const res = await get(
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.ACCOMPANYING}&status=${OpportunityStatusType.SEARCHING}&search=${encodeURIComponent(prefix)}`,
+      "coordinator",
+    );
+    expect(res.statusCode).toBe(200);
+    const row = res
+      .json()
+      .data.find((r: { id: number }) => r.id === opportunities.accompanying.id);
+    expect(row.postcode).toBe(appointmentPostcode.value);
+  });
+
+  it("stores the new appointment postcode's district when it is edited", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunities.accompanying.id}`,
+      cookies: { [accessCookieName]: cookies.coordinator },
+      payload: {
+        accompanyingDetails: { appointmentPostcode: ngoPostcode.value },
+      },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const stored = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: opportunities.accompanying.id,
+    });
+    expect(stored.districtId).toBe(ngoDistrictId);
   });
 });

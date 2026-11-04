@@ -62,6 +62,13 @@ export async function getDistrictCentroids(
   return result;
 }
 
+// A postcode can straddle districts; the lowest district_postcode.id wins.
+export function firstDistrictPostcode<T extends { id: number }>(
+  links: Voidable<T[]>,
+): T | undefined {
+  return [...(links ?? [])].sort((a, b) => a.id - b.id)[0];
+}
+
 export async function getDistrictFromPostcode(
   postcode: Voidable<Postcode | number>,
   manager: DataSource | EntityManager = dataSource,
@@ -76,11 +83,12 @@ export async function getDistrictFromPostcode(
   }
   if (postcodeId) {
     const districtPostcodeRepository = getRepository(manager, DistrictPostcode);
-    const districtPostcode = await districtPostcodeRepository.findOne({
-      where: { postcodeId: postcodeId },
-      relations: ["district"],
-      order: { id: "ASC" },
-    });
+    const districtPostcode = firstDistrictPostcode(
+      await districtPostcodeRepository.find({
+        where: { postcodeId: postcodeId },
+        relations: ["district"],
+      }),
+    );
     if (districtPostcode) {
       return districtPostcode.district;
     }

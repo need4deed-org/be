@@ -4,6 +4,7 @@ import {
   dtoOpportunityGetList,
   dtoVolunteerOpportunityGetList,
   getOpportunityContact,
+  getOpportunityDistrictIdNeedingCentroid,
   getOpportunityLocation,
 } from "../../../services/dto/dto-opportunity";
 
@@ -226,7 +227,24 @@ describe("getOpportunityLocation", () => {
     };
     const expected = { postcode: "12043", district: { id: 6 } };
     expect(dtoOpportunityGetList(opportunity as any)).toMatchObject(expected);
-    expect(dtoOpportunityGet(opportunity as any)).toMatchObject(expected);
+    expect(dtoOpportunityGet(opportunity as any)).toMatchObject({
+      ...expected,
+      accompanyingDetails: { appointmentDistrict: { id: 6 } },
+    });
+    expect(dtoVolunteerOpportunityGetList(opportunity as any)).toMatchObject(
+      expected,
+    );
+  });
+
+  it("centers the map-pin fallback on the same district it reports", () => {
+    const opportunity = {
+      type: "accompanying",
+      status: "opp-searching",
+      districtId: 5,
+      deal: { postcode: ngoPostcode },
+      accompanying: { postcode: appointmentPostcode },
+    };
+    expect(getOpportunityDistrictIdNeedingCentroid(opportunity as any)).toBe(6);
   });
 });
 

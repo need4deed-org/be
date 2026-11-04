@@ -10,11 +10,9 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Deal from "../../data/entity/deal.entity";
-import District from "../../data/entity/location/district.entity";
-import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
-import { Centroid } from "../../data/utils/get-district";
+import { Centroid, firstDistrictPostcode } from "../../data/utils/get-district";
 import logger from "../../logger";
 import { isNoMatchFound } from "../../server/utils/data/no-match-found";
 import {
@@ -53,8 +51,7 @@ function resolveMapPin(opportunity: Opportunity): MapPinResolution {
   return {
     lat: null,
     lon: null,
-    neededDistrictId:
-      opportunity.district?.id ?? opportunity.districtId ?? undefined,
+    neededDistrictId: getOpportunityLocation(opportunity).districtId,
   };
 }
 
@@ -105,11 +102,12 @@ interface OpportunityLocation {
   districtId: number | undefined;
 }
 
-function firstDistrictId(postcode: Postcode): number | undefined {
-  const [first] = [...(postcode.districtPostcode ?? [])].sort(
-    (a, b) => a.id - b.id,
-  );
-  return first?.districtId;
+export function getAppointmentDistrictId(
+  opportunity: Opportunity,
+): number | undefined {
+  return firstDistrictPostcode(
+    accompanyingForType(opportunity)?.postcode?.districtPostcode,
+  )?.districtId;
 }
 
 export function getOpportunityLocation(
@@ -120,7 +118,7 @@ export function getOpportunityLocation(
   if (appointmentPostcode) {
     return {
       postcode: appointmentPostcode.value ?? null,
-      districtId: firstDistrictId(appointmentPostcode) ?? storedDistrictId,
+      districtId: getAppointmentDistrictId(opportunity) ?? storedDistrictId,
     };
   }
   return {
@@ -256,7 +254,6 @@ export function dtoVolunteerOpportunityGetList(
 
 export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
-  accompanyingDistrict?: District | null,
   districtCentroid?: Centroid,
 ): ApiOpportunityGet {
   const deal = dealOrEmpty(opportunityComments);
@@ -310,7 +307,7 @@ export function dtoOpportunityGet(
       accompanyingForType(opportunityComments)!,
       opportunityComments.onetimer?.date,
       deal.dealLanguage,
-      accompanyingDistrict,
+      getAppointmentDistrictId(opportunityComments),
     ),
     event: eventStart
       ? {
