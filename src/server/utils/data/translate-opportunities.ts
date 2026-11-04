@@ -90,9 +90,9 @@ export async function divertTranslatedEdits(
   submitted: Pick<Partial<Opportunity>, "title" | "info">,
   effectiveType: OpportunityType,
   lang: Lang | null,
-): Promise<void> {
+): Promise<number> {
   if (!lang) {
-    return;
+    return 0;
   }
   const current = await manager.findOneOrFail(Opportunity, {
     where: { id: opportunity.id },
@@ -103,21 +103,22 @@ export async function divertTranslatedEdits(
   )
     ? ["title", "info"]
     : ["title"];
-  const diverted = await writeHumanTranslations(
+  const written = await writeHumanTranslations(
     manager,
     EntityTableName.OPPORTUNITY,
     current,
     lang,
     Object.fromEntries(fields.map((field) => [field, submitted[field]])),
   );
-  if (!diverted) {
-    return;
+  if (written === null) {
+    return 0;
   }
   for (const field of fields) {
     if (submitted[field] !== undefined) {
       delete patch[field];
     }
   }
+  return written;
 }
 
 const BACKFILL_LIMIT = 100;

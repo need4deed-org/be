@@ -12,17 +12,17 @@ export async function writeHumanTranslations(
   entity: TranslatableEntity,
   lang: Lang,
   fields: Record<string, string | null | undefined>,
-): Promise<boolean> {
+): Promise<number | null> {
   const source = entity as SourceEntity;
   const { idOf, langOf } = await languageIds(manager);
   if (lang === originalLang(source, langOf)) {
-    return false;
+    return null;
   }
   const submitted = Object.entries(fields).filter(
     (entry): entry is [string, string | null] => entry[1] !== undefined,
   );
   if (submitted.length === 0) {
-    return true;
+    return 0;
   }
   const fieldNames = submitted.map(([fieldName]) => fieldName);
   const { fk } = getMachineEntry(entityType, fieldNames);
@@ -56,5 +56,5 @@ export async function writeHumanTranslations(
   for (const [fieldName, text] of changed) {
     await storeHuman(manager, fk, source, idOf[lang], fieldName, text);
   }
-  return true;
+  return changed.length;
 }
