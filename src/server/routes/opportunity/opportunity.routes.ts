@@ -45,7 +45,6 @@ import logger from "../../../logger";
 import {
   accompanyingParserOpportunity,
   dtoOpportunityGet,
-  dtoOpportunityGetList,
   getOpportunityDistrictIdNeedingCentroid,
   parseBerlinDatetime,
   parseOpportunity,
@@ -83,7 +82,6 @@ import {
   assertRoleIn,
   getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
-  getCategoryToDealHandler,
   getDistrictToAgentHandler,
   getDistrictToOpportunityHandler,
   getEntitySnapshot,
@@ -109,6 +107,10 @@ import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
 import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
+import {
+  dtoOpportunityListForCaller,
+  loadOpportunityList,
+} from "../../utils/data/opportunity-list";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
@@ -121,6 +123,7 @@ import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-descr
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
+import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
 async function sendNewOpportunityEmail(
@@ -220,6 +223,10 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityEventRegistrationRoutes, {
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
+  });
+
+  await fastify.register(opportunityRecommendedVolunteerRoutes, {
+    prefix: `:id${RoutePrefix.RECOMMENDED_VOLUNTEERS}`,
   });
 
   fastify.get<{
@@ -429,20 +436,6 @@ export default async function opportunityRoutes(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
       );
 
-      const relations = [
-        "deal.dealActivity.activity",
-        "deal.dealLanguage.language",
-        "deal.dealTimeslot.timeslot",
-        "deal.dealDistrict.district",
-        "deal.postcode",
-        "agent",
-        "agent.address.postcode",
-        "accompanying.postcode.districtPostcode",
-        "onetimer",
-        "opportunityVolunteer.volunteer.person",
-        "originalLanguage",
-      ];
-
       const opportunityRepository = fastify.db.opportunityRepository;
 
       const [pageRows, count] =
@@ -470,82 +463,15 @@ export default async function opportunityRoutes(
               ...(order ? order : {}),
             });
 
-      // Loaded without the filter: a where on a relation also trims what it loads.
-      const pageIds = pageRows.map(({ id }) => id);
-      const loaded = pageIds.length
-        ? await opportunityRepository.find({
-            where: { id: In(pageIds) },
-            relations,
-            relationLoadStrategy: "query",
-          })
-        : [];
-      const loadedById = new Map(loaded.map((o) => [o.id, o]));
-      const opportunities = pageIds
-        .map((id) => loadedById.get(id))
-        .filter((o): o is Opportunity => o !== undefined);
-
-      const { addCategoryToDeal, updates: dealUpdates } =
-        getCategoryToDealHandler();
-
-      const { addDistrictToOpportunity, updates: opportunityUpdates } =
-        getDistrictToOpportunityHandler();
-
-      const opportunitiesCategoryDistrict = await Promise.all(
-        opportunities.map(async (opportunity) => {
-          Object.assign(
-            opportunity,
-            await addDistrictToOpportunity(opportunity),
-          );
-          addCategoryToDeal(opportunity.deal);
-          return opportunity;
-        }),
-      );
-
-      await updateBackfilledColumn(
-        fastify.db.dealRepository,
-        dealUpdates,
-        "categoryId",
-      );
-      await updateBackfilledColumn(
-        opportunityRepository,
-        opportunityUpdates,
-        "districtId",
-      );
-      logger.debug(
-        `Saving category updates: ${dealUpdates.length}, opportunity updates: ${opportunityUpdates.length}`,
-      );
-
-      await translateOpportunities(
+      const data = await dtoOpportunityListForCaller(
         fastify,
-        opportunitiesCategoryDistrict,
+        request,
+        await loadOpportunityList(
+          fastify,
+          pageRows.map(({ id }) => id),
+        ),
         requestLanguage(request.query),
       );
-
-      await maskForCaller(request, opportunitiesCategoryDistrict);
-
-      const neededDistrictIds = new Map(
-        opportunitiesCategoryDistrict.map((opportunity) => [
-          opportunity.id,
-          getOpportunityDistrictIdNeedingCentroid(opportunity),
-        ]),
-      );
-      const districtCentroids = await getDistrictCentroids([
-        ...new Set(
-          [...neededDistrictIds.values()].filter(
-            (id): id is number => id !== undefined,
-          ),
-        ),
-      ]);
-
-      const data = opportunitiesCategoryDistrict.map((opportunity) => {
-        const districtId = neededDistrictIds.get(opportunity.id);
-        return dtoOpportunityGetList(
-          opportunity,
-          districtId !== undefined
-            ? districtCentroids.get(districtId)
-            : undefined,
-        );
-      });
 
       return reply.status(200).send({
         message,

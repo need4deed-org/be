@@ -1,4 +1,8 @@
-import { EntityTableName, UserRole } from "need4deed-sdk";
+import {
+  EntityTableName,
+  OpportunityStatusType,
+  UserRole,
+} from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import Comment from "../../../../data/entity/comment.entity";
 import Address from "../../../../data/entity/location/address.entity";
@@ -330,20 +334,62 @@ describe("maskPii", () => {
       expect(opp.accompanying!.address).toBe("Hidden St 5");
     });
 
-    it("hides the appointment postcode of an opportunity that isn't visible, keeping its district link", () => {
-      const districtPostcode = [{ id: 1, districtId: 3 }];
-      const opp = Object.assign(new Opportunity(), {
+    const hiddenAppointment = (
+      status: OpportunityStatusType = OpportunityStatusType.SEARCHING,
+    ) =>
+      Object.assign(new Opportunity(), {
         id: 5,
+        status,
         accompanying: Object.assign(makeAccompanying(), {
-          postcode: { id: 7, value: "12043", districtPostcode },
+          postcode: {
+            id: 7,
+            value: "12043",
+            latitude: 52.48,
+            longitude: 13.43,
+            districtPostcode: [{ id: 1, districtId: 3 }],
+          },
         }),
       });
-      maskPii(opp, ctx({ opportunityIds: [] }));
+
+    it("shows a volunteer the appointment postcode of an opportunity that isn't visible, without coordinates", () => {
+      const opp = hiddenAppointment();
+      maskPii(opp, ctx({ role: UserRole.VOLUNTEER, opportunityIds: [] }));
       expect(opp.accompanying!.postcode).toMatchObject({
-        value: null,
-        districtPostcode,
+        value: "12043",
+        latitude: null,
+        longitude: null,
+        districtPostcode: [{ id: 1, districtId: 3 }],
       });
+      expect(opp.accompanying!.address).toMatch(MASKED);
     });
+
+    it.each([
+      OpportunityStatusType.NEW,
+      OpportunityStatusType.ACTIVE,
+      OpportunityStatusType.INACTIVE,
+      OpportunityStatusType.PAST,
+    ])(
+      "hides a volunteer the appointment postcode of a %s opportunity that isn't visible",
+      (status) => {
+        const opp = hiddenAppointment(status);
+        maskPii(opp, ctx({ role: UserRole.VOLUNTEER, opportunityIds: [] }));
+        expect(opp.accompanying!.postcode!.value).toBeNull();
+      },
+    );
+
+    it.each([UserRole.USER, UserRole.AGENT])(
+      "hides the appointment postcode of an opportunity that isn't visible from a %s caller, keeping its district link",
+      (role) => {
+        const opp = hiddenAppointment();
+        maskPii(opp, ctx({ role, opportunityIds: [] }));
+        expect(opp.accompanying!.postcode).toMatchObject({
+          value: null,
+          latitude: null,
+          longitude: null,
+          districtPostcode: [{ id: 1, districtId: 3 }],
+        });
+      },
+    );
 
     it("keeps the appointment postcode when the opportunity is visible", () => {
       const opp = Object.assign(new Opportunity(), {

@@ -15,13 +15,18 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { DealType } from "../../../data/types";
-import { getRepository, hashPassword } from "../../../data/utils";
+import {
+  getDistrictCentroids,
+  getRepository,
+  hashPassword,
+} from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
+const MASKED = /^[a-z]\*\*\*$/;
 
-type Caller = "volunteer" | "coordinator";
+type Caller = "volunteer" | "coordinator" | "user";
 
 describe("opportunity location: appointment postcode for accompanying (be#1210)", () => {
   let fastify: FastifyInstance;
@@ -86,6 +91,7 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       new Accompanying({
         name: "Refugee",
         address: "Appointment St 1",
+        phone: "+49 30 1234567",
         postcodeId: appointmentPostcode.id,
       }),
     );
@@ -117,6 +123,7 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     const roles: Record<Caller, UserRole> = {
       volunteer: UserRole.VOLUNTEER,
       coordinator: UserRole.COORDINATOR,
+      user: UserRole.USER,
     };
     for (const caller of Object.keys(roles) as Caller[]) {
       const person = await fastify.db.personRepository.save(
@@ -191,10 +198,46 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     });
   });
 
-  it("hides the appointment postcode from a volunteer who isn't matched", async () => {
+  it("shows the appointment postcode to a volunteer who isn't matched", async () => {
     const row = await listed("volunteer", opportunities.accompanying.id);
-    expect(row.postcode).toBeNull();
+    expect(row.postcode).toBe(appointmentPostcode.value);
     expect(row.district).toEqual({ id: appointmentDistrictId });
+  });
+
+  it("shows the appointment postcode on the detail to a volunteer who isn't matched", async () => {
+    const res = await get(
+      `/opportunity/${opportunities.accompanying.id}`,
+      "volunteer",
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toMatchObject({
+      postcode: appointmentPostcode.value,
+      accompanyingDetails: { appointmentPostcode: appointmentPostcode.value },
+    });
+    const details = res.json().data.accompanyingDetails;
+    expect(details.appointmentAddress).toMatch(MASKED);
+    expect(details.refugeeName).toMatch(MASKED);
+    expect(details.refugeeNumber).toMatch(MASKED);
+  });
+
+  it("pins an accompanying opportunity at its appointment postcode (be#1272)", async () => {
+    const row = await listed("coordinator", opportunities.accompanying.id);
+    expect(appointmentPostcode.latitude).not.toBeNull();
+    expect(row).toMatchObject({
+      lat: appointmentPostcode.latitude,
+      lon: appointmentPostcode.longitude,
+    });
+  });
+
+  it("pins the appointment district's centroid, not the postcode, for a volunteer who isn't matched", async () => {
+    const row = await listed("volunteer", opportunities.accompanying.id);
+    const centroid = (await getDistrictCentroids([appointmentDistrictId])).get(
+      appointmentDistrictId,
+    );
+    expect(row).toMatchObject({
+      lat: centroid?.latitude,
+      lon: centroid?.longitude,
+    });
   });
 
   it("returns the same postcode on the volunteer-facing list", async () => {
@@ -207,6 +250,24 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       .json()
       .data.find((r: { id: number }) => r.id === opportunities.accompanying.id);
     expect(row.postcode).toBe(appointmentPostcode.value);
+  });
+
+  it("shows the appointment postcode on the volunteer-facing list to a volunteer who isn't matched", async () => {
+    const res = await get(
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.ACCOMPANYING}&status=${OpportunityStatusType.SEARCHING}&search=${encodeURIComponent(prefix)}`,
+      "volunteer",
+    );
+    expect(res.statusCode).toBe(200);
+    const row = res
+      .json()
+      .data.find((r: { id: number }) => r.id === opportunities.accompanying.id);
+    expect(row.postcode).toBe(appointmentPostcode.value);
+  });
+
+  it("hides the appointment postcode from a caller who isn't a volunteer", async () => {
+    const row = await listed("user", opportunities.accompanying.id);
+    expect(row.postcode).toBeNull();
+    expect(row.district).toEqual({ id: appointmentDistrictId });
   });
 
   it("stores the new appointment postcode's district when it is edited", async () => {
