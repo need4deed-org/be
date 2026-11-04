@@ -117,6 +117,7 @@ import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-descr
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
+import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
 async function sendNewOpportunityEmail(
@@ -192,6 +193,10 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityEventRegistrationRoutes, {
     prefix: `:id${RoutePrefix.REGISTRATIONS}`,
+  });
+
+  await fastify.register(opportunityRecommendedVolunteerRoutes, {
+    prefix: `:id${RoutePrefix.RECOMMENDED_VOLUNTEERS}`,
   });
 
   fastify.get<{
