@@ -216,4 +216,45 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     });
     expect(stored.districtId).toBe(ngoDistrictId);
   });
+
+  const patch = (payload: object) =>
+    fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunities.accompanying.id}`,
+      cookies: { [accessCookieName]: cookies.coordinator },
+      payload,
+    });
+  const storedDistrictId = async () =>
+    (
+      await fastify.db.opportunityRepository.findOneByOrFail({
+        id: opportunities.accompanying.id,
+      })
+    ).districtId;
+
+  it("clears the stored district when the new appointment postcode has no district link", async () => {
+    const [unlinked] = await dataSource.query(
+      `SELECT p.value FROM postcode p
+       WHERE NOT EXISTS (SELECT 1 FROM district_postcode dp WHERE dp.postcode_id = p.id)
+       LIMIT 1`,
+    );
+    if (!unlinked) {
+      throw new Error("Fixture needs a seeded postcode without a district.");
+    }
+    const res = await patch({
+      accompanyingDetails: { appointmentPostcode: unlinked.value },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(await storedDistrictId()).toBeNull();
+  });
+
+  it("clears the appointment's district when the opportunity stops being accompanying", async () => {
+    await patch({
+      accompanyingDetails: { appointmentPostcode: appointmentPostcode.value },
+    });
+    expect(await storedDistrictId()).toBe(appointmentDistrictId);
+
+    const res = await patch({ opportunity_type: OpportunityType.REGULAR });
+    expect(res.statusCode).toBe(204);
+    expect(await storedDistrictId()).toBeNull();
+  });
 });

@@ -201,6 +201,8 @@ export function dtoOpportunityGetList(
     accompanyingDetails: dtoOpportunityAccompanying(
       accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
+      undefined,
+      getAppointmentDistrictId(opportunity),
     ),
     agentTitle: opportunity.agent?.title ?? "",
     agentId: opportunity.agentId,
@@ -246,6 +248,7 @@ export function dtoVolunteerOpportunityGetList(
       accompanyingForType(opportunity)!,
       opportunity.onetimer?.date,
       deal.dealLanguage,
+      getAppointmentDistrictId(opportunity),
     ),
     statusMatch: opportunity.statusMatch,
     postcode: location.postcode,
