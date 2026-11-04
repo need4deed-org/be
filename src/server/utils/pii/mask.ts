@@ -73,18 +73,13 @@ function isAgentVisible(agentId: number, ctx: CallerVisibility): boolean {
   return ctx.agentIds.has(agentId) || ctx.matchedAgentIds.has(agentId);
 }
 
-const OPEN_OPPORTUNITY_STATUSES: readonly OpportunityStatusType[] = [
-  OpportunityStatusType.NEW,
-  OpportunityStatusType.SEARCHING,
-];
-
 function canSeeAppointmentPostcode(
   opportunity: Opportunity,
   ctx: CallerVisibility,
 ): boolean {
   return (
     ctx.role === UserRole.VOLUNTEER &&
-    OPEN_OPPORTUNITY_STATUSES.includes(opportunity.status)
+    opportunity.status === OpportunityStatusType.SEARCHING
   );
 }
 

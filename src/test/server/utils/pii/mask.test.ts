@@ -363,7 +363,12 @@ describe("maskPii", () => {
       expect(opp.accompanying!.address).toMatch(MASKED);
     });
 
-    it.each([OpportunityStatusType.ACTIVE, OpportunityStatusType.PAST])(
+    it.each([
+      OpportunityStatusType.NEW,
+      OpportunityStatusType.ACTIVE,
+      OpportunityStatusType.INACTIVE,
+      OpportunityStatusType.PAST,
+    ])(
       "hides a volunteer the appointment postcode of a %s opportunity that isn't visible",
       (status) => {
         const opp = hiddenAppointment(status);
