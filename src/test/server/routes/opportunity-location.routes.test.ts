@@ -20,6 +20,7 @@ import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
+const MASKED = /^[a-z]\*\*\*$/;
 
 type Caller = "volunteer" | "coordinator" | "user";
 
@@ -86,6 +87,7 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       new Accompanying({
         name: "Refugee",
         address: "Appointment St 1",
+        phone: "+49 30 1234567",
         postcodeId: appointmentPostcode.id,
       }),
     );
@@ -209,8 +211,9 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       accompanyingDetails: { appointmentPostcode: appointmentPostcode.value },
     });
     const details = res.json().data.accompanyingDetails;
-    expect(details.appointmentAddress).not.toBe(accompanying.address);
-    expect(details.refugeeName).not.toBe(accompanying.name);
+    expect(details.appointmentAddress).toMatch(MASKED);
+    expect(details.refugeeName).toMatch(MASKED);
+    expect(details.refugeeNumber).toMatch(MASKED);
   });
 
   it("returns the same postcode on the volunteer-facing list", async () => {
