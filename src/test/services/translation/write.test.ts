@@ -75,17 +75,17 @@ describe("translation writes", () => {
 
   describe("writeHumanTranslations", () => {
     it.each([
-      [Lang.DE, Lang.DE, false],
-      [Lang.DE, Lang.EN, true],
-      [Lang.EN, Lang.EN, false],
-      [Lang.EN, Lang.DE, true],
+      [Lang.DE, Lang.DE, null],
+      [Lang.DE, Lang.EN, 0],
+      [Lang.EN, Lang.EN, null],
+      [Lang.EN, Lang.DE, 0],
     ])(
-      "original %s, written in %s: handled %s",
-      async (original, lang, handled) => {
+      "original %s, written in %s: returns %s",
+      async (original, lang, written) => {
         const opportunity = await queued({ originalLanguageId: ids[original] });
         expect(
           await writeHumanTranslations(manager(), OPP, opportunity, lang, {}),
-        ).toBe(handled);
+        ).toBe(written);
       },
     );
 
@@ -93,10 +93,10 @@ describe("translation writes", () => {
       const legacy = await queued({ originalLanguageId: null });
       expect(
         await writeHumanTranslations(manager(), OPP, legacy, Lang.DE, {}),
-      ).toBe(false);
+      ).toBe(null);
       expect(
         await writeHumanTranslations(manager(), OPP, legacy, Lang.EN, {}),
-      ).toBe(true);
+      ).toBe(0);
     });
 
     it("stores a changed field as a human translation and keeps the source", async () => {
