@@ -145,14 +145,14 @@ function missingToken(
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
 
-  for (const email of source.match(EMAIL) ?? []) {
-    if (!output.includes(email)) {
-      return "email_missing";
-    }
-  }
   for (const url of source.match(URL) ?? []) {
     if (!output.includes(trimTrailingPunctuation(url))) {
       return "url_missing";
+    }
+  }
+  for (const email of source.match(EMAIL) ?? []) {
+    if (!output.includes(email)) {
+      return "email_missing";
     }
   }
   for (const phone of source.match(PHONE) ?? []) {

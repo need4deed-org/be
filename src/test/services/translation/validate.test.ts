@@ -89,6 +89,16 @@ describe("validateTranslation", () => {
       "In late August from 4 pm for children",
       Lang.EN,
     ).toMatchObject({ code: "date_missing" });
+    expectCode(
+      "Details at https://example.org/kontakt/info@example.org",
+      "Alle Details findet ihr auf unserer Kontaktseite",
+      Lang.DE,
+    ).toMatchObject({ code: "url_missing" });
+    expectCode(
+      "Open from 4:30 pm, call +49 30 1234567",
+      "Geöffnet am Nachmittag, Telefon +49 30 1234567",
+      Lang.DE,
+    ).toMatchObject({ code: "time_missing" });
   });
 
   it("allows notation changes that keep the values", () => {
