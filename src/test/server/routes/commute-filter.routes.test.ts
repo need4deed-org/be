@@ -501,4 +501,43 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       expect(own(opportunities, res)).toEqual([...expected].sort());
     },
   );
+
+  it.each([
+    [
+      "the accompanying postcode before the deal postcode",
+      () => opportunities.accompanying20Deal50.id,
+      true,
+    ],
+    [
+      "the deal postcode before the agent address",
+      () => opportunities.deal20.id,
+      true,
+    ],
+    [
+      "the agent address when there is no deal postcode",
+      () => opportunities.noDealAgent50.id,
+      false,
+    ],
+  ])(
+    "uses %s as the opportunity commute source",
+    async (_, sourceId, includesSameAsOrigin) => {
+      const res = await get(
+        `/volunteer?filter[search]=Commute${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_OPPORTUNITY_ID, sourceId(), 30)}`,
+      );
+      expect(res.statusCode).toBe(200);
+      expect(own(volunteers, res).includes("sameAsOrigin")).toBe(
+        includesSameAsOrigin,
+      );
+    },
+  );
+
+  it("uses a volunteer address before its deal postcode as the commute source", async () => {
+    const res = await get(
+      `/opportunity?limit=100&filter[search]=${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_VOLUNTEER_ID, volunteers.sameAsOrigin.id, 30)}`,
+    );
+    expect(res.statusCode).toBe(200);
+    const matchingOpportunities = own(opportunities, res);
+    expect(matchingOpportunities).toContain("deal20");
+    expect(matchingOpportunities).not.toContain("deal50");
+  });
 });
