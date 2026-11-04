@@ -32,13 +32,3 @@ export interface TranslationProvider {
   readonly name: string;
   translate(request: TranslationRequest): Promise<ProviderResult>;
 }
-
-export type TranslationErrorCode =
-  | "empty"
-  | "length_ratio"
-  | "token_missing"
-  | "untranslated"
-  | "source_is_target"
-  | "wrong_language"
-  | "bad_response"
-  | "provider_unavailable";

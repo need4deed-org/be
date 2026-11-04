@@ -1,4 +1,9 @@
-import { Lang, TranslationOrigin, TranslationStatus } from "need4deed-sdk";
+import {
+  Lang,
+  TranslationErrorCode,
+  TranslationOrigin,
+  TranslationStatus,
+} from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import logger from "../../logger";
@@ -6,7 +11,6 @@ import { TranslationConfig } from "./config";
 import { sourceHashOf } from "./queue";
 import { translatedEntities } from "./registry";
 import { TranslationService } from "./service";
-import { TranslationErrorCode } from "./types";
 
 export interface BatchOptions {
   rowIds?: number[];

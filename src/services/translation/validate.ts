@@ -1,7 +1,6 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, TranslationErrorCode } from "need4deed-sdk";
 import { languageHint } from "./language-hint";
 import { similarity, wordCount } from "./similarity";
-import { TranslationErrorCode } from "./types";
 
 export type ValidationResult =
   | { status: "ok" }
@@ -137,28 +136,28 @@ function rangeStartPresent(output: string, hour: number): boolean {
   );
 }
 
-function tokensPreserved(
+function missingToken(
   source: string,
   output: string,
   sourceLang: Lang,
-): boolean {
+): TranslationErrorCode | undefined {
   const { time, fullHour, hourRangeStart } = SOURCE_TIME_PATTERNS[sourceLang];
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
 
-  for (const email of source.match(EMAIL) ?? []) {
-    if (!output.includes(email)) {
-      return false;
-    }
-  }
   for (const url of source.match(URL) ?? []) {
     if (!output.includes(trimTrailingPunctuation(url))) {
-      return false;
+      return "url_missing";
+    }
+  }
+  for (const email of source.match(EMAIL) ?? []) {
+    if (!output.includes(email)) {
+      return "email_missing";
     }
   }
   for (const phone of source.match(PHONE) ?? []) {
     if (!squashedOutput.includes(squash(phone))) {
-      return false;
+      return "phone_missing";
     }
   }
 
@@ -172,7 +171,7 @@ function tokensPreserved(
     return " ";
   });
   if (!datesPreserved) {
-    return false;
+    return "date_missing";
   }
   for (const [, hour, minutes, meridiem] of rest.matchAll(hourRangeStart)) {
     const start = hour24(Number(hour), meridiem);
@@ -181,25 +180,25 @@ function tokensPreserved(
         ? !timePresent(output, start, minutes)
         : !rangeStartPresent(output, start)
     ) {
-      return false;
+      return "time_missing";
     }
   }
   rest = rest.replace(hourRangeStart, " ");
   for (const [, hour, minutes, meridiem] of rest.matchAll(time)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), minutes)) {
-      return false;
+      return "time_missing";
     }
   }
   rest = rest.replace(time, " ");
   for (const [, hour] of rest.matchAll(H_HOUR)) {
     if (!hourPresent(output, Number(hour))) {
-      return false;
+      return "time_missing";
     }
   }
   rest = rest.replace(H_HOUR, " ");
   for (const [, hour, meridiem] of rest.matchAll(fullHour)) {
     if (!timePresent(output, hour24(Number(hour), meridiem), "00")) {
-      return false;
+      return "time_missing";
     }
   }
   const numbersOutput = collapseGrouping(output);
@@ -210,10 +209,10 @@ function tokensPreserved(
   );
   for (const [number] of rest.matchAll(NUMBER)) {
     if (!numberPresent(numbersOutput, Number(number))) {
-      return false;
+      return "number_missing";
     }
   }
-  return true;
+  return undefined;
 }
 
 export function validateTranslation(
@@ -238,8 +237,9 @@ export function validateTranslation(
     }
   }
   const sourceLang = targetLang === Lang.DE ? Lang.EN : Lang.DE;
-  if (!tokensPreserved(src, out, sourceLang)) {
-    return invalid("token_missing");
+  const missing = missingToken(src, out, sourceLang);
+  if (missing) {
+    return invalid(missing);
   }
   const words = wordCount(src);
   if (out === src) {
