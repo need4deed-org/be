@@ -7,18 +7,17 @@ import {
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import { berlinTimeZone } from "../../../config";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import logger from "../../../logger";
 import {
   getOpportunityDescription,
   getOpportunityLocation,
 } from "../../../services/dto/dto-opportunity";
 import { getAvailability } from "../../../services/dto/utils";
-import { tryCatchFn } from "../../../services/utils";
 
 const GERMAN_SUPPORT_CATEGORY = "de-lng-support";
-const GERMAN_MENTION = /\b(german(?!y\b)|deutsch(?!(e|em|en|er|es)\b|land))/i;
+const GERMAN_MENTION = /\b(german(?!y\b)|deutsch(?!land))/i;
 const GERMAN_ISO_CODE = "de";
 const FLUENT_GERMAN = new Set<string>([
   LangProficiency.FLUENT,
@@ -66,17 +65,20 @@ export const recommendationOpportunityRelations = [
 const overlap = <T>(a: Set<T>, b: Set<T>) =>
   [...a].filter((item) => b.has(item)).length;
 
-const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
-  logger.error(`Error getting availability for a recommendation: ${error}`);
-});
+const slotKey = (dealTimeslot: DealTimeslot) => {
+  try {
+    const [{ day, daytime }] = getAvailability([dealTimeslot]);
+    return `${day}|${daytime}`;
+  } catch {
+    return undefined;
+  }
+};
 
 const availabilityKeys = (opportunityOrVolunteer: Opportunity | Volunteer) =>
   new Set(
-    (
-      getAvailabilityTryCatch(
-        opportunityOrVolunteer.deal?.dealTimeslot ?? [],
-      ) ?? []
-    ).map(({ day, daytime }) => `${day}|${daytime}`),
+    (opportunityOrVolunteer.deal?.dealTimeslot ?? [])
+      .map(slotKey)
+      .filter((key): key is string => key !== undefined),
   );
 
 export function isGermanOpportunity(opportunity: Opportunity): boolean {

@@ -21,6 +21,7 @@ describe("isGermanOpportunity", () => {
     ["description", { title: "Treffen", info: "We practise German together" }],
     ["compound", { title: "Treffen", info: "Deutschunterricht für Kinder" }],
     ["other compound", { title: "Deutschtraining für Frauen" }],
+    ["inflection", { title: "Hilfe mit der deutschen Sprache" }],
   ])("detects German mentioned in the %s", (_, fields) => {
     const opportunity = {
       type: OpportunityType.REGULAR,
@@ -44,7 +45,6 @@ describe("isGermanOpportunity", () => {
   it.each([
     "Neu in Deutschland",
     "Refugees newly arrived in Germany",
-    "Begleitung zum deutschen Jobcenter",
     "Ämter Deutschlands",
   ])("ignores the country in %s", (title) => {
     const opportunity = { type: OpportunityType.REGULAR, title, deal: null };
@@ -98,6 +98,23 @@ describe("matchScore", () => {
     expect(matchScore(opportunity as any, mondayVolunteer as any)).toBe(1);
     expect(matchScore(opportunity as any, mondayNoonVolunteer as any)).toBe(2);
     expect(matchScore(opportunity as any, tuesdayVolunteer as any)).toBe(0);
+  });
+
+  it("keeps a volunteer's valid slots when another slot is malformed", () => {
+    const opportunity = {
+      type: OpportunityType.ACCOMPANYING,
+      onetimer: { date: new Date("2026-11-09T10:00:00Z") },
+      deal: { dealTimeslot: [] },
+    };
+    const volunteer = {
+      deal: {
+        dealTimeslot: [
+          slot("FREQ=WEEKLY;BYDAY=MO", 11, 14),
+          slot("FREQ=WEEKLY;BYDAY=MO", 9, 10),
+        ],
+      },
+    };
+    expect(matchScore(opportunity as any, volunteer as any)).toBe(2);
   });
 });
 
