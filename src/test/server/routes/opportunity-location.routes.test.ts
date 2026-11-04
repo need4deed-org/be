@@ -180,6 +180,15 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     const row = await listed("coordinator", opportunities.regular.id);
     expect(row.postcode).toBe(ngoPostcode.value);
     expect(row.district).toEqual({ id: ngoDistrictId });
+
+    const res = await get(
+      `/opportunity/${opportunities.regular.id}`,
+      "coordinator",
+    );
+    expect(res.json().data).toMatchObject({
+      postcode: ngoPostcode.value,
+      district: { id: ngoDistrictId },
+    });
   });
 
   it("hides the appointment postcode from a volunteer who isn't matched", async () => {
@@ -256,5 +265,36 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     const res = await patch({ opportunity_type: OpportunityType.REGULAR });
     expect(res.statusCode).toBe(204);
     expect(await storedDistrictId()).toBeNull();
+  });
+
+  it("syncs the district when a legacy row switches to accompanying with its existing appointment", async () => {
+    const legacy = await fastify.db.accompanyingRepository.save(
+      new Accompanying({
+        name: "Refugee",
+        address: "Appointment St 2",
+        postcodeId: appointmentPostcode.id,
+      }),
+    );
+    await fastify.db.opportunityRepository.update(opportunities.regular.id, {
+      accompanyingId: legacy.id,
+    });
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/opportunity/${opportunities.regular.id}`,
+      cookies: { [accessCookieName]: cookies.coordinator },
+      payload: { opportunity_type: OpportunityType.ACCOMPANYING },
+    });
+    expect(res.statusCode).toBe(204);
+
+    const stored = await fastify.db.opportunityRepository.findOneByOrFail({
+      id: opportunities.regular.id,
+    });
+    expect(stored.districtId).toBe(appointmentDistrictId);
+
+    await fastify.db.opportunityRepository.update(opportunities.regular.id, {
+      accompanyingId: null as unknown as number,
+    });
+    await fastify.db.accompanyingRepository.delete({ id: legacy.id });
   });
 });

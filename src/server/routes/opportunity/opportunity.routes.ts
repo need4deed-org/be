@@ -185,8 +185,15 @@ async function clearStaleAccompanying(
 async function syncAppointmentDistrict(
   manager: EntityManager,
   opportunityId: number,
-  postcodeId: number,
 ): Promise<void> {
+  const opportunity = await manager.findOne(Opportunity, {
+    where: { id: opportunityId },
+    relations: ["accompanying"],
+  });
+  const postcodeId = opportunity?.accompanying?.postcodeId;
+  if (!postcodeId) {
+    return;
+  }
   const district = await getDistrictFromPostcode(postcodeId, manager);
   await manager.update(Opportunity, opportunityId, {
     districtId: district?.id ?? null,
@@ -264,6 +271,7 @@ export default async function opportunityRoutes(
       const id = request.params.id;
       const relations = [
         "accompanying.postcode.districtPostcode",
+        "deal.postcode",
         "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
@@ -949,6 +957,9 @@ export default async function opportunityRoutes(
         }
       });
 
+      const switchedToAccompanying =
+        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+        opportunity.type !== OpportunityType.ACCOMPANYING;
       if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
         const appointmentPostcodeValue =
           request.body.accompanyingDetails?.appointmentPostcode;
@@ -972,12 +983,11 @@ export default async function opportunityRoutes(
                 accompanyingId,
                 manager,
               );
-              if (patched && accompanying.postcodeId) {
-                await syncAppointmentDistrict(
-                  manager,
-                  opportunity.id,
-                  accompanying.postcodeId,
-                );
+              if (
+                patched &&
+                (accompanying.postcodeId || switchedToAccompanying)
+              ) {
+                await syncAppointmentDistrict(manager, opportunity.id);
               }
               return patched;
             },
@@ -1001,34 +1011,16 @@ export default async function opportunityRoutes(
                 await manager.update(Opportunity, opportunity.id, {
                   accompanyingId: newAccompanying.id,
                 });
-                if (newAccompanying.postcodeId) {
-                  await syncAppointmentDistrict(
-                    manager,
-                    opportunity.id,
-                    newAccompanying.postcodeId,
-                  );
-                }
+                await syncAppointmentDistrict(manager, opportunity.id);
               },
             );
           } catch {
             throw new BadRequestError("Saving new accompanying failed");
           }
         }
-      } else if (
-        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
-        opportunity.accompanyingId
-      ) {
-        // switched back to accompanying, reusing the existing appointment
-        const existing = await fastify.db.accompanyingRepository.findOneBy({
-          id: opportunity.accompanyingId,
-        });
-        if (existing?.postcodeId) {
-          await syncAppointmentDistrict(
-            dataSource.manager,
-            opportunity.id,
-            existing.postcodeId,
-          );
-        }
+      } else if (switchedToAccompanying && opportunity.accompanyingId) {
+        // switched to accompanying, reusing the existing appointment
+        await syncAppointmentDistrict(dataSource.manager, opportunity.id);
       }
 
       const resolvedOnetimerDate =

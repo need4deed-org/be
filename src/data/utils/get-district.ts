@@ -66,7 +66,10 @@ export async function getDistrictCentroids(
 export function firstDistrictPostcode<T extends { id: number }>(
   links: Voidable<T[]>,
 ): T | undefined {
-  return [...(links ?? [])].sort((a, b) => a.id - b.id)[0];
+  return links?.reduce<T | undefined>(
+    (first, link) => (!first || link.id < first.id ? link : first),
+    undefined,
+  );
 }
 
 export async function getDistrictFromPostcode(
