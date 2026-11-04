@@ -42,7 +42,6 @@ import {
   QuerystringVolunteerGetList,
   ReplyMessage,
   RoutePrefix,
-  VolunteerListType,
 } from "../../types";
 import {
   alertOnChange,
@@ -67,6 +66,7 @@ import {
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
+import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import {
   resetCallerMask,
@@ -84,6 +84,7 @@ import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 import volunteerRegisterRoutes from "./register.routes";
 import volunteerOpportunityRoutes from "./volunteer-opportunity.routes";
+import volunteerRecommendedOpportunityRoutes from "./volunteer-recommended-opportunity.routes";
 
 export default async function volunteerRoutes(
   fastify: FastifyInstance,
@@ -101,23 +102,6 @@ export default async function volunteerRoutes(
     "deal.dealDistrict.district",
   ];
 
-  const listRelationsCommon = [
-    "person",
-    "deal",
-    "deal.dealLanguage.language",
-    "deal.dealDistrict.district",
-  ];
-  const listRelationsCardExtra = [
-    "deal.dealActivity.activity",
-    "deal.dealSkill.skill",
-    "deal.dealTimeslot.timeslot",
-    "person.address.postcode",
-  ];
-  const getListRelations = (listType: VolunteerListType) =>
-    listType === "table"
-      ? listRelationsCommon
-      : [...listRelationsCommon, ...listRelationsCardExtra];
-
   fastify.addHook("onRequest", fastify.authenticate());
   fastify.addHook("preHandler", async (request) => {
     const { id } = (request.params ?? {}) as { id?: string };
@@ -132,6 +116,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerDocRoutes, {
     prefix: `/:id${RoutePrefix.DOC}`,
+  });
+
+  await fastify.register(volunteerRecommendedOpportunityRoutes, {
+    prefix: `/:id${RoutePrefix.RECOMMENDED_OPPORTUNITIES}`,
   });
 
   await fastify.register(volunteerCommunicationRoutes, {
@@ -267,7 +255,7 @@ export default async function volunteerRoutes(
       const volunteers = ids.length
         ? await volunteerRepository.find({
             where: { id: In(ids) },
-            relations: getListRelations(listType ?? "card"),
+            relations: volunteerListRelations(listType ?? "card"),
             relationLoadStrategy: "query",
             order,
           })

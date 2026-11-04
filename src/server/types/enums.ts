@@ -24,6 +24,8 @@ export const RoutePrefix = {
   PERSON: "/person",
   REGISTRATIONS: "/registrations",
   POST: "/post",
+  RECOMMENDED_OPPORTUNITIES: "/recommended-opportunities",
+  RECOMMENDED_VOLUNTEERS: "/recommended-volunteers",
   REFRESH: "/refresh",
   REQUEST_RESET: "/request-reset",
   RESET_PASSWORD: "/password-reset",
