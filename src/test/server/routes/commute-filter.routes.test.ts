@@ -90,7 +90,9 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
   let cookie: string;
+  let agentCookie: string;
   let coordinator: Person;
+  let agentPerson: Person;
   let agent: Agent;
   let agentNear: Agent;
   let commuteOpportunity: Opportunity;
@@ -119,6 +121,12 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       method: "GET",
       url,
       cookies: { [accessCookieName]: cookie },
+    });
+  const getAsAgent = (url: string) =>
+    fastify.inject({
+      method: "GET",
+      url,
+      cookies: { [accessCookieName]: agentCookie },
     });
 
   beforeAll(async () => {
@@ -293,6 +301,27 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     });
     cookie = res.cookies.find((c) => c.name === accessCookieName)
       ?.value as string;
+
+    agentPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Commute", lastName: `Agent${suffix}` }),
+    );
+    const agentEmail = `commute-agent-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: agentEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentPerson.id,
+      }),
+    );
+    const agentRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: agentEmail, password: PASSWORD },
+    });
+    agentCookie = agentRes.cookies.find((c) => c.name === accessCookieName)
+      ?.value as string;
   });
 
   afterAll(async () => {
@@ -320,6 +349,8 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     });
     await fastify.db.userRepository.delete({ personId: coordinator.id });
     await fastify.db.personRepository.delete({ id: coordinator.id });
+    await fastify.db.userRepository.delete({ personId: agentPerson.id });
+    await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.close();
   });
 
@@ -345,6 +376,11 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
         `${list}?filter[search]=commute&${filterQuery(sourceId())}`,
       );
       expect(res.statusCode).toBe(200);
+    });
+
+    it("rejects commute source ids for agent callers with 403", async () => {
+      const res = await getAsAgent(`${list}?${filterQuery(sourceId())}`);
+      expect(res.statusCode).toBe(403);
     });
 
     it.each([

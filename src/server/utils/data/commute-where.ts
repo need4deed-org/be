@@ -1,15 +1,30 @@
-import { QueryParamsKeys } from "need4deed-sdk";
+import { QueryParamsKeys, UserRole } from "need4deed-sdk";
 import { Raw } from "typeorm";
-import { BadRequestError } from "../../../config";
+import { BadRequestError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringCommuteFiltering } from "../../types";
+import { isStaffRole } from "./is-staff-role";
 
 export interface CommuteFilter {
   postcodeIds: number[];
   maxMinutes: number;
+}
+
+export function assertCommuteFilterAccess(
+  filter: QuerystringCommuteFiltering | undefined,
+  role: UserRole | undefined,
+): void {
+  const hasCommuteSource =
+    filter?.[QueryParamsKeys.COMMUTE_OPPORTUNITY_ID] !== undefined ||
+    filter?.[QueryParamsKeys.COMMUTE_VOLUNTEER_ID] !== undefined;
+  if (hasCommuteSource && !isStaffRole(role)) {
+    throw new UnauthorizedError(
+      "Commute filtering is only available to coordinators and admins.",
+    );
+  }
 }
 
 export async function resolveCommuteFilter(

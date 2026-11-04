@@ -47,6 +47,7 @@ import {
 } from "../../types";
 import {
   andIntoWhere,
+  assertCommuteFilterAccess,
   buildEraseSummaryMessage,
   createAddress,
   erasePersonPii,
@@ -236,6 +237,7 @@ export default async function volunteerRoutes(
       const { page, limit, sortOrder, filter, listType } = filterWorkaround(
         request.query,
       );
+      assertCommuteFilterAccess(filter, request.authUser?.role);
       const [skip, take] = getSkipTake({ page, limit });
 
       const [visibility, availabilityDealIds, commute] = await Promise.all([
