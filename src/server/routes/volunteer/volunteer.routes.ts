@@ -46,6 +46,7 @@ import {
   VolunteerListType,
 } from "../../types";
 import {
+  alertOnChange,
   andIntoWhere,
   buildEraseSummaryMessage,
   createAddress,
@@ -53,10 +54,12 @@ import {
   ErasePersonPiiSummary,
   fetchVolunteerById,
   findAvailabilityDealIds,
+  getEntitySnapshot,
   getLanguageCode,
   getOrCreateTimeslot,
   getSkipTake,
   getVolunteerPatchData,
+  getVolunteerSelfEditNotificationText,
   getVolunteerWhere,
   isStaffRole,
   patchEntity,
@@ -424,6 +427,18 @@ export default async function volunteerRoutes(
         };
       }
 
+      const snapshotRelations = [
+        "person.address",
+        "deal.dealLanguage",
+        "deal.dealTimeslot",
+        "deal.dealActivity",
+        "deal.dealSkill",
+        "deal.dealDistrict",
+      ];
+      const takeSnapshot = () =>
+        getEntitySnapshot(Volunteer, id, snapshotRelations);
+      const snapshotBefore = isSelf ? await takeSnapshot() : null;
+
       const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
       if (
         volunteerData?.statusEngagement !== undefined &&
@@ -573,6 +588,22 @@ export default async function volunteerRoutes(
       } catch (error) {
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
         throw error;
+      } finally {
+        if (snapshotBefore !== null) {
+          await alertOnChange(
+            async () => snapshotBefore !== (await takeSnapshot()),
+            async () => {
+              const editedName = Object.assign(
+                new Person(),
+                ownPerson,
+                personData,
+              ).name;
+              fastify.notify.opsAlert(
+                getVolunteerSelfEditNotificationText(editedName, id),
+              );
+            },
+          );
+        }
       }
 
       if (auditLogEntries.length) {
