@@ -247,7 +247,7 @@ export default async function opportunityRoutes(
       const id = request.params.id;
       const relations = [
         "accompanying",
-        "accompanying.postcode",
+        "accompanying.postcode.districtPostcode",
         "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
@@ -423,7 +423,7 @@ export default async function opportunityRoutes(
         "deal.postcode",
         "agent",
         "agent.address.postcode",
-        "accompanying",
+        "accompanying.postcode.districtPostcode",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
         "originalLanguage",

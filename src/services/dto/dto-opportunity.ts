@@ -11,6 +11,7 @@ import {
 import Comment from "../../data/entity/comment.entity";
 import Deal from "../../data/entity/deal.entity";
 import District from "../../data/entity/location/district.entity";
+import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { Centroid } from "../../data/utils/get-district";
@@ -99,6 +100,35 @@ export function accompanyingForType(
     : undefined;
 }
 
+interface OpportunityLocation {
+  postcode: string | null;
+  districtId: number | undefined;
+}
+
+function firstDistrictId(postcode: Postcode): number | undefined {
+  const [first] = [...(postcode.districtPostcode ?? [])].sort(
+    (a, b) => a.id - b.id,
+  );
+  return first?.districtId;
+}
+
+export function getOpportunityLocation(
+  opportunity: Opportunity,
+): OpportunityLocation {
+  const storedDistrictId = opportunity.district?.id ?? opportunity.districtId;
+  const appointmentPostcode = accompanyingForType(opportunity)?.postcode;
+  if (appointmentPostcode) {
+    return {
+      postcode: appointmentPostcode.value ?? null,
+      districtId: firstDistrictId(appointmentPostcode) ?? storedDistrictId,
+    };
+  }
+  return {
+    postcode: opportunity.deal?.postcode?.value ?? null,
+    districtId: storedDistrictId,
+  };
+}
+
 export function getOpportunityContact(
   opportunity: Opportunity,
 ): ApiOpportunityContact {
@@ -141,6 +171,7 @@ export function dtoOpportunityGetList(
   districtCentroid?: Centroid,
 ): ApiOpportunityGetList {
   const deal = dealOrEmpty(opportunity);
+  const location = getOpportunityLocation(opportunity);
   const { appointmentDate, appointmentTime } = formatAppointmentDateTime(
     opportunity.onetimer?.date,
   );
@@ -149,7 +180,7 @@ export function dtoOpportunityGetList(
     id: opportunity.id,
     title: opportunity.title,
     category: { id: deal.categoryId },
-    district: { id: opportunity.district?.id ?? opportunity.districtId },
+    district: { id: location.districtId },
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     statusMatch: opportunity.statusMatch,
@@ -182,7 +213,7 @@ export function dtoOpportunityGetList(
       .map((ov) => ov.volunteer?.person?.name)
       .filter((name): name is string => Boolean(name)),
     ...getOpportunityCoordinates(opportunity, districtCentroid),
-    postcode: opportunity.deal?.postcode?.value ?? null,
+    postcode: location.postcode,
     originalLanguage:
       (opportunity.originalLanguage?.isoCode as Lang | undefined) ?? Lang.DE,
   } as ApiOpportunityGetList;
@@ -192,14 +223,13 @@ export function dtoVolunteerOpportunityGetList(
   opportunity: Opportunity,
 ): ApiVolunteerOpportunityGetList {
   const deal = dealOrEmpty(opportunity);
+  const location = getOpportunityLocation(opportunity);
   return {
     id: opportunity.id,
     title: opportunity.title,
     createdAt: opportunity.createdAt,
     category: { id: deal.categoryId },
-    ...(opportunity.districtId
-      ? { district: { id: opportunity.districtId } }
-      : {}),
+    ...(location.districtId ? { district: { id: location.districtId } } : {}),
     volunteerType: opportunity.type,
     statusOpportunity: opportunity.status,
     languages: deal.dealLanguage.filter(Boolean).map((pl) => ({
@@ -220,7 +250,7 @@ export function dtoVolunteerOpportunityGetList(
       deal.dealLanguage,
     ),
     statusMatch: opportunity.statusMatch,
-    postcode: opportunity.deal?.postcode?.value ?? null,
+    postcode: location.postcode,
   } as ApiVolunteerOpportunityGetList;
 }
 
@@ -230,6 +260,7 @@ export function dtoOpportunityGet(
   districtCentroid?: Centroid,
 ): ApiOpportunityGet {
   const deal = dealOrEmpty(opportunityComments);
+  const location = getOpportunityLocation(opportunityComments);
   const eventStart =
     opportunityComments.type === OpportunityType.EVENTS
       ? opportunityComments.onetimer?.date
@@ -249,9 +280,8 @@ export function dtoOpportunityGet(
     statusOpportunity: opportunityComments.status,
     createdAt: opportunityComments.createdAt,
     category: { id: deal.categoryId },
-    district: {
-      id: opportunityComments.district?.id ?? opportunityComments.districtId,
-    },
+    district: { id: location.districtId },
+    postcode: location.postcode,
     description: getOpportunityDescription(opportunityComments) ?? "",
     numberOfVolunteers: opportunityComments.numberVolunteers,
     agentTitle: opportunityComments.agent?.title ?? "",
