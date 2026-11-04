@@ -82,7 +82,7 @@ const getAvailabilityTryCatch = tryCatchFn(getAvailability, (error) => {
   logger.error(`Error getting availability for opportunity: ${error}`);
 });
 
-function getOpportunityDescription(opportunity: Opportunity) {
+export function getOpportunityDescription(opportunity: Opportunity) {
   if (opportunity.type === OpportunityType.ACCOMPANYING) {
     return opportunity.infoConfidential;
   }

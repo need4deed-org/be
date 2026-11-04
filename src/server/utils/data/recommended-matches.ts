@@ -2,15 +2,20 @@ import {
   LangProficiency,
   LangPurpose,
   OpportunityType,
+  ProfileVolunteeringType,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import { berlinTimeZone } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import {
+  getOpportunityDescription,
+  getOpportunityLocation,
+} from "../../../services/dto/dto-opportunity";
 import { getAvailability } from "../../../services/dto/utils";
 
 const GERMAN_SUPPORT_CATEGORY = "de-lng-support";
-const GERMAN_MENTION = /\b(german|deutsch)/i;
+const GERMAN_MENTION = /\b(german(?!y)|deutsch(?!land))/i;
 const GERMAN_ISO_CODE = "de";
 const FLUENT_GERMAN = new Set<string>([
   LangProficiency.FLUENT,
@@ -23,6 +28,13 @@ const berlinWeekday = new Intl.DateTimeFormat("en-US", {
   timeZone: berlinTimeZone,
   weekday: "long",
 });
+
+export const recommendationVolunteerRelations = [
+  "deal.dealActivity",
+  "deal.dealLanguage.language",
+  "deal.dealTimeslot.timeslot",
+  "deal.dealDistrict",
+];
 
 export const recommendedVolunteerRelations = [
   "person",
@@ -40,6 +52,8 @@ export const recommendationOpportunityRelations = [
   "deal.dealLanguage.language",
   "deal.dealTimeslot.timeslot",
   "deal.dealDistrict.district",
+  "accompanying.postcode.districtPostcode",
+  "agent",
   "onetimer",
 ];
 
@@ -54,17 +68,13 @@ const availabilityKeys = (opportunityOrVolunteer: Opportunity | Volunteer) =>
   );
 
 export function isGermanOpportunity(opportunity: Opportunity): boolean {
-  const description =
-    opportunity.type === OpportunityType.ACCOMPANYING
-      ? opportunity.infoConfidential
-      : opportunity.info;
   return (
     (opportunity.deal?.dealActivity ?? []).some(
       (dealActivity) =>
         dealActivity?.activity?.category?.title === GERMAN_SUPPORT_CATEGORY,
     ) ||
     GERMAN_MENTION.test(opportunity.title ?? "") ||
-    GERMAN_MENTION.test(description ?? "")
+    GERMAN_MENTION.test(getOpportunityDescription(opportunity) ?? "")
   );
 }
 
@@ -73,6 +83,14 @@ export function speaksFluentGerman(volunteer: Volunteer): boolean {
     (dealLanguage) =>
       dealLanguage?.language?.isoCode === GERMAN_ISO_CODE &&
       FLUENT_GERMAN.has(dealLanguage.proficiency),
+  );
+}
+
+export function volunteerStatusTypesFor(
+  opportunityType: OpportunityType,
+): ProfileVolunteeringType[] {
+  return Object.values(ProfileVolunteeringType).filter((statusType) =>
+    volunteerTypesFromStatusType(statusType).includes(opportunityType),
   );
 }
 
@@ -110,7 +128,8 @@ export function matchScore(
 
   const opportunityDistricts = new Set(
     [
-      opportunity.districtId,
+      getOpportunityLocation(opportunity).districtId ??
+        opportunity.agent?.districtId,
       ...(opportunity.deal?.dealDistrict ?? []).map(
         (dealDistrict) => dealDistrict.districtId,
       ),
@@ -135,10 +154,11 @@ export function matchScore(
 
   const volunteerAvailability = availabilityKeys(volunteer);
   const appointment = opportunity.onetimer?.date;
-  const availabilityOverlap = appointment
-    ? [...volunteerAvailability].filter((key) =>
-        key.startsWith(`${berlinWeekday.format(new Date(appointment))}|`),
-      ).length
+  const appointmentDay =
+    appointment && `${berlinWeekday.format(new Date(appointment))}|`;
+  const availabilityOverlap = appointmentDay
+    ? [...volunteerAvailability].filter((key) => key.startsWith(appointmentDay))
+        .length
     : overlap(availabilityKeys(opportunity), volunteerAvailability);
 
   return (

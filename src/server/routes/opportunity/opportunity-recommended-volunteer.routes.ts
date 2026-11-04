@@ -2,11 +2,13 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiRecommendedMatchesQuery,
   ApiVolunteerGetList,
-  RECOMMENDED_MATCHES_DEFAULT_LIMIT,
+  OpportunityStatusType,
   UserRole,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
+import { In, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { volunteerListSerializer } from "../../../services/dto/dto-volunteer";
 import {
   idParamSchema,
@@ -14,19 +16,23 @@ import {
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { assertAgentOwnsOpportunity, assertRoleIn } from "../../utils";
+import {
+  andIntoWhere,
+  assertAgentOwnsOpportunity,
+  assertRoleIn,
+  getVolunteerWhere,
+} from "../../utils";
 import {
   matchScore,
   recommendationOpportunityRelations,
+  recommendationVolunteerRelations,
   recommendedVolunteerRelations,
   topRanked,
   volunteerFitsOpportunity,
+  volunteerStatusTypesFor,
 } from "../../utils/data/recommended-matches";
 import { maskPii } from "../../utils/pii/mask";
-import {
-  isVolunteerVisible,
-  resolveVolunteerVisibility,
-} from "../../utils/pii/volunteer-visibility";
+import { resolveVolunteerVisibility } from "../../utils/pii/volunteer-visibility";
 
 export default function opportunityRecommendedVolunteerRoutes(
   fastify: FastifyInstance,
@@ -34,7 +40,7 @@ export default function opportunityRecommendedVolunteerRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    Querystring: ApiRecommendedMatchesQuery;
+    Querystring: Required<ApiRecommendedMatchesQuery>;
     Reply: ReplyData<ApiVolunteerGetList[]>;
   }>(
     "/",
@@ -48,6 +54,7 @@ export default function opportunityRecommendedVolunteerRoutes(
     async (request, reply) => {
       assertRoleIn(request);
       const { id } = request.params;
+      const message = `Recommended volunteers for opportunity (id:${id}).`;
 
       const opportunity = await fastify.db.opportunityRepository.findOne({
         where: { id },
@@ -58,42 +65,67 @@ export default function opportunityRecommendedVolunteerRoutes(
       }
       await assertAgentOwnsOpportunity(request, id, opportunity.agentId);
 
-      const isAgent = request.authUser?.role === UserRole.AGENT;
-      const linked = await fastify.db.opportunityVolunteerRepository.find({
-        select: { volunteerId: true },
-        where: isAgent ? {} : { opportunityId: id },
-      });
-      const excludedVolunteerIds = new Set(
-        linked.map(({ volunteerId }) => volunteerId),
-      );
+      if (opportunity.status !== OpportunityStatusType.SEARCHING) {
+        return reply.status(200).send({ message, data: [] });
+      }
 
       const visibility = await resolveVolunteerVisibility(request);
+      const where = getVolunteerWhere(undefined, visibility);
+      Object.assign(where, {
+        statusEngagement: VolunteerStateEngagementType.AVAILABLE,
+        statusType: In(volunteerStatusTypesFor(opportunity.type)),
+      });
+      andIntoWhere(
+        where,
+        "id",
+        request.authUser?.role === UserRole.AGENT
+          ? Raw(
+              (column) =>
+                `${column} NOT IN (SELECT volunteer_id FROM opportunity_volunteer)`,
+            )
+          : Raw(
+              (column) =>
+                `${column} NOT IN (SELECT volunteer_id FROM opportunity_volunteer WHERE opportunity_id = :opportunityId)`,
+              { opportunityId: id },
+            ),
+      );
+
       const candidates = (
         await fastify.db.volunteerRepository.find({
-          where: { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
-          relations: recommendedVolunteerRelations,
+          where,
+          relations: recommendationVolunteerRelations,
           relationLoadStrategy: "query",
         })
       ).filter(
         (volunteer) =>
-          volunteer.person &&
+          volunteer.personId &&
           volunteer.deal &&
-          !excludedVolunteerIds.has(volunteer.id) &&
-          isVolunteerVisible(volunteer, visibility) &&
           volunteerFitsOpportunity(volunteer, opportunity),
       );
 
-      const recommended = topRanked(
+      const rankedIds = topRanked(
         candidates,
         (volunteer) => matchScore(opportunity, volunteer),
-        request.query.limit ?? RECOMMENDED_MATCHES_DEFAULT_LIMIT,
-      );
+        request.query.limit,
+      ).map(({ id: volunteerId }) => volunteerId);
+
+      const loaded = rankedIds.length
+        ? await fastify.db.volunteerRepository.find({
+            where: { id: In(rankedIds) },
+            relations: recommendedVolunteerRelations,
+            relationLoadStrategy: "query",
+          })
+        : [];
+      const loadedById = new Map(loaded.map((v) => [v.id, v]));
+      const recommended = rankedIds
+        .map((volunteerId) => loadedById.get(volunteerId))
+        .filter((v): v is Volunteer => v !== undefined);
       if (visibility) {
         maskPii(recommended, visibility);
       }
 
       return reply.status(200).send({
-        message: `Recommended volunteers for opportunity (id:${id}).`,
+        message,
         data: recommended.map(volunteerListSerializer).filter(Boolean),
       });
     },

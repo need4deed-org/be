@@ -3,14 +3,12 @@ import {
   ApiOpportunityGetList,
   ApiRecommendedMatchesQuery,
   OpportunityStatusType,
-  RECOMMENDED_MATCHES_DEFAULT_LIMIT,
   UserRole,
+  VolunteerStateEngagementType,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
 import { In } from "typeorm";
 import { NotFoundError } from "../../../config";
-import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { dtoOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
   idParamSchema,
   recommendedMatchesQuerySchema,
@@ -18,30 +16,17 @@ import {
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
 import {
+  dtoOpportunityListForCaller,
+  loadOpportunityList,
+} from "../../utils/data/opportunity-list";
+import {
   matchScore,
   recommendationOpportunityRelations,
+  recommendationVolunteerRelations,
   topRanked,
   volunteerFitsOpportunity,
 } from "../../utils/data/recommended-matches";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
-
-const listRelations = [
-  "deal.dealActivity.activity",
-  "deal.dealLanguage.language",
-  "deal.dealTimeslot.timeslot",
-  "deal.dealDistrict.district",
-  "deal.postcode",
-  "agent",
-  "agent.address.postcode",
-  "accompanying",
-  "onetimer",
-  "opportunityVolunteer.volunteer.person",
-  "originalLanguage",
-];
+import { requestLanguage } from "../../utils/data/translate-opportunities";
 
 export default function volunteerRecommendedOpportunityRoutes(
   fastify: FastifyInstance,
@@ -49,7 +34,7 @@ export default function volunteerRecommendedOpportunityRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    Querystring: ApiRecommendedMatchesQuery & { language?: string };
+    Querystring: Required<ApiRecommendedMatchesQuery> & { language?: string };
     Reply: ReplyData<ApiOpportunityGetList[]>;
   }>(
     "/",
@@ -66,15 +51,16 @@ export default function volunteerRecommendedOpportunityRoutes(
 
       const volunteer = await fastify.db.volunteerRepository.findOne({
         where: { id },
-        relations: [
-          "deal.dealActivity",
-          "deal.dealLanguage.language",
-          "deal.dealTimeslot.timeslot",
-          "deal.dealDistrict",
-        ],
+        relations: recommendationVolunteerRelations,
       });
       if (!volunteer) {
         throw new NotFoundError(`Volunteer (id:${id}) not found.`);
+      }
+      const message = `Recommended opportunities for volunteer (id:${id}).`;
+      if (
+        volunteer.statusEngagement !== VolunteerStateEngagementType.AVAILABLE
+      ) {
+        return reply.status(200).send({ message, data: [] });
       }
 
       const types = volunteerTypesFromStatusType(volunteer.statusType);
@@ -103,36 +89,25 @@ export default function volunteerRecommendedOpportunityRoutes(
           )
         : [];
 
-      const rankedIds = topRanked(
-        candidates,
-        (opportunity) => matchScore(opportunity, volunteer),
-        request.query.limit ?? RECOMMENDED_MATCHES_DEFAULT_LIMIT,
-      ).map(({ id: opportunityId }) => opportunityId);
-
-      const loaded = rankedIds.length
-        ? await fastify.db.opportunityRepository.find({
-            where: { id: In(rankedIds) },
-            relations: listRelations,
-            relationLoadStrategy: "query",
-          })
-        : [];
-      const loadedById = new Map(loaded.map((o) => [o.id, o]));
-      const recommended = rankedIds
-        .map((opportunityId) => loadedById.get(opportunityId))
-        .filter((o): o is Opportunity => o !== undefined);
-
-      await translateOpportunities(
+      const recommended = await loadOpportunityList(
         fastify,
+        topRanked(
+          candidates,
+          (opportunity) => matchScore(opportunity, volunteer),
+          request.query.limit,
+        ).map(({ id: opportunityId }) => opportunityId),
+      );
+
+      const data = await dtoOpportunityListForCaller(
+        fastify,
+        request,
         recommended,
         requestLanguage(request.query),
       );
-      await maskForCaller(request, recommended);
 
       return reply.status(200).send({
-        message: `Recommended opportunities for volunteer (id:${id}).`,
-        data: recommended.map((opportunity) =>
-          dtoOpportunityGetList(opportunity),
-        ),
+        message,
+        data,
       });
     },
   );

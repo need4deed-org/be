@@ -1,16 +1,17 @@
-import { OpportunityType } from "need4deed-sdk";
+import { OpportunityType, ProfileVolunteeringType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import {
   isGermanOpportunity,
   matchScore,
+  volunteerStatusTypesFor,
 } from "../../../../server/utils/data/recommended-matches";
 
 const slot = (rrule: string) => ({
   timeslot: {
     id: 1,
     rrule,
-    start: new Date("2026-01-05T07:00:00Z"),
-    end: new Date("2026-01-05T10:00:00Z"),
+    start: new Date(2026, 0, 5, 8),
+    end: new Date(2026, 0, 5, 11),
   },
 });
 
@@ -38,6 +39,14 @@ describe("isGermanOpportunity", () => {
     expect(isGermanOpportunity(opportunity as any)).toBe(false);
   });
 
+  it.each(["Neu in Deutschland", "Refugees newly arrived in Germany"])(
+    "ignores the country in %s",
+    (title) => {
+      const opportunity = { type: OpportunityType.REGULAR, title, deal: null };
+      expect(isGermanOpportunity(opportunity as any)).toBe(false);
+    },
+  );
+
   it("ignores a word that only contains the letters", () => {
     const opportunity = {
       type: OpportunityType.REGULAR,
@@ -49,6 +58,24 @@ describe("isGermanOpportunity", () => {
 });
 
 describe("matchScore", () => {
+  it("scores the appointment district of an accompanying opportunity", () => {
+    const opportunity = {
+      type: OpportunityType.ACCOMPANYING,
+      accompanying: {
+        postcode: {
+          value: "12043",
+          districtPostcode: [{ id: 1, districtId: 7 }],
+        },
+      },
+      deal: { dealTimeslot: [] },
+    };
+    const volunteerIn = (districtId: number) => ({
+      deal: { dealDistrict: [{ districtId }], dealTimeslot: [] },
+    });
+    expect(matchScore(opportunity as any, volunteerIn(7) as any)).toBe(3);
+    expect(matchScore(opportunity as any, volunteerIn(8) as any)).toBe(0);
+  });
+
   it("counts the volunteer's slots on the appointment weekday for dated opportunities", () => {
     const opportunity = {
       type: OpportunityType.ACCOMPANYING,
@@ -64,4 +91,31 @@ describe("matchScore", () => {
     expect(matchScore(opportunity as any, mondayVolunteer as any)).toBe(1);
     expect(matchScore(opportunity as any, tuesdayVolunteer as any)).toBe(0);
   });
+});
+
+describe("volunteerStatusTypesFor", () => {
+  it.each([
+    [
+      OpportunityType.REGULAR,
+      [
+        ProfileVolunteeringType.REGULAR,
+        ProfileVolunteeringType.REGULAR_ACCOMPANYING,
+      ],
+    ],
+    [
+      OpportunityType.ACCOMPANYING,
+      [
+        ProfileVolunteeringType.ACCOMPANYING,
+        ProfileVolunteeringType.REGULAR_ACCOMPANYING,
+      ],
+    ],
+    [OpportunityType.EVENTS, [ProfileVolunteeringType.EVENTS]],
+  ])(
+    "lists the volunteer types that fit a %s opportunity",
+    (type, expected) => {
+      expect(volunteerStatusTypesFor(type).sort()).toEqual(
+        [...expected].sort(),
+      );
+    },
+  );
 });

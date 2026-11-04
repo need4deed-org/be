@@ -22,6 +22,7 @@ import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
@@ -54,6 +55,7 @@ describe("recommended matches (be#1184)", () => {
   let otherAgent: Agent;
   let districtId: number;
   let postcodeId: number;
+  let appointmentPostcode: { id: number; value: string };
   let languageIds: number[];
   let germanId: number;
   let activityId: number;
@@ -63,6 +65,7 @@ describe("recommended matches (be#1184)", () => {
   const volunteers: Record<string, Volunteer> = {};
   const opportunities: Record<string, Opportunity> = {};
   const links: OpportunityVolunteer[] = [];
+  const accompanyings: Accompanying[] = [];
   const cookies = {} as Record<Caller, string>;
 
   const get = (url: string, as: Caller) =>
@@ -149,8 +152,21 @@ describe("recommended matches (be#1184)", () => {
       status?: OpportunityStatusType;
       agentId?: number;
       activity?: number;
+      appointmentPostcodeId?: number;
     } = {},
   ) => {
+    const accompanying = options.appointmentPostcodeId
+      ? await fastify.db.accompanyingRepository.save(
+          new Accompanying({
+            address: "Teststr. 1",
+            name: `Rec ${suffix}`,
+            postcodeId: options.appointmentPostcodeId,
+          }),
+        )
+      : undefined;
+    if (accompanying) {
+      accompanyings.push(accompanying);
+    }
     const deal = await saveDeal(
       DealType.OPPORTUNITY,
       { languages: 3, activity: true },
@@ -163,7 +179,8 @@ describe("recommended matches (be#1184)", () => {
         type: options.type ?? OpportunityType.REGULAR,
         status: options.status ?? OpportunityStatusType.SEARCHING,
         dealId: deal.id,
-        districtId,
+        districtId: accompanying ? undefined : districtId,
+        accompanyingId: accompanying?.id,
         agentId: options.agentId ?? agent.id,
       }),
     );
@@ -195,9 +212,24 @@ describe("recommended matches (be#1184)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    districtId = (
-      await fastify.db.districtRepository.findOneOrFail({ where: {} })
-    ).id;
+    const [singleDistrictPostcode]: {
+      districtId: number;
+      postcodeId: number;
+      value: string;
+    }[] = await dataSource.query(
+      `SELECT dp.district_id AS "districtId", p.id AS "postcodeId", p.value
+         FROM district_postcode dp
+         JOIN postcode p ON p.id = dp.postcode_id
+        WHERE NOT EXISTS (SELECT 1 FROM district_postcode other
+                           WHERE other.postcode_id = dp.postcode_id
+                             AND other.id <> dp.id)
+        LIMIT 1`,
+    );
+    districtId = singleDistrictPostcode.districtId;
+    appointmentPostcode = {
+      id: singleDistrictPostcode.postcodeId,
+      value: singleDistrictPostcode.value,
+    };
     postcodeId = (
       await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
     ).id;
@@ -239,6 +271,11 @@ describe("recommended matches (be#1184)", () => {
       status: OpportunityStatusType.ACTIVE,
     });
     await saveOpportunity("event", { type: OpportunityType.EVENTS });
+    await saveOpportunity("accompanying", {
+      type: OpportunityType.ACCOMPANYING,
+      agentId: otherAgent.id,
+      appointmentPostcodeId: appointmentPostcode.id,
+    });
 
     await saveVolunteer("best", {
       languages: 3,
@@ -340,6 +377,11 @@ describe("recommended matches (be#1184)", () => {
     await fastify.db.dealRepository.delete({
       id: In(deals.map(({ id }) => id)),
     });
+    if (accompanyings.length) {
+      await fastify.db.accompanyingRepository.delete({
+        id: In(accompanyings.map(({ id }) => id)),
+      });
+    }
     await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
     for (const person of persons) {
       await fastify.db.userRepository.delete({ personId: person.id });
@@ -412,6 +454,12 @@ describe("recommended matches (be#1184)", () => {
       expect(regularAccompanying.email).not.toContain("@");
     });
 
+    it("recommends nobody for an opportunity that is not searching", async () => {
+      const res = await recommend("notSearching", "coordinator");
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([]);
+    });
+
     it("hides another NGO's opportunity from an NGO user", async () => {
       const res = await recommend("otherAgents", "agent");
       expect(res.statusCode).toBe(404);
@@ -435,6 +483,24 @@ describe("recommended matches (be#1184)", () => {
       expect(ours).not.toContain("elsewhere");
       expect(ours).not.toContain("notSearching");
       expect(ours).not.toContain("event");
+    });
+
+    it("lists an accompanying opportunity with its appointment location", async () => {
+      const res = await recommend("accompanyingOnly", "coordinator");
+      expect(res.statusCode).toBe(200);
+      const item = res
+        .json()
+        .data.find(
+          (row: { id: number }) => row.id === opportunities.accompanying.id,
+        );
+      expect(item.postcode).toBe(appointmentPostcode.value);
+      expect(item.district.id).toBe(districtId);
+    });
+
+    it("recommends nothing to a volunteer who is not available", async () => {
+      const res = await recommend("notAvailable", "coordinator");
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([]);
     });
 
     it("applies the German rule from the volunteer side too", async () => {
