@@ -69,6 +69,10 @@ function isAgentVisible(agentId: number, ctx: CallerVisibility): boolean {
   return ctx.agentIds.has(agentId) || ctx.matchedAgentIds.has(agentId);
 }
 
+function canSeeAppointmentPostcode(ctx: CallerVisibility): boolean {
+  return ctx.role === UserRole.VOLUNTEER;
+}
+
 function isEntityVisible(
   entityType: EntityTableName,
   entityId: number,
@@ -212,7 +216,7 @@ function walk(
           ACCOMPANYING_PII_FIELDS,
         );
         maskPostcode(node.accompanying as unknown as Record<string, unknown>, {
-          hideValue: ctx.role !== UserRole.VOLUNTEER,
+          hideValue: !canSeeAppointmentPostcode(ctx),
         });
       }
       if (node.deal && typeof node.deal === "object") {

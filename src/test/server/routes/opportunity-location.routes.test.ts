@@ -21,7 +21,7 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type Caller = "volunteer" | "coordinator";
+type Caller = "volunteer" | "coordinator" | "user";
 
 describe("opportunity location: appointment postcode for accompanying (be#1210)", () => {
   let fastify: FastifyInstance;
@@ -117,6 +117,7 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     const roles: Record<Caller, UserRole> = {
       volunteer: UserRole.VOLUNTEER,
       coordinator: UserRole.COORDINATOR,
+      user: UserRole.USER,
     };
     for (const caller of Object.keys(roles) as Caller[]) {
       const person = await fastify.db.personRepository.save(
@@ -207,9 +208,24 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       postcode: appointmentPostcode.value,
       accompanyingDetails: { appointmentPostcode: appointmentPostcode.value },
     });
+    const details = res.json().data.accompanyingDetails;
+    expect(details.appointmentAddress).not.toBe(accompanying.address);
+    expect(details.refugeeName).not.toBe(accompanying.name);
   });
 
   it("returns the same postcode on the volunteer-facing list", async () => {
+    const res = await get(
+      `/volunteer/opportunity?limit=100&type=${OpportunityType.ACCOMPANYING}&status=${OpportunityStatusType.SEARCHING}&search=${encodeURIComponent(prefix)}`,
+      "coordinator",
+    );
+    expect(res.statusCode).toBe(200);
+    const row = res
+      .json()
+      .data.find((r: { id: number }) => r.id === opportunities.accompanying.id);
+    expect(row.postcode).toBe(appointmentPostcode.value);
+  });
+
+  it("shows the appointment postcode on the volunteer-facing list to a volunteer who isn't matched", async () => {
     const res = await get(
       `/volunteer/opportunity?limit=100&type=${OpportunityType.ACCOMPANYING}&status=${OpportunityStatusType.SEARCHING}&search=${encodeURIComponent(prefix)}`,
       "volunteer",
@@ -219,6 +235,12 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
       .json()
       .data.find((r: { id: number }) => r.id === opportunities.accompanying.id);
     expect(row.postcode).toBe(appointmentPostcode.value);
+  });
+
+  it("hides the appointment postcode from a caller who isn't a volunteer", async () => {
+    const row = await listed("user", opportunities.accompanying.id);
+    expect(row.postcode).toBeNull();
+    expect(row.district).toEqual({ id: appointmentDistrictId });
   });
 
   it("stores the new appointment postcode's district when it is edited", async () => {
