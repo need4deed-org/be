@@ -78,6 +78,7 @@ import {
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
+  assertCommuteFilterAccess,
   assertRoleIn,
   getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
@@ -393,6 +394,7 @@ export default async function opportunityRoutes(
       },
     },
     async (request, reply) => {
+      assertCommuteFilterAccess(request.query.filter, request.authUser?.role);
       const [skip, take] = getSkipTake({
         page: request.query.page,
         limit: request.query.limit,

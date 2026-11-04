@@ -3,6 +3,7 @@ import {
   AgentEngagementStatusType,
   OpportunityStatusType,
   OpportunityType,
+  QueryParamsKeys,
   UserRole,
 } from "need4deed-sdk";
 import { In } from "typeorm";
@@ -85,13 +86,18 @@ const OPPORTUNITY_PLACE: Record<
   noDealAgent50: { deal: null, atAgentNear: true },
 };
 
-describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunteer and GET /opportunity", () => {
+describe("commute filters on GET /volunteer and GET /opportunity", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
   let cookie: string;
+  let agentCookie: string;
   let coordinator: Person;
+  let agentPerson: Person;
   let agent: Agent;
   let agentNear: Agent;
+  let commuteOpportunity: Opportunity;
+  let opportunityWithoutCoordinates: Opportunity;
+  let volunteerWithoutCoordinates: Volunteer;
   const postcodes = {} as Record<PostcodeKey, Postcode>;
   const extraPostcodes: Postcode[] = [];
   let withoutCoordinates: Postcode;
@@ -115,6 +121,12 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
       method: "GET",
       url,
       cookies: { [accessCookieName]: cookie },
+    });
+  const getAsAgent = (url: string) =>
+    fastify.inject({
+      method: "GET",
+      url,
+      cookies: { [accessCookieName]: agentCookie },
     });
 
   beforeAll(async () => {
@@ -225,6 +237,50 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
         );
     }
 
+    commuteOpportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Commute origin ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.SEARCHING,
+        dealId: (await dealAt("origin")).id,
+        agentId: agent.id,
+      }),
+    );
+    const withoutCoordinatesDeal = await fastify.db.dealRepository.save(
+      new Deal({
+        type: DealType.VOLUNTEER,
+        postcodeId: withoutCoordinates.id,
+      }),
+    );
+    deals.push(withoutCoordinatesDeal);
+    opportunityWithoutCoordinates = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Commute no coordinates ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.SEARCHING,
+        dealId: withoutCoordinatesDeal.id,
+        agentId: agent.id,
+      }),
+    );
+    const volunteerAddress = await getRepository(dataSource, Address).save(
+      new Address({ postcodeId: withoutCoordinates.id }),
+    );
+    addresses.push(volunteerAddress);
+    const volunteerPerson = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Commute",
+        lastName: "Source",
+        addressId: volunteerAddress.id,
+      }),
+    );
+    persons.push(volunteerPerson);
+    volunteerWithoutCoordinates = await fastify.db.volunteerRepository.save(
+      new Volunteer({
+        dealId: withoutCoordinatesDeal.id,
+        personId: volunteerPerson.id,
+      }),
+    );
+
     coordinator = await fastify.db.personRepository.save(
       new Person({ firstName: "Commute", lastName: `Coord${suffix}` }),
     );
@@ -245,19 +301,44 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
     });
     cookie = res.cookies.find((c) => c.name === accessCookieName)
       ?.value as string;
+
+    agentPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Commute", lastName: `Agent${suffix}` }),
+    );
+    const agentEmail = `commute-agent-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: agentEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentPerson.id,
+      }),
+    );
+    const agentRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: agentEmail, password: PASSWORD },
+    });
+    agentCookie = agentRes.cookies.find((c) => c.name === accessCookieName)
+      ?.value as string;
   });
 
   afterAll(async () => {
     const ids = (entities: { id: number }[]) =>
       In(entities.map(({ id }) => id));
     await fastify.db.opportunityRepository.delete({
-      id: ids(Object.values(opportunities)),
+      id: ids([
+        ...Object.values(opportunities),
+        commuteOpportunity,
+        opportunityWithoutCoordinates,
+      ]),
     });
     await getRepository(dataSource, Accompanying).delete({
       id: ids(accompanyings),
     });
     await fastify.db.volunteerRepository.delete({
-      id: ids(Object.values(volunteers)),
+      id: ids([...Object.values(volunteers), volunteerWithoutCoordinates]),
     });
     await fastify.db.dealRepository.delete({ id: ids(deals) });
     await fastify.db.personRepository.delete({ id: ids(persons) });
@@ -268,60 +349,81 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
     });
     await fastify.db.userRepository.delete({ personId: coordinator.id });
     await fastify.db.personRepository.delete({ id: coordinator.id });
+    await fastify.db.userRepository.delete({ personId: agentPerson.id });
+    await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.close();
   });
 
   describe.each(LISTS)("GET %s", (list) => {
+    const sourceKey =
+      list === "/volunteer"
+        ? QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
+        : QueryParamsKeys.COMMUTE_VOLUNTEER_ID;
+    const sourceId =
+      list === "/volunteer"
+        ? () => commuteOpportunity.id
+        : () => volunteers.sameAsOrigin.id;
+    const filterQuery = (id: number, max = 30) =>
+      `filter[${sourceKey}]=${id}&filter[max-commute-minutes]=${max}`;
+
     it("accepts both keys together", async () => {
-      const res = await get(
-        `${list}?filter[commute-postcode]=12043&filter[max-commute-minutes]=30`,
-      );
+      const res = await get(`${list}?${filterQuery(sourceId())}`);
       expect(res.statusCode).toBe(200);
     });
 
     it("accepts them together with a search, which adds its own id condition", async () => {
       const res = await get(
-        `${list}?filter[search]=commute&filter[commute-postcode]=12043&filter[max-commute-minutes]=30`,
+        `${list}?filter[search]=commute&${filterQuery(sourceId())}`,
       );
       expect(res.statusCode).toBe(200);
     });
 
+    it("rejects commute source ids for agent callers with 403", async () => {
+      const res = await getAsAgent(`${list}?${filterQuery(sourceId())}`);
+      expect(res.statusCode).toBe(403);
+    });
+
     it.each([
-      ["only commute-postcode", "filter[commute-postcode]=12043"],
-      ["only max-commute-minutes", "filter[max-commute-minutes]=30"],
+      ["only commute source id", () => `filter[${sourceKey}]=${sourceId()}`],
+      ["only max-commute-minutes", () => "filter[max-commute-minutes]=30"],
       [
-        "a postcode that is not 5 digits",
-        "filter[commute-postcode]=1204&filter[max-commute-minutes]=30",
+        "a source id that is not an integer",
+        () => `filter[${sourceKey}]=invalid&filter[max-commute-minutes]=30`,
       ],
       [
         "non-integer minutes",
-        "filter[commute-postcode]=12043&filter[max-commute-minutes]=half",
+        () =>
+          `filter[${sourceKey}]=${sourceId()}&filter[max-commute-minutes]=half`,
       ],
       [
         "more than 600 minutes",
-        "filter[commute-postcode]=12043&filter[max-commute-minutes]=601",
+        () =>
+          `filter[${sourceKey}]=${sourceId()}&filter[max-commute-minutes]=601`,
       ],
       [
         "zero minutes",
-        "filter[commute-postcode]=12043&filter[max-commute-minutes]=0",
+        () =>
+          `filter[${sourceKey}]=${sourceId()}&filter[max-commute-minutes]=0`,
       ],
     ])("rejects %s with 400", async (_, query) => {
-      const res = await get(`${list}?${query}`);
+      const res = await get(`${list}?${query()}`);
       expect(res.statusCode).toBe(400);
     });
 
-    it("rejects a postcode that is not in the postcode table with 400", async () => {
-      const res = await get(
-        `${list}?filter[commute-postcode]=00000&filter[max-commute-minutes]=30`,
-      );
+    it("rejects an unknown commute source id with 400", async () => {
+      const res = await get(`${list}?${filterQuery(900000000)}`);
       expect(res.statusCode).toBe(400);
-      expect(res.json().message).toBe('Unknown commute postcode "00000".');
+      expect(res.json().message).toBe(
+        `Unknown commute ${list === "/volunteer" ? "opportunity" : "volunteer"} "900000000".`,
+      );
     });
 
-    it("rejects a postcode without coordinates with 400", async () => {
-      const res = await get(
-        `${list}?filter[commute-postcode]=${withoutCoordinates.value}&filter[max-commute-minutes]=30`,
-      );
+    it("rejects a commute source postcode without coordinates with 400", async () => {
+      const noCoordinatesSourceId =
+        list === "/volunteer"
+          ? opportunityWithoutCoordinates.id
+          : volunteerWithoutCoordinates.id;
+      const res = await get(`${list}?${filterQuery(noCoordinatesSourceId)}`);
       expect(res.statusCode).toBe(400);
       expect(res.json().message).toBe(
         `Commute postcode "${withoutCoordinates.value}" has no coordinates.`,
@@ -339,16 +441,22 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
       )
       .map(([key]) => key)
       .sort();
-  const commuteQuery = (max?: number) =>
+  const commuteQuery = (
+    sourceKey: QueryParamsKeys,
+    sourceId: number,
+    max?: number,
+  ) =>
     max === undefined
       ? ""
-      : `&filter[commute-postcode]=${postcodes.origin.value}&filter[max-commute-minutes]=${max}`;
+      : `&filter[${sourceKey}]=${sourceId}&filter[max-commute-minutes]=${max}`;
   const listVolunteers = (max?: number) =>
     get(
-      `/volunteer?limit=50&filter[search]=Commute${suffix}${commuteQuery(max)}`,
+      `/volunteer?limit=50&filter[search]=Commute${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_OPPORTUNITY_ID, commuteOpportunity.id, max)}`,
     );
   const listOpportunities = (max?: number) =>
-    get(`/opportunity?limit=100&filter[search]=${suffix}${commuteQuery(max)}`);
+    get(
+      `/opportunity?limit=100&filter[search]=${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_VOLUNTEER_ID, volunteers.sameAsOrigin.id, max)}`,
+    );
 
   const ALL_VOLUNTEERS = Object.keys(VOLUNTEER_HOME).sort();
   const ALL_OPPORTUNITIES = Object.keys(OPPORTUNITY_PLACE).sort();
@@ -393,4 +501,43 @@ describe("filter[commute-postcode] / filter[max-commute-minutes] on GET /volunte
       expect(own(opportunities, res)).toEqual([...expected].sort());
     },
   );
+
+  it.each([
+    [
+      "the accompanying postcode before the deal postcode",
+      () => opportunities.accompanying20Deal50.id,
+      true,
+    ],
+    [
+      "the deal postcode before the agent address",
+      () => opportunities.deal20.id,
+      true,
+    ],
+    [
+      "the agent address when there is no deal postcode",
+      () => opportunities.noDealAgent50.id,
+      false,
+    ],
+  ])(
+    "uses %s as the opportunity commute source",
+    async (_, sourceId, includesSameAsOrigin) => {
+      const res = await get(
+        `/volunteer?filter[search]=Commute${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_OPPORTUNITY_ID, sourceId(), 30)}`,
+      );
+      expect(res.statusCode).toBe(200);
+      expect(own(volunteers, res).includes("sameAsOrigin")).toBe(
+        includesSameAsOrigin,
+      );
+    },
+  );
+
+  it("uses a volunteer address before its deal postcode as the commute source", async () => {
+    const res = await get(
+      `/opportunity?limit=100&filter[search]=${suffix}${commuteQuery(QueryParamsKeys.COMMUTE_VOLUNTEER_ID, volunteers.sameAsOrigin.id, 30)}`,
+    );
+    expect(res.statusCode).toBe(200);
+    const matchingOpportunities = own(opportunities, res);
+    expect(matchingOpportunities).toContain("deal20");
+    expect(matchingOpportunities).not.toContain("deal50");
+  });
 });

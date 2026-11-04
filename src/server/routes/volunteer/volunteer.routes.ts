@@ -4,6 +4,7 @@ import {
   ApiVolunteerGetList,
   EntityTableName,
   Lang,
+  QueryParamsKeys,
   SortOrder,
   UserRole,
   VolunteerPatchBodyData,
@@ -46,6 +47,7 @@ import {
 import {
   alertOnChange,
   andIntoWhere,
+  assertCommuteFilterAccess,
   buildEraseSummaryMessage,
   createAddress,
   erasePersonPii,
@@ -226,12 +228,13 @@ export default async function volunteerRoutes(
       const { page, limit, sortOrder, filter, listType } = filterWorkaround(
         request.query,
       );
+      assertCommuteFilterAccess(filter, request.authUser?.role);
       const [skip, take] = getSkipTake({ page, limit });
 
       const [visibility, availabilityDealIds, commute] = await Promise.all([
         resolveVolunteerVisibility(request),
         findAvailabilityDealIds(filter?.availability),
-        resolveCommuteFilter(filter),
+        resolveCommuteFilter(filter, QueryParamsKeys.COMMUTE_OPPORTUNITY_ID),
       ]);
       const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
       if (commute) {

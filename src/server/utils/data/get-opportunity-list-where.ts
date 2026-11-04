@@ -1,4 +1,4 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, QueryParamsKeys } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -23,7 +23,7 @@ export async function getOpportunityListWhere(
   const [searchLanguageId, availabilityDealIds, commute] = await Promise.all([
     filter?.search ? languageIdOf(dataSource.manager, lang) : undefined,
     findOpportunityAvailabilityDealIds(filter?.availability),
-    resolveCommuteFilter(filter),
+    resolveCommuteFilter(filter, QueryParamsKeys.COMMUTE_VOLUNTEER_ID),
   ]);
   const where = getOpportunityWhere(
     filter,
