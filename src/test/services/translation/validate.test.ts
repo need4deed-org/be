@@ -47,22 +47,32 @@ describe("validateTranslation", () => {
     ).toMatchObject({ code: "length_ratio" });
   });
 
-  it("rejects an output that drops an email, phone number or time", () => {
+  it("rejects a dropped email, phone number or time with its own code", () => {
     expectCode(
       MENS_CAFE_DE,
       MENS_CAFE_EN.replace("benn-wilmersdorf@mts-socialdesign.com", "us"),
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "email_missing" });
     expectCode(
       MENS_CAFE_DE,
       MENS_CAFE_EN.replace("+49 176 24753773", "by phone"),
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "phone_missing" });
     expectCode(
       MENS_CAFE_DE,
       MENS_CAFE_EN.replace("4:30–6:00 PM", "in the afternoon"),
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "time_missing" });
+    expectCode(
+      "Anmeldung unter https://need4deed.org/anmeldung bis Freitag",
+      "Sign up on our website by Friday",
+      Lang.EN,
+    ).toMatchObject({ code: "url_missing" });
+    expectCode(
+      "Start am 22.08.2025 im Hof",
+      "Starts in late August in the yard",
+      Lang.EN,
+    ).toMatchObject({ code: "date_missing" });
   });
 
   it("allows notation changes that keep the values", () => {
@@ -100,14 +110,14 @@ describe("validateTranslation", () => {
       "For 8 euros a month",
       Lang.EN,
     ).toMatchObject({
-      code: "token_missing",
+      code: "number_missing",
     });
     expectCode(
       "100 Plätze sind frei",
       "88 seats are available",
       Lang.EN,
     ).toMatchObject({
-      code: "token_missing",
+      code: "number_missing",
     });
     const ok = { status: "ok" };
     expectCode(
@@ -160,12 +170,12 @@ describe("validateTranslation", () => {
       "Donnerstags von 17 bis 19 Uhr",
       "Thursdays from 6 to 7 pm",
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "time_missing" });
     expectCode(
       "Donnerstags von 17 bis 19 Uhr",
       "Thursdays from 6 to 7 pm, 5 volunteers",
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "time_missing" });
     for (const [source, output] of [
       ["Von 9 bis 17 Uhr", "From 9 pm to 5 pm"],
       ["Termin 3 und 17 Uhr", "Appointment 3 pm and 5 pm"],
@@ -173,19 +183,19 @@ describe("validateTranslation", () => {
       ["Dauer 14h", "Takes 2 hours"],
     ]) {
       expectCode(source, output, Lang.EN).toMatchObject({
-        code: "token_missing",
+        code: "time_missing",
       });
     }
     expectCode(
       "Insgesamt 16h im Monat",
       "A total of 4 hours a month",
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "time_missing" });
     expectCode(
       "Ab ca. 16h für zwei Stunden",
       "From about 5 pm for two hours",
       Lang.EN,
-    ).toMatchObject({ code: "token_missing" });
+    ).toMatchObject({ code: "time_missing" });
     // "am" at the start of a word isn't a time.
     expectCode(
       "We need 5 amazing volunteers",
@@ -268,7 +278,7 @@ describe("validateTranslation", () => {
       "Room 3, places free",
       Lang.EN,
     ).toMatchObject({
-      code: "token_missing",
+      code: "number_missing",
     });
   });
 
@@ -278,7 +288,7 @@ describe("validateTranslation", () => {
       "Budget: 100 euros per year",
       Lang.EN,
     ).toMatchObject({
-      code: "token_missing",
+      code: "number_missing",
     });
   });
 

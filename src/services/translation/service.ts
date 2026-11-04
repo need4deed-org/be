@@ -1,15 +1,10 @@
-import { Lang } from "need4deed-sdk";
+import { Lang, TranslationErrorCode } from "need4deed-sdk";
 import { isTest } from "../../config/constants";
 import { TranslationConfig } from "./config";
 import { DOMAIN_TERMS, glossaryFor, loadReferenceGlossary } from "./glossary";
 import { FakeProvider } from "./providers/fake";
 import { InfomaniakProvider } from "./providers/infomaniak";
-import {
-  GlossaryEntry,
-  TranslationErrorCode,
-  TranslationProvider,
-  TranslationUsage,
-} from "./types";
+import { GlossaryEntry, TranslationProvider, TranslationUsage } from "./types";
 import { validateTranslation } from "./validate";
 
 export type FieldTranslationResult =
