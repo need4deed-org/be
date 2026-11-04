@@ -114,6 +114,22 @@ export function getOpportunityNotificationText(title: string): string {
   return `New opportunity arrived: "${title}" at ${formatBerlinTimestamp()}`;
 }
 
+export function getVolunteerSelfEditNotificationText(
+  name: string,
+  id: number,
+): string {
+  return `Volunteer ${name ? `${name} ` : ""}(id:${id}) edited their profile at ${formatBerlinTimestamp()}`;
+}
+
+export function getAgentOpportunityEditNotificationText(
+  title: string,
+  id: number,
+  agentTitle: string,
+  movedToAgent = false,
+): string {
+  return `Opportunity "${title}" (id:${id}) was ${movedToAgent ? "moved to" : "edited by"} NGO "${agentTitle}" at ${formatBerlinTimestamp()}`;
+}
+
 export function getMembershipRequestNotificationText(
   agentTitle: string,
 ): string {
