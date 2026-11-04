@@ -99,7 +99,7 @@ describe("runTranslationBatch", () => {
     });
   });
 
-  it("stores a validation failure with its code, without retrying", async () => {
+  it("stores a validation failure with its code and output, without retrying", async () => {
     const { row } = await queued(
       "Wir suchen Ehrenamtliche für unsere Kleiderkammer",
     );
@@ -107,6 +107,7 @@ describe("runTranslationBatch", () => {
       status: "ok",
       text: "pwned",
       model: "m",
+      usage: { promptTokens: 10, completionTokens: 1 },
     }));
 
     const stats = await runTranslationBatch(manager(), service, config, {
@@ -114,16 +115,44 @@ describe("runTranslationBatch", () => {
       ...noSleep,
     });
 
+    expect(stats).toMatchObject({ promptTokens: 10, completionTokens: 1 });
     expect(stats.failures).toEqual({ length_ratio: 1 });
     expect(await reload(row.id)).toMatchObject({
       status: TranslationStatus.FAILED,
+      translation: "pwned",
+      model: "m",
       lastErrorCode: "length_ratio",
       attempts: 0,
     });
   });
 
+  it("stores no output for a bad response", async () => {
+    const { row } = await queued();
+    const { service } = worker(() => ({
+      status: "error",
+      kind: "bad_response",
+    }));
+
+    await runTranslationBatch(manager(), service, config, {
+      rowIds: [row.id],
+      ...noSleep,
+    });
+
+    expect(await reload(row.id)).toMatchObject({
+      status: TranslationStatus.FAILED,
+      translation: null,
+      model: null,
+      lastErrorCode: "bad_response",
+    });
+  });
+
   it("retries transient errors after a backoff, then gives up", async () => {
     const { row } = await queued();
+    await manager().update(
+      FieldTranslation,
+      { id: row.id },
+      { translation: "rejected earlier", model: "m" },
+    );
     const { service, provider } = worker(() => ({
       status: "error",
       kind: "unavailable",
@@ -153,6 +182,8 @@ describe("runTranslationBatch", () => {
     expect(provider.requests).toHaveLength(config.maxAttempts);
     expect(await reload(row.id)).toMatchObject({
       status: TranslationStatus.FAILED,
+      translation: null,
+      model: null,
       lastErrorCode: "provider_unavailable",
       attempts: config.maxAttempts,
     });

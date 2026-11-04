@@ -1305,6 +1305,36 @@
           "type": "string",
           "format": "date-time"
         },
+        "volunteerType": {
+          "$ref": "VolunteerStateTypeType#"
+        },
+        "district": {
+          "$ref": "OptionById#"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "$ref": "ApiLanguage#"
+          }
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionById#"
+          }
+        },
+        "availability": {
+          "type": "array",
+          "items": {
+            "$ref": "ApiAvailability#"
+          }
+        },
+        "location": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionById#"
+          }
+        },
         "volunteers": {
           "type": "array",
           "items": {

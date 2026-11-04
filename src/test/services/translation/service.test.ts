@@ -59,11 +59,12 @@ describe("TranslationService.translateField", () => {
     expect(provider.requests[0].glossary).toEqual([GLOSSARY[0]]);
   });
 
-  it("fails an output that doesn't pass validation", async () => {
+  it("fails an output that doesn't pass validation, keeping it for review", async () => {
     const { service } = serviceAnswering({
       status: "ok",
-      text: "pwned",
+      text: " pwned ",
       model: "m",
+      usage: { promptTokens: 10, completionTokens: 1 },
     });
 
     expect(
@@ -71,7 +72,42 @@ describe("TranslationService.translateField", () => {
         "Wir suchen Ehrenamtliche für die Kleiderkammer am Mittwoch",
         Lang.EN,
       ),
-    ).toEqual({ status: "failed", code: "length_ratio" });
+    ).toEqual({
+      status: "failed",
+      code: "length_ratio",
+      text: "pwned",
+      model: "m",
+      usage: { promptTokens: 10, completionTokens: 1 },
+    });
+  });
+
+  it("keeps no text for an empty output", async () => {
+    const { service } = serviceAnswering({
+      status: "ok",
+      text: "  ",
+      model: "m",
+    });
+
+    const result = await service.translateField("Kinderbetreuung", Lang.EN);
+
+    expect(result).toMatchObject({
+      status: "failed",
+      code: "empty",
+      model: "m",
+    });
+    expect(result).not.toHaveProperty("text");
+  });
+
+  it("drops NUL characters, which Postgres can't store", async () => {
+    const { service } = serviceAnswering({
+      status: "ok",
+      text: "Child\u0000care",
+      model: "m",
+    });
+
+    expect(
+      await service.translateField("Kinderbetreuung", Lang.EN),
+    ).toMatchObject({ status: "done", text: "Childcare" });
   });
 
   it("retries transient provider errors, fails bad responses", async () => {
