@@ -211,9 +211,6 @@ function walk(
           node.accompanying as unknown as Record<string, unknown>,
           ACCOMPANYING_PII_FIELDS,
         );
-        maskPostcode(node.accompanying as unknown as Record<string, unknown>, {
-          hideValue: true,
-        });
       }
       if (node.deal && typeof node.deal === "object") {
         maskPostcode(node.deal as unknown as Record<string, unknown>, {

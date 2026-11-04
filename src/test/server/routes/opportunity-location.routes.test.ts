@@ -191,9 +191,9 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     });
   });
 
-  it("hides the appointment postcode from a volunteer who isn't matched", async () => {
+  it("shows the appointment postcode to a volunteer who isn't matched", async () => {
     const row = await listed("volunteer", opportunities.accompanying.id);
-    expect(row.postcode).toBeNull();
+    expect(row.postcode).toBe(appointmentPostcode.value);
     expect(row.district).toEqual({ id: appointmentDistrictId });
   });
 

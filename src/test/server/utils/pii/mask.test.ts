@@ -330,19 +330,16 @@ describe("maskPii", () => {
       expect(opp.accompanying!.address).toBe("Hidden St 5");
     });
 
-    it("hides the appointment postcode of an opportunity that isn't visible, keeping its district link", () => {
-      const districtPostcode = [{ id: 1, districtId: 3 }];
+    it("keeps the appointment postcode of an opportunity that isn't visible", () => {
       const opp = Object.assign(new Opportunity(), {
         id: 5,
         accompanying: Object.assign(makeAccompanying(), {
-          postcode: { id: 7, value: "12043", districtPostcode },
+          postcode: { id: 7, value: "12043" },
         }),
       });
       maskPii(opp, ctx({ opportunityIds: [] }));
-      expect(opp.accompanying!.postcode).toMatchObject({
-        value: null,
-        districtPostcode,
-      });
+      expect(opp.accompanying!.postcode!.value).toBe("12043");
+      expect(opp.accompanying!.address).toMatch(MASKED);
     });
 
     it("keeps the appointment postcode when the opportunity is visible", () => {
