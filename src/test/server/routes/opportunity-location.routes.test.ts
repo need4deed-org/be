@@ -197,10 +197,22 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     expect(row.district).toEqual({ id: appointmentDistrictId });
   });
 
+  it("shows the appointment postcode on the detail to a volunteer who isn't matched", async () => {
+    const res = await get(
+      `/opportunity/${opportunities.accompanying.id}`,
+      "volunteer",
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data).toMatchObject({
+      postcode: appointmentPostcode.value,
+      accompanyingDetails: { appointmentPostcode: appointmentPostcode.value },
+    });
+  });
+
   it("returns the same postcode on the volunteer-facing list", async () => {
     const res = await get(
       `/volunteer/opportunity?limit=100&type=${OpportunityType.ACCOMPANYING}&status=${OpportunityStatusType.SEARCHING}&search=${encodeURIComponent(prefix)}`,
-      "coordinator",
+      "volunteer",
     );
     expect(res.statusCode).toBe(200);
     const row = res
