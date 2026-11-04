@@ -1,6 +1,5 @@
 import { TranslatedIntoType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
-import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
@@ -80,24 +79,12 @@ describe("dtoOpportunityAccompanying", () => {
     expect(result).not.toHaveProperty("appointmentDistrict");
   });
 
-  it("omits appointmentDistrict when district is null", () => {
-    const result = dtoOpportunityAccompanying(
-      buildAccompanying(),
-      TEST_DATE,
-      [],
-      null,
-    );
-
-    expect(result).not.toHaveProperty("appointmentDistrict");
-  });
-
   it("emits appointmentDistrict { id } when district is provided", () => {
-    const district = new District({ id: 3, title: "Mitte" });
     const result = dtoOpportunityAccompanying(
       buildAccompanying(),
       TEST_DATE,
       [],
-      district,
+      3,
     );
 
     expect(result.appointmentDistrict).toEqual({ id: 3 });
@@ -105,13 +92,12 @@ describe("dtoOpportunityAccompanying", () => {
 
   it("emits both appointmentPostcode and appointmentDistrict together", () => {
     const postcode = new Postcode({ id: 42, value: "10115" });
-    const district = new District({ id: 3, title: "Mitte" });
 
     const result = dtoOpportunityAccompanying(
       buildAccompanying({ postcode }),
       TEST_DATE,
       [],
-      district,
+      3,
     );
 
     expect(result.appointmentPostcode).toBe("10115");

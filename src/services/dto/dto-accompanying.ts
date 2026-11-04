@@ -1,5 +1,4 @@
 import { ApiOpportunityAccompanyingDetails, OptionById } from "need4deed-sdk";
-import District from "../../data/entity/location/district.entity";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import { formatAppointmentDateTime } from "../utils";
@@ -8,7 +7,7 @@ export function dtoOpportunityAccompanying(
   accompanying: Accompanying,
   onetimerDate?: Date,
   dealLanguage: DealLanguage[] = [],
-  district?: District | null,
+  districtId?: number,
 ): ApiOpportunityAccompanyingDetails {
   const { appointmentDate, appointmentTime } =
     formatAppointmentDateTime(onetimerDate);
@@ -26,7 +25,7 @@ export function dtoOpportunityAccompanying(
         ...(accompanying.postcode?.value
           ? { appointmentPostcode: accompanying.postcode.value }
           : {}),
-        ...(district ? { appointmentDistrict: { id: district.id } } : {}),
+        ...(districtId ? { appointmentDistrict: { id: districtId } } : {}),
       }
     : {};
 }

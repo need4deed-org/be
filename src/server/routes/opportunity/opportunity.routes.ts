@@ -171,6 +171,10 @@ async function clearStaleAccompanying(
   await manager.update(Opportunity, opportunity.id, {
     accompanyingId: null,
     ...(alsoClearOnetimer ? { onetimerId: null } : {}),
+    // the stored district was the appointment's; let the backfill re-derive it
+    ...(opportunity.type === OpportunityType.ACCOMPANYING
+      ? { districtId: null }
+      : {}),
   });
   if (opportunity.accompanyingId) {
     await manager.delete(Accompanying, opportunity.accompanyingId);
@@ -178,6 +182,26 @@ async function clearStaleAccompanying(
   if (alsoClearOnetimer && opportunity.onetimerId) {
     await manager.delete(Onetimer, opportunity.onetimerId);
   }
+}
+
+// The stored district follows the appointment postcode (be#1210); a postcode
+// without a district link leaves it to the backfill.
+async function syncAppointmentDistrict(
+  manager: EntityManager,
+  opportunityId: number,
+): Promise<void> {
+  const opportunity = await manager.findOne(Opportunity, {
+    where: { id: opportunityId },
+    relations: ["accompanying"],
+  });
+  const postcodeId = opportunity?.accompanying?.postcodeId;
+  if (!postcodeId) {
+    return;
+  }
+  const district = await getDistrictFromPostcode(postcodeId, manager);
+  await manager.update(Opportunity, opportunityId, {
+    districtId: district?.id ?? null,
+  });
 }
 
 export default async function opportunityRoutes(
@@ -250,8 +274,8 @@ export default async function opportunityRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
-        "accompanying",
-        "accompanying.postcode",
+        "accompanying.postcode.districtPostcode",
+        "deal.postcode",
         "onetimer",
         "deal.dealLanguage.language",
         "deal.dealActivity.activity",
@@ -303,22 +327,11 @@ export default async function opportunityRoutes(
         await agentRepository.save(districtUpdates);
       }
 
-      const accompanyingDistrict =
-        opportunityComments.type === OpportunityType.ACCOMPANYING &&
-        opportunityComments.accompanying?.postcode
-          ? await getDistrictFromPostcode(
-              opportunityComments.accompanying.postcode,
-            )
-          : null;
-
       const { addDistrictToOpportunity, updates: opportunityUpdates } =
         getDistrictToOpportunityHandler();
       Object.assign(
         opportunityComments,
-        await addDistrictToOpportunity(
-          opportunityComments,
-          accompanyingDistrict,
-        ),
+        await addDistrictToOpportunity(opportunityComments),
       );
 
       await updateBackfilledColumn(
@@ -345,11 +358,7 @@ export default async function opportunityRoutes(
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {
-        ...dtoOpportunityGet(
-          opportunityComments,
-          accompanyingDistrict,
-          districtCentroid,
-        ),
+        ...dtoOpportunityGet(opportunityComments, districtCentroid),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
       if (
@@ -428,7 +437,7 @@ export default async function opportunityRoutes(
         "deal.postcode",
         "agent",
         "agent.address.postcode",
-        "accompanying",
+        "accompanying.postcode.districtPostcode",
         "onetimer",
         "opportunityVolunteer.volunteer.person",
         "originalLanguage",
@@ -984,6 +993,9 @@ export default async function opportunityRoutes(
           },
         );
 
+        const switchedToAccompanying =
+          request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+          opportunity.type !== OpportunityType.ACCOMPANYING;
         if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
           const appointmentPostcodeValue =
             request.body.accompanyingDetails?.appointmentPostcode;
@@ -998,10 +1010,23 @@ export default async function opportunityRoutes(
           }
 
           if (opportunity.accompanyingId) {
-            const success = await patchEntity(
-              Accompanying,
-              accompanying,
-              opportunity.accompanyingId,
+            const accompanyingId = opportunity.accompanyingId;
+            const success = await dataSource.manager.transaction(
+              async (manager) => {
+                const patched = await patchEntity(
+                  Accompanying,
+                  accompanying,
+                  accompanyingId,
+                  manager,
+                );
+                if (
+                  patched &&
+                  (accompanying.postcodeId || switchedToAccompanying)
+                ) {
+                  await syncAppointmentDistrict(manager, opportunity.id);
+                }
+                return patched;
+              },
             );
             if (!success) {
               throw new BadRequestError(
@@ -1022,12 +1047,16 @@ export default async function opportunityRoutes(
                   await manager.update(Opportunity, opportunity.id, {
                     accompanyingId: newAccompanying.id,
                   });
+                  await syncAppointmentDistrict(manager, opportunity.id);
                 },
               );
             } catch {
               throw new BadRequestError("Saving new accompanying failed");
             }
           }
+        } else if (switchedToAccompanying && opportunity.accompanyingId) {
+          // switched to accompanying, reusing the existing appointment
+          await syncAppointmentDistrict(dataSource.manager, opportunity.id);
         }
 
         const resolvedOnetimerDate =
