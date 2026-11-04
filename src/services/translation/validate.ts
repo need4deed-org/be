@@ -136,21 +136,11 @@ function rangeStartPresent(output: string, hour: number): boolean {
   );
 }
 
-type MissingTokenCode = Extract<
-  TranslationErrorCode,
-  | "email_missing"
-  | "url_missing"
-  | "phone_missing"
-  | "date_missing"
-  | "time_missing"
-  | "number_missing"
->;
-
 function missingToken(
   source: string,
   output: string,
   sourceLang: Lang,
-): MissingTokenCode | undefined {
+): TranslationErrorCode | undefined {
   const { time, fullHour, hourRangeStart } = SOURCE_TIME_PATTERNS[sourceLang];
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);

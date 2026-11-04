@@ -75,6 +75,22 @@ describe("validateTranslation", () => {
     ).toMatchObject({ code: "date_missing" });
   });
 
+  it("reports the first missing kind when several are dropped", () => {
+    expectCode(
+      MENS_CAFE_DE,
+      MENS_CAFE_EN.replace("4:30–6:00 PM", "in the afternoon").replace(
+        "benn-wilmersdorf@mts-socialdesign.com",
+        "us",
+      ),
+      Lang.EN,
+    ).toMatchObject({ code: "email_missing" });
+    expectCode(
+      "Am 22.08.2025 ab 16 Uhr für 20 Kinder",
+      "In late August from 4 pm for children",
+      Lang.EN,
+    ).toMatchObject({ code: "date_missing" });
+  });
+
   it("allows notation changes that keep the values", () => {
     const ok = { status: "ok" };
     // 24h -> 12h, full hours
