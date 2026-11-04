@@ -15,7 +15,11 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { DealType } from "../../../data/types";
-import { getRepository, hashPassword } from "../../../data/utils";
+import {
+  getDistrictCentroids,
+  getRepository,
+  hashPassword,
+} from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
@@ -214,6 +218,26 @@ describe("opportunity location: appointment postcode for accompanying (be#1210)"
     expect(details.appointmentAddress).toMatch(MASKED);
     expect(details.refugeeName).toMatch(MASKED);
     expect(details.refugeeNumber).toMatch(MASKED);
+  });
+
+  it("pins an accompanying opportunity at its appointment postcode (be#1272)", async () => {
+    const row = await listed("coordinator", opportunities.accompanying.id);
+    expect(appointmentPostcode.latitude).not.toBeNull();
+    expect(row).toMatchObject({
+      lat: appointmentPostcode.latitude,
+      lon: appointmentPostcode.longitude,
+    });
+  });
+
+  it("pins the appointment district's centroid, not the postcode, for a volunteer who isn't matched", async () => {
+    const row = await listed("volunteer", opportunities.accompanying.id);
+    const centroid = (await getDistrictCentroids([appointmentDistrictId])).get(
+      appointmentDistrictId,
+    );
+    expect(row).toMatchObject({
+      lat: centroid?.latitude,
+      lon: centroid?.longitude,
+    });
   });
 
   it("returns the same postcode on the volunteer-facing list", async () => {

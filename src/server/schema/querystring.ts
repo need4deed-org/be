@@ -1,6 +1,8 @@
 import {
   OpportunitySortField,
   QueryParamsKeys,
+  RECOMMENDED_MATCHES_DEFAULT_LIMIT,
+  RECOMMENDED_MATCHES_MAX_LIMIT,
   SortOrder,
 } from "need4deed-sdk";
 import { getRef } from "../utils";
@@ -10,6 +12,27 @@ const paginationProps = {
   limit: { type: "integer", minimum: 1, maximum: 120 },
 };
 const langProp = { language: { type: "string" } };
+
+const recommendedLimitProp = {
+  limit: {
+    type: "integer",
+    minimum: 1,
+    maximum: RECOMMENDED_MATCHES_MAX_LIMIT,
+    default: RECOMMENDED_MATCHES_DEFAULT_LIMIT,
+  },
+};
+
+export const recommendedVolunteersQuerySchema = {
+  type: "object",
+  properties: recommendedLimitProp,
+  additionalProperties: false,
+};
+
+export const recommendedOpportunitiesQuerySchema = {
+  type: "object",
+  properties: { ...langProp, ...recommendedLimitProp },
+  additionalProperties: false,
+};
 
 export const paginationQuerySchema = {
   type: "object",

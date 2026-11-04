@@ -426,6 +426,47 @@ describe("dtoOpportunityGetList", () => {
       expect(result.lon).toBeNull();
     });
 
+    describe("accompanying (be#1272)", () => {
+      const accompanying = (appointmentCoordinates: {
+        latitude: number | null;
+        longitude: number | null;
+      }) => ({
+        ...baseOpportunity,
+        type: "accompanying",
+        status: "opp-searching",
+        districtId: 5,
+        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        accompanying: {
+          postcode: {
+            value: "12043",
+            ...appointmentCoordinates,
+            districtPostcode: [{ id: 1, districtId: 6 }],
+          },
+        },
+      });
+
+      it("pins the appointment postcode, not the NGO's address", () => {
+        const result = dtoOpportunityGetList(
+          accompanying({ latitude: 52.48, longitude: 13.43 }) as any,
+        );
+        expect(result.lat).toBe(52.48);
+        expect(result.lon).toBe(13.43);
+      });
+
+      it("falls back to the appointment district's centroid when the appointment coordinates are masked", () => {
+        const opportunity = accompanying({ latitude: null, longitude: null });
+        expect(
+          getOpportunityDistrictIdNeedingCentroid(opportunity as any),
+        ).toBe(6);
+        const result = dtoOpportunityGetList(opportunity as any, {
+          latitude: 52.47,
+          longitude: 13.44,
+        });
+        expect(result.lat).toBe(52.47);
+        expect(result.lon).toBe(13.44);
+      });
+    });
+
     it("returns null lat/lon when no centroid was supplied at all (e.g. district unresolved)", () => {
       const opportunity = {
         ...baseOpportunity,
