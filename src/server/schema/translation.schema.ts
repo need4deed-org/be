@@ -10,15 +10,6 @@ export const translationEntityParamSchema = {
   },
 };
 
-export const originalLanguageBodySchema = {
-  type: "object",
-  required: ["language"],
-  additionalProperties: false,
-  properties: {
-    language: { type: "string", enum: Object.values(Lang) },
-  },
-};
-
 export const fieldTranslationPostBodySchema = {
   type: "object",
   required: [
