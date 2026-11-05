@@ -1,18 +1,21 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiFieldTranslationPatch,
+  ApiFieldTranslationPost,
   ApiOriginalLanguagePut,
+  TranslatedEntityType,
   UserRole,
 } from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
-import { TranslatedEntityType } from "../../services/translation/registry";
 import {
   confirmTranslation,
+  createTranslation,
   editTranslation,
   getFieldTranslations,
 } from "../../services/translation/review";
 import {
   fieldTranslationPatchBodySchema,
+  fieldTranslationPostBodySchema,
   fieldTranslationResponseSchema,
   fieldTranslationsResponseSchema,
   idParamSchema,
@@ -54,6 +57,23 @@ export default async function translationRoutes(
       );
       return reply.status(200).send({
         message: `${data.length} translated fields of ${entityType} (id:${entityId}).`,
+        data,
+      });
+    },
+  );
+
+  fastify.post<{ Body: ApiFieldTranslationPost }>(
+    "/",
+    {
+      schema: {
+        body: fieldTranslationPostBodySchema,
+        response: { 201: fieldTranslationResponseSchema, ...responseErrors },
+      },
+    },
+    async (request, reply) => {
+      const data = await createTranslation(dataSource.manager, request.body);
+      return reply.status(201).send({
+        message: `Translation (id:${data.id}) created.`,
         data,
       });
     },
