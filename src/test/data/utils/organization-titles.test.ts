@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ORGANIZATION_DOMAINS } from "../../../data/migrations/1786109950000-seed-organization-from-agent-domains";
 import {
   BUILTIN_ORGANIZATION_TITLES,
+  domainOrganizationTitles,
   loadOrganizationTitleMap,
   PRIMARY_ORGANIZATION_DOMAINS,
 } from "../../../data/utils/organization-titles";
@@ -36,6 +37,34 @@ describe("built-in organization title map", () => {
     expect(primaryTitles).not.toContain(null);
     expect(primaryTitles).not.toContain(undefined);
     expect(new Set(primaryTitles).size).toBe(primaryTitles.length);
+  });
+});
+
+describe("domainOrganizationTitles", () => {
+  it("names a mapped domain's Träger, with or without www.", () => {
+    const title = BUILTIN_ORGANIZATION_TITLES["need4deed.org"];
+    expect(domainOrganizationTitles("need4deed.org")).toEqual([title]);
+    expect(domainOrganizationTitles("www.need4deed.org")).toEqual([title]);
+  });
+
+  it("lists every operator of a shared domain", () => {
+    expect(domainOrganizationTitles("wittenau-sued.de")).toEqual(
+      BUILTIN_ORGANIZATION_TITLES["wittenau-sued.de"],
+    );
+  });
+
+  it("has no Träger for a domain mapped to null", () => {
+    expect(domainOrganizationTitles("kulturnest.org")).toBeNull();
+  });
+
+  it("falls back to the domain itself", () => {
+    expect(domainOrganizationTitles("unknown.example.org")).toEqual([
+      "unknown.example.org",
+    ]);
+    expect(domainOrganizationTitles("www.unknown.example.org")).toEqual([
+      "unknown.example.org",
+    ]);
+    expect(domainOrganizationTitles("constructor")).toEqual(["constructor"]);
   });
 });
 
