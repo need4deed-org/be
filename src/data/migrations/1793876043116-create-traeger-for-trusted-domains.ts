@@ -1,24 +1,41 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
+import { domainOrganizationTitles } from "../utils/organization-titles";
 
 export class CreateTraegerForTrustedDomains1793876043116
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const inserted: unknown[] = await queryRunner.query(
-      `INSERT INTO "organization" ("title", "website")
-       SELECT td."domain", td."domain"
-         FROM "trusted_domain" td
-        WHERE NOT EXISTS (
-          SELECT 1 FROM "organization" o
-           WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = regexp_replace(td."domain", '^www\\.', '')
-              OR lower(o."title") = td."domain"
-        )
-       ON CONFLICT ("title") DO NOTHING
-       RETURNING "id"`,
+    const rows: { domain: string }[] = await queryRunner.query(
+      `SELECT DISTINCT lower("domain") AS "domain" FROM "trusted_domain" ORDER BY 1`,
     );
+    let created = 0;
+    for (const { domain } of rows) {
+      const titles = domainOrganizationTitles(domain);
+      if (!titles) {
+        continue;
+      }
+      const inserted: unknown[] = await queryRunner.query(
+        `INSERT INTO "organization" ("title", "website")
+         SELECT $1, $2
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "organization" o
+             WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = $3
+                OR lower(o."title") = ANY($4)
+          )
+         ON CONFLICT ("title") DO NOTHING
+         RETURNING "id"`,
+        [
+          titles[0],
+          domain,
+          domain.replace(/^www\./, ""),
+          [domain, ...titles].map((t) => t.toLowerCase()),
+        ],
+      );
+      created += inserted.length;
+    }
     queryRunner.connection.logger.log(
       "info",
-      `[traeger-for-trusted-domains] created ${inserted.length}`,
+      `[traeger-for-trusted-domains] created ${created}`,
     );
   }
 

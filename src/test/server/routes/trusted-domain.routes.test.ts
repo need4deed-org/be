@@ -5,7 +5,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
-import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { CreateTraegerForTrustedDomains1793876043116 } from "../../../data/migrations/1793876043116-create-traeger-for-trusted-domains";
 import { hashPassword } from "../../../data/utils";
@@ -73,8 +72,14 @@ describe("trusted domains create their Träger (be#1285)", () => {
       "enriched-renamed",
       "www-existing",
       "duplicate",
+      "shared",
+      "shared-renamed",
     ].map(domain);
-    names.push(`www.${domain("www-rename")}`, `www.${domain("www-existing")}`);
+    names.push(
+      `www.${domain("www-rename")}`,
+      `www.${domain("www-existing")}`,
+      `www.${domain("shared")}`,
+    );
     await fastify.db.trustedDomainRepository.delete({ domain: In(names) });
     await fastify.db.organizationRepository.delete({
       title: In([
@@ -161,6 +166,15 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(await traegerFor(`www.${domain("www-existing")}`)).toHaveLength(0);
   });
 
+  it("keeps a Träger another trusted domain still relies on when renaming", async () => {
+    const created = await post(domain("shared"));
+    await post(`www.${domain("shared")}`);
+    const res = await patch(created.json().data.id, domain("shared-renamed"));
+    expect(res.statusCode).toBe(200);
+    expect(await traegerFor(domain("shared"))).toHaveLength(1);
+    expect(await traegerFor(domain("shared-renamed"))).toHaveLength(1);
+  });
+
   it("answers 409 when the domain is already trusted", async () => {
     expect((await post(domain("duplicate"))).statusCode).toBe(201);
     expect((await post(domain("duplicate"))).statusCode).toBe(409);
@@ -195,22 +209,38 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(await traegerFor(domain("shouty"))).toHaveLength(0);
   });
 
-  it("backfills Träger for domains added before the fix", async () => {
+  it("backfills one Träger per host, skipping non-operators", async () => {
+    const legacy = domain("legacy");
+    const nonOperator = "kulturnest.org";
     const queryRunner =
       fastify.db.organizationRepository.manager.connection.createQueryRunner();
     await queryRunner.startTransaction();
     try {
-      await queryRunner.manager.save(
-        new TrustedDomain({ domain: domain("legacy") }),
+      await queryRunner.query(
+        `INSERT INTO "trusted_domain" ("domain") VALUES ($1), ($2), ($3), ($4)
+         ON CONFLICT ("domain") DO NOTHING`,
+        [legacy, `www.${legacy}`, domain("mixed").toUpperCase(), nonOperator],
+      );
+      await queryRunner.query(
+        `INSERT INTO "organization" ("title", "website") VALUES ($1, $2)`,
+        [`Mixed ${suffix}`, `https://${domain("mixed")}`],
       );
       const migration = new CreateTraegerForTrustedDomains1793876043116();
       await migration.up(queryRunner);
       await migration.up(queryRunner);
+      const count = async (website: string) => {
+        const [{ n }]: { n: number }[] = await queryRunner.query(
+          `SELECT count(*)::int AS "n" FROM "organization" WHERE lower("website") = $1`,
+          [website],
+        );
+        return n;
+      };
+      expect(await count(legacy)).toBe(1);
+      expect(await count(`www.${legacy}`)).toBe(0);
+      expect(await count(domain("mixed"))).toBe(0);
       expect(
-        await queryRunner.manager.countBy(Organization, {
-          title: domain("legacy"),
-        }),
-      ).toBe(1);
+        await queryRunner.manager.countBy(Organization, { title: nonOperator }),
+      ).toBe(0);
     } finally {
       await queryRunner.rollbackTransaction();
       await queryRunner.release();

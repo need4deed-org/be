@@ -367,3 +367,16 @@ export async function loadOrganizationTitleMap(
     return BUILTIN_ORGANIZATION_TITLES;
   }
 }
+
+export function domainOrganizationTitles(domain: string): string[] | null {
+  const key = Object.hasOwn(BUILTIN_ORGANIZATION_TITLES, domain)
+    ? domain
+    : domain.replace(/^www\./, "");
+  const entry = Object.hasOwn(BUILTIN_ORGANIZATION_TITLES, key)
+    ? BUILTIN_ORGANIZATION_TITLES[key]
+    : domain;
+  if (entry === null) {
+    return null;
+  }
+  return Array.isArray(entry) ? entry : [entry];
+}
