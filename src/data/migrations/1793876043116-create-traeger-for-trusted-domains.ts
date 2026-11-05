@@ -14,24 +14,29 @@ export class CreateTraegerForTrustedDomains1793876043116
       if (!titles) {
         continue;
       }
-      const inserted: unknown[] = await queryRunner.query(
-        `INSERT INTO "organization" ("title", "website")
-         SELECT $1, $2
-          WHERE NOT EXISTS (
-            SELECT 1 FROM "organization" o
-             WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = $3
-                OR lower(o."title") = ANY($4)
-          )
-         ON CONFLICT ("title") DO NOTHING
-         RETURNING "id"`,
+      const [{ exists }]: { exists: boolean }[] = await queryRunner.query(
+        `SELECT EXISTS (
+           SELECT 1 FROM "organization" o
+            WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = $1
+               OR lower(o."title") = ANY($2)
+         ) AS "exists"`,
         [
-          titles[0],
-          domain,
           domain.replace(/^www\./, ""),
           [domain, ...titles].map((t) => t.toLowerCase()),
         ],
       );
-      created += inserted.length;
+      if (exists) {
+        continue;
+      }
+      for (const title of titles) {
+        const inserted: unknown[] = await queryRunner.query(
+          `INSERT INTO "organization" ("title", "website") VALUES ($1, $2)
+           ON CONFLICT ("title") DO NOTHING
+           RETURNING "id"`,
+          [title, domain],
+        );
+        created += inserted.length;
+      }
     }
     queryRunner.connection.logger.log(
       "info",

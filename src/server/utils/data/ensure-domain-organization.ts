@@ -36,7 +36,9 @@ export async function ensureDomainOrganization(
   if (titles && !(await findDomainOrganization(manager, domain, titles))) {
     await manager
       .getRepository(Organization)
-      .save(new Organization({ title: titles[0], website: domain }));
+      .save(
+        titles.map((title) => new Organization({ title, website: domain })),
+      );
   }
 }
 
@@ -47,7 +49,7 @@ async function findStaleOrganization(
   renamedTo: string,
 ): Promise<Organization | null> {
   const stale = await manager.getRepository(Organization).findOneBy({
-    title: domain,
+    title: hostOf(domain),
     website: domain,
     email: IsNull(),
     phone: IsNull(),

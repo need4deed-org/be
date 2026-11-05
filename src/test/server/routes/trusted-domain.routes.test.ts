@@ -8,7 +8,9 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { CreateTraegerForTrustedDomains1793876043116 } from "../../../data/migrations/1793876043116-create-traeger-for-trusted-domains";
 import { hashPassword } from "../../../data/utils";
+import { BUILTIN_ORGANIZATION_TITLES } from "../../../data/utils/organization-titles";
 import { createServer } from "../../../server";
+import { ensureDomainOrganization } from "../../../server/utils";
 import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
@@ -173,6 +175,28 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(res.statusCode).toBe(200);
     expect(await traegerFor(domain("shared"))).toHaveLength(1);
     expect(await traegerFor(domain("shared-renamed"))).toHaveLength(1);
+  });
+
+  it("creates every operator of a domain they share", async () => {
+    const queryRunner =
+      fastify.db.organizationRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
+    try {
+      await queryRunner.query(
+        `UPDATE "organization" SET "title" = "title" || ' ' || "id", "website" = NULL
+          WHERE "website" ILIKE '%wittenau-sued.de%' OR "title" = ANY($1)`,
+        [BUILTIN_ORGANIZATION_TITLES["wittenau-sued.de"]],
+      );
+      await ensureDomainOrganization(queryRunner.manager, "wittenau-sued.de");
+      expect(
+        await queryRunner.manager.countBy(Organization, {
+          website: "wittenau-sued.de",
+        }),
+      ).toBe(2);
+    } finally {
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
+    }
   });
 
   it("answers 409 when the domain is already trusted", async () => {

@@ -61,6 +61,9 @@ describe("domainOrganizationTitles", () => {
     expect(domainOrganizationTitles("unknown.example.org")).toEqual([
       "unknown.example.org",
     ]);
+    expect(domainOrganizationTitles("www.unknown.example.org")).toEqual([
+      "unknown.example.org",
+    ]);
     expect(domainOrganizationTitles("constructor")).toEqual(["constructor"]);
   });
 });

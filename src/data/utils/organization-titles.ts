@@ -369,12 +369,13 @@ export async function loadOrganizationTitleMap(
 }
 
 export function domainOrganizationTitles(domain: string): string[] | null {
+  const host = domain.replace(/^www\./, "");
   const key = Object.hasOwn(BUILTIN_ORGANIZATION_TITLES, domain)
     ? domain
-    : domain.replace(/^www\./, "");
+    : host;
   const entry = Object.hasOwn(BUILTIN_ORGANIZATION_TITLES, key)
     ? BUILTIN_ORGANIZATION_TITLES[key]
-    : domain;
+    : host;
   if (entry === null) {
     return null;
   }
