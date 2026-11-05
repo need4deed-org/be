@@ -223,6 +223,7 @@ describe("/translation coordinator review", () => {
       const reference = await dataSource.manager
         .createQueryBuilder(FieldTranslation, "ft")
         .where("ft.skill_id IS NOT NULL")
+        .orderBy("ft.id", "ASC")
         .getOneOrFail();
 
       const res = await request("GET", `/skill/${reference.skillId}`);
@@ -383,6 +384,24 @@ describe("/translation coordinator review", () => {
         id: row.id,
         origin: TranslationOrigin.MACHINE,
       });
+    });
+
+    it("rejects a field with no original text", async () => {
+      const opportunity = await queued({ info: null });
+
+      const res = await post({
+        ...opportunityTitle(opportunity),
+        fieldName: "info",
+        original: "",
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(
+        await dataSource.manager.countBy(FieldTranslation, {
+          opportunityId: opportunity.id,
+          fieldName: "info",
+        }),
+      ).toBe(0);
     });
 
     it("409s when the original has changed", async () => {

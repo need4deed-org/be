@@ -117,14 +117,20 @@ export async function createTranslation(
   return manager.transaction(async (tx) => {
     const entity = await findEntity(tx, entityType, entityId, entry.machine);
     const { idOf, langOf } = await languageIds(tx);
-    let source = null;
+    let sourceHash = null;
     if (entry.machine) {
       if (language === originalLang(entity, langOf)) {
         throw new BadRequestError(
           `${language} is the original language of ${entityType} (id:${entityId}).`,
         );
       }
-      source = sourceHashOf(currentSource(entity, fieldName, original));
+      const current = currentSource(entity, fieldName, original);
+      if (!current) {
+        throw new BadRequestError(
+          `${entityType} (id:${entityId}) has no ${fieldName} to translate.`,
+        );
+      }
+      sourceHash = sourceHashOf(current);
     }
     const repository = tx.getRepository(FieldTranslation);
     try {
@@ -137,7 +143,7 @@ export async function createTranslation(
           : TranslationOrigin.REFERENCE,
         status: TranslationStatus.DONE,
         translation,
-        sourceHash: source,
+        sourceHash,
         attempts: 0,
         lastErrorCode: null,
         model: null,
