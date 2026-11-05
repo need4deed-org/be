@@ -2,13 +2,11 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiFieldTranslationPatch,
   ApiFieldTranslationPost,
-  ApiOriginalLanguagePut,
   TranslatedEntityType,
   UserRole,
 } from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
 import {
-  confirmTranslation,
   createTranslation,
   editTranslation,
   getFieldTranslations,
@@ -19,9 +17,7 @@ import {
   fieldTranslationResponseSchema,
   fieldTranslationsResponseSchema,
   idParamSchema,
-  originalLanguageBodySchema,
   responseErrors,
-  responseSchema,
   translationEntityParamSchema,
 } from "../schema";
 import { ParamsId } from "../types";
@@ -98,43 +94,6 @@ export default async function translationRoutes(
         message: `Translation (id:${data.id}) saved.`,
         data,
       });
-    },
-  );
-
-  fastify.post<{ Params: ParamsId }>(
-    "/:id/confirm",
-    {
-      schema: {
-        params: idParamSchema,
-        response: responseSchema({ statusCode: 204 }),
-      },
-    },
-    async (request, reply) => {
-      await confirmTranslation(dataSource.manager, request.params.id);
-      return reply.status(204).send();
-    },
-  );
-
-  fastify.put<{ Params: ParamsEntity; Body: ApiOriginalLanguagePut }>(
-    "/:entityType/:entityId/original-language",
-    {
-      schema: {
-        params: translationEntityParamSchema,
-        body: originalLanguageBodySchema,
-        response: responseSchema({ statusCode: 204 }),
-      },
-    },
-    async (request, reply) => {
-      const { entityType, entityId } = request.params;
-      await dataSource.manager.transaction((manager) =>
-        fastify.translation.setOriginalLanguage(
-          manager,
-          entityType,
-          entityId,
-          request.body.language,
-        ),
-      );
-      return reply.status(204).send();
     },
   );
 }

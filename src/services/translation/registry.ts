@@ -90,10 +90,6 @@ export const translatedEntityTypes = Object.keys(
   translatedEntities,
 ) as TranslatedEntityType[];
 
-export const machineEntityTypes = translatedEntityTypes.filter(
-  (entityType) => translatedEntities[entityType].machine,
-);
-
 export function isTranslatedEntityType(
   entityType: EntityTableName,
 ): entityType is TranslatedEntityType {

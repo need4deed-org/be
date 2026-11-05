@@ -14,12 +14,8 @@ import FieldTranslation from "../../data/entity/field_translation.entity";
 import { isUniqueViolation } from "../../data/utils";
 import { dtoFieldTranslation } from "../dto/dto-field-translation";
 import { languageIds, originalLang } from "./languages";
-import { loadEntity, SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
-import {
-  machineEntityTypes,
-  translatedEntities,
-  translatedEntityTypes,
-} from "./registry";
+import { SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
+import { translatedEntities, translatedEntityTypes } from "./registry";
 
 async function findEntity(
   manager: EntityManager,
@@ -206,47 +202,4 @@ export async function editTranslation(
     await tx.update(FieldTranslation, { id }, human);
     return dtoFieldTranslation({ ...row, ...human });
   });
-}
-
-export async function confirmTranslation(
-  manager: EntityManager,
-  id: number,
-): Promise<void> {
-  const row = await manager.findOneBy(FieldTranslation, { id });
-  const entityType = machineEntityTypes.find(
-    (type) => row?.[translatedEntities[type].fk],
-  );
-  if (!row || !entityType) {
-    throw new NotFoundError(`Translation (id:${id}) not found.`);
-  }
-  if (row.origin === TranslationOrigin.HUMAN) {
-    return;
-  }
-  if (row.status !== TranslationStatus.DONE || !row.translation) {
-    throw new BadRequestError(
-      `Translation (id:${id}) is ${row.status}; only a done translation can be confirmed.`,
-    );
-  }
-  const { entity } = await loadEntity(
-    manager,
-    entityType,
-    row[translatedEntities[entityType].fk] as number,
-    [row.fieldName],
-  );
-  const sourceHash = sourceHashOf(sourceTextOf(entity[row.fieldName]));
-  const { affected } = await manager.update(
-    FieldTranslation,
-    {
-      id,
-      origin: TranslationOrigin.MACHINE,
-      status: TranslationStatus.DONE,
-      sourceHash,
-    },
-    { origin: TranslationOrigin.HUMAN },
-  );
-  if (!affected) {
-    throw new ConflictError(
-      `Translation (id:${id}) no longer matches its original text; reload and review again.`,
-    );
-  }
 }
