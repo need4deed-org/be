@@ -1,6 +1,7 @@
 import {
   ApiFieldTranslation,
   ApiFieldTranslationGet,
+  ApiFieldTranslationPatch,
   Lang,
   TranslationOrigin,
   TranslationStatus,
@@ -10,7 +11,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../config";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import { dtoFieldTranslation } from "../dto/dto-field-translation";
 import { languageIds, originalLang } from "./languages";
-import { loadEntity, sourceHashOf, sourceTextOf } from "./queue";
+import { loadEntity, SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
 import {
   machineEntityTypes,
   translatedEntities,
@@ -48,6 +49,55 @@ export async function getFieldTranslations(
       }
       return { fieldName, original, originalLanguage, translations };
     });
+}
+
+export async function editTranslation(
+  manager: EntityManager,
+  id: number,
+  { text, original }: ApiFieldTranslationPatch,
+): Promise<ApiFieldTranslation> {
+  const translation = sourceTextOf(text);
+  if (!translation) {
+    throw new BadRequestError("A translation can't be empty.");
+  }
+  return manager.transaction(async (tx) => {
+    const row = await tx.findOneBy(FieldTranslation, { id });
+    const entityType = (
+      Object.keys(translatedEntities) as TranslatedEntityType[]
+    ).find((type) => row?.[translatedEntities[type].fk]);
+    if (!row || !entityType) {
+      throw new NotFoundError(`Translation (id:${id}) not found.`);
+    }
+    const entry = translatedEntities[entityType];
+    const done = {
+      translation,
+      status: TranslationStatus.DONE,
+      attempts: 0,
+      lastErrorCode: null,
+    };
+    if (!entry.machine) {
+      await tx.update(FieldTranslation, { id }, done);
+      return dtoFieldTranslation({ ...row, ...done });
+    }
+    const entity = (await tx.findOne(entry.entity, {
+      where: { id: row[entry.fk] as number },
+      lock: { mode: "pessimistic_write" },
+    })) as unknown as SourceEntity | null;
+    const current = sourceTextOf(entity?.[row.fieldName]);
+    if (!entity || current !== sourceTextOf(original)) {
+      throw new ConflictError(
+        `Translation (id:${id}) no longer matches its original text; reload and review again.`,
+      );
+    }
+    const human = {
+      ...done,
+      origin: TranslationOrigin.HUMAN,
+      sourceHash: sourceHashOf(current),
+      model: null,
+    };
+    await tx.update(FieldTranslation, { id }, human);
+    return dtoFieldTranslation({ ...row, ...human });
+  });
 }
 
 export async function confirmTranslation(

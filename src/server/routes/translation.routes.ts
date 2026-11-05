@@ -1,12 +1,19 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiOriginalLanguagePut, UserRole } from "need4deed-sdk";
+import {
+  ApiFieldTranslationPatch,
+  ApiOriginalLanguagePut,
+  UserRole,
+} from "need4deed-sdk";
 import { dataSource } from "../../data/data-source";
 import { TranslatedEntityType } from "../../services/translation/registry";
 import {
   confirmTranslation,
+  editTranslation,
   getFieldTranslations,
 } from "../../services/translation/review";
 import {
+  fieldTranslationPatchBodySchema,
+  fieldTranslationResponseSchema,
   fieldTranslationsResponseSchema,
   idParamSchema,
   originalLanguageBodySchema,
@@ -47,6 +54,28 @@ export default async function translationRoutes(
       );
       return reply.status(200).send({
         message: `${data.length} translated fields of ${entityType} (id:${entityId}).`,
+        data,
+      });
+    },
+  );
+
+  fastify.patch<{ Params: ParamsId; Body: ApiFieldTranslationPatch }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        body: fieldTranslationPatchBodySchema,
+        response: { 200: fieldTranslationResponseSchema, ...responseErrors },
+      },
+    },
+    async (request, reply) => {
+      const data = await editTranslation(
+        dataSource.manager,
+        request.params.id,
+        request.body,
+      );
+      return reply.status(200).send({
+        message: `Translation (id:${data.id}) saved.`,
         data,
       });
     },
