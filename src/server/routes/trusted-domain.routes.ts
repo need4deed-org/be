@@ -16,6 +16,7 @@ import {
   trustedDomainListResponseSchema,
 } from "../schema";
 import { ParamsId } from "../types";
+import { ensureDomainOrganization, renameDomainOrganization } from "../utils";
 
 const dtoTrustedDomain = (td: TrustedDomain) => ({
   id: td.id,
@@ -70,7 +71,11 @@ export default async function trustedDomainRoutes(
         throw new ConflictError(`Domain "${domain}" is already trusted.`);
       }
 
-      const saved = await repo.save(new TrustedDomain({ domain }));
+      const saved = await repo.manager.transaction(async (manager) => {
+        const trustedDomain = await manager.save(new TrustedDomain({ domain }));
+        await ensureDomainOrganization(manager, domain);
+        return trustedDomain;
+      });
       return reply.status(201).send({
         message: `Trusted domain "${domain}" added.`,
         data: dtoTrustedDomain(saved),
@@ -101,8 +106,13 @@ export default async function trustedDomainRoutes(
         throw new ConflictError(`Domain "${domain}" is already trusted.`);
       }
 
+      const previous = existing.domain;
       existing.domain = domain;
-      const saved = await repo.save(existing);
+      const saved = await repo.manager.transaction(async (manager) => {
+        const trustedDomain = await manager.save(existing);
+        await renameDomainOrganization(manager, previous, domain);
+        return trustedDomain;
+      });
       return reply.status(200).send({
         message: `Trusted domain (id:${id}) updated.`,
         data: dtoTrustedDomain(saved),
