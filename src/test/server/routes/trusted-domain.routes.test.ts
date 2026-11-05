@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
+import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import { CreateTraegerForTrustedDomains1793876043116 } from "../../../data/migrations/1793876043116-create-traeger-for-trusted-domains";
 import { hashPassword } from "../../../data/utils";
@@ -59,12 +60,18 @@ describe("trusted domains create their Träger (be#1285)", () => {
   });
 
   afterAll(async () => {
-    const names = ["new", "renamed", "existing", "legacy"].map(domain);
-    await fastify.db.trustedDomainRepository.delete({
-      domain: In([...names, domain("before-rename")]),
-    });
+    const names = [
+      "new",
+      "before-rename",
+      "renamed",
+      "before-merge",
+      "merged",
+      "existing",
+      "shouty",
+    ].map(domain);
+    await fastify.db.trustedDomainRepository.delete({ domain: In(names) });
     await fastify.db.organizationRepository.delete({
-      title: In([...names, domain("before-rename"), `Existing ${suffix}`]),
+      title: In([...names, `Existing ${suffix}`, `Shouty ${suffix}`]),
     });
     await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
@@ -84,16 +91,36 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(titles).toContain(domain("new"));
   });
 
-  it("creates the Träger for a renamed domain", async () => {
-    const created = await post(domain("before-rename"));
-    const res = await fastify.inject({
+  const patch = (id: number, value: string) =>
+    fastify.inject({
       method: "PATCH",
-      url: `/trusted-domain/${created.json().data.id}`,
+      url: `/trusted-domain/${id}`,
       cookies: { [accessCookieName]: cookie },
-      payload: { domain: domain("renamed") },
+      payload: { domain: value },
     });
+
+  it("moves the auto-created Träger along with a renamed domain", async () => {
+    const created = await post(domain("before-rename"));
+    const res = await patch(created.json().data.id, domain("renamed"));
     expect(res.statusCode).toBe(200);
     expect(await traegerFor(domain("renamed"))).toHaveLength(1);
+    expect(await traegerFor(domain("before-rename"))).toHaveLength(0);
+  });
+
+  it("drops the stale auto-created Träger when the new domain already has one", async () => {
+    await fastify.db.organizationRepository.save(
+      new Organization({ title: domain("merged"), website: domain("merged") }),
+    );
+    const created = await post(domain("before-merge"));
+    const res = await patch(created.json().data.id, domain("merged"));
+    expect(res.statusCode).toBe(200);
+    expect(await traegerFor(domain("merged"))).toHaveLength(1);
+    expect(await traegerFor(domain("before-merge"))).toHaveLength(0);
+  });
+
+  it("answers 409 when the domain is already trusted", async () => {
+    await post(domain("new"));
+    expect((await post(domain("new"))).statusCode).toBe(409);
   });
 
   it("doesn't duplicate a Träger that already has the domain as its website", async () => {
@@ -113,16 +140,37 @@ describe("trusted domains create their Träger (be#1285)", () => {
     ).toBe(1);
   });
 
+  it("matches a Träger whose website has an upper-case scheme, port and query", async () => {
+    await fastify.db.organizationRepository.save(
+      new Organization({
+        title: `Shouty ${suffix}`,
+        website: ` HTTPS://WWW.${domain("shouty").toUpperCase()}:443/?lang=de`,
+      }),
+    );
+    const res = await post(domain("shouty"));
+    expect(res.statusCode).toBe(201);
+    expect(await traegerFor(domain("shouty"))).toHaveLength(0);
+  });
+
   it("backfills Träger for domains added before the fix", async () => {
-    await fastify.db.trustedDomainRepository.save({ domain: domain("legacy") });
     const queryRunner =
       fastify.db.organizationRepository.manager.connection.createQueryRunner();
+    await queryRunner.startTransaction();
     try {
-      await new CreateTraegerForTrustedDomains1793876043116().up(queryRunner);
-      await new CreateTraegerForTrustedDomains1793876043116().up(queryRunner);
+      await queryRunner.manager.save(
+        new TrustedDomain({ domain: domain("legacy") }),
+      );
+      const migration = new CreateTraegerForTrustedDomains1793876043116();
+      await migration.up(queryRunner);
+      await migration.up(queryRunner);
+      expect(
+        await queryRunner.manager.countBy(Organization, {
+          title: domain("legacy"),
+        }),
+      ).toBe(1);
     } finally {
+      await queryRunner.rollbackTransaction();
       await queryRunner.release();
     }
-    expect(await traegerFor(domain("legacy"))).toHaveLength(1);
   });
 });

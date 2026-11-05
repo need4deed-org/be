@@ -16,7 +16,7 @@ import {
   trustedDomainListResponseSchema,
 } from "../schema";
 import { ParamsId } from "../types";
-import { ensureDomainOrganization } from "../utils";
+import { ensureDomainOrganization, renameDomainOrganization } from "../utils";
 
 const dtoTrustedDomain = (td: TrustedDomain) => ({
   id: td.id,
@@ -24,6 +24,13 @@ const dtoTrustedDomain = (td: TrustedDomain) => ({
 });
 
 const normalize = (domain: string) => domain.trim().toLowerCase();
+
+const conflictOnDuplicate = (domain: string) => (error: unknown) => {
+  if ((error as { code?: string }).code === "23505") {
+    throw new ConflictError(`Domain "${domain}" is already trusted.`);
+  }
+  throw error;
+};
 
 export default async function trustedDomainRoutes(
   fastify: FastifyInstance,
@@ -71,11 +78,15 @@ export default async function trustedDomainRoutes(
         throw new ConflictError(`Domain "${domain}" is already trusted.`);
       }
 
-      const saved = await repo.manager.transaction(async (manager) => {
-        const trustedDomain = await manager.save(new TrustedDomain({ domain }));
-        await ensureDomainOrganization(manager, domain);
-        return trustedDomain;
-      });
+      const saved = await repo.manager
+        .transaction(async (manager) => {
+          const trustedDomain = await manager.save(
+            new TrustedDomain({ domain }),
+          );
+          await ensureDomainOrganization(manager, domain);
+          return trustedDomain;
+        })
+        .catch(conflictOnDuplicate(domain));
       return reply.status(201).send({
         message: `Trusted domain "${domain}" added.`,
         data: dtoTrustedDomain(saved),
@@ -106,12 +117,15 @@ export default async function trustedDomainRoutes(
         throw new ConflictError(`Domain "${domain}" is already trusted.`);
       }
 
+      const previous = existing.domain;
       existing.domain = domain;
-      const saved = await repo.manager.transaction(async (manager) => {
-        const trustedDomain = await manager.save(existing);
-        await ensureDomainOrganization(manager, domain);
-        return trustedDomain;
-      });
+      const saved = await repo.manager
+        .transaction(async (manager) => {
+          const trustedDomain = await manager.save(existing);
+          await renameDomainOrganization(manager, previous, domain);
+          return trustedDomain;
+        })
+        .catch(conflictOnDuplicate(domain));
       return reply.status(200).send({
         message: `Trusted domain (id:${id}) updated.`,
         data: dtoTrustedDomain(saved),

@@ -1,5 +1,4 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
-import { websiteDomainSql } from "../../server/utils/data/ensure-domain-organization";
 
 export class CreateTraegerForTrustedDomains1793876043116
   implements MigrationInterface
@@ -11,7 +10,7 @@ export class CreateTraegerForTrustedDomains1793876043116
          FROM "trusted_domain" td
         WHERE NOT EXISTS (
           SELECT 1 FROM "organization" o
-           WHERE ${websiteDomainSql('o."website"')} = td."domain"
+           WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = td."domain"
               OR lower(o."title") = td."domain"
         )
        ON CONFLICT ("title") DO NOTHING
