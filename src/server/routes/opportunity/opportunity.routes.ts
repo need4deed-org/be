@@ -428,7 +428,7 @@ export default async function opportunityRoutes(
         request.query,
       );
       if (agentIds) {
-        mergeIntoWhere(where, { agent: { id: In(agentIds) } });
+        mergeIntoWhere(where, { agentId: In(agentIds) });
       }
       if (request.authUser?.role === UserRole.VOLUNTEER) {
         andIntoWhere(where, "id", closedForVolunteersIdWhere());
