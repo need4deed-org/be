@@ -826,6 +826,16 @@ export default async function opportunityRoutes(
         translatedEdits = await dataSource.manager.transaction(
           async (manager) => {
             let written = 0;
+            if (request.body.originalLanguage) {
+              await fastify.translation.setOriginalLanguage(
+                manager,
+                EntityTableName.OPPORTUNITY,
+                id,
+                request.body.originalLanguage,
+              );
+              ({ originalLanguageId: opportunity.originalLanguageId } =
+                await manager.findOneByOrFail(Opportunity, { id }));
+            }
             if (opportunityObj) {
               written = await divertTranslatedEdits(
                 manager,
