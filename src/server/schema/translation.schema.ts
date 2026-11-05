@@ -19,6 +19,16 @@ export const originalLanguageBodySchema = {
   },
 };
 
+export const fieldTranslationPatchBodySchema = {
+  type: "object",
+  required: ["text", "original"],
+  additionalProperties: false,
+  properties: {
+    text: { type: "string", minLength: 1 },
+    original: { type: "string" },
+  },
+};
+
 const fieldTranslationSchema = {
   type: "object",
   required: ["id", "text", "origin", "status"],
@@ -28,6 +38,15 @@ const fieldTranslationSchema = {
     origin: { type: "string", enum: Object.values(TranslationOrigin) },
     status: { type: "string", enum: Object.values(TranslationStatus) },
     lastErrorCode: { type: "string" },
+  },
+};
+
+export const fieldTranslationResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: fieldTranslationSchema,
   },
 };
 
