@@ -25,7 +25,7 @@ export class CreateTraegerForTrustedDomains1793876043116
           [domain, ...titles].map((t) => t.toLowerCase()),
         ],
       );
-      if (exists) {
+      if (exists && titles.length === 1) {
         continue;
       }
       for (const title of titles) {

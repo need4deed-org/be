@@ -177,7 +177,7 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(await traegerFor(domain("shared-renamed"))).toHaveLength(1);
   });
 
-  it("creates every operator of a domain they share", async () => {
+  it("creates every missing operator of a domain they share", async () => {
     const queryRunner =
       fastify.db.organizationRepository.manager.connection.createQueryRunner();
     await queryRunner.startTransaction();
@@ -187,12 +187,18 @@ describe("trusted domains create their Träger (be#1285)", () => {
           WHERE "website" ILIKE '%wittenau-sued.de%' OR "title" = ANY($1)`,
         [BUILTIN_ORGANIZATION_TITLES["wittenau-sued.de"]],
       );
+      const [first, second] = BUILTIN_ORGANIZATION_TITLES[
+        "wittenau-sued.de"
+      ] as string[];
+      await queryRunner.manager.save(
+        new Organization({ title: first, website: "wittenau-sued.de" }),
+      );
       await ensureDomainOrganization(queryRunner.manager, "wittenau-sued.de");
-      expect(
-        await queryRunner.manager.countBy(Organization, {
-          website: "wittenau-sued.de",
-        }),
-      ).toBe(2);
+      for (const title of [first, second]) {
+        expect(await queryRunner.manager.countBy(Organization, { title })).toBe(
+          1,
+        );
+      }
     } finally {
       await queryRunner.rollbackTransaction();
       await queryRunner.release();

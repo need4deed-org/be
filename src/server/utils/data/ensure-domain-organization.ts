@@ -33,12 +33,22 @@ export async function ensureDomainOrganization(
   domain: string,
 ): Promise<void> {
   const titles = domainOrganizationTitles(domain);
-  if (titles && !(await findDomainOrganization(manager, domain, titles))) {
-    await manager
-      .getRepository(Organization)
-      .save(
-        titles.map((title) => new Organization({ title, website: domain })),
-      );
+  if (!titles) {
+    return;
+  }
+  const repository = manager.getRepository(Organization);
+  if (titles.length > 1) {
+    for (const title of titles) {
+      if (!(await repository.existsBy({ title }))) {
+        await repository.save(new Organization({ title, website: domain }));
+      }
+    }
+    return;
+  }
+  if (!(await findDomainOrganization(manager, domain, titles))) {
+    await repository.save(
+      new Organization({ title: titles[0], website: domain }),
+    );
   }
 }
 
@@ -76,21 +86,20 @@ export async function renameDomainOrganization(
   to: string,
 ): Promise<void> {
   const stale = from !== to && (await findStaleOrganization(manager, from, to));
-  if (!stale) {
-    await ensureDomainOrganization(manager, to);
-    return;
+  if (stale) {
+    const repository = manager.getRepository(Organization);
+    const titles = domainOrganizationTitles(to);
+    if (
+      !titles ||
+      (await findDomainOrganization(manager, to, titles, stale.id))
+    ) {
+      await repository.delete({ id: stale.id });
+    } else {
+      await repository.update(
+        { id: stale.id },
+        { title: titles[0], website: to },
+      );
+    }
   }
-  const repository = manager.getRepository(Organization);
-  const titles = domainOrganizationTitles(to);
-  if (
-    !titles ||
-    (await findDomainOrganization(manager, to, titles, stale.id))
-  ) {
-    await repository.delete({ id: stale.id });
-  } else {
-    await repository.update(
-      { id: stale.id },
-      { title: titles[0], website: to },
-    );
-  }
+  await ensureDomainOrganization(manager, to);
 }
