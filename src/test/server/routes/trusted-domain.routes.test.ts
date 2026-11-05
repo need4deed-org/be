@@ -72,6 +72,7 @@ describe("trusted domains create their Träger (be#1285)", () => {
       "enriched",
       "enriched-renamed",
       "www-existing",
+      "duplicate",
     ].map(domain);
     names.push(`www.${domain("www-rename")}`, `www.${domain("www-existing")}`);
     await fastify.db.trustedDomainRepository.delete({ domain: In(names) });
@@ -161,8 +162,8 @@ describe("trusted domains create their Träger (be#1285)", () => {
   });
 
   it("answers 409 when the domain is already trusted", async () => {
-    await post(domain("new"));
-    expect((await post(domain("new"))).statusCode).toBe(409);
+    expect((await post(domain("duplicate"))).statusCode).toBe(201);
+    expect((await post(domain("duplicate"))).statusCode).toBe(409);
   });
 
   it("doesn't duplicate a Träger that already has the domain as its website", async () => {
