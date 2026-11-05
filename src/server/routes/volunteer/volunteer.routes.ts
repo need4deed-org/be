@@ -78,6 +78,7 @@ import {
   assertVolunteerVisible,
   resolveVolunteerVisibility,
 } from "../../utils/pii/volunteer-visibility";
+import { volunteerDistrictRoutes } from "../district-map.routes";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
@@ -111,6 +112,8 @@ export default async function volunteerRoutes(
       await assertVolunteerVisible(request, Number(id));
     }
   });
+
+  fastify.register(volunteerDistrictRoutes);
 
   await fastify.register(volunteerOpportunityRoutes, {
     prefix: RoutePrefix.OPPORTUNITY,

@@ -66,6 +66,7 @@ import {
   maskForCaller,
   resolveCallerMask,
 } from "../../utils/pii/pre-serialization";
+import { agentDistrictRoutes } from "../district-map.routes";
 import agentCommunicationRoutes from "./agent-communication.routes";
 import agentOpportunityRoutes from "./agent-opportunity.routes";
 import agentVolunteerRoutes from "./agent-volunteer.routes";
@@ -89,6 +90,7 @@ export default async function agentRoutes(
 ) {
   fastify.addHook("onRequest", fastify.authenticate());
   fastify.addHook("onRequest", denyVolunteer);
+  fastify.register(agentDistrictRoutes);
 
   fastify.register(agentRegisterRoutes, { prefix: RoutePrefix.REGISTER });
 

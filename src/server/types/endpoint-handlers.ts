@@ -58,13 +58,14 @@ export interface QuerystringCommuteFiltering {
 
 export interface QuerystringOpportunityFiltering {
   filter?: {
-    type: string;
-    status: string;
-    agentId?: number;
+    type?: string | string[];
+    status?: string | string[];
+    agentId?: number | number[];
+    match?: string | string[];
     search?: string;
-    language?: string;
-    activity?: string;
-    skill?: string;
+    language?: string | string[];
+    activity?: string | string[];
+    skill?: string | string[];
     availability?: string | string[];
     district?: string;
   } & QuerystringCommuteFiltering;
@@ -92,6 +93,7 @@ export interface QuerystringAgentFiltering {
     street?: string;
     district?: string[];
     type?: string[];
+    status?: string[];
     volunteerSearch?: string[];
     engagementStatus?: string[];
     services?: string[];
