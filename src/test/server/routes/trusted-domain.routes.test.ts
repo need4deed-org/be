@@ -68,10 +68,20 @@ describe("trusted domains create their Träger (be#1285)", () => {
       "merged",
       "existing",
       "shouty",
+      "www-rename",
+      "enriched",
+      "enriched-renamed",
+      "www-existing",
     ].map(domain);
+    names.push(`www.${domain("www-rename")}`, `www.${domain("www-existing")}`);
     await fastify.db.trustedDomainRepository.delete({ domain: In(names) });
     await fastify.db.organizationRepository.delete({
-      title: In([...names, `Existing ${suffix}`, `Shouty ${suffix}`]),
+      title: In([
+        ...names,
+        `Existing ${suffix}`,
+        `Shouty ${suffix}`,
+        `WWW ${suffix}`,
+      ]),
     });
     await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
@@ -116,6 +126,38 @@ describe("trusted domains create their Träger (be#1285)", () => {
     expect(res.statusCode).toBe(200);
     expect(await traegerFor(domain("merged"))).toHaveLength(1);
     expect(await traegerFor(domain("before-merge"))).toHaveLength(0);
+  });
+
+  it("keeps the Träger when a www. domain is renamed to its bare form", async () => {
+    const created = await post(`www.${domain("www-rename")}`);
+    const res = await patch(created.json().data.id, domain("www-rename"));
+    expect(res.statusCode).toBe(200);
+    expect(await traegerFor(domain("www-rename"))).toHaveLength(1);
+    expect(await traegerFor(`www.${domain("www-rename")}`)).toHaveLength(0);
+  });
+
+  it("leaves a Träger a coordinator filled in where it is on rename", async () => {
+    const created = await post(domain("enriched"));
+    await fastify.db.organizationRepository.update(
+      { title: domain("enriched") },
+      { email: `info@${domain("enriched")}` },
+    );
+    const res = await patch(created.json().data.id, domain("enriched-renamed"));
+    expect(res.statusCode).toBe(200);
+    expect(await traegerFor(domain("enriched"))).toHaveLength(1);
+    expect(await traegerFor(domain("enriched-renamed"))).toHaveLength(1);
+  });
+
+  it("matches an existing Träger for a domain entered with www.", async () => {
+    await fastify.db.organizationRepository.save(
+      new Organization({
+        title: `WWW ${suffix}`,
+        website: `https://${domain("www-existing")}`,
+      }),
+    );
+    const res = await post(`www.${domain("www-existing")}`);
+    expect(res.statusCode).toBe(201);
+    expect(await traegerFor(`www.${domain("www-existing")}`)).toHaveLength(0);
   });
 
   it("answers 409 when the domain is already trusted", async () => {

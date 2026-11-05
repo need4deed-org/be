@@ -10,7 +10,7 @@ export class CreateTraegerForTrustedDomains1793876043116
          FROM "trusted_domain" td
         WHERE NOT EXISTS (
           SELECT 1 FROM "organization" o
-           WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = td."domain"
+           WHERE rtrim(regexp_replace(regexp_replace(lower(btrim(coalesce(o."website", ''))), '^[a-z][a-z0-9+.-]*://', ''), '^www\\.|[:/?#].*$', '', 'g'), '.') = regexp_replace(td."domain", '^www\\.', '')
               OR lower(o."title") = td."domain"
         )
        ON CONFLICT ("title") DO NOTHING
