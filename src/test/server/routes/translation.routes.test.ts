@@ -14,6 +14,7 @@ import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
+import Skill from "../../../data/entity/profile/skill.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
@@ -27,6 +28,7 @@ describe("/translation coordinator review", () => {
   const cookies = {} as Record<UserRole.COORDINATOR | UserRole.AGENT, string>;
   const persons: number[] = [];
   const created: number[] = [];
+  const skills: number[] = [];
   const ids = {} as Record<Lang, number>;
   const suffix = randomNumericSuffix();
 
@@ -67,6 +69,14 @@ describe("/translation coordinator review", () => {
     created.push(opportunity.id);
     await queueOpportunityTranslation(dataSource.manager, opportunity);
     return opportunity;
+  }
+
+  async function skill() {
+    const saved = await dataSource.manager.save(
+      new Skill({ title: `Juggling ${suffix}-${skills.length}` }),
+    );
+    skills.push(saved.id);
+    return saved;
   }
 
   const titleRow = (opportunityId: number) =>
@@ -113,6 +123,9 @@ describe("/translation coordinator review", () => {
     if (created.length) {
       await dataSource.manager.delete(Opportunity, created);
     }
+    if (skills.length) {
+      await dataSource.manager.delete(Skill, skills);
+    }
     for (const personId of persons) {
       await fastify.db.userRepository.delete({ personId });
       await fastify.db.personRepository.delete({ id: personId });
@@ -123,6 +136,7 @@ describe("/translation coordinator review", () => {
   describe("access", () => {
     it.each([
       ["GET", "/opportunity/1"],
+      ["POST", "/"],
       ["PATCH", "/1"],
       ["POST", "/1/confirm"],
       ["PUT", "/opportunity/1/original-language"],
@@ -130,6 +144,14 @@ describe("/translation coordinator review", () => {
       const payload = {
         PUT: { language: Lang.EN },
         PATCH: { text: "Tutoring", original: "Nachhilfe" },
+        POST: url === "/" && {
+          entityType: "skill",
+          entityId: 1,
+          fieldName: "title",
+          language: Lang.DE,
+          text: "Jonglieren",
+          original: "Juggling",
+        },
       }[method as string];
       expect(
         (await request(method, url, UserRole.AGENT, payload)).statusCode,
@@ -137,13 +159,10 @@ describe("/translation coordinator review", () => {
       expect((await request(method, url, null, payload)).statusCode).toBe(401);
     });
 
-    it.each(["skill", "language", "comment"])(
-      "rejects %s, which is not machine-translated",
-      async (entityType) => {
-        const res = await request("GET", `/${entityType}/1`);
-        expect(res.statusCode).toBe(400);
-      },
-    );
+    it("rejects an entity type that isn't translated", async () => {
+      const res = await request("GET", "/comment/1");
+      expect(res.statusCode).toBe(400);
+    });
 
     it("404s on a missing entity", async () => {
       const res = await request("GET", "/opportunity/2147483647");
@@ -196,6 +215,28 @@ describe("/translation coordinator review", () => {
       ]);
     });
 
+    it("returns a reference entity's translations in every language", async () => {
+      const reference = await dataSource.manager
+        .createQueryBuilder(FieldTranslation, "ft")
+        .where("ft.skill_id IS NOT NULL")
+        .getOneOrFail();
+
+      const res = await request("GET", `/skill/${reference.skillId}`);
+
+      expect(res.statusCode).toBe(200);
+      const [title] = res.json().data;
+      expect(title).not.toHaveProperty("originalLanguage");
+      expect(Object.keys(title.translations).sort()).toEqual(
+        Object.values(Lang).sort(),
+      );
+      expect(Object.values(title.translations)).toContainEqual(
+        expect.objectContaining({
+          id: reference.id,
+          origin: TranslationOrigin.REFERENCE,
+        }),
+      );
+    });
+
     it("skips fields with no original text", async () => {
       const opportunity = await queued({ info: null });
 
@@ -204,6 +245,161 @@ describe("/translation coordinator review", () => {
       expect(
         res.json().data.map((field: { fieldName: string }) => field.fieldName),
       ).toEqual(["title"]);
+    });
+  });
+
+  describe("POST /", () => {
+    const post = (payload: Record<string, unknown>) =>
+      request("POST", "/", UserRole.COORDINATOR, payload);
+    const opportunityTitle = (opportunity: Opportunity) => ({
+      entityType: "opportunity",
+      entityId: opportunity.id,
+      fieldName: "title",
+      language: Lang.EN,
+      text: " Tutoring ",
+      original: opportunity.title,
+    });
+
+    it("creates a human translation of an opportunity field", async () => {
+      const opportunity = await queued();
+      await dataSource.manager.delete(FieldTranslation, {
+        opportunityId: opportunity.id,
+        fieldName: "title",
+      });
+
+      const res = await post(opportunityTitle(opportunity));
+
+      expect(res.statusCode).toBe(201);
+      const row = await titleRow(opportunity.id);
+      expect(res.json().data).toEqual({
+        id: row.id,
+        text: "Tutoring",
+        origin: TranslationOrigin.HUMAN,
+        status: TranslationStatus.DONE,
+      });
+      expect(row).toMatchObject({
+        languageId: ids[Lang.EN],
+        attempts: 0,
+        lastErrorCode: null,
+        model: null,
+      });
+      expect(row.sourceHash).toEqual(expect.any(String));
+      await queueOpportunityTranslation(dataSource.manager, opportunity);
+      expect(await titleRow(opportunity.id)).toMatchObject({
+        origin: TranslationOrigin.HUMAN,
+        translation: "Tutoring",
+      });
+    });
+
+    it("creates a reference translation without checking the original", async () => {
+      const { id } = await skill();
+
+      const res = await post({
+        entityType: "skill",
+        entityId: id,
+        fieldName: "title",
+        language: Lang.DE,
+        text: "Jonglieren",
+        original: "",
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(
+        await dataSource.manager.findOneByOrFail(FieldTranslation, {
+          skillId: id,
+        }),
+      ).toMatchObject({
+        origin: TranslationOrigin.REFERENCE,
+        status: TranslationStatus.DONE,
+        translation: "Jonglieren",
+        sourceHash: null,
+      });
+      const read = await request("GET", `/skill/${id}`);
+      expect(read.json().data[0].translations[Lang.DE]).toMatchObject({
+        text: "Jonglieren",
+      });
+    });
+
+    it("rejects a field the entity type doesn't translate", async () => {
+      const opportunity = await queued();
+
+      const res = await post({
+        ...opportunityTitle(opportunity),
+        fieldName: "description",
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("rejects the entity's original language", async () => {
+      const opportunity = await queued();
+
+      const res = await post({
+        ...opportunityTitle(opportunity),
+        language: Lang.DE,
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it.each([
+      { text: "   " },
+      { entityType: "comment" },
+      { language: "fr" },
+      { original: undefined },
+    ])("rejects the body change %j", async (change) => {
+      const opportunity = await queued();
+
+      const res = await post({ ...opportunityTitle(opportunity), ...change });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("404s on a missing entity", async () => {
+      const res = await post({
+        entityType: "skill",
+        entityId: 2147483647,
+        fieldName: "title",
+        language: Lang.DE,
+        text: "Jonglieren",
+        original: "Juggling",
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("409s when the translation already exists", async () => {
+      const opportunity = await queued();
+      const row = await translatedTitle(opportunity);
+
+      const res = await post(opportunityTitle(opportunity));
+
+      expect(res.statusCode).toBe(409);
+      expect(await titleRow(opportunity.id)).toMatchObject({
+        id: row.id,
+        origin: TranslationOrigin.MACHINE,
+      });
+    });
+
+    it("409s when the original has changed", async () => {
+      const opportunity = await queued();
+      await dataSource.manager.delete(FieldTranslation, {
+        opportunityId: opportunity.id,
+        fieldName: "title",
+      });
+
+      const res = await post({
+        ...opportunityTitle(opportunity),
+        original: "Alter Titel",
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(
+        await dataSource.manager.countBy(FieldTranslation, {
+          opportunityId: opportunity.id,
+          fieldName: "title",
+        }),
+      ).toBe(0);
     });
   });
 

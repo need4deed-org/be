@@ -1,11 +1,11 @@
 import { Lang, TranslationOrigin, TranslationStatus } from "need4deed-sdk";
-import { machineEntityTypes } from "../../services/translation/registry";
+import { translatedEntityTypes } from "../../services/translation/registry";
 
 export const translationEntityParamSchema = {
   type: "object",
   required: ["entityType", "entityId"],
   properties: {
-    entityType: { type: "string", enum: machineEntityTypes },
+    entityType: { type: "string", enum: translatedEntityTypes },
     entityId: { type: "integer", minimum: 1 },
   },
 };
@@ -16,6 +16,27 @@ export const originalLanguageBodySchema = {
   additionalProperties: false,
   properties: {
     language: { type: "string", enum: Object.values(Lang) },
+  },
+};
+
+export const fieldTranslationPostBodySchema = {
+  type: "object",
+  required: [
+    "entityType",
+    "entityId",
+    "fieldName",
+    "language",
+    "text",
+    "original",
+  ],
+  additionalProperties: false,
+  properties: {
+    entityType: { type: "string", enum: translatedEntityTypes },
+    entityId: { type: "integer", minimum: 1 },
+    fieldName: { type: "string", minLength: 1 },
+    language: { type: "string", enum: Object.values(Lang) },
+    text: { type: "string", minLength: 1 },
+    original: { type: "string" },
   },
 };
 
