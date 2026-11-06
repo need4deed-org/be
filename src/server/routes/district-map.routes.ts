@@ -65,7 +65,10 @@ import {
 } from "../utils/data/get-availability-deal-ids";
 import { getCallerAgentIds } from "../utils/data/get-caller-agent-ids";
 import { getOpportunityWhere } from "../utils/data/get-opportunity-where";
-import { getVolunteerWhere } from "../utils/data/get-volunteer-where";
+import {
+  getVolunteerWhere,
+  normalizeVolunteerStatusFilter,
+} from "../utils/data/get-volunteer-where";
 import { isStaffRole } from "../utils/data/is-staff-role";
 import { andIntoWhere, mergeIntoWhere } from "../utils/data/merge-into-where";
 import { closedForVolunteersIdWhere } from "../utils/data/no-match-found";
@@ -143,8 +146,10 @@ function normalizeVolunteerFilter(
     activity: toStringFilter(filter?.activity),
     skill: toStringFilter(filter?.skill),
     availability: toStringFilter(filter?.availability),
-    engagement: toStringFilter(filter?.engagement),
-    match: toStringFilter(filter?.match),
+    engagement: normalizeVolunteerStatusFilter(
+      toStringFilter(filter?.engagement),
+    ),
+    match: normalizeVolunteerStatusFilter(toStringFilter(filter?.match)),
   };
 }
 

@@ -62,6 +62,7 @@ import {
   getVolunteerSelfEditNotificationText,
   getVolunteerWhere,
   isStaffRole,
+  normalizeVolunteerStatusFilter,
   patchEntity,
   patchOrReplaceAddress,
   resolveCommuteFilter,
@@ -210,27 +211,16 @@ export default async function volunteerRoutes(
       },
     },
     async (request, reply) => {
-      function filterWorkaround(query: QuerystringVolunteerGetList) {
-        if (query.filter) {
-          const engagement = [query.filter.engagement]
-            .flat()
-            .filter(Boolean)
-            .map((e) => `vol-${e}`);
-          const match = [query.filter.match]
-            .flat()
-            .filter(Boolean)
-            .map((m) => `vol-${m}`);
-          Object.assign(query.filter, {
-            engagement: engagement.length ? engagement : undefined,
-            match: match.length ? match : undefined,
-          });
-        }
-        return query;
-      }
-
-      const { page, limit, sortOrder, filter, listType } = filterWorkaround(
-        request.query,
-      );
+      const { page, limit, sortOrder, listType } = request.query;
+      const filter = request.query.filter
+        ? {
+            ...request.query.filter,
+            engagement: normalizeVolunteerStatusFilter(
+              request.query.filter.engagement,
+            ),
+            match: normalizeVolunteerStatusFilter(request.query.filter.match),
+          }
+        : undefined;
       assertCommuteFilterAccess(filter, request.authUser?.role);
       const [skip, take] = getSkipTake({ page, limit });
 
