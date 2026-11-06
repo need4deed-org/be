@@ -25,6 +25,18 @@ export function sourceTextOf(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+export function pendingRow(sourceHash: string, attempts = 0) {
+  return {
+    origin: TranslationOrigin.MACHINE,
+    status: TranslationStatus.PENDING,
+    sourceHash,
+    translation: null,
+    attempts,
+    lastErrorCode: null,
+    model: null,
+  };
+}
+
 function rowsOf(
   fk: TranslationFk,
   entityId: number,
@@ -68,15 +80,7 @@ export async function enqueue(
       if (existing?.sourceHash === sourceHash) {
         continue;
       }
-      const pending = {
-        origin: TranslationOrigin.MACHINE,
-        status: TranslationStatus.PENDING,
-        sourceHash,
-        translation: null,
-        attempts: 0,
-        lastErrorCode: null,
-        model: null,
-      };
+      const pending = pendingRow(sourceHash);
       if (existing) {
         await repository.update({ id: existing.id }, pending);
       } else {

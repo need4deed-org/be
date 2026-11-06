@@ -103,7 +103,7 @@ export default async function translationRoutes(
     {
       schema: {
         description:
-          "Resets machine-entity translations to pending for regeneration; reference translations are permanently deleted.",
+          "Resets machine-entity translations to pending without clearing retry attempts. Already-pending translations are unchanged; exhausted translations return 409. Reference translations are permanently deleted.",
         params: idParamSchema,
         response: { 204: { type: "null" }, ...responseErrors },
       },

@@ -2,6 +2,7 @@ import {
   EntityTableName,
   Lang,
   OpportunityType,
+  TranslationOrigin,
   TranslationStatus,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -250,6 +251,46 @@ describe("runTranslationBatch", () => {
       await manager().findOneBy(FieldTranslation, { id: row.id }),
     ).toBeNull();
   });
+
+  it("accepts a valid result after an unrelated timestamp update", async () => {
+    const { row } = await queued();
+    const { service } = worker(async ({ text }) => {
+      await manager().update(FieldTranslation, row.id, {
+        updatedAt: new Date(),
+      });
+      return { status: "ok", text: `[en] ${text}`, model: "fake" };
+    });
+    const stats = await runTranslationBatch(manager(), service, config, {
+      rowIds: [row.id],
+      ...noSleep,
+    });
+    expect(stats).toMatchObject({ done: 1, stale: 0 });
+  });
+
+  it.each(["human", "retry"])(
+    "rejects a late result after a %s write",
+    async (kind) => {
+      const { row } = await queued();
+      const changed =
+        kind === "human"
+          ? {
+              origin: TranslationOrigin.HUMAN,
+              status: TranslationStatus.DONE,
+              translation: "Human text",
+            }
+          : { attempts: 1 };
+      const { service } = worker(async ({ text }) => {
+        await manager().update(FieldTranslation, row.id, changed);
+        return { status: "ok", text: `[en] ${text}`, model: "fake" };
+      });
+      const stats = await runTranslationBatch(manager(), service, config, {
+        rowIds: [row.id],
+        ...noSleep,
+      });
+      expect(stats).toMatchObject({ done: 0, stale: 1 });
+      expect(await reload(row.id)).toMatchObject(changed);
+    },
+  );
 
   it("discards a result when the source is edited during the call", async () => {
     const { row, opportunity } = await queued();

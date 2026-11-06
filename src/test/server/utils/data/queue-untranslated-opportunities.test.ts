@@ -5,12 +5,13 @@ import {
   OpportunityType,
 } from "need4deed-sdk";
 import { In, QueryRunner } from "typeorm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import FieldTranslation from "../../../../data/entity/field_translation.entity";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import Language from "../../../../data/entity/profile/language.entity";
 import { queueUntranslatedOpportunities } from "../../../../server/utils/data/translate-opportunities";
+import * as queue from "../../../../services/translation/queue";
 import { enqueue } from "../../../../services/translation/queue";
 import { randomNumericSuffix } from "../../../random";
 
@@ -24,6 +25,7 @@ describe("queueUntranslatedOpportunities", () => {
   let firstRun: number;
   let firstRows: FieldTranslation[];
   let secondRows: FieldTranslation[];
+  let secondPickedIds: number[];
 
   const fieldsOf = async (id: number) =>
     (
@@ -84,7 +86,13 @@ describe("queueUntranslatedOpportunities", () => {
 
     firstRun = await queueUntranslatedOpportunities(queryRunner.manager, ALL);
     firstRows = await ownRows();
-    await queueUntranslatedOpportunities(queryRunner.manager, ALL);
+    const enqueueSpy = vi.spyOn(queue, "enqueue");
+    try {
+      await queueUntranslatedOpportunities(queryRunner.manager, ALL);
+      secondPickedIds = enqueueSpy.mock.calls.map(([, , entity]) => entity.id);
+    } finally {
+      enqueueSpy.mockRestore();
+    }
     secondRows = await ownRows();
   });
 
@@ -120,6 +128,9 @@ describe("queueUntranslatedOpportunities", () => {
     expect(firstRun).toBeGreaterThanOrEqual(3);
     expect(await fieldsOf(opportunity.nothing.id)).toEqual([]);
     expect(secondRows).toEqual(firstRows);
+    for (const { id } of Object.values(opportunity)) {
+      expect(secondPickedIds).not.toContain(id);
+    }
   });
 
   it("queues searching opportunities first", async () => {

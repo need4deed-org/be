@@ -62,7 +62,6 @@ export async function runTranslationBatch(
   const query = manager
     .getRepository(FieldTranslation)
     .createQueryBuilder("ft")
-    .addSelect("ft.xmin::text", "revision")
     .leftJoinAndSelect("ft.language", "language")
     .where("ft.status = :pending", { pending: TranslationStatus.PENDING })
     .andWhere("ft.origin = :machine", { machine: TranslationOrigin.MACHINE })
@@ -74,13 +73,7 @@ export async function runTranslationBatch(
   if (rowIds) {
     query.andWhere("ft.id IN (:...rowIds)", { rowIds: [0, ...rowIds] });
   }
-  const { entities: rows, raw } = await query.getRawAndEntities<{
-    ft_id: number;
-    revision: string;
-  }>();
-  const revisions = new Map(
-    raw.map(({ ft_id, revision }) => [ft_id, revision]),
-  );
+  const rows = await query.getMany();
   stats.picked = rows.length;
 
   const interval = 60_000 / config.maxRequestsPerMinute;
@@ -99,7 +92,10 @@ export async function runTranslationBatch(
           hash: row.sourceHash,
           pending: TranslationStatus.PENDING,
         })
-        .andWhere("xmin::text = :revision", { revision: revisions.get(row.id) })
+        .andWhere("origin = :origin AND attempts = :attempts", {
+          origin: TranslationOrigin.MACHINE,
+          attempts: row.attempts,
+        })
         .execute();
       if (affected) {
         stats.removed++;
@@ -128,7 +124,10 @@ export async function runTranslationBatch(
           hash: row.sourceHash,
           pending: TranslationStatus.PENDING,
         })
-        .andWhere("xmin::text = :revision", { revision: revisions.get(row.id) })
+        .andWhere("origin = :origin AND attempts = :attempts", {
+          origin: TranslationOrigin.MACHINE,
+          attempts: row.attempts,
+        })
         .execute();
 
     if (result.status !== "retry") {

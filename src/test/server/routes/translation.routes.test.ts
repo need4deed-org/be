@@ -13,12 +13,14 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
+import AgentService from "../../../data/entity/m2m/agent-service";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import AgentType from "../../../data/entity/profile/agent-type.entity";
 import Language from "../../../data/entity/profile/language.entity";
+import Service from "../../../data/entity/profile/service.entity";
 import Skill from "../../../data/entity/profile/skill.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -26,7 +28,7 @@ import { createServer } from "../../../server";
 import { addAgentTypeServiceTranslations } from "../../../server/utils/data/add-agent-type-service-translations";
 import { addTranslatedFields } from "../../../server/utils/data/for-routes";
 import { queueOpportunityTranslation } from "../../../server/utils/data/translate-opportunities";
-import { dtoAgentGetList } from "../../../services/dto/dto-agent";
+import { dtoAgentGet, dtoAgentGetList } from "../../../services/dto/dto-agent";
 import { getOptionItems } from "../../../services/dto/utils";
 import { getTranslationConfig } from "../../../services/translation/config";
 import { FakeProvider } from "../../../services/translation/providers/fake";
@@ -45,6 +47,7 @@ describe("/translation coordinator review", () => {
   const created: number[] = [];
   const skills: number[] = [];
   const agentTypes: number[] = [];
+  const services: number[] = [];
   const ids = {} as Record<Lang, number>;
   const suffix = randomNumericSuffix();
 
@@ -147,6 +150,9 @@ describe("/translation coordinator review", () => {
     }
     if (agentTypes.length) {
       await dataSource.manager.delete(AgentType, agentTypes);
+    }
+    if (services.length) {
+      await dataSource.manager.delete(Service, services);
     }
     for (const personId of persons) {
       await fastify.db.userRepository.delete({ personId });
@@ -636,7 +642,7 @@ describe("/translation coordinator review", () => {
           origin: TranslationOrigin.MACHINE,
           status: TranslationStatus.PENDING,
           translation: null,
-          attempts: 0,
+          attempts: 3,
           lastErrorCode: null,
           model: null,
           sourceHash: sourceHashOf(source),
@@ -719,19 +725,20 @@ describe("/translation coordinator review", () => {
     });
 
     it.each(["done", "failed", "unavailable"] as const)(
-      "discards a %s worker result started before a reset of the same pending source",
+      "keeps an in-flight %s result when the same pending row is reset",
       async (outcome) => {
         const opportunity = await queued({ info: null });
         const row = await titleRow(opportunity.id);
         const provider = new FakeProvider(async ({ text }) => {
           expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(204);
+          expect(await titleRow(opportunity.id)).toEqual(row);
           if (outcome === "unavailable") {
             return { status: "error", kind: "unavailable" };
           }
           return {
             status: "ok",
             text: outcome === "failed" ? "" : `[en] ${text}`,
-            model: "before-reset",
+            model: "in-flight",
           };
         });
         const stats = await runTranslationBatch(
@@ -740,15 +747,171 @@ describe("/translation coordinator review", () => {
           getTranslationConfig({}),
           { rowIds: [row.id], sleep: async () => {} },
         );
-        expect(stats).toMatchObject({ stale: 1, done: 0 });
-        expect(await titleRow(opportunity.id)).toMatchObject({
-          status: TranslationStatus.PENDING,
-          translation: null,
-          attempts: 0,
-          model: null,
-        });
+        expect(stats.stale).toBe(0);
+        expect(stats[outcome === "unavailable" ? "retried" : outcome]).toBe(1);
       },
     );
+
+    it("preserves backoff when a pending reset is repeated", async () => {
+      const opportunity = await queued({ info: null });
+      const row = await titleRow(opportunity.id);
+      await dataSource.manager.update(
+        FieldTranslation,
+        { id: row.id },
+        { attempts: 3 },
+      );
+      const before = await titleRow(opportunity.id);
+      for (let i = 0; i < 2; i++) {
+        expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(204);
+        expect(await titleRow(opportunity.id)).toEqual(before);
+      }
+      const provider = new FakeProvider();
+      const stats = await runTranslationBatch(
+        dataSource.manager,
+        new TranslationService(provider, async () => []),
+        getTranslationConfig({}),
+        { rowIds: [row.id], sleep: async () => {} },
+      );
+      expect(stats.picked).toBe(0);
+      expect(provider.requests).toHaveLength(0);
+    });
+
+    it("exhausts the remaining retry budget after a reset and refuses another reset", async () => {
+      const opportunity = await queued({ info: null });
+      const row = await translatedTitle(opportunity);
+      const maxAttempts = getTranslationConfig({}).maxAttempts;
+      await dataSource.manager.update(
+        FieldTranslation,
+        { id: row.id },
+        { attempts: maxAttempts - 1 },
+      );
+      expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(204);
+      await dataSource.manager
+        .createQueryBuilder()
+        .update(FieldTranslation)
+        .set({ updatedAt: () => "now() - interval '1 hour'" })
+        .where("id = :id", { id: row.id })
+        .execute();
+      const provider = new FakeProvider(async () => ({
+        status: "error",
+        kind: "unavailable",
+      }));
+      const stats = await runTranslationBatch(
+        dataSource.manager,
+        new TranslationService(provider, async () => []),
+        getTranslationConfig({}),
+        { rowIds: [row.id], sleep: async () => {} },
+      );
+      expect(stats).toMatchObject({ picked: 1, failed: 1 });
+      expect(provider.requests).toHaveLength(1);
+      const failed = await titleRow(opportunity.id);
+      expect(failed).toMatchObject({
+        attempts: maxAttempts,
+        status: TranslationStatus.FAILED,
+      });
+      expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(409);
+      expect(await titleRow(opportunity.id)).toEqual(failed);
+    });
+
+    it("refuses to reset an exhausted translation without changing it", async () => {
+      const opportunity = await queued({ info: null });
+      const row = await titleRow(opportunity.id);
+      await dataSource.manager.update(
+        FieldTranslation,
+        { id: row.id },
+        {
+          attempts: getTranslationConfig({}).maxAttempts,
+          status: TranslationStatus.FAILED,
+          lastErrorCode: "provider_unavailable",
+        },
+      );
+      const before = await titleRow(opportunity.id);
+      for (let i = 0; i < 2; i++) {
+        expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(409);
+        expect(await titleRow(opportunity.id)).toEqual(before);
+      }
+    });
+
+    it.each(["original-language", "unregistered-field"])(
+      "refuses a stale %s row without changing it",
+      async (kind) => {
+        const opportunity = await queued({ info: null });
+        const row = await titleRow(opportunity.id);
+        await dataSource.manager.update(
+          FieldTranslation,
+          { id: row.id },
+          kind === "original-language"
+            ? { languageId: ids[Lang.DE] }
+            : { fieldName: "removedField" },
+        );
+        const before = await dataSource.manager.findOneByOrFail(
+          FieldTranslation,
+          { id: row.id },
+        );
+        expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(400);
+        expect(
+          await dataSource.manager.findOneByOrFail(FieldTranslation, {
+            id: row.id,
+          }),
+        ).toEqual(before);
+      },
+    );
+
+    it("immediately removes a reset row whose source is empty", async () => {
+      const opportunity = await queued({ info: null });
+      const row = await titleRow(opportunity.id);
+      await dataSource.manager.update(
+        Opportunity,
+        { id: opportunity.id },
+        { title: "  " },
+      );
+      expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(204);
+      expect(
+        await dataSource.manager.findOneBy(FieldTranslation, { id: row.id }),
+      ).toBeNull();
+      expect((await request("DELETE", `/${row.id}`)).statusCode).toBe(404);
+    });
+
+    it("keeps original type and service labels when reference values are null", async () => {
+      const type = await dataSource.manager.save(
+        new AgentType({ title: `Type ${suffix}` }),
+      );
+      agentTypes.push(type.id);
+      const service = await dataSource.manager.save(
+        new Service({ title: `Service ${suffix}` }),
+      );
+      services.push(service.id);
+      await dataSource.manager.save(FieldTranslation, [
+        { agentTypeId: type.id, languageId: ids[Lang.DE], translation: null },
+        {
+          agentTypeId: type.id,
+          languageId: ids[Lang.EN],
+          translation: "Accommodation",
+        },
+        { serviceId: service.id, languageId: ids[Lang.DE], translation: null },
+        {
+          serviceId: service.id,
+          languageId: ids[Lang.EN],
+          translation: "Advice",
+        },
+      ]);
+      const agent = new Agent({
+        agentTypeId: type.id,
+        agentType: type,
+        opportunity: [],
+        agentService: [new AgentService({ serviceId: service.id, service })],
+      });
+      await addAgentTypeServiceTranslations([agent]);
+      expect(dtoAgentGetList(agent).type.title).toEqual({
+        de: type.title,
+        en: "Accommodation",
+      });
+      expect(
+        dtoAgentGet(Object.assign(agent, { comments: [] })).services,
+      ).toEqual([
+        { id: service.id, title: { de: service.title, en: "Advice" } },
+      ]);
+    });
 
     it("deletes a reference row and falls back to the original skill title", async () => {
       const original = await skill();

@@ -47,6 +47,9 @@ export async function addAgentTypeServiceTranslations(
 
   const translationsByKey = new Map<string, OptionTitle>();
   for (const row of rows) {
+    if (row.translation === null) {
+      continue;
+    }
     const key = row.agentTypeId
       ? `${EntityTableName.AGENT_TYPE}_${row.agentTypeId}`
       : `${EntityTableName.SERVICE}_${row.serviceId}`;
