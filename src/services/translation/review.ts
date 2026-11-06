@@ -203,3 +203,48 @@ export async function editTranslation(
     return dtoFieldTranslation({ ...row, ...human });
   });
 }
+
+export async function deleteTranslation(
+  manager: EntityManager,
+  id: number,
+): Promise<void> {
+  await manager.transaction(async (tx) => {
+    const row = await tx.findOneBy(FieldTranslation, { id });
+    const entityType = translatedEntityTypes.find(
+      (type) => row?.[translatedEntities[type].fk],
+    );
+    if (!row || !entityType) {
+      throw new NotFoundError(`Translation (id:${id}) not found.`);
+    }
+    const entry = translatedEntities[entityType];
+    if (!entry.machine) {
+      const { affected } = await tx.delete(FieldTranslation, { id });
+      if (!affected) {
+        throw new NotFoundError(`Translation (id:${id}) not found.`);
+      }
+      return;
+    }
+    const entity = await findEntity(
+      tx,
+      entityType,
+      row[entry.fk] as number,
+      true,
+    );
+    const { affected } = await tx.update(
+      FieldTranslation,
+      { id },
+      {
+        origin: TranslationOrigin.MACHINE,
+        status: TranslationStatus.PENDING,
+        translation: null,
+        attempts: 0,
+        lastErrorCode: null,
+        model: null,
+        sourceHash: sourceHashOf(sourceTextOf(entity[row.fieldName])),
+      },
+    );
+    if (!affected) {
+      throw new NotFoundError(`Translation (id:${id}) not found.`);
+    }
+  });
+}

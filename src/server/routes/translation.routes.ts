@@ -8,6 +8,7 @@ import {
 import { dataSource } from "../../data/data-source";
 import {
   createTranslation,
+  deleteTranslation,
   editTranslation,
   getFieldTranslations,
 } from "../../services/translation/review";
@@ -94,6 +95,22 @@ export default async function translationRoutes(
         message: `Translation (id:${data.id}) saved.`,
         data,
       });
+    },
+  );
+
+  fastify.delete<{ Params: ParamsId }>(
+    "/:id",
+    {
+      schema: {
+        description:
+          "Resets machine-entity translations to pending for regeneration; reference translations are permanently deleted.",
+        params: idParamSchema,
+        response: { 204: { type: "null" }, ...responseErrors },
+      },
+    },
+    async (request, reply) => {
+      await deleteTranslation(dataSource.manager, request.params.id);
+      return reply.status(204).send();
     },
   );
 }
