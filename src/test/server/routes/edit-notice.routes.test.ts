@@ -33,7 +33,7 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
+describe("#new-volunteers-opportunities notice on profile edits by volunteers and agents (be#971)", () => {
   let fastify: FastifyInstance;
   const suffix = randomNumericSuffix();
   const coordinatorEmail = `coordinator-edit-alert-${suffix}@test.need4deed.org`;
@@ -51,7 +51,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
   let coordinatorCookie: string;
   let volunteerCookie: string;
   let agentCookie: string;
-  let opsAlert: ReturnType<typeof vi.spyOn>;
+  let editNotice: ReturnType<typeof vi.spyOn>;
 
   async function login(email: string): Promise<string> {
     const res = await fastify.inject({
@@ -141,15 +141,15 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     volunteerCookie = await login(volunteerEmail);
     agentCookie = await login(agentEmail);
 
-    opsAlert = vi.spyOn(fastify.notify, "opsAlert").mockResolvedValue();
+    editNotice = vi.spyOn(fastify.notify, "arrival").mockResolvedValue();
   });
 
   afterEach(() => {
-    opsAlert.mockClear();
+    editNotice.mockClear();
   });
 
   afterAll(async () => {
-    opsAlert?.mockRestore();
+    editNotice?.mockRestore();
     await fastify.db.userRepository.delete({ email: coordinatorEmail });
     await fastify.db.userRepository.delete({ email: volunteerEmail });
     await fastify.db.userRepository.delete({ email: agentEmail });
@@ -186,8 +186,8 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    expect(opsAlert).toHaveBeenCalledTimes(1);
-    const [text] = opsAlert.mock.lastCall ?? [];
+    expect(editNotice).toHaveBeenCalledTimes(1);
+    const [text] = editNotice.mock.lastCall ?? [];
     expect(text).toContain(volunteerPerson.name);
     expect(text).toContain(`id:${volunteer.id}`);
   });
@@ -201,7 +201,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("does not alert when a volunteer's patch writes nothing", async () => {
@@ -213,7 +213,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("does not alert when a coordinator edits a volunteer", async () => {
@@ -225,7 +225,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("alerts when an agent edits their NGO's opportunity", async () => {
@@ -237,8 +237,8 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(204);
 
-    expect(opsAlert).toHaveBeenCalledTimes(1);
-    const [text] = opsAlert.mock.lastCall ?? [];
+    expect(editNotice).toHaveBeenCalledTimes(1);
+    const [text] = editNotice.mock.lastCall ?? [];
     expect(text).toContain(opportunityTitle);
     expect(text).toContain(`id:${opportunity.id}`);
     expect(text).toContain(agentTitle);
@@ -253,7 +253,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(204);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("does not alert when an agent's patch is empty", async () => {
@@ -265,7 +265,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(204);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("alerts when a volunteer's edit was saved before a later step failed", async () => {
@@ -280,7 +280,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(400);
 
-    await vi.waitFor(() => expect(opsAlert).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(editNotice).toHaveBeenCalledTimes(1));
   });
 
   it("alerts when an agent edits the title in a language other than the original", async () => {
@@ -292,7 +292,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(204);
 
-    expect(opsAlert).toHaveBeenCalledTimes(1);
+    expect(editNotice).toHaveBeenCalledTimes(1);
   });
 
   it("does not alert when only the side effect on the agent's search status changes", async () => {
@@ -313,7 +313,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
       (await fastify.db.agentRepository.findOneByOrFail({ id: agent.id }))
         .searchStatus,
     ).toBe(AgentVolunteerSearchType.SEARCHING);
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 
   it("alerts when an agent's edit was saved before a later step failed", async () => {
@@ -328,7 +328,7 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(400);
 
-    expect(opsAlert).toHaveBeenCalledTimes(1);
+    expect(editNotice).toHaveBeenCalledTimes(1);
   });
 
   it("does not alert when a coordinator edits an opportunity", async () => {
@@ -340,6 +340,6 @@ describe("ops alert on profile edits by volunteers and agents (be#971)", () => {
     });
     expect(res.statusCode).toBe(204);
 
-    expect(opsAlert).not.toHaveBeenCalled();
+    expect(editNotice).not.toHaveBeenCalled();
   });
 });
