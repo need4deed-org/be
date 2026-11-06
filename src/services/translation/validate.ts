@@ -24,7 +24,8 @@ const MERIDIEMS: Record<Lang, string> = {
   [Lang.EN]: MERIDIEM,
   [Lang.DE]: GERMAN_MERIDIEM,
 };
-const DAY_PART = "morgens|früh|vormittags|mittags|nachmittags|abends|nachts";
+const DAY_PART =
+  "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
 
@@ -135,13 +136,17 @@ function clockHour(hour: number, { meridiem, dayPart }: Clock): number {
   if (!dayPart || hour > 12) {
     return hour;
   }
-  switch (dayPart.toLowerCase()) {
-    case "nachmittags":
-    case "abends":
+  const part = dayPart
+    .toLowerCase()
+    .replace(/^(?:am|in\s+der)\s+/, "")
+    .replace(/s$/, "");
+  switch (part) {
+    case "nachmittag":
+    case "abend":
       return hour24(hour, "pm");
-    case "mittags":
-      return hour < 11 ? hour + 12 : hour;
-    case "nachts":
+    case "mittag":
+      return hour <= 4 ? hour + 12 : hour;
+    case "nacht":
       return hour === 12 ? 0 : hour >= 7 ? hour + 12 : hour;
     default:
       return hour24(hour, "am");
@@ -176,23 +181,38 @@ function clockMatches(h: number, hour: number, clock: Clock): boolean {
   return !(clock.uhr || clock.oClock) || sameHour(h, hour);
 }
 
+const PATTERN_CACHE_LIMIT = 500;
+
+function cachedPattern(
+  cache: Map<string, RegExp>,
+  key: string,
+  build: () => RegExp,
+): RegExp {
+  let pattern = cache.get(key);
+  if (!pattern) {
+    if (cache.size >= PATTERN_CACHE_LIMIT) {
+      cache.clear();
+    }
+    pattern = build();
+    cache.set(key, pattern);
+  }
+  return pattern;
+}
+
+const NOT_AFTER_DIGITS = "(?<!\\d)(?<!\\d[.:])";
 const timePatterns = new Map<string, RegExp>();
 
 function timePattern(h: string, minutes: string, outputLang: Lang): RegExp {
-  const key = `${outputLang}:${h}:${minutes}`;
-  let pattern = timePatterns.get(key);
-  if (!pattern) {
+  return cachedPattern(timePatterns, `${outputLang}:${h}:${minutes}`, () => {
     const minutesPattern =
       minutes === "00"
         ? "(?!\\d)(?<withMinutes>[.:]00(?!\\d))?(?![.:]\\d)"
         : `(?<withMinutes>[.:]${minutes})(?!\\d)`;
-    pattern = new RegExp(
-      `(?<![\\d.:])\\b0?${h}${minutesPattern}${clockSuffix(outputLang)}`,
+    return new RegExp(
+      `${NOT_AFTER_DIGITS}\\b0?${h}${minutesPattern}${clockSuffix(outputLang)}`,
       "giu",
     );
-    timePatterns.set(key, pattern);
-  }
-  return pattern;
+  });
 }
 
 function timePresent(
@@ -240,7 +260,7 @@ function hourForms(hours: string[], minutes: string, words = true): string {
   return forms.length ? forms.join("|") : "(?!)";
 }
 
-const RANGE_FILLER = "(?:[\\p{L}.]+\\s+){0,2}";
+const RANGE_FILLER = "(?:\\p{L}+\\.\\s*|\\p{L}+\\s+|[~≈]\\s*){0,2}";
 const rangePatterns = new Map<string, RegExp>();
 
 function rangePattern(
@@ -250,8 +270,7 @@ function rangePattern(
   outputLang: Lang,
 ): RegExp {
   const key = `${outputLang}:${startHour}:${startMinutes}-${end}`;
-  let pattern = rangePatterns.get(key);
-  if (!pattern) {
+  return cachedPattern(rangePatterns, key, () => {
     const starts =
       startMinutes === "00"
         ? hourForms([startHour], "(?:[.:]00)?")
@@ -264,13 +283,11 @@ function rangePattern(
       endVariants.filter((h) => !is24Hour(h)),
       endMinutes,
     );
-    pattern = new RegExp(
-      `(?<![\\p{L}\\d.:])(?:${starts})${clockSuffix(outputLang, "start")}\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
+    return new RegExp(
+      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
       "giu",
     );
-    rangePatterns.set(key, pattern);
-  }
-  return pattern;
+  });
 }
 
 function rangePresent(
@@ -301,10 +318,7 @@ function rangePresent(
               (!startClock.uhr && !endClock.uhr),
           );
       } else {
-        matches = clockMatches(Number(h), start, {
-          ...startClock,
-          oClock: undefined,
-        });
+        matches = clockMatches(Number(h), start, startClock);
       }
       if (matches) {
         return true;

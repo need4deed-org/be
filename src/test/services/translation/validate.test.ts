@@ -341,7 +341,7 @@ describe("validateTranslation", () => {
     }
     for (const [source, output] of [
       ["Meet at 5 pm", "Treffen um 5 Uhr nachts"],
-      ["Meet at 9 am", "Treffen um 9 Uhr mittags"],
+      ["Meet at 1 am", "Treffen um 1 Uhr mittags"],
     ]) {
       expectCode(source, output, Lang.DE).toMatchObject({
         code: "time_missing",
@@ -381,6 +381,27 @@ describe("validateTranslation", () => {
       "Every Monday at 4:30",
       Lang.EN,
     ).toEqual({ status: "ok" });
+  });
+
+  it("accepts day-part nouns, approximations and label colons", () => {
+    const ok = { status: "ok" };
+    for (const [source, output, target] of [
+      ["Meet at 5 pm", "Treffen um 5 Uhr am Nachmittag", Lang.DE],
+      ["Meet at 4:30 pm", "Treffen um 4:30 Uhr am Nachmittag", Lang.DE],
+      ["Meet at 10 pm", "Treffen um 10 Uhr in der Nacht", Lang.DE],
+      ["From 9 to 5 pm", "Von 9 bis ~17 Uhr", Lang.DE],
+      ["From 9 to 5 pm", "Von 9 bis ca.17 Uhr", Lang.DE],
+      ["Zeit: 17 Uhr", "Time:5 pm", Lang.EN],
+      ["Um 10 Uhr mittags", "At 10 am", Lang.EN],
+      ["Um 1 Uhr mittags", "At 1 pm", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toEqual(ok);
+    }
+    expectCode(
+      "Von 0 bis 2 Uhr",
+      "From 12 o'clock to 2 am",
+      Lang.EN,
+    ).toMatchObject({ code: "time_missing" });
   });
 
   it("accepts dates and numbers copied with leading zeros", () => {
