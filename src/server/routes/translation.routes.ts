@@ -1,17 +1,23 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiOriginalLanguagePut, UserRole } from "need4deed-sdk";
-import { dataSource } from "../../data/data-source";
-import { TranslatedEntityType } from "../../services/translation/registry";
 import {
-  confirmTranslation,
+  ApiFieldTranslationPatch,
+  ApiFieldTranslationPost,
+  TranslatedEntityType,
+  UserRole,
+} from "need4deed-sdk";
+import { dataSource } from "../../data/data-source";
+import {
+  createTranslation,
+  editTranslation,
   getFieldTranslations,
 } from "../../services/translation/review";
 import {
+  fieldTranslationPatchBodySchema,
+  fieldTranslationPostBodySchema,
+  fieldTranslationResponseSchema,
   fieldTranslationsResponseSchema,
   idParamSchema,
-  originalLanguageBodySchema,
   responseErrors,
-  responseSchema,
   translationEntityParamSchema,
 } from "../schema";
 import { ParamsId } from "../types";
@@ -52,40 +58,42 @@ export default async function translationRoutes(
     },
   );
 
-  fastify.post<{ Params: ParamsId }>(
-    "/:id/confirm",
+  fastify.post<{ Body: ApiFieldTranslationPost }>(
+    "/",
     {
       schema: {
-        params: idParamSchema,
-        response: responseSchema({ statusCode: 204 }),
+        body: fieldTranslationPostBodySchema,
+        response: { 201: fieldTranslationResponseSchema, ...responseErrors },
       },
     },
     async (request, reply) => {
-      await confirmTranslation(dataSource.manager, request.params.id);
-      return reply.status(204).send();
+      const data = await createTranslation(dataSource.manager, request.body);
+      return reply.status(201).send({
+        message: `Translation (id:${data.id}) created.`,
+        data,
+      });
     },
   );
 
-  fastify.put<{ Params: ParamsEntity; Body: ApiOriginalLanguagePut }>(
-    "/:entityType/:entityId/original-language",
+  fastify.patch<{ Params: ParamsId; Body: ApiFieldTranslationPatch }>(
+    "/:id",
     {
       schema: {
-        params: translationEntityParamSchema,
-        body: originalLanguageBodySchema,
-        response: responseSchema({ statusCode: 204 }),
+        params: idParamSchema,
+        body: fieldTranslationPatchBodySchema,
+        response: { 200: fieldTranslationResponseSchema, ...responseErrors },
       },
     },
     async (request, reply) => {
-      const { entityType, entityId } = request.params;
-      await dataSource.manager.transaction((manager) =>
-        fastify.translation.setOriginalLanguage(
-          manager,
-          entityType,
-          entityId,
-          request.body.language,
-        ),
+      const data = await editTranslation(
+        dataSource.manager,
+        request.params.id,
+        request.body,
       );
-      return reply.status(204).send();
+      return reply.status(200).send({
+        message: `Translation (id:${data.id}) saved.`,
+        data,
+      });
     },
   );
 }

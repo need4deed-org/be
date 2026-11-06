@@ -1,4 +1,8 @@
-import { EntityTableName } from "need4deed-sdk";
+import {
+  EntityTableName,
+  TranslatedEntityType,
+  TranslationFieldsByEntity,
+} from "need4deed-sdk";
 import type FieldTranslation from "../../data/entity/field_translation.entity";
 import LeadFrom from "../../data/entity/lead.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -10,12 +14,14 @@ import Service from "../../data/entity/profile/service.entity";
 import Skill from "../../data/entity/profile/skill.entity";
 import { pascal2snake } from "../utils";
 
-interface TranslatedEntity {
-  fk: keyof FieldTranslation;
-  entity: new () => { id: number };
-  fields: readonly string[];
-  machine: boolean;
-}
+type TranslatedEntities = {
+  [Entity in TranslatedEntityType]: {
+    fk: keyof FieldTranslation;
+    entity: new () => { id: number };
+    fields: readonly TranslationFieldsByEntity[Entity][];
+    machine: boolean;
+  };
+};
 
 export const translatedEntities = {
   [EntityTableName.OPPORTUNITY]: {
@@ -66,15 +72,23 @@ export const translatedEntities = {
     fields: ["title"],
     machine: false,
   },
-} as const satisfies Partial<Record<EntityTableName, TranslatedEntity>>;
+} as const satisfies TranslatedEntities;
 
-export type TranslatedEntityType = keyof typeof translatedEntities;
+type UnregisteredFields = {
+  [Entity in TranslatedEntityType]: Exclude<
+    TranslationFieldsByEntity[Entity],
+    (typeof translatedEntities)[Entity]["fields"][number]
+  >;
+}[TranslatedEntityType];
+export const registryMatchesSdk: [UnregisteredFields] extends [never]
+  ? true
+  : never = true;
 export type TranslationFk =
   (typeof translatedEntities)[TranslatedEntityType]["fk"];
 
-export const machineEntityTypes = (
-  Object.keys(translatedEntities) as TranslatedEntityType[]
-).filter((entityType) => translatedEntities[entityType].machine);
+export const translatedEntityTypes = Object.keys(
+  translatedEntities,
+) as TranslatedEntityType[];
 
 export function isTranslatedEntityType(
   entityType: EntityTableName,

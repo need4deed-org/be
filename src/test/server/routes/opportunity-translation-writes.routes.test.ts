@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentMembershipStatus,
+  AgentRoleType,
   Lang,
   OpportunityLegacyType,
   OpportunityStatusType,
@@ -14,6 +16,7 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -34,6 +37,8 @@ const PASSWORD = "Translation-Writes-1!";
 describe("opportunity writes queue translations", () => {
   let fastify: FastifyInstance;
   let cookie: string;
+  let agentCookie: string;
+  let agentPerson: Person;
   let agent: Agent;
   let address: Address;
   let person: Person;
@@ -81,11 +86,12 @@ describe("opportunity writes queue translations", () => {
     id: number,
     payload: Record<string, unknown>,
     language?: Lang,
+    as = cookie,
   ) =>
     fastify.inject({
       method: "PATCH",
       url: `/opportunity/${id}${language ? `?language=${language}` : ""}`,
-      cookies: { [accessCookieName]: cookie },
+      cookies: { [accessCookieName]: as },
       payload,
     });
 
@@ -176,6 +182,36 @@ describe("opportunity writes queue translations", () => {
       payload: { email, password: PASSWORD },
     });
     cookie = login.cookies.find((c) => c.name === accessCookieName)!.value;
+
+    agentPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Translation writes agent" }),
+    );
+    const agentEmail = `agent-translation-writes-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email: agentEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: agentPerson.id,
+      }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: agentPerson.id,
+        role: AgentRoleType.SOCIAL_WORKER,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+    const agentLogin = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: agentEmail, password: PASSWORD },
+    });
+    agentCookie = agentLogin.cookies.find(
+      (c) => c.name === accessCookieName,
+    )!.value;
   });
 
   afterAll(async () => {
@@ -193,6 +229,9 @@ describe("opportunity writes queue translations", () => {
     }
     await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
+    await fastify.db.agentPersonRepository.delete({ personId: agentPerson.id });
+    await fastify.db.userRepository.delete({ personId: agentPerson.id });
+    await fastify.db.personRepository.delete({ id: agentPerson.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await dataSource.manager.delete(Address, { id: address.id });
     await fastify.close();
@@ -254,6 +293,97 @@ describe("opportunity writes queue translations", () => {
   });
 
   describe("PATCH /opportunity/:id", () => {
+    describe("originalLanguage", () => {
+      async function translatedToEnglish() {
+        const opportunity = await saved({});
+        await dataSource.manager.update(
+          FieldTranslation,
+          { opportunityId: opportunity.id },
+          { status: TranslationStatus.DONE, translation: "Done" },
+        );
+        return opportunity;
+      }
+
+      const originalLanguageId = async (id: number) =>
+        (await fastify.db.opportunityRepository.findOneByOrFail({ id }))
+          .originalLanguageId;
+
+      it.each([
+        ["coordinator", () => cookie],
+        ["agent", () => agentCookie],
+      ])(
+        "lets a %s switch it, dropping the new language's rows and queueing the old one",
+        async (_role, as) => {
+          const opportunity = await translatedToEnglish();
+
+          const res = await patch(
+            opportunity.id,
+            { originalLanguage: Lang.EN },
+            undefined,
+            as(),
+          );
+
+          expect(res.statusCode).toBe(204);
+          expect(await originalLanguageId(opportunity.id)).toBe(ids[Lang.EN]);
+          const rows = await rowsOf(opportunity.id);
+          expect(
+            rows.map((row) => [row.fieldName, row.languageId, row.status]),
+          ).toEqual([
+            ["info", ids[Lang.DE], TranslationStatus.PENDING],
+            ["title", ids[Lang.DE], TranslationStatus.PENDING],
+          ]);
+        },
+      );
+
+      it("changes nothing when it is already the original language", async () => {
+        const opportunity = await translatedToEnglish();
+        const before = await rowsOf(opportunity.id);
+
+        const res = await patch(opportunity.id, { originalLanguage: Lang.DE });
+
+        expect(res.statusCode).toBe(204);
+        expect(await originalLanguageId(opportunity.id)).toBe(ids[Lang.DE]);
+        expect(await rowsOf(opportunity.id)).toEqual(before);
+      });
+
+      it("queues a title sent with it against the new language", async () => {
+        const opportunity = await translatedToEnglish();
+
+        const res = await patch(opportunity.id, {
+          originalLanguage: Lang.EN,
+          title: "Homework help",
+        });
+
+        expect(res.statusCode).toBe(204);
+        expect(
+          (
+            await fastify.db.opportunityRepository.findOneByOrFail({
+              id: opportunity.id,
+            })
+          ).title,
+        ).toBe("Homework help");
+        const title = (await rowsOf(opportunity.id)).filter(
+          (row) => row.fieldName === "title",
+        );
+        expect(title).toEqual([
+          expect.objectContaining({
+            languageId: ids[Lang.DE],
+            status: TranslationStatus.PENDING,
+            sourceHash: sourceHashOf("Homework help"),
+          }),
+        ]);
+      });
+
+      it("rejects a language outside Lang", async () => {
+        const opportunity = await saved({});
+
+        const res = await patch(opportunity.id, { originalLanguage: "fr" });
+
+        expect(res.statusCode).toBe(400);
+        expect(await originalLanguageId(opportunity.id)).toBe(ids[Lang.DE]);
+      });
+    });
+
     it("re-queues only the changed field", async () => {
       const opportunity = await saved({});
       await dataSource.manager.update(

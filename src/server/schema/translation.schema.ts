@@ -1,21 +1,43 @@
 import { Lang, TranslationOrigin, TranslationStatus } from "need4deed-sdk";
-import { machineEntityTypes } from "../../services/translation/registry";
+import { translatedEntityTypes } from "../../services/translation/registry";
 
 export const translationEntityParamSchema = {
   type: "object",
   required: ["entityType", "entityId"],
   properties: {
-    entityType: { type: "string", enum: machineEntityTypes },
+    entityType: { type: "string", enum: translatedEntityTypes },
     entityId: { type: "integer", minimum: 1 },
   },
 };
 
-export const originalLanguageBodySchema = {
+export const fieldTranslationPostBodySchema = {
   type: "object",
-  required: ["language"],
+  required: [
+    "entityType",
+    "entityId",
+    "fieldName",
+    "language",
+    "text",
+    "original",
+  ],
   additionalProperties: false,
   properties: {
+    entityType: { type: "string", enum: translatedEntityTypes },
+    entityId: { type: "integer", minimum: 1 },
+    fieldName: { type: "string", minLength: 1 },
     language: { type: "string", enum: Object.values(Lang) },
+    text: { type: "string", minLength: 1 },
+    original: { type: "string" },
+  },
+};
+
+export const fieldTranslationPatchBodySchema = {
+  type: "object",
+  required: ["text", "original"],
+  additionalProperties: false,
+  properties: {
+    text: { type: "string", minLength: 1 },
+    original: { type: "string" },
   },
 };
 
@@ -28,6 +50,15 @@ const fieldTranslationSchema = {
     origin: { type: "string", enum: Object.values(TranslationOrigin) },
     status: { type: "string", enum: Object.values(TranslationStatus) },
     lastErrorCode: { type: "string" },
+  },
+};
+
+export const fieldTranslationResponseSchema = {
+  type: "object",
+  required: ["message", "data"],
+  properties: {
+    message: { type: "string" },
+    data: fieldTranslationSchema,
   },
 };
 

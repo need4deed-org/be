@@ -974,6 +974,7 @@
         "opportunity_type": {
           "$ref": "OpportunityType#"
         },
+        "originalLanguage": { "$ref": "Lang#" },
         "accompanyingDetails": {
           "$ref": "ApiAccompanyingPatch#"
         },
