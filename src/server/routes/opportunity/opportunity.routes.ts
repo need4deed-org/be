@@ -1122,7 +1122,7 @@ export default async function opportunityRoutes(
                 (await fastify.db.agentRepository.findOneBy({
                   id: effectiveAgentId,
                 }));
-              fastify.notify.opsAlert(
+              fastify.notify.arrival(
                 getAgentOpportunityEditNotificationText(
                   opportunityObj?.title ?? opportunity.title,
                   opportunity.id,
