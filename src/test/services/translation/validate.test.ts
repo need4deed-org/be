@@ -288,8 +288,12 @@ describe("validateTranslation", () => {
       ["From 9 to 5 pm", "Von 9 bis um 17 Uhr", Lang.DE],
       ["Von 9 bis 17 Uhr", "From 9 to around 5 pm", Lang.EN],
       ["Von 9 bis 17 Uhr", "From 9 until about 5 pm", Lang.EN],
-      ["From 9 to 12 pm on Monday", "Von 9 bis 12 am Montag", Lang.DE],
-      ["Meet at 12 pm on Friday", "Treffen um 12 am Freitag", Lang.DE],
+      ["From 9 to 12 pm on Monday", "Von 9 bis 12 Uhr am Montag", Lang.DE],
+      ["Meet at 12 pm on Friday", "Treffen um 12 Uhr am Freitag", Lang.DE],
+      ["Meet at 5 pm", "Treffen um 5 pm", Lang.DE],
+      ["From 5 to 7 pm", "Von 5 Uhr bis 7 Uhr abends", Lang.DE],
+      ["From 11 to 1 am", "Von 23 bis 1 Uhr", Lang.DE],
+      ["Von 10 bis 2 Uhr nachts", "From 10 pm to 2 am", Lang.EN],
     ] as const) {
       expectCode(source, output, target).toEqual(ok);
     }
@@ -354,8 +358,21 @@ describe("validateTranslation", () => {
       ["Um 9 Uhr", "At 9.15"],
       ["Um 0 Uhr", "At 05 o'clock"],
       ["Von 9 bis 17 Uhr", "From 9 together 5 pm"],
+      ["Um 17 Uhr", "At 5 o'clock"],
+      ["Von 17 bis 19 Uhr", "From 5 to 7 o'clock"],
+      ["Treffen um 17 Uhr", "Meeting with volunteers from 17 countries"],
+      ["Um 15 Uhr", "At 9:03 pm"],
+      ["Von 10 bis 2 Uhr nachts", "From 10 am to 2 am"],
     ]) {
       expectCode(source, output, Lang.EN).toMatchObject({
+        code: "time_missing",
+      });
+    }
+    for (const [source, output] of [
+      ["From 3 to 5 pm", "Von 9:15 bis 17 Uhr"],
+      ["From 4:30 to 7 pm", "Von 4:30 bis 19 Uhr"],
+    ]) {
+      expectCode(source, output, Lang.DE).toMatchObject({
         code: "time_missing",
       });
     }
