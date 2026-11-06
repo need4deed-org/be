@@ -142,14 +142,15 @@ function clockHour(hour: number, { meridiem, dayPart }: Clock): number {
     .replace(/s$/, "");
   switch (part) {
     case "nachmittag":
-    case "abend":
       return hour24(hour, "pm");
+    case "abend":
+      return hour === 12 ? 0 : hour24(hour, "pm");
     case "mittag":
       return hour <= 4 ? hour + 12 : hour;
     case "nacht":
       return hour === 12 ? 0 : hour >= 7 ? hour + 12 : hour;
     default:
-      return hour24(hour, "am");
+      return hour;
   }
 }
 
@@ -174,11 +175,20 @@ function sameHour(a: number, b: number): boolean {
   return a % 24 === b % 24;
 }
 
-function clockMatches(h: number, hour: number, clock: Clock): boolean {
+function clockMatches(
+  h: number,
+  hour: number,
+  clock: Clock,
+  outputLang: Lang,
+): boolean {
   if (clock.meridiem || clock.dayPart) {
     return sameHour(clockHour(h, clock), hour);
   }
-  return !(clock.uhr || clock.oClock) || sameHour(h, hour);
+  if (sameHour(h, hour)) {
+    return true;
+  }
+  // German readers take a bare 12-hour time as 24-hour, and anyone takes a bare 12 as noon.
+  return !(clock.uhr || clock.oClock) && outputLang === Lang.EN && h !== 12;
 }
 
 const PATTERN_CACHE_LIMIT = 500;
@@ -228,7 +238,7 @@ function timePresent(
       const clock = toClock(groups);
       if (
         (groups?.withMinutes || clock.meridiem || clock.uhr || clock.oClock) &&
-        clockMatches(Number(h), hour, clock)
+        clockMatches(Number(h), hour, clock, outputLang)
       ) {
         return true;
       }
@@ -290,6 +300,24 @@ function rangePattern(
   });
 }
 
+function borrowsEndMeridiem(
+  groups: Record<string, string | undefined> | undefined,
+  startClock: Clock,
+  endClock: Clock,
+  outputLang: Lang,
+): boolean {
+  if (!groups?.end12) {
+    return false;
+  }
+  if (startClock.uhr) {
+    return Boolean(endClock.dayPart);
+  }
+  return (
+    Boolean(endClock.meridiem || endClock.dayPart) ||
+    (outputLang === Lang.EN && !endClock.uhr)
+  );
+}
+
 function rangePresent(
   output: string,
   start: number,
@@ -298,29 +326,18 @@ function rangePresent(
   outputLang: Lang,
 ): boolean {
   for (const h of hourVariants(start)) {
-    // A 12-hour start without its own meridiem takes the end's, so the end must be in 12-hour form too.
-    const twelveHourStart =
-      start > 12 && start < 24 && Number(h) === start - 12;
     for (const { groups } of output.matchAll(
       rangePattern(h, startMinutes, end, outputLang),
     )) {
       const startClock = toClock(groups, "start");
       const endClock = toClock(groups, "end");
-      let matches: boolean;
-      if (startClock.meridiem || startClock.dayPart) {
-        matches = clockMatches(Number(h), start, startClock);
-      } else if (twelveHourStart) {
-        matches =
-          Boolean(groups?.end12) &&
-          Boolean(
-            endClock.meridiem ||
-              endClock.dayPart ||
-              (!startClock.uhr && !endClock.uhr),
-          );
-      } else {
-        matches = clockMatches(Number(h), start, startClock);
-      }
-      if (matches) {
+      const ownClock =
+        startClock.meridiem || startClock.dayPart || sameHour(Number(h), start);
+      if (
+        ownClock
+          ? clockMatches(Number(h), start, startClock, outputLang)
+          : borrowsEndMeridiem(groups, startClock, endClock, outputLang)
+      ) {
         return true;
       }
     }

@@ -394,14 +394,30 @@ describe("validateTranslation", () => {
       ["Zeit: 17 Uhr", "Time:5 pm", Lang.EN],
       ["Um 10 Uhr mittags", "At 10 am", Lang.EN],
       ["Um 1 Uhr mittags", "At 1 pm", Lang.EN],
+      ["Von 0 bis 2 Uhr", "From 12 o'clock to 2 am", Lang.EN],
     ] as const) {
       expectCode(source, output, target).toEqual(ok);
     }
-    expectCode(
-      "Von 0 bis 2 Uhr",
-      "From 12 o'clock to 2 am",
-      Lang.EN,
-    ).toMatchObject({ code: "time_missing" });
+  });
+
+  it("rejects a bare 12-hour time where it reads as another hour", () => {
+    for (const [source, output, target] of [
+      ["Meet at 12 am", "Treffen um 12:00", Lang.DE],
+      ["Meet at 12:30 am", "Treffen um 12:30", Lang.DE],
+      ["Um 0 Uhr", "At 12:00", Lang.EN],
+      ["From 12 to 6 am", "Von 12 bis 6 Uhr", Lang.DE],
+      ["Meet 5 to 7 pm", "Treffen von 5 Uhr bis 7 pm", Lang.DE],
+      ["Meet at 5:30 pm", "Treffen um 5:30", Lang.DE],
+      ["Meet at 5 pm", "Treffen um 05:00", Lang.DE],
+      ["Meet 5 to 7 pm", "Treffen von 5 bis 7 und 19 Uhr", Lang.DE],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "time_missing",
+      });
+    }
+    expectCode("Um 12 Uhr abends", "At 12 am", Lang.EN).toEqual({
+      status: "ok",
+    });
   });
 
   it("accepts dates and numbers copied with leading zeros", () => {
