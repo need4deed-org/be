@@ -588,7 +588,7 @@ export default async function volunteerRoutes(
                 ownPerson,
                 personData,
               ).name;
-              fastify.notify.opsAlert(
+              fastify.notify.arrival(
                 getVolunteerSelfEditNotificationText(editedName, id),
               );
             },
