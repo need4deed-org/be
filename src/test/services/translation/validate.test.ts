@@ -315,6 +315,57 @@ describe("validateTranslation", () => {
     }
   });
 
+  it("reads German day parts in the source like a meridiem", () => {
+    const ok = { status: "ok" };
+    for (const [source, output] of [
+      ["Um 8 Uhr abends", "At 8 pm"],
+      ["Um 3 Uhr nachmittags", "At 3 p.m."],
+      ["Von 5 bis 7 Uhr abends", "From 5 to 7 pm"],
+      ["Um 2 Uhr nachts", "At 2 am"],
+      ["Um 11 Uhr nachts", "At 11 pm"],
+    ]) {
+      expectCode(source, output, Lang.EN).toEqual(ok);
+    }
+    expectCode("From 6 to 8 pm", "Von 6 bis 8 Uhr abends", Lang.DE).toEqual(ok);
+    for (const [source, output] of [
+      ["Um 8 Uhr abends", "At 8 am"],
+      ["Von 5 bis 7 Uhr abends", "From 5 to 7 am"],
+    ]) {
+      expectCode(source, output, Lang.EN).toMatchObject({
+        code: "time_missing",
+      });
+    }
+    for (const [source, output] of [
+      ["Meet at 5 pm", "Treffen um 5 Uhr nachts"],
+      ["Meet at 9 am", "Treffen um 9 Uhr mittags"],
+    ]) {
+      expectCode(source, output, Lang.DE).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
+  it("does not read part of another number or time as the hour", () => {
+    for (const [source, output] of [
+      ["Um 1 Uhr", "At 12"],
+      ["Um 1 Uhr", "At 10"],
+      ["Um 5 Uhr treffen", "We meet at 5:30"],
+      ["Um 5 Uhr treffen", "We meet from 50 volunteers"],
+      ["Um 9 Uhr", "At 9.15"],
+      ["Um 0 Uhr", "At 05 o'clock"],
+      ["Von 9 bis 17 Uhr", "From 9 together 5 pm"],
+    ]) {
+      expectCode(source, output, Lang.EN).toMatchObject({
+        code: "time_missing",
+      });
+    }
+    expectCode(
+      "Jeden Montag um 16:30 Uhr",
+      "Every Monday at 4:30",
+      Lang.EN,
+    ).toEqual({ status: "ok" });
+  });
+
   it("accepts dates and numbers copied with leading zeros", () => {
     // Review finding 1: "01" was not recognised as the day 1.
     expectCode(
