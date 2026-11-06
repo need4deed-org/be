@@ -274,6 +274,47 @@ describe("validateTranslation", () => {
     }
   });
 
+  it("accepts midnight, day parts, o'clock and filler words in times", () => {
+    const ok = { status: "ok" };
+    for (const [source, output, target] of [
+      ["Bis 24 Uhr", "Until 12 am", Lang.EN],
+      ["Von 22 bis 24 Uhr", "From 10 pm to 12 am", Lang.EN],
+      ["From 11 to 12 am", "Von 23 bis 24 Uhr", Lang.DE],
+      ["Ab 0 Uhr", "From 12 am", Lang.EN],
+      ["Meeting at 5 pm", "Treffen um 5 Uhr nachmittags", Lang.DE],
+      ["Meet at 4:30 pm", "Treffen um 4:30 Uhr nachmittags", Lang.DE],
+      ["Um 9 Uhr", "At 9 o'clock", Lang.EN],
+      ["From 9 to 5 pm", "Von 9 bis ca. 17 Uhr", Lang.DE],
+      ["From 9 to 5 pm", "Von 9 bis um 17 Uhr", Lang.DE],
+      ["Von 9 bis 17 Uhr", "From 9 to around 5 pm", Lang.EN],
+      ["Von 9 bis 17 Uhr", "From 9 until about 5 pm", Lang.EN],
+      ["From 9 to 12 pm on Monday", "Von 9 bis 12 am Montag", Lang.DE],
+      ["Meet at 12 pm on Friday", "Treffen um 12 am Freitag", Lang.DE],
+    ] as const) {
+      expectCode(source, output, target).toEqual(ok);
+    }
+    for (const [source, output, target] of [
+      ["Bis 24 Uhr", "Until 12 pm", Lang.EN],
+      ["Meeting at 5 pm", "Treffen um 5 Uhr morgens", Lang.DE],
+      ["Treffen um 17 Uhr", "Meeting at 5", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
+  it("rejects a 12-hour range start paired with a 24-hour end", () => {
+    for (const [source, output] of [
+      ["From 1 to 3 pm", "Von 1 bis 15 Uhr"],
+      ["From 5 to 7 pm", "Von 5 bis 19 Uhr"],
+    ]) {
+      expectCode(source, output, Lang.DE).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
   it("accepts dates and numbers copied with leading zeros", () => {
     // Review finding 1: "01" was not recognised as the day 1.
     expectCode(
