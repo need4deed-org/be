@@ -230,6 +230,50 @@ describe("validateTranslation", () => {
     ).toEqual(ok);
   });
 
+  it("rejects a wrong meridiem or a 12-hour form with Uhr", () => {
+    for (const [source, output, target] of [
+      ["Von 17 bis 19 Uhr", "From 5 to 7 am", Lang.EN],
+      ["Ab ca. 16h für zwei Stunden", "From about 4 am for two hours", Lang.EN],
+      ["Meet 5 to 7 pm", "Treffen 17 bis 7 Uhr", Lang.DE],
+      ["Meeting at 5 PM in the garden", "Treffen um 5 Uhr im Garten", Lang.DE],
+      ["Jeden Montag, 16:30 Uhr", "Every Monday, 4:30 am", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 5 am to 7 pm", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
+  it("reads a range start across noon with the other meridiem", () => {
+    const ok = { status: "ok" };
+    expectCode("From 9 to 5 pm", "Von 9 bis 17 Uhr", Lang.DE).toEqual(ok);
+    expectCode("From 11 to 1 pm", "Von 11 bis 13 Uhr", Lang.DE).toEqual(ok);
+    expectCode("From 11:30 to 1 pm", "Von 11:30 bis 13 Uhr", Lang.DE).toEqual(
+      ok,
+    );
+    expectCode("From 9 to 5 pm", "Von 21 bis 17 Uhr", Lang.DE).toMatchObject({
+      code: "time_missing",
+    });
+    expectCode("From 11 to 1 pm", "Von 23 bis 13 Uhr", Lang.DE).toMatchObject({
+      code: "time_missing",
+    });
+  });
+
+  it("matches a range start only together with its end", () => {
+    for (const [source, output] of [
+      [
+        "Donnerstags von 17 bis 19 Uhr",
+        "Thursdays from 6 to 7 pm, 5 or 6 volunteers",
+      ],
+      ["Von 13 bis 15 Uhr, 2 Kinder", "From 2 to 3 pm, one or 2 kids"],
+    ]) {
+      expectCode(source, output, Lang.EN).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
   it("accepts dates and numbers copied with leading zeros", () => {
     // Review finding 1: "01" was not recognised as the day 1.
     expectCode(
