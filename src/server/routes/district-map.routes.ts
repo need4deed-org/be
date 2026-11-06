@@ -26,15 +26,14 @@ import {
   Not,
   Raw,
 } from "typeorm";
+import { UnauthorizedError } from "../../config/error/fastify";
 import District from "../../data/entity/location/district.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
-import {
-  firstDistrictPostcode,
-  getDistrictCentroids,
-} from "../../data/utils/get-district";
+import { getDistrictCentroids } from "../../data/utils/get-district";
+import { getOpportunityLocation } from "../../services/dto/dto-opportunity";
 import {
   getAvailability,
   getCoordinates,
@@ -246,6 +245,11 @@ function getOpportunityDistrictWhere(
     { districtId },
     {
       districtId: IsNull(),
+      type: Not(OpportunityType.ACCOMPANYING),
+      deal: { postcode: { id: firstDistrictPostcodeIdWhere(districtId) } },
+    },
+    {
+      districtId: IsNull(),
       type: OpportunityType.ACCOMPANYING,
       accompanying: {
         postcode: { id: firstDistrictPostcodeIdWhere(districtId) },
@@ -358,6 +362,7 @@ function opportunityRelations() {
   return [
     "agent.address.postcode.districtPostcode",
     "accompanying.postcode.districtPostcode",
+    "deal.postcode.districtPostcode",
     "deal.dealLanguage.language",
     "deal.dealTimeslot.timeslot",
     "onetimer",
@@ -372,15 +377,10 @@ function getOpportunityPhysicalLocation(opportunity: Opportunity): {
     opportunity.type === OpportunityType.ACCOMPANYING
       ? opportunity.accompanying?.postcode
       : undefined;
-  const postcode = appointmentPostcode ?? opportunity.agent?.address?.postcode;
-  const districtId =
-    opportunity.districtId ??
-    (appointmentPostcode
-      ? firstDistrictPostcode(appointmentPostcode.districtPostcode)?.districtId
-      : (opportunity.agent?.districtId ??
-        firstDistrictPostcode(postcode?.districtPostcode)?.districtId));
-
-  return { districtId, postcode };
+  return {
+    districtId: getOpportunityLocation(opportunity).districtId,
+    postcode: appointmentPostcode ?? opportunity.deal?.postcode,
+  };
 }
 
 const agentSelect = {
@@ -433,6 +433,13 @@ const opportunitySelect = {
   },
   deal: {
     id: true,
+    postcode: {
+      id: true,
+      value: true,
+      latitude: true,
+      longitude: true,
+      districtPostcode: { id: true, districtId: true },
+    },
     dealLanguage: {
       id: true,
       proficiency: true,
@@ -865,14 +872,19 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      if (request.authUser?.role === UserRole.AGENT) {
+        throw new UnauthorizedError(
+          "Agent users cannot access individual volunteer markers.",
+        );
+      }
       const filter = normalizeVolunteerFilter(request.query.filter);
       const [visibility, availabilityDealIds] = await Promise.all([
         resolveVolunteerVisibility(request),
         findAvailabilityDealIds(filter.availability),
       ]);
       const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
-      const [volunteers, total] =
-        await fastify.db.volunteerRepository.findAndCount({
+      const [[volunteers, total], centroids] = await Promise.all([
+        fastify.db.volunteerRepository.findAndCount({
           where: getVolunteerDistrictWhere(where, request.query.districtId),
           select: {
             id: true,
@@ -919,7 +931,9 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
           relationLoadStrategy: "query",
           order: { id: "ASC" },
           take: apiDistrictMarkerMaxEntities,
-        });
+        }),
+        getDistrictCentroids([request.query.districtId]),
+      ]);
       await maskForCaller(request, volunteers);
 
       const items = volunteers
@@ -936,6 +950,9 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
           const coordinates = getCoordinates(
             volunteer.person?.address?.postcode,
           );
+          const centroid = centroids.get(request.query.districtId);
+          const hasCoordinates =
+            coordinates.latitude !== null && coordinates.longitude !== null;
           const child: ApiDistrictMarkerChild = {
             id: volunteer.id,
             title: volunteer.person?.name || "Volunteer",
@@ -946,8 +963,12 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
 
           return {
             child,
-            latitude: coordinates.latitude,
-            longitude: coordinates.longitude,
+            latitude: hasCoordinates
+              ? coordinates.latitude
+              : (centroid?.latitude ?? null),
+            longitude: hasCoordinates
+              ? coordinates.longitude
+              : (centroid?.longitude ?? null),
           };
         });
 
