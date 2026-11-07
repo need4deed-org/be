@@ -57,6 +57,7 @@ async function sendSuggestionEmail(
       "volunteer.person",
       "volunteer.person.users",
       "opportunity.deal.postcode",
+      "opportunity.address.postcode",
       "opportunity.deal.dealTimeslot.timeslot",
       "opportunity.deal.dealLanguage.language",
       "opportunity.accompanying.postcode",

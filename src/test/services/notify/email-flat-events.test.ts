@@ -476,6 +476,48 @@ describe("sendEmailSuggestion one-of-these-times note", () => {
   });
 });
 
+describe("sendEmailSuggestion location", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetSuggestionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const sendWith = async (over: Record<string, unknown>) => {
+    await sendEmailSuggestion(
+      email,
+      ov({
+        opportunity: opportunity({
+          type: "regular",
+          deal: { postcode: { value: "10115" }, dealTimeslot: [] },
+          ...over,
+        }),
+      }) as unknown as Parameters<typeof sendEmailSuggestion>[1],
+    );
+    return send.mock.calls.at(-1)?.[0].text ?? "";
+  };
+
+  it("gives the NGO's PLZ when the opportunity has no own address", async () => {
+    const text = await sendWith({ address: null });
+
+    expect(text).toContain("in Berlin 10115.");
+  });
+
+  it("gives the own address's PLZ when the opportunity has one", async () => {
+    const text = await sendWith({
+      address: {
+        street: "Weg 1",
+        city: "Berlin",
+        postcode: { value: "10247" },
+      },
+    });
+
+    expect(text).toContain("in Berlin 10247.");
+    expect(text).not.toContain("10115");
+    expect(text).not.toContain("Weg 1");
+  });
+});
+
 describe("coordinator's email note", () => {
   const NOTE = "Please bring <your> ID & arrive early.";
 

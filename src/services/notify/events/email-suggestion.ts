@@ -5,6 +5,7 @@ import {
   emailSuggestionManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { getOpportunityLocation } from "../../dto/dto-opportunity";
 import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
 import { createManifestLoader, renderEmailWithNote } from "../email-template";
@@ -48,7 +49,7 @@ export async function sendEmailSuggestion(
 
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = await localizedOpportunityTitle(ov.opportunity);
-  const plz = ov.opportunity?.deal?.postcode?.value ?? "";
+  const plz = getOpportunityLocation(ov.opportunity).postcode ?? "";
   const dealTimeslot = ov.opportunity?.deal?.dealTimeslot ?? [];
   const opportunitySchedule = await resolveOrAlert(
     errorTransport,
