@@ -14,7 +14,7 @@ export const POST_MATCH_CHECKUP_BUILTIN: LocaleContent = {
 export const ACCOMPANY_NOT_FOUND_BUILTIN: LocaleContent = {
   subject:
     "Begleitung zum Termin am {{ appointmentDate }} in {{ appointmentDistrict }} für {{ clientName }}",
-  text: `Hallo {{ contactpersonName }},\n \nleider hat sich niemand für die Sprachmittlung gemeldet. Wir haben nun unsere Suche eingestellt.\n \nViele Grüße\nNeed4Deed`,
+  text: `Hallo {{ contactpersonName }},\n \nleider hat sich niemand für die Sprachmittlung gemeldet. Wir haben nun unsere Suche eingestellt.\n \nViele Grüße\ndas Team – Need4Deed`,
 };
 
 export const REGULAR_UPDATE_BUILTIN: LocaleContent = {
