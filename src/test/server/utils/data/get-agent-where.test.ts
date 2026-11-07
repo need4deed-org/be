@@ -22,6 +22,13 @@ describe("getAgentWhere", () => {
     expect(where).toEqual({ agentTypeId: In(["1", "2"]) });
   });
 
+  it("filters trust level for district marker `status`", async () => {
+    const where = await getAgentWhere({ status: ["trusted", "unknown"] });
+    expect(where).toEqual({
+      trustLevel: In(["trusted", "unknown"]),
+    });
+  });
+
   // Regression test: a naive `agentService: { serviceId: In(...) }` filter
   // joins agent -> agent_service, so an agent matching more than one
   // selected service comes back once per match, duplicating it in

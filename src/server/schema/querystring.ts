@@ -119,9 +119,21 @@ export const opportunityListQuerySchema = {
           type: "array",
           items: getRef("OpportunityType#"),
         },
+        agentId: {
+          anyOf: [
+            { type: "integer", minimum: 1 },
+            { type: "array", items: { type: "integer", minimum: 1 } },
+          ],
+        },
         status: {
           type: "array",
           items: getRef("OpportunityStatusType#"),
+        },
+        match: {
+          anyOf: [
+            { type: "string" },
+            { type: "array", items: { type: "string" } },
+          ],
         },
         ...commuteFilterProps(QueryParamsKeys.COMMUTE_VOLUNTEER_ID),
       },
@@ -146,6 +158,7 @@ export const agentListQuerySchema = {
         street: { type: "string" },
         district: { type: "array", items: { type: "string" } },
         type: { type: "array", items: { type: "string" } },
+        status: { type: "array", items: { type: "string" } },
         volunteerSearch: { type: "array", items: { type: "string" } },
         engagementStatus: { type: "array", items: { type: "string" } },
         services: { type: "array", items: { type: "string" } },
@@ -266,7 +279,12 @@ export const volunteerOpportunityListQuerySchema = {
     ...langProp,
     type: getRef("VolunteerStateTypeType#"),
     status: getRef("OpportunityStatusType#"),
-    agentId: { type: "number", minimum: 1 },
+    agentId: {
+      anyOf: [
+        { type: "integer", minimum: 1 },
+        { type: "array", items: { type: "integer", minimum: 1 } },
+      ],
+    },
     search: { type: "string" },
     activity: { type: "string" },
     skill: { type: "string" },

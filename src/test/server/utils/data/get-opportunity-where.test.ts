@@ -107,6 +107,18 @@ describe("getOpportunityWhere", () => {
     });
   });
 
+  it("filters district markers by agent and match status", () => {
+    expect(
+      getOpportunityWhere({
+        agentId: [2, 4],
+        match: ["vol-matched"],
+      } as never),
+    ).toEqual({
+      agentId: In([2, 4]),
+      statusMatch: In(["vol-matched"]),
+    });
+  });
+
   describe("excludeAccompanying", () => {
     it("sets type: Not(ACCOMPANYING) when true and no explicit filter.type is given", () => {
       const where = getOpportunityWhere(undefined, {

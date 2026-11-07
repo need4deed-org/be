@@ -121,6 +121,7 @@ import {
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
 import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
@@ -212,6 +213,7 @@ export default async function opportunityRoutes(
   _options: FastifyPluginOptions,
 ) {
   fastify.addHook("onRequest", fastify.authenticate());
+  fastify.register(opportunityDistrictRoutes);
 
   await fastify.register(opportunityLegacyRoutes, {
     prefix: RoutePrefix.LEGACY,
@@ -426,7 +428,7 @@ export default async function opportunityRoutes(
         request.query,
       );
       if (agentIds) {
-        mergeIntoWhere(where, { agent: { id: In(agentIds) } });
+        mergeIntoWhere(where, { agentId: In(agentIds) });
       }
       if (request.authUser?.role === UserRole.VOLUNTEER) {
         andIntoWhere(where, "id", closedForVolunteersIdWhere());
@@ -1120,7 +1122,7 @@ export default async function opportunityRoutes(
                 (await fastify.db.agentRepository.findOneBy({
                   id: effectiveAgentId,
                 }));
-              fastify.notify.opsAlert(
+              fastify.notify.arrival(
                 getAgentOpportunityEditNotificationText(
                   opportunityObj?.title ?? opportunity.title,
                   opportunity.id,
