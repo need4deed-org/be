@@ -22,9 +22,9 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import { randomNumericSuffix } from "../../random";
+import { HOUR } from "../../time";
 
 const PASSWORD = "test_password";
-const HOUR = 60 * 60 * 1000;
 
 type Caller = "volunteer" | "coordinator";
 type Key =

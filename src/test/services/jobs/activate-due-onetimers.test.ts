@@ -24,6 +24,12 @@ describe("activateDueOnetimers", () => {
   const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
 
   it("does nothing when no opportunity is due", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: daysFromNow(2),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
+
     await activateDueOnetimers(ctx.fastify);
 
     expect(ctx.loggerInfo).not.toHaveBeenCalled();

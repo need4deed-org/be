@@ -19,9 +19,9 @@ import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { minAppointmentDate } from "../../../server/utils/data/min-appointment-date";
 import { randomNumericSuffix } from "../../random";
+import { HOUR } from "../../time";
 
 const PASSWORD = "test_password";
-const HOUR = 60 * 60 * 1000;
 
 type Caller = "agent" | "coordinator";
 

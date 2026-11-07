@@ -36,8 +36,10 @@ export async function applyOnetimerTransition(
             a.volunteer.id - b.volunteer.id,
         );
         for (const { volunteer, status } of ordered) {
-          volunteer.status = status;
-          await manager.save(OpportunityVolunteer, volunteer);
+          await manager.save(
+            OpportunityVolunteer,
+            new OpportunityVolunteer({ ...volunteer, status }),
+          );
         }
 
         const volunteerIds = new Set(
