@@ -57,6 +57,7 @@ export const recommendationOpportunityRelations = [
   "deal.dealLanguage.language",
   "deal.dealTimeslot.timeslot",
   "deal.dealDistrict.district",
+  "address.postcode.districtPostcode",
   "accompanying.postcode.districtPostcode",
   "agent",
   "onetimer",
@@ -141,7 +142,7 @@ export function matchScore(
   const opportunityDistricts = new Set(
     [
       getOpportunityLocation(opportunity).districtId ??
-        opportunity.agent?.districtId,
+        (opportunity.addressId ? undefined : opportunity.agent?.districtId),
       ...(opportunity.deal?.dealDistrict ?? []).map(
         (dealDistrict) => dealDistrict.districtId,
       ),

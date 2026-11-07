@@ -10,6 +10,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import { isStaffRole } from "../data/is-staff-role";
+import { isOwnAddressVisible } from "./own-address";
 import { CallerVisibility } from "./visible-persons";
 
 export const PERSON_PII_FIELDS = [
@@ -133,6 +134,14 @@ function collectAddresses(
   if (node instanceof Person) {
     if (
       ctx.personIds.has(node.id) &&
+      node.address &&
+      typeof node.address === "object"
+    ) {
+      addresses.visible.add(node.address);
+    }
+  } else if (node instanceof Opportunity) {
+    if (
+      isOwnAddressVisible(ctx, node.id) &&
       node.address &&
       typeof node.address === "object"
     ) {

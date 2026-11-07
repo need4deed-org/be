@@ -986,8 +986,22 @@
           },
           "required": ["date", "time"],
           "additionalProperties": false
+        },
+        "address": {
+          "anyOf": [{ "const": null }, { "$ref": "ApiOpportunityAddress#" }]
         }
       },
+      "additionalProperties": false
+    },
+    "ApiOpportunityAddress": {
+      "$id": "ApiOpportunityAddress",
+      "type": "object",
+      "properties": {
+        "street": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "postcode": { "type": "string", "minLength": 1 },
+        "city": { "type": "string", "minLength": 1, "maxLength": 100 }
+      },
+      "required": ["street", "postcode", "city"],
       "additionalProperties": false
     },
     "ApiVolunteerOpportunityPost": {
@@ -1253,6 +1267,14 @@
                 { "$ref": "OpportunityVolunteerStatusType#" },
                 { "type": "null" }
               ]
+            },
+            "address": {
+              "type": ["object", "null"],
+              "properties": {
+                "street": { "type": "string" },
+                "postcode": { "type": "string" },
+                "city": { "type": "string" }
+              }
             }
           }
         }

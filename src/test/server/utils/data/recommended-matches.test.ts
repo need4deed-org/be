@@ -80,6 +80,25 @@ describe("matchScore", () => {
     expect(matchScore(opportunity as any, volunteerIn(8) as any)).toBe(0);
   });
 
+  it("scores an own address's district and never the NGO's when it has none", () => {
+    const volunteerIn = (districtId: number) => ({
+      deal: { dealDistrict: [{ districtId }], dealTimeslot: [] },
+    });
+    const opportunity = (
+      districtPostcode: { id: number; districtId: number }[],
+    ) => ({
+      type: OpportunityType.REGULAR,
+      addressId: 1,
+      address: { postcode: { value: "10247", districtPostcode } },
+      agent: { districtId: 9 },
+      deal: { dealTimeslot: [] },
+    });
+    const inDistrict = opportunity([{ id: 1, districtId: 7 }]);
+    expect(matchScore(inDistrict as any, volunteerIn(7) as any)).toBe(3);
+    expect(matchScore(inDistrict as any, volunteerIn(9) as any)).toBe(0);
+    expect(matchScore(opportunity([]) as any, volunteerIn(9) as any)).toBe(0);
+  });
+
   it("counts the volunteer's slots on the appointment weekday for dated opportunities", () => {
     const opportunity = {
       type: OpportunityType.ACCOMPANYING,

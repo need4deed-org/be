@@ -6,8 +6,9 @@ export function isValidPLZ(plz: string, city?: string) {
   }
   const code = Number(plz);
 
+  // 01001 (Dresden PO boxes) to 99998 is the whole Deutsche Post range.
   if (!city) {
-    return code >= 1067 && code <= 99998;
+    return code >= 1001 && code <= 99998;
   }
 
   switch (city) {

@@ -25,6 +25,7 @@ import {
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
@@ -51,6 +52,11 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
+import {
+  assertAddressAllowedForType,
+  newOpportunityAddress,
+  parseOpportunityAddress,
+} from "../../../services/dto/parser-opportunity-address";
 import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
 import {
@@ -102,7 +108,11 @@ import {
   upsertOnetimer,
   writeOpportunityLegacy,
 } from "../../utils";
-import { addTranslatedFields } from "../../utils/data/for-routes";
+import {
+  addTranslatedFields,
+  createAddress,
+  patchAddress,
+} from "../../utils/data/for-routes";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
@@ -120,7 +130,11 @@ import {
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
-import { maskForCaller } from "../../utils/pii/pre-serialization";
+import { isOwnAddressVisible } from "../../utils/pii/own-address";
+import {
+  maskForCaller,
+  resolveCallerMask,
+} from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
@@ -170,13 +184,15 @@ async function sendNewOpportunityEmail(
 async function clearStaleAccompanying(
   manager: EntityManager,
   opportunity: Opportunity,
-  { alsoClearOnetimer }: { alsoClearOnetimer: boolean },
+  {
+    alsoClearOnetimer,
+    keepDistrict = false,
+  }: { alsoClearOnetimer: boolean; keepDistrict?: boolean },
 ): Promise<void> {
   await manager.update(Opportunity, opportunity.id, {
     accompanyingId: null,
     ...(alsoClearOnetimer ? { onetimerId: null } : {}),
-    // the stored district was the appointment's; let the backfill re-derive it
-    ...(opportunity.type === OpportunityType.ACCOMPANYING
+    ...(opportunity.type === OpportunityType.ACCOMPANYING && !keepDistrict
       ? { districtId: null }
       : {}),
   });
@@ -186,6 +202,54 @@ async function clearStaleAccompanying(
   if (alsoClearOnetimer && opportunity.onetimerId) {
     await manager.delete(Onetimer, opportunity.onetimerId);
   }
+}
+
+async function upsertOwnAddress(
+  manager: EntityManager,
+  opportunity: Opportunity,
+  address: Pick<Address, "street" | "city" | "postcodeId">,
+): Promise<void> {
+  const { postcodeId, ...fields } = address;
+  let addressId = opportunity.addressId;
+  if (addressId) {
+    await patchAddress(
+      { id: addressId, ...fields },
+      { id: postcodeId },
+      manager,
+    );
+  } else {
+    addressId = (await createAddress(fields, { id: postcodeId }, manager))?.id;
+  }
+  await storeDistrictOfPostcode(manager, opportunity.id, postcodeId, {
+    addressId,
+  });
+}
+
+async function storeDistrictOfPostcode(
+  manager: EntityManager,
+  opportunityId: number,
+  postcodeId: number,
+  alongside: Partial<Opportunity> = {},
+): Promise<void> {
+  const district = await getDistrictFromPostcode(postcodeId, manager);
+  await manager.update(Opportunity, opportunityId, {
+    ...alongside,
+    districtId: district?.id ?? null,
+  });
+}
+
+async function removeOwnAddress(
+  manager: EntityManager,
+  opportunity: Opportunity,
+): Promise<void> {
+  if (!opportunity.addressId) {
+    return;
+  }
+  await manager.update(Opportunity, opportunity.id, {
+    addressId: null,
+    districtId: null,
+  });
+  await manager.delete(Address, opportunity.addressId);
 }
 
 // The stored district follows the appointment postcode (be#1210); a postcode
@@ -199,13 +263,9 @@ async function syncAppointmentDistrict(
     relations: ["accompanying"],
   });
   const postcodeId = opportunity?.accompanying?.postcodeId;
-  if (!postcodeId) {
-    return;
+  if (postcodeId) {
+    await storeDistrictOfPostcode(manager, opportunityId, postcodeId);
   }
-  const district = await getDistrictFromPostcode(postcodeId, manager);
-  await manager.update(Opportunity, opportunityId, {
-    districtId: district?.id ?? null,
-  });
 }
 
 export default async function opportunityRoutes(
@@ -283,6 +343,7 @@ export default async function opportunityRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
+        "address.postcode.districtPostcode",
         "accompanying.postcode.districtPostcode",
         "deal.postcode",
         "onetimer",
@@ -370,6 +431,9 @@ export default async function opportunityRoutes(
         ...dtoOpportunityGet(opportunityComments, districtCentroid),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
+      if (!isOwnAddressVisible(await resolveCallerMask(request), id)) {
+        data.address = null;
+      }
       if (
         !canSeeOpportunityDescription(
           opportunityComments.type,
@@ -525,6 +589,11 @@ export default async function opportunityRoutes(
 
       const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
+      assertAddressAllowedForType(opportunity.type, body.address);
+      if (body.address) {
+        opportunity.address = await newOpportunityAddress(body.address);
+        opportunity.districtId = undefined;
+      }
       opportunity.deal = await dealParserOpportunityCreate(
         body,
         agent.address?.postcode?.value,
@@ -734,6 +803,10 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      const switchedToAccompanying =
+        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+        opportunity.type !== OpportunityType.ACCOMPANYING;
+      assertAddressAllowedForType(effectiveType, request.body.address);
       if (effectiveType === OpportunityType.ACCOMPANYING && onetimerDate) {
         const current = opportunity.onetimerId
           ? await fastify.db.onetimerRepository.findOneBy({
@@ -806,8 +879,13 @@ export default async function opportunityRoutes(
         }
       }
 
+      const ownAddress = request.body.address
+        ? await parseOpportunityAddress(request.body.address)
+        : undefined;
+
       const snapshotRelations = [
         "agent",
+        "address",
         "accompanying",
         "onetimer",
         "deal.dealLanguage",
@@ -927,13 +1005,19 @@ export default async function opportunityRoutes(
                 );
               }
             }
+
+            if (ownAddress) {
+              await upsertOwnAddress(manager, opportunity, ownAddress);
+            } else if (
+              request.body.address === null ||
+              effectiveType === OpportunityType.ACCOMPANYING
+            ) {
+              await removeOwnAddress(manager, opportunity);
+            }
             return written;
           },
         );
 
-        const switchedToAccompanying =
-          request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
-          opportunity.type !== OpportunityType.ACCOMPANYING;
         if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
           const appointmentPostcodeValue =
             request.body.accompanyingDetails?.appointmentPostcode;
@@ -1037,6 +1121,7 @@ export default async function opportunityRoutes(
           await dataSource.manager.transaction((manager) =>
             clearStaleAccompanying(manager, opportunity, {
               alsoClearOnetimer: true,
+              keepDistrict: !!ownAddress,
             }),
           );
         }
@@ -1049,6 +1134,7 @@ export default async function opportunityRoutes(
           await dataSource.manager.transaction((manager) =>
             clearStaleAccompanying(manager, opportunity, {
               alsoClearOnetimer: false,
+              keepDistrict: !!ownAddress,
             }),
           );
         }
@@ -1157,7 +1243,7 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
 
-      const { dealId, accompanyingId, onetimerId } = opportunity;
+      const { dealId, accompanyingId, onetimerId, addressId } = opportunity;
 
       const links = await fastify.db.opportunityVolunteerRepository.find({
         where: { opportunityId: id },
@@ -1178,6 +1264,9 @@ export default async function opportunityRoutes(
         }
         if (onetimerId) {
           await manager.delete(Onetimer, { id: onetimerId });
+        }
+        if (addressId) {
+          await manager.delete(Address, { id: addressId });
         }
         // The cascade bypasses OpportunityVolunteerSubscriber, so the linked
         // volunteers' activity log and engagement are updated here.

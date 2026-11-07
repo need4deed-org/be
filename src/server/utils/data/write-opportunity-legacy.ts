@@ -10,7 +10,11 @@ import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { languageHint } from "../../../services/translation/language-hint";
-import { impliesAgentSearching, setAgentSearching } from "./for-routes";
+import {
+  createAddress,
+  impliesAgentSearching,
+  setAgentSearching,
+} from "./for-routes";
 import {
   languageIdOf,
   queueOpportunityTranslation,
@@ -73,6 +77,16 @@ export async function writeOpportunityLegacy(
 
     if (opportunity.onetimer) {
       await onetimerRepository.save(opportunity.onetimer);
+    }
+
+    if (opportunity.address) {
+      const { street, city, postcodeId } = opportunity.address;
+      opportunity.address =
+        (await createAddress(
+          { street, city },
+          { id: postcodeId },
+          transactionalEntityManager,
+        )) ?? undefined;
     }
 
     const { title, info } = translatedOpportunityFields(opportunity);

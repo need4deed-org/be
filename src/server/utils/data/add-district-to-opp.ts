@@ -1,9 +1,19 @@
 import { OpportunityType } from "need4deed-sdk";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
   firstDistrictPostcode,
   getDistrictFromPostcode,
 } from "../../../data/utils/get-district";
+
+async function districtOf(
+  postcode: Postcode | number,
+): Promise<number | undefined> {
+  if (typeof postcode !== "number" && postcode.districtPostcode) {
+    return firstDistrictPostcode(postcode.districtPostcode)?.districtId;
+  }
+  return (await getDistrictFromPostcode(postcode))?.id;
+}
 
 export function getDistrictToOpportunityHandler() {
   const updates: Opportunity[] = [];
@@ -13,6 +23,20 @@ export function getDistrictToOpportunityHandler() {
       opportunity: Opportunity,
     ): Promise<Opportunity> {
       if (opportunity.districtId) {
+        return opportunity;
+      }
+
+      const ownAddressPostcode =
+        opportunity.type === OpportunityType.ACCOMPANYING
+          ? undefined
+          : (opportunity.address?.postcode ?? opportunity.address?.postcodeId);
+      if (ownAddressPostcode) {
+        const district = await districtOf(ownAddressPostcode);
+        if (district) {
+          opportunity.districtId = district;
+          updates.push(opportunity);
+        }
+        // an own address outside any district never falls back to the NGO's
         return opportunity;
       }
 

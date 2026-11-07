@@ -1,4 +1,5 @@
 import {
+  ApiOpportunityAddress,
   ApiOpportunityContact,
   ApiOpportunityGet,
   ApiOpportunityGetList,
@@ -10,6 +11,8 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Deal from "../../data/entity/deal.entity";
+import Address from "../../data/entity/location/address.entity";
+import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { Centroid, firstDistrictPostcode } from "../../data/utils/get-district";
@@ -40,11 +43,8 @@ function resolveMapPin(opportunity: Opportunity): MapPinResolution {
     return { lat: null, lon: null };
   }
 
-  // an accompanying pin sits at the appointment, like its postcode and district
-  // (be#1272); masked appointment coordinates fall back to the district centroid
   const coordinates = getCoordinates(
-    accompanyingForType(opportunity)?.postcode ??
-      opportunity.agent?.address?.postcode,
+    getOwnLocationPostcode(opportunity) ?? opportunity.agent?.address?.postcode,
   );
   if (coordinates.latitude !== null && coordinates.longitude !== null) {
     return { lat: coordinates.latitude, lon: coordinates.longitude };
@@ -112,15 +112,26 @@ export function getAppointmentDistrictId(
   )?.districtId;
 }
 
+export function getOwnLocationPostcode(
+  opportunity: Opportunity,
+): Postcode | undefined {
+  if (opportunity.type === OpportunityType.ACCOMPANYING) {
+    return opportunity.accompanying?.postcode ?? undefined;
+  }
+  return opportunity.address?.postcode;
+}
+
 export function getOpportunityLocation(
   opportunity: Opportunity,
 ): OpportunityLocation {
   const storedDistrictId = opportunity.district?.id ?? opportunity.districtId;
-  const appointmentPostcode = accompanyingForType(opportunity)?.postcode;
-  if (appointmentPostcode) {
+  const ownPostcode = getOwnLocationPostcode(opportunity);
+  if (ownPostcode) {
     return {
-      postcode: appointmentPostcode.value ?? null,
-      districtId: getAppointmentDistrictId(opportunity) ?? storedDistrictId,
+      postcode: ownPostcode.value ?? null,
+      districtId:
+        firstDistrictPostcode(ownPostcode.districtPostcode)?.districtId ??
+        storedDistrictId,
     };
   }
   return {
@@ -257,6 +268,19 @@ export function dtoVolunteerOpportunityGetList(
   } as ApiVolunteerOpportunityGetList;
 }
 
+function dtoOpportunityAddress(
+  address: Address | null | undefined,
+): ApiOpportunityAddress | null {
+  if (!address) {
+    return null;
+  }
+  return {
+    street: address.street,
+    postcode: address.postcode?.value ?? "",
+    city: address.city,
+  };
+}
+
 export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
   districtCentroid?: Centroid,
@@ -320,6 +344,7 @@ export function dtoOpportunityGet(
           time: formatTime(eventStart),
         }
       : undefined,
+    address: dtoOpportunityAddress(opportunityComments.address),
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
     noMatchFound: isNoMatchFound(opportunityComments),
