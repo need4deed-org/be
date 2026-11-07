@@ -5,17 +5,25 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { EntityManager, EntityTarget, ObjectLiteral } from "typeorm";
-import { vi } from "vitest";
-import Deal from "../../../data/entity/deal.entity";
+import { EntityManager, EntityTarget, In, ObjectLiteral } from "typeorm";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  MockInstance,
+  vi,
+} from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import Person from "../../../data/entity/person.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { DealType } from "../../../data/types";
+import logger from "../../../logger";
+import { createServer } from "../../../server";
+import { createVolunteer, deleteFixtures } from "../../data/match-fixtures";
 import { randomNumericSuffix } from "../../random";
+import { onetimerQueryScope } from "./onetimer-query-scope";
 
 export const DAY = 24 * 60 * 60 * 1000;
 
@@ -30,9 +38,12 @@ export class OnetimerFixtures {
   private readonly agents: Agent[] = [];
   private readonly opportunities: Opportunity[] = [];
   private readonly volunteers: Volunteer[] = [];
-  private deal?: Deal;
 
   constructor(private readonly fastify: FastifyInstance) {}
+
+  private get manager(): EntityManager {
+    return this.fastify.db.opportunityRepository.manager;
+  }
 
   async agent(): Promise<Agent> {
     const agent = await this.fastify.db.agentRepository.save(
@@ -47,28 +58,10 @@ export class OnetimerFixtures {
   async volunteer(
     statusEngagement = VolunteerStateEngagementType.AVAILABLE,
   ): Promise<Volunteer> {
-    if (!this.deal) {
-      const postcode = await this.fastify.db.postcodeRepository.findOneOrFail({
-        where: {},
-      });
-      this.deal = await this.fastify.db.dealRepository.save(
-        new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
-      );
-    }
-    const person = await this.fastify.db.personRepository.save(
-      new Person({
-        firstName: "Test",
-        lastName: `Onetimer ${randomNumericSuffix()}`,
-      }),
-    );
-    const volunteer = await this.fastify.db.volunteerRepository.save(
-      new Volunteer({
-        personId: person.id,
-        dealId: this.deal.id,
-        statusEngagement,
-      }),
-    );
+    const volunteer = await createVolunteer(this.manager);
     this.volunteers.push(volunteer);
+    await this.manager.update(Volunteer, volunteer.id, { statusEngagement });
+    volunteer.statusEngagement = statusEngagement;
     return volunteer;
   }
 
@@ -137,25 +130,56 @@ export class OnetimerFixtures {
     });
 
   async cleanup(): Promise<void> {
-    for (const opportunity of this.opportunities) {
-      await this.fastify.db.opportunityRepository.delete({
-        id: opportunity.id,
+    await deleteFixtures(this.manager, this.volunteers, this.opportunities);
+    const onetimerIds = this.opportunities.map(({ onetimerId }) => onetimerId!);
+    if (onetimerIds.length) {
+      await this.manager.delete(Onetimer, { id: In(onetimerIds) });
+    }
+    if (this.agents.length) {
+      await this.manager.delete(Agent, {
+        id: In(this.agents.map(({ id }) => id)),
       });
-      await this.fastify.db.onetimerRepository.delete({
-        id: opportunity.onetimerId!,
-      });
-    }
-    for (const volunteer of this.volunteers) {
-      await this.fastify.db.volunteerRepository.delete({ id: volunteer.id });
-      await this.fastify.db.personRepository.delete({ id: volunteer.personId });
-    }
-    if (this.deal) {
-      await this.fastify.db.dealRepository.delete({ id: this.deal.id });
-    }
-    for (const agent of this.agents) {
-      await this.fastify.db.agentRepository.delete({ id: agent.id });
     }
   }
+}
+
+export interface OnetimerJobContext {
+  fastify: FastifyInstance;
+  fixtures: OnetimerFixtures;
+  agent: Agent;
+  loggerError: MockInstance<typeof logger.error>;
+  loggerInfo: MockInstance<typeof logger.info>;
+}
+
+export function setupOnetimerJobTest(): OnetimerJobContext {
+  const context = {} as OnetimerJobContext;
+
+  beforeAll(async () => {
+    context.fastify = await createServer();
+    await context.fastify.ready();
+    context.fixtures = new OnetimerFixtures(context.fastify);
+  });
+
+  beforeEach(async () => {
+    context.loggerError = vi.spyOn(logger, "error");
+    context.loggerInfo = vi.spyOn(logger, "info");
+    context.agent = await context.fixtures.agent();
+    onetimerQueryScope.agentId = context.agent.id;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    try {
+      await context.fixtures?.cleanup();
+    } finally {
+      await context.fastify?.close();
+    }
+  });
+
+  return context;
 }
 
 export function failSaveOf<Entity extends ObjectLiteral>(

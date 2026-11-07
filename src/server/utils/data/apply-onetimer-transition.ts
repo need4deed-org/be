@@ -21,7 +21,6 @@ export async function applyOnetimerTransition(
   volunteerUpdates: VolunteerStatusUpdate[],
   errorMessage: string,
 ): Promise<void> {
-  const originalOpportunityStatus = opportunity.status;
   const originalVolunteerStatuses = volunteerUpdates.map(
     ({ volunteer }) => volunteer.status,
   );
@@ -29,7 +28,6 @@ export async function applyOnetimerTransition(
   try {
     await fastify.db.opportunityRepository.manager.transaction(
       async (manager: EntityManager) => {
-        opportunity.status = opportunityStatus;
         await manager.update(
           Opportunity,
           { id: opportunity.id },
@@ -54,8 +52,8 @@ export async function applyOnetimerTransition(
         }
       },
     );
+    opportunity.status = opportunityStatus;
   } catch (err) {
-    opportunity.status = originalOpportunityStatus;
     volunteerUpdates.forEach(({ volunteer }, i) => {
       volunteer.status = originalVolunteerStatuses[i];
     });
