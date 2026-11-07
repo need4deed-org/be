@@ -1,4 +1,4 @@
-import { DocumentStatusType, Lang } from "need4deed-sdk";
+import { DocumentStatusType, Lang, OpportunityType } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -7,6 +7,7 @@ import {
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import { serializeAddress } from "../../dto/dto-address";
 import {
   formatScheduleDe,
   getLanguages,
@@ -127,6 +128,10 @@ export async function sendEmailIntroduction(
       .join(", ");
   })();
   const agentTitle = opportunity.agent?.title ?? "";
+  const opportunityAddress =
+    opportunity.type !== OpportunityType.ACCOMPANYING && opportunity.address
+      ? `\nEinsatzort: ${serializeAddress(opportunity.address)}`
+      : "";
 
   const statmentOnCertificates = resolveStatmentOnCertificates(
     volunteer.statusCGC,
@@ -149,6 +154,7 @@ export async function sendEmailIntroduction(
       contactpersonPhone: contactPerson.phone ?? "",
       agentAddress,
       agentTitle,
+      opportunityAddress,
       statmentOnCertificates,
     },
     emailNote,

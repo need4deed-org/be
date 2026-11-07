@@ -173,6 +173,7 @@ async function sendMatchedEmails(
       "opportunity.contactPerson",
       "opportunity.contactPerson.users",
       "opportunity.agent.address.postcode",
+      "opportunity.address.postcode",
       "opportunity.agent.agentPerson.person",
       "opportunity.agent.agentPerson.person.users",
       "opportunity.accompanying.postcode",

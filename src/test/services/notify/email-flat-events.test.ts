@@ -518,6 +518,50 @@ describe("sendEmailSuggestion location", () => {
   });
 });
 
+describe("sendEmailIntroduction location", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetIntroductionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const ownAddress = {
+    street: "Weg 1",
+    city: "Berlin",
+    postcode: { value: "10247" },
+  };
+  const sendWith = async (over: Record<string, unknown>) => {
+    await sendEmailIntroduction(
+      email,
+      ov({ opportunity: opportunity(over) }) as unknown as Parameters<
+        typeof sendEmailIntroduction
+      >[1],
+    );
+    return send.mock.calls.at(-1)?.[0].text ?? "";
+  };
+
+  it("adds an Einsatzort line after the introduction for an opportunity with its own address", async () => {
+    const text = await sendWith({ type: "regular", address: ownAddress });
+
+    expect(text).toContain(
+      "einander vorstellen.\nEinsatzort: Weg 1, 10247 Berlin\n \n",
+    );
+  });
+
+  it("leaves the text as it was without an own address", async () => {
+    const text = await sendWith({ type: "regular", address: null });
+
+    expect(text).toContain("einander vorstellen.\n \n");
+    expect(text).not.toContain("Einsatzort");
+  });
+
+  it("never adds the line to an accompanying opportunity", async () => {
+    const text = await sendWith({ type: "accompanying", address: ownAddress });
+
+    expect(text).not.toContain("Einsatzort");
+  });
+});
+
 describe("coordinator's email note", () => {
   const NOTE = "Please bring <your> ID & arrive early.";
 
