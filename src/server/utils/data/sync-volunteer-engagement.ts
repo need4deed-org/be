@@ -62,11 +62,12 @@ export async function syncVolunteerEngagement(
   }
 }
 
-async function logEngagementChange(
+export async function logEngagementChange(
   manager: EntityManager,
   volunteerId: number,
   from: VolunteerStateEngagementType,
   to: VolunteerStateEngagementType,
+  actorUserId?: number,
 ): Promise<void> {
   await manager.save(
     VolunteerAuditLog,
@@ -75,6 +76,7 @@ async function logEngagementChange(
       type: "availability_changed",
       detail: `Status changed from ${from} to ${to}.`,
       occurredAt: new Date(),
+      actorUserId,
     }),
   );
 }

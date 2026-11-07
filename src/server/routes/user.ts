@@ -14,7 +14,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { EntityManager, FindOptionsWhere, ILike, In, Not } from "typeorm";
+import { EntityManager, FindOptionsWhere, ILike, In } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
@@ -62,6 +62,7 @@ import {
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
+import { deactivateVolunteerProfile } from "../utils/data/deactivate-volunteer-profile";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
@@ -185,24 +186,33 @@ export default async function userRoutes(
         throw new UnauthorizedError("Permission denied");
       }
 
-      if (request.authUser!.role === UserRole.ADMIN) {
-        const otherActiveAdmins = await fastify.db.userRepository.count({
-          where: { role: UserRole.ADMIN, isActive: true, id: Not(id) },
-        });
-        if (otherActiveAdmins === 0) {
-          throw new BadRequestError(
-            "The last active admin account cannot be deactivated.",
-          );
+      await fastify.db.userRepository.manager.transaction(async (manager) => {
+        const { role, personId } = request.authUser!;
+        if (role === UserRole.ADMIN) {
+          const activeAdmins = await manager.find(User, {
+            select: { id: true },
+            where: { role: UserRole.ADMIN, isActive: true },
+            order: { id: "ASC" },
+            lock: { mode: "for_no_key_update" },
+          });
+          if (!activeAdmins.some((admin) => admin.id !== id)) {
+            throw new BadRequestError(
+              "The last active admin account cannot be deactivated.",
+            );
+          }
         }
-      }
-
-      const result = await fastify.db.userRepository.update(
-        { id },
-        { isActive: false, deactivatedAt: new Date() },
-      );
-      if (!result.affected) {
-        throw new NotFoundError(`User id:${id} not found.`);
-      }
+        if (role === UserRole.VOLUNTEER && personId) {
+          await deactivateVolunteerProfile(manager, personId, id);
+        }
+        const result = await manager.update(
+          User,
+          { id },
+          { isActive: false, deactivatedAt: new Date() },
+        );
+        if (!result.affected) {
+          throw new NotFoundError(`User id:${id} not found.`);
+        }
+      });
 
       return reply
         .status(200)

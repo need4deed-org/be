@@ -84,7 +84,7 @@ export class OpportunityVolunteerSubscriber
   }
 }
 
-interface ParentIds {
+export interface ParentIds {
   opportunityIds: number[];
   volunteerIds: number[];
 }
@@ -104,7 +104,7 @@ function parentIds(
   };
 }
 
-async function lockParents(
+export async function lockParents(
   {
     manager,
     queryRunner,
