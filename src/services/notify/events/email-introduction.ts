@@ -5,6 +5,8 @@ import {
   emailFromVolunteer,
   emailIntroductionManifestUrl,
 } from "../../../config/constants";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { serializeAddress } from "../../dto/dto-address";
@@ -54,6 +56,25 @@ function resolveStatmentOnCertificates(
     return "Das erweiterte Führungszeugnis beantragen wir sofort.";
   }
   return "";
+}
+
+function cleanAddressField(value: string | null | undefined): string {
+  return value?.normalize("NFC").replace(/\s+/g, " ").trim() ?? "";
+}
+
+function cleanAddress(address: Address | null | undefined): string {
+  if (!address) {
+    return "";
+  }
+  return serializeAddress(
+    new Address({
+      street: cleanAddressField(address.street),
+      city: cleanAddressField(address.city),
+      postcode: new Postcode({
+        value: cleanAddressField(address.postcode?.value),
+      }),
+    }),
+  );
 }
 
 export async function sendEmailIntroduction(
@@ -118,11 +139,12 @@ export async function sendEmailIntroduction(
     `sendEmailIntroduction, ov ${ov.id}`,
   );
 
-  const agentAddress = serializeAddress(opportunity.agent?.address);
+  const agentAddress = cleanAddress(opportunity.agent?.address);
   const agentTitle = opportunity.agent?.title ?? "";
-  const ownAddress = serializeAddress(opportunity.address);
+  const ownAddress = cleanAddress(opportunity.address);
   const opportunityAddress =
-    ownAddress && ownAddress !== agentAddress
+    ownAddress &&
+    ownAddress.toLocaleUpperCase("de") !== agentAddress.toLocaleUpperCase("de")
       ? `\nEinsatzort: ${ownAddress}`
       : "";
 
