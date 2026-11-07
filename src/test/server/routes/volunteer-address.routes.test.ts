@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -13,6 +13,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -50,8 +51,8 @@ describe("PATCH /volunteer/:id does not corrupt a shared Address (be#1026)", () 
     addressRepository = dataSource.getRepository(Address);
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
+    postcode = await fastify.db.postcodeRepository.findOneByOrFail({
+      value: "10115",
     });
 
     shared = await addressRepository.save(
@@ -184,8 +185,8 @@ describe("PATCH /volunteer/:id does not patch an address owned by a different Pe
     addressRepository = dataSource.getRepository(Address);
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
+    postcode = await fastify.db.postcodeRepository.findOneByOrFail({
+      value: "10115",
     });
 
     addressOwnedByB = await addressRepository.save(
@@ -312,6 +313,22 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
   let postcode: Postcode;
+  const createdPostcodeIds: number[] = [];
+  const trackPostcode = async (value: string) => {
+    const row = await fastify.db.postcodeRepository.findOneBy({ value });
+    if (row) {
+      createdPostcodeIds.push(row.id);
+    }
+  };
+  const unusedPostcode = async (make: () => string) => {
+    let value: string;
+    do {
+      value = make();
+    } while (await fastify.db.postcodeRepository.existsBy({ value }));
+    return value;
+  };
+  const randomBetween = (min: number, max: number) =>
+    min + Math.floor(Math.random() * (max - min + 1));
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   const patch = (person: Record<string, unknown>) =>
@@ -325,8 +342,8 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
+    postcode = await fastify.db.postcodeRepository.findOneByOrFail({
+      value: "10115",
     });
     person = await fastify.db.personRepository.save(
       new Person({
@@ -375,6 +392,11 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     if (created?.addressId) {
       await dataSource.getRepository(Address).delete({ id: created.addressId });
     }
+    if (createdPostcodeIds.length) {
+      await fastify.db.postcodeRepository.delete({
+        id: In(createdPostcodeIds),
+      });
+    }
     await fastify.close();
   });
 
@@ -395,7 +417,10 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     expect(refreshed.addressId).toBeNull();
   });
 
-  it("400s for an unknown postcode before writing anything", async () => {
+  it("400s for an invalid postcode before writing anything", async () => {
+    const code = await unusedPostcode(() =>
+      String(randomBetween(1, 1066)).padStart(5, "0"),
+    );
     const before = await fastify.db.personRepository.findOneByOrFail({
       id: person.id,
     });
@@ -404,9 +429,13 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       firstName: person.firstName,
       email: person.email,
       phone: "0300000000",
-      address: { street: "Somewhere 1", postcode: { code: "00000" } },
+      address: { street: "Somewhere 1", postcode: { code } },
     });
     expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain("invalid postcode");
+    expect(await fastify.db.postcodeRepository.existsBy({ value: code })).toBe(
+      false,
+    );
 
     const refreshed = await fastify.db.personRepository.findOneByOrFail({
       id: person.id,
@@ -448,5 +477,80 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     });
     expect(refreshed.address?.street).toBe("Kept Street 2");
     expect(refreshed.address?.postcodeId).toBe(postcode.id);
+  });
+
+  it("accepts a valid German postcode outside Berlin that isn't known yet", async () => {
+    const code = await unusedPostcode(() =>
+      String(randomBetween(80000, 99998)),
+    );
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Suburb Street 3", postcode: { code } },
+    });
+    await trackPostcode(code);
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address", "address.postcode"],
+    });
+    expect(refreshed.address?.street).toBe("Suburb Street 3");
+    expect(refreshed.address?.postcode?.value).toBe(code);
+  });
+
+  it("restores the leading zero of a 4-digit postcode before saving it", async () => {
+    const value = await unusedPostcode(() =>
+      String(randomBetween(1067, 9999)).padStart(5, "0"),
+    );
+    const code = value.slice(1);
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Leading Zero Street 4", postcode: { code } },
+    });
+    await trackPostcode(value);
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address", "address.postcode"],
+    });
+    expect(refreshed.address?.postcode?.value).toBe(value);
+  });
+
+  it("reuses an already stored postcode, even one that fails the format check", async () => {
+    const value = await unusedPostcode(() => `9${randomNumericSuffix(5)}`);
+    const stored = await fastify.db.postcodeRepository.save(
+      new Postcode({ value }),
+    );
+    createdPostcodeIds.push(stored.id);
+
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Legacy Street 5", postcode: { code: value } },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address"],
+    });
+    expect(refreshed.address?.postcodeId).toBe(stored.id);
+  });
+
+  it("400s for a non-numeric postcode id instead of failing in the database", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Broken Id Street 6", postcode: { id: "abc" } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain("unknown postcode");
   });
 });
