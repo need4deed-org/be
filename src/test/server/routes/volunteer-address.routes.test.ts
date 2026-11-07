@@ -328,7 +328,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     return value;
   };
   const randomBetween = (min: number, max: number) =>
-    min + (Number(randomNumericSuffix()) % (max - min + 1));
+    min + Math.floor(Math.random() * (max - min + 1));
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   const patch = (person: Record<string, unknown>) =>
@@ -541,5 +541,16 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       relations: ["address"],
     });
     expect(refreshed.address?.postcodeId).toBe(stored.id);
+  });
+
+  it("400s for a non-numeric postcode id instead of failing in the database", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Broken Id Street 6", postcode: { id: "abc" } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain("unknown postcode");
   });
 });

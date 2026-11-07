@@ -3,8 +3,7 @@ import Postcode from "../entity/location/postcode.entity";
 import { getRepository } from "./get-repository";
 import { isValidPLZ } from "./is-valid-plz";
 
-// The legacy volunteer form sends postal_code as a number, which drops the
-// leading zero of e.g. 01067; restore it so it matches the real postcode.
+// Postcodes sent as numbers lose their leading zero (01067 → 1067).
 export function normalizePostcode(code: string): string {
   const trimmed = code.trim();
   return /^\d{4}$/.test(trimmed) ? `0${trimmed}` : trimmed;

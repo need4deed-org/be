@@ -391,9 +391,10 @@ export default async function volunteerRoutes(
         if (sendsPostcode) {
           let postcode: Postcode | null;
           if (postcodeData?.id) {
-            postcode = await fastify.db.postcodeRepository.findOneBy({
-              id: Number(postcodeData.id),
-            });
+            const id = Number(postcodeData.id);
+            postcode = Number.isInteger(id)
+              ? await fastify.db.postcodeRepository.findOneBy({ id })
+              : null;
             if (!postcode) {
               throw new BadRequestError("Address not saved: unknown postcode.");
             }
