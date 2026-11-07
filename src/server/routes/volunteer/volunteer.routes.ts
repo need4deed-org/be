@@ -29,11 +29,13 @@ import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
-  getGermanPostcode,
+  getPostcode,
+  normalizePostcode,
   updateOpportunityMatching,
 } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerListSerializer } from "../../../services";
+import { isValidPLZ } from "../../../services/validators/custom";
 import {
   idParamSchema,
   langQuerySchema,
@@ -392,11 +394,15 @@ export default async function volunteerRoutes(
       let resolvedPostcode: Partial<Postcode> | undefined;
       if (Object.keys(addressFields).length || sendsPostcode) {
         if (sendsPostcode) {
+          const postcodeValue = normalizePostcode(String(postcodeData?.value));
+          if (!postcodeData?.id && !isValidPLZ(postcodeValue)) {
+            throw new BadRequestError("Address not saved: invalid postcode.");
+          }
           const postcode = postcodeData?.id
             ? await fastify.db.postcodeRepository.findOneBy({
                 id: Number(postcodeData.id),
               })
-            : await getGermanPostcode(String(postcodeData?.value));
+            : await getPostcode(postcodeValue);
           if (!postcode) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
