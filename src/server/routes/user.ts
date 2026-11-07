@@ -14,7 +14,7 @@ import {
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
-import { EntityManager, FindOptionsWhere, ILike, In, Not } from "typeorm";
+import { EntityManager, FindOptionsWhere, ILike, In } from "typeorm";
 import {
   AlreadyUsedTokenError,
   BadRequestError,
@@ -186,19 +186,21 @@ export default async function userRoutes(
         throw new UnauthorizedError("Permission denied");
       }
 
-      if (request.authUser!.role === UserRole.ADMIN) {
-        const otherActiveAdmins = await fastify.db.userRepository.count({
-          where: { role: UserRole.ADMIN, isActive: true, id: Not(id) },
-        });
-        if (otherActiveAdmins === 0) {
-          throw new BadRequestError(
-            "The last active admin account cannot be deactivated.",
-          );
-        }
-      }
-
       await fastify.db.userRepository.manager.transaction(async (manager) => {
         const { role, personId } = request.authUser!;
+        if (role === UserRole.ADMIN) {
+          const activeAdmins = await manager.find(User, {
+            select: { id: true },
+            where: { role: UserRole.ADMIN, isActive: true },
+            order: { id: "ASC" },
+            lock: { mode: "pessimistic_write" },
+          });
+          if (!activeAdmins.some((admin) => admin.id !== id)) {
+            throw new BadRequestError(
+              "The last active admin account cannot be deactivated.",
+            );
+          }
+        }
         if (role === UserRole.VOLUNTEER && personId) {
           await deactivateVolunteerProfile(manager, personId, id);
         }

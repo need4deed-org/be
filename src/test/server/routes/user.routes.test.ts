@@ -9,6 +9,7 @@ import {
 import { EntityManager, In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import Deal from "../../../data/entity/deal.entity";
+import ActivityLog from "../../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -1827,9 +1828,14 @@ describe("DELETE /user/:id (be#583)", () => {
     const { admin, accessToken } = await makeAdmin(
       `admin-last-${suffix}@example.com`,
     );
-    const countSpy = vi
-      .spyOn(fastify.db.userRepository, "count")
-      .mockResolvedValue(0);
+    const realFind = EntityManager.prototype.find;
+    const onlyAdminSpy = vi
+      .spyOn(EntityManager.prototype, "find")
+      .mockImplementation(function (this: EntityManager, ...args) {
+        return args[0] === User
+          ? Promise.resolve([admin])
+          : realFind.apply(this, args);
+      } as EntityManager["find"]);
 
     try {
       const res = await fastify.inject({
@@ -1839,13 +1845,13 @@ describe("DELETE /user/:id (be#583)", () => {
       });
 
       expect(res.statusCode).toBe(400);
-      countSpy.mockRestore();
+      onlyAdminSpy.mockRestore();
       const untouched = await fastify.db.userRepository.findOneOrFail({
         where: { id: admin.id },
       });
       expect(untouched.isActive).toBe(true);
     } finally {
-      countSpy.mockRestore();
+      onlyAdminSpy.mockRestore();
       await fastify.db.userRepository.delete({ id: admin.id });
     }
   });
@@ -1968,6 +1974,7 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
       type: "availability_changed",
     });
     expect(logs).toHaveLength(1);
+    expect(logs[0].actorUserId).toBe(user.id);
     expect(logs[0].detail).toBe(
       `Status changed from ${VolunteerStateEngagementType.ACTIVE} to ${VolunteerStateEngagementType.INACTIVE}.`,
     );
@@ -1987,6 +1994,33 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
         OpportunityVolunteerStatusType.PAST,
       ]),
     );
+  });
+
+  it("keeps a not-started match with logged hours, ending it as PAST", async () => {
+    const { volunteer, user, accessToken } = await volunteerAccount();
+    const matched = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+    await manager.save(
+      new ActivityLog({
+        opportunityVolunteerId: matched.id,
+        date: new Date(),
+        hours: 2,
+      }),
+    );
+
+    const res = await selfDelete(user.id, accessToken);
+    expect(res.statusCode).toBe(200);
+
+    expect(await matchStatus(matched.id)).toBe(
+      OpportunityVolunteerStatusType.PAST,
+    );
+    expect(
+      await manager.countBy(ActivityLog, {
+        opportunityVolunteerId: matched.id,
+      }),
+    ).toBe(1);
   });
 
   it("leaves the volunteer profile alone when the account is not a volunteer's", async () => {

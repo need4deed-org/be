@@ -3,14 +3,11 @@ import {
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
 import { EntityManager, In } from "typeorm";
+import ActivityLog from "../../../data/entity/m2m/activity-log.entity";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import {
-  logMatchChangeSafely,
-  updateOpportunityMatching,
-  updateVolunteerMatching,
-} from "../../../data/utils";
+import { lockParents } from "../../../data/subscribers/opportunity-volunteer.subscriber";
+import { logMatchChangeSafely } from "../../../data/utils";
 import { logEngagementChange } from "./sync-volunteer-engagement";
 
 const NOT_STARTED = [
@@ -19,45 +16,40 @@ const NOT_STARTED = [
 ];
 const OPEN = [...NOT_STARTED, OpportunityVolunteerStatusType.ACTIVE];
 
-const lockRow = (
-  manager: EntityManager,
-  entity: typeof Opportunity | typeof Volunteer,
-  id: number,
-) =>
-  manager
-    .createQueryBuilder(entity, "row")
-    .select("row.id")
-    .where("row.id = :id", { id })
-    .setLock("for_no_key_update")
-    .getRawOne();
-
 export async function deactivateVolunteerProfile(
   manager: EntityManager,
   personId: number,
   actorUserId: number,
 ): Promise<void> {
-  const volunteer = await manager.findOneBy(Volunteer, { personId });
+  const volunteer = await manager.findOne(Volunteer, {
+    select: { id: true },
+    where: { personId },
+  });
   if (!volunteer) {
     return;
   }
 
-  // Lock order of every link write (OpportunityVolunteerSubscriber): opportunities, then volunteer.
-  const openOpportunityIds = (
-    await manager.findBy(OpportunityVolunteer, {
-      volunteerId: volunteer.id,
-      status: In(OPEN),
-    })
-  )
-    .map(({ opportunityId }) => opportunityId)
-    .sort((a, b) => a - b);
-  for (const id of new Set(openOpportunityIds)) {
-    await lockRow(manager, Opportunity, id);
-  }
-  await lockRow(manager, Volunteer, volunteer.id);
+  const openOpportunityIds = [
+    ...new Set(
+      (
+        await manager.findBy(OpportunityVolunteer, {
+          volunteerId: volunteer.id,
+          status: In(OPEN),
+        })
+      ).map(({ opportunityId }) => opportunityId),
+    ),
+  ].sort((a, b) => a - b);
+  await lockParents(
+    { manager, queryRunner: manager.queryRunner! },
+    { opportunityIds: openOpportunityIds, volunteerIds: [volunteer.id] },
+  );
 
-  const { statusEngagement: previous } = await manager.findOneByOrFail(
+  const { statusEngagement: previous } = await manager.findOneOrFail(
     Volunteer,
-    { id: volunteer.id },
+    {
+      select: { id: true, statusEngagement: true },
+      where: { id: volunteer.id },
+    },
   );
   if (previous !== VolunteerStateEngagementType.INACTIVE) {
     await manager.update(
@@ -73,19 +65,35 @@ export async function deactivateVolunteerProfile(
       volunteer.id,
       previous,
       VolunteerStateEngagementType.INACTIVE,
+      actorUserId,
     );
   }
 
-  const matches = openOpportunityIds.length
-    ? await manager.findBy(OpportunityVolunteer, {
-        volunteerId: volunteer.id,
-        opportunityId: In(openOpportunityIds),
-        status: In(OPEN),
+  if (!openOpportunityIds.length) {
+    return;
+  }
+  const matches = await manager.find(OpportunityVolunteer, {
+    where: {
+      volunteerId: volunteer.id,
+      opportunityId: In(openOpportunityIds),
+      status: In(OPEN),
+    },
+    relations: { opportunity: true },
+  });
+  const withLoggedHours = new Set(
+    (
+      await manager.findBy(ActivityLog, {
+        opportunityVolunteerId: In(matches.map(({ id }) => id)),
       })
-    : [];
+    ).map(({ opportunityVolunteerId }) => opportunityVolunteerId),
+  );
 
+  const removable = matches.filter(
+    ({ id, status }) =>
+      NOT_STARTED.includes(status) && !withLoggedHours.has(id),
+  );
   for (const match of matches) {
-    if (match.status === OpportunityVolunteerStatusType.ACTIVE) {
+    if (!removable.includes(match)) {
       await manager.save(
         OpportunityVolunteer,
         { id: match.id, status: OpportunityVolunteerStatusType.PAST },
@@ -94,27 +102,17 @@ export async function deactivateVolunteerProfile(
     }
   }
 
-  const notStarted = matches.filter(({ status }) =>
-    NOT_STARTED.includes(status),
-  );
-  if (!notStarted.length) {
-    return;
-  }
-  await manager.delete(OpportunityVolunteer, {
-    id: In(notStarted.map(({ id }) => id)),
-  });
-  for (const match of notStarted) {
+  const removed = removable.map(({ opportunityId, status, opportunity }) => ({
+    opportunityId,
+    from: status,
+    title: opportunity?.title,
+  }));
+  await manager.remove(removable, { data: { actorUserId } });
+  for (const change of removed) {
     await logMatchChangeSafely(manager, {
       volunteerId: volunteer.id,
-      opportunityId: match.opportunityId,
-      from: match.status,
       actorUserId,
+      ...change,
     });
   }
-  for (const id of new Set(
-    notStarted.map(({ opportunityId }) => opportunityId),
-  )) {
-    await updateOpportunityMatching(id, manager);
-  }
-  await updateVolunteerMatching(volunteer.id, manager);
 }
