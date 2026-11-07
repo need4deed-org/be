@@ -33,7 +33,10 @@ import Agent from "../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { getDistrictCentroids } from "../../data/utils/get-district";
-import { getOpportunityLocation } from "../../services/dto/dto-opportunity";
+import {
+  getOpportunityLocation,
+  getOwnLocationPostcode,
+} from "../../services/dto/dto-opportunity";
 import {
   getAvailability,
   getCoordinates,
@@ -246,6 +249,12 @@ function getOpportunityDistrictWhere(
     {
       districtId: IsNull(),
       type: Not(OpportunityType.ACCOMPANYING),
+      address: { postcode: { id: firstDistrictPostcodeIdWhere(districtId) } },
+    },
+    {
+      districtId: IsNull(),
+      type: Not(OpportunityType.ACCOMPANYING),
+      addressId: IsNull(),
       deal: { postcode: { id: firstDistrictPostcodeIdWhere(districtId) } },
     },
     {
@@ -258,6 +267,7 @@ function getOpportunityDistrictWhere(
     {
       districtId: IsNull(),
       type: Not(OpportunityType.ACCOMPANYING),
+      addressId: IsNull(),
       agent: { districtId },
     },
     {
@@ -361,6 +371,7 @@ function agentRelations() {
 function opportunityRelations() {
   return [
     "agent.address.postcode.districtPostcode",
+    "address.postcode.districtPostcode",
     "accompanying.postcode.districtPostcode",
     "deal.postcode.districtPostcode",
     "deal.dealLanguage.language",
@@ -373,13 +384,9 @@ function getOpportunityPhysicalLocation(opportunity: Opportunity): {
   districtId?: number;
   postcode?: Postcode;
 } {
-  const appointmentPostcode =
-    opportunity.type === OpportunityType.ACCOMPANYING
-      ? opportunity.accompanying?.postcode
-      : undefined;
   return {
     districtId: getOpportunityLocation(opportunity).districtId,
-    postcode: appointmentPostcode ?? opportunity.deal?.postcode,
+    postcode: getOwnLocationPostcode(opportunity) ?? opportunity.deal?.postcode,
   };
 }
 

@@ -283,6 +283,7 @@ export default async function opportunityRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const relations = [
+        "address.postcode.districtPostcode",
         "accompanying.postcode.districtPostcode",
         "deal.postcode",
         "onetimer",

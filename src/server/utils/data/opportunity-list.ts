@@ -23,6 +23,7 @@ export const opportunityListRelations = [
   "deal.postcode",
   "agent",
   "agent.address.postcode",
+  "address.postcode.districtPostcode",
   "accompanying.postcode.districtPostcode",
   "onetimer",
   "opportunityVolunteer.volunteer.person",

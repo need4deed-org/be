@@ -10,6 +10,7 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Deal from "../../data/entity/deal.entity";
+import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import { Centroid, firstDistrictPostcode } from "../../data/utils/get-district";
@@ -40,11 +41,11 @@ function resolveMapPin(opportunity: Opportunity): MapPinResolution {
     return { lat: null, lon: null };
   }
 
-  // an accompanying pin sits at the appointment, like its postcode and district
-  // (be#1272); masked appointment coordinates fall back to the district centroid
+  // the pin sits at the opportunity's own address or the appointment, like its
+  // postcode and district (be#1272, be#1291); masked coordinates fall back to
+  // the district centroid
   const coordinates = getCoordinates(
-    accompanyingForType(opportunity)?.postcode ??
-      opportunity.agent?.address?.postcode,
+    getOwnLocationPostcode(opportunity) ?? opportunity.agent?.address?.postcode,
   );
   if (coordinates.latitude !== null && coordinates.longitude !== null) {
     return { lat: coordinates.latitude, lon: coordinates.longitude };
@@ -112,15 +113,27 @@ export function getAppointmentDistrictId(
   )?.districtId;
 }
 
+// The opportunity's own address (be#1291), else the accompanying appointment;
+// undefined means the NGO's location applies.
+export function getOwnLocationPostcode(
+  opportunity: Opportunity,
+): Postcode | undefined {
+  return (
+    opportunity.address?.postcode ?? accompanyingForType(opportunity)?.postcode
+  );
+}
+
 export function getOpportunityLocation(
   opportunity: Opportunity,
 ): OpportunityLocation {
   const storedDistrictId = opportunity.district?.id ?? opportunity.districtId;
-  const appointmentPostcode = accompanyingForType(opportunity)?.postcode;
-  if (appointmentPostcode) {
+  const ownPostcode = getOwnLocationPostcode(opportunity);
+  if (ownPostcode) {
     return {
-      postcode: appointmentPostcode.value ?? null,
-      districtId: getAppointmentDistrictId(opportunity) ?? storedDistrictId,
+      postcode: ownPostcode.value ?? null,
+      districtId:
+        firstDistrictPostcode(ownPostcode.districtPostcode)?.districtId ??
+        storedDistrictId,
     };
   }
   return {
