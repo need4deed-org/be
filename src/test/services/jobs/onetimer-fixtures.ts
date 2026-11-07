@@ -36,6 +36,7 @@ export class OnetimerFixtures {
   private readonly agents: Agent[] = [];
   private readonly opportunities: Opportunity[] = [];
   private readonly volunteers: Volunteer[] = [];
+  private readonly onetimers: Onetimer[] = [];
 
   constructor(private readonly fastify: FastifyInstance) {}
 
@@ -56,10 +57,8 @@ export class OnetimerFixtures {
   async volunteer(
     statusEngagement = VolunteerStateEngagementType.AVAILABLE,
   ): Promise<Volunteer> {
-    const volunteer = await createVolunteer(this.manager);
+    const volunteer = await createVolunteer(this.manager, { statusEngagement });
     this.volunteers.push(volunteer);
-    await this.manager.update(Volunteer, volunteer.id, { statusEngagement });
-    volunteer.statusEngagement = statusEngagement;
     return volunteer;
   }
 
@@ -75,6 +74,7 @@ export class OnetimerFixtures {
     const onetimer = await this.fastify.db.onetimerRepository.save(
       new Onetimer({ date }),
     );
+    this.onetimers.push(onetimer);
     const opportunity = await this.fastify.db.opportunityRepository.save(
       new Opportunity({
         title: `Onetimer ${randomNumericSuffix()}`,
@@ -129,9 +129,10 @@ export class OnetimerFixtures {
 
   async cleanup(): Promise<void> {
     await deleteFixtures(this.manager, this.volunteers, this.opportunities);
-    const onetimerIds = this.opportunities.map(({ onetimerId }) => onetimerId!);
-    if (onetimerIds.length) {
-      await this.manager.delete(Onetimer, { id: In(onetimerIds) });
+    if (this.onetimers.length) {
+      await this.manager.delete(Onetimer, {
+        id: In(this.onetimers.map(({ id }) => id)),
+      });
     }
     if (this.agents.length) {
       await this.manager.delete(Agent, {
