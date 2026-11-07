@@ -1,4 +1,4 @@
-import { DocumentStatusType, Lang, OpportunityType } from "need4deed-sdk";
+import { DocumentStatusType, Lang } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
@@ -118,19 +118,12 @@ export async function sendEmailIntroduction(
     `sendEmailIntroduction, ov ${ov.id}`,
   );
 
-  const agentAddress = (() => {
-    const addr = opportunity.agent?.address;
-    if (!addr) {
-      return "";
-    }
-    return [addr.street, addr.postcode?.value, addr.city]
-      .filter(Boolean)
-      .join(", ");
-  })();
+  const agentAddress = serializeAddress(opportunity.agent?.address);
   const agentTitle = opportunity.agent?.title ?? "";
+  const ownAddress = serializeAddress(opportunity.address);
   const opportunityAddress =
-    opportunity.type !== OpportunityType.ACCOMPANYING && opportunity.address
-      ? `\nEinsatzort: ${serializeAddress(opportunity.address)}`
+    ownAddress && ownAddress !== agentAddress
+      ? `\nEinsatzort: ${ownAddress}`
       : "";
 
   const statmentOnCertificates = resolveStatmentOnCertificates(

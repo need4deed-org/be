@@ -49,7 +49,8 @@ export async function sendEmailSuggestion(
 
   const volunteerName = ov.volunteer.person.name;
   const opportunityName = await localizedOpportunityTitle(ov.opportunity);
-  const plz = getOpportunityLocation(ov.opportunity).postcode ?? "";
+  const plz =
+    (ov.opportunity && getOpportunityLocation(ov.opportunity).postcode) ?? "";
   const dealTimeslot = ov.opportunity?.deal?.dealTimeslot ?? [];
   const opportunitySchedule = await resolveOrAlert(
     errorTransport,

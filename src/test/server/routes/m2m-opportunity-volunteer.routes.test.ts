@@ -15,8 +15,10 @@ import {
 import { Repository } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Communication from "../../../data/entity/communication.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -25,7 +27,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
@@ -512,6 +514,8 @@ describe("coordinator's email note on suggest / match", () => {
   let volunteer: Volunteer;
   let opportunityDeal: Deal;
   let opportunity: Opportunity;
+  let ownAddress: Address;
+  let ownPostcodeValue: string;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
 
@@ -536,12 +540,17 @@ describe("coordinator's email note on suggest / match", () => {
     opportunityDeal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );
+    ownAddress = await getRepository(dataSource, Address).save(
+      new Address({ street: "Weg 1", city: "Berlin", postcodeId: postcode.id }),
+    );
+    ownPostcodeValue = postcode.value;
     opportunity = await fastify.db.opportunityRepository.save(
       new Opportunity({
         title: `Test Opportunity (email note) ${suffix}`,
         type: OpportunityType.REGULAR,
         status: OpportunityStatusType.NEW,
         dealId: opportunityDeal.id,
+        addressId: ownAddress.id,
       }),
     );
 
@@ -577,6 +586,7 @@ describe("coordinator's email note on suggest / match", () => {
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.personRepository.delete({ id: volunteerPerson.id });
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
+    await getRepository(dataSource, Address).delete({ id: ownAddress.id });
     await fastify.db.dealRepository.delete({ id: opportunityDeal.id });
     await fastify.close();
   });
@@ -595,6 +605,14 @@ describe("coordinator's email note on suggest / match", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+
+  const withOwnAddress = () =>
+    expect.objectContaining({
+      address: expect.objectContaining({
+        street: "Weg 1",
+        postcode: expect.objectContaining({ value: ownPostcodeValue }),
+      }),
+    });
 
   it("passes the note to the suggestion and then the introduction email", async () => {
     const suggestion = vi
@@ -618,7 +636,10 @@ describe("coordinator's email note on suggest / match", () => {
     expect(created.statusCode).toBe(201);
     await vi.waitFor(() =>
       expect(suggestion).toHaveBeenCalledWith(
-        expect.objectContaining({ volunteerId: volunteer.id }),
+        expect.objectContaining({
+          volunteerId: volunteer.id,
+          opportunity: withOwnAddress(),
+        }),
         "Suggest note",
       ),
     );
@@ -639,7 +660,7 @@ describe("coordinator's email note on suggest / match", () => {
     expect(matched.statusCode).toBe(204);
     await vi.waitFor(() =>
       expect(introduction).toHaveBeenCalledWith(
-        expect.objectContaining({ id: ov.id }),
+        expect.objectContaining({ id: ov.id, opportunity: withOwnAddress() }),
         "Match note",
       ),
     );

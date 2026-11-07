@@ -555,10 +555,15 @@ describe("sendEmailIntroduction location", () => {
     expect(text).not.toContain("Einsatzort");
   });
 
-  it("never adds the line to an accompanying opportunity", async () => {
-    const text = await sendWith({ type: "accompanying", address: ownAddress });
+  it("leaves the line out when the own address is the NGO's address", async () => {
+    const text = await sendWith({
+      type: "regular",
+      address: ownAddress,
+      agent: { title: "NGO", address: { ...ownAddress } },
+    });
 
     expect(text).not.toContain("Einsatzort");
+    expect(text).toContain("Weg 1, 10247 Berlin");
   });
 });
 
