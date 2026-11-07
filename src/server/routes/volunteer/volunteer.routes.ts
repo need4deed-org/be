@@ -394,15 +394,11 @@ export default async function volunteerRoutes(
       let resolvedPostcode: Partial<Postcode> | undefined;
       if (Object.keys(addressFields).length || sendsPostcode) {
         if (sendsPostcode) {
-          const postcodeValue = normalizePostcode(String(postcodeData?.value));
-          if (!postcodeData?.id && !isValidPLZ(postcodeValue)) {
-            throw new BadRequestError("Address not saved: invalid postcode.");
-          }
           const postcode = postcodeData?.id
             ? await fastify.db.postcodeRepository.findOneBy({
                 id: Number(postcodeData.id),
               })
-            : await getPostcode(postcodeValue);
+            : await findOrCreateGermanPostcode(String(postcodeData?.value));
           if (!postcode) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
@@ -692,4 +688,17 @@ export default async function volunteerRoutes(
       return reply.status(200).send({ message });
     },
   );
+}
+
+// Stored postcodes are accepted as they are; only a new one must be a German PLZ.
+async function findOrCreateGermanPostcode(code: string) {
+  const value = normalizePostcode(code);
+  const stored = await dataSource.getRepository(Postcode).findOneBy({ value });
+  if (stored) {
+    return stored;
+  }
+  if (!isValidPLZ(value)) {
+    throw new BadRequestError("Address not saved: invalid postcode.");
+  }
+  return getPostcode(value);
 }
