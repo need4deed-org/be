@@ -4,28 +4,28 @@ import {
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { QueryRunner } from "typeorm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { In, QueryRunner } from "typeorm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import FieldTranslation from "../../../../data/entity/field_translation.entity";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
 import Language from "../../../../data/entity/profile/language.entity";
 import { queueUntranslatedOpportunities } from "../../../../server/utils/data/translate-opportunities";
+import * as queue from "../../../../services/translation/queue";
 import { enqueue } from "../../../../services/translation/queue";
 import { randomNumericSuffix } from "../../../random";
 
-// No limit worth the name: every untranslated opportunity in the database.
 const ALL = 1_000_000;
 
-// be#1068 backfill. It queues every untranslated opportunity in the shared
-// database, so it runs inside a transaction that is rolled back.
 describe("queueUntranslatedOpportunities", () => {
   const suffix = randomNumericSuffix();
   let queryRunner: QueryRunner;
   const ids = {} as Record<Lang, number>;
   const opportunity: Record<string, Opportunity> = {};
   let firstRun: number;
-  let secondRun: number;
+  let firstRows: FieldTranslation[];
+  let secondRows: FieldTranslation[];
+  let secondPickedIds: number[];
 
   const fieldsOf = async (id: number) =>
     (
@@ -34,6 +34,14 @@ describe("queueUntranslatedOpportunities", () => {
         order: { fieldName: "ASC" },
       })
     ).map((row) => [row.fieldName, row.languageId]);
+
+  const ownRows = () =>
+    queryRunner.manager.find(FieldTranslation, {
+      where: {
+        opportunityId: In(Object.values(opportunity).map(({ id }) => id)),
+      },
+      order: { id: "ASC" },
+    });
 
   beforeAll(async () => {
     if (!dataSource.isInitialized) {
@@ -77,7 +85,15 @@ describe("queueUntranslatedOpportunities", () => {
     );
 
     firstRun = await queueUntranslatedOpportunities(queryRunner.manager, ALL);
-    secondRun = await queueUntranslatedOpportunities(queryRunner.manager, ALL);
+    firstRows = await ownRows();
+    const enqueueSpy = vi.spyOn(queue, "enqueue");
+    try {
+      await queueUntranslatedOpportunities(queryRunner.manager, ALL);
+      secondPickedIds = enqueueSpy.mock.calls.map(([, , entity]) => entity.id);
+    } finally {
+      enqueueSpy.mockRestore();
+    }
+    secondRows = await ownRows();
   });
 
   afterAll(async () => {
@@ -108,17 +124,18 @@ describe("queueUntranslatedOpportunities", () => {
     ]);
   });
 
-  it("picks nothing again, including opportunities with nothing to translate", async () => {
+  it("leaves its own rows unchanged on a second run, including empty sources", async () => {
     expect(firstRun).toBeGreaterThanOrEqual(3);
     expect(await fieldsOf(opportunity.nothing.id)).toEqual([]);
-    expect(secondRun).toBe(0);
+    expect(secondRows).toEqual(firstRows);
+    for (const { id } of Object.values(opportunity)) {
+      expect(secondPickedIds).not.toContain(id);
+    }
   });
 
   it("queues searching opportunities first", async () => {
     const savepoint = `searching_${suffix}`;
     await queryRunner.query(`SAVEPOINT ${savepoint}`);
-    // Every other untranslated opportunity in the database is queued
-    // already (beforeAll), so these two are the only candidates.
     const inactive = await queryRunner.manager.save(
       new Opportunity({
         title: `Backfill inactive ${suffix}`,

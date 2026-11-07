@@ -23,7 +23,7 @@ function dtoOptionTitle(
   id: number | undefined,
   ref?: { title?: string; translations?: OptionTitle },
 ): OptionById {
-  return { id, title: ref?.translations ?? { de: ref?.title } };
+  return { id, title: { de: ref?.title, ...ref?.translations } };
 }
 
 export function dtoSerializeAgentMembership(

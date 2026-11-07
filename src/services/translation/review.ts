@@ -13,9 +13,32 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../config";
 import FieldTranslation from "../../data/entity/field_translation.entity";
 import { isUniqueViolation } from "../../data/utils";
 import { dtoFieldTranslation } from "../dto/dto-field-translation";
+import { getTranslationConfig } from "./config";
 import { languageIds, originalLang } from "./languages";
-import { SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
+import { pendingRow, SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
 import { translatedEntities, translatedEntityTypes } from "./registry";
+
+async function findTranslationRow(
+  manager: EntityManager,
+  id: number,
+  lock = false,
+): Promise<{
+  row: FieldTranslation;
+  entityType: TranslatedEntityType;
+  entry: (typeof translatedEntities)[TranslatedEntityType];
+}> {
+  const row = await manager.findOne(FieldTranslation, {
+    where: { id },
+    ...(lock && { lock: { mode: "pessimistic_write" as const } }),
+  });
+  const entityType = translatedEntityTypes.find(
+    (type) => row?.[translatedEntities[type].fk],
+  );
+  if (!row || !entityType) {
+    throw new NotFoundError(`Translation (id:${id}) not found.`);
+  }
+  return { row, entityType, entry: translatedEntities[entityType] };
+}
 
 async function findEntity(
   manager: EntityManager,
@@ -169,14 +192,7 @@ export async function editTranslation(
 ): Promise<ApiFieldTranslation> {
   const translation = translationText(text);
   return manager.transaction(async (tx) => {
-    const row = await tx.findOneBy(FieldTranslation, { id });
-    const entityType = translatedEntityTypes.find(
-      (type) => row?.[translatedEntities[type].fk],
-    );
-    if (!row || !entityType) {
-      throw new NotFoundError(`Translation (id:${id}) not found.`);
-    }
-    const entry = translatedEntities[entityType];
+    const { row, entityType, entry } = await findTranslationRow(tx, id);
     const done = {
       translation,
       status: TranslationStatus.DONE,
@@ -201,5 +217,56 @@ export async function editTranslation(
     };
     await tx.update(FieldTranslation, { id }, human);
     return dtoFieldTranslation({ ...row, ...human });
+  });
+}
+
+export async function deleteTranslation(
+  manager: EntityManager,
+  id: number,
+): Promise<void> {
+  await manager.transaction(async (tx) => {
+    const { row, entityType, entry } = await findTranslationRow(tx, id);
+    if (!entry.machine) {
+      await findTranslationRow(tx, id, true);
+      await tx.delete(FieldTranslation, { id });
+      return;
+    }
+    const entity = await findEntity(
+      tx,
+      entityType,
+      row[entry.fk] as number,
+      true,
+    );
+    const { row: current } = await findTranslationRow(tx, id, true);
+    if (!(entry.fields as readonly string[]).includes(current.fieldName)) {
+      throw new BadRequestError(
+        `${entityType} has no translated ${current.fieldName}.`,
+      );
+    }
+    const { idOf, langOf } = await languageIds(tx);
+    if (current.languageId === idOf[originalLang(entity, langOf)]) {
+      throw new BadRequestError("The original language cannot be regenerated.");
+    }
+    const source = sourceTextOf(entity[current.fieldName]);
+    if (!source) {
+      await tx.delete(FieldTranslation, { id });
+      return;
+    }
+    const sourceHash = sourceHashOf(source);
+    if (
+      current.origin === TranslationOrigin.MACHINE &&
+      current.status === TranslationStatus.PENDING &&
+      current.sourceHash === sourceHash
+    ) {
+      return;
+    }
+    if (current.attempts >= getTranslationConfig().maxAttempts) {
+      throw new ConflictError("Translation retry limit reached.");
+    }
+    await tx.update(
+      FieldTranslation,
+      { id },
+      pendingRow(sourceHash, current.attempts),
+    );
   });
 }

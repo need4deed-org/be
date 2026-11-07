@@ -92,6 +92,10 @@ export async function runTranslationBatch(
           hash: row.sourceHash,
           pending: TranslationStatus.PENDING,
         })
+        .andWhere("origin = :origin AND attempts = :attempts", {
+          origin: TranslationOrigin.MACHINE,
+          attempts: row.attempts,
+        })
         .execute();
       if (affected) {
         stats.removed++;
@@ -119,6 +123,10 @@ export async function runTranslationBatch(
           id: row.id,
           hash: row.sourceHash,
           pending: TranslationStatus.PENDING,
+        })
+        .andWhere("origin = :origin AND attempts = :attempts", {
+          origin: TranslationOrigin.MACHINE,
+          attempts: row.attempts,
         })
         .execute();
 
