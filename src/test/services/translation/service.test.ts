@@ -216,6 +216,14 @@ describe("prompt and glossary", () => {
     expect(glossaryFor("nothing relevant", entries)).toEqual([]);
   });
 
+  it("tells the translator to render Begleitung as accompanying", () => {
+    const glossary = glossaryFor("Begleitung zu Arztterminen", DOMAIN_TERMS);
+
+    expect(buildSystemPrompt(Lang.EN, glossary)).toContain(
+      "- Begleitung = accompanying",
+    );
+  });
+
   it("keeps the domain terms consistent", () => {
     for (const { de, en } of DOMAIN_TERMS) {
       expect(de.trim()).toBe(de);
