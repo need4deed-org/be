@@ -62,7 +62,7 @@ export async function syncVolunteerEngagement(
   }
 }
 
-async function logEngagementChange(
+export async function logEngagementChange(
   manager: EntityManager,
   volunteerId: number,
   from: VolunteerStateEngagementType,

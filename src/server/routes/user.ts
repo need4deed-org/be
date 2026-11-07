@@ -62,6 +62,7 @@ import {
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
+import { deactivateVolunteerProfile } from "../utils/data/deactivate-volunteer-profile";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
@@ -196,13 +197,20 @@ export default async function userRoutes(
         }
       }
 
-      const result = await fastify.db.userRepository.update(
-        { id },
-        { isActive: false, deactivatedAt: new Date() },
-      );
-      if (!result.affected) {
-        throw new NotFoundError(`User id:${id} not found.`);
-      }
+      await fastify.db.userRepository.manager.transaction(async (manager) => {
+        const result = await manager.update(
+          User,
+          { id },
+          { isActive: false, deactivatedAt: new Date() },
+        );
+        if (!result.affected) {
+          throw new NotFoundError(`User id:${id} not found.`);
+        }
+        const { role, personId } = request.authUser!;
+        if (role === UserRole.VOLUNTEER && personId) {
+          await deactivateVolunteerProfile(manager, personId, id);
+        }
+      });
 
       return reply
         .status(200)

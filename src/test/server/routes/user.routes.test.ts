@@ -1,17 +1,36 @@
 import { FastifyInstance } from "fastify";
-import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentRoleType,
+  OpportunityVolunteerStatusType,
+  UserRole,
+  VolunteerStateEngagementType,
+} from "need4deed-sdk";
+import { EntityManager, In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import TrustedDomain from "../../../data/entity/trusted-domain.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import {
+  resolveOpportunityMatchStatus,
+  resolveVolunteerMatchStatus,
+} from "../../../data/lib";
 import { DealType } from "../../../data/types";
 import { getPostcode, hashPassword } from "../../../data/utils";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
+import {
+  createOpportunity,
+  createVolunteer,
+  deleteFixtures,
+} from "../../data/match-fixtures";
+import { randomNumericSuffix } from "../../random";
 
 // Regression coverage for two things landed together:
 // 1. POST /user's AGENT email-domain gate rejects with InvalidOrganizationEmailError
@@ -1829,5 +1848,199 @@ describe("DELETE /user/:id (be#583)", () => {
       countSpy.mockRestore();
       await fastify.db.userRepository.delete({ id: admin.id });
     }
+  });
+});
+
+describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)", () => {
+  let fastify: FastifyInstance;
+  let manager: EntityManager;
+  const volunteers: Volunteer[] = [];
+  const opportunities: Opportunity[] = [];
+  const userIds: number[] = [];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+    manager = fastify.db.userRepository.manager;
+  });
+
+  afterAll(async () => {
+    try {
+      if (userIds.length) {
+        await fastify.db.userRepository.delete({ id: In(userIds) });
+      }
+      await deleteFixtures(manager, volunteers, opportunities);
+    } finally {
+      await fastify.close();
+    }
+  });
+
+  async function volunteerAccount(role = UserRole.VOLUNTEER) {
+    const volunteer = await createVolunteer(manager, {
+      statusEngagement: VolunteerStateEngagementType.ACTIVE,
+    });
+    volunteers.push(volunteer);
+    const user = await fastify.db.userRepository.save(
+      new User({
+        email: `self-delete-vol-${randomNumericSuffix()}@example.com`,
+        password: await hashPassword("test_password"),
+        role,
+        isActive: true,
+        personId: volunteer.personId,
+      }),
+    );
+    userIds.push(user.id);
+    const accessToken = fastify.jwt.sign({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      type: "access",
+    });
+    return { volunteer, user, accessToken };
+  }
+
+  async function match(
+    volunteer: Volunteer,
+    status: OpportunityVolunteerStatusType,
+  ) {
+    const opportunity = await createOpportunity(
+      manager,
+      `Self-delete ${status} ${randomNumericSuffix()}`,
+    );
+    opportunities.push(opportunity);
+    return fastify.db.opportunityVolunteerRepository.save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status,
+      }),
+    );
+  }
+
+  const selfDelete = (userId: number, accessToken: string) =>
+    fastify.inject({
+      method: "DELETE",
+      url: `/user/${userId}`,
+      cookies: { access: accessToken },
+    });
+
+  const matchStatus = async (id: number) =>
+    (await fastify.db.opportunityVolunteerRepository.findOneBy({ id }))?.status;
+
+  it("removes not-started matches, ends running ones and marks the volunteer inactive", async () => {
+    const { volunteer, user, accessToken } = await volunteerAccount();
+    const pending = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.PENDING,
+    );
+    const matched = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+    const active = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.ACTIVE,
+    );
+    const past = await match(volunteer, OpportunityVolunteerStatusType.PAST);
+
+    const res = await selfDelete(user.id, accessToken);
+    expect(res.statusCode).toBe(200);
+
+    expect(await matchStatus(pending.id)).toBeUndefined();
+    expect(await matchStatus(matched.id)).toBeUndefined();
+    expect(await matchStatus(active.id)).toBe(
+      OpportunityVolunteerStatusType.PAST,
+    );
+    expect(await matchStatus(past.id)).toBe(
+      OpportunityVolunteerStatusType.PAST,
+    );
+
+    const refreshed = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteer.id,
+    });
+    expect(refreshed.statusEngagement).toBe(
+      VolunteerStateEngagementType.INACTIVE,
+    );
+    const logs = await fastify.db.volunteerAuditLogRepository.find({
+      where: { volunteerId: volunteer.id, type: "availability_changed" },
+      order: { id: "DESC" },
+    });
+    expect(logs[0]?.detail).toContain(VolunteerStateEngagementType.INACTIVE);
+
+    for (const { opportunityId } of [pending, matched]) {
+      const opportunity =
+        await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunityId,
+        });
+      expect(opportunity.statusMatch).toBe(
+        resolveOpportunityMatchStatus(opportunity.statusMatch, []),
+      );
+    }
+    expect(refreshed.statusMatch).toBe(
+      resolveVolunteerMatchStatus(refreshed.statusMatch, [
+        OpportunityVolunteerStatusType.PAST,
+        OpportunityVolunteerStatusType.PAST,
+      ]),
+    );
+  });
+
+  it("leaves the volunteer profile alone when the account is not a volunteer's", async () => {
+    const { volunteer, user, accessToken } = await volunteerAccount(
+      UserRole.COORDINATOR,
+    );
+    const matched = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+
+    const res = await selfDelete(user.id, accessToken);
+    expect(res.statusCode).toBe(200);
+
+    expect(await matchStatus(matched.id)).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+    const refreshed = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteer.id,
+    });
+    expect(refreshed.statusEngagement).toBe(
+      VolunteerStateEngagementType.ACTIVE,
+    );
+  });
+
+  it("rolls back the account deactivation when the profile cascade fails", async () => {
+    const { volunteer, user, accessToken } = await volunteerAccount();
+    const matched = await match(
+      volunteer,
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+    const realUpdate = EntityManager.prototype.update;
+    const spy = vi
+      .spyOn(EntityManager.prototype, "update")
+      .mockImplementation(function (this: EntityManager, ...args) {
+        if (args[0] === Volunteer) {
+          return Promise.reject(new Error("db unavailable"));
+        }
+        return realUpdate.apply(this, args);
+      });
+    const loggerError = vi
+      .spyOn(logger, "error")
+      .mockImplementation(() => undefined);
+
+    try {
+      const res = await selfDelete(user.id, accessToken);
+      expect(res.statusCode).toBe(500);
+    } finally {
+      spy.mockRestore();
+      loggerError.mockRestore();
+    }
+
+    const account = await fastify.db.userRepository.findOneByOrFail({
+      id: user.id,
+    });
+    expect(account.isActive).toBe(true);
+    expect(account.deactivatedAt).toBeNull();
+    expect(await matchStatus(matched.id)).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
   });
 });
