@@ -154,7 +154,8 @@ Parallel files share one database and commit real rows, so a test must only asse
 
 - never assert on a whole-table count or an unfiltered list — scope the query to your own rows (your own postcode/agent/title suffix);
 - make "unique" fixture values really unique — use `randomNumericSuffix()` from `src/test/random.ts`, not `Date.now() % 10000` (collides with other files, and with real seeded Berlin postcodes);
-- expect other files' rows — including odd-but-valid ones (e.g. an opportunity with no deal) — to show up in any list you read.
+- expect other files' rows — including odd-but-valid ones (e.g. an opportunity with no deal) — to show up in any list you read;
+- a job that sweeps a whole table must not touch other files' rows: pass it a scope it already takes (`scanAccompanyNotFound`'s `today`), or wrap its query builder with `vi.mock` + `importOriginal` to add a filter on your own rows (see `src/test/services/jobs/activate-due-onetimers.test.ts`). Never replace the repository with `vi.fn()` mocks.
 
 ---
 
