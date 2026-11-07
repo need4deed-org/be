@@ -144,7 +144,7 @@ export async function sendEmailIntroduction(
   const ownAddress = cleanAddress(opportunity.address);
   const opportunityAddress =
     ownAddress &&
-    ownAddress.toLocaleLowerCase("de") !== agentAddress.toLocaleLowerCase("de")
+    ownAddress.toLocaleUpperCase("de") !== agentAddress.toLocaleUpperCase("de")
       ? `\nEinsatzort: ${ownAddress}`
       : "";
 

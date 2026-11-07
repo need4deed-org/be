@@ -585,6 +585,15 @@ describe("sendEmailIntroduction location", () => {
     },
   );
 
+  it("treats ß and ss as the same letter", async () => {
+    const text = await sendAt(
+      { street: "Hauptstrasse 5", city: "Berlin" },
+      { street: "Hauptstraße 5", city: "Berlin" },
+    );
+
+    expect(text).not.toContain("Einsatzort");
+  });
+
   it("treats a composed and a decomposed umlaut as the same street", async () => {
     const text = await sendAt(
       { street: "Müllerstr. 3", city: "Berlin" },
