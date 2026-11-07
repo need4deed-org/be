@@ -1878,6 +1878,7 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
   async function volunteerAccount(role = UserRole.VOLUNTEER) {
     const volunteer = await createVolunteer(manager, {
       statusEngagement: VolunteerStateEngagementType.ACTIVE,
+      dateReturn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
     volunteers.push(volunteer);
     const user = await fastify.db.userRepository.save(
@@ -1961,11 +1962,15 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
     expect(refreshed.statusEngagement).toBe(
       VolunteerStateEngagementType.INACTIVE,
     );
-    const logs = await fastify.db.volunteerAuditLogRepository.find({
-      where: { volunteerId: volunteer.id, type: "availability_changed" },
-      order: { id: "DESC" },
+    expect(refreshed.dateReturn).toBeNull();
+    const logs = await fastify.db.volunteerAuditLogRepository.findBy({
+      volunteerId: volunteer.id,
+      type: "availability_changed",
     });
-    expect(logs[0]?.detail).toContain(VolunteerStateEngagementType.INACTIVE);
+    expect(logs).toHaveLength(1);
+    expect(logs[0].detail).toBe(
+      `Status changed from ${VolunteerStateEngagementType.ACTIVE} to ${VolunteerStateEngagementType.INACTIVE}.`,
+    );
 
     for (const { opportunityId } of [pending, matched]) {
       const opportunity =

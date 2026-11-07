@@ -198,6 +198,10 @@ export default async function userRoutes(
       }
 
       await fastify.db.userRepository.manager.transaction(async (manager) => {
+        const { role, personId } = request.authUser!;
+        if (role === UserRole.VOLUNTEER && personId) {
+          await deactivateVolunteerProfile(manager, personId, id);
+        }
         const result = await manager.update(
           User,
           { id },
@@ -205,10 +209,6 @@ export default async function userRoutes(
         );
         if (!result.affected) {
           throw new NotFoundError(`User id:${id} not found.`);
-        }
-        const { role, personId } = request.authUser!;
-        if (role === UserRole.VOLUNTEER && personId) {
-          await deactivateVolunteerProfile(manager, personId, id);
         }
       });
 
