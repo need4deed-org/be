@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   getVolunteerFilterWhere,
   getVolunteerWhere,
+  normalizeVolunteerStatusFilter,
 } from "../../../../server/utils/data/get-volunteer-where";
 import { CallerVisibility } from "../../../../server/utils/pii/visible-persons";
 
@@ -23,6 +24,15 @@ function visibility(
 }
 
 describe("getVolunteerWhere search (be#666, be#972)", () => {
+  it("normalizes frontend engagement and match status filters", () => {
+    expect(normalizeVolunteerStatusFilter("new")).toBe("vol-new");
+    expect(normalizeVolunteerStatusFilter(["new", "vol-active"])).toEqual([
+      "vol-new",
+      "vol-active",
+    ]);
+    expect(normalizeVolunteerStatusFilter(undefined)).toBeUndefined();
+  });
+
   it("matches name/email across all persons for a privileged caller", () => {
     expect(getVolunteerFilterWhere({ search: "ann" }, null)).toEqual({
       person: [

@@ -39,6 +39,11 @@ export async function getAgentWhere(
           agentTypeId: normalizeStringArrayInput(filter.type),
         }
       : {}),
+    ...(filter?.status
+      ? {
+          trustLevel: normalizeStringArrayInput(filter.status),
+        }
+      : {}),
     ...(filter?.search
       ? {
           title: ILike(`%${filter.search}%`),

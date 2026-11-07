@@ -3,6 +3,7 @@ import {
   Between,
   FindOptionsWhere,
   ILike,
+  In,
   IsNull,
   LessThanOrEqual,
   MoreThanOrEqual,
@@ -72,7 +73,9 @@ export function getSearchBranches(
   return branches;
 }
 
-function hasFilterValue(value: string | string[] | undefined): boolean {
+function hasFilterValue(
+  value: string | string[] | number | number[] | undefined,
+): boolean {
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
 }
 
@@ -164,11 +167,23 @@ export function getOpportunityWhere(
 
   const base = {
     ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
+    ...(hasFilterValue(filter?.agentId)
+      ? {
+          agentId: Array.isArray(filter.agentId)
+            ? In(filter.agentId)
+            : filter.agentId,
+        }
+      : {}),
     ...getTypeWhere(filter, appointment?.excludeAccompanying),
     ...getAppointmentDateWhere(appointment),
     ...(hasFilterValue(filter?.status)
       ? {
           status: normalizeStringArrayInput(filter.status),
+        }
+      : {}),
+    ...(hasFilterValue(filter?.match)
+      ? {
+          statusMatch: normalizeStringArrayInput(filter.match),
         }
       : {}),
     ...(Object.keys(dealFilter).length ? { deal: dealFilter } : {}),

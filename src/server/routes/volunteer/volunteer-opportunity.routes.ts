@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGetList } from "need4deed-sdk";
+import { In } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { dtoVolunteerOpportunityGetList } from "../../../services/dto/dto-opportunity";
 import {
@@ -57,7 +58,9 @@ export default async function volunteerOpportunityRoutes(
         requestLanguage({ language }),
       );
       if (agentId) {
-        mergeIntoWhere<Opportunity>(where, { agentId });
+        mergeIntoWhere<Opportunity>(where, {
+          agentId: Array.isArray(agentId) ? In(agentId) : agentId,
+        });
       }
 
       const opportunityRepository = fastify.db.opportunityRepository;

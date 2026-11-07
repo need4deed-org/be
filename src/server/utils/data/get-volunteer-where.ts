@@ -29,6 +29,17 @@ function getPersonSearchBranches(search: string): Record<string, unknown>[] {
 
 const NO_OWNER = "none";
 
+export function normalizeVolunteerStatusFilter(
+  value: string | string[] | undefined,
+): string | string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalize = (status: string) =>
+    status.startsWith("vol-") ? status : `vol-${status}`;
+  return Array.isArray(value) ? value.map(normalize) : normalize(value);
+}
+
 export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
