@@ -28,6 +28,7 @@ export const opportunityCreateBodySchema = {
     accomp_phone: { type: "string" },
     accomp_information: { type: "string" },
     accomp_translation: { type: "string" },
+    address: { $ref: "ApiOpportunityAddress#" },
     language: { type: "string" },
     last_edited_time_notion: { type: "string" },
   },

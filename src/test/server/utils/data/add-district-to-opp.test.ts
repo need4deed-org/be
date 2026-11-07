@@ -47,6 +47,56 @@ describe("getDistrictToOpportunityHandler", () => {
   });
 
   describe("addDistrictToOpportunity", () => {
+    describe("own address (be#1291)", () => {
+      it("takes the district from the loaded own address postcode, not the agent's", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.REGULAR,
+          agent: { districtId: 99 } as any,
+          address: {
+            postcode: { districtPostcode: [{ id: 2, districtId: 4 }] },
+          } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(result.districtId).toBe(4);
+        expect(handler.updates).toEqual([opportunity]);
+        expect(mockedGetDistrictFromPostcode).not.toHaveBeenCalled();
+      });
+
+      it("looks the district up by postcodeId when the postcode isn't loaded", async () => {
+        mockedGetDistrictFromPostcode.mockResolvedValueOnce(
+          makeDistrict({ id: 6 }) as any,
+        );
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.EVENTS,
+          address: { postcodeId: 17 } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(mockedGetDistrictFromPostcode).toHaveBeenCalledWith(17);
+        expect(result.districtId).toBe(6);
+      });
+
+      it("leaves the district unset, not the agent's, when the own postcode has no district", async () => {
+        mockedGetDistrictFromPostcode.mockResolvedValueOnce(null);
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.REGULAR,
+          agent: { districtId: 99 } as any,
+          address: { postcodeId: 17 } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(result.districtId).toBeUndefined();
+        expect(handler.updates).toEqual([]);
+      });
+    });
+
     it("does nothing if opportunity.districtId is already set", async () => {
       const handler = getDistrictToOpportunityHandler();
       const opportunity = makeOpportunity({

@@ -236,6 +236,53 @@ describe("getOpportunityLocation", () => {
     );
   });
 
+  describe("own address (be#1291)", () => {
+    const ownPostcode = {
+      id: 3,
+      value: "10247",
+      districtPostcode: [{ id: 7, districtId: 4 }],
+    };
+
+    it("uses the own address postcode and its district over the NGO's", () => {
+      const opportunity = {
+        type: "regular",
+        districtId: 5,
+        deal: { postcode: ngoPostcode },
+        address: { postcode: ownPostcode },
+      };
+      expect(getOpportunityLocation(opportunity as any)).toEqual({
+        postcode: "10247",
+        districtId: 4,
+      });
+    });
+
+    it("falls back to the stored district when the own postcode has no district link", () => {
+      const opportunity = {
+        type: "events",
+        districtId: 5,
+        deal: { postcode: ngoPostcode },
+        address: { postcode: { id: 3, value: "80331" } },
+      };
+      expect(getOpportunityLocation(opportunity as any)).toEqual({
+        postcode: "80331",
+        districtId: 5,
+      });
+    });
+
+    it("uses the NGO's postcode when the own address is null", () => {
+      const opportunity = {
+        type: "regular",
+        districtId: 5,
+        deal: { postcode: ngoPostcode },
+        address: null,
+      };
+      expect(getOpportunityLocation(opportunity as any)).toEqual({
+        postcode: "10115",
+        districtId: 5,
+      });
+    });
+  });
+
   it("centers the map-pin fallback on the same district it reports", () => {
     const opportunity = {
       type: "accompanying",
@@ -464,6 +511,41 @@ describe("dtoOpportunityGetList", () => {
         });
         expect(result.lat).toBe(52.47);
         expect(result.lon).toBe(13.44);
+      });
+    });
+
+    describe("own address (be#1291)", () => {
+      const withOwnAddress = (ownCoordinates: {
+        latitude: number | null;
+        longitude: number | null;
+      }) => ({
+        ...baseOpportunity,
+        status: "opp-searching",
+        districtId: 5,
+        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        address: {
+          postcode: {
+            value: "10247",
+            ...ownCoordinates,
+            districtPostcode: [{ id: 1, districtId: 4 }],
+          },
+        },
+      });
+
+      it("pins the own address postcode, not the NGO's address", () => {
+        const result = dtoOpportunityGetList(
+          withOwnAddress({ latitude: 52.51, longitude: 13.45 }) as any,
+        );
+        expect(result.lat).toBe(52.51);
+        expect(result.lon).toBe(13.45);
+      });
+
+      it("falls back to the own address district's centroid when its coordinates are missing", () => {
+        expect(
+          getOpportunityDistrictIdNeedingCentroid(
+            withOwnAddress({ latitude: null, longitude: null }) as any,
+          ),
+        ).toBe(4);
       });
     });
 

@@ -46,6 +46,7 @@ export default async function volunteerOpportunityRoutes(
         "deal.dealDistrict.district",
         "deal.dealTimeslot.timeslot",
         "deal.postcode",
+        "address.postcode.districtPostcode",
         "accompanying.postcode.districtPostcode",
       ];
 

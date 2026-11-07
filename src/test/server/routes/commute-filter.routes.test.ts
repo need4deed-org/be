@@ -66,7 +66,8 @@ type OpportunityKey =
   | "accompanyingWithoutPostcodeDeal50"
   | "dealUnmatched"
   | "noDeal"
-  | "noDealAgent50";
+  | "noDealAgent50"
+  | "own20Deal50";
 
 const OPPORTUNITY_PLACE: Record<
   OpportunityKey,
@@ -74,6 +75,7 @@ const OPPORTUNITY_PLACE: Record<
     deal: PostcodeKey | null;
     accompanying?: PostcodeKey | null;
     atAgentNear?: boolean;
+    own?: PostcodeKey;
   }
 > = {
   deal20: { deal: "far", atAgentNear: true },
@@ -84,6 +86,7 @@ const OPPORTUNITY_PLACE: Record<
   dealUnmatched: { deal: "unmatched" },
   noDeal: { deal: null },
   noDealAgent50: { deal: null, atAgentNear: true },
+  own20Deal50: { deal: "near", own: "far" },
 };
 
 describe("commute filters on GET /volunteer and GET /opportunity", () => {
@@ -222,6 +225,14 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       if (accompanying) {
         accompanyings.push(accompanying);
       }
+      const ownAddress = place.own
+        ? await getRepository(dataSource, Address).save(
+            new Address({ postcodeId: postcodes[place.own].id }),
+          )
+        : null;
+      if (ownAddress) {
+        addresses.push(ownAddress);
+      }
       opportunities[key as OpportunityKey] =
         await fastify.db.opportunityRepository.save(
           new Opportunity({
@@ -232,6 +243,7 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
             status: OpportunityStatusType.SEARCHING,
             dealId: place.deal ? (await dealAt(place.deal)).id : undefined,
             accompanyingId: accompanying?.id,
+            addressId: ownAddress?.id,
             agentId: place.atAgentNear ? agentNear.id : agent.id,
           }),
         );
@@ -490,11 +502,17 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     [
       "30 minutes",
       30,
-      ["accompanying20Deal50", "deal20", "dealUnmatched", "noDeal"],
+      [
+        "accompanying20Deal50",
+        "deal20",
+        "dealUnmatched",
+        "noDeal",
+        "own20Deal50",
+      ],
     ],
     ["10 minutes", 10, ["dealUnmatched", "noDeal"]],
   ])(
-    "filters opportunities by the commute from the origin to their appointment, else deal, else agent postcode: %s",
+    "filters opportunities by the commute from the origin to their own address, else appointment, else deal, else agent postcode: %s",
     async (_, max, expected) => {
       const res = await listOpportunities(max);
       expect(res.statusCode).toBe(200);
@@ -506,6 +524,11 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     [
       "the accompanying postcode before the deal postcode",
       () => opportunities.accompanying20Deal50.id,
+      true,
+    ],
+    [
+      "the own address before the deal postcode",
+      () => opportunities.own20Deal50.id,
       true,
     ],
     [

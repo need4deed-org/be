@@ -57,6 +57,7 @@ export const recommendationOpportunityRelations = [
   "deal.dealLanguage.language",
   "deal.dealTimeslot.timeslot",
   "deal.dealDistrict.district",
+  "address.postcode.districtPostcode",
   "accompanying.postcode.districtPostcode",
   "agent",
   "onetimer",

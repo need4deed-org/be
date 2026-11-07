@@ -17,6 +17,7 @@ import {
 } from "typeorm";
 import Communication from "../communication.entity";
 import Deal from "../deal.entity";
+import Address from "../location/address.entity";
 import District from "../location/district.entity";
 import OpportunityVolunteer from "../m2m/opportunity-volunteer";
 import Person from "../person.entity";
@@ -126,6 +127,12 @@ export default class Opportunity {
   submittedByPerson?: Person;
   @Column({ nullable: true })
   submittedByPersonId?: number;
+
+  @ManyToOne(() => Address, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "address_id" })
+  address?: Address | null;
+  @Column({ nullable: true })
+  addressId?: number | null;
 
   @ManyToOne(() => District)
   @JoinColumn({ name: "district_id" })
