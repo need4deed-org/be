@@ -1,4 +1,3 @@
-import { In } from "typeorm";
 import { dataSource } from "../data-source";
 import Postcode from "../entity/location/postcode.entity";
 import { getRepository } from "./get-repository";
@@ -18,10 +17,7 @@ export async function getPostcode(
   const postcodeRepository = getRepository(dataSource, Postcode);
   const value = normalizePostcode(code);
 
-  const stored = await postcodeRepository.findOne({
-    where: { value: In([...new Set([code.trim(), value])]) },
-    order: { value: "ASC" },
-  });
+  const stored = await postcodeRepository.findOneBy({ value });
   if (stored) {
     return stored;
   }

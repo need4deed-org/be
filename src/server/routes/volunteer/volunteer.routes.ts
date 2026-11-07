@@ -389,19 +389,21 @@ export default async function volunteerRoutes(
       let resolvedPostcode: Partial<Postcode> | undefined;
       if (Object.keys(addressFields).length || sendsPostcode) {
         if (sendsPostcode) {
-          const postcode = postcodeData?.id
-            ? await fastify.db.postcodeRepository.findOneBy({
-                id: Number(postcodeData.id),
-              })
-            : await getPostcode(String(postcodeData?.value), {
-                createOnlyGerman: true,
-              });
-          if (!postcode) {
-            throw new BadRequestError(
-              postcodeData?.id
-                ? "Address not saved: unknown postcode."
-                : "Address not saved: invalid postcode.",
-            );
+          let postcode: Postcode | null;
+          if (postcodeData?.id) {
+            postcode = await fastify.db.postcodeRepository.findOneBy({
+              id: Number(postcodeData.id),
+            });
+            if (!postcode) {
+              throw new BadRequestError("Address not saved: unknown postcode.");
+            }
+          } else {
+            postcode = await getPostcode(postcodeData!.value!, {
+              createOnlyGerman: true,
+            });
+            if (!postcode) {
+              throw new BadRequestError("Address not saved: invalid postcode.");
+            }
           }
           resolvedPostcode = { id: postcode.id };
         }

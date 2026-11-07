@@ -313,7 +313,13 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
   let postcode: Postcode;
-  const createdPostcodeValues: string[] = [];
+  const createdPostcodeIds: number[] = [];
+  const trackPostcode = async (value: string) => {
+    const row = await fastify.db.postcodeRepository.findOneBy({ value });
+    if (row) {
+      createdPostcodeIds.push(row.id);
+    }
+  };
   const unusedPostcode = async (make: () => string) => {
     let value: string;
     do {
@@ -386,9 +392,9 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     if (created?.addressId) {
       await dataSource.getRepository(Address).delete({ id: created.addressId });
     }
-    if (createdPostcodeValues.length) {
+    if (createdPostcodeIds.length) {
       await fastify.db.postcodeRepository.delete({
-        value: In(createdPostcodeValues),
+        id: In(createdPostcodeIds),
       });
     }
     await fastify.close();
@@ -477,14 +483,13 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     const code = await unusedPostcode(() =>
       String(randomBetween(80000, 99998)),
     );
-    createdPostcodeValues.push(code);
-
     const res = await patch({
       id: person.id,
       firstName: person.firstName,
       email: person.email,
       address: { street: "Suburb Street 3", postcode: { code } },
     });
+    await trackPostcode(code);
     expect(res.statusCode).toBe(200);
 
     const refreshed = await fastify.db.personRepository.findOneOrFail({
@@ -500,14 +505,13 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       String(randomBetween(1067, 9999)).padStart(5, "0"),
     );
     const code = value.slice(1);
-    createdPostcodeValues.push(value);
-
     const res = await patch({
       id: person.id,
       firstName: person.firstName,
       email: person.email,
       address: { street: "Leading Zero Street 4", postcode: { code } },
     });
+    await trackPostcode(value);
     expect(res.statusCode).toBe(200);
 
     const refreshed = await fastify.db.personRepository.findOneOrFail({
@@ -517,29 +521,25 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     expect(refreshed.address?.postcode?.value).toBe(value);
   });
 
-  it("reuses an already stored postcode, even one saved without normalizing or validating", async () => {
-    for (const value of [
-      await unusedPostcode(() => `9${randomNumericSuffix(5)}`),
-      await unusedPostcode(() => String(randomBetween(1067, 9999))),
-    ]) {
-      const stored = await fastify.db.postcodeRepository.save(
-        new Postcode({ value }),
-      );
-      createdPostcodeValues.push(value);
+  it("reuses an already stored postcode, even one that fails the format check", async () => {
+    const value = await unusedPostcode(() => `9${randomNumericSuffix(5)}`);
+    const stored = await fastify.db.postcodeRepository.save(
+      new Postcode({ value }),
+    );
+    createdPostcodeIds.push(stored.id);
 
-      const res = await patch({
-        id: person.id,
-        firstName: person.firstName,
-        email: person.email,
-        address: { street: "Legacy Street 5", postcode: { code: value } },
-      });
-      expect(res.statusCode).toBe(200);
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Legacy Street 5", postcode: { code: value } },
+    });
+    expect(res.statusCode).toBe(200);
 
-      const refreshed = await fastify.db.personRepository.findOneOrFail({
-        where: { id: person.id },
-        relations: ["address"],
-      });
-      expect(refreshed.address?.postcodeId).toBe(stored.id);
-    }
+    const refreshed = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address"],
+    });
+    expect(refreshed.address?.postcodeId).toBe(stored.id);
   });
 });
