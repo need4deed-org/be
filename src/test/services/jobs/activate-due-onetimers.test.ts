@@ -7,7 +7,8 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { activateDueOnetimers } from "../../../services/jobs/activate-due-onetimers";
-import { DAY, failSaveOf, setupOnetimerJobTest } from "./onetimer-fixtures";
+import { DAY } from "../../time";
+import { failSaveOf, setupOnetimerJobTest } from "./onetimer-fixtures";
 
 vi.mock(
   "../../../server/utils/data/build-onetimer-opportunity-query",

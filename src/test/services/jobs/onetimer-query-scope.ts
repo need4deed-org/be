@@ -7,6 +7,7 @@ export function scopeOnetimerQuery(
   original: typeof OnetimerQuery,
 ): typeof OnetimerQuery {
   return {
+    ...original,
     buildOnetimerOpportunityQuery: (fastify) =>
       original
         .buildOnetimerOpportunityQuery(fastify)

@@ -25,8 +25,6 @@ import { createVolunteer, deleteFixtures } from "../../data/match-fixtures";
 import { randomNumericSuffix } from "../../random";
 import { onetimerQueryScope } from "./onetimer-query-scope";
 
-export const DAY = 24 * 60 * 60 * 1000;
-
 export interface OnetimerOptions {
   date: Date;
   status?: OpportunityStatusType;
