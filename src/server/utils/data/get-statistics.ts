@@ -89,7 +89,10 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
       [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
       [StatisticsGroupBy.DISTRICT]: {
         join: `LEFT JOIN agent a ON a.id = r.agent_id
-               LEFT JOIN district d ON d.id = COALESCE(r.district_id, a.district_id)`,
+               LEFT JOIN district d ON d.id = COALESCE(
+                 r.district_id,
+                 CASE WHEN r.address_id IS NULL THEN a.district_id END
+               )`,
         key: "d.id::text",
       },
     },

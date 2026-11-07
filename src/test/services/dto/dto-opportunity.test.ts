@@ -269,6 +269,20 @@ describe("getOpportunityLocation", () => {
       });
     });
 
+    it("ignores a stale own address on an accompanying opportunity", () => {
+      const opportunity = {
+        type: "accompanying",
+        districtId: 5,
+        deal: { postcode: ngoPostcode },
+        address: { postcode: ownPostcode },
+        accompanying: { postcode: appointmentPostcode },
+      };
+      expect(getOpportunityLocation(opportunity as any)).toEqual({
+        postcode: "12043",
+        districtId: 6,
+      });
+    });
+
     it("uses the NGO's postcode when the own address is null", () => {
       const opportunity = {
         type: "regular",

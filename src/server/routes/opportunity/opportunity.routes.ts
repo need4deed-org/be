@@ -220,9 +220,17 @@ async function upsertOwnAddress(
   } else {
     addressId = (await createAddress(fields, { id: postcodeId }, manager))?.id;
   }
-  const district = await getDistrictFromPostcode(address.postcodeId, manager);
-  await manager.update(Opportunity, opportunity.id, {
-    addressId,
+  await manager.update(Opportunity, opportunity.id, { addressId });
+  await storeDistrictOfPostcode(manager, opportunity.id, postcodeId);
+}
+
+async function storeDistrictOfPostcode(
+  manager: EntityManager,
+  opportunityId: number,
+  postcodeId: number,
+): Promise<void> {
+  const district = await getDistrictFromPostcode(postcodeId, manager);
+  await manager.update(Opportunity, opportunityId, {
     districtId: district?.id ?? null,
   });
 }
@@ -253,13 +261,9 @@ async function syncAppointmentDistrict(
     relations: ["accompanying"],
   });
   const postcodeId = opportunity?.accompanying?.postcodeId;
-  if (!postcodeId) {
-    return;
+  if (postcodeId) {
+    await storeDistrictOfPostcode(manager, opportunityId, postcodeId);
   }
-  const district = await getDistrictFromPostcode(postcodeId, manager);
-  await manager.update(Opportunity, opportunityId, {
-    districtId: district?.id ?? null,
-  });
 }
 
 export default async function opportunityRoutes(
@@ -1077,7 +1081,10 @@ export default async function opportunityRoutes(
           await syncAppointmentDistrict(dataSource.manager, opportunity.id);
         }
 
-        if (effectiveType === OpportunityType.ACCOMPANYING) {
+        if (
+          effectiveType === OpportunityType.ACCOMPANYING &&
+          opportunity.addressId
+        ) {
           await dataSource.manager.transaction((manager) =>
             removeOwnAddress(manager, opportunity, { keepDistrict: true }),
           );

@@ -142,7 +142,7 @@ export function matchScore(
   const opportunityDistricts = new Set(
     [
       getOpportunityLocation(opportunity).districtId ??
-        opportunity.agent?.districtId,
+        (opportunity.addressId ? undefined : opportunity.agent?.districtId),
       ...(opportunity.deal?.dealDistrict ?? []).map(
         (dealDistrict) => dealDistrict.districtId,
       ),

@@ -115,9 +115,10 @@ export function getAppointmentDistrictId(
 export function getOwnLocationPostcode(
   opportunity: Opportunity,
 ): Postcode | undefined {
-  return (
-    opportunity.address?.postcode ?? accompanyingForType(opportunity)?.postcode
-  );
+  if (opportunity.type === OpportunityType.ACCOMPANYING) {
+    return opportunity.accompanying?.postcode ?? undefined;
+  }
+  return opportunity.address?.postcode;
 }
 
 export function getOpportunityLocation(
