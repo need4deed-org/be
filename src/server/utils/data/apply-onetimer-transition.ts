@@ -30,7 +30,11 @@ export async function applyOnetimerTransition(
     await fastify.db.opportunityRepository.manager.transaction(
       async (manager: EntityManager) => {
         opportunity.status = opportunityStatus;
-        await manager.save(Opportunity, opportunity);
+        await manager.update(
+          Opportunity,
+          { id: opportunity.id },
+          { status: opportunityStatus },
+        );
 
         const ordered = [...volunteerUpdates].sort(
           (a, b) =>
