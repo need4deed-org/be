@@ -314,6 +314,15 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   let coordinatorCookie: string;
   let postcode: Postcode;
   const createdPostcodeValues: string[] = [];
+  const unusedPostcode = async (make: () => string) => {
+    let value: string;
+    do {
+      value = make();
+    } while (await fastify.db.postcodeRepository.existsBy({ value }));
+    return value;
+  };
+  const randomBetween = (min: number, max: number) =>
+    min + (Number(randomNumericSuffix()) % (max - min + 1));
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   const patch = (person: Record<string, unknown>) =>
@@ -403,6 +412,9 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   });
 
   it("400s for an invalid postcode before writing anything", async () => {
+    const code = await unusedPostcode(() =>
+      String(randomBetween(1, 1066)).padStart(5, "0"),
+    );
     const before = await fastify.db.personRepository.findOneByOrFail({
       id: person.id,
     });
@@ -411,13 +423,13 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       firstName: person.firstName,
       email: person.email,
       phone: "0300000000",
-      address: { street: "Somewhere 1", postcode: { code: "00000" } },
+      address: { street: "Somewhere 1", postcode: { code } },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().message).toContain("invalid postcode");
-    expect(
-      await fastify.db.postcodeRepository.existsBy({ value: "00000" }),
-    ).toBe(false);
+    expect(await fastify.db.postcodeRepository.existsBy({ value: code })).toBe(
+      false,
+    );
 
     const refreshed = await fastify.db.personRepository.findOneByOrFail({
       id: person.id,
@@ -462,10 +474,9 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   });
 
   it("accepts a valid German postcode outside Berlin that isn't known yet", async () => {
-    let code: string;
-    do {
-      code = String(80000 + (Number(randomNumericSuffix()) % 19999));
-    } while (await fastify.db.postcodeRepository.existsBy({ value: code }));
+    const code = await unusedPostcode(() =>
+      String(randomBetween(80000, 99998)),
+    );
     createdPostcodeValues.push(code);
 
     const res = await patch({
@@ -485,18 +496,17 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
   });
 
   it("restores the leading zero of a 4-digit postcode before saving it", async () => {
-    const stored = await fastify.db.postcodeRepository.existsBy({
-      value: "01067",
-    });
-    if (!stored) {
-      createdPostcodeValues.push("01067");
-    }
+    const value = await unusedPostcode(() =>
+      String(randomBetween(1067, 9999)).padStart(5, "0"),
+    );
+    const code = value.slice(1);
+    createdPostcodeValues.push(value);
 
     const res = await patch({
       id: person.id,
       firstName: person.firstName,
       email: person.email,
-      address: { street: "Dresden Street 4", postcode: { code: "1067" } },
+      address: { street: "Leading Zero Street 4", postcode: { code } },
     });
     expect(res.statusCode).toBe(200);
 
@@ -504,22 +514,32 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       where: { id: person.id },
       relations: ["address", "address.postcode"],
     });
-    expect(refreshed.address?.postcode?.value).toBe("01067");
+    expect(refreshed.address?.postcode?.value).toBe(value);
   });
 
-  it("keeps accepting an already stored postcode that fails the format check", async () => {
-    const value = "99999";
-    if (!(await fastify.db.postcodeRepository.existsBy({ value }))) {
-      await fastify.db.postcodeRepository.save(new Postcode({ value }));
+  it("reuses an already stored postcode, even one saved without normalizing or validating", async () => {
+    for (const value of [
+      await unusedPostcode(() => `9${randomNumericSuffix(5)}`),
+      await unusedPostcode(() => String(randomBetween(1067, 9999))),
+    ]) {
+      const stored = await fastify.db.postcodeRepository.save(
+        new Postcode({ value }),
+      );
       createdPostcodeValues.push(value);
-    }
 
-    const res = await patch({
-      id: person.id,
-      firstName: person.firstName,
-      email: person.email,
-      address: { street: "Legacy Street 5", postcode: { code: value } },
-    });
-    expect(res.statusCode).toBe(200);
+      const res = await patch({
+        id: person.id,
+        firstName: person.firstName,
+        email: person.email,
+        address: { street: "Legacy Street 5", postcode: { code: value } },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const refreshed = await fastify.db.personRepository.findOneOrFail({
+        where: { id: person.id },
+        relations: ["address"],
+      });
+      expect(refreshed.address?.postcodeId).toBe(stored.id);
+    }
   });
 });

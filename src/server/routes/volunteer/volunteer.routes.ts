@@ -28,14 +28,9 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import {
-  getPostcode,
-  normalizePostcode,
-  updateOpportunityMatching,
-} from "../../../data/utils";
+import { getPostcode, updateOpportunityMatching } from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerListSerializer } from "../../../services";
-import { isValidPLZ } from "../../../services/validators/custom";
 import {
   idParamSchema,
   langQuerySchema,
@@ -398,9 +393,15 @@ export default async function volunteerRoutes(
             ? await fastify.db.postcodeRepository.findOneBy({
                 id: Number(postcodeData.id),
               })
-            : await findOrCreateGermanPostcode(String(postcodeData?.value));
+            : await getPostcode(String(postcodeData?.value), {
+                createOnlyGerman: true,
+              });
           if (!postcode) {
-            throw new BadRequestError("Address not saved: unknown postcode.");
+            throw new BadRequestError(
+              postcodeData?.id
+                ? "Address not saved: unknown postcode."
+                : "Address not saved: invalid postcode.",
+            );
           }
           resolvedPostcode = { id: postcode.id };
         }
@@ -688,17 +689,4 @@ export default async function volunteerRoutes(
       return reply.status(200).send({ message });
     },
   );
-}
-
-// Stored postcodes are accepted as they are; only a new one must be a German PLZ.
-async function findOrCreateGermanPostcode(code: string) {
-  const value = normalizePostcode(code);
-  const stored = await dataSource.getRepository(Postcode).findOneBy({ value });
-  if (stored) {
-    return stored;
-  }
-  if (!isValidPLZ(value)) {
-    throw new BadRequestError("Address not saved: invalid postcode.");
-  }
-  return getPostcode(value);
 }
