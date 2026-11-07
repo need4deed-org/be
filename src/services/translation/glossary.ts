@@ -17,6 +17,7 @@ export const DOMAIN_TERMS: readonly GlossaryEntry[] = [
   { de: "Bewohnende", en: "residents" },
   { de: "Geflüchtete", en: "refugees" },
   { de: "Sozialbetreuer*in", en: "social worker" },
+  { de: "Begleitung", en: "accompanying" },
   { de: "Sprachmittlung", en: "language mediation" },
   { de: "Sprachcafé", en: "language café" },
   { de: "Hausaufgabenhilfe", en: "homework help" },
