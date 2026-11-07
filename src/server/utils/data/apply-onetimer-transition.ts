@@ -10,13 +10,13 @@ import logger from "../../../logger";
 import { syncVolunteerEngagement } from "./sync-volunteer-engagement";
 
 interface VolunteerStatusUpdate {
-  volunteer: OpportunityVolunteer;
+  volunteer: Pick<OpportunityVolunteer, "id" | "volunteerId">;
   status: OpportunityVolunteerStatusType;
 }
 
 export async function applyOnetimerTransition(
   fastify: FastifyInstance,
-  opportunity: Opportunity,
+  opportunity: Pick<Opportunity, "id">,
   opportunityStatus: OpportunityStatusType,
   volunteerUpdates: VolunteerStatusUpdate[],
   errorMessage: string,

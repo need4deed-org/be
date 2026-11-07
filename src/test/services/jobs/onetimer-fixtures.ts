@@ -129,16 +129,22 @@ export class OnetimerFixtures {
     });
 
   async cleanup(): Promise<void> {
-    await deleteFixtures(this.manager, this.volunteers, this.opportunities);
-    if (this.onetimers.length) {
-      await this.manager.delete(Onetimer, {
-        id: In(this.onetimers.map(({ id }) => id)),
-      });
-    }
-    if (this.agents.length) {
-      await this.manager.delete(Agent, {
-        id: In(this.agents.map(({ id }) => id)),
-      });
+    try {
+      await deleteFixtures(this.manager, this.volunteers, this.opportunities);
+    } finally {
+      try {
+        if (this.onetimers.length) {
+          await this.manager.delete(Onetimer, {
+            id: In(this.onetimers.map(({ id }) => id)),
+          });
+        }
+      } finally {
+        if (this.agents.length) {
+          await this.manager.delete(Agent, {
+            id: In(this.agents.map(({ id }) => id)),
+          });
+        }
+      }
     }
   }
 }

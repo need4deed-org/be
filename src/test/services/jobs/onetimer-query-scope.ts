@@ -9,12 +9,18 @@ export function scopeOnetimerQuery(
   original: typeof OnetimerQuery,
 ): typeof OnetimerQuery {
   const buildOnetimerOpportunityQuery: typeof original.buildOnetimerOpportunityQuery =
-    (fastify) =>
-      original
+    (fastify) => {
+      if (!onetimerQueryScope.agentId) {
+        throw new Error(
+          "onetimer query scope is unset: call setupOnetimerJobTest()",
+        );
+      }
+      return original
         .buildOnetimerOpportunityQuery(fastify)
         .andWhere("opportunity.agentId = :scopedAgentId", {
           scopedAgentId: onetimerQueryScope.agentId,
         });
+    };
   return {
     ...original,
     buildOnetimerOpportunityQuery: Object.assign(
