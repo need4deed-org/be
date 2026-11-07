@@ -10,27 +10,25 @@ import logger from "../../../logger";
 import { syncVolunteerEngagement } from "./sync-volunteer-engagement";
 
 interface VolunteerStatusUpdate {
-  volunteer: OpportunityVolunteer;
+  volunteer: Pick<OpportunityVolunteer, "id" | "volunteerId">;
   status: OpportunityVolunteerStatusType;
 }
 
 export async function applyOnetimerTransition(
   fastify: FastifyInstance,
-  opportunity: Opportunity,
+  opportunity: Pick<Opportunity, "id">,
   opportunityStatus: OpportunityStatusType,
   volunteerUpdates: VolunteerStatusUpdate[],
   errorMessage: string,
 ): Promise<void> {
-  const originalOpportunityStatus = opportunity.status;
-  const originalVolunteerStatuses = volunteerUpdates.map(
-    ({ volunteer }) => volunteer.status,
-  );
-
   try {
     await fastify.db.opportunityRepository.manager.transaction(
       async (manager: EntityManager) => {
-        opportunity.status = opportunityStatus;
-        await manager.save(Opportunity, opportunity);
+        await manager.update(
+          Opportunity,
+          { id: opportunity.id },
+          { status: opportunityStatus },
+        );
 
         const ordered = [...volunteerUpdates].sort(
           (a, b) =>
@@ -38,8 +36,10 @@ export async function applyOnetimerTransition(
             a.volunteer.id - b.volunteer.id,
         );
         for (const { volunteer, status } of ordered) {
-          volunteer.status = status;
-          await manager.save(OpportunityVolunteer, volunteer);
+          await manager.save(OpportunityVolunteer, {
+            id: volunteer.id,
+            status,
+          });
         }
 
         const volunteerIds = new Set(
@@ -51,11 +51,6 @@ export async function applyOnetimerTransition(
       },
     );
   } catch (err) {
-    opportunity.status = originalOpportunityStatus;
-    volunteerUpdates.forEach(({ volunteer }, i) => {
-      volunteer.status = originalVolunteerStatuses[i];
-    });
-
     logger.error(
       {
         err,

@@ -1,241 +1,277 @@
-import { FastifyInstance } from "fastify";
 import {
   OpportunityStatusType,
+  OpportunityType,
   OpportunityVolunteerStatusType,
+  VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { EntityManager } from "typeorm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
-import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { activateDueOnetimers } from "../../../services/jobs/activate-due-onetimers";
+import { DAY } from "../../time";
+import { failSaveOf, setupOnetimerJobTest } from "./onetimer-fixtures";
 
-const loggerErrorMock = vi.fn();
-const loggerInfoMock = vi.fn();
-vi.mock("../../../logger", () => ({
-  default: {
-    error: (...args: unknown[]) => loggerErrorMock(...args),
-    info: (...args: unknown[]) => loggerInfoMock(...args),
-  },
-}));
-
-const getMany = vi.fn();
-const managerSave = vi.fn();
-const managerExists = vi.fn();
-const managerUpdate = vi.fn();
-
-const qbMock = {
-  leftJoinAndSelect: vi.fn().mockReturnThis(),
-  where: vi.fn().mockReturnThis(),
-  andWhere: vi.fn().mockReturnThis(),
-  getMany,
-};
-
-// Runs the transaction callback against a fake EntityManager whose save()
-// delegates to the managerSave mock — good enough to assert what was written
-// and to simulate a mid-transaction failure without a real DB.
-const transaction = vi.fn(
-  async (cb: (manager: EntityManager) => Promise<void>) =>
-    cb({
-      save: (...args: unknown[]) => managerSave(...args),
-      exists: (...args: unknown[]) => managerExists(...args),
-      update: (...args: unknown[]) => managerUpdate(...args),
-    } as unknown as EntityManager),
+vi.mock(
+  "../../../server/utils/data/build-onetimer-opportunity-query",
+  async (importOriginal) =>
+    (await import("./onetimer-query-scope")).scopeOnetimerQuery(
+      await importOriginal(),
+    ),
 );
 
-const fastify = {
-  db: {
-    opportunityRepository: {
-      createQueryBuilder: vi.fn(() => qbMock),
-      manager: { transaction },
-    },
-  },
-} as unknown as FastifyInstance;
-
-function buildOpportunity(
-  id: number,
-  ovs: Partial<OpportunityVolunteer>[],
-): Opportunity {
-  return new Opportunity({
-    id,
-    status: OpportunityStatusType.SEARCHING,
-    opportunityVolunteer: ovs.map((ov) => new OpportunityVolunteer(ov)),
-  } as Partial<Opportunity>);
-}
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  transaction.mockImplementation(async (cb) =>
-    cb({
-      save: (...args: unknown[]) => managerSave(...args),
-      exists: (...args: unknown[]) => managerExists(...args),
-      update: (...args: unknown[]) => managerUpdate(...args),
-    } as unknown as EntityManager),
-  );
-  managerSave.mockImplementation(async (_entity: unknown, obj: unknown) => obj);
-  managerExists.mockResolvedValue(false);
-  managerUpdate.mockResolvedValue({ affected: 0 });
-});
-
 describe("activateDueOnetimers", () => {
-  it("does nothing when there are no opportunities due today", async () => {
-    getMany.mockResolvedValue([]);
+  const ctx = setupOnetimerJobTest();
+  const now = () => new Date();
+  const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
 
-    await activateDueOnetimers(fastify);
+  it("activates an opportunity due today and its matched volunteer", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const {
+      opportunity,
+      matches: [match],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
 
-    expect(transaction).not.toHaveBeenCalled();
-    expect(loggerInfoMock).not.toHaveBeenCalled();
-  });
+    await activateDueOnetimers(ctx.fastify);
 
-  it("activates opportunities due today with a matched volunteer", async () => {
-    const matched = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
-    const opportunity = buildOpportunity(10, [matched]);
-    getMany.mockResolvedValue([opportunity]);
-
-    await activateDueOnetimers(fastify);
-
-    expect(qbMock.andWhere).toHaveBeenCalledWith(
-      "opportunity.status NOT IN (:...terminalStatuses)",
-      {
-        terminalStatuses: [
-          OpportunityStatusType.ACTIVE,
-          OpportunityStatusType.INACTIVE,
-          OpportunityStatusType.PAST,
-        ],
-      },
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.ACTIVE,
     );
-    expect(qbMock.andWhere).toHaveBeenCalledWith(
-      "opportunityVolunteer.status = :matched",
-      { matched: OpportunityVolunteerStatusType.MATCHED },
-    );
-
-    expect(opportunity.status).toBe(OpportunityStatusType.ACTIVE);
-    expect(managerSave).toHaveBeenCalledWith(Opportunity, opportunity);
-
-    expect(opportunity.opportunityVolunteer[0].status).toBe(
+    expect(await ctx.fixtures.matchStatus(match)).toBe(
       OpportunityVolunteerStatusType.ACTIVE,
     );
-    expect(managerSave).toHaveBeenCalledWith(
-      OpportunityVolunteer,
-      opportunity.opportunityVolunteer[0],
-    );
-    expect(loggerInfoMock).toHaveBeenCalledWith(
+    expect(ctx.loggerInfo).toHaveBeenCalledWith(
       expect.stringContaining("processed 1 due opportunities"),
     );
   });
 
-  it("be#987 review: matches onetimers due on or before today, not just exactly today, so a missed cron run still catches up", async () => {
-    getMany.mockResolvedValue([]);
-
-    await activateDueOnetimers(fastify);
-
-    expect(qbMock.andWhere).toHaveBeenCalledWith("onetimer.date <= :endOfDay", {
-      endOfDay: expect.any(Date),
+  it("catches up on an opportunity due on an earlier day, so a missed run is not lost", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const { opportunity } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: daysFromNow(-3),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
     });
-    expect(qbMock.andWhere).not.toHaveBeenCalledWith(
-      "onetimer.date BETWEEN :startOfDay AND :endOfDay",
-      expect.anything(),
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.ACTIVE,
     );
   });
 
-  it("keeps processing remaining opportunities when one's transaction fails", async () => {
-    const failing = buildOpportunity(1, [
-      { id: 1, status: OpportunityVolunteerStatusType.MATCHED },
-    ]);
-    const succeeding = buildOpportunity(2, [
-      { id: 2, status: OpportunityVolunteerStatusType.MATCHED },
-    ]);
-    getMany.mockResolvedValue([failing, succeeding]);
-
-    // Fails on the very first save of the run — the opportunity save for
-    // `failing` — before its transaction ever reaches the volunteer save.
-    managerSave.mockImplementationOnce(async () => {
-      throw new Error("db unavailable");
+  it("does nothing when no opportunity is due yet", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const {
+      opportunity,
+      matches: [match],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: daysFromNow(2),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
     });
 
-    await activateDueOnetimers(fastify);
+    await activateDueOnetimers(ctx.fastify);
 
-    expect(loggerErrorMock).toHaveBeenCalledWith(
-      expect.objectContaining({ opportunityId: 1 }),
+    expect(ctx.loggerInfo).not.toHaveBeenCalled();
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.SEARCHING,
+    );
+    expect(await ctx.fixtures.matchStatus(match)).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+  });
+
+  it.each([
+    OpportunityStatusType.ACTIVE,
+    OpportunityStatusType.INACTIVE,
+    OpportunityStatusType.PAST,
+  ])("skips a due opportunity that is already %s", async (status) => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const {
+      opportunity,
+      matches: [match],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      status,
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(status);
+    expect(await ctx.fixtures.matchStatus(match)).toBe(
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+  });
+
+  it("skips a due opportunity without a matched volunteer", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const {
+      opportunity,
+      matches: [match],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.PENDING }],
+    });
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.SEARCHING,
+    );
+    expect(await ctx.fixtures.matchStatus(match)).toBe(
+      OpportunityVolunteerStatusType.PENDING,
+    );
+  });
+
+  it("activates only the matched volunteer, leaving other candidates as they are", async () => {
+    const matchedVolunteer = await ctx.fixtures.volunteer();
+    const pendingVolunteer = await ctx.fixtures.volunteer();
+    const {
+      opportunity,
+      matches: [matched, pending],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [
+        {
+          volunteer: matchedVolunteer,
+          status: OpportunityVolunteerStatusType.MATCHED,
+        },
+        {
+          volunteer: pendingVolunteer,
+          status: OpportunityVolunteerStatusType.PENDING,
+        },
+      ],
+    });
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(ctx.loggerError).not.toHaveBeenCalled();
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.ACTIVE,
+    );
+    expect(await ctx.fixtures.matchStatus(matched)).toBe(
+      OpportunityVolunteerStatusType.ACTIVE,
+    );
+    expect(await ctx.fixtures.matchStatus(pending)).toBe(
+      OpportunityVolunteerStatusType.PENDING,
+    );
+  });
+
+  it("skips a due opportunity that is not a onetimer type", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const { opportunity } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      type: OpportunityType.REGULAR,
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.SEARCHING,
+    );
+  });
+
+  it("marks each activated volunteer as engaged and logs the change", async () => {
+    const first = await ctx.fixtures.volunteer();
+    const second = await ctx.fixtures.volunteer();
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [
+        { volunteer: first, status: OpportunityVolunteerStatusType.MATCHED },
+        { volunteer: second, status: OpportunityVolunteerStatusType.MATCHED },
+      ],
+    });
+
+    await activateDueOnetimers(ctx.fastify);
+
+    for (const volunteer of [first, second]) {
+      expect(await ctx.fixtures.engagement(volunteer)).toBe(
+        VolunteerStateEngagementType.ACTIVE,
+      );
+      expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(1);
+    }
+  });
+
+  it("keeps processing the remaining opportunities when one fails", async () => {
+    const failingVolunteer = await ctx.fixtures.volunteer();
+    const succeedingVolunteer = await ctx.fixtures.volunteer();
+    const failing = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [
+        {
+          volunteer: failingVolunteer,
+          status: OpportunityVolunteerStatusType.MATCHED,
+        },
+      ],
+    });
+    const succeeding = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [
+        {
+          volunteer: succeedingVolunteer,
+          status: OpportunityVolunteerStatusType.MATCHED,
+        },
+      ],
+    });
+    failSaveOf(OpportunityVolunteer, failing.matches[0].id);
+
+    await activateDueOnetimers(ctx.fastify);
+
+    expect(ctx.loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ opportunityId: failing.opportunity.id }),
       expect.stringContaining(
         "failed to activate opportunity and its volunteer(s)",
       ),
     );
-
-    // The failing opportunity's volunteer must not have been touched.
-    expect(managerSave).not.toHaveBeenCalledWith(
-      OpportunityVolunteer,
-      failing.opportunityVolunteer[0],
+    expect(await ctx.fixtures.opportunityStatus(failing.opportunity)).toBe(
+      OpportunityStatusType.SEARCHING,
     );
-    expect(failing.opportunityVolunteer[0].status).toBe(
+    expect(await ctx.fixtures.matchStatus(failing.matches[0])).toBe(
       OpportunityVolunteerStatusType.MATCHED,
     );
-
-    // The second opportunity is still processed despite the first one failing.
-    expect(succeeding.status).toBe(OpportunityStatusType.ACTIVE);
-    expect(succeeding.opportunityVolunteer[0].status).toBe(
+    expect(await ctx.fixtures.opportunityStatus(succeeding.opportunity)).toBe(
+      OpportunityStatusType.ACTIVE,
+    );
+    expect(await ctx.fixtures.matchStatus(succeeding.matches[0])).toBe(
       OpportunityVolunteerStatusType.ACTIVE,
     );
   });
 
-  it("be#988: rolls back the whole opportunity when one volunteer save fails, instead of partially applying it", async () => {
-    const first = { id: 1, status: OpportunityVolunteerStatusType.MATCHED };
-    const second = { id: 2, status: OpportunityVolunteerStatusType.MATCHED };
-    const opportunity = buildOpportunity(1, [first, second]);
-    getMany.mockResolvedValue([opportunity]);
-
-    managerSave.mockImplementation(async (entity: unknown, obj: unknown) => {
-      if (entity === OpportunityVolunteer && (obj as { id: number }).id === 1) {
-        throw new Error("db unavailable");
-      }
-      return obj;
+  it("rolls back the whole opportunity when one volunteer fails, instead of applying it partially", async () => {
+    const first = await ctx.fixtures.volunteer();
+    const second = await ctx.fixtures.volunteer();
+    const { opportunity, matches } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: now(),
+      matches: [
+        { volunteer: first, status: OpportunityVolunteerStatusType.MATCHED },
+        { volunteer: second, status: OpportunityVolunteerStatusType.MATCHED },
+      ],
     });
+    failSaveOf(OpportunityVolunteer, matches[1].id);
 
-    await activateDueOnetimers(fastify);
+    await activateDueOnetimers(ctx.fastify);
 
-    expect(loggerErrorMock).toHaveBeenCalledWith(
+    expect(ctx.loggerError).toHaveBeenCalledWith(
       expect.objectContaining({ opportunityId: opportunity.id }),
       expect.stringContaining(
         "failed to activate opportunity and its volunteer(s)",
       ),
     );
-
-    // The transaction aborts as soon as the first volunteer's save throws —
-    // the second volunteer's save is never even attempted, proving this is
-    // all-or-nothing per opportunity rather than best-effort per volunteer.
-    expect(managerSave).not.toHaveBeenCalledWith(
-      OpportunityVolunteer,
-      opportunity.opportunityVolunteer[1],
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.SEARCHING,
     );
-    expect(opportunity.opportunityVolunteer[1].status).toBe(
-      OpportunityVolunteerStatusType.MATCHED,
-    );
-
-    // be#987 review: the opportunity and first volunteer were mutated
-    // in-memory to ACTIVE before their saves ran (the opportunity's save
-    // even succeeded) — both must be restored to their pre-transaction
-    // status once the transaction as a whole rolls back, or a caller
-    // reading these fields afterward would see a status that was never
-    // actually persisted.
-    expect(opportunity.status).toBe(OpportunityStatusType.SEARCHING);
-    expect(opportunity.opportunityVolunteer[0].status).toBe(
-      OpportunityVolunteerStatusType.MATCHED,
-    );
-  });
-  it("syncs each affected volunteer's engagement status in the same transaction", async () => {
-    const opportunity = buildOpportunity(30, [
-      { id: 1, volunteerId: 5, status: OpportunityVolunteerStatusType.MATCHED },
-      { id: 2, volunteerId: 6, status: OpportunityVolunteerStatusType.MATCHED },
-    ]);
-    getMany.mockResolvedValue([opportunity]);
-
-    await activateDueOnetimers(fastify);
-
-    expect(managerExists).toHaveBeenCalledWith(OpportunityVolunteer, {
-      where: { volunteerId: 5, status: OpportunityVolunteerStatusType.ACTIVE },
-    });
-    expect(managerExists).toHaveBeenCalledWith(OpportunityVolunteer, {
-      where: { volunteerId: 6, status: OpportunityVolunteerStatusType.ACTIVE },
-    });
-    expect(managerUpdate).toHaveBeenCalledTimes(2);
+    for (const match of matches) {
+      expect(await ctx.fixtures.matchStatus(match)).toBe(
+        OpportunityVolunteerStatusType.MATCHED,
+      );
+    }
+    for (const volunteer of [first, second]) {
+      expect(await ctx.fixtures.engagement(volunteer)).toBe(
+        VolunteerStateEngagementType.AVAILABLE,
+      );
+      expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(0);
+    }
   });
 });

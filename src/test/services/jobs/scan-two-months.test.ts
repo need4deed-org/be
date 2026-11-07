@@ -21,6 +21,7 @@ import { scanRegularUpdate } from "../../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../../services/jobs/scan-stale-pending";
 import { sendEmailRegularUpdate } from "../../../services/notify/events/email-regular-update";
 import { randomNumericSuffix } from "../../random";
+import { HOUR } from "../../time";
 
 // A fixed run, so the window doesn't depend on today: the run on Oct 3
 // takes [Aug 2, Aug 3), the next day's [Aug 3, Aug 4).
@@ -28,7 +29,6 @@ const NOW = new Date(2026, 9, 3, 6);
 const NEXT_DAY = new Date(2026, 9, 4, 6);
 const { from: FROM, to: TO } = crossedMonthsAgo(2, NOW);
 const shift = (date: Date, ms: number) => new Date(date.getTime() + ms);
-const HOUR = 60 * 60 * 1000;
 
 // be#1088: the "2 months" scans post through fastify.cronNotify (Slack) and
 // record nothing in Communication.

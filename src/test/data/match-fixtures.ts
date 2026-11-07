@@ -8,7 +8,10 @@ import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 
 // Minimal volunteer/opportunity rows for status_match tests (be#1106).
-export async function createVolunteer(manager: EntityManager) {
+export async function createVolunteer(
+  manager: EntityManager,
+  overrides: Partial<Volunteer> = {},
+) {
   const postcode = await manager.findOneOrFail(Postcode, { where: {} });
   const deal = await manager.save(
     new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
@@ -16,7 +19,9 @@ export async function createVolunteer(manager: EntityManager) {
   const person = await manager.save(
     new Person({ firstName: "Match", lastName: "Volunteer" }),
   );
-  return manager.save(new Volunteer({ dealId: deal.id, personId: person.id }));
+  return manager.save(
+    new Volunteer({ dealId: deal.id, personId: person.id, ...overrides }),
+  );
 }
 
 export function createOpportunity(manager: EntityManager, title: string) {

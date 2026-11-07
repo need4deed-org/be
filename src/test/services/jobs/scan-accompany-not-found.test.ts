@@ -32,9 +32,7 @@ import { appointmentsDue } from "../../../services/jobs/berlin-dates";
 import { scanAccompanyNotFound } from "../../../services/jobs/scan-accompany-not-found";
 import { SuspendedEmailError } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
-
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
+import { DAY, HOUR } from "../../time";
 
 const nextWeekday = (date: Date, weekday: number) => {
   const result = new Date(date);
