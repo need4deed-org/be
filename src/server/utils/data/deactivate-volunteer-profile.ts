@@ -51,15 +51,15 @@ export async function deactivateVolunteerProfile(
       where: { id: volunteer.id },
     },
   );
+  await manager.update(
+    Volunteer,
+    { id: volunteer.id },
+    {
+      statusEngagement: VolunteerStateEngagementType.INACTIVE,
+      dateReturn: null,
+    },
+  );
   if (previous !== VolunteerStateEngagementType.INACTIVE) {
-    await manager.update(
-      Volunteer,
-      { id: volunteer.id },
-      {
-        statusEngagement: VolunteerStateEngagementType.INACTIVE,
-        dateReturn: null,
-      },
-    );
     await logEngagementChange(
       manager,
       volunteer.id,
@@ -72,34 +72,46 @@ export async function deactivateVolunteerProfile(
   if (!openOpportunityIds.length) {
     return;
   }
-  const matches = await manager.find(OpportunityVolunteer, {
-    where: {
-      volunteerId: volunteer.id,
-      opportunityId: In(openOpportunityIds),
-      status: In(OPEN),
-    },
-    relations: { opportunity: true },
-  });
+  // Locking the match rows blocks new activity_log inserts until commit, so no hours are lost to the cascade.
+  const matches = await manager
+    .createQueryBuilder(OpportunityVolunteer, "match")
+    .leftJoin("match.opportunity", "opportunity")
+    .addSelect(["opportunity.id", "opportunity.title"])
+    .where("match.volunteerId = :volunteerId", { volunteerId: volunteer.id })
+    .andWhere("match.opportunityId IN (:...opportunityIds)", {
+      opportunityIds: openOpportunityIds,
+    })
+    .andWhere("match.status IN (:...open)", { open: OPEN })
+    .orderBy("match.id")
+    .setLock("pessimistic_write", undefined, ["match"])
+    .getMany();
+  if (!matches.length) {
+    return;
+  }
   const withLoggedHours = new Set(
     (
-      await manager.findBy(ActivityLog, {
-        opportunityVolunteerId: In(matches.map(({ id }) => id)),
+      await manager.find(ActivityLog, {
+        select: { opportunityVolunteerId: true },
+        where: { opportunityVolunteerId: In(matches.map(({ id }) => id)) },
       })
     ).map(({ opportunityVolunteerId }) => opportunityVolunteerId),
   );
 
-  const removable = matches.filter(
-    ({ id, status }) =>
-      NOT_STARTED.includes(status) && !withLoggedHours.has(id),
-  );
+  const removable: OpportunityVolunteer[] = [];
+  const toEnd: OpportunityVolunteer[] = [];
   for (const match of matches) {
-    if (!removable.includes(match)) {
-      await manager.save(
-        OpportunityVolunteer,
-        { id: match.id, status: OpportunityVolunteerStatusType.PAST },
-        { data: { actorUserId } },
-      );
-    }
+    const notStarted = NOT_STARTED.includes(match.status);
+    (notStarted && !withLoggedHours.has(match.id) ? removable : toEnd).push(
+      match,
+    );
+  }
+
+  for (const match of toEnd) {
+    await manager.save(
+      OpportunityVolunteer,
+      { id: match.id, status: OpportunityVolunteerStatusType.PAST },
+      { data: { actorUserId } },
+    );
   }
 
   const removed = removable.map(({ opportunityId, status, opportunity }) => ({

@@ -2023,6 +2023,32 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
     ).toBe(1);
   });
 
+  it("clears dateReturn of an already inactive volunteer without a new audit row", async () => {
+    const { volunteer, user, accessToken } = await volunteerAccount();
+    await manager.update(
+      Volunteer,
+      { id: volunteer.id },
+      { statusEngagement: VolunteerStateEngagementType.INACTIVE },
+    );
+
+    const res = await selfDelete(user.id, accessToken);
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteer.id,
+    });
+    expect(refreshed.statusEngagement).toBe(
+      VolunteerStateEngagementType.INACTIVE,
+    );
+    expect(refreshed.dateReturn).toBeNull();
+    expect(
+      await fastify.db.volunteerAuditLogRepository.countBy({
+        volunteerId: volunteer.id,
+        type: "availability_changed",
+      }),
+    ).toBe(0);
+  });
+
   it("leaves the volunteer profile alone when the account is not a volunteer's", async () => {
     const { volunteer, user, accessToken } = await volunteerAccount(
       UserRole.COORDINATOR,

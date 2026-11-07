@@ -193,7 +193,7 @@ export default async function userRoutes(
             select: { id: true },
             where: { role: UserRole.ADMIN, isActive: true },
             order: { id: "ASC" },
-            lock: { mode: "pessimistic_write" },
+            lock: { mode: "for_no_key_update" },
           });
           if (!activeAdmins.some((admin) => admin.id !== id)) {
             throw new BadRequestError(
