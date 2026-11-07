@@ -555,6 +555,42 @@ describe("sendEmailIntroduction location", () => {
     expect(text).not.toContain("Einsatzort");
   });
 
+  it.each([
+    ["case", { street: "Weg 1", city: "berlin" }],
+    ["spacing", { street: " Weg  1", city: "Berlin " }],
+  ])(
+    "leaves the line out when the own address differs from the NGO's only in %s",
+    async (_, ngoAddress) => {
+      const text = await sendWith({
+        type: "regular",
+        address: ownAddress,
+        agent: {
+          title: "NGO",
+          address: { ...ngoAddress, postcode: { value: "10247" } },
+        },
+      });
+
+      expect(text).not.toContain("Einsatzort");
+    },
+  );
+
+  it("keeps the line when the own address is somewhere else", async () => {
+    const text = await sendWith({
+      type: "regular",
+      address: ownAddress,
+      agent: {
+        title: "NGO",
+        address: {
+          street: "Hauptstr. 5",
+          city: "Berlin",
+          postcode: { value: "10115" },
+        },
+      },
+    });
+
+    expect(text).toContain("Einsatzort: Weg 1, 10247 Berlin");
+  });
+
   it("leaves the line out when the own address is the NGO's address", async () => {
     const text = await sendWith({
       type: "regular",

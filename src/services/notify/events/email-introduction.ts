@@ -56,6 +56,10 @@ function resolveStatmentOnCertificates(
   return "";
 }
 
+function comparableAddress(address: string): string {
+  return address.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+}
+
 export async function sendEmailIntroduction(
   email: EmailTransport,
   ov: OpportunityVolunteer,
@@ -122,7 +126,8 @@ export async function sendEmailIntroduction(
   const agentTitle = opportunity.agent?.title ?? "";
   const ownAddress = serializeAddress(opportunity.address);
   const opportunityAddress =
-    ownAddress && ownAddress !== agentAddress
+    ownAddress &&
+    comparableAddress(ownAddress) !== comparableAddress(agentAddress)
       ? `\nEinsatzort: ${ownAddress}`
       : "";
 
