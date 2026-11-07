@@ -1,6 +1,7 @@
 import { Lang, OpportunityStatusType } from "need4deed-sdk";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
@@ -73,6 +74,12 @@ export async function writeOpportunityLegacy(
 
     if (opportunity.onetimer) {
       await onetimerRepository.save(opportunity.onetimer);
+    }
+
+    if (opportunity.address) {
+      await transactionalEntityManager
+        .getRepository(Address)
+        .save(opportunity.address);
     }
 
     const { title, info } = translatedOpportunityFields(opportunity);

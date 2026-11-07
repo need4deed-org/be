@@ -51,6 +51,10 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-opportunity-create";
+import {
+  assertAddressAllowedForType,
+  newOpportunityAddress,
+} from "../../../services/dto/parser-opportunity-address";
 import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
 import {
@@ -526,6 +530,12 @@ export default async function opportunityRoutes(
 
       const legacyBody = body as unknown as OpportunityLegacyFormData;
       const opportunity = await parseOpportunityLegacy(legacyBody);
+      assertAddressAllowedForType(opportunity.type, body.address);
+      if (body.address) {
+        opportunity.address = await newOpportunityAddress(body.address);
+        // the own address decides the district (below), not berlin_locations
+        opportunity.districtId = undefined;
+      }
       opportunity.deal = await dealParserOpportunityCreate(
         body,
         agent.address?.postcode?.value,

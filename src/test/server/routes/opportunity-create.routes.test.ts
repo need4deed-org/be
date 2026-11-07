@@ -865,3 +865,222 @@ describe("POST /opportunity cascades a new agent to SEARCHING (be#862)", () => {
     expect(updatedAgent.searchStatus).toBe(AgentVolunteerSearchType.SEARCHING);
   });
 });
+
+describe("POST /opportunity saves an own address (be#1291)", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+
+  let coordinatorPerson: Person;
+  let coordinatorCookie: string;
+  let agent: Agent;
+  let agentAddressId: number;
+  let agentDistrict: District;
+  let berlinPostcode: { value: string; districtId: number };
+  let unlinkedPostcodeValue: string;
+  const createdOpportunityIds: number[] = [];
+
+  const create = (payload: Record<string, unknown>) =>
+    fastify.inject({
+      method: "POST",
+      url: "/opportunity/",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        title: `Own Address ${suffix}`,
+        opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+        volunteers_number: 1,
+        category: "",
+        category_id: "",
+        language: "en",
+        agent_id: agent.id,
+        ...payload,
+      },
+    });
+  const created = async (res: { json: () => { data: { id: number } } }) => {
+    const id = res.json().data.id;
+    createdOpportunityIds.push(id);
+    return getRepository(dataSource, Opportunity).findOneOrFail({
+      where: { id },
+      relations: ["address"],
+    });
+  };
+  const countOwnAddressOpportunities = () =>
+    getRepository(dataSource, Opportunity).count({
+      where: { title: `Own Address ${suffix}` },
+    });
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const [linked] = await dataSource.query<
+      { value: string; district_id: number }[]
+    >(
+      `SELECT p.value, dp.district_id
+         FROM postcode p
+         JOIN district_postcode dp ON dp.postcode_id = p.id
+        WHERE dp.id = (SELECT MIN(id) FROM district_postcode
+                        WHERE postcode_id = p.id)
+        LIMIT 1`,
+    );
+    berlinPostcode = { value: linked.value, districtId: linked.district_id };
+
+    do {
+      unlinkedPostcodeValue = `8${String(Math.floor(Math.random() * 1e4)).padStart(4, "0")}`;
+    } while (
+      await fastify.db.postcodeRepository.findOneBy({
+        value: unlinkedPostcodeValue,
+      })
+    );
+
+    agentDistrict = await getRepository(dataSource, District).save(
+      new District({ title: `Own Address Agent District ${suffix}` }),
+    );
+    const agentPostcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    const agentAddress = await getRepository(dataSource, Address).save(
+      new Address({ postcodeId: agentPostcode.id }),
+    );
+    agentAddressId = agentAddress.id;
+    agent = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Own Address Agent ${suffix}`,
+        addressId: agentAddress.id,
+        districtId: agentDistrict.id,
+      }),
+    );
+
+    coordinatorPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Coordinator" }),
+    );
+    const email = `coordinator-own-address-${suffix}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: coordinatorPerson.id,
+      }),
+    );
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: PASSWORD },
+    });
+    coordinatorCookie = getCookie(res.cookies, accessCookieName);
+  });
+
+  afterAll(async () => {
+    const opportunities = await getRepository(dataSource, Opportunity).find({
+      where: { title: `Own Address ${suffix}` },
+    });
+    await fastify.db.opportunityRepository.delete({
+      title: `Own Address ${suffix}`,
+    });
+    const ownAddressIds = opportunities
+      .map(({ addressId }) => addressId)
+      .filter((id): id is number => !!id);
+    if (ownAddressIds.length) {
+      await getRepository(dataSource, Address).delete(ownAddressIds);
+    }
+    await fastify.db.postcodeRepository.delete({
+      value: unlinkedPostcodeValue,
+    });
+    await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
+    await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
+    await fastify.db.agentRepository.delete({ id: agent.id });
+    await getRepository(dataSource, Address).delete({ id: agentAddressId });
+    await getRepository(dataSource, District).delete({ id: agentDistrict.id });
+    await fastify.close();
+  });
+
+  it("saves the address and takes the district from its postcode, not the NGO's", async () => {
+    const res = await create({
+      address: {
+        street: "  Musterstraße 1 ",
+        postcode: berlinPostcode.value,
+        city: "Berlin",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const saved = await created(res);
+    expect(saved.address).toMatchObject({
+      street: "Musterstraße 1",
+      city: "Berlin",
+    });
+    const postcode = await fastify.db.postcodeRepository.findOneByOrFail({
+      id: saved.address!.postcodeId,
+    });
+    expect(postcode.value).toBe(berlinPostcode.value);
+    expect(saved.districtId).toBe(berlinPostcode.districtId);
+  });
+
+  it("creates an unknown German postcode and leaves the district unset, not the NGO's", async () => {
+    const res = await create({
+      address: {
+        street: "Marienplatz 1",
+        postcode: unlinkedPostcodeValue,
+        city: "München",
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const saved = await created(res);
+    expect(saved.addressId).not.toBeNull();
+    expect(saved.districtId).toBeNull();
+    expect(
+      await fastify.db.postcodeRepository.findOneBy({
+        value: unlinkedPostcodeValue,
+      }),
+    ).not.toBeNull();
+  });
+
+  it("keeps the NGO's location when no address is sent", async () => {
+    const res = await create({});
+
+    expect(res.statusCode).toBe(201);
+    const saved = await created(res);
+    expect(saved.addressId).toBeNull();
+    expect(saved.districtId).toBe(agentDistrict.id);
+  });
+
+  it.each([
+    [
+      "a non-German postcode",
+      { street: "Rue 1", postcode: "75001x", city: "Paris" },
+    ],
+    [
+      "postcode 00000",
+      { street: "Weg 1", postcode: "00000", city: "Nirgendwo" },
+    ],
+    ["a blank street", { street: "  ", postcode: "10115", city: "Berlin" }],
+    ["a missing city", { street: "Weg 1", postcode: "10115" }],
+  ])("rejects %s with 400 and creates nothing", async (_, address) => {
+    const before = await countOwnAddressOpportunities();
+
+    const res = await create({ address });
+
+    expect(res.statusCode).toBe(400);
+    expect(await countOwnAddressOpportunities()).toBe(before);
+  });
+
+  it("rejects an address on an accompanying opportunity with 400", async () => {
+    const before = await countOwnAddressOpportunities();
+
+    const res = await create({
+      opportunity_type: OpportunityLegacyType.ACCOMPANYING,
+      accomp_postcode: berlinPostcode.value,
+      address: {
+        street: "Weg 1",
+        postcode: berlinPostcode.value,
+        city: "Berlin",
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toMatch(/accompanying/i);
+    expect(await countOwnAddressOpportunities()).toBe(before);
+  });
+});
