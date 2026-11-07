@@ -21,9 +21,10 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
+import { buildOnetimerOpportunityQuery } from "../../../server/utils/data/build-onetimer-opportunity-query";
 import { createVolunteer, deleteFixtures } from "../../data/match-fixtures";
 import { randomNumericSuffix } from "../../random";
-import { onetimerQueryScope } from "./onetimer-query-scope";
+import { onetimerQueryScope, SCOPED } from "./onetimer-query-scope";
 
 export interface OnetimerOptions {
   date: Date;
@@ -154,14 +155,23 @@ export function setupOnetimerJobTest(): OnetimerJobContext {
   const context = {} as OnetimerJobContext;
 
   beforeAll(async () => {
+    if (!(SCOPED in buildOnetimerOpportunityQuery)) {
+      throw new Error(
+        "vi.mock build-onetimer-opportunity-query with scopeOnetimerQuery, or the job sweeps the shared test DB",
+      );
+    }
     context.fastify = await createServer();
     await context.fastify.ready();
     context.fixtures = new OnetimerFixtures(context.fastify);
   });
 
   beforeEach(async () => {
-    context.loggerError = vi.spyOn(logger, "error");
-    context.loggerInfo = vi.spyOn(logger, "info");
+    context.loggerError = vi
+      .spyOn(logger, "error")
+      .mockImplementation(() => undefined);
+    context.loggerInfo = vi
+      .spyOn(logger, "info")
+      .mockImplementation(() => undefined);
     context.agent = await context.fixtures.agent();
     onetimerQueryScope.agentId = context.agent.id;
   });

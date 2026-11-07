@@ -23,18 +23,6 @@ describe("activateDueOnetimers", () => {
   const now = () => new Date();
   const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
 
-  it("does nothing when no opportunity is due", async () => {
-    const volunteer = await ctx.fixtures.volunteer();
-    await ctx.fixtures.onetimer(ctx.agent, {
-      date: daysFromNow(2),
-      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
-    });
-
-    await activateDueOnetimers(ctx.fastify);
-
-    expect(ctx.loggerInfo).not.toHaveBeenCalled();
-  });
-
   it("activates an opportunity due today and its matched volunteer", async () => {
     const volunteer = await ctx.fixtures.volunteer();
     const {
@@ -72,7 +60,7 @@ describe("activateDueOnetimers", () => {
     );
   });
 
-  it("leaves an opportunity due on a later day alone", async () => {
+  it("does nothing when no opportunity is due yet", async () => {
     const volunteer = await ctx.fixtures.volunteer();
     const {
       opportunity,
@@ -84,6 +72,7 @@ describe("activateDueOnetimers", () => {
 
     await activateDueOnetimers(ctx.fastify);
 
+    expect(ctx.loggerInfo).not.toHaveBeenCalled();
     expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
       OpportunityStatusType.SEARCHING,
     );

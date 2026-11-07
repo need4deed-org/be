@@ -24,14 +24,6 @@ describe("scanExpiredOnetimers", () => {
   const ctx = setupOnetimerJobTest();
   const expired = () => new Date(Date.now() - 10 * DAY);
 
-  it("does nothing when no opportunity has expired", async () => {
-    await ctx.fixtures.onetimer(ctx.agent, { date: new Date() });
-
-    await scanExpiredOnetimers(ctx.fastify);
-
-    expect(ctx.loggerInfo).not.toHaveBeenCalled();
-  });
-
   it.each([
     OpportunityVolunteerStatusType.MATCHED,
     OpportunityVolunteerStatusType.ACTIVE,
@@ -111,7 +103,7 @@ describe("scanExpiredOnetimers", () => {
     );
   });
 
-  it("leaves an opportunity that has not expired yet alone", async () => {
+  it("does nothing when no opportunity has expired yet", async () => {
     const volunteer = await ctx.fixtures.volunteer();
     const {
       opportunity,
@@ -123,6 +115,7 @@ describe("scanExpiredOnetimers", () => {
 
     await scanExpiredOnetimers(ctx.fastify);
 
+    expect(ctx.loggerInfo).not.toHaveBeenCalled();
     expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
       OpportunityStatusType.SEARCHING,
     );
