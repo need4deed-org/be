@@ -220,17 +220,20 @@ async function upsertOwnAddress(
   } else {
     addressId = (await createAddress(fields, { id: postcodeId }, manager))?.id;
   }
-  await manager.update(Opportunity, opportunity.id, { addressId });
-  await storeDistrictOfPostcode(manager, opportunity.id, postcodeId);
+  await storeDistrictOfPostcode(manager, opportunity.id, postcodeId, {
+    addressId,
+  });
 }
 
 async function storeDistrictOfPostcode(
   manager: EntityManager,
   opportunityId: number,
   postcodeId: number,
+  alongside: Partial<Opportunity> = {},
 ): Promise<void> {
   const district = await getDistrictFromPostcode(postcodeId, manager);
   await manager.update(Opportunity, opportunityId, {
+    ...alongside,
     districtId: district?.id ?? null,
   });
 }
@@ -238,14 +241,13 @@ async function storeDistrictOfPostcode(
 async function removeOwnAddress(
   manager: EntityManager,
   opportunity: Opportunity,
-  { keepDistrict }: { keepDistrict: boolean },
 ): Promise<void> {
   if (!opportunity.addressId) {
     return;
   }
   await manager.update(Opportunity, opportunity.id, {
     addressId: null,
-    ...(keepDistrict ? {} : { districtId: null }),
+    districtId: null,
   });
   await manager.delete(Address, opportunity.addressId);
 }
@@ -1007,12 +1009,10 @@ export default async function opportunityRoutes(
             if (ownAddress) {
               await upsertOwnAddress(manager, opportunity, ownAddress);
             } else if (
-              request.body.address === null &&
-              effectiveType !== OpportunityType.ACCOMPANYING
+              request.body.address === null ||
+              effectiveType === OpportunityType.ACCOMPANYING
             ) {
-              await removeOwnAddress(manager, opportunity, {
-                keepDistrict: false,
-              });
+              await removeOwnAddress(manager, opportunity);
             }
             return written;
           },
@@ -1079,15 +1079,6 @@ export default async function opportunityRoutes(
         } else if (switchedToAccompanying && opportunity.accompanyingId) {
           // switched to accompanying, reusing the existing appointment
           await syncAppointmentDistrict(dataSource.manager, opportunity.id);
-        }
-
-        if (
-          effectiveType === OpportunityType.ACCOMPANYING &&
-          opportunity.addressId
-        ) {
-          await dataSource.manager.transaction((manager) =>
-            removeOwnAddress(manager, opportunity, { keepDistrict: true }),
-          );
         }
 
         const resolvedOnetimerDate =

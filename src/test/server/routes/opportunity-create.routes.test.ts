@@ -984,6 +984,12 @@ describe("POST /opportunity saves an own address (be#1291)", () => {
     if (ownAddressIds.length) {
       await getRepository(dataSource, Address).delete(ownAddressIds);
     }
+    const dealIds = opportunities
+      .map(({ dealId }) => dealId)
+      .filter((id): id is number => !!id);
+    if (dealIds.length) {
+      await fastify.db.dealRepository.delete(dealIds);
+    }
     await fastify.db.postcodeRepository.delete({
       value: unlinkedPostcodeValue,
     });

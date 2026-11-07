@@ -27,7 +27,9 @@ export function getDistrictToOpportunityHandler() {
       }
 
       const ownAddressPostcode =
-        opportunity.address?.postcode ?? opportunity.address?.postcodeId;
+        opportunity.type === OpportunityType.ACCOMPANYING
+          ? undefined
+          : (opportunity.address?.postcode ?? opportunity.address?.postcodeId);
       if (ownAddressPostcode) {
         const district = await districtOf(ownAddressPostcode);
         if (district) {

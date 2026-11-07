@@ -16,7 +16,7 @@ const volunteerLocationJoins = `FROM volunteer v
   LEFT JOIN address a ON a.id = p.address_id
   LEFT JOIN deal d ON d.id = v.deal_id`;
 const opportunityPostcodeId =
-  "COALESCE(oa.postcode_id, ac.postcode_id, d.postcode_id, aa.postcode_id)";
+  "COALESCE(CASE WHEN o.type <> 'accompanying' THEN oa.postcode_id END, ac.postcode_id, d.postcode_id, aa.postcode_id)";
 const volunteerPostcodeId = "COALESCE(a.postcode_id, d.postcode_id)";
 
 interface CommuteSourcePostcode {

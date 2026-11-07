@@ -81,6 +81,23 @@ describe("getDistrictToOpportunityHandler", () => {
         expect(result.districtId).toBe(6);
       });
 
+      it("ignores a leftover own address on an accompanying opportunity", async () => {
+        const handler = getDistrictToOpportunityHandler();
+        const opportunity = makeOpportunity({
+          type: OpportunityType.ACCOMPANYING,
+          address: {
+            postcode: { districtPostcode: [{ id: 2, districtId: 4 }] },
+          } as any,
+          accompanying: {
+            postcode: { districtPostcode: [{ id: 3, districtId: 6 }] },
+          } as any,
+        });
+
+        const result = await handler.addDistrictToOpportunity(opportunity);
+
+        expect(result.districtId).toBe(6);
+      });
+
       it("leaves the district unset, not the agent's, when the own postcode has no district", async () => {
         mockedGetDistrictFromPostcode.mockResolvedValueOnce(null);
         const handler = getDistrictToOpportunityHandler();

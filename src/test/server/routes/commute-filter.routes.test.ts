@@ -80,7 +80,7 @@ const OPPORTUNITY_PLACE: Record<
 > = {
   deal20: { deal: "far", atAgentNear: true },
   deal50: { deal: "near" },
-  accompanying20Deal50: { deal: "near", accompanying: "far" },
+  accompanying20Deal50: { deal: "near", accompanying: "far", own: "near" },
   accompanying50Deal20: { deal: "far", accompanying: "near" },
   accompanyingWithoutPostcodeDeal50: { deal: "near", accompanying: null },
   dealUnmatched: { deal: "unmatched" },
