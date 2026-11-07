@@ -1950,6 +1950,20 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
     );
     const past = await match(volunteer, OpportunityVolunteerStatusType.PAST);
 
+    const statusMatchBefore = async (opportunityId: number) =>
+      (
+        await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunityId,
+        })
+      ).statusMatch;
+    const opportunityBefore = new Map([
+      [pending.opportunityId, await statusMatchBefore(pending.opportunityId)],
+      [matched.opportunityId, await statusMatchBefore(matched.opportunityId)],
+    ]);
+    const volunteerBefore = (
+      await fastify.db.volunteerRepository.findOneByOrFail({ id: volunteer.id })
+    ).statusMatch;
+
     const res = await selfDelete(user.id, accessToken);
     expect(res.statusCode).toBe(200);
 
@@ -1979,17 +1993,17 @@ describe("DELETE /user/:id deactivates the caller's volunteer profile (be#1044)"
       `Status changed from ${VolunteerStateEngagementType.ACTIVE} to ${VolunteerStateEngagementType.INACTIVE}.`,
     );
 
-    for (const { opportunityId } of [pending, matched]) {
+    for (const [opportunityId, before] of opportunityBefore) {
       const opportunity =
         await fastify.db.opportunityRepository.findOneByOrFail({
           id: opportunityId,
         });
       expect(opportunity.statusMatch).toBe(
-        resolveOpportunityMatchStatus(opportunity.statusMatch, []),
+        resolveOpportunityMatchStatus(before, []),
       );
     }
     expect(refreshed.statusMatch).toBe(
-      resolveVolunteerMatchStatus(refreshed.statusMatch, [
+      resolveVolunteerMatchStatus(volunteerBefore, [
         OpportunityVolunteerStatusType.PAST,
         OpportunityVolunteerStatusType.PAST,
       ]),
