@@ -1,6 +1,6 @@
 import Address from "../../data/entity/location/address.entity";
 
-export function serializeAddress(address: Address): string {
+export function serializeAddress(address: Address | null | undefined): string {
   if (!(address && typeof address === "object")) {
     return "";
   }

@@ -7,6 +7,7 @@ import {
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
+import { serializeAddress } from "../../dto/dto-address";
 import {
   formatScheduleDe,
   getLanguages,
@@ -117,16 +118,13 @@ export async function sendEmailIntroduction(
     `sendEmailIntroduction, ov ${ov.id}`,
   );
 
-  const agentAddress = (() => {
-    const addr = opportunity.agent?.address;
-    if (!addr) {
-      return "";
-    }
-    return [addr.street, addr.postcode?.value, addr.city]
-      .filter(Boolean)
-      .join(", ");
-  })();
+  const agentAddress = serializeAddress(opportunity.agent?.address);
   const agentTitle = opportunity.agent?.title ?? "";
+  const ownAddress = serializeAddress(opportunity.address);
+  const opportunityAddress =
+    ownAddress && ownAddress !== agentAddress
+      ? `\nEinsatzort: ${ownAddress}`
+      : "";
 
   const statmentOnCertificates = resolveStatmentOnCertificates(
     volunteer.statusCGC,
@@ -149,6 +147,7 @@ export async function sendEmailIntroduction(
       contactpersonPhone: contactPerson.phone ?? "",
       agentAddress,
       agentTitle,
+      opportunityAddress,
       statmentOnCertificates,
     },
     emailNote,

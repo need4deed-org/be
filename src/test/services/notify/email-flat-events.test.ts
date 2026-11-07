@@ -476,6 +476,97 @@ describe("sendEmailSuggestion one-of-these-times note", () => {
   });
 });
 
+describe("sendEmailSuggestion location", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetSuggestionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const sendWith = async (over: Record<string, unknown>) => {
+    await sendEmailSuggestion(
+      email,
+      ov({
+        opportunity: opportunity({
+          type: "regular",
+          deal: { postcode: { value: "10115" }, dealTimeslot: [] },
+          ...over,
+        }),
+      }) as unknown as Parameters<typeof sendEmailSuggestion>[1],
+    );
+    return send.mock.calls.at(-1)?.[0].text ?? "";
+  };
+
+  it("gives the NGO's PLZ when the opportunity has no own address", async () => {
+    const text = await sendWith({ address: null });
+
+    expect(text).toContain("in Berlin 10115.");
+  });
+
+  it("gives the own address's PLZ when the opportunity has one", async () => {
+    const text = await sendWith({
+      address: {
+        street: "Weg 1",
+        city: "Berlin",
+        postcode: { value: "10247" },
+      },
+    });
+
+    expect(text).toContain("in Berlin 10247.");
+    expect(text).not.toContain("10115");
+    expect(text).not.toContain("Weg 1");
+  });
+});
+
+describe("sendEmailIntroduction location", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetIntroductionTemplateCache();
+    vi.mocked(fetchJsonFromUrl).mockRejectedValue(new Error("no CDN in tests"));
+  });
+
+  const ownAddress = {
+    street: "Weg 1",
+    city: "Berlin",
+    postcode: { value: "10247" },
+  };
+  const sendWith = async (over: Record<string, unknown>) => {
+    await sendEmailIntroduction(
+      email,
+      ov({ opportunity: opportunity(over) }) as unknown as Parameters<
+        typeof sendEmailIntroduction
+      >[1],
+    );
+    return send.mock.calls.at(-1)?.[0].text ?? "";
+  };
+
+  it("adds an Einsatzort line after the introduction for an opportunity with its own address", async () => {
+    const text = await sendWith({ type: "regular", address: ownAddress });
+
+    expect(text).toContain(
+      "einander vorstellen.\nEinsatzort: Weg 1, 10247 Berlin\n \n",
+    );
+  });
+
+  it("leaves the text as it was without an own address", async () => {
+    const text = await sendWith({ type: "regular", address: null });
+
+    expect(text).toContain("einander vorstellen.\n \n");
+    expect(text).not.toContain("Einsatzort");
+  });
+
+  it("leaves the line out when the own address is the NGO's address", async () => {
+    const text = await sendWith({
+      type: "regular",
+      address: ownAddress,
+      agent: { title: "NGO", address: { ...ownAddress } },
+    });
+
+    expect(text).not.toContain("Einsatzort");
+    expect(text).toContain("Weg 1, 10247 Berlin");
+  });
+});
+
 describe("coordinator's email note", () => {
   const NOTE = "Please bring <your> ID & arrive early.";
 
