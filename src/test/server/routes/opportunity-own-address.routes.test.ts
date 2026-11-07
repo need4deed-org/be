@@ -476,4 +476,125 @@ describe("opportunity own address (be#1291)", () => {
       expect(res.json().data.postcode).toBe(ngoPostcode.value);
     });
   });
+
+  describe("DELETE /opportunity/:id", () => {
+    it("deletes the opportunity's own address row with it", async () => {
+      const opportunity = await newOpportunity();
+      await patch(opportunity.id, { address: ownAddress(ownPostcode) });
+      const { addressId } = await stored(opportunity.id);
+
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/opportunity/${opportunity.id}`,
+        cookies: { [accessCookieName]: cookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(
+        await addressRepository().findOneBy({ id: addressId! }),
+      ).toBeNull();
+    });
+  });
+
+  describe("postcode validation", () => {
+    let storedInvalid: Postcode;
+
+    beforeAll(async () => {
+      storedInvalid = await fastify.db.postcodeRepository.save(
+        new Postcode({ value: `X${suffix}`.slice(0, 5) }),
+      );
+    });
+
+    afterAll(async () => {
+      await fastify.db.postcodeRepository.delete({ id: storedInvalid.id });
+    });
+
+    it("rejects a non-German postcode even when it is already stored", async () => {
+      const opportunity = await newOpportunity();
+
+      const res = await patch(opportunity.id, {
+        address: { street: "Weg 1", postcode: storedInvalid.value, city: "X" },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect((await stored(opportunity.id)).addressId).toBeNull();
+    });
+  });
+
+  describe("GET /opportunity/map", () => {
+    let ngoWithoutDistrict: Agent;
+    let ngoWithoutDistrictAddress: Address;
+    let unlinkedPostcode: Postcode;
+
+    beforeAll(async () => {
+      let value: string;
+      do {
+        value = `8${randomNumericSuffix(4)}`;
+      } while (await fastify.db.postcodeRepository.findOneBy({ value }));
+      unlinkedPostcode = await fastify.db.postcodeRepository.save(
+        new Postcode({ value }),
+      );
+      ngoWithoutDistrictAddress = await addressRepository().save(
+        new Address({ postcodeId: ngoPostcode.id }),
+      );
+      ngoWithoutDistrict = await fastify.db.agentRepository.save(
+        new Agent({
+          title: `${prefix} NGO without district`,
+          addressId: ngoWithoutDistrictAddress.id,
+        }),
+      );
+    });
+
+    afterAll(async () => {
+      const opportunities = await fastify.db.opportunityRepository.find({
+        where: { agentId: ngoWithoutDistrict.id },
+      });
+      await fastify.db.opportunityRepository.delete({
+        agentId: ngoWithoutDistrict.id,
+      });
+      const ownAddressIds = opportunities
+        .map(({ addressId }) => addressId)
+        .filter((id): id is number => !!id);
+      if (ownAddressIds.length) {
+        await addressRepository().delete(ownAddressIds);
+      }
+      await fastify.db.agentRepository.delete({ id: ngoWithoutDistrict.id });
+      await addressRepository().delete({ id: ngoWithoutDistrictAddress.id });
+      await fastify.db.postcodeRepository.delete({ id: unlinkedPostcode.id });
+    });
+
+    it("doesn't count an own address outside any district in the NGO's district", async () => {
+      const atNgo = await newOpportunity({
+        agentId: ngoWithoutDistrict.id,
+        districtId: undefined,
+      });
+      const elsewhereAddress = await addressRepository().save(
+        new Address({
+          street: "Weg 1",
+          city: "X",
+          postcodeId: unlinkedPostcode.id,
+        }),
+      );
+      await newOpportunity({
+        agentId: ngoWithoutDistrict.id,
+        districtId: undefined,
+        addressId: elsewhereAddress.id,
+      });
+
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity/map?districtId=${ngoDistrictId}&language=de&filter[agentId]=${ngoWithoutDistrict.id}`,
+        cookies: { [accessCookieName]: cookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const { markers, total } = res.json().data;
+      expect(total).toBe(1);
+      expect(
+        markers.flatMap(({ children }: { children: { id: number }[] }) =>
+          children.map(({ id }) => id),
+        ),
+      ).toEqual([atNgo.id]);
+    });
+  });
 });

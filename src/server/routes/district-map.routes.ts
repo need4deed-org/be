@@ -273,6 +273,7 @@ function getOpportunityDistrictWhere(
     {
       districtId: IsNull(),
       type: Not(OpportunityType.ACCOMPANYING),
+      addressId: IsNull(),
       agent: {
         districtId: IsNull(),
         address: { postcode: { id: firstDistrictPostcodeIdWhere(districtId) } },
@@ -426,6 +427,16 @@ const opportunitySelect = {
         longitude: true,
         districtPostcode: { id: true, districtId: true },
       },
+    },
+  },
+  address: {
+    id: true,
+    postcode: {
+      id: true,
+      value: true,
+      latitude: true,
+      longitude: true,
+      districtPostcode: { id: true, districtId: true },
     },
   },
   accompanying: {

@@ -1,10 +1,8 @@
-import { FastifyRequest } from "fastify";
-import { resolveCallerMask } from "./pre-serialization";
+import { CallerVisibility } from "./visible-persons";
 
-export async function canSeeOwnAddress(
-  request: FastifyRequest,
+export function isOwnAddressVisible(
+  visibility: CallerVisibility | null,
   opportunityId: number,
-): Promise<boolean> {
-  const visibility = await resolveCallerMask(request);
+): boolean {
   return visibility === null || visibility.opportunityIds.has(opportunityId);
 }

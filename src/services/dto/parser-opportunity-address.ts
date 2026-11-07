@@ -1,7 +1,8 @@
 import { ApiOpportunityAddress, OpportunityType } from "need4deed-sdk";
 import { BadRequestError } from "../../config";
 import Address from "../../data/entity/location/address.entity";
-import { getPostcode } from "../../data/utils/get-postcode";
+import { getPostcode, normalizePostcode } from "../../data/utils/get-postcode";
+import { isValidPLZ } from "../../data/utils/is-valid-plz";
 
 export function assertAddressAllowedForType(
   type: OpportunityType,
@@ -22,9 +23,9 @@ export async function parseOpportunityAddress(
   if (!street || !city) {
     throw new BadRequestError("The address needs a street and a city.");
   }
-  const postcode = await getPostcode(input.postcode, {
-    createOnlyGerman: true,
-  });
+  const postcode = isValidPLZ(normalizePostcode(input.postcode))
+    ? await getPostcode(input.postcode)
+    : null;
   if (!postcode) {
     throw new BadRequestError(
       `"${input.postcode}" is not a valid German postcode.`,
