@@ -1,3 +1,4 @@
+import { isValidPLZ } from "../../services/validators/custom";
 import { dataSource } from "../data-source";
 import Postcode from "../entity/location/postcode.entity";
 import { getRepository } from "./get-repository";
@@ -21,4 +22,10 @@ export async function getPostcode(code: string): Promise<Postcode | null> {
   }
 
   return postcode;
+}
+
+export async function getGermanPostcode(
+  code: string,
+): Promise<Postcode | null> {
+  return isValidPLZ(normalizePostcode(code)) ? getPostcode(code) : null;
 }

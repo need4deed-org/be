@@ -7,7 +7,7 @@ import {
 } from "class-validator";
 import { Country, GermanCity } from "../../data/types";
 
-function isValidPLZ(plz: string, city?: string) {
+export function isValidPLZ(plz: string, city?: string) {
   if (!/^\d{5}$/.test(plz)) {
     return false;
   }

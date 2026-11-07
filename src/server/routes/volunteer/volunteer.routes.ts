@@ -28,7 +28,10 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { updateOpportunityMatching } from "../../../data/utils";
+import {
+  getGermanPostcode,
+  updateOpportunityMatching,
+} from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerListSerializer } from "../../../services";
 import {
@@ -389,11 +392,11 @@ export default async function volunteerRoutes(
       let resolvedPostcode: Partial<Postcode> | undefined;
       if (Object.keys(addressFields).length || sendsPostcode) {
         if (sendsPostcode) {
-          const postcode = await fastify.db.postcodeRepository.findOneBy(
-            postcodeData?.id
-              ? { id: Number(postcodeData.id) }
-              : { value: postcodeData?.value },
-          );
+          const postcode = postcodeData?.id
+            ? await fastify.db.postcodeRepository.findOneBy({
+                id: Number(postcodeData.id),
+              })
+            : await getGermanPostcode(String(postcodeData?.value));
           if (!postcode) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
