@@ -28,16 +28,7 @@ export const opportunityCreateBodySchema = {
     accomp_phone: { type: "string" },
     accomp_information: { type: "string" },
     accomp_translation: { type: "string" },
-    address: {
-      type: "object",
-      additionalProperties: false,
-      required: ["street", "postcode", "city"],
-      properties: {
-        street: { type: "string", minLength: 1, maxLength: 200 },
-        postcode: { type: "string", minLength: 1 },
-        city: { type: "string", minLength: 1, maxLength: 100 },
-      },
-    },
+    address: { $ref: "ApiOpportunityAddress#" },
     language: { type: "string" },
     last_edited_time_notion: { type: "string" },
   },

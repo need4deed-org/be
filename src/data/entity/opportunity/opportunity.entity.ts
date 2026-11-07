@@ -128,7 +128,6 @@ export default class Opportunity {
   @Column({ nullable: true })
   submittedByPersonId?: number;
 
-  // Own address for non-accompanying opportunities (be#1291); null = the NGO's.
   @ManyToOne(() => Address, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "address_id" })
   address?: Address | null;

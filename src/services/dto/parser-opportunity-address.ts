@@ -14,8 +14,6 @@ export function assertAddressAllowedForType(
   }
 }
 
-// An opportunity's own address (be#1291): the postcode is found or created,
-// German postcodes only.
 export async function parseOpportunityAddress(
   input: ApiOpportunityAddress,
 ): Promise<{ street: string; city: string; postcodeId: number }> {

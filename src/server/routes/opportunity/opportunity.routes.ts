@@ -25,6 +25,7 @@ import {
 import { dataSource } from "../../../data/data-source";
 import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
@@ -54,6 +55,7 @@ import { dealParserOpportunityCreate } from "../../../services/dto/parser-deal-o
 import {
   assertAddressAllowedForType,
   newOpportunityAddress,
+  parseOpportunityAddress,
 } from "../../../services/dto/parser-opportunity-address";
 import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
@@ -174,13 +176,16 @@ async function sendNewOpportunityEmail(
 async function clearStaleAccompanying(
   manager: EntityManager,
   opportunity: Opportunity,
-  { alsoClearOnetimer }: { alsoClearOnetimer: boolean },
+  {
+    alsoClearOnetimer,
+    keepDistrict = false,
+  }: { alsoClearOnetimer: boolean; keepDistrict?: boolean },
 ): Promise<void> {
   await manager.update(Opportunity, opportunity.id, {
     accompanyingId: null,
     ...(alsoClearOnetimer ? { onetimerId: null } : {}),
     // the stored district was the appointment's; let the backfill re-derive it
-    ...(opportunity.type === OpportunityType.ACCOMPANYING
+    ...(opportunity.type === OpportunityType.ACCOMPANYING && !keepDistrict
       ? { districtId: null }
       : {}),
   });
@@ -190,6 +195,38 @@ async function clearStaleAccompanying(
   if (alsoClearOnetimer && opportunity.onetimerId) {
     await manager.delete(Onetimer, opportunity.onetimerId);
   }
+}
+
+async function upsertOwnAddress(
+  manager: EntityManager,
+  opportunity: Opportunity,
+  address: Pick<Address, "street" | "city" | "postcodeId">,
+): Promise<void> {
+  let addressId = opportunity.addressId;
+  if (addressId) {
+    await manager.update(Address, addressId, address);
+  } else {
+    addressId = (await manager.save(Address, new Address(address))).id;
+  }
+  const district = await getDistrictFromPostcode(address.postcodeId, manager);
+  await manager.update(Opportunity, opportunity.id, {
+    addressId,
+    districtId: district?.id ?? null,
+  });
+}
+
+async function removeOwnAddress(
+  manager: EntityManager,
+  opportunity: Opportunity,
+): Promise<void> {
+  if (!opportunity.addressId) {
+    return;
+  }
+  await manager.update(Opportunity, opportunity.id, {
+    addressId: null,
+    districtId: null,
+  });
+  await manager.delete(Address, opportunity.addressId);
 }
 
 // The stored district follows the appointment postcode (be#1210); a postcode
@@ -533,7 +570,6 @@ export default async function opportunityRoutes(
       assertAddressAllowedForType(opportunity.type, body.address);
       if (body.address) {
         opportunity.address = await newOpportunityAddress(body.address);
-        // the own address decides the district (below), not berlin_locations
         opportunity.districtId = undefined;
       }
       opportunity.deal = await dealParserOpportunityCreate(
@@ -745,6 +781,16 @@ export default async function opportunityRoutes(
       }
 
       const effectiveType = request.body.opportunity_type ?? opportunity.type;
+      const switchedToAccompanying =
+        request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
+        opportunity.type !== OpportunityType.ACCOMPANYING;
+      assertAddressAllowedForType(effectiveType, request.body.address);
+      const ownAddress = request.body.address
+        ? await parseOpportunityAddress(request.body.address)
+        : undefined;
+      const dropOwnAddress =
+        request.body.address === null ||
+        effectiveType === OpportunityType.ACCOMPANYING;
       if (effectiveType === OpportunityType.ACCOMPANYING && onetimerDate) {
         const current = opportunity.onetimerId
           ? await fastify.db.onetimerRepository.findOneBy({
@@ -819,6 +865,7 @@ export default async function opportunityRoutes(
 
       const snapshotRelations = [
         "agent",
+        "address",
         "accompanying",
         "onetimer",
         "deal.dealLanguage",
@@ -938,13 +985,16 @@ export default async function opportunityRoutes(
                 );
               }
             }
+
+            if (ownAddress) {
+              await upsertOwnAddress(manager, opportunity, ownAddress);
+            } else if (dropOwnAddress) {
+              await removeOwnAddress(manager, opportunity);
+            }
             return written;
           },
         );
 
-        const switchedToAccompanying =
-          request.body.opportunity_type === OpportunityType.ACCOMPANYING &&
-          opportunity.type !== OpportunityType.ACCOMPANYING;
         if (accompanying && effectiveType === OpportunityType.ACCOMPANYING) {
           const appointmentPostcodeValue =
             request.body.accompanyingDetails?.appointmentPostcode;
@@ -1048,6 +1098,7 @@ export default async function opportunityRoutes(
           await dataSource.manager.transaction((manager) =>
             clearStaleAccompanying(manager, opportunity, {
               alsoClearOnetimer: true,
+              keepDistrict: !!ownAddress,
             }),
           );
         }
@@ -1060,6 +1111,7 @@ export default async function opportunityRoutes(
           await dataSource.manager.transaction((manager) =>
             clearStaleAccompanying(manager, opportunity, {
               alsoClearOnetimer: false,
+              keepDistrict: !!ownAddress,
             }),
           );
         }

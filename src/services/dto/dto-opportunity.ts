@@ -41,9 +41,6 @@ function resolveMapPin(opportunity: Opportunity): MapPinResolution {
     return { lat: null, lon: null };
   }
 
-  // the pin sits at the opportunity's own address or the appointment, like its
-  // postcode and district (be#1272, be#1291); masked coordinates fall back to
-  // the district centroid
   const coordinates = getCoordinates(
     getOwnLocationPostcode(opportunity) ?? opportunity.agent?.address?.postcode,
   );
@@ -113,8 +110,6 @@ export function getAppointmentDistrictId(
   )?.districtId;
 }
 
-// The opportunity's own address (be#1291), else the accompanying appointment;
-// undefined means the NGO's location applies.
 export function getOwnLocationPostcode(
   opportunity: Opportunity,
 ): Postcode | undefined {
