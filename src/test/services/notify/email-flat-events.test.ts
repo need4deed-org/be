@@ -555,40 +555,61 @@ describe("sendEmailIntroduction location", () => {
     expect(text).not.toContain("Einsatzort");
   });
 
+  const sendAt = (own: Record<string, unknown>, ngo: Record<string, unknown>) =>
+    sendWith({
+      type: "regular",
+      address: { postcode: { value: "10247" }, ...own },
+      agent: {
+        title: "NGO",
+        address: { postcode: { value: "10247" }, ...ngo },
+      },
+    });
+
   it.each([
-    ["case", { street: "Weg 1", city: "berlin" }],
-    ["spacing", { street: " Weg  1", city: "Berlin " }],
+    ["case in the city", { city: "berlin" }],
+    ["case in the street", { street: "WEG 1" }],
+    ["a trailing space on the street", { street: "Weg 1 " }],
+    [
+      "leading, doubled and trailing spaces",
+      { street: " Weg  1", city: "Berlin " },
+    ],
   ])(
     "leaves the line out when the own address differs from the NGO's only in %s",
-    async (_, ngoAddress) => {
-      const text = await sendWith({
-        type: "regular",
-        address: ownAddress,
-        agent: {
-          title: "NGO",
-          address: { ...ngoAddress, postcode: { value: "10247" } },
-        },
-      });
+    async (_, ngo) => {
+      const text = await sendAt(
+        { street: "Weg 1", city: "Berlin" },
+        { street: "Weg 1", city: "Berlin", ...ngo },
+      );
 
       expect(text).not.toContain("Einsatzort");
     },
   );
 
-  it("keeps the line when the own address is somewhere else", async () => {
-    const text = await sendWith({
-      type: "regular",
-      address: ownAddress,
-      agent: {
-        title: "NGO",
-        address: {
-          street: "Hauptstr. 5",
-          city: "Berlin",
-          postcode: { value: "10115" },
-        },
-      },
-    });
+  it("treats a composed and a decomposed umlaut as the same street", async () => {
+    const text = await sendAt(
+      { street: "Müllerstr. 3", city: "Berlin" },
+      { street: "Mu\u0308llerstr. 3", city: "Berlin" },
+    );
 
-    expect(text).toContain("Einsatzort: Weg 1, 10247 Berlin");
+    expect(text).not.toContain("Einsatzort");
+  });
+
+  it("treats a blank street like a missing one", async () => {
+    const text = await sendAt(
+      { street: "  ", city: "Berlin" },
+      { street: null, city: "Berlin" },
+    );
+
+    expect(text).not.toContain("Einsatzort");
+  });
+
+  it("keeps the line, with tidied spacing, when the own address is somewhere else", async () => {
+    const text = await sendAt(
+      { street: " Hauptstr.  5", city: "Berlin" },
+      { street: "Weg 1", city: "Berlin" },
+    );
+
+    expect(text).toContain("Einsatzort: Hauptstr. 5, 10247 Berlin\n");
   });
 
   it("leaves the line out when the own address is the NGO's address", async () => {
