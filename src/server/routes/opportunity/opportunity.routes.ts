@@ -126,6 +126,7 @@ import {
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
+import { canSeeOwnAddress } from "../../utils/pii/own-address";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
@@ -412,6 +413,9 @@ export default async function opportunityRoutes(
         ...dtoOpportunityGet(opportunityComments, districtCentroid),
         ...(myMatchStatus !== undefined && { myMatchStatus }),
       };
+      if (!(await canSeeOwnAddress(request, id))) {
+        data.address = null;
+      }
       if (
         !canSeeOpportunityDescription(
           opportunityComments.type,

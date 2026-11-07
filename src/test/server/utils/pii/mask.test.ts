@@ -184,6 +184,38 @@ describe("maskPii", () => {
     expect(agent.title).toBe("Center");
   });
 
+  describe("an opportunity's own address", () => {
+    const makeOpportunity = () =>
+      Object.assign(new Opportunity(), {
+        id: 7,
+        address: Object.assign(makeAddress("Event Platz 1"), {
+          postcode: { value: "10247", latitude: 52.51, longitude: 13.45 },
+        }),
+      });
+
+    it("stays unmasked for a caller who can see the opportunity", () => {
+      const opportunity = makeOpportunity();
+      maskPii(opportunity, ctx({ opportunityIds: [7] }));
+      expect(opportunity.address.street).toBe("Event Platz 1");
+      expect(opportunity.address.city).toBe("Berlin");
+    });
+
+    it("masks street, city and coordinates but keeps the postcode value for anyone else", () => {
+      const opportunity = makeOpportunity();
+      maskPii(
+        opportunity,
+        ctx({ role: UserRole.VOLUNTEER, opportunityIds: [8] }),
+      );
+      expect(opportunity.address.street).toMatch(MASKED);
+      expect(opportunity.address.city).toMatch(MASKED);
+      expect(opportunity.address.postcode).toMatchObject({
+        value: "10247",
+        latitude: null,
+        longitude: null,
+      });
+    });
+  });
+
   it("leaves an Agent's own address unmasked when the caller has visibility into that agent", () => {
     const agent = Object.assign(new Agent(), {
       id: 5,

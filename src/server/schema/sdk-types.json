@@ -1267,6 +1267,14 @@
                 { "$ref": "OpportunityVolunteerStatusType#" },
                 { "type": "null" }
               ]
+            },
+            "address": {
+              "type": ["object", "null"],
+              "properties": {
+                "street": { "type": "string" },
+                "postcode": { "type": "string" },
+                "city": { "type": "string" }
+              }
             }
           }
         }

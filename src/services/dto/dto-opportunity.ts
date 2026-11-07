@@ -1,4 +1,5 @@
 import {
+  ApiOpportunityAddress,
   ApiOpportunityContact,
   ApiOpportunityGet,
   ApiOpportunityGetList,
@@ -10,6 +11,7 @@ import {
 } from "need4deed-sdk";
 import Comment from "../../data/entity/comment.entity";
 import Deal from "../../data/entity/deal.entity";
+import Address from "../../data/entity/location/address.entity";
 import Postcode from "../../data/entity/location/postcode.entity";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
@@ -265,6 +267,19 @@ export function dtoVolunteerOpportunityGetList(
   } as ApiVolunteerOpportunityGetList;
 }
 
+function dtoOpportunityAddress(
+  address: Address | null | undefined,
+): ApiOpportunityAddress | null {
+  if (!address) {
+    return null;
+  }
+  return {
+    street: address.street,
+    postcode: address.postcode?.value ?? "",
+    city: address.city,
+  };
+}
+
 export function dtoOpportunityGet(
   opportunityComments: Opportunity & { comments: Comment[] },
   districtCentroid?: Centroid,
@@ -328,6 +343,7 @@ export function dtoOpportunityGet(
           time: formatTime(eventStart),
         }
       : undefined,
+    address: dtoOpportunityAddress(opportunityComments.address),
     comments: opportunityComments.comments.map(commentSerializer),
     statusMatch: opportunityComments.statusMatch,
     noMatchFound: isNoMatchFound(opportunityComments),

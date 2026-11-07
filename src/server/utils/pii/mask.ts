@@ -138,6 +138,14 @@ function collectAddresses(
     ) {
       addresses.visible.add(node.address);
     }
+  } else if (node instanceof Opportunity) {
+    if (
+      ctx.opportunityIds.has(node.id) &&
+      node.address &&
+      typeof node.address === "object"
+    ) {
+      addresses.visible.add(node.address);
+    }
   } else if (node instanceof Agent) {
     if (node.address && typeof node.address === "object") {
       addresses.ofAgents.add(node.address);

@@ -1,7 +1,10 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentMembershipStatus,
+  AgentRoleType,
   OpportunityStatusType,
   OpportunityType,
+  OpportunityVolunteerStatusType,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -10,12 +13,15 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
@@ -327,6 +333,147 @@ describe("opportunity own address (be#1291)", () => {
       expect(saved.type).toBe(OpportunityType.REGULAR);
       expect(saved.accompanyingId).toBeNull();
       expect(saved.districtId).toBe(ownDistrictId);
+    });
+  });
+
+  describe("GET /opportunity/:id", () => {
+    type Caller = "ngo" | "matchedVolunteer" | "pendingVolunteer";
+    const callerCookies = {} as Record<Caller, string>;
+    const callerPersons: Person[] = [];
+    const volunteers: Volunteer[] = [];
+    let opportunity: Opportunity;
+
+    async function loginAs(caller: Caller, role: UserRole): Promise<Person> {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Own", lastName: `${caller}${suffix}` }),
+      );
+      callerPersons.push(person);
+      const email = `own-address-${caller}-${suffix}@test.need4deed.org`;
+      await fastify.db.userRepository.save(
+        new User({
+          email,
+          password: await hashPassword(PASSWORD),
+          role,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      callerCookies[caller] = res.cookies.find(
+        (c) => c.name === accessCookieName,
+      )?.value as string;
+      return person;
+    }
+
+    async function volunteerWithMatch(
+      caller: Caller,
+      status: OpportunityVolunteerStatusType,
+    ): Promise<void> {
+      const person = await loginAs(caller, UserRole.VOLUNTEER);
+      const deal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.VOLUNTEER, postcodeId: ngoPostcode.id }),
+      );
+      deals.push(deal);
+      const volunteer = await fastify.db.volunteerRepository.save(
+        new Volunteer({ personId: person.id, dealId: deal.id }),
+      );
+      volunteers.push(volunteer);
+      await fastify.db.opportunityVolunteerRepository.save(
+        new OpportunityVolunteer({
+          opportunityId: opportunity.id,
+          volunteerId: volunteer.id,
+          status,
+        }),
+      );
+    }
+
+    const getAs = (as: Caller | "coordinator") =>
+      fastify.inject({
+        method: "GET",
+        url: `/opportunity/${opportunity.id}`,
+        cookies: {
+          [accessCookieName]: as === "coordinator" ? cookie : callerCookies[as],
+        },
+      });
+
+    beforeAll(async () => {
+      opportunity = await newOpportunity();
+      await patch(opportunity.id, { address: ownAddress(ownPostcode) });
+
+      const ngoPerson = await loginAs("ngo", UserRole.AGENT);
+      await fastify.db.agentPersonRepository.save(
+        new AgentPerson({
+          agentId: agent.id,
+          personId: ngoPerson.id,
+          role: AgentRoleType.SOCIAL_WORKER,
+          status: AgentMembershipStatus.ACTIVE,
+        }),
+      );
+      await volunteerWithMatch(
+        "matchedVolunteer",
+        OpportunityVolunteerStatusType.MATCHED,
+      );
+      await volunteerWithMatch(
+        "pendingVolunteer",
+        OpportunityVolunteerStatusType.PENDING,
+      );
+    });
+
+    afterAll(async () => {
+      for (const volunteer of volunteers) {
+        await fastify.db.opportunityVolunteerRepository.delete({
+          volunteerId: volunteer.id,
+        });
+        await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+      }
+      for (const person of callerPersons) {
+        await fastify.db.agentPersonRepository.delete({ personId: person.id });
+        await fastify.db.userRepository.delete({ personId: person.id });
+        await fastify.db.personRepository.delete({ id: person.id });
+      }
+    });
+
+    it.each(["coordinator", "ngo", "matchedVolunteer"] as const)(
+      "returns the address to the %s",
+      async (as) => {
+        const res = await getAs(as);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data).toMatchObject({
+          address: ownAddress(ownPostcode),
+          postcode: ownPostcode.value,
+          district: { id: ownDistrictId },
+        });
+      },
+    );
+
+    it("returns a null address, but the own postcode and district, to a volunteer who isn't matched", async () => {
+      const res = await getAs("pendingVolunteer");
+
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      expect(data.address).toBeNull();
+      expect(data.postcode).toBe(ownPostcode.value);
+      expect(data.district).toEqual({ id: ownDistrictId });
+      expect(res.body).not.toContain("Musterstraße");
+    });
+
+    it("returns a null address for an opportunity without one", async () => {
+      const withoutAddress = await newOpportunity();
+
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity/${withoutAddress.id}`,
+        cookies: { [accessCookieName]: cookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.address).toBeNull();
+      expect(res.json().data.postcode).toBe(ngoPostcode.value);
     });
   });
 });
