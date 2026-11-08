@@ -308,6 +308,34 @@ describe("validateTranslation", () => {
     }
   });
 
+  it("accepts a range whose end keeps the exact hour without a clock marker", () => {
+    const ok = { status: "ok" };
+    for (const [source, output, target] of [
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13 h", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13h", Lang.EN],
+      ["Am Freitag zwischen 12-15 Uhr", "On Friday between 12-15", Lang.EN],
+      ["Zwischen 10 und 16 Uhr", "Between 10 and 16", Lang.EN],
+      ["Freitags von 13-15 Uhr", "Fridays from 13-15", Lang.EN],
+      ["From 1 to 3 pm", "Von 13 bis 15", Lang.DE],
+    ] as const) {
+      expectCode(source, output, target).toEqual(ok);
+    }
+  });
+
+  it("rejects a range end with the wrong hour or meridiem", () => {
+    for (const [source, output, target] of [
+      ["Von 10 bis 12Uhr", "From 10 to 12AM", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 5 to 7", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 18", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 7 Uhr", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-14 h", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
   it("rejects a 12-hour range start paired with a 24-hour end", () => {
     for (const [source, output] of [
       ["From 1 to 3 pm", "Von 1 bis 15 Uhr"],
