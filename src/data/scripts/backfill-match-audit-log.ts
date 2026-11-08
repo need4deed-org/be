@@ -1,5 +1,6 @@
 import "reflect-metadata";
-import { DataSource, EntityManager, In, LessThan } from "typeorm";
+import { OpportunityVolunteerStatusType } from "need4deed-sdk";
+import { DataSource, EntityManager, LessThan } from "typeorm";
 import logger from "../../logger";
 import { dataSource } from "../data-source";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
@@ -11,9 +12,22 @@ export interface BackfillMatchAuditLogOptions {
   importedOn: string[];
 }
 
+export interface MatchRow {
+  id: number;
+  volunteerId: number;
+  opportunityId: number;
+  title: string | null;
+  status: OpportunityVolunteerStatusType;
+  createdAt: Date;
+  updatedAt: Date;
+  createdOn: string;
+}
+
 export interface PlannedEntry {
   opportunityVolunteerId: number;
   volunteerId: number;
+  kind: "linked" | "status-changed";
+  imported: boolean;
   detail: string;
   occurredAt: Date;
 }
@@ -26,10 +40,15 @@ export interface BackfillPlan {
 
 export interface BackfillMatchAuditLogReport extends BackfillPlan {
   cutoff: Date;
+  loggedSince: Date;
   written: number;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const CUTOFF_MARGIN_MS = 60_000;
+
+const WRITE_CHUNK = 500;
 
 const utcDay = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -68,105 +87,118 @@ export async function findCutoff(manager: EntityManager): Promise<Date> {
     where: { type: "opportunity_status_changed" },
     order: { id: "ASC" },
   });
-  return firstLogged?.occurredAt ?? new Date();
+  if (!firstLogged) {
+    throw new Error(
+      "No match step has been logged yet, so there is no cutoff; nothing to backfill.",
+    );
+  }
+  return firstLogged.occurredAt;
 }
 
-const matchTitle = ({ opportunity, opportunityId }: OpportunityVolunteer) =>
-  opportunity?.title ?? `#${opportunityId}`;
+const matchTitle = ({ title, opportunityId }: MatchRow) =>
+  title ?? `#${opportunityId}`;
 
 export function planMatchEntries(
-  match: OpportunityVolunteer,
-  cutoff: Date,
+  match: MatchRow,
+  loggedSince: Date,
   importedOn: string[],
 ): PlannedEntry[] {
-  const { id, volunteerId, status, createdAt, updatedAt } = match;
+  const { id, volunteerId, status, createdAt, updatedAt, createdOn } = match;
   const title = matchTitle(match);
   const changedLater = updatedAt.getTime() > createdAt.getTime();
-  const entry = (detail: string, occurredAt: Date): PlannedEntry => ({
+  const imported = importedOn.includes(createdOn);
+  const entry = (
+    kind: PlannedEntry["kind"],
+    detail: string,
+    occurredAt: Date,
+  ): PlannedEntry => ({
     opportunityVolunteerId: id,
     volunteerId,
+    kind,
+    imported: kind === "linked" && imported,
     detail,
     occurredAt,
   });
 
   const planned = [
     entry(
-      matchDetail.linked(
-        title,
-        changedLater ? undefined : status,
-        importedOn.includes(utcDay(createdAt)),
-      ),
+      "linked",
+      matchDetail.linked(title, changedLater ? undefined : status, imported),
       createdAt,
     ),
   ];
-  if (changedLater && updatedAt.getTime() < cutoff.getTime()) {
-    planned.push(entry(matchDetail.statusChanged(title, status), updatedAt));
+  if (changedLater && updatedAt.getTime() < loggedSince.getTime()) {
+    planned.push(
+      entry(
+        "status-changed",
+        matchDetail.statusChanged(title, { to: status }),
+        updatedAt,
+      ),
+    );
   }
   return planned;
 }
 
-async function findLinkedDetails(
+const backfilledKey = (volunteerId: number, occurredAt: Date) =>
+  `${volunteerId}@${occurredAt.getTime()}`;
+
+async function findBackfilledLinks(
   manager: EntityManager,
-  volunteerIds: number[],
-): Promise<Map<number, string[]>> {
-  const entries = volunteerIds.length
-    ? await manager.find(VolunteerAuditLog, {
-        select: { id: true, volunteerId: true, detail: true },
-        where: {
-          type: "opportunity_status_changed",
-          volunteerId: In([...new Set(volunteerIds)]),
-        },
-      })
-    : [];
-  const byVolunteer = new Map<number, string[]>();
-  for (const { volunteerId, detail } of entries) {
-    byVolunteer.set(volunteerId, [
-      ...(byVolunteer.get(volunteerId) ?? []),
-      detail,
-    ]);
+  loggedSince: Date,
+): Promise<Map<string, string[]>> {
+  const entries = await manager.find(VolunteerAuditLog, {
+    select: { id: true, volunteerId: true, detail: true, occurredAt: true },
+    where: {
+      type: "opportunity_status_changed",
+      occurredAt: LessThan(loggedSince),
+    },
+  });
+  const byKey = new Map<string, string[]>();
+  for (const { volunteerId, occurredAt, detail } of entries) {
+    const key = backfilledKey(volunteerId, occurredAt);
+    byKey.set(key, [...(byKey.get(key) ?? []), detail]);
   }
-  return byVolunteer;
+  return byKey;
 }
 
 export async function planEntries(
   manager: EntityManager,
   { importedOn }: BackfillMatchAuditLogOptions,
-  cutoff: Date,
+  loggedSince: Date,
 ): Promise<BackfillPlan> {
-  const matches = await manager.find(OpportunityVolunteer, {
-    select: {
-      id: true,
-      volunteerId: true,
-      opportunityId: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-      opportunity: { id: true, title: true },
-    },
-    relations: { opportunity: true },
-    where: { createdAt: LessThan(cutoff) },
-    order: { createdAt: "ASC", id: "ASC" },
-  });
-  const linkedDetails = await findLinkedDetails(
-    manager,
-    matches.map(({ volunteerId }) => volunteerId),
-  );
-  const isLinked = (match: OpportunityVolunteer) => {
+  const matches = await manager
+    .createQueryBuilder(OpportunityVolunteer, "ov")
+    .leftJoin("ov.opportunity", "o")
+    .select("ov.id", "id")
+    .addSelect("ov.volunteer_id", "volunteerId")
+    .addSelect("ov.opportunity_id", "opportunityId")
+    .addSelect("o.title", "title")
+    .addSelect("ov.status", "status")
+    .addSelect("ov.created_at", "createdAt")
+    .addSelect("ov.updated_at", "updatedAt")
+    .addSelect("to_char(ov.created_at, 'YYYY-MM-DD')", "createdOn")
+    .where("ov.created_at < :loggedSince", { loggedSince })
+    .orderBy("ov.created_at", "ASC")
+    .addOrderBy("ov.id", "ASC")
+    .getRawMany<MatchRow>();
+
+  const backfilledLinks = await findBackfilledLinks(manager, loggedSince);
+  const isBackfilled = (match: MatchRow) => {
     const prefix = matchDetail.linkedPrefix(matchTitle(match));
-    return (linkedDetails.get(match.volunteerId) ?? []).some((detail) =>
-      detail.startsWith(prefix),
-    );
+    return (
+      backfilledLinks.get(backfilledKey(match.volunteerId, match.createdAt)) ??
+      []
+    ).some((detail) => detail.startsWith(prefix));
   };
-  const toBackfill = matches.filter((match) => !isLinked(match));
+  const toBackfill = matches.filter((match) => !isBackfilled(match));
 
   const matchesCreatedOn: Record<string, number> = {};
-  for (const { createdAt } of matches) {
-    const day = utcDay(createdAt);
-    matchesCreatedOn[day] = (matchesCreatedOn[day] ?? 0) + 1;
+  for (const { createdOn } of matches) {
+    matchesCreatedOn[createdOn] = (matchesCreatedOn[createdOn] ?? 0) + 1;
   }
   return {
     planned: toBackfill.flatMap((match) =>
-      planMatchEntries(match, cutoff, importedOn),
+      planMatchEntries(match, loggedSince, importedOn),
     ),
     skippedAlreadyLinked: matches.length - toBackfill.length,
     matchesCreatedOn,
@@ -177,21 +209,19 @@ async function writeEntries(
   manager: EntityManager,
   planned: PlannedEntry[],
 ): Promise<number> {
-  if (!planned.length) {
-    return 0;
-  }
-  await manager.save(
-    VolunteerAuditLog,
-    planned.map(
-      ({ volunteerId, detail, occurredAt }) =>
-        new VolunteerAuditLog({
+  for (let start = 0; start < planned.length; start += WRITE_CHUNK) {
+    await manager.insert(
+      VolunteerAuditLog,
+      planned
+        .slice(start, start + WRITE_CHUNK)
+        .map(({ volunteerId, detail, occurredAt }) => ({
           volunteerId,
-          type: "opportunity_status_changed",
+          type: "opportunity_status_changed" as const,
           detail,
           occurredAt,
-        }),
-    ),
-  );
+        })),
+    );
+  }
   return planned.length;
 }
 
@@ -200,9 +230,12 @@ export async function backfill(
   options: BackfillMatchAuditLogOptions,
 ): Promise<BackfillMatchAuditLogReport> {
   const cutoff = await findCutoff(manager);
-  const plan = await planEntries(manager, options, cutoff);
+  // Matches written in the same transaction as the first logged step carry a DB timestamp slightly before it.
+  const loggedSince = new Date(cutoff.getTime() - CUTOFF_MARGIN_MS);
+  const plan = await planEntries(manager, options, loggedSince);
   return {
     cutoff,
+    loggedSince,
     ...plan,
     written: options.apply ? await writeEntries(manager, plan.planned) : 0,
   };
@@ -221,27 +254,27 @@ function printReport(
   report: BackfillMatchAuditLogReport,
   apply: boolean,
 ): void {
+  const count = (keep: (entry: PlannedEntry) => boolean) =>
+    report.planned.filter(keep).length;
   logger.info(
-    `Cutoff (first logged match step): ${report.cutoff.toISOString()}.`,
+    `Cutoff (first logged match step): ${report.cutoff.toISOString()}; ` +
+      `backfilling matches before ${report.loggedSince.toISOString()}.`,
   );
-  logger.info("Pre-cutoff matches per created_at day (UTC):");
-  for (const [day, count] of Object.entries(report.matchesCreatedOn)) {
-    logger.info(`  ${day}: ${count}`);
+  logger.info("Pre-cutoff matches per created_at day (DB time):");
+  for (const [day, matches] of Object.entries(report.matchesCreatedOn)) {
+    logger.info(`  ${day}: ${matches}`);
   }
   logger.info(
-    `Skipped ${report.skippedAlreadyLinked} match(es) that already have a Linked entry.`,
+    `Skipped ${report.skippedAlreadyLinked} match(es) already backfilled.`,
   );
   logger.info(
     `${apply ? "Wrote" : "[dry-run] Would write"} ${
       apply ? report.written : report.planned.length
-    } volunteer activity-log entries.`,
+    } volunteer activity-log entries: ` +
+      `${count(({ kind }) => kind === "linked")} Linked ` +
+      `(${count(({ imported }) => imported)} imported), ` +
+      `${count(({ kind }) => kind === "status-changed")} status changed.`,
   );
-  for (const entry of report.planned) {
-    logger.info(
-      `  volunteer ${entry.volunteerId} (match ${entry.opportunityVolunteerId}) ` +
-        `@ ${entry.occurredAt.toISOString()}: ${entry.detail}`,
-    );
-  }
 }
 
 async function main() {

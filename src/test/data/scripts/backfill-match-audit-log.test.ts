@@ -9,6 +9,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   backfill,
   findCutoff,
+  MatchRow,
   parseArgs,
   planMatchEntries,
 } from "../../../data/scripts/backfill-match-audit-log";
@@ -50,23 +51,25 @@ describe("backfill-match-audit-log parseArgs", () => {
 describe("backfill-match-audit-log planMatchEntries", () => {
   const cutoff = new Date("2026-10-07T12:00:00Z");
   const createdAt = new Date("2026-03-10T12:00:00Z");
-  const match = (overrides: Partial<OpportunityVolunteer> = {}) =>
-    new OpportunityVolunteer({
-      id: 7,
-      volunteerId: 11,
-      opportunityId: 13,
-      opportunity: new Opportunity({ id: 13, title: "Kleiderkammer" }),
-      status: MATCHED,
-      createdAt,
-      updatedAt: createdAt,
-      ...overrides,
-    });
+  const match = (overrides: Partial<MatchRow> = {}): MatchRow => ({
+    id: 7,
+    volunteerId: 11,
+    opportunityId: 13,
+    title: "Kleiderkammer",
+    status: MATCHED,
+    createdAt,
+    updatedAt: createdAt,
+    createdOn: "2026-03-10",
+    ...overrides,
+  });
 
   it("links with the current status when the match was never updated", () => {
     expect(planMatchEntries(match(), cutoff, [])).toEqual([
       {
         opportunityVolunteerId: 7,
         volunteerId: 11,
+        kind: "linked",
+        imported: false,
         detail: 'Linked to opportunity "Kleiderkammer" as opp-matched.',
         occurredAt: createdAt,
       },
@@ -101,7 +104,7 @@ describe("backfill-match-audit-log planMatchEntries", () => {
     }
   });
 
-  it("marks only the Linked entry of a match created on an imported day", () => {
+  it("marks only the Linked entry of a match created on an imported day (DB date)", () => {
     const updatedAt = new Date("2026-06-01T12:00:00Z");
     expect(
       planMatchEntries(match({ updatedAt }), cutoff, [
@@ -112,21 +115,21 @@ describe("backfill-match-audit-log planMatchEntries", () => {
       'Linked to opportunity "Kleiderkammer" (imported).',
       'Opportunity "Kleiderkammer" status changed to opp-matched.',
     ]);
-    expect(planMatchEntries(match(), cutoff, ["2026-03-11"])[0].detail).toBe(
-      'Linked to opportunity "Kleiderkammer" as opp-matched.',
-    );
+    expect(
+      planMatchEntries(match({ createdOn: "2026-03-11" }), cutoff, [
+        "2026-03-10",
+      ])[0].detail,
+    ).toBe('Linked to opportunity "Kleiderkammer" as opp-matched.');
   });
 
   it("falls back to #<opportunityId> without a title", () => {
-    expect(
-      planMatchEntries(match({ opportunity: undefined }), cutoff, [])[0].detail,
-    ).toBe('Linked to opportunity "#13" as opp-matched.');
+    expect(planMatchEntries(match({ title: null }), cutoff, [])[0].detail).toBe(
+      'Linked to opportunity "#13" as opp-matched.',
+    );
   });
 });
 
-// backfill sweeps every match and findCutoff reads the whole audit log, and
-// other test files share this database, so all of it runs in a transaction
-// that is rolled back.
+// Sweeps every match in the shared test DB, so it runs in a rolled-back transaction.
 describe("backfill-match-audit-log backfill", () => {
   const suffix = randomNumericSuffix();
   const createdOn = "2020-01-15";
@@ -187,7 +190,7 @@ describe("backfill-match-audit-log backfill", () => {
       );
     }
 
-    for (const key of ["fresh", "changed", "linked"]) {
+    for (const key of ["fresh", "changed", "linked", "twin"]) {
       v[key] = await createVolunteer(manager);
       o[key] = await createOpportunity(manager, `Backfill ${key} ${suffix}`);
     }
@@ -202,6 +205,15 @@ describe("backfill-match-audit-log backfill", () => {
       o.changed,
       ACTIVE,
       "2020-06-01 12:00",
+    );
+    m.twin = await insertMatch(v.twin, o.twin, MATCHED, `${createdOn} 12:00`);
+    await manager.save(
+      new VolunteerAuditLog({
+        volunteerId: v.twin.id,
+        type: "opportunity_status_changed",
+        detail: `Linked to opportunity "${o.twin.title}" as opp-pending.`,
+        occurredAt: new Date(),
+      }),
     );
     m.linked = await insertMatch(
       v.linked,
@@ -242,7 +254,7 @@ describe("backfill-match-audit-log backfill", () => {
     });
 
     expect(report.written).toBe(0);
-    expect(report.matchesCreatedOn[createdOn]).toBeGreaterThanOrEqual(3);
+    expect(report.matchesCreatedOn[createdOn]).toBeGreaterThanOrEqual(4);
     expect(
       ownPlanned(report.planned).map(({ volunteerId, detail, occurredAt }) => ({
         volunteerId,
@@ -264,6 +276,11 @@ describe("backfill-match-audit-log backfill", () => {
         volunteerId: v.changed.id,
         detail: `Opportunity "${o.changed.title}" status changed to opp-active.`,
         occurredAt: m.changed.updatedAt,
+      },
+      {
+        volunteerId: v.twin.id,
+        detail: `Linked to opportunity "${o.twin.title}" as opp-matched (imported).`,
+        occurredAt: m.twin.createdAt,
       },
     ]);
     expect(await entriesOf(v.fresh)).toEqual([]);
@@ -310,6 +327,16 @@ describe("backfill-match-audit-log backfill", () => {
           actorUserId: null,
         },
       ],
+      twin: [
+        {
+          detail: `Linked to opportunity "${o.twin.title}" as opp-matched.`,
+          occurredAt: m.twin.createdAt,
+          actorUserId: null,
+        },
+        expect.objectContaining({
+          detail: `Linked to opportunity "${o.twin.title}" as opp-pending.`,
+        }),
+      ],
       linked: [
         {
           detail: `Linked to opportunity "${o.linked.title}" as opp-matched.`,
@@ -322,11 +349,11 @@ describe("backfill-match-audit-log backfill", () => {
     const second = await backfill(manager, { apply: true, importedOn: [] });
     expect(second.cutoff).toEqual(first.cutoff);
     expect(second.written).toBe(0);
-    expect(second.skippedAlreadyLinked).toBeGreaterThanOrEqual(3);
+    expect(second.skippedAlreadyLinked).toBeGreaterThanOrEqual(4);
     expect(await written()).toEqual(afterFirst);
   });
 
-  it("leaves matches created at or after the cutoff alone", async () => {
+  it("leaves matches created within a minute before the cutoff alone", async () => {
     const cutoff = await findCutoff(manager);
     const lateVolunteer = await createVolunteer(manager);
     const lateOpportunity = await createOpportunity(
@@ -336,7 +363,12 @@ describe("backfill-match-audit-log backfill", () => {
     await manager.query(
       `INSERT INTO opportunity_volunteer (volunteer_id, opportunity_id, status, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $4)`,
-      [lateVolunteer.id, lateOpportunity.id, MATCHED, cutoff],
+      [
+        lateVolunteer.id,
+        lateOpportunity.id,
+        MATCHED,
+        new Date(cutoff.getTime() - 30_000),
+      ],
     );
 
     const report = await backfill(manager, { apply: false, importedOn: [] });

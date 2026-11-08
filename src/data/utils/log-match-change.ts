@@ -29,8 +29,13 @@ export const matchDetail = {
     `Removed from opportunity "${title}" (was ${from}).`,
   statusChanged: (
     title: string,
-    to: OpportunityVolunteerStatusType,
-    from?: OpportunityVolunteerStatusType,
+    {
+      from,
+      to,
+    }: {
+      from?: OpportunityVolunteerStatusType;
+      to: OpportunityVolunteerStatusType;
+    },
   ) =>
     `Opportunity "${title}" status changed${from ? ` from ${from}` : ""} to ${to}.`,
 };
@@ -59,7 +64,7 @@ export async function logMatchChange(
   } else if (to === undefined) {
     detail = matchDetail.removed(title, from);
   } else {
-    detail = matchDetail.statusChanged(title, to, from);
+    detail = matchDetail.statusChanged(title, { from, to });
   }
 
   await manager.save(
