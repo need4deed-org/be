@@ -35,7 +35,8 @@ const matchesFromSql = (
 const onetimerFromSql = (
   volunteerColumn: string,
   status: "activeMatch" | "pastMatch",
-) => matchesFromSql(volunteerColumn, status, "onetimer");
+) =>
+  `${matchesFromSql(volunteerColumn, status, "onetimer")}${status === "pastMatch" ? " AND ot.date <= :endOfToday" : ""}`;
 
 export const anyActiveMatchSql = (volunteerColumn: string) =>
   `EXISTS (SELECT 1 ${matchesFromSql(volunteerColumn, "activeMatch")})`;
@@ -50,13 +51,16 @@ export const pastOnetimerMatchSql = (volunteerColumn: string, since?: string) =>
   `EXISTS (SELECT 1 ${onetimerFromSql(volunteerColumn, "pastMatch")} ${since ? `AND ot.date >= :${since}` : ""})`;
 
 export const onetimerHoldSql = (volunteerColumn: string) =>
-  `EXISTS (SELECT 1 ${onetimerFromSql(volunteerColumn, "pastMatch")} AND ot.date >= :activeSince AND ot.date <= :endOfToday)`;
+  `EXISTS (SELECT 1 ${onetimerFromSql(volunteerColumn, "pastMatch")} AND ot.date >= :activeSince)`;
 
 export const handSetActiveSinceOnetimerSql = (volunteerColumn: string) =>
   `COALESCE((
     SELECT latest.actor_user_id IS NOT NULL
       AND latest.detail LIKE :toActive
-      AND latest.occurred_at >= (SELECT max(ot.date) ${onetimerFromSql(volunteerColumn, "pastMatch")})
+      AND latest.occurred_at >= (
+        SELECT date_trunc('day', max(ot.date) AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin'
+        ${onetimerFromSql(volunteerColumn, "pastMatch")}
+      )
     FROM (
       SELECT al.actor_user_id, al.detail, al.occurred_at
       FROM volunteer_audit_log al

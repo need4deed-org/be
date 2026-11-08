@@ -19,17 +19,20 @@ export class RestoreActiveAfterRecentOnetimer1794168561406
               AND ov.status = 'opp-past'
               AND o.type IN ('accompanying', 'events')
               AND ot.date >= (date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') - interval '28 days') AT TIME ZONE 'Europe/Berlin'
+              AND ot.date < (date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day') AT TIME ZONE 'Europe/Berlin'
           )
           AND (
             SELECT al.actor_user_id IS NULL
               AND al.detail = 'Status changed from vol-active to vol-available.'
               AND al.occurred_at >= (
-                SELECT max(ot.date) FROM "opportunity_volunteer" ov
+                SELECT date_trunc('day', max(ot.date) AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin'
+                FROM "opportunity_volunteer" ov
                 JOIN "opportunity" o ON o.id = ov.opportunity_id
                 JOIN "onetimer" ot ON ot.id = o.onetimer_id
                 WHERE ov.volunteer_id = v.id
                   AND ov.status = 'opp-past'
                   AND o.type IN ('accompanying', 'events')
+                  AND ot.date < (date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') + interval '1 day') AT TIME ZONE 'Europe/Berlin'
               )
             FROM "volunteer_audit_log" al
             WHERE al.volunteer_id = v.id AND al.type = 'availability_changed'

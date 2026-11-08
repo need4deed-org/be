@@ -4,37 +4,21 @@ import { EntityManager, In } from "typeorm";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
-import { engagementChangeDetail } from "../../server/utils/data/engagement-change-detail";
 import {
-  anyActiveMatchSql,
-  handSetActiveSinceOnetimerSql,
-  onetimerHoldSql,
-  onetimerSqlParameters,
-  pastOnetimerMatchSql,
-} from "../../server/utils/data/onetimer-active-period";
+  buildLapsedHoldQuery,
+  lapsedHoldWhere,
+} from "../../server/utils/data/build-lapsed-hold-query";
+import { engagementChangeDetail } from "../../server/utils/data/engagement-change-detail";
+import { onetimerSqlParameters } from "../../server/utils/data/onetimer-active-period";
 
 const { ACTIVE, AVAILABLE } = VolunteerStateEngagementType;
-
-const lapsedWhere = `volunteer.status_engagement = :activeEngagement
-  AND NOT ${anyActiveMatchSql("volunteer.id")}
-  AND NOT ${onetimerHoldSql("volunteer.id")}
-  AND ${pastOnetimerMatchSql("volunteer.id", "holdRuleStart")}
-  AND NOT ${handSetActiveSinceOnetimerSql("volunteer.id")}`;
 
 async function releaseLapsed(
   manager: EntityManager,
   today: Date,
-  volunteerIds?: number[],
 ): Promise<number[]> {
   const parameters = onetimerSqlParameters(today);
-  const candidates = manager
-    .createQueryBuilder(Volunteer, "volunteer")
-    .select("volunteer.id", "id")
-    .where(lapsedWhere);
-  if (volunteerIds) {
-    candidates.andWhere({ id: In(volunteerIds) });
-  }
-  const locked: { id: number }[] = await candidates
+  const locked: { id: number }[] = await buildLapsedHoldQuery(manager)
     .setParameters(parameters)
     .orderBy("volunteer.id")
     .setLock("for_no_key_update")
@@ -47,7 +31,7 @@ async function releaseLapsed(
     .update(Volunteer)
     .set({ statusEngagement: AVAILABLE })
     .where({ id: In(locked.map(({ id }) => id)) })
-    .andWhere(lapsedWhere)
+    .andWhere(lapsedHoldWhere)
     .setParameters(parameters)
     .returning(["id"])
     .execute();
@@ -70,10 +54,9 @@ async function releaseLapsed(
 export async function releaseLapsedOnetimerEngagement(
   fastify: FastifyInstance,
   today: Date = berlinToday(),
-  volunteerIds?: number[],
 ): Promise<void> {
   const released = await fastify.db.volunteerRepository.manager.transaction(
-    (manager) => releaseLapsed(manager, today, volunteerIds),
+    (manager) => releaseLapsed(manager, today),
   );
   if (released.length) {
     logger.info(

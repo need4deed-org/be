@@ -22,6 +22,31 @@ vi.mock(
     ),
 );
 
+const scope = { volunteerIds: [] as number[] };
+
+vi.mock(
+  "../../../server/utils/data/build-lapsed-hold-query",
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import("../../../server/utils/data/build-lapsed-hold-query")
+      >();
+    return {
+      ...original,
+      buildLapsedHoldQuery: (
+        ...args: Parameters<typeof original.buildLapsedHoldQuery>
+      ) =>
+        original
+          .buildLapsedHoldQuery(...args)
+          .andWhere("volunteer.id IN (:...scopedVolunteerIds)", {
+            scopedVolunteerIds: scope.volunteerIds.length
+              ? scope.volunteerIds
+              : [0],
+          }),
+    };
+  },
+);
+
 const TODAY = new Date(2101, 2, 15);
 const daysAgo = (days: number) => {
   const date = addDays(TODAY, -days);
@@ -98,12 +123,10 @@ describe("releaseLapsedOnetimerEngagement", () => {
       matches: [{ volunteer, status: PAST }],
     });
 
-  const run = (...volunteers: Volunteer[]) =>
-    releaseLapsedOnetimerEngagement(
-      ctx.fastify,
-      TODAY,
-      volunteers.map(({ id }) => id),
-    );
+  const run = (...volunteers: Volunteer[]) => {
+    scope.volunteerIds = volunteers.map(({ id }) => id);
+    return releaseLapsedOnetimerEngagement(ctx.fastify, TODAY);
+  };
 
   it.each([OpportunityType.ACCOMPANYING, OpportunityType.EVENTS])(
     "keeps a volunteer Active on day 28 after an %s",
@@ -196,6 +219,22 @@ describe("releaseLapsedOnetimerEngagement", () => {
     await addPastOnetimer(volunteer, 40);
     await logStatus(volunteer, AVAILABLE, ACTIVE, true);
     await backdateLogs(volunteer, 10);
+
+    await run(volunteer);
+
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(ACTIVE);
+  });
+
+  it("counts a hand-set Active earlier on the day of the accompanying as after it", async () => {
+    const volunteer = await ctx.fixtures.volunteer(ACTIVE);
+    await addPastOnetimer(volunteer, 40);
+    await logStatus(volunteer, AVAILABLE, ACTIVE, true);
+    const morning = daysAgo(40);
+    morning.setHours(8);
+    await ctx.fastify.db.volunteerAuditLogRepository.update(
+      { volunteerId: volunteer.id },
+      { occurredAt: morning },
+    );
 
     await run(volunteer);
 
