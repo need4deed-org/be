@@ -419,7 +419,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
 
   it("400s for an invalid postcode before writing anything", async () => {
     const code = await unusedPostcode(() =>
-      String(randomBetween(1, 1066)).padStart(5, "0"),
+      String(randomBetween(1, 1000)).padStart(5, "0"),
     );
     const before = await fastify.db.personRepository.findOneByOrFail({
       id: person.id,
