@@ -26,6 +26,7 @@ export const RoutePrefix = {
   POST: "/post",
   RECOMMENDED_OPPORTUNITIES: "/recommended-opportunities",
   RECOMMENDED_VOLUNTEERS: "/recommended-volunteers",
+  SUGGESTION_REQUEST: "/suggestion-request",
   REFRESH: "/refresh",
   REQUEST_RESET: "/request-reset",
   RESET_PASSWORD: "/password-reset",

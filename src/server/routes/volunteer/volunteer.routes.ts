@@ -87,6 +87,7 @@ import volunteerDocRoutes from "./doc.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 import volunteerRegisterRoutes from "./register.routes";
+import volunteerSuggestionRequestRoutes from "./suggestion-request.routes";
 import volunteerOpportunityRoutes from "./volunteer-opportunity.routes";
 import volunteerRecommendedOpportunityRoutes from "./volunteer-recommended-opportunity.routes";
 
@@ -134,6 +135,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerAppreciationRoutes, {
     prefix: `/:id${RoutePrefix.APPRECIATION}`,
+  });
+
+  await fastify.register(volunteerSuggestionRequestRoutes, {
+    prefix: `/:id${RoutePrefix.SUGGESTION_REQUEST}`,
   });
 
   await fastify.register(volunteerAuditLogRoutes, {

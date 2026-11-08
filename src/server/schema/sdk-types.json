@@ -1004,6 +1004,18 @@
       "required": ["street", "postcode", "city"],
       "additionalProperties": false
     },
+    "ApiVolunteerSuggestionRequestPost": {
+      "$id": "ApiVolunteerSuggestionRequestPost",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
     "ApiVolunteerOpportunityPost": {
       "$id": "ApiVolunteerOpportunityPost",
       "type": "object",
