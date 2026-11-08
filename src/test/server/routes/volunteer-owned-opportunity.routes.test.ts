@@ -202,7 +202,7 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
     });
 
     it("stays masked for an unmatched platform volunteer", async () => {
-      expect(await agentTitleOf("platform")).not.toBe(agents.owner.title);
+      expect(await agentTitleOf("platform")).toMatch(/^[a-z]\*{3}$/);
     });
   });
 

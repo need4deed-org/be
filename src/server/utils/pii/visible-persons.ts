@@ -61,8 +61,11 @@ export async function resolveCallerVisibility(
   personIds.add(personId);
 
   if (user.role === UserRole.VOLUNTEER) {
-    const rows: { opportunity_id: number; agent_id: number | null }[] =
-      await request.server.db.agentPersonRepository.manager.query(
+    const [rows, ownedScope]: [
+      { opportunity_id: number; agent_id: number | null }[],
+      Awaited<ReturnType<typeof resolveOwnedVolunteerScope>>,
+    ] = await Promise.all([
+      request.server.db.agentPersonRepository.manager.query(
         `SELECT ov.opportunity_id, o.agent_id
            FROM opportunity_volunteer ov
            JOIN volunteer v ON v.id = ov.volunteer_id
@@ -70,14 +73,15 @@ export async function resolveCallerVisibility(
           WHERE v.person_id = $1
             AND ov.status = ANY($2)`,
         [personId, VISIBLE_MATCH_STATUSES],
-      );
+      ),
+      resolveOwnedVolunteerScope(request, user),
+    ]);
     rows.forEach((r) => {
       opportunityIds.add(Number(r.opportunity_id));
       if (r.agent_id !== null) {
         matchedAgentIds.add(Number(r.agent_id));
       }
     });
-    const ownedScope = await resolveOwnedVolunteerScope(request);
     if (ownedScope) {
       matchedAgentIds.add(ownedScope.ownerAgentId);
     }

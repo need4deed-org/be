@@ -110,6 +110,17 @@ describe("resolveCallerVisibility", () => {
       expect([...v.agentIds]).toEqual([]);
       expect(sorted(v.opportunityIds)).toEqual([11]);
     });
+
+    it("adds no owning NGO for a platform volunteer", async () => {
+      query.mockResolvedValueOnce([{ opportunity_id: 11, agent_id: 42 }]);
+      mockOwnedScope.mockResolvedValueOnce(null);
+      const user = makeUser(UserRole.VOLUNTEER, 7);
+
+      const v = await resolveCallerVisibility(request, user);
+
+      expect([...v.matchedAgentIds]).toEqual([42]);
+      expect(mockOwnedScope).toHaveBeenCalledWith(request, user);
+    });
   });
 
   describe("AGENT", () => {

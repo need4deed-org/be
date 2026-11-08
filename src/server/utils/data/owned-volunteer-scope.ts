@@ -3,6 +3,7 @@ import { UserRole } from "need4deed-sdk";
 import { FindOptionsWhere, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import User from "../../../data/entity/user.entity";
 import { andIntoWhere } from "./merge-into-where";
 import { closedForVolunteersIdWhere } from "./no-match-found";
 
@@ -10,16 +11,17 @@ export type OwnedVolunteerScope = { volunteerId: number; ownerAgentId: number };
 
 export async function resolveOwnedVolunteerScope(
   request: FastifyRequest,
+  user: User | undefined = request.authUser,
 ): Promise<OwnedVolunteerScope | null> {
-  if (request.ownedVolunteerScope !== undefined) {
+  const isCaller = user === request.authUser;
+  if (isCaller && request.ownedVolunteerScope !== undefined) {
     return request.ownedVolunteerScope;
   }
-  const { authUser } = request;
   let scope: OwnedVolunteerScope | null = null;
-  if (authUser?.role === UserRole.VOLUNTEER && authUser.personId) {
+  if (user?.role === UserRole.VOLUNTEER && user.personId) {
     const volunteer = await request.server.db.volunteerRepository.findOne({
       select: { id: true, ownerAgentId: true },
-      where: { personId: authUser.personId },
+      where: { personId: user.personId },
     });
     if (volunteer?.ownerAgentId) {
       scope = {
@@ -28,7 +30,9 @@ export async function resolveOwnedVolunteerScope(
       };
     }
   }
-  request.ownedVolunteerScope = scope;
+  if (isCaller) {
+    request.ownedVolunteerScope = scope;
+  }
   return scope;
 }
 
