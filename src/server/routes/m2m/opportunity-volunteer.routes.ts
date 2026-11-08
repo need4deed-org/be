@@ -32,8 +32,8 @@ import {
   assertAgentCanSuggest,
   isOwnersPendingSuggestion,
 } from "../../utils/data/assert-agent-can-suggest";
+import { agentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
-import { getCallerAgentIds } from "../../utils/data/get-caller-agent-ids";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
   claimEmailCommunication,
@@ -287,24 +287,23 @@ async function assertCanChangeMatch(
     return;
   }
   const opportunity = await fastify.db.opportunityRepository.findOne({
-    select: { id: true, agentId: true },
+    relations: { agent: true },
+    select: {
+      id: true,
+      agentId: true,
+      agent: { id: true, engagementStatus: true },
+    },
     where: { id: ov.opportunityId },
   });
-  const callerAgentIds = await getCallerAgentIds(
-    request,
-    request.authUser.personId,
-  );
-  if (!opportunity?.agentId || !callerAgentIds.includes(opportunity.agentId)) {
+  if (!(await agentOwnsOpportunity(request, opportunity?.agentId))) {
     if (change === "remove" && (await isOwnersPendingSuggestion(request, ov))) {
       return;
     }
     throw new NotFoundError(`Opportunity (id:${ov.opportunityId}) not found.`);
   }
-  const agent = await fastify.db.agentRepository.findOne({
-    select: { id: true, engagementStatus: true },
-    where: { id: opportunity?.agentId },
-  });
-  if (agent?.engagementStatus === AgentEngagementStatusType.INACTIVE) {
+  if (
+    opportunity?.agent?.engagementStatus === AgentEngagementStatusType.INACTIVE
+  ) {
     throw new UnauthorizedError("This NGO is inactive.");
   }
   const isAllowed =
@@ -348,7 +347,7 @@ export default async function m2mOpportunityVolunteerRoutes(
       const { opportunityId, volunteerId } = body;
 
       if (request.authUser?.role === UserRole.AGENT) {
-        await assertAgentCanSuggest(request, body);
+        await assertAgentCanSuggest(request, request.body);
       }
 
       if (

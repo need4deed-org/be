@@ -6,7 +6,6 @@ import {
 } from "fastify";
 import {
   ApiOpportunityEventRegistrationPost,
-  OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../config";
@@ -16,12 +15,7 @@ import {
   opportunityEventRegistrationResponseSchema,
 } from "../schema";
 import { ReplyMessage } from "../types/endpoint-handlers";
-
-const OPEN_OPPORTUNITY_STATUSES: OpportunityStatusType[] = [
-  OpportunityStatusType.NEW,
-  OpportunityStatusType.ACTIVE,
-  OpportunityStatusType.SEARCHING,
-];
+import { OPEN_OPPORTUNITY_STATUSES } from "../utils/data/open-opportunity-statuses";
 
 export default async function opportunityEventRegistrationRoutes(
   fastify: FastifyInstance,

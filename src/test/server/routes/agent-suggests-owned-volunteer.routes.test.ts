@@ -305,6 +305,21 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("400s an email note, which only coordinators may add", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: cookies.private },
+      payload: {
+        volunteerId: volunteers.private.id,
+        opportunityId: opportunities.private.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+        emailNote: "Please call me directly.",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("400s an opportunity that is no longer open", async () => {
     const deal = await fastify.db.dealRepository.save(
       new Deal({
@@ -371,6 +386,15 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
       expect(
         await fastify.db.opportunityVolunteerRepository.existsBy({ id }),
       ).toBe(false);
+    });
+
+    it("404s a pending suggestion on an NGO it can't suggest to", async () => {
+      const { id } = await link(
+        "home",
+        "closed",
+        OpportunityVolunteerStatusType.PENDING,
+      );
+      expect((await remove("home", id)).statusCode).toBe(404);
     });
 
     it("404s once the other NGO has moved the suggestion on", async () => {

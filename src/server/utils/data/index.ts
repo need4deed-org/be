@@ -33,6 +33,7 @@ export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
 export * from "./is-person-referenced";
 export * from "./is-staff-role";
+export * from "./open-opportunity-statuses";
 export * from "./owned-volunteer-scope";
 export * from "./update-backfilled-column";
 export * from "./is-trusted-domain";
