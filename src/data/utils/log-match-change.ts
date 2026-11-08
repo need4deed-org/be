@@ -15,13 +15,16 @@ type MatchChange = {
   title?: string;
 };
 
+const linkedPrefix = (title: string) => `Linked to opportunity "${title}"`;
+
 export const matchDetail = {
+  linkedPrefix,
   linked: (
     title: string,
     status?: OpportunityVolunteerStatusType,
     imported = false,
   ) =>
-    `Linked to opportunity "${title}"${status ? ` as ${status}` : ""}${imported ? " (imported)" : ""}.`,
+    `${linkedPrefix(title)}${status ? ` as ${status}` : ""}${imported ? " (imported)" : ""}.`,
   removed: (title: string, from: OpportunityVolunteerStatusType) =>
     `Removed from opportunity "${title}" (was ${from}).`,
   statusChanged: (

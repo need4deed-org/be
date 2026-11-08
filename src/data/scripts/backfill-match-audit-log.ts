@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { DataSource, EntityManager, LessThan } from "typeorm";
+import { DataSource, EntityManager, In, LessThan } from "typeorm";
 import logger from "../../logger";
 import { dataSource } from "../data-source";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
@@ -20,6 +20,7 @@ export interface PlannedEntry {
 
 export interface BackfillPlan {
   planned: PlannedEntry[];
+  skippedAlreadyLinked: number;
   matchesCreatedOn: Record<string, number>;
 }
 
@@ -70,14 +71,16 @@ export async function findCutoff(manager: EntityManager): Promise<Date> {
   return firstLogged?.occurredAt ?? new Date();
 }
 
+const matchTitle = ({ opportunity, opportunityId }: OpportunityVolunteer) =>
+  opportunity?.title ?? `#${opportunityId}`;
+
 export function planMatchEntries(
   match: OpportunityVolunteer,
   cutoff: Date,
   importedOn: string[],
 ): PlannedEntry[] {
-  const { id, volunteerId, opportunityId, status, createdAt, updatedAt } =
-    match;
-  const title = match.opportunity?.title ?? `#${opportunityId}`;
+  const { id, volunteerId, status, createdAt, updatedAt } = match;
+  const title = matchTitle(match);
   const changedLater = updatedAt.getTime() > createdAt.getTime();
   const entry = (detail: string, occurredAt: Date): PlannedEntry => ({
     opportunityVolunteerId: id,
@@ -102,6 +105,29 @@ export function planMatchEntries(
   return planned;
 }
 
+async function findLinkedDetails(
+  manager: EntityManager,
+  volunteerIds: number[],
+): Promise<Map<number, string[]>> {
+  const entries = volunteerIds.length
+    ? await manager.find(VolunteerAuditLog, {
+        select: { id: true, volunteerId: true, detail: true },
+        where: {
+          type: "opportunity_status_changed",
+          volunteerId: In([...new Set(volunteerIds)]),
+        },
+      })
+    : [];
+  const byVolunteer = new Map<number, string[]>();
+  for (const { volunteerId, detail } of entries) {
+    byVolunteer.set(volunteerId, [
+      ...(byVolunteer.get(volunteerId) ?? []),
+      detail,
+    ]);
+  }
+  return byVolunteer;
+}
+
 export async function planEntries(
   manager: EntityManager,
   { importedOn }: BackfillMatchAuditLogOptions,
@@ -121,15 +147,28 @@ export async function planEntries(
     where: { createdAt: LessThan(cutoff) },
     order: { createdAt: "ASC", id: "ASC" },
   });
+  const linkedDetails = await findLinkedDetails(
+    manager,
+    matches.map(({ volunteerId }) => volunteerId),
+  );
+  const isLinked = (match: OpportunityVolunteer) => {
+    const prefix = matchDetail.linkedPrefix(matchTitle(match));
+    return (linkedDetails.get(match.volunteerId) ?? []).some((detail) =>
+      detail.startsWith(prefix),
+    );
+  };
+  const toBackfill = matches.filter((match) => !isLinked(match));
+
   const matchesCreatedOn: Record<string, number> = {};
   for (const { createdAt } of matches) {
     const day = utcDay(createdAt);
     matchesCreatedOn[day] = (matchesCreatedOn[day] ?? 0) + 1;
   }
   return {
-    planned: matches.flatMap((match) =>
+    planned: toBackfill.flatMap((match) =>
       planMatchEntries(match, cutoff, importedOn),
     ),
+    skippedAlreadyLinked: matches.length - toBackfill.length,
     matchesCreatedOn,
   };
 }
@@ -190,6 +229,9 @@ function printReport(
   for (const [day, count] of Object.entries(report.matchesCreatedOn)) {
     logger.info(`  ${day}: ${count}`);
   }
+  logger.info(
+    `Skipped ${report.skippedAlreadyLinked} match(es) that already have a Linked entry.`,
+  );
   logger.info(
     `${apply ? "Wrote" : "[dry-run] Would write"} ${
       apply ? report.written : report.planned.length
