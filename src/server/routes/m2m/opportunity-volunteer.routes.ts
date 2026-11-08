@@ -32,8 +32,8 @@ import {
   assertAgentCanSuggest,
   isOwnersPendingSuggestion,
 } from "../../utils/data/assert-agent-can-suggest";
-import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
+import { getCallerAgentIds } from "../../utils/data/get-caller-agent-ids";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
   claimEmailCommunication,
@@ -286,18 +286,20 @@ async function assertCanChangeMatch(
     assertCoordinator(request);
     return;
   }
-  if (change === "remove" && (await isOwnersPendingSuggestion(request, ov))) {
-    return;
-  }
   const opportunity = await fastify.db.opportunityRepository.findOne({
     select: { id: true, agentId: true },
     where: { id: ov.opportunityId },
   });
-  await assertAgentOwnsOpportunity(
+  const callerAgentIds = await getCallerAgentIds(
     request,
-    ov.opportunityId,
-    opportunity?.agentId,
+    request.authUser.personId,
   );
+  if (!opportunity?.agentId || !callerAgentIds.includes(opportunity.agentId)) {
+    if (change === "remove" && (await isOwnersPendingSuggestion(request, ov))) {
+      return;
+    }
+    throw new NotFoundError(`Opportunity (id:${ov.opportunityId}) not found.`);
+  }
   const agent = await fastify.db.agentRepository.findOne({
     select: { id: true, engagementStatus: true },
     where: { id: opportunity?.agentId },

@@ -1,41 +1,75 @@
 import { FastifyRequest } from "fastify";
 import {
   AgentEngagementStatusType,
+  ApiOpportunityVolunteerPost,
+  OpportunityStatusType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
-import { In } from "typeorm";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../../config";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { getLiveSharingAgentIds } from "./live-sharing-agents";
 
-type Suggestion = {
-  opportunityId: number;
-  volunteerId: number;
-  status?: OpportunityVolunteerStatusType;
-};
+type Suggestion = Pick<
+  ApiOpportunityVolunteerPost,
+  "opportunityId" | "volunteerId" | "status"
+>;
+
+const SUGGESTABLE_OPPORTUNITY_STATUSES = [
+  OpportunityStatusType.NEW,
+  OpportunityStatusType.SEARCHING,
+  OpportunityStatusType.ACTIVE,
+];
+
+const isInactive = (
+  agent: Pick<Agent, "engagementStatus"> | null | undefined,
+) => agent?.engagementStatus === AgentEngagementStatusType.INACTIVE;
+
+async function findOwnedVolunteer(
+  request: FastifyRequest,
+  volunteerId: number,
+) {
+  const [callerAgentIds, volunteer] = await Promise.all([
+    getCallerAgentIds(request, request.authUser?.personId),
+    request.server.db.volunteerRepository.findOne({
+      relations: { ownerAgent: true },
+      select: {
+        id: true,
+        ownerAgentId: true,
+        ownerAgent: { id: true, engagementStatus: true },
+      },
+      where: { id: volunteerId },
+    }),
+  ]);
+  const ownerAgentId = volunteer?.ownerAgentId;
+  if (!ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
+    return null;
+  }
+  return { callerAgentIds, ownerAgentId, ownerAgent: volunteer.ownerAgent };
+}
 
 export async function assertAgentCanSuggest(
   request: FastifyRequest,
   { opportunityId, volunteerId, status }: Suggestion,
 ): Promise<void> {
-  if (status !== OpportunityVolunteerStatusType.PENDING) {
-    throw new UnauthorizedError("Permission denied");
-  }
-  const { db } = request.server;
-  const [callerAgentIds, volunteer, opportunity] = await Promise.all([
-    getCallerAgentIds(request, request.authUser?.personId),
-    db.volunteerRepository.findOne({
-      select: { id: true, ownerAgentId: true },
-      where: { id: volunteerId },
-    }),
-    db.opportunityRepository.findOne({
-      select: { id: true, agentId: true },
+  const [owned, opportunity] = await Promise.all([
+    findOwnedVolunteer(request, volunteerId),
+    request.server.db.opportunityRepository.findOne({
+      relations: { agent: true },
+      select: {
+        id: true,
+        agentId: true,
+        status: true,
+        agent: { id: true, engagementStatus: true },
+      },
       where: { id: opportunityId },
     }),
   ]);
-
-  const ownerAgentId = volunteer?.ownerAgentId;
-  if (!ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
+  if (!owned) {
     throw new NotFoundError(`Volunteer (id:${volunteerId}) not found.`);
   }
   const opportunityAgentId = opportunity?.agentId;
@@ -43,27 +77,28 @@ export async function assertAgentCanSuggest(
     throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
   }
 
-  if (!callerAgentIds.includes(opportunityAgentId)) {
+  if (owned.callerAgentIds.includes(opportunityAgentId)) {
+    if (isInactive(owned.ownerAgent) || isInactive(opportunity.agent)) {
+      throw new UnauthorizedError("This NGO is inactive.");
+    }
+  } else {
     const sharing = await getLiveSharingAgentIds(request, [
-      ownerAgentId,
+      owned.ownerAgentId,
       opportunityAgentId,
     ]);
     if (
-      !sharing.includes(ownerAgentId) ||
+      !sharing.includes(owned.ownerAgentId) ||
       !sharing.includes(opportunityAgentId)
     ) {
       throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
     }
   }
 
-  const inactive = await db.agentRepository.exists({
-    where: {
-      id: In([ownerAgentId, opportunityAgentId]),
-      engagementStatus: AgentEngagementStatusType.INACTIVE,
-    },
-  });
-  if (inactive) {
-    throw new UnauthorizedError("This NGO is inactive.");
+  if (status !== OpportunityVolunteerStatusType.PENDING) {
+    throw new UnauthorizedError("Permission denied");
+  }
+  if (!SUGGESTABLE_OPPORTUNITY_STATUSES.includes(opportunity.status)) {
+    throw new BadRequestError("Opportunity is no longer open.");
   }
 }
 
@@ -74,24 +109,11 @@ export async function isOwnersPendingSuggestion(
   if (status !== OpportunityVolunteerStatusType.PENDING) {
     return false;
   }
-  const [callerAgentIds, volunteer] = await Promise.all([
-    getCallerAgentIds(request, request.authUser?.personId),
-    request.server.db.volunteerRepository.findOne({
-      select: { id: true, ownerAgentId: true },
-      where: { id: volunteerId },
-    }),
-  ]);
-  const ownerAgentId = volunteer?.ownerAgentId;
-  if (!ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
+  const owned = await findOwnedVolunteer(request, volunteerId);
+  if (!owned) {
     return false;
   }
-  const inactive = await request.server.db.agentRepository.exists({
-    where: {
-      id: ownerAgentId,
-      engagementStatus: AgentEngagementStatusType.INACTIVE,
-    },
-  });
-  if (inactive) {
+  if (isInactive(owned.ownerAgent)) {
     throw new UnauthorizedError("This NGO is inactive.");
   }
   return true;

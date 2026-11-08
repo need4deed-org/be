@@ -40,7 +40,8 @@ type VolunteerKey =
   | "private"
   | "dormant"
   | "platform"
-  | "withdrawn";
+  | "withdrawn"
+  | "inactivePeer";
 
 const AGENTS: Record<
   AgentKey,
@@ -71,6 +72,7 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
   const persons: Person[] = [];
   const deals: Deal[] = [];
   const cookies = {} as Record<Caller, string>;
+  const extraOpportunityIds: number[] = [];
   let suggestionsSent = 0;
 
   const suggest = (
@@ -197,6 +199,7 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
       dormant: agents.dormant.id,
       platform: null,
       withdrawn: agents.home.id,
+      inactivePeer: agents.inactivePeer.id,
     };
     for (const [key, ownerAgentId] of Object.entries(owners) as [
       VolunteerKey,
@@ -227,7 +230,10 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
     });
     await fastify.db.volunteerRepository.delete({ id: In(volunteerIds) });
     await fastify.db.opportunityRepository.delete({
-      id: In(Object.values(opportunities).map(({ id }) => id)),
+      id: In([
+        ...Object.values(opportunities).map(({ id }) => id),
+        ...extraOpportunityIds,
+      ]),
     });
     await fastify.db.dealRepository.delete({
       id: In(deals.map(({ id }) => id)),
@@ -289,6 +295,47 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
     );
   });
 
+  it("404s rather than 403s a non-suggestion for a volunteer it can't reach", async () => {
+    const res = await suggest(
+      "home",
+      "peer",
+      "home",
+      OpportunityVolunteerStatusType.MATCHED,
+    );
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("400s an opportunity that is no longer open", async () => {
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({
+        type: DealType.OPPORTUNITY,
+        postcodeId: deals[0].postcodeId,
+      }),
+    );
+    deals.push(deal);
+    const past = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Suggest Opportunity past ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.PAST,
+        agentId: agents.home.id,
+        dealId: deal.id,
+      }),
+    );
+    extraOpportunityIds.push(past.id);
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/opportunity-volunteer",
+      cookies: { [accessCookieName]: cookies.home },
+      payload: {
+        volunteerId: volunteers.home.id,
+        opportunityId: past.id,
+        status: OpportunityVolunteerStatusType.PENDING,
+      },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("keeps letting a coordinator suggest any volunteer anywhere", async () => {
     await expectSuggested("coordinator", "platform", "closed");
   });
@@ -333,6 +380,15 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
         OpportunityVolunteerStatusType.MATCHED,
       );
       expect((await remove("home", id)).statusCode).toBe(404);
+    });
+
+    it("still lets the opportunity's NGO remove it when the volunteer's NGO is inactive", async () => {
+      const { id } = await link(
+        "inactivePeer",
+        "peer",
+        OpportunityVolunteerStatusType.PENDING,
+      );
+      expect((await remove("peer", id)).statusCode).toBe(204);
     });
 
     it("403s members of an inactive NGO", async () => {
