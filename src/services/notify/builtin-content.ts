@@ -126,6 +126,29 @@ export const TAGGED_BUILTIN: Record<
   },
 };
 
+export interface SuggestionRequestLabels {
+  someone: string;
+  noName: string;
+}
+
+export const SUGGESTION_REQUEST_BUILTIN: Record<
+  Lang,
+  LocaleContent & { labels: SuggestionRequestLabels }
+> = {
+  [Lang.EN]: {
+    subject:
+      "{{ requesterAgent }} would like {{ volunteerName }} for an opportunity — Need4Deed",
+    text: `Hi {{ recipientName }},\n\n{{ requesterName }} from {{ requesterAgent }} asks whether your volunteer {{ volunteerName }} could be suggested for their opportunity "{{ opportunityTitle }}".\n\nIt's your call: if it fits, suggest them from the volunteer's card on the Need4Deed dashboard: {{ link }}\n\nThe Need4Deed Team`,
+    labels: { someone: "Someone", noName: "there" },
+  },
+  [Lang.DE]: {
+    subject:
+      "{{ requesterAgent }} fragt {{ volunteerName }} für ein Gesuch an — Need4Deed",
+    text: `Hallo {{ recipientName }},\n\n{{ requesterName }} von {{ requesterAgent }} fragt, ob eure freiwillige Person {{ volunteerName }} für das Gesuch „{{ opportunityTitle }}“ vorgeschlagen werden kann.\n\nIhr entscheidet: Wenn es passt, schlagt die Person über ihre Karte im Need4Deed-Dashboard vor: {{ link }}\n\nViele Grüße\nNeed4Deed`,
+    labels: { someone: "Jemand", noName: "zusammen" },
+  },
+};
+
 export const CGC_APPLICATION_BUILTIN: Record<Lang, LocaleContent> = {
   [Lang.EN]: {
     subject: "Your certificate of good conduct application — Need4Deed",

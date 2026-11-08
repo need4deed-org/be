@@ -1,7 +1,7 @@
 import { validate } from "class-validator";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiComment, EntityTableName, UserRole } from "need4deed-sdk";
-import { In } from "typeorm";
+import { FindOptionsWhere, In } from "typeorm";
 import { BadRequestError } from "../../config";
 import Comment from "../../data/entity/comment.entity";
 import CommentPerson from "../../data/entity/m2m/comment-person";
@@ -10,6 +10,10 @@ import logger from "../../logger";
 import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 import { notifyTaggedByEmail, STAFF_ROLES, syncCommentTags } from "../utils";
+import {
+  commentReadWhere,
+  resolveCommentReadScope,
+} from "../utils/data/comment-read-scope";
 
 const COMMENT_READER_ROLES = STAFF_ROLES;
 
@@ -90,9 +94,9 @@ export default async function commentRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
-      // Non-staff get an empty list, not a 403: the notification badge asks for every role.
-      const role = request.authUser?.role;
-      if (!role || !COMMENT_READER_ROLES.includes(role)) {
+      // Non-readers get an empty list, not a 403: the notification badge asks for every role.
+      const readScope = await resolveCommentReadScope(request);
+      if (readScope === "none") {
         return reply
           .status(200)
           .send({ message: "Comments", data: [], count: 0 });
@@ -119,13 +123,16 @@ export default async function commentRoutes(
           }
         }
 
+        const base: FindOptionsWhere<Comment> = {
+          userId,
+          entityId,
+          entityType,
+          ...(commentIdFilter ? { id: In(commentIdFilter) } : {}),
+        };
+        const where =
+          readScope === "all" ? base : commentReadWhere(base, readScope);
         const [comments, count] = await commentRepository.findAndCount({
-          where: {
-            userId,
-            entityId,
-            entityType,
-            ...(commentIdFilter ? { id: In(commentIdFilter) } : {}),
-          },
+          where,
           relations: ["user", "user.person", "language", "commentPerson"],
         });
 
@@ -172,14 +179,18 @@ export default async function commentRoutes(
           });
         }
 
-        const commentRepository = fastify.db.commentRepository;
-        const comment = await commentRepository.findOne({
-          where: { id },
-          relations: ["user", "user.person", "language", "commentPerson"],
-        });
-
-        const role = request.authUser?.role;
-        if (!comment || !role || !COMMENT_READER_ROLES.includes(role)) {
+        const readScope = await resolveCommentReadScope(request);
+        const comment =
+          readScope === "none"
+            ? null
+            : await fastify.db.commentRepository.findOne({
+                where:
+                  readScope === "all"
+                    ? { id }
+                    : commentReadWhere({ id }, readScope),
+                relations: ["user", "user.person", "language", "commentPerson"],
+              });
+        if (!comment) {
           return reply
             .status(404)
             .send({ message: `Comment id:${id} not found.` });
