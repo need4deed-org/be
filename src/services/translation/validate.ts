@@ -8,7 +8,7 @@ export type ValidationResult =
 
 export const SAME_LANGUAGE_MIN_WORDS = 12;
 export const SAME_LANGUAGE_MAX_SIMILARITY = 0.6;
-// A real translation keeps names, addresses and numbers verbatim.
+// Only when the hints read source → target: names and addresses stay verbatim.
 export const TRANSLATED_MAX_SIMILARITY = 0.75;
 const LENGTH_RATIO_MIN = 0.5;
 const LENGTH_RATIO_MAX = 2;
