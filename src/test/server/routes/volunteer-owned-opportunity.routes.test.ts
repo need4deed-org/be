@@ -190,6 +190,22 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
     });
   });
 
+  describe("owning NGO's name", () => {
+    const agentTitleOf = async (as: Caller) => {
+      const res = await get(`/opportunity/${opportunities.own.id}`, as);
+      expect(res.statusCode).toBe(200);
+      return res.json().data.agentTitle;
+    };
+
+    it("is visible to the NGO's owned volunteer", async () => {
+      expect(await agentTitleOf("owned")).toBe(agents.owner.title);
+    });
+
+    it("stays masked for an unmatched platform volunteer", async () => {
+      expect(await agentTitleOf("platform")).not.toBe(agents.owner.title);
+    });
+  });
+
   describe("GET /opportunity/:id", () => {
     it("shows the owning NGO's and the suggested opportunity", async () => {
       for (const key of ["own", "suggested"] as OpportunityKey[]) {

@@ -7,6 +7,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type User from "../../../../data/entity/user.entity";
 import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
+import { resolveOwnedVolunteerScope } from "../../../../server/utils/data/owned-volunteer-scope";
 import {
   resolveCallerVisibility,
   VISIBLE_MATCH_STATUSES,
@@ -16,7 +17,12 @@ vi.mock("../../../../server/utils/data/get-agent-memberships", () => ({
   getActiveAgentMemberships: vi.fn(),
 }));
 
+vi.mock("../../../../server/utils/data/owned-volunteer-scope", () => ({
+  resolveOwnedVolunteerScope: vi.fn(),
+}));
+
 const mockMemberships = vi.mocked(getActiveAgentMemberships);
+const mockOwnedScope = vi.mocked(resolveOwnedVolunteerScope);
 
 const find = vi.fn();
 const query = vi.fn();
@@ -86,6 +92,23 @@ describe("resolveCallerVisibility", () => {
         ],
       ]);
       expect(find).not.toHaveBeenCalled();
+    });
+
+    it("sees the owning NGO like a matched agent", async () => {
+      query.mockResolvedValueOnce([{ opportunity_id: 11, agent_id: 42 }]);
+      mockOwnedScope.mockResolvedValueOnce({
+        volunteerId: 3,
+        ownerAgentId: 77,
+      });
+
+      const v = await resolveCallerVisibility(
+        request,
+        makeUser(UserRole.VOLUNTEER, 7),
+      );
+
+      expect(sorted(v.matchedAgentIds)).toEqual([42, 77]);
+      expect([...v.agentIds]).toEqual([]);
+      expect(sorted(v.opportunityIds)).toEqual([11]);
     });
   });
 

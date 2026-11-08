@@ -7,6 +7,7 @@ import {
 import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
 import { getCallerAgentIds } from "../data/get-caller-agent-ids";
+import { resolveOwnedVolunteerScope } from "../data/owned-volunteer-scope";
 
 export interface CallerVisibility {
   userId: number;
@@ -76,6 +77,10 @@ export async function resolveCallerVisibility(
         matchedAgentIds.add(Number(r.agent_id));
       }
     });
+    const ownedScope = await resolveOwnedVolunteerScope(request);
+    if (ownedScope) {
+      matchedAgentIds.add(ownedScope.ownerAgentId);
+    }
     return visibility;
   }
 
