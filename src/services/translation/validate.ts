@@ -607,13 +607,19 @@ export function validateTranslation(
       ? invalid("untranslated")
       : { status: "ok" };
   }
+  const hint = languageHint(out);
+  const sourceHint = languageHint(src);
+  const translated =
+    sourceHint !== undefined &&
+    sourceHint !== targetLang &&
+    hint === targetLang;
   if (
+    !translated &&
     words >= SAME_LANGUAGE_MIN_WORDS &&
     similarity(src, out) > SAME_LANGUAGE_MAX_SIMILARITY
   ) {
     return invalid("source_is_target");
   }
-  const hint = languageHint(out);
   if (hint !== undefined && hint !== targetLang) {
     return invalid("wrong_language");
   }

@@ -669,6 +669,21 @@ describe("validateTranslation", () => {
     });
   });
 
+  it("accepts a similar output when the hints show a real translation", () => {
+    expectCode(
+      "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)",
+      "Appointment details:\nTuesday, 18 August 2026, at 09:00 AM.\nLocation: DHZC Clinic for Cardiology, Angiology and Intensive Care Medicine. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)",
+      Lang.EN,
+    ).toEqual({ status: "ok" });
+  });
+
+  it("still rejects a near-copy that keeps the source language", () => {
+    const nearCopy = CREATIVE_DE.replace("Lust hat", "Freude hat");
+    expectCode(CREATIVE_DE, nearCopy, Lang.EN).toMatchObject({
+      code: "source_is_target",
+    });
+  });
+
   it("rejects a long output in the other language", () => {
     // Target German, but the model answered in English (1022.info).
     expectCode(
