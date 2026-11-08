@@ -313,6 +313,7 @@ describe("validateTranslation", () => {
     for (const [source, output, target] of [
       ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13 h", Lang.EN],
       ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13h", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12h-13h", Lang.EN],
       ["Am Freitag zwischen 12-15 Uhr", "On Friday between 12-15", Lang.EN],
       ["Zwischen 10 und 16 Uhr", "Between 10 and 16", Lang.EN],
       ["Freitags von 13-15 Uhr", "Fridays from 13-15", Lang.EN],
@@ -340,6 +341,9 @@ describe("validateTranslation", () => {
       ["Von 17 bis 19 Uhr", "From 17 to 19 am", Lang.EN],
       ["From 4:30 to 6:30 pm", "Von 16:30 bis 6:30 Uhr", Lang.DE],
       ["Von 22 bis 24 Uhr", "From 22 to 12:00", Lang.EN],
+      ["Von 23 bis 1:30 Uhr", "From 11 to 1:30", Lang.EN],
+      ["Von 22 bis 6:30 Uhr", "From 10 to 6:30", Lang.EN],
+      ["Von 21 bis 22 Uhr", "From 21 to 22 o'clock", Lang.EN],
       ["Von 17 bis 19 Uhr", "From 17 to 7 Uhr", Lang.EN],
       ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-14 h", Lang.EN],
     ] as const) {

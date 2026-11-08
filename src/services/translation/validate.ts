@@ -297,39 +297,45 @@ function rangePattern(
       endMinutes,
     );
     return new RegExp(
-      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
+      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
       "giu",
     );
   });
 }
 
+type Groups = Record<string, string | undefined>;
+
+function endHasMinutes(groups: Groups): boolean {
+  return /[.:]/.test(groups.end12 ?? groups.end24 ?? "");
+}
+
 function rangeEndMatches(
-  groups: Record<string, string | undefined>,
+  groups: Groups,
   end: number,
   endClock: Clock,
   outputLang: Lang,
 ): boolean {
   if (groups.end24 !== undefined) {
-    return !endClock.meridiem;
+    return !endClock.meridiem && !endClock.oClock;
   }
   const h = end % 12 || 12;
   if (endClock.meridiem || endClock.dayPart) {
-    return sameHour(clockHour(h, endClock), end);
+    return clockMatches(h, end, endClock, outputLang);
   }
   return (
     h === end ||
-    (/[.:]/.test(groups.end12 ?? "") &&
-      clockMatches(h, end, endClock, outputLang))
+    (endHasMinutes(groups) && clockMatches(h, end, endClock, outputLang))
   );
 }
 
 function borrowsEndMeridiem(
-  groups: Record<string, string | undefined> | undefined,
+  groups: Groups,
+  end: number,
   startClock: Clock,
   endClock: Clock,
   outputLang: Lang,
 ): boolean {
-  if (!groups?.end12) {
+  if (groups.end12 === undefined) {
     return false;
   }
   if (endClock.dayPart) {
@@ -341,9 +347,10 @@ function borrowsEndMeridiem(
   return (
     Boolean(endClock.meridiem) ||
     (outputLang === Lang.EN &&
+      end > 12 &&
       !endClock.uhr &&
       !endClock.oClock &&
-      /[.:]/.test(groups.end12))
+      endHasMinutes(groups))
   );
 }
 
@@ -356,7 +363,7 @@ function rangePresent(
   outputLang: Lang,
 ): boolean {
   for (const h of hourVariants(start)) {
-    for (const { groups } of output.matchAll(
+    for (const { groups = {} } of output.matchAll(
       rangePattern(h, startMinutes, end, endMinutes, outputLang),
     )) {
       const startClock = toClock(groups, "start");
@@ -364,11 +371,10 @@ function rangePresent(
       const ownClock =
         startClock.meridiem || startClock.dayPart || sameHour(Number(h), start);
       if (
-        groups &&
         rangeEndMatches(groups, end, endClock, outputLang) &&
         (ownClock
           ? clockMatches(Number(h), start, startClock, outputLang)
-          : borrowsEndMeridiem(groups, startClock, endClock, outputLang))
+          : borrowsEndMeridiem(groups, end, startClock, endClock, outputLang))
       ) {
         return true;
       }
