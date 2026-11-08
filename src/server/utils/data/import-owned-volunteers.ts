@@ -6,65 +6,93 @@ import {
   ApiVolunteerImportRow,
   ApiVolunteerImportRowResult,
 } from "need4deed-sdk";
-import { In } from "typeorm";
+import { EntityManager, In } from "typeorm";
 import { NotFoundError } from "../../../config";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { normalizeEmail } from "../../../data/lib/email-transformer";
 import { DealType } from "../../../data/types";
+import { normalizePostcode } from "../../../data/utils/get-postcode";
 import logger from "../../../logger";
 
-type ExistingPerson = { id: number; registered: boolean; volunteer: boolean };
-
-type PlannedRow = {
-  row: ApiVolunteerImportRow;
-  result: ApiVolunteerImportRowResult;
-  postcodeId?: number;
-  personId?: number;
+type ExistingPerson = {
+  id: number;
+  firstName: string;
+  addressId: number | null;
+  volunteer: boolean;
 };
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
+type Plan = {
+  row: ApiVolunteerImportRow;
+  result: ApiVolunteerImportRowResult;
+  email: string;
+  postcodeId?: number;
+  person?: ExistingPerson;
+};
+
+const sameName = (a: string, b: string) =>
+  a.trim().localeCompare(b.trim(), "de", { sensitivity: "base" }) === 0;
+
+const escapeSlack = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+async function findRegisteredEmails(
+  manager: EntityManager,
+  emails: string[],
+): Promise<Set<string>> {
+  const rows: { email: string }[] = await manager.query(
+    `SELECT LOWER(u.email) AS email FROM "user" u WHERE LOWER(u.email) = ANY($1)
+     UNION
+     SELECT LOWER(p.email) FROM person p
+       JOIN "user" u ON u.person_id = p.id
+      WHERE LOWER(p.email) = ANY($1)`,
+    [emails],
+  );
+  return new Set(rows.map(({ email }) => email));
+}
 
 async function findExistingPersons(
-  request: FastifyRequest,
+  manager: EntityManager,
   emails: string[],
 ): Promise<Map<string, ExistingPerson>> {
-  if (emails.length === 0) {
-    return new Map();
-  }
   const rows: {
     id: number;
     email: string;
-    registered: boolean;
+    first_name: string;
+    address_id: number | null;
     volunteer: boolean;
-  }[] = await request.server.db.personRepository.manager.query(
-    `SELECT p.id, LOWER(p.email) AS email,
-            EXISTS (SELECT 1 FROM "user" u WHERE u.person_id = p.id) AS registered,
+  }[] = await manager.query(
+    `SELECT p.id, LOWER(p.email) AS email, p.first_name, p.address_id,
             EXISTS (SELECT 1 FROM volunteer v WHERE v.person_id = p.id) AS volunteer
        FROM person p
       WHERE LOWER(p.email) = ANY($1)
-      ORDER BY p.id`,
+      ORDER BY volunteer DESC, p.id`,
     [emails],
   );
   const byEmail = new Map<string, ExistingPerson>();
-  for (const { id, email, registered, volunteer } of rows) {
-    const known = byEmail.get(email);
-    byEmail.set(email, {
-      id: known?.id ?? Number(id),
-      registered: (known?.registered ?? false) || registered,
-      volunteer: (known?.volunteer ?? false) || volunteer,
-    });
+  for (const row of rows) {
+    if (!byEmail.has(row.email)) {
+      byEmail.set(row.email, {
+        id: Number(row.id),
+        firstName: row.first_name,
+        addressId: row.address_id === null ? null : Number(row.address_id),
+        volunteer: row.volunteer,
+      });
+    }
   }
   return byEmail;
 }
 
 async function findPostcodeIds(
-  request: FastifyRequest,
+  manager: EntityManager,
   values: string[],
 ): Promise<Map<string, number>> {
-  const postcodes = await request.server.db.postcodeRepository.find({
+  const postcodes = await manager.find(Postcode, {
     select: { id: true, value: true },
     where: { value: In(values) },
     order: { id: "ASC" },
@@ -79,29 +107,29 @@ async function findPostcodeIds(
 }
 
 async function planImport(
-  request: FastifyRequest,
+  manager: EntityManager,
   rows: ApiVolunteerImportRow[],
-): Promise<PlannedRow[]> {
+): Promise<Plan[]> {
   const emails = rows.map(({ email }) => normalizeEmail(email ?? ""));
-  const [existing, postcodeIds] = await Promise.all([
-    findExistingPersons(
-      request,
-      emails.filter((email) => isEmail(email)),
-    ),
-    findPostcodeIds(
-      request,
-      rows.map(({ postcode }) => (postcode ?? "").trim()),
-    ),
+  const postcodes = rows.map(({ postcode }) =>
+    normalizePostcode(postcode ?? ""),
+  );
+  const validEmails = emails.filter((email) => isEmail(email));
+  const [registered, existing, postcodeIds] = await Promise.all([
+    findRegisteredEmails(manager, validEmails),
+    findExistingPersons(manager, validEmails),
+    findPostcodeIds(manager, postcodes),
   ]);
 
   const seen = new Set<string>();
-  return rows.map((row, index) => {
+  return rows.map((row, index): Plan => {
     const email = emails[index];
     const result: ApiVolunteerImportRowResult = {
       row: index,
       email: row.email,
       outcome: "created",
     };
+    const person = existing.get(email);
     const errors: string[] = [];
     if (!row.firstName?.trim()) {
       errors.push("firstName is required");
@@ -109,20 +137,31 @@ async function planImport(
     if (!isEmail(email)) {
       errors.push("email is not a valid address");
     }
-    const postcodeId = postcodeIds.get((row.postcode ?? "").trim());
+    const postcodeId = postcodeIds.get(postcodes[index]);
     if (!postcodeId) {
       errors.push(`postcode ${row.postcode} is unknown`);
     }
-    const person = existing.get(email);
-    if (person?.registered && !person.volunteer) {
+    if (registered.has(email) && !person?.volunteer) {
       errors.push("email belongs to a registered account");
+    } else if (
+      person &&
+      !person.volunteer &&
+      row.firstName?.trim() &&
+      !sameName(person.firstName ?? "", row.firstName)
+    ) {
+      errors.push("email belongs to an existing person with another name");
     }
     if (errors.length > 0) {
-      return { row, result: { ...result, outcome: "invalid", errors } };
+      return {
+        row,
+        email,
+        result: { ...result, outcome: "invalid", errors },
+      };
     }
     if (seen.has(email)) {
       return {
         row,
+        email,
         result: {
           ...result,
           outcome: "skipped",
@@ -134,6 +173,7 @@ async function planImport(
     if (person?.volunteer) {
       return {
         row,
+        email,
         result: {
           ...result,
           outcome: "skipped",
@@ -141,15 +181,12 @@ async function planImport(
         },
       };
     }
-    return { row, result, postcodeId, personId: person?.id };
+    return { row, email, result, postcodeId, person };
   });
 }
 
-function summarize(
-  planned: PlannedRow[],
-  dryRun: boolean,
-): ApiVolunteerImportResult {
-  const rows = planned.map(({ result }) => result);
+function summarize(plans: Plan[], dryRun: boolean): ApiVolunteerImportResult {
+  const rows = plans.map(({ result }) => result);
   const count = (outcome: ApiVolunteerImportRowResult["outcome"]) =>
     rows.filter((row) => row.outcome === outcome).length;
   return {
@@ -161,50 +198,99 @@ function summarize(
   };
 }
 
+async function insertIds<T extends object>(
+  manager: EntityManager,
+  entity: new () => T,
+  values: T[],
+): Promise<number[]> {
+  if (values.length === 0) {
+    return [];
+  }
+  const { identifiers } = await manager.insert(entity, values);
+  return identifiers.map(({ id }) => Number(id));
+}
+
 async function writeImport(
-  request: FastifyRequest,
+  manager: EntityManager,
   agent: Agent,
-  planned: PlannedRow[],
+  plans: Plan[],
+  actorUserId: number | undefined,
 ): Promise<void> {
-  const actorUserId = request.authUser?.id;
-  await request.server.db.volunteerRepository.manager.transaction(
-    async (manager) => {
-      for (const plan of planned) {
-        if (plan.result.outcome !== "created") {
-          continue;
-        }
-        const { row } = plan;
-        const personId =
-          plan.personId ??
-          (
-            await manager.save(
-              new Person({
-                firstName: row.firstName.trim(),
-                lastName: row.lastName?.trim() || undefined,
-                email: normalizeEmail(row.email),
-                phone: row.phone?.trim() || undefined,
-              }),
-            )
-          ).id;
-        const deal = await manager.save(
-          new Deal({ type: DealType.VOLUNTEER, postcodeId: plan.postcodeId }),
-        );
-        const volunteer = await manager.save(
-          new Volunteer({ dealId: deal.id, personId, ownerAgentId: agent.id }),
-        );
-        await manager.save(
-          new VolunteerAuditLog({
-            volunteerId: volunteer.id,
-            type: "owner_changed",
-            detail: `Imported for ${agent.title} (id:${agent.id}).`,
-            actorUserId,
-            occurredAt: new Date(),
-          }),
-        );
-        plan.result.volunteerId = volunteer.id;
-      }
-    },
+  const toCreate = plans.filter(({ result }) => result.outcome === "created");
+  const needAddress = toCreate.filter(({ person }) => !person?.addressId);
+  const addressIds = await insertIds(
+    manager,
+    Address,
+    needAddress.map(({ postcodeId }) => new Address({ postcodeId })),
   );
+  const addressIdOf = new Map(
+    needAddress.map((plan, i) => [plan, addressIds[i]]),
+  );
+
+  for (const plan of needAddress) {
+    if (plan.person) {
+      await manager.update(
+        Person,
+        { id: plan.person.id },
+        { addressId: addressIdOf.get(plan) },
+      );
+    }
+  }
+
+  const fresh = toCreate.filter(({ person }) => !person);
+  const freshIds = await insertIds(
+    manager,
+    Person,
+    fresh.map(
+      (plan) =>
+        new Person({
+          firstName: plan.row.firstName.trim(),
+          lastName: plan.row.lastName?.trim() || undefined,
+          email: plan.email,
+          phone: plan.row.phone?.trim() || undefined,
+          addressId: addressIdOf.get(plan),
+        }),
+    ),
+  );
+  const personIdOf = new Map(fresh.map((plan, i) => [plan, freshIds[i]]));
+
+  const dealIds = await insertIds(
+    manager,
+    Deal,
+    toCreate.map(
+      ({ postcodeId }) => new Deal({ type: DealType.VOLUNTEER, postcodeId }),
+    ),
+  );
+  const volunteerIds = await insertIds(
+    manager,
+    Volunteer,
+    toCreate.map(
+      (plan, i) =>
+        new Volunteer({
+          dealId: dealIds[i],
+          personId: plan.person?.id ?? personIdOf.get(plan),
+          ownerAgentId: agent.id,
+        }),
+    ),
+  );
+  const occurredAt = new Date();
+  await insertIds(
+    manager,
+    VolunteerAuditLog,
+    volunteerIds.map(
+      (volunteerId) =>
+        new VolunteerAuditLog({
+          volunteerId,
+          type: "owner_changed",
+          detail: `Imported for ${agent.title} (id:${agent.id}).`,
+          actorUserId,
+          occurredAt,
+        }),
+    ),
+  );
+  toCreate.forEach((plan, i) => {
+    plan.result.volunteerId = volunteerIds[i];
+  });
 }
 
 export async function importOwnedVolunteers(
@@ -212,7 +298,8 @@ export async function importOwnedVolunteers(
   agentId: number,
   { rows, dryRun = false }: ApiVolunteerImportPost,
 ): Promise<ApiVolunteerImportResult> {
-  const agent = await request.server.db.agentRepository.findOne({
+  const { db, notify } = request.server;
+  const agent = await db.agentRepository.findOne({
     select: { id: true, title: true },
     where: { id: agentId },
   });
@@ -220,18 +307,26 @@ export async function importOwnedVolunteers(
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
 
-  const planned = await planImport(request, rows);
-  const invalid = planned.some(({ result }) => result.outcome === "invalid");
-  if (dryRun || invalid) {
-    return summarize(planned, dryRun);
-  }
+  const report = await db.volunteerRepository.manager.transaction(
+    async (manager) => {
+      await manager.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+        "volunteer-import",
+      ]);
+      const plans = await planImport(manager, rows);
+      const invalid = plans.some(({ result }) => result.outcome === "invalid");
+      if (!dryRun && !invalid) {
+        await writeImport(manager, agent, plans, request.authUser?.id);
+      }
+      return summarize(plans, dryRun);
+    },
+  );
 
-  await writeImport(request, agent, planned);
-  const report = summarize(planned, false);
-  request.server.notify
-    .activity(
-      `📥 Imported ${report.created} volunteer(s) for *${agent.title}* (${report.skipped} skipped).`,
-    )
-    .catch((err) => logger.warn(`volunteer import slack notice: ${err}`));
+  if (!report.dryRun && report.invalid === 0 && report.created > 0) {
+    notify
+      .activity(
+        `📥 Imported ${report.created} volunteer(s) for *${escapeSlack(agent.title)}* (${report.skipped} skipped).`,
+      )
+      .catch((err) => logger.warn(`volunteer import slack notice: ${err}`));
+  }
   return report;
 }

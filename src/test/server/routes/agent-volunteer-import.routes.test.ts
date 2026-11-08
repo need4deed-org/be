@@ -9,6 +9,7 @@ import { In, Raw } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -68,7 +69,7 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
   const ownedVolunteers = () =>
     fastify.db.volunteerRepository.find({
       where: { ownerAgentId: agent.id },
-      relations: { person: true, deal: true },
+      relations: { person: { address: true }, deal: true },
     });
 
   beforeAll(async () => {
@@ -77,7 +78,7 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
     vi.spyOn(fastify.notify, "activity").mockResolvedValue(undefined);
 
     const found = await fastify.db.postcodeRepository.findOneOrFail({
-      where: { value: Raw((v) => `${v} ~ '^[0-9]{5}$'`) },
+      where: { value: Raw((v) => `${v} ~ '^0[0-9]{4}$'`) },
     });
     postcode = found.value;
     postcodeId = found.id;
@@ -132,6 +133,19 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
       }),
     );
 
+    const accountOnly = await fastify.db.personRepository.save(
+      new Person({ firstName: "AccountOnly", lastName: `${suffix}` }),
+    );
+    await fastify.db.userRepository.save(
+      new User({
+        email: mail("account-only"),
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: accountOnly.id,
+      }),
+    );
+
     const volunteerPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Already", email: mail("already") }),
     );
@@ -169,6 +183,14 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
     const personIds = persons.map(({ id }) => id);
     await fastify.db.userRepository.delete({ personId: In(personIds) });
     await fastify.db.personRepository.delete({ id: In(personIds) });
+    const addressIds = persons.flatMap(({ addressId }) =>
+      addressId ? [addressId] : [],
+    );
+    if (addressIds.length > 0) {
+      await fastify.db.personRepository.manager
+        .getRepository(Address)
+        .delete({ id: In(addressIds) });
+    }
     await fastify.db.agentRepository.delete({ id: agent.id });
     await fastify.close();
   });
@@ -179,7 +201,7 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
         row("fresh"),
         row("already"),
         row("fresh", { firstName: "Twice" }),
-        row("loose"),
+        row("loose", { firstName: "loose" }),
       ],
       { dryRun: true },
     );
@@ -210,25 +232,32 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
       row("bad", { email: "not-an-email" }),
       row("nowhere", { postcode: "0000x" }),
       row("registered"),
+      row("account-only"),
+      row("loose", { firstName: "Anna" }),
     ]);
     expect(res.statusCode).toBe(400);
     const report: ApiVolunteerImportResult = res.json().data;
-    expect(report.invalid).toBe(4);
+    expect(report.invalid).toBe(6);
     expect(report.rows[0].outcome).toBe("created");
     expect(report.rows.slice(1).map(({ errors }) => errors)).toEqual([
       ["firstName is required"],
       ["email is not a valid address"],
       ["postcode 0000x is unknown"],
       ["email belongs to a registered account"],
+      ["email belongs to a registered account"],
+      ["email belongs to an existing person with another name"],
     ]);
     expect(await ownedVolunteers()).toEqual([]);
   });
 
   it("imports volunteers owned by the NGO, reusing a person without a profile", async () => {
     const res = await importRows([
-      row("fresh", { email: ` ${mail("fresh").toUpperCase()} ` }),
+      row("fresh", {
+        email: ` ${mail("fresh").toUpperCase()} `,
+        postcode: postcode.slice(1),
+      }),
       row("already"),
-      row("loose"),
+      row("loose", { firstName: "loose" }),
     ]);
     expect(res.statusCode).toBe(201);
     const report: ApiVolunteerImportResult = res.json().data;
@@ -246,6 +275,11 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
       phone: "+49 30 1234567",
     });
     expect(fresh?.deal.postcodeId).toBe(postcodeId);
+    expect(fresh?.person.address?.postcodeId).toBe(postcodeId);
+    expect(
+      owned.find(({ personId }) => personId === loosePerson.id)?.person.address
+        ?.postcodeId,
+    ).toBe(postcodeId);
     expect(
       owned.find(({ personId }) => personId === loosePerson.id),
     ).toBeTruthy();
@@ -261,9 +295,13 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
   });
 
   it("is idempotent: importing the same rows again creates nothing", async () => {
-    const res = await importRows([row("fresh"), row("loose")]);
+    const res = await importRows([
+      row("fresh"),
+      row("loose", { firstName: "loose" }),
+    ]);
     expect(res.statusCode).toBe(201);
     expect(res.json().data).toMatchObject({ created: 0, skipped: 2 });
+    expect(fastify.notify.activity).toHaveBeenCalledTimes(1);
     expect(await ownedVolunteers()).toHaveLength(2);
   });
 
