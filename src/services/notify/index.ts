@@ -8,6 +8,7 @@ export * from "./transports/dry-run";
 export * from "./transports/validating";
 export * from "./validate-email-message";
 export { AttachmentUnavailableError } from "./email-template";
+export * from "./events/activity";
 export * from "./events/email-verification";
 export * from "./events/arrival";
 export * from "./events/ops-alert";

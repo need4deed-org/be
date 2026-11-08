@@ -39,6 +39,7 @@ export const RoutePrefix = {
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",
   VOLUNTEER: "/volunteer",
+  VOLUNTEER_IMPORT: "/volunteer-import",
   VOLUNTEER_LINKED: "/volunteer-linked",
   WORKER: "/worker",
 } as const;

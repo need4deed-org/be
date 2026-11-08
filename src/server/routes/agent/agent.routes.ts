@@ -73,6 +73,7 @@ import agentVolunteerRoutes from "./agent-volunteer.routes";
 import agentContactRoutes from "./contact.routes";
 import agentMembershipRoutes from "./membership.routes";
 import agentRegisterRoutes from "./register.routes";
+import agentVolunteerImportRoutes from "./volunteer-import.routes";
 
 async function denyVolunteer(request: FastifyRequest): Promise<void> {
   const config = request.routeOptions.config as { public?: boolean };
@@ -102,6 +103,10 @@ export default async function agentRoutes(
 
   fastify.register(agentOpportunityRoutes, {
     prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
+  });
+
+  fastify.register(agentVolunteerImportRoutes, {
+    prefix: `/:id${RoutePrefix.VOLUNTEER_IMPORT}`,
   });
 
   fastify.register(agentVolunteerRoutes, {

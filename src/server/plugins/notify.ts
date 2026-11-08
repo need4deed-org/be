@@ -15,6 +15,7 @@ import {
   EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
+  sendActivity,
   sendArrival,
   sendEmailAccompanyMatch,
   sendEmailAccompanyMatchVolunteer,
@@ -55,6 +56,7 @@ interface NotifyService {
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   arrival(text: string): Promise<void>;
+  activity(text: string): Promise<void>;
   tagged(input: TaggedInput): Promise<void>;
   emailSuggestion: MatchEmail;
   emailSuggestionAccompanying: MatchEmail;
@@ -244,6 +246,7 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),
     arrival: (text: string) => sendArrival({ slack }, text),
+    activity: (text: string) => sendActivity({ slack }, text),
     tagged: (input: TaggedInput) => sendTagged({ slack }, input),
     emailSuggestion: matchEmail(sendEmailSuggestion),
     emailSuggestionAccompanying: matchEmail(sendEmailSuggestionAccompanying),
