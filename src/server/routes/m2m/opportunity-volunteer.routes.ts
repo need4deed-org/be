@@ -28,7 +28,10 @@ import { UNRESOLVED_PLACEHOLDER_RE } from "../../../services/notify/validate-ema
 import { errorName } from "../../../services/utils";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
-import { assertAgentCanSuggest } from "../../utils/data/assert-agent-can-suggest";
+import {
+  assertAgentCanSuggest,
+  isOwnersPendingSuggestion,
+} from "../../utils/data/assert-agent-can-suggest";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
@@ -281,6 +284,9 @@ async function assertCanChangeMatch(
 ): Promise<void> {
   if (request.authUser?.role !== UserRole.AGENT) {
     assertCoordinator(request);
+    return;
+  }
+  if (change === "remove" && (await isOwnersPendingSuggestion(request, ov))) {
     return;
   }
   const opportunity = await fastify.db.opportunityRepository.findOne({

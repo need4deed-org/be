@@ -66,3 +66,33 @@ export async function assertAgentCanSuggest(
     throw new UnauthorizedError("This NGO is inactive.");
   }
 }
+
+export async function isOwnersPendingSuggestion(
+  request: FastifyRequest,
+  { volunteerId, status }: Pick<Suggestion, "volunteerId" | "status">,
+): Promise<boolean> {
+  if (status !== OpportunityVolunteerStatusType.PENDING) {
+    return false;
+  }
+  const [callerAgentIds, volunteer] = await Promise.all([
+    getCallerAgentIds(request, request.authUser?.personId),
+    request.server.db.volunteerRepository.findOne({
+      select: { id: true, ownerAgentId: true },
+      where: { id: volunteerId },
+    }),
+  ]);
+  const ownerAgentId = volunteer?.ownerAgentId;
+  if (!ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
+    return false;
+  }
+  const inactive = await request.server.db.agentRepository.exists({
+    where: {
+      id: ownerAgentId,
+      engagementStatus: AgentEngagementStatusType.INACTIVE,
+    },
+  });
+  if (inactive) {
+    throw new UnauthorizedError("This NGO is inactive.");
+  }
+  return true;
+}

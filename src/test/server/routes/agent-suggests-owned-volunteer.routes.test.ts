@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
@@ -33,7 +34,13 @@ type AgentKey =
   | "private"
   | "dormant";
 type Caller = "home" | "peer" | "private" | "dormant" | "coordinator";
-type VolunteerKey = "home" | "peer" | "private" | "dormant" | "platform";
+type VolunteerKey =
+  | "home"
+  | "peer"
+  | "private"
+  | "dormant"
+  | "platform"
+  | "withdrawn";
 
 const AGENTS: Record<
   AgentKey,
@@ -189,6 +196,7 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
       private: agents.private.id,
       dormant: agents.dormant.id,
       platform: null,
+      withdrawn: agents.home.id,
     };
     for (const [key, ownerAgentId] of Object.entries(owners) as [
       VolunteerKey,
@@ -283,5 +291,57 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
 
   it("keeps letting a coordinator suggest any volunteer anywhere", async () => {
     await expectSuggested("coordinator", "platform", "closed");
+  });
+
+  describe("withdrawing a suggestion to another NGO's opportunity", () => {
+    const link = (
+      volunteer: VolunteerKey,
+      opportunity: AgentKey,
+      status: OpportunityVolunteerStatusType,
+    ) =>
+      fastify.db.opportunityVolunteerRepository.save(
+        new OpportunityVolunteer({
+          volunteerId: volunteers[volunteer].id,
+          opportunityId: opportunities[opportunity].id,
+          status,
+        }),
+      );
+    const remove = (as: Caller, id: number) =>
+      fastify.inject({
+        method: "DELETE",
+        url: `/opportunity-volunteer/${id}`,
+        cookies: { [accessCookieName]: cookies[as] },
+      });
+
+    it("lets the volunteer's NGO remove its pending suggestion, and no other NGO", async () => {
+      const { id } = await link(
+        "withdrawn",
+        "peer",
+        OpportunityVolunteerStatusType.PENDING,
+      );
+      expect((await remove("private", id)).statusCode).toBe(404);
+      expect((await remove("home", id)).statusCode).toBe(204);
+      expect(
+        await fastify.db.opportunityVolunteerRepository.existsBy({ id }),
+      ).toBe(false);
+    });
+
+    it("404s once the other NGO has moved the suggestion on", async () => {
+      const { id } = await link(
+        "withdrawn",
+        "closed",
+        OpportunityVolunteerStatusType.MATCHED,
+      );
+      expect((await remove("home", id)).statusCode).toBe(404);
+    });
+
+    it("403s members of an inactive NGO", async () => {
+      const { id } = await link(
+        "dormant",
+        "peer",
+        OpportunityVolunteerStatusType.PENDING,
+      );
+      expect((await remove("dormant", id)).statusCode).toBe(403);
+    });
   });
 });
