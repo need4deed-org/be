@@ -427,7 +427,7 @@ function missingToken(
     const startMinutes = groups.minutes || "00";
     const endMinutes = groups.endMinutes || "00";
     const durationLike = !Object.values(endClock).some(Boolean);
-    // English readers take a bare 12-hour clock end as pm, unless it is noon.
+    // A bare 12-hour clock end is ambiguous in English, unless it is noon.
     const bareEndReadable =
       durationLike || targetLang === Lang.DE || end === 12;
     if (
