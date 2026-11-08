@@ -28,6 +28,7 @@ import { UNRESOLVED_PLACEHOLDER_RE } from "../../../services/notify/validate-ema
 import { errorName } from "../../../services/utils";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
+import { assertAgentCanSuggest } from "../../utils/data/assert-agent-can-suggest";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
@@ -321,7 +322,11 @@ export default async function m2mOpportunityVolunteerRoutes(
   }>(
     "/",
     {
-      preValidation: async (request) => assertCoordinator(request),
+      preValidation: async (request) => {
+        if (request.authUser?.role !== UserRole.AGENT) {
+          assertCoordinator(request);
+        }
+      },
       schema: {
         body: { $ref: "ApiVolunteerOpportunityPost#" },
         response: responseSchema({ statusCode: 201 }),
@@ -333,6 +338,10 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       const { emailNote, ...body } = request.body;
       const { opportunityId, volunteerId } = body;
+
+      if (request.authUser?.role === UserRole.AGENT) {
+        await assertAgentCanSuggest(request, body);
+      }
 
       if (
         await opportunityVolunteerRepository.findOneBy({
