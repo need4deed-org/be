@@ -7,6 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { logMatchChangeSafely } from "../../../data/utils/log-match-change";
+import { engagementChangeDetail } from "./engagement-change-detail";
 import { hasRecentOnetimerMatch } from "./onetimer-active-period";
 
 export async function syncVolunteerEngagement(
@@ -79,7 +80,7 @@ export async function logEngagementChange(
     new VolunteerAuditLog({
       volunteerId,
       type: "availability_changed",
-      detail: `Status changed from ${from} to ${to}.`,
+      detail: engagementChangeDetail(from, to),
       occurredAt: new Date(),
       actorUserId,
     }),

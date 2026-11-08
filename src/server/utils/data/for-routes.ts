@@ -737,18 +737,18 @@ export async function fetchVolunteerById(
 
   await addTranslatedFields([volunteer], isoCode);
 
-  const timedEvents = await getTimedEvents(volunteer);
-  const comments = await getVolunteerComments(volunteer);
+  const [timedEvents, comments, activeFromOnetimer] = await Promise.all([
+    getTimedEvents(volunteer),
+    getVolunteerComments(volunteer),
+    findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, [
+      volunteer.id,
+    ]),
+  ]);
 
   if (maskContext) {
     maskPii(volunteer, maskContext);
     maskPii(comments, maskContext);
   }
-
-  const activeFromOnetimer = await findVolunteerIdsActiveFromOnetimer(
-    volunteerRepository.manager,
-    [volunteer.id],
-  );
 
   return {
     ...volunteerSerializer(volunteer, comments, timedEvents),

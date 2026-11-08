@@ -69,6 +69,7 @@ import {
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
+import { engagementChangeDetail } from "../../utils/data/engagement-change-detail";
 import { findVolunteerIdsActiveFromOnetimer } from "../../utils/data/onetimer-active-period";
 import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
@@ -474,7 +475,10 @@ export default async function volunteerRoutes(
       ) {
         auditLogEntries.push({
           type: "availability_changed",
-          detail: `Status changed from ${volunteer.statusEngagement} to ${volunteerData.statusEngagement}.`,
+          detail: engagementChangeDetail(
+            volunteer.statusEngagement,
+            volunteerData.statusEngagement,
+          ),
         });
       }
       let hasContactChange = false;

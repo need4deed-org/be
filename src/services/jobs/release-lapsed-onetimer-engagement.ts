@@ -4,40 +4,37 @@ import { EntityManager, In } from "typeorm";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
+import { engagementChangeDetail } from "../../server/utils/data/engagement-change-detail";
 import {
   activeMatchSql,
+  handSetActiveSinceOnetimerSql,
   onetimerHoldSql,
   onetimerSqlParameters,
+  pastOnetimerMatchSql,
 } from "../../server/utils/data/onetimer-active-period";
 
 const { ACTIVE, AVAILABLE } = VolunteerStateEngagementType;
 
-// A hand-set Active is logged with an actor; only a system-set one is released.
 const lapsedWhere = `volunteer.status_engagement = :activeEngagement
   AND NOT ${activeMatchSql("volunteer.id")}
   AND NOT ${onetimerHoldSql("volunteer.id")}
-  AND (
-    SELECT al.actor_user_id IS NULL AND al.detail LIKE :toActive
-    FROM volunteer_audit_log al
-    WHERE al.volunteer_id = volunteer.id AND al.type = 'availability_changed'
-    ORDER BY al.occurred_at DESC, al.id DESC
-    LIMIT 1
-  )`;
+  AND ${pastOnetimerMatchSql("volunteer.id")}
+  AND NOT ${handSetActiveSinceOnetimerSql("volunteer.id")}`;
 
 async function releaseLapsed(
   manager: EntityManager,
   today: Date,
   volunteerIds?: number[],
 ): Promise<number[]> {
-  const parameters = {
-    ...onetimerSqlParameters(today),
-    toActive: `% ${ACTIVE}.`,
-  };
-  const locked: { id: number }[] = await manager
+  const parameters = onetimerSqlParameters(today);
+  const candidates = manager
     .createQueryBuilder(Volunteer, "volunteer")
     .select("volunteer.id", "id")
-    .where(lapsedWhere)
-    .andWhere(volunteerIds ? { id: In(volunteerIds) } : "TRUE")
+    .where(lapsedWhere);
+  if (volunteerIds) {
+    candidates.andWhere({ id: In(volunteerIds) });
+  }
+  const locked: { id: number }[] = await candidates
     .setParameters(parameters)
     .orderBy("volunteer.id")
     .setLock("for_no_key_update")
@@ -62,7 +59,7 @@ async function releaseLapsed(
       ids.map((volunteerId) => ({
         volunteerId,
         type: "availability_changed" as const,
-        detail: `Status changed from ${ACTIVE} to ${AVAILABLE}.`,
+        detail: engagementChangeDetail(ACTIVE, AVAILABLE),
         occurredAt,
       })),
     );

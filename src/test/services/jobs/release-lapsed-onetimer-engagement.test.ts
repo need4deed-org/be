@@ -59,6 +59,12 @@ describe("releaseLapsedOnetimerEngagement", () => {
     return volunteer;
   };
 
+  const backdateLogs = (volunteer: Volunteer, days: number) =>
+    ctx.fastify.db.volunteerAuditLogRepository.update(
+      { volunteerId: volunteer.id },
+      { occurredAt: daysAgo(days) },
+    );
+
   const addPastOnetimer = (
     volunteer: Volunteer,
     days: number,
@@ -111,15 +117,21 @@ describe("releaseLapsedOnetimerEngagement", () => {
     },
   );
 
-  it("releases a volunteer whose hold lapsed long ago or whose match is gone", async () => {
-    const lapsedLongAgo = await systemActiveVolunteer();
-    await addPastOnetimer(lapsedLongAgo, 60);
-    const matchGone = await systemActiveVolunteer();
+  it("releases a volunteer whose hold lapsed long ago, after missed runs", async () => {
+    const volunteer = await systemActiveVolunteer();
+    await addPastOnetimer(volunteer, 60);
 
-    await run(lapsedLongAgo, matchGone);
+    await run(volunteer);
 
-    expect(await ctx.fixtures.engagement(lapsedLongAgo)).toBe(AVAILABLE);
-    expect(await ctx.fixtures.engagement(matchGone)).toBe(AVAILABLE);
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(AVAILABLE);
+  });
+
+  it("leaves an Active volunteer without any accompanying or event alone", async () => {
+    const volunteer = await systemActiveVolunteer();
+
+    await run(volunteer);
+
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(ACTIVE);
   });
 
   it("keeps a volunteer Active while another match is Active", async () => {
@@ -150,23 +162,37 @@ describe("releaseLapsedOnetimerEngagement", () => {
   it("never touches a status a coordinator set by hand", async () => {
     const unavailable = await ctx.fixtures.volunteer(TEMP_UNAVAILABLE);
     await addPastOnetimer(unavailable, 29);
-    const activeByHand = await systemActiveVolunteer();
-    await addPastOnetimer(activeByHand, 29);
-    await logStatus(activeByHand, AVAILABLE, ACTIVE, true);
 
-    await run(unavailable, activeByHand);
+    await run(unavailable);
 
     expect(await ctx.fixtures.engagement(unavailable)).toBe(TEMP_UNAVAILABLE);
-    expect(await ctx.fixtures.engagement(activeByHand)).toBe(ACTIVE);
+    expect(await ctx.fixtures.engagementLogs(unavailable)).toHaveLength(0);
   });
 
-  it("leaves an Active volunteer with no status history alone", async () => {
+  it("keeps an Active a coordinator set by hand after the accompanying", async () => {
     const volunteer = await ctx.fixtures.volunteer(ACTIVE);
-    await addPastOnetimer(volunteer, 29);
+    await addPastOnetimer(volunteer, 40);
+    await logStatus(volunteer, AVAILABLE, ACTIVE, true);
+    await backdateLogs(volunteer, 10);
 
     await run(volunteer);
 
     expect(await ctx.fixtures.engagement(volunteer)).toBe(ACTIVE);
-    expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(0);
+  });
+
+  it.each([
+    ["set Active by hand before the accompanying", true],
+    ["with no status history", false],
+  ])("releases a volunteer %s", async (_label, byHand) => {
+    const volunteer = await ctx.fixtures.volunteer(ACTIVE);
+    if (byHand) {
+      await logStatus(volunteer, AVAILABLE, ACTIVE, true);
+      await backdateLogs(volunteer, 90);
+    }
+    await addPastOnetimer(volunteer, 29);
+
+    await run(volunteer);
+
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(AVAILABLE);
   });
 });

@@ -128,6 +128,21 @@ describe("activeFromOnetimer on the volunteer list and detail", () => {
     expect(await flagged(volunteer)).toBe(false);
   });
 
+  it("is false when a coordinator set the volunteer Active by hand after it", async () => {
+    const volunteer = await withMatch(await fixtures.volunteer(ACTIVE), {
+      days: 10,
+      status: OpportunityVolunteerStatusType.PAST,
+    });
+    await fastify.db.volunteerAuditLogRepository.save({
+      volunteerId: volunteer.id,
+      type: "availability_changed",
+      detail: `Status changed from ${AVAILABLE} to ${ACTIVE}.`,
+      occurredAt: new Date(),
+      actorUserId: admin.id,
+    });
+    expect(await flagged(volunteer)).toBe(false);
+  });
+
   it("is false once the accompanying is more than 28 days ago", async () => {
     const volunteer = await withMatch(await fixtures.volunteer(ACTIVE), {
       days: 40,

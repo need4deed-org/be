@@ -9,6 +9,7 @@ import {
   addDays,
   berlinDayBoundaries,
 } from "../../../services/jobs/berlin-dates";
+import { engagementChangeDetail } from "./engagement-change-detail";
 import { ONETIMER_OPPORTUNITY_TYPES } from "./onetimer-statuses";
 
 export const ONETIMER_ACTIVE_PERIOD_DAYS = 28;
@@ -18,34 +19,36 @@ export function onetimerActiveSince(today: Date = berlinToday()): Date {
     .startOfDay;
 }
 
-function matchExistsSql(
+const matchesFromSql = (
   volunteerColumn: string,
   status: "activeMatch" | "pastMatch",
   onetimer?: boolean,
-): string {
-  const typeFilter =
-    onetimer === undefined
-      ? ""
-      : `AND o.type ${onetimer ? "IN" : "NOT IN"} (:...onetimerTypes)`;
-  const recent =
-    status === "pastMatch"
-      ? "JOIN onetimer ot ON ot.id = o.onetimer_id AND ot.date >= :activeSince"
-      : "";
-  return `EXISTS (
-    SELECT 1 FROM opportunity_volunteer ov
+) => `FROM opportunity_volunteer ov
     JOIN opportunity o ON o.id = ov.opportunity_id
-    ${recent}
+    LEFT JOIN onetimer ot ON ot.id = o.onetimer_id
     WHERE ov.volunteer_id = ${volunteerColumn}
       AND ov.status = :${status}
-      ${typeFilter}
-  )`;
-}
+      ${onetimer === undefined ? "" : `AND o.type ${onetimer ? "IN" : "NOT IN"} (:...onetimerTypes)`}`;
 
 export const activeMatchSql = (volunteerColumn: string, onetimer?: boolean) =>
-  matchExistsSql(volunteerColumn, "activeMatch", onetimer);
+  `EXISTS (SELECT 1 ${matchesFromSql(volunteerColumn, "activeMatch", onetimer)})`;
+
+export const pastOnetimerMatchSql = (volunteerColumn: string) =>
+  `EXISTS (SELECT 1 ${matchesFromSql(volunteerColumn, "pastMatch", true)})`;
 
 export const onetimerHoldSql = (volunteerColumn: string) =>
-  matchExistsSql(volunteerColumn, "pastMatch", true);
+  `EXISTS (SELECT 1 ${matchesFromSql(volunteerColumn, "pastMatch", true)} AND ot.date >= :activeSince)`;
+
+export const handSetActiveSinceOnetimerSql = (volunteerColumn: string) =>
+  `COALESCE((
+    SELECT al.actor_user_id IS NOT NULL
+      AND al.detail LIKE :toActive
+      AND al.occurred_at >= (SELECT max(ot.date) ${matchesFromSql(volunteerColumn, "pastMatch", true)})
+    FROM volunteer_audit_log al
+    WHERE al.volunteer_id = ${volunteerColumn} AND al.type = 'availability_changed'
+    ORDER BY al.occurred_at DESC, al.id DESC
+    LIMIT 1
+  ), false)`;
 
 export const onetimerSqlParameters = (today?: Date) => ({
   activeEngagement: VolunteerStateEngagementType.ACTIVE,
@@ -53,6 +56,7 @@ export const onetimerSqlParameters = (today?: Date) => ({
   pastMatch: OpportunityVolunteerStatusType.PAST,
   onetimerTypes: ONETIMER_OPPORTUNITY_TYPES,
   activeSince: onetimerActiveSince(today),
+  toActive: engagementChangeDetail("%", VolunteerStateEngagementType.ACTIVE),
 });
 
 export function hasRecentOnetimerMatch(
@@ -85,6 +89,7 @@ export async function findVolunteerIdsActiveFromOnetimer(
     .andWhere(
       `(${activeMatchSql("volunteer.id", true)} OR ${onetimerHoldSql("volunteer.id")})`,
     )
+    .andWhere(`NOT ${handSetActiveSinceOnetimerSql("volunteer.id")}`)
     .setParameters(onetimerSqlParameters(today))
     .getRawMany();
   return new Set(rows.map(({ id }) => Number(id)));
