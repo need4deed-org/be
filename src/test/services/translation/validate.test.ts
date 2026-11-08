@@ -319,6 +319,9 @@ describe("validateTranslation", () => {
       ["From 1 to 3 pm", "Von 13 bis 15", Lang.DE],
       ["Von 16:30 bis 18:30 Uhr", "From 16:30 to 18:30", Lang.EN],
       ["Von 23 bis 1 Uhr", "From 11 pm to 1 am", Lang.EN],
+      ["Von 16:30 bis 18:30 Uhr", "From 4:30 to 6:30", Lang.EN],
+      ["Von 9 bis 18:30 Uhr", "From 9 am to 6:30", Lang.EN],
+      ["Von 16 bis 18:30 Uhr", "From 4 to 6:30", Lang.EN],
     ] as const) {
       expectCode(source, output, target).toEqual(ok);
     }
@@ -334,6 +337,9 @@ describe("validateTranslation", () => {
       ["Von 16:30 bis 18:30 Uhr", "From 16:30 to 18:00", Lang.EN],
       ["Von 23 bis 1 Uhr", "From 11 to 1", Lang.EN],
       ["Von 0 bis 6 Uhr", "From 12 to 6", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 19 am", Lang.EN],
+      ["From 4:30 to 6:30 pm", "Von 16:30 bis 6:30 Uhr", Lang.DE],
+      ["Von 22 bis 24 Uhr", "From 22 to 12:00", Lang.EN],
       ["Von 17 bis 19 Uhr", "From 17 to 7 Uhr", Lang.EN],
       ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-14 h", Lang.EN],
     ] as const) {

@@ -273,23 +273,26 @@ function hourForms(hours: string[], minutes: string, words = true): string {
 const RANGE_FILLER = "(?:\\p{L}+\\.\\s*|\\p{L}+\\s+|[~≈]\\s*){0,2}";
 const rangePatterns = new Map<string, RegExp>();
 
+function hourMinuteForms(hours: string[], minutes: string): string {
+  return minutes === "00"
+    ? hourForms(hours, "(?:[.:]00)?(?![.:]\\d)")
+    : hourForms(hours, `[.:]${minutes}`, false);
+}
+
 function rangePattern(
   startHour: string,
   startMinutes: string,
   end: number,
+  endMinutes: string,
   outputLang: Lang,
 ): RegExp {
-  const key = `${outputLang}:${startHour}:${startMinutes}-${end}`;
+  const key = `${outputLang}:${startHour}:${startMinutes}-${end}:${endMinutes}`;
   return cachedPattern(rangePatterns, key, () => {
-    const starts =
-      startMinutes === "00"
-        ? hourForms([startHour], "(?:[.:]00)?")
-        : hourForms([startHour], `[.:]${startMinutes}`, false);
+    const starts = hourMinuteForms([startHour], startMinutes);
     const endVariants = hourVariants(end);
     const is24Hour = (h: string) => h === "0" || Number(h) > 12;
-    const endMinutes = "(?:[.:]\\d{2})?";
-    const ends24 = hourForms(endVariants.filter(is24Hour), endMinutes);
-    const ends12 = hourForms(
+    const ends24 = hourMinuteForms(endVariants.filter(is24Hour), endMinutes);
+    const ends12 = hourMinuteForms(
       endVariants.filter((h) => !is24Hour(h)),
       endMinutes,
     );
@@ -300,28 +303,23 @@ function rangePattern(
   });
 }
 
-const NUMBER_WORD_VALUES = new Map(
-  Object.entries(NUMBER_WORDS).flatMap(([value, words]) =>
-    words.map((word) => [word, Number(value)] as const),
-  ),
-);
-
 function rangeEndMatches(
-  form: string,
+  groups: Record<string, string | undefined>,
   end: number,
-  endMinutes: string,
   endClock: Clock,
+  outputLang: Lang,
 ): boolean {
-  const [, digits, minutes = "00"] = /^(\d+)(?:[.:](\d{2}))?/.exec(form) ?? [];
-  const h = digits
-    ? Number(digits)
-    : NUMBER_WORD_VALUES.get(form.toLowerCase());
-  if (h === undefined || minutes !== endMinutes) {
-    return false;
+  if (groups.end24 !== undefined) {
+    return !endClock.meridiem;
   }
-  return sameHour(
-    endClock.meridiem || endClock.dayPart ? clockHour(h, endClock) : h,
-    end,
+  const h = end % 12 || 12;
+  if (endClock.meridiem || endClock.dayPart) {
+    return sameHour(clockHour(h, endClock), end);
+  }
+  return (
+    h === end ||
+    (/[.:]/.test(groups.end12 ?? "") &&
+      clockMatches(h, end, endClock, outputLang))
   );
 }
 
@@ -329,11 +327,24 @@ function borrowsEndMeridiem(
   groups: Record<string, string | undefined> | undefined,
   startClock: Clock,
   endClock: Clock,
+  outputLang: Lang,
 ): boolean {
   if (!groups?.end12) {
     return false;
   }
-  return Boolean(endClock.dayPart || (!startClock.uhr && endClock.meridiem));
+  if (endClock.dayPart) {
+    return true;
+  }
+  if (startClock.uhr) {
+    return false;
+  }
+  return (
+    Boolean(endClock.meridiem) ||
+    (outputLang === Lang.EN &&
+      !endClock.uhr &&
+      !endClock.oClock &&
+      /[.:]/.test(groups.end12))
+  );
 }
 
 function rangePresent(
@@ -346,7 +357,7 @@ function rangePresent(
 ): boolean {
   for (const h of hourVariants(start)) {
     for (const { groups } of output.matchAll(
-      rangePattern(h, startMinutes, end, outputLang),
+      rangePattern(h, startMinutes, end, endMinutes, outputLang),
     )) {
       const startClock = toClock(groups, "start");
       const endClock = toClock(groups, "end");
@@ -354,15 +365,10 @@ function rangePresent(
         startClock.meridiem || startClock.dayPart || sameHour(Number(h), start);
       if (
         groups &&
-        rangeEndMatches(
-          groups.end24 ?? groups.end12 ?? "",
-          end,
-          endMinutes,
-          endClock,
-        ) &&
+        rangeEndMatches(groups, end, endClock, outputLang) &&
         (ownClock
           ? clockMatches(Number(h), start, startClock, outputLang)
-          : borrowsEndMeridiem(groups, startClock, endClock))
+          : borrowsEndMeridiem(groups, startClock, endClock, outputLang))
       ) {
         return true;
       }
