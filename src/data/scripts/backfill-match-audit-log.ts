@@ -18,13 +18,19 @@ export interface PlannedEntry {
   occurredAt: Date;
 }
 
-export interface BackfillMatchAuditLogReport {
-  cutoff: Date;
+export interface BackfillPlan {
   planned: PlannedEntry[];
+  matchesCreatedOn: Record<string, number>;
+}
+
+export interface BackfillMatchAuditLogReport extends BackfillPlan {
+  cutoff: Date;
   written: number;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const utcDay = (date: Date) => date.toISOString().slice(0, 10);
 
 export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
   const flagIndex = argv.indexOf("--imported-on");
@@ -42,7 +48,7 @@ export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
       (day) =>
         !ISO_DATE.test(day) ||
         Number.isNaN(Date.parse(`${day}T00:00:00Z`)) ||
-        new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day,
+        utcDay(new Date(`${day}T00:00:00Z`)) !== day,
     );
     if (invalid.length) {
       throw new Error(
@@ -67,6 +73,7 @@ export async function findCutoff(manager: EntityManager): Promise<Date> {
 export function planMatchEntries(
   match: OpportunityVolunteer,
   cutoff: Date,
+  importedOn: string[],
 ): PlannedEntry[] {
   const { id, volunteerId, opportunityId, status, createdAt, updatedAt } =
     match;
@@ -81,7 +88,11 @@ export function planMatchEntries(
 
   const planned = [
     entry(
-      matchDetail.linked(title, changedLater ? undefined : status),
+      matchDetail.linked(
+        title,
+        changedLater ? undefined : status,
+        importedOn.includes(utcDay(createdAt)),
+      ),
       createdAt,
     ),
   ];
@@ -93,9 +104,9 @@ export function planMatchEntries(
 
 export async function planEntries(
   manager: EntityManager,
-  _options: BackfillMatchAuditLogOptions,
+  { importedOn }: BackfillMatchAuditLogOptions,
   cutoff: Date,
-): Promise<PlannedEntry[]> {
+): Promise<BackfillPlan> {
   const matches = await manager.find(OpportunityVolunteer, {
     select: {
       id: true,
@@ -110,7 +121,17 @@ export async function planEntries(
     where: { createdAt: LessThan(cutoff) },
     order: { createdAt: "ASC", id: "ASC" },
   });
-  return matches.flatMap((match) => planMatchEntries(match, cutoff));
+  const matchesCreatedOn: Record<string, number> = {};
+  for (const { createdAt } of matches) {
+    const day = utcDay(createdAt);
+    matchesCreatedOn[day] = (matchesCreatedOn[day] ?? 0) + 1;
+  }
+  return {
+    planned: matches.flatMap((match) =>
+      planMatchEntries(match, cutoff, importedOn),
+    ),
+    matchesCreatedOn,
+  };
 }
 
 async function writeEntries(
@@ -143,14 +164,18 @@ export async function runBackfill(
     const cutoff = await findCutoff(ds.manager);
     return {
       cutoff,
-      planned: await planEntries(ds.manager, options, cutoff),
+      ...(await planEntries(ds.manager, options, cutoff)),
       written: 0,
     };
   }
   return ds.transaction(async (manager) => {
     const cutoff = await findCutoff(manager);
-    const planned = await planEntries(manager, options, cutoff);
-    return { cutoff, planned, written: await writeEntries(manager, planned) };
+    const plan = await planEntries(manager, options, cutoff);
+    return {
+      cutoff,
+      ...plan,
+      written: await writeEntries(manager, plan.planned),
+    };
   });
 }
 
@@ -161,6 +186,10 @@ function printReport(
   logger.info(
     `Cutoff (first logged match step): ${report.cutoff.toISOString()}.`,
   );
+  logger.info("Pre-cutoff matches per created_at day (UTC):");
+  for (const [day, count] of Object.entries(report.matchesCreatedOn)) {
+    logger.info(`  ${day}: ${count}`);
+  }
   logger.info(
     `${apply ? "Wrote" : "[dry-run] Would write"} ${
       apply ? report.written : report.planned.length

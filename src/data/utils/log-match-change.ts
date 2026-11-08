@@ -16,8 +16,12 @@ type MatchChange = {
 };
 
 export const matchDetail = {
-  linked: (title: string, status?: OpportunityVolunteerStatusType) =>
-    `Linked to opportunity "${title}"${status ? ` as ${status}` : ""}.`,
+  linked: (
+    title: string,
+    status?: OpportunityVolunteerStatusType,
+    imported = false,
+  ) =>
+    `Linked to opportunity "${title}"${status ? ` as ${status}` : ""}${imported ? " (imported)" : ""}.`,
   removed: (title: string, from: OpportunityVolunteerStatusType) =>
     `Removed from opportunity "${title}" (was ${from}).`,
   statusChanged: (
