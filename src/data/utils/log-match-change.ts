@@ -18,6 +18,8 @@ type MatchChange = {
 const linkedPrefix = (title: string) => `Linked to opportunity "${title}"`;
 
 export const matchDetail = {
+  title: (title: string | null | undefined, opportunityId: number) =>
+    title ?? `#${opportunityId}`,
   linkedPrefix,
   linked: (
     title: string,
@@ -56,7 +58,7 @@ export async function logMatchChange(
         where: { id: opportunityId },
       })
     )?.title;
-  const title = opportunityTitle ?? `#${opportunityId}`;
+  const title = matchDetail.title(opportunityTitle, opportunityId);
 
   let detail: string;
   if (from === undefined) {

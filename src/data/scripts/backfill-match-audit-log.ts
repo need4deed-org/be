@@ -10,6 +10,7 @@ import { matchDetail } from "../utils/log-match-change";
 export interface BackfillMatchAuditLogOptions {
   apply: boolean;
   importedOn: string[];
+  cutoff?: Date;
 }
 
 export interface MatchRow {
@@ -39,11 +40,14 @@ export interface BackfillPlan {
 
 export interface BackfillMatchAuditLogReport extends BackfillPlan {
   cutoff: Date;
+  cutoffFrom: "--cutoff" | "first logged match step";
   loggedSince: Date;
-  written: number;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const ISO_TIMESTAMP_WITH_ZONE =
+  /^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:\d{2})$/;
 
 const CUTOFF_MARGIN_MS = 5_000;
 
@@ -51,42 +55,69 @@ const WRITE_CHUNK = 500;
 
 const utcDay = (date: Date) => date.toISOString().slice(0, 10);
 
-export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
-  const flagIndex = argv.indexOf("--imported-on");
-  let importedOn: string[] = [];
-
-  if (flagIndex !== -1) {
-    const raw = argv[flagIndex + 1];
-    if (!raw || raw.startsWith("--")) {
-      throw new Error(
-        "--imported-on requires a comma-separated list of dates, e.g. --imported-on 2026-01-28,2026-05-27",
-      );
-    }
-    importedOn = raw.split(",");
-    const invalid = importedOn.filter(
-      (day) =>
-        !ISO_DATE.test(day) ||
-        Number.isNaN(Date.parse(`${day}T00:00:00Z`)) ||
-        utcDay(new Date(`${day}T00:00:00Z`)) !== day,
+function parseImportedOn(raw: string): string[] {
+  const days = raw.split(",");
+  const invalid = days.filter(
+    (day) =>
+      !ISO_DATE.test(day) ||
+      Number.isNaN(Date.parse(`${day}T00:00:00Z`)) ||
+      utcDay(new Date(`${day}T00:00:00Z`)) !== day,
+  );
+  if (invalid.length) {
+    throw new Error(
+      `--imported-on must be YYYY-MM-DD dates, got "${invalid.join(", ")}"`,
     );
-    if (invalid.length) {
-      throw new Error(
-        `--imported-on must be YYYY-MM-DD dates, got "${invalid.join(", ")}"`,
-      );
+  }
+  return days;
+}
+
+function parseCutoff(raw: string): Date {
+  if (!ISO_TIMESTAMP_WITH_ZONE.test(raw) || Number.isNaN(Date.parse(raw))) {
+    throw new Error(
+      `--cutoff must be an ISO timestamp with a zone, got "${raw}"`,
+    );
+  }
+  return new Date(raw);
+}
+
+const VALUE_EXAMPLES: Record<string, string> = {
+  "--imported-on":
+    "a comma-separated list of dates, e.g. --imported-on 2026-01-28,2026-05-27",
+  "--cutoff": "an ISO timestamp, e.g. --cutoff 2026-10-07T09:00:00Z",
+};
+
+export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
+  const options: BackfillMatchAuditLogOptions = {
+    apply: false,
+    importedOn: [],
+  };
+  const unknown: string[] = [];
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+    if (arg === "--apply") {
+      options.apply = true;
+      continue;
+    }
+    if (!(arg in VALUE_EXAMPLES)) {
+      unknown.push(arg);
+      continue;
+    }
+    const value = argv[++index];
+    if (!value || value.startsWith("--")) {
+      throw new Error(`${arg} requires ${VALUE_EXAMPLES[arg]}`);
+    }
+    if (arg === "--imported-on") {
+      options.importedOn = parseImportedOn(value);
+    } else {
+      options.cutoff = parseCutoff(value);
     }
   }
 
-  const unknown = argv.filter(
-    (arg, index) =>
-      arg !== "--apply" &&
-      arg !== "--imported-on" &&
-      !(flagIndex !== -1 && index === flagIndex + 1),
-  );
   if (unknown.length) {
     throw new Error(`Unknown argument(s): ${unknown.join(" ")}`);
   }
-
-  return { apply: argv.includes("--apply"), importedOn };
+  return options;
 }
 
 export async function findCutoff(manager: EntityManager): Promise<Date> {
@@ -105,7 +136,7 @@ export async function findCutoff(manager: EntityManager): Promise<Date> {
 }
 
 const matchTitle = ({ title, opportunityId }: MatchRow) =>
-  title ?? `#${opportunityId}`;
+  matchDetail.title(title, opportunityId);
 
 export function planMatchEntries(
   match: MatchRow,
@@ -221,7 +252,7 @@ export async function planEntries(
 async function writeEntries(
   manager: EntityManager,
   planned: PlannedEntry[],
-): Promise<number> {
+): Promise<void> {
   for (let start = 0; start < planned.length; start += WRITE_CHUNK) {
     await manager.insert(
       VolunteerAuditLog,
@@ -235,22 +266,24 @@ async function writeEntries(
         })),
     );
   }
-  return planned.length;
 }
 
 export async function backfill(
   manager: EntityManager,
   options: BackfillMatchAuditLogOptions,
 ): Promise<BackfillMatchAuditLogReport> {
-  const cutoff = await findCutoff(manager);
+  const cutoff = options.cutoff ?? (await findCutoff(manager));
   // Matches written in the same transaction as the first logged step carry a DB timestamp slightly before it.
   const loggedSince = new Date(cutoff.getTime() - CUTOFF_MARGIN_MS);
   const plan = await planEntries(manager, options, loggedSince);
+  if (options.apply) {
+    await writeEntries(manager, plan.planned);
+  }
   return {
     cutoff,
+    cutoffFrom: options.cutoff ? "--cutoff" : "first logged match step",
     loggedSince,
     ...plan,
-    written: options.apply ? await writeEntries(manager, plan.planned) : 0,
   };
 }
 
@@ -270,7 +303,7 @@ function printReport(
   const count = (keep: (entry: PlannedEntry) => boolean) =>
     report.planned.filter(keep).length;
   logger.info(
-    `Cutoff (first logged match step): ${report.cutoff.toISOString()}; ` +
+    `Cutoff (${report.cutoffFrom}): ${report.cutoff.toISOString()}; ` +
       `backfilling matches before ${report.loggedSince.toISOString()}.`,
   );
   logger.info("Pre-cutoff matches per created_at day (DB time):");
@@ -282,7 +315,7 @@ function printReport(
   );
   logger.info(
     `${apply ? "Wrote" : "[dry-run] Would write"} ${
-      apply ? report.written : report.planned.length
+      report.planned.length
     } volunteer activity-log entries: ` +
       `${count(({ kind }) => kind === "linked")} Linked ` +
       `(${count(({ imported }) => imported)} imported), ` +

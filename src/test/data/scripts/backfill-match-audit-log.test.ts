@@ -45,6 +45,23 @@ describe("backfill-match-audit-log parseArgs", () => {
     expect(() => parseArgs(["--aply"])).toThrow("Unknown argument(s): --aply");
   });
 
+  it("parses --cutoff and requires a zone", () => {
+    expect(parseArgs(["--cutoff", "2026-10-07T09:00:00Z"])).toEqual({
+      apply: false,
+      importedOn: [],
+      cutoff: new Date("2026-10-07T09:00:00Z"),
+    });
+    expect(parseArgs(["--cutoff", "2026-10-07T11:00:00+02:00"]).cutoff).toEqual(
+      new Date("2026-10-07T09:00:00Z"),
+    );
+    expect(() => parseArgs(["--cutoff", "2026-10-07T09:00:00"])).toThrow(
+      '--cutoff must be an ISO timestamp with a zone, got "2026-10-07T09:00:00"',
+    );
+    expect(() => parseArgs(["--cutoff"])).toThrow(
+      "--cutoff requires an ISO timestamp",
+    );
+  });
+
   it("rejects malformed and impossible dates", () => {
     expect(() => parseArgs(["--imported-on", "2026-1-5"])).toThrow(
       '--imported-on must be YYYY-MM-DD dates, got "2026-1-5"',
@@ -259,7 +276,7 @@ describe("backfill-match-audit-log backfill", () => {
       importedOn: [createdOn],
     });
 
-    expect(report.written).toBe(0);
+    expect(report.cutoffFrom).toBe("first logged match step");
     expect(report.matchesCreatedOn[createdOn]).toBeGreaterThanOrEqual(4);
     expect(
       ownPlanned(report.planned).map(({ volunteerId, detail, occurredAt }) => ({
@@ -293,9 +310,21 @@ describe("backfill-match-audit-log backfill", () => {
     expect(await entriesOf(v.changed)).toEqual([]);
   });
 
+  it("uses --cutoff instead of the first logged step when given", async () => {
+    const cutoff = new Date("2020-01-01T00:00:00Z");
+    const report = await backfill(manager, {
+      apply: false,
+      importedOn: [],
+      cutoff,
+    });
+
+    expect(report.cutoff).toEqual(cutoff);
+    expect(report.cutoffFrom).toBe("--cutoff");
+    expect(ownPlanned(report.planned)).toEqual([]);
+  });
+
   it("apply writes the planned entries, then a second run adds nothing", async () => {
     const first = await backfill(manager, { apply: true, importedOn: [] });
-    expect(first.written).toBe(first.planned.length);
 
     const written = async () =>
       Object.fromEntries(
@@ -354,7 +383,7 @@ describe("backfill-match-audit-log backfill", () => {
 
     const second = await backfill(manager, { apply: true, importedOn: [] });
     expect(second.cutoff).toEqual(first.cutoff);
-    expect(second.written).toBe(0);
+    expect(ownPlanned(second.planned)).toEqual([]);
     expect(second.skippedAlreadyLinked).toBeGreaterThanOrEqual(4);
     expect(await written()).toEqual(afterFirst);
   });
