@@ -27,16 +27,16 @@ const MERIDIEMS: Record<Lang, string> = {
 const DAY_PART =
   "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
-const REPEAT_PERIODS: Record<string, { nouns: string[]; adverbs: string[] }> = {
-  day: {
+const REPEAT_PERIODS: { nouns: string[]; adverbs: string[] }[] = [
+  {
     nouns: ["tag", "day"],
     adverbs: ["täglich", "daily", "every day", "each day", "jeden tag"],
   },
-  week: {
+  {
     nouns: ["woche", "week"],
     adverbs: ["wöchentlich", "weekly", "every week", "each week", "jede woche"],
   },
-  month: {
+  {
     nouns: ["monat", "month"],
     adverbs: [
       "monatlich",
@@ -46,7 +46,7 @@ const REPEAT_PERIODS: Record<string, { nouns: string[]; adverbs: string[] }> = {
       "jeden monat",
     ],
   },
-  year: {
+  {
     nouns: ["jahr", "year"],
     adverbs: [
       "jährlich",
@@ -57,15 +57,16 @@ const REPEAT_PERIODS: Record<string, { nouns: string[]; adverbs: string[] }> = {
       "jedes jahr",
     ],
   },
-};
-const PERIOD_WORDS = Object.values(REPEAT_PERIODS).flatMap(
-  ({ nouns, adverbs }) => [...nouns, ...adverbs],
-);
+];
+const PERIOD_WORDS = REPEAT_PERIODS.flatMap(({ nouns, adverbs }) => [
+  ...nouns,
+  ...adverbs.filter((adverb) => !adverb.includes(" ")),
+]);
 const REPEAT_SUFFIX =
   "(?:[x×](?![\\p{L}\\d])|\\s+[x×](?![\\p{L}\\d])(?!\\s*\\d)|\\s*mal(?!\\p{L})|\\s+times?(?!\\p{L}))";
 const REPEAT_PERIOD = `(?:\\s*/\\s*|\\s+(?:(?:pro|im|am|die|in\\s+der|a|per|each|every|jede[nms]?)\\s+)?)(?<period>${PERIOD_WORDS.join("|")})(?!\\p{L})`;
 const REPEAT_COUNT = new RegExp(
-  `(?<![.,\\d])\\b(?<count>\\d{1,2})(?:\\s*[-–]\\s*(?<countEnd>\\d{1,2}))?${REPEAT_SUFFIX}(?:${REPEAT_PERIOD})?`,
+  `(?<![.,\\d])\\b(?<count>\\d{1,2})(?:(?:\\s*[-–—]\\s*|\\s+(?:oder|or|bis|to|und|and)\\s+)(?<countEnd>\\d{1,2}))?${REPEAT_SUFFIX}(?:${REPEAT_PERIOD})?`,
   "giu",
 );
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
@@ -312,7 +313,7 @@ function numberPresent(output: string, value: number): boolean {
 function periodAdverbs(period: string): string[] {
   const word = period.toLowerCase().replace(/\s+/g, " ");
   return (
-    Object.values(REPEAT_PERIODS).find(
+    REPEAT_PERIODS.find(
       ({ nouns, adverbs }) => nouns.includes(word) || adverbs.includes(word),
     )?.adverbs ?? []
   );
@@ -324,11 +325,16 @@ function repeatPresent(
   adverbs: string[] = [],
 ): boolean {
   return (
-    hasNumber(output, String(count)) ||
+    (count === 1
+      ? hasNumber(output, "1") ||
+        NUMBER_WORDS[1].some((word) =>
+          hasWord(
+            output,
+            `${word}(?:[\\s-]*(?:times?|mal)|-\\s+(?:oder|bis|und)\\s+\\p{L}+mal)`,
+          ),
+        )
+      : numberPresent(output, count)) ||
     (REPEAT_WORDS[count] ?? []).some((word) => hasWord(output, word)) ||
-    (NUMBER_WORDS[count] ?? []).some((word) =>
-      hasWord(output, `${word}\\s+(?:times?|mal)`),
-    ) ||
     adverbs.some((adverb) => hasWord(output, adverb.replace(/ /g, "\\s+")))
   );
 }

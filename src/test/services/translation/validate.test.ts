@@ -266,6 +266,21 @@ describe("validateTranslation", () => {
       ["Treffen 1x wöchentlich", "Meeting every week", Lang.EN],
       ["Meeting 1x a week", "Treffen jede Woche", Lang.DE],
       ["Treffen 1x wo\u0308chentlich", "Meeting weekly", Lang.EN],
+      ["2x Kinokarten zu vergeben", "two cinema tickets to give away", Lang.EN],
+      [
+        "Treffen 1 oder 2 Mal pro Woche",
+        "Meeting once or twice a week",
+        Lang.EN,
+      ],
+      [
+        "Meeting 1 or 2 times a week",
+        "Treffen ein- oder zweimal pro Woche",
+        Lang.DE,
+      ],
+      ["Treffen 1—2x pro Woche", "Meeting once or twice a week", Lang.EN],
+      ["Meeting 2x a week", "Treffen zwei-mal pro Woche", Lang.DE],
+      ["Meeting 1x a week", "Treffen ein-mal pro Woche", Lang.DE],
+      ["Meeting 1-2x a week", "Treffen ein- bis zweimal pro Woche", Lang.DE],
     ] as const) {
       expectCode(source, output, target).toEqual({ status: "ok" });
     }
