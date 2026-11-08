@@ -46,18 +46,29 @@ function ownedVolunteerOpportunityIdWhere(scope: OwnedVolunteerScope) {
   );
 }
 
+type OpportunityWhere =
+  | FindOptionsWhere<Opportunity>
+  | FindOptionsWhere<Opportunity>[];
+
+export async function applyOwnedVolunteerScope(
+  request: FastifyRequest,
+  where: OpportunityWhere,
+): Promise<void> {
+  const scope = await resolveOwnedVolunteerScope(request);
+  if (scope) {
+    andIntoWhere(where, "id", ownedVolunteerOpportunityIdWhere(scope));
+  }
+}
+
 export async function applyVolunteerOpportunityScope(
   request: FastifyRequest,
-  where: FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[],
+  where: OpportunityWhere,
 ): Promise<void> {
   if (request.authUser?.role !== UserRole.VOLUNTEER) {
     return;
   }
   andIntoWhere(where, "id", closedForVolunteersIdWhere());
-  const scope = await resolveOwnedVolunteerScope(request);
-  if (scope) {
-    andIntoWhere(where, "id", ownedVolunteerOpportunityIdWhere(scope));
-  }
+  await applyOwnedVolunteerScope(request, where);
 }
 
 export async function assertOwnedVolunteerSeesOpportunity(

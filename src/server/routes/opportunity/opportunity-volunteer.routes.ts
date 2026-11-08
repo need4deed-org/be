@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { BadRequestError } from "../../../config/error/fastify";
+import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
@@ -45,15 +45,20 @@ export default function opportunityOpportunityVolunteerRoutes(
           where: { id: opportunityId },
           select: { id: true, agentId: true },
         });
+        if (!opportunity) {
+          throw new NotFoundError(
+            `Opportunity (id:${opportunityId}) not found.`,
+          );
+        }
         await assertAgentOwnsOpportunity(
           request,
           opportunityId,
-          opportunity?.agentId,
+          opportunity.agentId,
         );
         await assertOwnedVolunteerSeesOpportunity(
           request,
           opportunityId,
-          opportunity?.agentId,
+          opportunity.agentId,
         );
       }
 

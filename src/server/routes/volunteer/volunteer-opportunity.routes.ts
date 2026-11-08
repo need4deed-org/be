@@ -12,13 +12,13 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
+  applyOwnedVolunteerScope,
   getCategoryToDealHandler,
   getOpportunityListWhere,
   getSkipTake,
   mergeIntoWhere,
   updateBackfilledColumn,
 } from "../../utils";
-import { applyVolunteerOpportunityScope } from "../../utils/data/owned-volunteer-scope";
 import {
   requestLanguage,
   translateOpportunities,
@@ -64,7 +64,7 @@ export default async function volunteerOpportunityRoutes(
           agentId: Array.isArray(agentId) ? In(agentId) : agentId,
         });
       }
-      await applyVolunteerOpportunityScope(request, where);
+      await applyOwnedVolunteerScope(request, where);
 
       const opportunityRepository = fastify.db.opportunityRepository;
 
