@@ -27,6 +27,48 @@ const MERIDIEMS: Record<Lang, string> = {
 const DAY_PART =
   "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
+const REPEAT_PERIODS: { nouns: string[]; adverbs: string[] }[] = [
+  {
+    nouns: ["tag", "day"],
+    adverbs: ["täglich", "daily", "every day", "each day", "jeden tag"],
+  },
+  {
+    nouns: ["woche", "week"],
+    adverbs: ["wöchentlich", "weekly", "every week", "each week", "jede woche"],
+  },
+  {
+    nouns: ["monat", "month"],
+    adverbs: [
+      "monatlich",
+      "monthly",
+      "every month",
+      "each month",
+      "jeden monat",
+    ],
+  },
+  {
+    nouns: ["jahr", "year"],
+    adverbs: [
+      "jährlich",
+      "yearly",
+      "annually",
+      "every year",
+      "each year",
+      "jedes jahr",
+    ],
+  },
+];
+const PERIOD_WORDS = REPEAT_PERIODS.flatMap(({ nouns, adverbs }) => [
+  ...nouns,
+  ...adverbs.filter((adverb) => !adverb.includes(" ")),
+]);
+const REPEAT_SUFFIX =
+  "(?:[x×](?![\\p{L}\\d])|\\s+[x×](?![\\p{L}\\d])(?!\\s*\\d)|\\s*mal(?!\\p{L})|\\s+times?(?!\\p{L}))";
+const REPEAT_PERIOD = `(?:\\s*/\\s*|\\s+(?:(?:pro|im|am|die|in\\s+der|a|per|each|every|jede[nms]?)\\s+)?)(?<period>${PERIOD_WORDS.join("|")})(?!\\p{L})`;
+const REPEAT_COUNT = new RegExp(
+  `(?<![.,\\d])\\b(?<count>\\d{1,2})(?:(?:\\s*[-–—]\\s*|\\s+(?:oder|or|bis|to|und|and)\\s+)(?<countEnd>\\d{1,2}))?${REPEAT_SUFFIX}(?:${REPEAT_PERIOD})?`,
+  "giu",
+);
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
 
 function groupName(prefix: string, group: string): string {
@@ -84,6 +126,21 @@ const NUMBER_WORDS: Record<number, string[]> = {
   10: ["ten", "zehn"],
   11: ["eleven", "elf"],
   12: ["twelve", "zwölf"],
+};
+
+const REPEAT_WORDS: Record<number, string[]> = {
+  1: ["once", "einmal"],
+  2: ["twice", "zweimal"],
+  3: ["thrice", "dreimal"],
+  4: ["viermal"],
+  5: ["fünfmal"],
+  6: ["sechsmal"],
+  7: ["siebenmal"],
+  8: ["achtmal"],
+  9: ["neunmal"],
+  10: ["zehnmal"],
+  11: ["elfmal"],
+  12: ["zwölfmal"],
 };
 
 function trimTrailingPunctuation(token: string): string {
@@ -250,6 +307,35 @@ function numberPresent(output: string, value: number): boolean {
   return (
     hasNumber(output, String(value)) ||
     (NUMBER_WORDS[value] ?? []).some((word) => hasWord(output, word))
+  );
+}
+
+function periodAdverbs(period: string): string[] {
+  const word = period.toLowerCase().replace(/\s+/g, " ");
+  return (
+    REPEAT_PERIODS.find(
+      ({ nouns, adverbs }) => nouns.includes(word) || adverbs.includes(word),
+    )?.adverbs ?? []
+  );
+}
+
+function repeatPresent(
+  output: string,
+  count: number,
+  adverbs: string[] = [],
+): boolean {
+  return (
+    (count === 1
+      ? hasNumber(output, "1") ||
+        NUMBER_WORDS[1].some((word) =>
+          hasWord(
+            output,
+            `${word}(?:[\\s-]*(?:times?|mal)|-\\s+(?:oder|bis|und)\\s+\\p{L}+mal)`,
+          ),
+        )
+      : numberPresent(output, count)) ||
+    (REPEAT_WORDS[count] ?? []).some((word) => hasWord(output, word)) ||
+    adverbs.some((adverb) => hasWord(output, adverb.replace(/ /g, "\\s+")))
   );
 }
 
@@ -464,8 +550,20 @@ function missingToken(
       return "time_missing";
     }
   }
+  rest = rest.replace(fullHour, " ");
+  for (const { groups = {} } of rest.matchAll(REPEAT_COUNT)) {
+    const { count, countEnd, period } = groups;
+    const adverbs =
+      count === "1" && !countEnd && period ? periodAdverbs(period) : [];
+    if (
+      !repeatPresent(output, Number(count), adverbs) ||
+      (countEnd !== undefined && !repeatPresent(output, Number(countEnd)))
+    ) {
+      return "number_missing";
+    }
+  }
   const numbersOutput = collapseGrouping(output);
-  rest = collapseGrouping(rest.replace(fullHour, " ")).replace(
+  rest = collapseGrouping(rest.replace(REPEAT_COUNT, " ")).replace(
     SPACE_GROUPED,
     (grouped) =>
       hasNumber(numbersOutput, grouped.replace(/\D/g, "")) ? " " : grouped,
@@ -487,8 +585,8 @@ export function validateTranslation(
     status: "invalid",
     code,
   });
-  const src = source.trim();
-  const out = output.trim();
+  const src = source.normalize("NFC").trim();
+  const out = output.normalize("NFC").trim();
 
   if (!out) {
     return invalid("empty");

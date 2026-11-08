@@ -230,6 +230,89 @@ describe("validateTranslation", () => {
     ).toEqual(ok);
   });
 
+  it("accepts a repeat count as a digit or a repeat word", () => {
+    for (const [source, output, target] of [
+      ["Sprachcafé 1x wöchentlich", "Language café once a week", Lang.EN],
+      ["Treffen 1x in der Woche", "Meeting once a week", Lang.EN],
+      ["Treffen 1 x pro Woche", "Meeting once per week", Lang.EN],
+      ["Treffen 1× pro Woche", "Meeting once per week", Lang.EN],
+      ["Treffen 2x im Monat", "Meeting twice a month", Lang.EN],
+      ["Treffen 3x pro Woche", "Meeting three times a week", Lang.EN],
+      ["Treffen 2X im Monat", "Meeting 2x a month", Lang.EN],
+      ["Meeting 1x a week", "Treffen einmal pro Woche", Lang.DE],
+      ["Meeting 2x a week", "Treffen zweimal pro Woche", Lang.DE],
+      ["Meeting 3x a week", "Treffen dreimal pro Woche", Lang.DE],
+      ["Meeting 3x a week", "Treffen 3 Mal pro Woche", Lang.DE],
+      ["Treffen 3x pro Woche", "Meeting thrice a week", Lang.EN],
+      ["Sprachcafé 1x wöchentlich", "Language café weekly", Lang.EN],
+      ["Treffen 1x im Monat", "Meeting monthly", Lang.EN],
+      ["Meeting 1x a week", "Treffen wöchentlich", Lang.DE],
+      ["Raum 3 x 4 m groß", "Room 3 x 4 m in size", Lang.EN],
+      ["Erreichbar 24x7", "Available 24x7", Lang.EN],
+      ["Preis 1,5x so hoch", "Price 1.5x as high", Lang.EN],
+      ["Treffen 1-2x pro Woche", "Meeting once or twice a week", Lang.EN],
+      ["Treffen 1–2 Mal pro Woche", "Meeting 1-2 times a week", Lang.EN],
+      [
+        "Treffen 1x 2 Stunden pro Woche",
+        "Meeting once a week for 2 hours",
+        Lang.EN,
+      ],
+      ["Treffen 2 Mal pro Woche", "Meeting twice a week", Lang.EN],
+      ["Meeting 2 times a week", "Treffen zweimal pro Woche", Lang.DE],
+      ["Meeting 2x a week", "Treffen zwei Mal pro Woche", Lang.DE],
+      ["Treffen 1x am Tag", "Meeting daily", Lang.EN],
+      ["Treffen 1x die Woche", "Meeting weekly", Lang.EN],
+      ["Treffen 1x/Woche", "Meeting weekly", Lang.EN],
+      ["Treffen 1x wöchentlich", "Meeting every week", Lang.EN],
+      ["Meeting 1x a week", "Treffen jede Woche", Lang.DE],
+      ["Treffen 1x wo\u0308chentlich", "Meeting weekly", Lang.EN],
+      ["2x Kinokarten zu vergeben", "two cinema tickets to give away", Lang.EN],
+      [
+        "Treffen 1 oder 2 Mal pro Woche",
+        "Meeting once or twice a week",
+        Lang.EN,
+      ],
+      [
+        "Meeting 1 or 2 times a week",
+        "Treffen ein- oder zweimal pro Woche",
+        Lang.DE,
+      ],
+      ["Treffen 1—2x pro Woche", "Meeting once or twice a week", Lang.EN],
+      ["Meeting 2x a week", "Treffen zwei-mal pro Woche", Lang.DE],
+      ["Meeting 1x a week", "Treffen ein-mal pro Woche", Lang.DE],
+      ["Meeting 1-2x a week", "Treffen ein- bis zweimal pro Woche", Lang.DE],
+    ] as const) {
+      expectCode(source, output, target).toEqual({ status: "ok" });
+    }
+  });
+
+  it("rejects a changed repeat count and repeat words for plain numbers", () => {
+    for (const [source, output, target] of [
+      ["Sprachcafé 1x wöchentlich", "Language café twice a week", Lang.EN],
+      ["Treffen 3x pro Woche", "Meeting twice a week", Lang.EN],
+      ["Meeting 3x a week", "Treffen zweimal pro Woche", Lang.DE],
+      ["Wir suchen 1 Person", "We are looking for someone once", Lang.EN],
+      ["Wir suchen 2 Personen", "We are looking for people twice", Lang.EN],
+      ["Treffen 2x pro Woche", "Meeting weekly", Lang.EN],
+      ["Treffen 1x im Monat", "Meeting weekly", Lang.EN],
+      ["Treffen 1x", "Meeting weekly", Lang.EN],
+      ["Raum 3 x 4 m groß", "Room thrice 4 m in size", Lang.EN],
+      [
+        "Meeting 1x a week",
+        "Treffen zweimal pro Woche mit einer Gruppe",
+        Lang.DE,
+      ],
+      ["Treffen 1x pro Woche", "Meeting twice a week with one tutor", Lang.EN],
+      ["Treffen 1-2x pro Woche", "Meeting weekly", Lang.EN],
+      ["Treffen 1-2x pro Woche", "Meeting once a week", Lang.EN],
+      ["Treffen 2 Mal pro Woche", "Meeting weekly", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "number_missing",
+      });
+    }
+  });
+
   it("rejects a wrong meridiem or a 12-hour form with Uhr", () => {
     for (const [source, output, target] of [
       ["Von 17 bis 19 Uhr", "From 5 to 7 am", Lang.EN],
