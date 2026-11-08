@@ -14,6 +14,7 @@ export const VOLUNTEER_AUDIT_LOG_TYPES = [
   "contact_details_changed",
   "availability_changed",
   "opportunity_status_changed",
+  "owner_changed",
 ] as const;
 export type VolunteerAuditLogType = (typeof VOLUNTEER_AUDIT_LOG_TYPES)[number];
 
