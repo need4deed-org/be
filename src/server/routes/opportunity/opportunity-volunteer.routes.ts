@@ -6,6 +6,7 @@ import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import {
   assertAgentOwnsOpportunity,
+  assertOwnedVolunteerSeesOpportunity,
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
@@ -37,12 +38,20 @@ export default function opportunityOpportunityVolunteerRoutes(
         throw new BadRequestError(msg400);
       }
 
-      if (request.authUser?.role === UserRole.AGENT) {
+      if (
+        request.authUser?.role === UserRole.AGENT ||
+        request.authUser?.role === UserRole.VOLUNTEER
+      ) {
         const opportunity = await fastify.db.opportunityRepository.findOne({
           where: { id: opportunityId },
           select: { id: true, agentId: true },
         });
         await assertAgentOwnsOpportunity(
+          request,
+          opportunityId,
+          opportunity?.agentId,
+        );
+        await assertOwnedVolunteerSeesOpportunity(
           request,
           opportunityId,
           opportunity?.agentId,

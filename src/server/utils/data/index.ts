@@ -5,6 +5,7 @@ export * from "./add-district-to-agent";
 export * from "./add-district-to-opp";
 export * from "./agent-membership";
 export * from "./assert-agent-owns-opportunity";
+export * from "./owned-volunteer-scope";
 export * from "./assert-agent-visible";
 export * from "./assert-communication-author";
 export * from "./assert-email-available";
