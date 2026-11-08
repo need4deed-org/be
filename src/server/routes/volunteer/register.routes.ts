@@ -11,6 +11,7 @@ import {
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../../config";
+import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import logger from "../../../logger";
 import {
   parserVolunteerSelfRegister,
@@ -40,7 +41,11 @@ async function authByVerifyToken(
 ) {
   const { token } = request.query as { token?: string };
 
-  const payload = await verifyTokenOfType<{ id: number; email: string }>(
+  const payload = await verifyTokenOfType<{
+    id: number;
+    email: string;
+    ownerAgentId?: number;
+  }>(
     fastify,
     token,
     "verify",
@@ -64,6 +69,7 @@ async function authByVerifyToken(
   }
 
   request.registrant = user;
+  request.ngoOwnerAgentId = payload.ownerAgentId;
 }
 
 export default async function volunteerRegisterRoutes(
@@ -119,6 +125,16 @@ export default async function volunteerRegisterRoutes(
       const { volunteer, leads, addressReuse } =
         await parserVolunteerSelfRegister(person, request.body);
 
+      const owner = request.ngoOwnerAgentId
+        ? await fastify.db.agentRepository.findOne({
+            select: { id: true, title: true },
+            where: { id: request.ngoOwnerAgentId },
+          })
+        : null;
+      if (owner) {
+        volunteer.ownerAgentId = owner.id;
+      }
+
       let id: number;
       try {
         id = await writeVolunteerLegacy(volunteer, addressReuse);
@@ -129,6 +145,17 @@ export default async function volunteerRegisterRoutes(
           );
         }
         throw err;
+      }
+      if (owner) {
+        await fastify.db.volunteerAuditLogRepository.save(
+          new VolunteerAuditLog({
+            volunteerId: id,
+            type: "owner_changed",
+            detail: `Registered through the registration link of ${owner.title} (id:${owner.id}).`,
+            actorUserId: user?.id,
+            occurredAt: new Date(),
+          }),
+        );
       }
       if (leads.length) {
         updateLeads(leads).catch((error) => {

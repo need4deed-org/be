@@ -67,6 +67,7 @@ import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
 import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-person-id";
 import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
+import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-token";
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
 
 export default async function userRoutes(
@@ -401,10 +402,22 @@ export default async function userRoutes(
         },
       },
       preHandler: async (request) => {
-        const { person: personData, email, role } = request.body;
+        const { person: personData, email, role, ngoToken } = request.body;
 
         if (isStaffRole(role)) {
           throw new UnauthorizedError();
+        }
+
+        if (ngoToken !== undefined) {
+          if (role !== UserRole.VOLUNTEER) {
+            throw new BadRequestError(
+              "An NGO registration link is only for volunteers.",
+            );
+          }
+          request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
+            request,
+            ngoToken,
+          );
         }
 
         if (role === UserRole.AGENT) {
@@ -467,11 +480,13 @@ export default async function userRoutes(
       }
       logger.info(`Password set for user ${result.user.id} via register`);
 
-      fastify.notify.emailVerification(result.user).catch((err) => {
-        logger.error(
-          `Failed to send verification email for user ${result.user.id}: ${err instanceof Error ? err.message : err}`,
-        );
-      });
+      fastify.notify
+        .emailVerification(result.user, request.ngoOwnerAgentId)
+        .catch((err) => {
+          logger.error(
+            `Failed to send verification email for user ${result.user.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
 
       return reply.status(201).send(result.user);
     },

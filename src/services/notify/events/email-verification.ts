@@ -29,6 +29,7 @@ export function resetVerificationTemplateCache(): void {
 export async function sendEmailVerification(
   { email, jwt }: EmailVerificationDeps,
   user: User,
+  ownerAgentId?: number,
 ): Promise<void> {
   if (!user?.email) {
     throw new Error("User email is required for verification");
@@ -39,6 +40,7 @@ export async function sendEmailVerification(
       id: user.id,
       email: user.email,
       type: "verify",
+      ...(ownerAgentId ? { ownerAgentId } : {}),
     },
     { expiresIn: `${VERIFY_LIFESPAN_MS}` },
   );

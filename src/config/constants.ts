@@ -99,6 +99,9 @@ export const urlPasswordReset =
 export const urlCoordinatorInvite =
   process.env.URL_COORDINATOR_INVITE || `${urlApp}/register-with-invite`;
 
+export const urlNgoRegistration =
+  process.env.URL_NGO_REGISTRATION || `${urlApp}/register/volunteer`;
+
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
 
@@ -165,6 +168,7 @@ export const ACCESS_LIFESPAN_MS = 15 * 60 * 1000;
 export const VERIFY_LIFESPAN_MS = 24 * 60 * 60 * 1000;
 export const RESET_LIFESPAN_MS = 60 * 60 * 1000;
 export const COORDINATOR_INVITE_LIFESPAN_MS = 7 * 24 * 60 * 60 * 1000;
+export const NGO_REGISTRATION_LIFESPAN_MS = 90 * 24 * 60 * 60 * 1000;
 export const pluginTimeout = 300 * 1000;
 
 export const accessCookieName = "access";
