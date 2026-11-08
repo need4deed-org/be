@@ -195,27 +195,26 @@ async function writeEntries(
   return planned.length;
 }
 
-export async function runBackfill(
+export async function backfill(
+  manager: EntityManager,
+  options: BackfillMatchAuditLogOptions,
+): Promise<BackfillMatchAuditLogReport> {
+  const cutoff = await findCutoff(manager);
+  const plan = await planEntries(manager, options, cutoff);
+  return {
+    cutoff,
+    ...plan,
+    written: options.apply ? await writeEntries(manager, plan.planned) : 0,
+  };
+}
+
+export function runBackfill(
   ds: DataSource,
   options: BackfillMatchAuditLogOptions,
 ): Promise<BackfillMatchAuditLogReport> {
-  if (!options.apply) {
-    const cutoff = await findCutoff(ds.manager);
-    return {
-      cutoff,
-      ...(await planEntries(ds.manager, options, cutoff)),
-      written: 0,
-    };
-  }
-  return ds.transaction(async (manager) => {
-    const cutoff = await findCutoff(manager);
-    const plan = await planEntries(manager, options, cutoff);
-    return {
-      cutoff,
-      ...plan,
-      written: await writeEntries(manager, plan.planned),
-    };
-  });
+  return options.apply
+    ? ds.transaction((manager) => backfill(manager, options))
+    : backfill(ds.manager, options);
 }
 
 function printReport(
