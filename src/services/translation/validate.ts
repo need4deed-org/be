@@ -27,6 +27,7 @@ const MERIDIEMS: Record<Lang, string> = {
 const DAY_PART =
   "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
+const REPEAT_COUNT = /\b(\d{1,2})\s*[x×](?![\p{L}\d])/giu;
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
 
 function groupName(prefix: string, group: string): string {
@@ -84,6 +85,21 @@ const NUMBER_WORDS: Record<number, string[]> = {
   10: ["ten", "zehn"],
   11: ["eleven", "elf"],
   12: ["twelve", "zwölf"],
+};
+
+const REPEAT_WORDS: Record<number, string[]> = {
+  1: ["once", "einmal"],
+  2: ["twice", "zweimal"],
+  3: ["dreimal"],
+  4: ["viermal"],
+  5: ["fünfmal"],
+  6: ["sechsmal"],
+  7: ["siebenmal"],
+  8: ["achtmal"],
+  9: ["neunmal"],
+  10: ["zehnmal"],
+  11: ["elfmal"],
+  12: ["zwölfmal"],
 };
 
 function trimTrailingPunctuation(token: string): string {
@@ -250,6 +266,13 @@ function numberPresent(output: string, value: number): boolean {
   return (
     hasNumber(output, String(value)) ||
     (NUMBER_WORDS[value] ?? []).some((word) => hasWord(output, word))
+  );
+}
+
+function repeatPresent(output: string, count: number): boolean {
+  return (
+    numberPresent(output, count) ||
+    (REPEAT_WORDS[count] ?? []).some((word) => hasWord(output, word))
   );
 }
 
@@ -464,8 +487,14 @@ function missingToken(
       return "time_missing";
     }
   }
+  rest = rest.replace(fullHour, " ");
+  for (const [, count] of rest.matchAll(REPEAT_COUNT)) {
+    if (!repeatPresent(output, Number(count))) {
+      return "number_missing";
+    }
+  }
   const numbersOutput = collapseGrouping(output);
-  rest = collapseGrouping(rest.replace(fullHour, " ")).replace(
+  rest = collapseGrouping(rest.replace(REPEAT_COUNT, " ")).replace(
     SPACE_GROUPED,
     (grouped) =>
       hasNumber(numbersOutput, grouped.replace(/\D/g, "")) ? " " : grouped,
