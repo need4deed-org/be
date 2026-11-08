@@ -296,7 +296,7 @@ function rangePattern(
       endMinutes,
     );
     return new RegExp(
-      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
+      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}(?<endH>\\s*h\\b)?`,
       "giu",
     );
   });
@@ -320,7 +320,8 @@ function rangeEndMatches(
   if (endClock.meridiem || endClock.dayPart || endHasMinutes(groups)) {
     return clockMatches(h, end, endClock, outputLang);
   }
-  return h === end && bareEndReadable;
+  const marked = endClock.uhr || endClock.oClock || groups.endH;
+  return h === end && (Boolean(marked) || bareEndReadable);
 }
 
 function borrowsEndMeridiem(
