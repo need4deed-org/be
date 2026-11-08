@@ -11,6 +11,7 @@ import {
   CRON_EMAIL_SENT,
   DryRunEmailTransport,
   DryRunSlackTransport,
+  EmailSuggestionRequestInput,
   EmailTaggedInput,
   EmailTransport,
   RegistrationEmailRecipient,
@@ -28,6 +29,7 @@ import {
   sendEmailStale,
   sendEmailSuggestion,
   sendEmailSuggestionAccompanying,
+  sendEmailSuggestionRequest,
   sendEmailTagged,
   sendEmailVerification,
   sendOpsAlert,
@@ -63,6 +65,7 @@ interface NotifyService {
   emailNewAccompanying(opportunity: Opportunity): Promise<void>;
   emailRegistration(volunteer: RegistrationEmailRecipient): Promise<void>;
   emailTagged(input: EmailTaggedInput): Promise<void>;
+  emailSuggestionRequest(input: EmailSuggestionRequestInput): Promise<void>;
   emailCgcApplication(input: CgcApplicationEmailInput): Promise<void>;
 }
 
@@ -256,6 +259,8 @@ async function notifyPlugin(fastify: FastifyInstance) {
       sendEmailRegistration(emailNotify, volunteer),
     emailTagged: (input: EmailTaggedInput) =>
       sendEmailTagged(emailNotify, input),
+    emailSuggestionRequest: (input: EmailSuggestionRequestInput) =>
+      sendEmailSuggestionRequest(emailNotify, input),
     emailCgcApplication: (input: CgcApplicationEmailInput) =>
       sendEmailCgcApplication(emailNotifyRejecting, input),
   });

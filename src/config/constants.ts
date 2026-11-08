@@ -129,6 +129,8 @@ export const emailNewAccompanyingManifestUrl =
   CDNBaseUrl + "/emails/confirmationaccompanying.json";
 
 export const emailTaggedManifestUrl = CDNBaseUrl + "/emails/tagged.json";
+export const emailSuggestionRequestManifestUrl =
+  CDNBaseUrl + "/emails/suggestion-request.json";
 export const emailCgcApplicationManifestUrl =
   CDNBaseUrl + "/emails/cgcapplication.json";
 export const cgcApplicationResendGuardMs = 60 * 1000;

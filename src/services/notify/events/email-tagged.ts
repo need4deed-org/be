@@ -87,7 +87,7 @@ function whereLabel(where: TaggedWhere): keyof TaggedLabels {
   );
 }
 
-function neutralizeBraces(value: string): string {
+export function neutralizeBraces(value: string): string {
   return value.replace(/\{\{/g, "{\u200B{").replace(/\}\}/g, "}\u200B}");
 }
 
