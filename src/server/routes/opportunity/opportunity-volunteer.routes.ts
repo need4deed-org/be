@@ -1,12 +1,14 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { BadRequestError } from "../../../config/error/fastify";
+import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import {
   assertAgentOwnsOpportunity,
+  assertOwnedVolunteerSeesOpportunity,
   maskVolunteerIdentities,
+  resolveOwnedVolunteerScope,
   shouldMaskInactiveAgentData,
 } from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
@@ -37,15 +39,26 @@ export default function opportunityOpportunityVolunteerRoutes(
         throw new BadRequestError(msg400);
       }
 
-      if (request.authUser?.role === UserRole.AGENT) {
+      const ownedScope = await resolveOwnedVolunteerScope(request);
+      if (request.authUser?.role === UserRole.AGENT || ownedScope) {
         const opportunity = await fastify.db.opportunityRepository.findOne({
           where: { id: opportunityId },
           select: { id: true, agentId: true },
         });
+        if (!opportunity) {
+          throw new NotFoundError(
+            `Opportunity (id:${opportunityId}) not found.`,
+          );
+        }
         await assertAgentOwnsOpportunity(
           request,
           opportunityId,
-          opportunity?.agentId,
+          opportunity.agentId,
+        );
+        await assertOwnedVolunteerSeesOpportunity(
+          request,
+          opportunityId,
+          opportunity.agentId,
         );
       }
 

@@ -12,6 +12,7 @@ import {
   ReplyDataCount,
 } from "../../types";
 import {
+  applyOwnedVolunteerScope,
   getCategoryToDealHandler,
   getOpportunityListWhere,
   getSkipTake,
@@ -63,6 +64,7 @@ export default async function volunteerOpportunityRoutes(
           agentId: Array.isArray(agentId) ? In(agentId) : agentId,
         });
       }
+      await applyOwnedVolunteerScope(request, where);
 
       const opportunityRepository = fastify.db.opportunityRepository;
 

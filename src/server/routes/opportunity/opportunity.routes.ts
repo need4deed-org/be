@@ -80,7 +80,6 @@ import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
   alertOnChange,
-  andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
@@ -116,11 +115,14 @@ import {
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { getOtherOpportunities } from "../../utils/data/get-other-opportunities";
 import { logEmailCommunication } from "../../utils/data/log-email-communication";
-import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import {
   dtoOpportunityListForCaller,
   loadOpportunityList,
 } from "../../utils/data/opportunity-list";
+import {
+  applyVolunteerOpportunityScope,
+  assertOwnedVolunteerSeesOpportunity,
+} from "../../utils/data/owned-volunteer-scope";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
@@ -372,6 +374,12 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
       await assertAgentOwnsOpportunity(request, id, opportunity.agentId);
+      await assertOwnedVolunteerSeesOpportunity(
+        request,
+        id,
+        opportunity.agentId,
+        opportunity.opportunityVolunteer,
+      );
 
       const opportunityComments: Opportunity & { comments: Comment[] } =
         await addComments2Entity(opportunity);
@@ -494,9 +502,7 @@ export default async function opportunityRoutes(
       if (agentIds) {
         mergeIntoWhere(where, { agentId: In(agentIds) });
       }
-      if (request.authUser?.role === UserRole.VOLUNTEER) {
-        andIntoWhere(where, "id", closedForVolunteersIdWhere());
-      }
+      await applyVolunteerOpportunityScope(request, where);
 
       logger.debug(
         `GET /opportunities called. options: ${JSON.stringify({ where })}`,
