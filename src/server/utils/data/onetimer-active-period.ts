@@ -14,6 +14,8 @@ import { ONETIMER_OPPORTUNITY_TYPES } from "./onetimer-statuses";
 
 export const ONETIMER_ACTIVE_PERIOD_DAYS = 28;
 
+export const ONETIMER_HOLD_RULE_START = new Date("2026-10-12T00:00:00+02:00");
+
 export function onetimerActiveSince(today: Date = berlinToday()): Date {
   return berlinDayBoundaries(addDays(today, -ONETIMER_ACTIVE_PERIOD_DAYS))
     .startOfDay;
@@ -48,17 +50,20 @@ export const pastOnetimerMatchSql = (volunteerColumn: string, since?: string) =>
   `EXISTS (SELECT 1 ${onetimerFromSql(volunteerColumn, "pastMatch")} ${since ? `AND ot.date >= :${since}` : ""})`;
 
 export const onetimerHoldSql = (volunteerColumn: string) =>
-  pastOnetimerMatchSql(volunteerColumn, "activeSince");
+  `EXISTS (SELECT 1 ${onetimerFromSql(volunteerColumn, "pastMatch")} AND ot.date >= :activeSince AND ot.date <= :endOfToday)`;
 
 export const handSetActiveSinceOnetimerSql = (volunteerColumn: string) =>
   `COALESCE((
-    SELECT al.actor_user_id IS NOT NULL
-      AND al.detail LIKE :toActive
-      AND al.occurred_at >= (SELECT max(ot.date) ${onetimerFromSql(volunteerColumn, "pastMatch")})
-    FROM volunteer_audit_log al
-    WHERE al.volunteer_id = ${volunteerColumn} AND al.type = 'availability_changed'
-    ORDER BY al.occurred_at DESC, al.id DESC
-    LIMIT 1
+    SELECT latest.actor_user_id IS NOT NULL
+      AND latest.detail LIKE :toActive
+      AND latest.occurred_at >= (SELECT max(ot.date) ${onetimerFromSql(volunteerColumn, "pastMatch")})
+    FROM (
+      SELECT al.actor_user_id, al.detail, al.occurred_at
+      FROM volunteer_audit_log al
+      WHERE al.volunteer_id = ${volunteerColumn} AND al.type = 'availability_changed'
+      ORDER BY al.occurred_at DESC, al.id DESC
+      LIMIT 1
+    ) latest
   ), false)`;
 
 export const onetimerSqlParameters = (today?: Date) => ({
@@ -67,6 +72,8 @@ export const onetimerSqlParameters = (today?: Date) => ({
   pastMatch: OpportunityVolunteerStatusType.PAST,
   onetimerTypes: ONETIMER_OPPORTUNITY_TYPES,
   activeSince: onetimerActiveSince(today),
+  endOfToday: berlinDayBoundaries(today ?? berlinToday()).endOfDay,
+  holdRuleStart: ONETIMER_HOLD_RULE_START,
   toActive: engagementChangeDetail("%", VolunteerStateEngagementType.ACTIVE),
 });
 

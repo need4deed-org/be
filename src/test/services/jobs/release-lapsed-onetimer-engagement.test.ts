@@ -217,4 +217,17 @@ describe("releaseLapsedOnetimerEngagement", () => {
 
     expect(await ctx.fixtures.engagement(volunteer)).toBe(AVAILABLE);
   });
+
+  it("leaves a volunteer alone whose last accompanying or event predates the rule", async () => {
+    const volunteer = await systemActiveVolunteer();
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: new Date("2026-09-01T12:00:00+02:00"),
+      status: OpportunityStatusType.PAST,
+      matches: [{ volunteer, status: PAST }],
+    });
+
+    await run(volunteer);
+
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(ACTIVE);
+  });
 });

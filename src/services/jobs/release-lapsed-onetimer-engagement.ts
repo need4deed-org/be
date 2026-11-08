@@ -18,7 +18,7 @@ const { ACTIVE, AVAILABLE } = VolunteerStateEngagementType;
 const lapsedWhere = `volunteer.status_engagement = :activeEngagement
   AND NOT ${anyActiveMatchSql("volunteer.id")}
   AND NOT ${onetimerHoldSql("volunteer.id")}
-  AND ${pastOnetimerMatchSql("volunteer.id")}
+  AND ${pastOnetimerMatchSql("volunteer.id", "holdRuleStart")}
   AND NOT ${handSetActiveSinceOnetimerSql("volunteer.id")}`;
 
 async function releaseLapsed(

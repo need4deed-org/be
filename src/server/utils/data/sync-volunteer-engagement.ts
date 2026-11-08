@@ -96,11 +96,7 @@ export async function syncEngagementForMatchChange(
   const isActive = OpportunityVolunteerStatusType.ACTIVE;
   if (to === isActive && from !== isActive) {
     await syncVolunteerEngagement(manager, volunteerId, "follow");
-  } else if (
-    (from === isActive || from === OpportunityVolunteerStatusType.PAST) &&
-    to !== isActive &&
-    to !== from
-  ) {
+  } else if (from === isActive && to !== isActive) {
     await syncVolunteerEngagement(manager, volunteerId, "release");
   }
 }

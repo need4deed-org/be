@@ -168,25 +168,10 @@ describe("syncEngagementForMatchChange", () => {
     );
   });
 
-  it.each([
-    [PAST, undefined],
-    [PAST, PENDING],
-  ])(
-    "re-checks the hold when a Past match goes from %s to %s",
-    async (from, to) => {
-      exists.mockResolvedValue(false);
-      await syncEngagementForMatchChange(manager, 7, from, to);
-      expect(update).toHaveBeenCalledWith(
-        Volunteer,
-        { id: 7, statusEngagement: VolunteerStateEngagementType.ACTIVE },
-        { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
-      );
-    },
-  );
-
   it("leaves engagement alone for transitions that don't touch Active", async () => {
     await syncEngagementForMatchChange(manager, 7, MATCHED, PAST);
     await syncEngagementForMatchChange(manager, 7, PENDING, undefined);
+    await syncEngagementForMatchChange(manager, 7, PAST, undefined);
     expect(exists).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });

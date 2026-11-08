@@ -151,6 +151,14 @@ describe("activeFromOnetimer on the volunteer list and detail", () => {
     expect(await flagged(volunteer)).toBe(false);
   });
 
+  it("is false for a Past match dated in the future", async () => {
+    const volunteer = await withMatch(await fixtures.volunteer(ACTIVE), {
+      days: -10,
+      status: OpportunityVolunteerStatusType.PAST,
+    });
+    expect(await flagged(volunteer)).toBe(false);
+  });
+
   it("is false when the volunteer isn't Active", async () => {
     const volunteer = await withMatch(await fixtures.volunteer(AVAILABLE), {
       days: 10,
