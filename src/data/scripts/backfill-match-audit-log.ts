@@ -24,7 +24,6 @@ export interface MatchRow {
 }
 
 export interface PlannedEntry {
-  opportunityVolunteerId: number;
   volunteerId: number;
   kind: "linked" | "status-changed";
   imported: boolean;
@@ -46,7 +45,7 @@ export interface BackfillMatchAuditLogReport extends BackfillPlan {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const CUTOFF_MARGIN_MS = 60_000;
+const CUTOFF_MARGIN_MS = 5_000;
 
 const WRITE_CHUNK = 500;
 
@@ -77,6 +76,16 @@ export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
     }
   }
 
+  const unknown = argv.filter(
+    (arg, index) =>
+      arg !== "--apply" &&
+      arg !== "--imported-on" &&
+      !(flagIndex !== -1 && index === flagIndex + 1),
+  );
+  if (unknown.length) {
+    throw new Error(`Unknown argument(s): ${unknown.join(" ")}`);
+  }
+
   return { apply: argv.includes("--apply"), importedOn };
 }
 
@@ -103,7 +112,7 @@ export function planMatchEntries(
   loggedSince: Date,
   importedOn: string[],
 ): PlannedEntry[] {
-  const { id, volunteerId, status, createdAt, updatedAt, createdOn } = match;
+  const { volunteerId, status, createdAt, updatedAt, createdOn } = match;
   const title = matchTitle(match);
   const changedLater = updatedAt.getTime() > createdAt.getTime();
   const imported = importedOn.includes(createdOn);
@@ -112,7 +121,6 @@ export function planMatchEntries(
     detail: string,
     occurredAt: Date,
   ): PlannedEntry => ({
-    opportunityVolunteerId: id,
     volunteerId,
     kind,
     imported: kind === "linked" && imported,
@@ -156,7 +164,12 @@ async function findBackfilledLinks(
   const byKey = new Map<string, string[]>();
   for (const { volunteerId, occurredAt, detail } of entries) {
     const key = backfilledKey(volunteerId, occurredAt);
-    byKey.set(key, [...(byKey.get(key) ?? []), detail]);
+    const details = byKey.get(key);
+    if (details) {
+      details.push(detail);
+    } else {
+      byKey.set(key, [detail]);
+    }
   }
   return byKey;
 }

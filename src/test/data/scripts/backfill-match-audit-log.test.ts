@@ -38,6 +38,13 @@ describe("backfill-match-audit-log parseArgs", () => {
     );
   });
 
+  it("rejects unknown arguments, including the --flag=value form", () => {
+    expect(() => parseArgs(["--imported-on=2026-05-27", "--apply"])).toThrow(
+      "Unknown argument(s): --imported-on=2026-05-27",
+    );
+    expect(() => parseArgs(["--aply"])).toThrow("Unknown argument(s): --aply");
+  });
+
   it("rejects malformed and impossible dates", () => {
     expect(() => parseArgs(["--imported-on", "2026-1-5"])).toThrow(
       '--imported-on must be YYYY-MM-DD dates, got "2026-1-5"',
@@ -66,7 +73,6 @@ describe("backfill-match-audit-log planMatchEntries", () => {
   it("links with the current status when the match was never updated", () => {
     expect(planMatchEntries(match(), cutoff, [])).toEqual([
       {
-        opportunityVolunteerId: 7,
         volunteerId: 11,
         kind: "linked",
         imported: false,
@@ -353,7 +359,7 @@ describe("backfill-match-audit-log backfill", () => {
     expect(await written()).toEqual(afterFirst);
   });
 
-  it("leaves matches created within a minute before the cutoff alone", async () => {
+  it("leaves matches created within seconds before the cutoff alone", async () => {
     const cutoff = await findCutoff(manager);
     const lateVolunteer = await createVolunteer(manager);
     const lateOpportunity = await createOpportunity(
@@ -367,7 +373,7 @@ describe("backfill-match-audit-log backfill", () => {
         lateVolunteer.id,
         lateOpportunity.id,
         MATCHED,
-        new Date(cutoff.getTime() - 30_000),
+        new Date(cutoff.getTime() - 3_000),
       ],
     );
 
