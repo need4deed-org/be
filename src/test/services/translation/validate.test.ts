@@ -11,7 +11,7 @@ import {
   validateTranslation,
 } from "../../../services/translation/validate";
 
-// Real opportunity texts and outputs from the be#1065 spike (public listing).
+// Real public-listing texts, so their contact details are not personal data.
 const MENS_CAFE_DE =
   "Freiwillige gesucht für das Männercafé: Für unser wöchentliches Männercafé suchen wir engagierte Männer, die Arabisch sprechen. Wann: Jeden Montag, 16:30–18:00 Uhr. Kontakt: benn-wilmersdorf@mts-socialdesign.com 📱 +49 176 24753773";
 const MENS_CAFE_EN =
@@ -20,6 +20,21 @@ const CREATIVE_DE =
   "Wir suchen eine kreative Person, die Lust hat, gemeinsam mit Kindern in unserer Unterkunft künstlerisch aktiv zu werden. Ob Malen, Zeichnen oder Collagen – der Fantasie sind keine Grenzen gesetzt!";
 const CREATIVE_EN =
   "We are looking for a creative person who enjoys working with children artistically in our accommodation centre. Whether painting, drawing or collages – there are no limits to the imagination!";
+
+const CREATIVE_DE_REWORDED =
+  "Gesucht wird eine kreative Person, die Freude daran hat, mit den Kindern in der Unterkunft künstlerisch tätig zu sein. Ob Malen, Basteln oder Collagen – der Kreativität sind keine Grenzen gesetzt!";
+const CREATIVE_EN_REWORDED =
+  "We are searching for a creative person who likes to work artistically with the children in our shelter. Whether painting, crafting or collages – there is no limit to the imagination!";
+const APPOINTMENT_DE =
+  "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)";
+const APPOINTMENT_EN =
+  "Appointment details:\nTuesday, 18 August 2026, at 09:00 AM.\nLocation: DHZC Clinic for Cardiology, Angiology and Intensive Care Medicine. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)";
+
+const expectInTranslatedBand = (source: string, output: string) => {
+  const score = similarity(source, output);
+  expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
+  expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
+};
 
 const expectCode = (source: string, output: string, target: Lang) =>
   expect(validateTranslation(source, output, target));
@@ -134,7 +149,6 @@ describe("validateTranslation", () => {
   });
 
   it("allows 12-hour notation for times only, not for other numbers", () => {
-    // Full-review finding 1: any number > 12 also passed as number - 12.
     expectCode(
       "Für 20 Euro im Monat",
       "For 8 euros a month",
@@ -567,7 +581,6 @@ describe("validateTranslation", () => {
   });
 
   it("accepts dates and numbers copied with leading zeros", () => {
-    // Review finding 1: "01" was not recognised as the day 1.
     expectCode(
       "Treffen ab 01.10.2026 im Hof, Raum 05",
       "Meeting from 01.10.2026 in the yard, room 05",
@@ -576,7 +589,6 @@ describe("validateTranslation", () => {
   });
 
   it("accepts thousands separators in either notation", () => {
-    // Review finding 2: "1.000" -> "1,000" was rejected.
     const ok = { status: "ok" };
     expectCode(
       "Budget: 1.000 Euro pro Jahr",
@@ -601,7 +613,6 @@ describe("validateTranslation", () => {
   });
 
   it("accepts a separator the model adds or drops", () => {
-    // Quick-review finding 1: only source-side separators were handled.
     const ok = { status: "ok" };
     expectCode(
       "Budget: 5000 Euro pro Jahr",
@@ -616,7 +627,6 @@ describe("validateTranslation", () => {
   });
 
   it("keeps space-separated numbers apart unless the output joins them", () => {
-    // Quick-review finding 2: "3 100" was read as 3100.
     const ok = { status: "ok" };
     expectCode(
       "Raum 3 100 Plätze frei",
@@ -663,7 +673,6 @@ describe("validateTranslation", () => {
   });
 
   it("rejects a long text that was reworded instead of translated", () => {
-    // Same-language input comes back "improved" (be#1065 identity test).
     const reworded = CREATIVE_DE.replace("Lust hat", "Freude hat").replace(
       "keine Grenzen gesetzt",
       "kaum Grenzen gesetzt",
@@ -674,19 +683,65 @@ describe("validateTranslation", () => {
   });
 
   it("accepts a similar output when the hints show a real translation", () => {
-    // be#1320 / opportunity 972: clinic name and address stay verbatim.
-    const source =
-      "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)";
-    const output =
-      "Appointment details:\nTuesday, 18 August 2026, at 09:00 AM.\nLocation: DHZC Clinic for Cardiology, Angiology and Intensive Care Medicine. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)";
-    const score = similarity(source, output);
-    expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
-    expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
-    expectCode(source, output, Lang.EN).toEqual({ status: "ok" });
+    expectInTranslatedBand(APPOINTMENT_DE, APPOINTMENT_EN);
+    expectCode(APPOINTMENT_DE, APPOINTMENT_EN, Lang.EN).toEqual({
+      status: "ok",
+    });
   });
 
+  it("applies the translated band in the en → de direction too", () => {
+    expect(languageHint(APPOINTMENT_EN)).toBe(Lang.EN);
+    expect(languageHint(APPOINTMENT_DE)).toBe(Lang.DE);
+    expectCode(APPOINTMENT_EN, APPOINTMENT_DE, Lang.DE).toEqual({
+      status: "ok",
+    });
+    expectCode(APPOINTMENT_EN, APPOINTMENT_DE, Lang.EN).toMatchObject({
+      code: "source_is_target",
+    });
+  });
+
+  it.each([
+    {
+      name: "DE → DE",
+      source: CREATIVE_DE,
+      output: CREATIVE_DE_REWORDED,
+      lang: Lang.DE,
+      target: Lang.DE,
+    },
+    {
+      name: "EN → EN",
+      source: CREATIVE_EN,
+      output: CREATIVE_EN_REWORDED,
+      lang: Lang.EN,
+      target: Lang.EN,
+    },
+    {
+      name: "EN → DE",
+      source: CREATIVE_EN,
+      output: CREATIVE_EN_REWORDED,
+      lang: Lang.EN,
+      target: Lang.DE,
+    },
+    {
+      name: "DE → EN",
+      source: CREATIVE_DE,
+      output: CREATIVE_DE_REWORDED,
+      lang: Lang.DE,
+      target: Lang.EN,
+    },
+  ])(
+    "keeps the same-language limit for a $name rewording in the band",
+    ({ source, output, lang, target }) => {
+      expectInTranslatedBand(source, output);
+      expect(languageHint(source)).toBe(lang);
+      expect(languageHint(output)).toBe(lang);
+      expectCode(source, output, target).toMatchObject({
+        code: "source_is_target",
+      });
+    },
+  );
+
   it("still rejects a half translation even when the hints read de → en", () => {
-    // Only the sentence frame is translated, the item list stays German.
     const items =
       "Winterjacken, Handschuhe, Wollmützen, Schals, Winterstiefel, Bettdecken, Kopfkissen, Bettwäsche, Handtücher, Zahnbürsten, Zahnpasta, Duschgel";
     const source = `Wir suchen für die Unterkunft dringend: ${items} und Shampoo.`;
@@ -702,7 +757,6 @@ describe("validateTranslation", () => {
   });
 
   it("rejects a long output in the other language", () => {
-    // Target German, but the model answered in English (1022.info).
     expectCode(
       "A creative person is wanted to paint and draw with children in the accommodation. Every idea is welcome here!",
       CREATIVE_EN,
