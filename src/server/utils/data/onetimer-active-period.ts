@@ -3,8 +3,7 @@ import {
   OpportunityVolunteerStatusType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { EntityManager, In, MoreThanOrEqual } from "typeorm";
-import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
+import { EntityManager } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   addDays,
@@ -19,40 +18,54 @@ export function onetimerActiveSince(today: Date = berlinToday()): Date {
     .startOfDay;
 }
 
+function matchExistsSql(
+  volunteerColumn: string,
+  status: "activeMatch" | "pastMatch",
+  onetimer?: boolean,
+): string {
+  const typeFilter =
+    onetimer === undefined
+      ? ""
+      : `AND o.type ${onetimer ? "IN" : "NOT IN"} (:...onetimerTypes)`;
+  const recent =
+    status === "pastMatch"
+      ? "JOIN onetimer ot ON ot.id = o.onetimer_id AND ot.date >= :activeSince"
+      : "";
+  return `EXISTS (
+    SELECT 1 FROM opportunity_volunteer ov
+    JOIN opportunity o ON o.id = ov.opportunity_id
+    ${recent}
+    WHERE ov.volunteer_id = ${volunteerColumn}
+      AND ov.status = :${status}
+      ${typeFilter}
+  )`;
+}
+
+export const activeMatchSql = (volunteerColumn: string, onetimer?: boolean) =>
+  matchExistsSql(volunteerColumn, "activeMatch", onetimer);
+
+export const onetimerHoldSql = (volunteerColumn: string) =>
+  matchExistsSql(volunteerColumn, "pastMatch", true);
+
+export const onetimerSqlParameters = (today?: Date) => ({
+  activeEngagement: VolunteerStateEngagementType.ACTIVE,
+  activeMatch: OpportunityVolunteerStatusType.ACTIVE,
+  pastMatch: OpportunityVolunteerStatusType.PAST,
+  onetimerTypes: ONETIMER_OPPORTUNITY_TYPES,
+  activeSince: onetimerActiveSince(today),
+});
+
 export function hasRecentOnetimerMatch(
   manager: EntityManager,
   volunteerId: number,
   today?: Date,
 ): Promise<boolean> {
-  return manager.exists(OpportunityVolunteer, {
-    where: {
-      volunteerId,
-      status: OpportunityVolunteerStatusType.PAST,
-      opportunity: {
-        type: In(ONETIMER_OPPORTUNITY_TYPES),
-        onetimer: { date: MoreThanOrEqual(onetimerActiveSince(today)) },
-      },
-    },
-  });
-}
-
-export function matchExistsSql(
-  volunteerColumn: string,
-  {
-    status,
-    onetimer,
-    onetimerSince,
-  }: { status: string; onetimer: boolean; onetimerSince?: string },
-): string {
-  return `EXISTS (
-    SELECT 1 FROM opportunity_volunteer ov
-    JOIN opportunity o ON o.id = ov.opportunity_id
-    ${onetimerSince ? "JOIN onetimer ot ON ot.id = o.onetimer_id" : ""}
-    WHERE ov.volunteer_id = ${volunteerColumn}
-      AND ov.status = :${status}
-      AND o.type ${onetimer ? "IN" : "NOT IN"} (:...onetimerTypes)
-      ${onetimerSince ? `AND ot.date >= :${onetimerSince}` : ""}
-  )`;
+  return manager
+    .createQueryBuilder(Volunteer, "volunteer")
+    .where("volunteer.id = :volunteerId", { volunteerId })
+    .andWhere(onetimerHoldSql("volunteer.id"))
+    .setParameters(onetimerSqlParameters(today))
+    .getExists();
 }
 
 export async function findVolunteerIdsActiveFromOnetimer(
@@ -67,21 +80,12 @@ export async function findVolunteerIdsActiveFromOnetimer(
     .createQueryBuilder(Volunteer, "volunteer")
     .select("volunteer.id", "id")
     .where("volunteer.id IN (:...volunteerIds)", { volunteerIds })
-    .andWhere("volunteer.statusEngagement = :activeEngagement")
+    .andWhere("volunteer.status_engagement = :activeEngagement")
+    .andWhere(`NOT ${activeMatchSql("volunteer.id", false)}`)
     .andWhere(
-      `NOT ${matchExistsSql("volunteer.id", { status: "activeMatch", onetimer: false })}`,
+      `(${activeMatchSql("volunteer.id", true)} OR ${onetimerHoldSql("volunteer.id")})`,
     )
-    .andWhere(
-      `(${matchExistsSql("volunteer.id", { status: "activeMatch", onetimer: true })}
-        OR ${matchExistsSql("volunteer.id", { status: "pastMatch", onetimer: true, onetimerSince: "activeSince" })})`,
-    )
-    .setParameters({
-      activeEngagement: VolunteerStateEngagementType.ACTIVE,
-      activeMatch: OpportunityVolunteerStatusType.ACTIVE,
-      pastMatch: OpportunityVolunteerStatusType.PAST,
-      onetimerTypes: ONETIMER_OPPORTUNITY_TYPES,
-      activeSince: onetimerActiveSince(today),
-    })
+    .setParameters(onetimerSqlParameters(today))
     .getRawMany();
   return new Set(rows.map(({ id }) => Number(id)));
 }

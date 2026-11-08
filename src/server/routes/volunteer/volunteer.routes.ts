@@ -254,22 +254,21 @@ export default async function volunteerRoutes(
       });
       const ids = idRows.map((v) => v.id);
 
-      const volunteers = ids.length
-        ? await volunteerRepository.find({
-            where: { id: In(ids) },
-            relations: volunteerListRelations(listType ?? "card"),
-            relationLoadStrategy: "query",
-            order,
-          })
-        : [];
+      const [volunteers, activeFromOnetimer] = await Promise.all([
+        ids.length
+          ? volunteerRepository.find({
+              where: { id: In(ids) },
+              relations: volunteerListRelations(listType ?? "card"),
+              relationLoadStrategy: "query",
+              order,
+            })
+          : [],
+        findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, ids),
+      ]);
 
       if (visibility) {
         maskPii(volunteers, visibility);
       }
-      const activeFromOnetimer = await findVolunteerIdsActiveFromOnetimer(
-        volunteerRepository.manager,
-        ids,
-      );
       const data = volunteers
         .map(volunteerListSerializer)
         .filter(Boolean)

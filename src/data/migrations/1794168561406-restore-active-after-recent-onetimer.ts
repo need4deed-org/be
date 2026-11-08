@@ -20,6 +20,14 @@ export class RestoreActiveAfterRecentOnetimer1794168561406
               AND o.type IN ('accompanying', 'events')
               AND ot.date >= (date_trunc('day', now() AT TIME ZONE 'Europe/Berlin') - interval '28 days') AT TIME ZONE 'Europe/Berlin'
           )
+          AND (
+            SELECT al.actor_user_id IS NULL
+              AND al.detail = 'Status changed from vol-active to vol-available.'
+            FROM "volunteer_audit_log" al
+            WHERE al.volunteer_id = v.id AND al.type = 'availability_changed'
+            ORDER BY al.occurred_at DESC, al.id DESC
+            LIMIT 1
+          )
         RETURNING v.id
       ),
       logged AS (

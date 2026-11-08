@@ -7,10 +7,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../../data/entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
+import { hasRecentOnetimerMatch } from "../../../../server/utils/data/onetimer-active-period";
 import {
   syncEngagementForMatchChange,
   syncVolunteerEngagement,
 } from "../../../../server/utils/data/sync-volunteer-engagement";
+
+vi.mock("../../../../server/utils/data/onetimer-active-period", () => ({
+  hasRecentOnetimerMatch: vi.fn(),
+}));
 
 const exists = vi.fn();
 const update = vi.fn();
@@ -117,11 +122,12 @@ describe("syncVolunteerEngagement", () => {
   it.each(["follow", "release"] as const)(
     "%s mode keeps Active while a recent accompanying or event holds it",
     async (mode) => {
-      exists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      exists.mockResolvedValue(false);
+      vi.mocked(hasRecentOnetimerMatch).mockResolvedValueOnce(true);
 
       await syncVolunteerEngagement(manager, 7, mode);
 
-      expect(exists).toHaveBeenCalledTimes(2);
+      expect(hasRecentOnetimerMatch).toHaveBeenCalledWith(manager, 7);
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     },
