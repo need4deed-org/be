@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -31,6 +32,7 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
   let agent: Agent;
   let postcode: string;
   let postcodeId: number;
+  let createdPostcode: Postcode | undefined;
   let existingVolunteer: Volunteer;
   let loosePerson: Person;
   const cookies = {} as Record<Caller, string>;
@@ -77,9 +79,13 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
     await fastify.ready();
     vi.spyOn(fastify.notify, "activity").mockResolvedValue(undefined);
 
-    const found = await fastify.db.postcodeRepository.findOneOrFail({
-      where: { value: Raw((v) => `${v} ~ '^0[0-9]{4}$'`) },
-    });
+    const found =
+      (await fastify.db.postcodeRepository.findOne({
+        where: { value: Raw((v) => `${v} ~ '^0[0-9]{4}$'`) },
+      })) ??
+      (createdPostcode = await fastify.db.postcodeRepository.save(
+        new Postcode({ value: `0${randomNumericSuffix(4)}` }),
+      ));
     postcode = found.value;
     postcodeId = found.id;
 
@@ -192,6 +198,9 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
         .delete({ id: In(addressIds) });
     }
     await fastify.db.agentRepository.delete({ id: agent.id });
+    if (createdPostcode) {
+      await fastify.db.postcodeRepository.delete({ id: createdPostcode.id });
+    }
     await fastify.close();
   });
 
