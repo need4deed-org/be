@@ -11,6 +11,7 @@ import {
   validateTranslation,
 } from "../../../services/translation/validate";
 
+// Real public-listing texts, so their contact details are not personal data.
 const MENS_CAFE_DE =
   "Freiwillige gesucht für das Männercafé: Für unser wöchentliches Männercafé suchen wir engagierte Männer, die Arabisch sprechen. Wann: Jeden Montag, 16:30–18:00 Uhr. Kontakt: benn-wilmersdorf@mts-socialdesign.com 📱 +49 176 24753773";
 const MENS_CAFE_EN =
@@ -715,6 +716,13 @@ describe("validateTranslation", () => {
       target: Lang.EN,
     },
     {
+      name: "EN → DE",
+      source: CREATIVE_EN,
+      output: CREATIVE_EN_REWORDED,
+      lang: Lang.EN,
+      target: Lang.DE,
+    },
+    {
       name: "DE → EN",
       source: CREATIVE_DE,
       output: CREATIVE_DE_REWORDED,
@@ -722,7 +730,7 @@ describe("validateTranslation", () => {
       target: Lang.EN,
     },
   ])(
-    "keeps the 0.6 limit for a $name rewording in the band",
+    "keeps the same-language limit for a $name rewording in the band",
     ({ source, output, lang, target }) => {
       expectInTranslatedBand(source, output);
       expect(languageHint(source)).toBe(lang);
