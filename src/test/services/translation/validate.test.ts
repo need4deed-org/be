@@ -308,6 +308,65 @@ describe("validateTranslation", () => {
     }
   });
 
+  it("accepts a range whose end keeps the exact hour without a clock marker", () => {
+    const ok = { status: "ok" };
+    for (const [source, output, target] of [
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13 h", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-13h", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12h-13h", Lang.EN],
+      ["Jeden Mittwoch 12h-13h", "Every Wednesday 12-13 h", Lang.EN],
+      ["Von 22 bis 24 Uhr", "From 22 to 24", Lang.EN],
+      ["Von 18 bis 0 Uhr", "From 18 to 0", Lang.EN],
+      ["Von 22 bis 0 Uhr", "From 10 to 12 am", Lang.EN],
+      ["Von 18 bis 24 Uhr", "From 6 to 12 am", Lang.EN],
+      ["Von 9 bis 12 Uhr", "From 9 to 12", Lang.EN],
+      ["Von 9 bis 11 Uhr", "From 9 to 11 o'clock", Lang.EN],
+      ["Von 9 bis 11 Uhr", "From 9 o'clock to 11 o'clock", Lang.EN],
+      ["Von 9 bis 11 Uhr", "From 9 to 11 h", Lang.EN],
+      ["From 1 to 3 am", "Von 1 bis 3", Lang.DE],
+      ["Am Freitag zwischen 12-15 Uhr", "On Friday between 12-15", Lang.EN],
+      ["Zwischen 10 und 16 Uhr", "Between 10 and 16", Lang.EN],
+      ["Freitags von 13-15 Uhr", "Fridays from 13-15", Lang.EN],
+      ["From 1 to 3 pm", "Von 13 bis 15", Lang.DE],
+      ["Von 16:30 bis 18:30 Uhr", "From 16:30 to 18:30", Lang.EN],
+      ["Von 23 bis 1 Uhr", "From 11 pm to 1 am", Lang.EN],
+      ["Von 16:30 bis 18:30 Uhr", "From 4:30 to 6:30", Lang.EN],
+      ["Von 9 bis 18:30 Uhr", "From 9 am to 6:30", Lang.EN],
+      ["Von 16 bis 18:30 Uhr", "From 4 to 6:30", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toEqual(ok);
+    }
+  });
+
+  it("rejects a range end with the wrong hour or meridiem", () => {
+    for (const [source, output, target] of [
+      ["Von 10 bis 12Uhr", "From 10 to 12AM", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 5 to 7", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 7 am", Lang.EN],
+      ["Jeden Mittwoch 13-15 Uhr", "Every Wednesday 13-15:30", Lang.EN],
+      ["Jeden Mittwoch 13-15 Uhr", "Every Wednesday 13-15.45 h", Lang.EN],
+      ["Von 16:30 bis 18:30 Uhr", "From 16:30 to 18:00", Lang.EN],
+      ["Von 23 bis 1 Uhr", "From 11 to 1", Lang.EN],
+      ["Von 0 bis 6 Uhr", "From 12 to 6", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 19 am", Lang.EN],
+      ["From 4:30 to 6:30 pm", "Von 16:30 bis 6:30 Uhr", Lang.DE],
+      ["Von 22 bis 24 Uhr", "From 22 to 12:00", Lang.EN],
+      ["Von 23 bis 1:30 Uhr", "From 11 to 1:30", Lang.EN],
+      ["Von 22 bis 6:30 Uhr", "From 10 to 6:30", Lang.EN],
+      ["Von 21 bis 22 Uhr", "From 21 to 22 o'clock", Lang.EN],
+      ["Von 0 bis 18 Uhr", "From 12 to 6 pm", Lang.EN],
+      ["Von 21 bis 17 Uhr", "From 9 to 5 pm", Lang.EN],
+      ["Von 1 bis 3 Uhr", "From 1 to 3", Lang.EN],
+      ["Jeden Mittwoch 12h-13h", "Every Wednesday 12-14 h", Lang.EN],
+      ["Von 17 bis 19 Uhr", "From 17 to 7 Uhr", Lang.EN],
+      ["Jeden Mittwoch 12-13 Uhr", "Every Wednesday 12-14 h", Lang.EN],
+    ] as const) {
+      expectCode(source, output, target).toMatchObject({
+        code: "time_missing",
+      });
+    }
+  });
+
   it("rejects a 12-hour range start paired with a 24-hour end", () => {
     for (const [source, output] of [
       ["From 1 to 3 pm", "Von 1 bis 15 Uhr"],

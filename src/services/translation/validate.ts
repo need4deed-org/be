@@ -49,8 +49,8 @@ function sourceTimePatterns(lang: Lang) {
       `\\b(?<hour>\\d{1,2})${clockSuffix(lang, "", true)}`,
       "giu",
     ),
-    hourRangeStart: new RegExp(
-      `(?<![.:,\\d])\\b(?<hour>\\d{1,2})(?:[.:](?<minutes>\\d{2}))?(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?=(?<endHour>\\d{1,2})(?:[.:]\\d{2})?(?:\\s*h\\b|${clockSuffix(lang, "end", true)}))`,
+    hourRange: new RegExp(
+      `(?<![.:,\\d])\\b(?<hour>\\d{1,2})(?:[.:](?<minutes>\\d{2}))?(?![.:,]\\d)(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*(?<endHour>\\d{1,2})(?:[.:](?<endMinutes>\\d{2}))?(?:\\s*h\\b|${clockSuffix(lang, "end", true)})`,
       "giu",
     ),
   };
@@ -116,10 +116,9 @@ type Clock = {
   oClock?: string;
 };
 
-function toClock(
-  groups: Record<string, string | undefined> = {},
-  prefix = "",
-): Clock {
+type Groups = Record<string, string | undefined>;
+
+function toClock(groups: Groups = {}, prefix = ""): Clock {
   const group = (name: string) => groups[groupName(prefix, name)];
   return {
     meridiem: group("meridiem"),
@@ -273,48 +272,76 @@ function hourForms(hours: string[], minutes: string, words = true): string {
 const RANGE_FILLER = "(?:\\p{L}+\\.\\s*|\\p{L}+\\s+|[~≈]\\s*){0,2}";
 const rangePatterns = new Map<string, RegExp>();
 
+function hourMinuteForms(hours: string[], minutes: string): string {
+  return minutes === "00"
+    ? hourForms(hours, "(?:[.:]00)?(?![.:]\\d)")
+    : hourForms(hours, `[.:]${minutes}`, false);
+}
+
 function rangePattern(
   startHour: string,
   startMinutes: string,
   end: number,
+  endMinutes: string,
   outputLang: Lang,
 ): RegExp {
-  const key = `${outputLang}:${startHour}:${startMinutes}-${end}`;
+  const key = `${outputLang}:${startHour}:${startMinutes}-${end}:${endMinutes}`;
   return cachedPattern(rangePatterns, key, () => {
-    const starts =
-      startMinutes === "00"
-        ? hourForms([startHour], "(?:[.:]00)?")
-        : hourForms([startHour], `[.:]${startMinutes}`, false);
+    const starts = hourMinuteForms([startHour], startMinutes);
     const endVariants = hourVariants(end);
     const is24Hour = (h: string) => h === "0" || Number(h) > 12;
-    const endMinutes = "(?:[.:]\\d{2})?";
-    const ends24 = hourForms(endVariants.filter(is24Hour), endMinutes);
-    const ends12 = hourForms(
+    const ends24 = hourMinuteForms(endVariants.filter(is24Hour), endMinutes);
+    const ends12 = hourMinuteForms(
       endVariants.filter((h) => !is24Hour(h)),
       endMinutes,
     );
     return new RegExp(
-      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}`,
+      `(?<!\\p{L})${NOT_AFTER_DIGITS}(?:${starts})${clockSuffix(outputLang, "start")}(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*${RANGE_FILLER}(?:(?<end24>${ends24})|(?<end12>${ends12}))${clockSuffix(outputLang, "end")}(?<endH>\\s*h\\b)?`,
       "giu",
     );
   });
 }
 
-function borrowsEndMeridiem(
-  groups: Record<string, string | undefined> | undefined,
-  startClock: Clock,
+function endHasMinutes(groups: Groups): boolean {
+  return /[.:]/.test(groups.end12 ?? groups.end24 ?? "");
+}
+
+function rangeEndMatches(
+  groups: Groups,
+  end: number,
   endClock: Clock,
   outputLang: Lang,
+  bareEndReadable: boolean,
 ): boolean {
-  if (!groups?.end12) {
+  if (groups.end24 !== undefined) {
+    return !endClock.meridiem && !endClock.oClock;
+  }
+  const h = end % 12 || 12;
+  if (endClock.meridiem || endClock.dayPart || endHasMinutes(groups)) {
+    return clockMatches(h, end, endClock, outputLang);
+  }
+  const marked = endClock.uhr || endClock.oClock || groups.endH;
+  return h === end && (Boolean(marked) || bareEndReadable);
+}
+
+function borrowsEndMeridiem(
+  h: number,
+  start: number,
+  end: number,
+  groups: Groups,
+  startClock: Clock,
+  endClock: Clock,
+): boolean {
+  if (groups.end12 === undefined) {
     return false;
   }
-  if (startClock.uhr) {
-    return Boolean(endClock.dayPart);
+  if (endClock.dayPart || (!startClock.uhr && endClock.meridiem)) {
+    return sameHour(rangeStart(h, end, endClock), start);
   }
   return (
-    Boolean(endClock.meridiem || endClock.dayPart) ||
-    (outputLang === Lang.EN && !endClock.uhr)
+    !startClock.uhr &&
+    end > 12 &&
+    sameHour(rangeStart(h, end, { meridiem: "pm" }), start)
   );
 }
 
@@ -323,20 +350,30 @@ function rangePresent(
   start: number,
   startMinutes: string,
   end: number,
+  endMinutes: string,
   outputLang: Lang,
+  bareEndReadable: boolean,
 ): boolean {
   for (const h of hourVariants(start)) {
-    for (const { groups } of output.matchAll(
-      rangePattern(h, startMinutes, end, outputLang),
+    for (const { groups = {} } of output.matchAll(
+      rangePattern(h, startMinutes, end, endMinutes, outputLang),
     )) {
       const startClock = toClock(groups, "start");
       const endClock = toClock(groups, "end");
       const ownClock =
         startClock.meridiem || startClock.dayPart || sameHour(Number(h), start);
       if (
-        ownClock
+        rangeEndMatches(groups, end, endClock, outputLang, bareEndReadable) &&
+        (ownClock
           ? clockMatches(Number(h), start, startClock, outputLang)
-          : borrowsEndMeridiem(groups, startClock, endClock, outputLang)
+          : borrowsEndMeridiem(
+              Number(h),
+              start,
+              end,
+              groups,
+              startClock,
+              endClock,
+            ))
       ) {
         return true;
       }
@@ -351,7 +388,7 @@ function missingToken(
   targetLang: Lang,
 ): TranslationErrorCode | undefined {
   const sourceLang = targetLang === Lang.DE ? Lang.EN : Lang.DE;
-  const { time, fullHour, hourRangeStart } = SOURCE_TIME_PATTERNS[sourceLang];
+  const { time, fullHour, hourRange } = SOURCE_TIME_PATTERNS[sourceLang];
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
 
@@ -383,15 +420,31 @@ function missingToken(
   if (!datesPreserved) {
     return "date_missing";
   }
-  for (const { groups = {} } of rest.matchAll(hourRangeStart)) {
+  for (const { groups = {} } of rest.matchAll(hourRange)) {
     const endClock = toClock(groups, "end");
     const end = clockHour(Number(groups.endHour), endClock);
     const start = rangeStart(Number(groups.hour), end, endClock);
-    if (!rangePresent(output, start, groups.minutes || "00", end, targetLang)) {
+    const startMinutes = groups.minutes || "00";
+    const endMinutes = groups.endMinutes || "00";
+    const durationLike = !Object.values(endClock).some(Boolean);
+    // A bare 12-hour clock end is ambiguous in English, unless it is noon.
+    const bareEndReadable =
+      durationLike || targetLang === Lang.DE || end === 12;
+    if (
+      !rangePresent(
+        output,
+        start,
+        startMinutes,
+        end,
+        endMinutes,
+        targetLang,
+        bareEndReadable,
+      )
+    ) {
       return "time_missing";
     }
   }
-  rest = rest.replace(hourRangeStart, " ");
+  rest = rest.replace(hourRange, " ");
   for (const { groups = {} } of rest.matchAll(time)) {
     const hour = clockHour(Number(groups.hour), toClock(groups));
     if (!timePresent(output, hour, groups.minutes, targetLang)) {
