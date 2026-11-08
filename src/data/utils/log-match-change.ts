@@ -15,6 +15,19 @@ type MatchChange = {
   title?: string;
 };
 
+export const matchDetail = {
+  linked: (title: string, status?: OpportunityVolunteerStatusType) =>
+    `Linked to opportunity "${title}"${status ? ` as ${status}` : ""}.`,
+  removed: (title: string, from: OpportunityVolunteerStatusType) =>
+    `Removed from opportunity "${title}" (was ${from}).`,
+  statusChanged: (
+    title: string,
+    to: OpportunityVolunteerStatusType,
+    from?: OpportunityVolunteerStatusType,
+  ) =>
+    `Opportunity "${title}" status changed${from ? ` from ${from}` : ""} to ${to}.`,
+};
+
 // One volunteer activity-log entry per match step.
 export async function logMatchChange(
   manager: EntityManager,
@@ -31,15 +44,15 @@ export async function logMatchChange(
         where: { id: opportunityId },
       })
     )?.title;
-  const title = `"${opportunityTitle ?? `#${opportunityId}`}"`;
+  const title = opportunityTitle ?? `#${opportunityId}`;
 
   let detail: string;
   if (from === undefined) {
-    detail = `Linked to opportunity ${title} as ${to}.`;
+    detail = matchDetail.linked(title, to);
   } else if (to === undefined) {
-    detail = `Removed from opportunity ${title} (was ${from}).`;
+    detail = matchDetail.removed(title, from);
   } else {
-    detail = `Opportunity ${title} status changed from ${from} to ${to}.`;
+    detail = matchDetail.statusChanged(title, to, from);
   }
 
   await manager.save(

@@ -1,8 +1,10 @@
 import "reflect-metadata";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, LessThan } from "typeorm";
 import logger from "../../logger";
 import { dataSource } from "../data-source";
+import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../entity/volunteer/volunteer-audit-log.entity";
+import { matchDetail } from "../utils/log-match-change";
 
 export interface BackfillMatchAuditLogOptions {
   apply: boolean;
@@ -62,12 +64,53 @@ export async function findCutoff(manager: EntityManager): Promise<Date> {
   return firstLogged?.occurredAt ?? new Date();
 }
 
+export function planMatchEntries(
+  match: OpportunityVolunteer,
+  cutoff: Date,
+): PlannedEntry[] {
+  const { id, volunteerId, opportunityId, status, createdAt, updatedAt } =
+    match;
+  const title = match.opportunity?.title ?? `#${opportunityId}`;
+  const changedLater = updatedAt.getTime() > createdAt.getTime();
+  const entry = (detail: string, occurredAt: Date): PlannedEntry => ({
+    opportunityVolunteerId: id,
+    volunteerId,
+    detail,
+    occurredAt,
+  });
+
+  const planned = [
+    entry(
+      matchDetail.linked(title, changedLater ? undefined : status),
+      createdAt,
+    ),
+  ];
+  if (changedLater && updatedAt.getTime() < cutoff.getTime()) {
+    planned.push(entry(matchDetail.statusChanged(title, status), updatedAt));
+  }
+  return planned;
+}
+
 export async function planEntries(
-  _manager: EntityManager,
+  manager: EntityManager,
   _options: BackfillMatchAuditLogOptions,
-  _cutoff: Date,
+  cutoff: Date,
 ): Promise<PlannedEntry[]> {
-  return [];
+  const matches = await manager.find(OpportunityVolunteer, {
+    select: {
+      id: true,
+      volunteerId: true,
+      opportunityId: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+      opportunity: { id: true, title: true },
+    },
+    relations: { opportunity: true },
+    where: { createdAt: LessThan(cutoff) },
+    order: { createdAt: "ASC", id: "ASC" },
+  });
+  return matches.flatMap((match) => planMatchEntries(match, cutoff));
 }
 
 async function writeEntries(
