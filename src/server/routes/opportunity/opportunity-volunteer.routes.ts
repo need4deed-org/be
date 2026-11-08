@@ -8,6 +8,7 @@ import {
   assertAgentOwnsOpportunity,
   assertOwnedVolunteerSeesOpportunity,
   maskVolunteerIdentities,
+  resolveOwnedVolunteerScope,
   shouldMaskInactiveAgentData,
 } from "../../utils";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
@@ -38,10 +39,8 @@ export default function opportunityOpportunityVolunteerRoutes(
         throw new BadRequestError(msg400);
       }
 
-      if (
-        request.authUser?.role === UserRole.AGENT ||
-        request.authUser?.role === UserRole.VOLUNTEER
-      ) {
+      const ownedScope = await resolveOwnedVolunteerScope(request);
+      if (request.authUser?.role === UserRole.AGENT || ownedScope) {
         const opportunity = await fastify.db.opportunityRepository.findOne({
           where: { id: opportunityId },
           select: { id: true, agentId: true },

@@ -72,12 +72,8 @@ import {
   normalizeVolunteerStatusFilter,
 } from "../utils/data/get-volunteer-where";
 import { isStaffRole } from "../utils/data/is-staff-role";
-import { andIntoWhere, mergeIntoWhere } from "../utils/data/merge-into-where";
-import { closedForVolunteersIdWhere } from "../utils/data/no-match-found";
-import {
-  ownedVolunteerOpportunityIdWhere,
-  resolveOwnedVolunteerScope,
-} from "../utils/data/owned-volunteer-scope";
+import { mergeIntoWhere } from "../utils/data/merge-into-where";
+import { applyVolunteerOpportunityScope } from "../utils/data/owned-volunteer-scope";
 import { translateOpportunities } from "../utils/data/translate-opportunities";
 import {
   maskForCaller,
@@ -666,13 +662,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
           mergeIntoWhere([branch], { agent: { id: In(agentIds) } });
         }
       }
-      if (request.authUser?.role === UserRole.VOLUNTEER) {
-        andIntoWhere(where, "id", closedForVolunteersIdWhere());
-      }
-      const ownedScope = await resolveOwnedVolunteerScope(request);
-      if (ownedScope) {
-        andIntoWhere(where, "id", ownedVolunteerOpportunityIdWhere(ownedScope));
-      }
+      await applyVolunteerOpportunityScope(request, where);
 
       const [opportunities, districts] = await Promise.all([
         fastify.db.opportunityRepository.find({
@@ -747,17 +737,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
           mergeIntoWhere([branch], { agent: { id: In(agentIds) } });
         }
       }
-      if (request.authUser?.role === UserRole.VOLUNTEER) {
-        andIntoWhere(baseWhere, "id", closedForVolunteersIdWhere());
-      }
-      const ownedScope = await resolveOwnedVolunteerScope(request);
-      if (ownedScope) {
-        andIntoWhere(
-          baseWhere,
-          "id",
-          ownedVolunteerOpportunityIdWhere(ownedScope),
-        );
-      }
+      await applyVolunteerOpportunityScope(request, baseWhere);
 
       const where = getOpportunityDistrictWhere(
         baseWhere,

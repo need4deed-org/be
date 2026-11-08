@@ -44,14 +44,22 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
       cookies: { [accessCookieName]: cookies[as] },
     });
 
-  const listedIds = async (as: Caller) => {
-    const res = await get(
-      `/opportunity?limit=100&filter[search]=${suffix}`,
-      as,
-    );
+  let districtId: number;
+  const sortedIds = (items: { id: number }[]) =>
+    items.map(({ id }) => id).sort((a, b) => a - b);
+  const idsOf = (...keys: OpportunityKey[]) =>
+    sortedIds(keys.map((key) => opportunities[key]));
+  const allIds = () => sortedIds(Object.values(opportunities));
+
+  const listedIds = async (url: string, as: Caller) => {
+    const res = await get(url, as);
     expect(res.statusCode).toBe(200);
-    return (res.json().data as { id: number }[]).map(({ id }) => id).sort();
+    return sortedIds(res.json().data);
   };
+  const opportunityListUrl = () =>
+    `/opportunity?limit=100&filter[search]=${suffix}`;
+  const volunteerOpportunityListUrl = () =>
+    `/volunteer/opportunity?limit=100&type=${OpportunityType.REGULAR}&status=${OpportunityStatusType.ACTIVE}&search=${suffix}`;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -60,6 +68,9 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
     });
+    ({ id: districtId } = await fastify.db.districtRepository.findOneOrFail({
+      where: {},
+    }));
     for (const key of ["owner", "other"] as AgentKey[]) {
       agents[key] = await fastify.db.agentRepository.save(
         new Agent({
@@ -86,6 +97,7 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
           status: OpportunityStatusType.ACTIVE,
           agentId: agents[opportunityAgents[key]].id,
           dealId: deal.id,
+          districtId,
         }),
       );
     }
@@ -163,19 +175,18 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
     await fastify.close();
   });
 
-  describe("GET /opportunity", () => {
+  describe.each([
+    ["GET /opportunity", opportunityListUrl],
+    ["GET /volunteer/opportunity", volunteerOpportunityListUrl],
+  ])("%s", (_route, url) => {
     it("lists only the owning NGO's and the suggested opportunities", async () => {
-      expect(await listedIds("owned")).toEqual(
-        [opportunities.own.id, opportunities.suggested.id].sort(),
+      expect(await listedIds(url(), "owned")).toEqual(
+        idsOf("own", "suggested"),
       );
     });
 
     it("keeps listing everything for a platform volunteer", async () => {
-      expect(await listedIds("platform")).toEqual(
-        Object.values(opportunities)
-          .map(({ id }) => id)
-          .sort(),
-      );
+      expect(await listedIds(url(), "platform")).toEqual(allIds());
     });
   });
 
@@ -226,5 +237,14 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
       outsideBerlin +
       remote;
     expect(total).toBe(2);
+  });
+
+  it("counts only visible opportunities on the district map", async () => {
+    const res = await get(
+      `/opportunity/map?districtId=${districtId}&language=de`,
+      "owned",
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.total).toBe(2);
   });
 });

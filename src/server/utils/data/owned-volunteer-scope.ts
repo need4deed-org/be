@@ -1,17 +1,18 @@
 import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
-import { Raw } from "typeorm";
+import { FindOptionsWhere, Raw } from "typeorm";
 import { NotFoundError } from "../../../config";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { andIntoWhere } from "./merge-into-where";
+import { closedForVolunteersIdWhere } from "./no-match-found";
 
-type OwnedVolunteerScope = { volunteerId: number; ownerAgentId: number };
-
-const scopes = new WeakMap<FastifyRequest, OwnedVolunteerScope | null>();
+export type OwnedVolunteerScope = { volunteerId: number; ownerAgentId: number };
 
 export async function resolveOwnedVolunteerScope(
   request: FastifyRequest,
 ): Promise<OwnedVolunteerScope | null> {
-  if (scopes.has(request)) {
-    return scopes.get(request) ?? null;
+  if (request.ownedVolunteerScope !== undefined) {
+    return request.ownedVolunteerScope;
   }
   const { authUser } = request;
   let scope: OwnedVolunteerScope | null = null;
@@ -27,17 +28,17 @@ export async function resolveOwnedVolunteerScope(
       };
     }
   }
-  scopes.set(request, scope);
+  request.ownedVolunteerScope = scope;
   return scope;
 }
 
-export function ownedVolunteerOpportunityIdWhere(scope: OwnedVolunteerScope) {
+function ownedVolunteerOpportunityIdWhere(scope: OwnedVolunteerScope) {
   return Raw(
-    (alias) => `${alias} IN (
-      SELECT o.id FROM opportunity o WHERE o.agent_id = :ownedScopeAgentId
-      UNION
+    (alias) => `(${alias} IN (
+      SELECT o.id FROM opportunity o WHERE o.agent_id = :ownedScopeAgentId)
+      OR ${alias} IN (
       SELECT ov.opportunity_id FROM opportunity_volunteer ov
-       WHERE ov.volunteer_id = :ownedScopeVolunteerId)`,
+       WHERE ov.volunteer_id = :ownedScopeVolunteerId))`,
     {
       ownedScopeAgentId: scope.ownerAgentId,
       ownedScopeVolunteerId: scope.volunteerId,
@@ -45,20 +46,36 @@ export function ownedVolunteerOpportunityIdWhere(scope: OwnedVolunteerScope) {
   );
 }
 
+export async function applyVolunteerOpportunityScope(
+  request: FastifyRequest,
+  where: FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[],
+): Promise<void> {
+  if (request.authUser?.role !== UserRole.VOLUNTEER) {
+    return;
+  }
+  andIntoWhere(where, "id", closedForVolunteersIdWhere());
+  const scope = await resolveOwnedVolunteerScope(request);
+  if (scope) {
+    andIntoWhere(where, "id", ownedVolunteerOpportunityIdWhere(scope));
+  }
+}
+
 export async function assertOwnedVolunteerSeesOpportunity(
   request: FastifyRequest,
   opportunityId: number,
   opportunityAgentId: number | null | undefined,
+  loadedMatches?: { volunteerId: number }[],
 ): Promise<void> {
   const scope = await resolveOwnedVolunteerScope(request);
   if (!scope || opportunityAgentId === scope.ownerAgentId) {
     return;
   }
-  const suggested =
-    await request.server.db.opportunityVolunteerRepository.existsBy({
-      opportunityId,
-      volunteerId: scope.volunteerId,
-    });
+  const suggested = loadedMatches
+    ? loadedMatches.some(({ volunteerId }) => volunteerId === scope.volunteerId)
+    : await request.server.db.opportunityVolunteerRepository.existsBy({
+        opportunityId,
+        volunteerId: scope.volunteerId,
+      });
   if (!suggested) {
     throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
   }
