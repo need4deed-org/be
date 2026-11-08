@@ -674,7 +674,6 @@ describe("validateTranslation", () => {
   });
 
   it("accepts a similar output when the hints show a real translation", () => {
-    // be#1320 / opportunity 972: clinic name and address stay verbatim.
     const source =
       "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)";
     const output =
@@ -683,6 +682,44 @@ describe("validateTranslation", () => {
     expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
     expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
     expectCode(source, output, Lang.EN).toEqual({ status: "ok" });
+  });
+
+  it("applies the translated band in the en → de direction too", () => {
+    const source =
+      "Appointment details:\nTuesday, 18 August 2026, at 09:00.\nLocation: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)";
+    const output =
+      "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)";
+    const score = similarity(source, output);
+    expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
+    expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
+    expect(languageHint(source)).toBe(Lang.EN);
+    expect(languageHint(output)).toBe(Lang.DE);
+    expectCode(source, output, Lang.DE).toEqual({ status: "ok" });
+    expectCode(source, output, Lang.EN).toMatchObject({
+      code: "source_is_target",
+    });
+  });
+
+  it("keeps the 0.6 limit for a same-language rewording in either language", () => {
+    const rewordings = [
+      [
+        CREATIVE_DE,
+        "Gesucht wird eine kreative Person, die Freude daran hat, mit den Kindern in der Unterkunft künstlerisch tätig zu sein. Ob Malen, Basteln oder Collagen – der Kreativität sind keine Grenzen gesetzt!",
+      ],
+      [
+        CREATIVE_EN,
+        "We are searching for a creative person who likes to work artistically with the children in our shelter. Whether painting, crafting or collages – there is no limit to the imagination!",
+      ],
+    ];
+    for (const [source, output] of rewordings) {
+      const score = similarity(source, output);
+      expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
+      expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
+      expect(languageHint(output)).toBe(languageHint(source));
+      expectCode(source, output, Lang.EN).toMatchObject({
+        code: "source_is_target",
+      });
+    }
   });
 
   it("still rejects a half translation even when the hints read de → en", () => {
