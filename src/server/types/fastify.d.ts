@@ -83,6 +83,7 @@ declare module "fastify" {
     authUser?: User;
     callerAgentIds?: number[];
     callerVisibility?: CallerVisibility | null;
+    ngoOwnerAgentId?: number;
     ownedVolunteerScope?: OwnedVolunteerScope | null;
   }
 }
@@ -93,7 +94,8 @@ declare module "@fastify/jwt" {
     | "refresh"
     | "verify"
     | "reset"
-    | "coordinator-invite";
+    | "coordinator-invite"
+    | "ngo-registration";
   interface FastifyJWT {
     payload:
       | {
@@ -114,6 +116,11 @@ declare module "@fastify/jwt" {
           id: number;
           email: string;
           type: "verify" | "reset";
+          ownerAgentId?: number;
+        }
+      | {
+          agentId: number;
+          type: "ngo-registration";
         }
       | {
           email: string;

@@ -52,7 +52,7 @@ type MatchEmail = (
 ) => Promise<void>;
 
 interface NotifyService {
-  emailVerification(user: User): Promise<void>;
+  emailVerification(user: User, ownerAgentId?: number): Promise<void>;
   passwordReset(user: User): Promise<void>;
   opsAlert(text: string): Promise<void>;
   arrival(text: string): Promise<void>;
@@ -240,8 +240,12 @@ async function notifyPlugin(fastify: FastifyInstance) {
       );
 
   fastify.decorate("notify", {
-    emailVerification: (user: User) =>
-      sendEmailVerification({ email: emailVerify, jwt: fastify.jwt }, user),
+    emailVerification: (user: User, ownerAgentId?: number) =>
+      sendEmailVerification(
+        { email: emailVerify, jwt: fastify.jwt },
+        user,
+        ownerAgentId,
+      ),
     passwordReset: (user: User) =>
       sendPasswordReset({ email: emailVerify, jwt: fastify.jwt }, user),
     opsAlert: (text: string) => sendOpsAlert({ slack }, text),

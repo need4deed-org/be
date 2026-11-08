@@ -27,6 +27,7 @@ import {
   verifyTokenOfType,
   writeVolunteerLegacy,
 } from "../../utils";
+import { findLinkableAgent } from "../../utils/data/ngo-registration-token";
 
 function isDuplicateVolunteerProfile(err: unknown): boolean {
   const e = err as { code?: string; detail?: string };
@@ -40,7 +41,11 @@ async function authByVerifyToken(
 ) {
   const { token } = request.query as { token?: string };
 
-  const payload = await verifyTokenOfType<{ id: number; email: string }>(
+  const payload = await verifyTokenOfType<{
+    id: number;
+    email: string;
+    ownerAgentId?: number;
+  }>(
     fastify,
     token,
     "verify",
@@ -64,6 +69,7 @@ async function authByVerifyToken(
   }
 
   request.registrant = user;
+  request.ngoOwnerAgentId = payload.ownerAgentId;
 }
 
 export default async function volunteerRegisterRoutes(
@@ -119,9 +125,26 @@ export default async function volunteerRegisterRoutes(
       const { volunteer, leads, addressReuse } =
         await parserVolunteerSelfRegister(person, request.body);
 
+      const owner = request.ngoOwnerAgentId
+        ? await findLinkableAgent(fastify, request.ngoOwnerAgentId)
+        : null;
+      if (owner) {
+        volunteer.ownerAgentId = owner.id;
+      }
+
       let id: number;
       try {
-        id = await writeVolunteerLegacy(volunteer, addressReuse);
+        id = await writeVolunteerLegacy(
+          volunteer,
+          addressReuse,
+          owner
+            ? {
+                type: "owner_changed",
+                detail: `Registered through the registration link of ${owner.title} (id:${owner.id}).`,
+                actorUserId: user?.id,
+              }
+            : undefined,
+        );
       } catch (err) {
         if (isDuplicateVolunteerProfile(err)) {
           throw new BadRequestError(

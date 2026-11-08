@@ -15,6 +15,14 @@ export const createUserBodySchema = {
   additionalProperties: false,
 };
 
+export const selfRegisterUserBodySchema = {
+  ...createUserBodySchema,
+  properties: {
+    ...createUserBodySchema.properties,
+    ngoToken: { type: "string", minLength: 1 },
+  },
+};
+
 export const refreshAccessSchema = {
   type: ["object", "null"],
   properties: {
@@ -166,7 +174,7 @@ export const coordinatorInviteBodySchema = {
   additionalProperties: false,
 };
 
-export const coordinatorInviteResponseSchema = {
+export const signedLinkResponseSchema = {
   type: "object",
   properties: {
     token: { type: "string" },
