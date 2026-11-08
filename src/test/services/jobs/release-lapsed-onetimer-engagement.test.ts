@@ -2,12 +2,16 @@ import {
   OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
+  UserRole,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import Person from "../../../data/entity/person.entity";
+import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { addDays } from "../../../services/jobs/berlin-dates";
 import { releaseLapsedOnetimerEngagement } from "../../../services/jobs/release-lapsed-onetimer-engagement";
+import { randomNumericSuffix } from "../../random";
 import { setupOnetimerJobTest } from "./onetimer-fixtures";
 
 vi.mock(
@@ -31,12 +35,29 @@ describe("releaseLapsedOnetimerEngagement", () => {
   const { PAST } = OpportunityVolunteerStatusType;
   let actorUserId: number;
 
+  let actor: User;
+
   beforeAll(async () => {
-    actorUserId = (
-      await ctx.fastify.db.userRepository.findOneOrFail({
-        where: {},
-      })
-    ).id;
+    const person = await ctx.fastify.db.personRepository.save(
+      new Person({ firstName: "Lapsed", lastName: "Coordinator" }),
+    );
+    actor = await ctx.fastify.db.userRepository.save(
+      new User({
+        email: `lapsed-${randomNumericSuffix()}@test.need4deed.org`,
+        password: "unused",
+        role: UserRole.COORDINATOR,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    actorUserId = actor.id;
+  });
+
+  afterAll(async () => {
+    if (actor) {
+      await ctx.fastify.db.userRepository.delete(actor.id);
+      await ctx.fastify.db.personRepository.delete(actor.personId);
+    }
   });
 
   const logStatus = (
@@ -112,6 +133,7 @@ describe("releaseLapsedOnetimerEngagement", () => {
       );
       expect(logs).toHaveLength(2);
       expect(ctx.loggerInfo).toHaveBeenCalledWith(
+        { volunteerIds: [volunteer.id] },
         expect.stringContaining("released 1 volunteer(s)"),
       );
     },

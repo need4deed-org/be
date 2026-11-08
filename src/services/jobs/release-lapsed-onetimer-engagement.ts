@@ -6,7 +6,7 @@ import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import logger from "../../logger";
 import { engagementChangeDetail } from "../../server/utils/data/engagement-change-detail";
 import {
-  activeMatchSql,
+  anyActiveMatchSql,
   handSetActiveSinceOnetimerSql,
   onetimerHoldSql,
   onetimerSqlParameters,
@@ -16,7 +16,7 @@ import {
 const { ACTIVE, AVAILABLE } = VolunteerStateEngagementType;
 
 const lapsedWhere = `volunteer.status_engagement = :activeEngagement
-  AND NOT ${activeMatchSql("volunteer.id")}
+  AND NOT ${anyActiveMatchSql("volunteer.id")}
   AND NOT ${onetimerHoldSql("volunteer.id")}
   AND ${pastOnetimerMatchSql("volunteer.id")}
   AND NOT ${handSetActiveSinceOnetimerSql("volunteer.id")}`;
@@ -77,6 +77,7 @@ export async function releaseLapsedOnetimerEngagement(
   );
   if (released.length) {
     logger.info(
+      { volunteerIds: released },
       `releaseLapsedOnetimerEngagement: released ${released.length} volunteer(s)`,
     );
   }

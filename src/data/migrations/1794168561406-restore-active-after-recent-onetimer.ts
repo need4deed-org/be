@@ -23,6 +23,14 @@ export class RestoreActiveAfterRecentOnetimer1794168561406
           AND (
             SELECT al.actor_user_id IS NULL
               AND al.detail = 'Status changed from vol-active to vol-available.'
+              AND al.occurred_at >= (
+                SELECT max(ot.date) FROM "opportunity_volunteer" ov
+                JOIN "opportunity" o ON o.id = ov.opportunity_id
+                JOIN "onetimer" ot ON ot.id = o.onetimer_id
+                WHERE ov.volunteer_id = v.id
+                  AND ov.status = 'opp-past'
+                  AND o.type IN ('accompanying', 'events')
+              )
             FROM "volunteer_audit_log" al
             WHERE al.volunteer_id = v.id AND al.type = 'availability_changed'
             ORDER BY al.occurred_at DESC, al.id DESC
