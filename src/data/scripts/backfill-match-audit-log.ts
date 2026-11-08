@@ -17,6 +17,7 @@ export interface PlannedEntry {
 }
 
 export interface BackfillMatchAuditLogReport {
+  cutoff: Date;
   planned: PlannedEntry[];
   written: number;
 }
@@ -51,9 +52,20 @@ export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
   return { apply: argv.includes("--apply"), importedOn };
 }
 
+export async function findCutoff(manager: EntityManager): Promise<Date> {
+  // By id, not occurredAt: backfilled entries are back-dated and would move the cutoff on re-runs.
+  const firstLogged = await manager.findOne(VolunteerAuditLog, {
+    select: { id: true, occurredAt: true },
+    where: { type: "opportunity_status_changed" },
+    order: { id: "ASC" },
+  });
+  return firstLogged?.occurredAt ?? new Date();
+}
+
 export async function planEntries(
   _manager: EntityManager,
   _options: BackfillMatchAuditLogOptions,
+  _cutoff: Date,
 ): Promise<PlannedEntry[]> {
   return [];
 }
@@ -85,11 +97,17 @@ export async function runBackfill(
   options: BackfillMatchAuditLogOptions,
 ): Promise<BackfillMatchAuditLogReport> {
   if (!options.apply) {
-    return { planned: await planEntries(ds.manager, options), written: 0 };
+    const cutoff = await findCutoff(ds.manager);
+    return {
+      cutoff,
+      planned: await planEntries(ds.manager, options, cutoff),
+      written: 0,
+    };
   }
   return ds.transaction(async (manager) => {
-    const planned = await planEntries(manager, options);
-    return { planned, written: await writeEntries(manager, planned) };
+    const cutoff = await findCutoff(manager);
+    const planned = await planEntries(manager, options, cutoff);
+    return { cutoff, planned, written: await writeEntries(manager, planned) };
   });
 }
 
@@ -97,6 +115,9 @@ function printReport(
   report: BackfillMatchAuditLogReport,
   apply: boolean,
 ): void {
+  logger.info(
+    `Cutoff (first logged match step): ${report.cutoff.toISOString()}.`,
+  );
   logger.info(
     `${apply ? "Wrote" : "[dry-run] Would write"} ${
       apply ? report.written : report.planned.length
