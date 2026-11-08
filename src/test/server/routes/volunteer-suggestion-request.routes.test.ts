@@ -12,6 +12,7 @@ import {
 import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import CommentPerson from "../../../data/entity/m2m/comment-person";
@@ -294,5 +295,95 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
     expect(
       (await requestSuggestion("coordinator", "owned", "open")).statusCode,
     ).toBe(403);
+  });
+
+  describe("comments on owned volunteers", () => {
+    let ownedComment: Comment;
+    let otherComment: Comment;
+
+    const getComments = (as: Caller, query: string) =>
+      fastify.inject({
+        method: "GET",
+        url: `/comment?${query}`,
+        cookies: { [accessCookieName]: cookies[as] },
+      });
+    const commentIds = async (as: Caller, query: string) => {
+      const res = await getComments(as, query);
+      expect(res.statusCode).toBe(200);
+      return (res.json().data as { id: number }[]).map(({ id }) => id);
+    };
+
+    beforeAll(async () => {
+      [ownedComment, otherComment] = await fastify.db.commentRepository.save(
+        [volunteers.owned.id, volunteers.platform.id].map((entityId) =>
+          fastify.db.commentRepository.create({
+            text: `Coordinator note ${suffix}`,
+            entityType: EntityTableName.VOLUNTEER,
+            entityId,
+            user: { id: users.coordinator.id },
+          }),
+        ),
+      );
+    });
+
+    it("lets the owning NGO read them", async () => {
+      expect(
+        await commentIds(
+          "owner",
+          `entityType=volunteer&entityId=${volunteers.owned.id}`,
+        ),
+      ).toContain(ownedComment.id);
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/comment/${ownedComment.id}`,
+        cookies: { [accessCookieName]: cookies.owner },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it("hides other volunteers' comments from the NGO", async () => {
+      expect(
+        await commentIds(
+          "owner",
+          `entityType=volunteer&entityId=${volunteers.platform.id}`,
+        ),
+      ).toEqual([]);
+      expect(
+        await commentIds(
+          "owner",
+          `entityType=opportunity&entityId=${volunteers.owned.id}`,
+        ),
+      ).toEqual([]);
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/comment/${otherComment.id}`,
+        cookies: { [accessCookieName]: cookies.owner },
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("hides them from a sharing NGO that doesn't own the volunteer", async () => {
+      expect(
+        await commentIds(
+          "requester",
+          `entityType=volunteer&entityId=${volunteers.owned.id}`,
+        ),
+      ).toEqual([]);
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/comment/${ownedComment.id}`,
+        cookies: { [accessCookieName]: cookies.requester },
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("keeps a coordinator's full view", async () => {
+      expect(
+        await commentIds(
+          "coordinator",
+          `entityType=volunteer&entityId=${volunteers.platform.id}`,
+        ),
+      ).toContain(otherComment.id);
+    });
   });
 });
