@@ -11,7 +11,6 @@ import {
   UnauthenticatedError,
   UnauthorizedError,
 } from "../../../config";
-import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import logger from "../../../logger";
 import {
   parserVolunteerSelfRegister,
@@ -28,6 +27,7 @@ import {
   verifyTokenOfType,
   writeVolunteerLegacy,
 } from "../../utils";
+import { findLinkableAgent } from "../../utils/data/ngo-registration-token";
 
 function isDuplicateVolunteerProfile(err: unknown): boolean {
   const e = err as { code?: string; detail?: string };
@@ -126,10 +126,7 @@ export default async function volunteerRegisterRoutes(
         await parserVolunteerSelfRegister(person, request.body);
 
       const owner = request.ngoOwnerAgentId
-        ? await fastify.db.agentRepository.findOne({
-            select: { id: true, title: true },
-            where: { id: request.ngoOwnerAgentId },
-          })
+        ? await findLinkableAgent(fastify, request.ngoOwnerAgentId)
         : null;
       if (owner) {
         volunteer.ownerAgentId = owner.id;
@@ -137,7 +134,17 @@ export default async function volunteerRegisterRoutes(
 
       let id: number;
       try {
-        id = await writeVolunteerLegacy(volunteer, addressReuse);
+        id = await writeVolunteerLegacy(
+          volunteer,
+          addressReuse,
+          owner
+            ? {
+                type: "owner_changed",
+                detail: `Registered through the registration link of ${owner.title} (id:${owner.id}).`,
+                actorUserId: user?.id,
+              }
+            : undefined,
+        );
       } catch (err) {
         if (isDuplicateVolunteerProfile(err)) {
           throw new BadRequestError(
@@ -145,17 +152,6 @@ export default async function volunteerRegisterRoutes(
           );
         }
         throw err;
-      }
-      if (owner) {
-        await fastify.db.volunteerAuditLogRepository.save(
-          new VolunteerAuditLog({
-            volunteerId: id,
-            type: "owner_changed",
-            detail: `Registered through the registration link of ${owner.title} (id:${owner.id}).`,
-            actorUserId: user?.id,
-            occurredAt: new Date(),
-          }),
-        );
       }
       if (leads.length) {
         updateLeads(leads).catch((error) => {

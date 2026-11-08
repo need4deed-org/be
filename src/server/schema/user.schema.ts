@@ -11,9 +11,16 @@ export const createUserBodySchema = {
     person: {
       oneOf: [existingPersonSchema, newPersonSchema],
     },
-    ngoToken: { type: "string", minLength: 1 },
   },
   additionalProperties: false,
+};
+
+export const selfRegisterUserBodySchema = {
+  ...createUserBodySchema,
+  properties: {
+    ...createUserBodySchema.properties,
+    ngoToken: { type: "string", minLength: 1 },
+  },
 };
 
 export const refreshAccessSchema = {
@@ -176,8 +183,6 @@ export const signedLinkResponseSchema = {
   },
   required: ["token", "link", "expiresAt"],
 };
-
-export const coordinatorInviteResponseSchema = signedLinkResponseSchema;
 
 export const registerWithInviteQuerySchema = {
   type: "object",

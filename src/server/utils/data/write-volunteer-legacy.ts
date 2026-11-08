@@ -7,6 +7,7 @@ import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
+import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { patchOrReplaceAddress } from "./for-routes";
 
@@ -18,6 +19,7 @@ export interface AddressReusePlan {
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
   addressReuse?: AddressReusePlan,
+  auditEntry?: Pick<VolunteerAuditLog, "type" | "detail" | "actorUserId">,
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
     const addressRepository = transactionalEntityManager.getRepository(Address);
@@ -87,6 +89,15 @@ export async function writeVolunteerLegacy(
     await dealDistrictRepository.save(volunteer.deal.dealDistrict);
 
     await volunteerRepository.save(volunteer);
+    if (auditEntry) {
+      await transactionalEntityManager.save(
+        new VolunteerAuditLog({
+          ...auditEntry,
+          volunteerId: volunteer.id,
+          occurredAt: new Date(),
+        }),
+      );
+    }
   });
 
   return volunteer.id;

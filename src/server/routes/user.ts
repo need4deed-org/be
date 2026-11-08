@@ -36,10 +36,11 @@ import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { ApiErrorReply, responseErrors } from "../schema/responseErrors";
 import {
   coordinatorInviteBodySchema,
-  coordinatorInviteResponseSchema,
   createUserBodySchema,
   registerWithInviteBodySchema,
   registerWithInviteQuerySchema,
+  selfRegisterUserBodySchema,
+  signedLinkResponseSchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
@@ -69,6 +70,7 @@ import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-pers
 import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
 import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-token";
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
+import { signLink } from "../utils/data/sign-link";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -395,7 +397,7 @@ export default async function userRoutes(
     "/",
     {
       schema: {
-        body: createUserBodySchema,
+        body: selfRegisterUserBodySchema,
         response: {
           201: userResponseSchemaIncludePerson,
           ...responseErrors,
@@ -406,18 +408,6 @@ export default async function userRoutes(
 
         if (isStaffRole(role)) {
           throw new UnauthorizedError();
-        }
-
-        if (ngoToken !== undefined) {
-          if (role !== UserRole.VOLUNTEER) {
-            throw new BadRequestError(
-              "An NGO registration link is only for volunteers.",
-            );
-          }
-          request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
-            request,
-            ngoToken,
-          );
         }
 
         if (role === UserRole.AGENT) {
@@ -440,6 +430,18 @@ export default async function userRoutes(
         if (personData.id) {
           throw new BadRequestError(
             "Linking to an existing person by id is not allowed on self-registration.",
+          );
+        }
+
+        if (ngoToken !== undefined) {
+          if (role !== UserRole.VOLUNTEER) {
+            throw new BadRequestError(
+              "An NGO registration link is only for volunteers.",
+            );
+          }
+          request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
+            request,
+            ngoToken,
           );
         }
       },
@@ -577,7 +579,7 @@ export default async function userRoutes(
       schema: {
         body: coordinatorInviteBodySchema,
         response: {
-          201: coordinatorInviteResponseSchema,
+          201: signedLinkResponseSchema,
           ...responseErrors,
         },
       },
@@ -588,17 +590,17 @@ export default async function userRoutes(
 
       await assertEmailAvailable(fastify.db.userRepository, email, "allow");
 
-      const token = fastify.jwt.sign(
-        { email, person, type: "coordinator-invite" },
-        { expiresIn: `${COORDINATOR_INVITE_LIFESPAN_MS}` },
-      );
-      const { exp } = fastify.jwt.decode<{ exp: number }>(token)!;
-
-      return reply.status(201).send({
-        token,
-        link: `${urlCoordinatorInvite}?token=${encodeURIComponent(token)}`,
-        expiresAt: new Date(exp * 1000).toISOString(),
-      });
+      return reply
+        .status(201)
+        .send(
+          signLink(
+            fastify,
+            { email, person, type: "coordinator-invite" },
+            COORDINATOR_INVITE_LIFESPAN_MS,
+            urlCoordinatorInvite,
+            "token",
+          ),
+        );
     },
   );
 

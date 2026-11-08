@@ -31,6 +31,18 @@ describe("NGO registration link (be#1318)", () => {
   let inactive: Agent;
   const cookies = {} as Record<Caller, string>;
   const createdVolunteerIds: number[] = [];
+  const profileBody = {
+    addressPostcode: "10115",
+    locations: [],
+    languages: [],
+    availability: [],
+    activities: [],
+    skills: [],
+    leadFrom: [],
+    goodConductCertificate: "undefined",
+    measlesVaccination: "undefined",
+    comments: "",
+  };
 
   const createLink = (agentId: number, as: Caller = "admin") =>
     fastify.inject({
@@ -119,7 +131,16 @@ describe("NGO registration link (be#1318)", () => {
     });
     const users = await fastify.db.userRepository.find({
       where: {
-        email: In(["admin", "coordinator", "volunteer", "agent"].map(mail)),
+        email: In(
+          [
+            "admin",
+            "coordinator",
+            "volunteer",
+            "agent",
+            "late",
+            "admin-made",
+          ].map(mail),
+        ),
       },
     });
     const personIds = users.flatMap(({ personId }) =>
@@ -194,18 +215,7 @@ describe("NGO registration link (be#1318)", () => {
       const profile = await fastify.inject({
         method: "POST",
         url: `/volunteer/register?token=${verify}`,
-        payload: {
-          addressPostcode: "10115",
-          locations: [],
-          languages: [],
-          availability: [],
-          activities: [],
-          skills: [],
-          leadFrom: [],
-          goodConductCertificate: "undefined",
-          measlesVaccination: "undefined",
-          comments: "",
-        },
+        payload: profileBody,
       });
       expect(profile.statusCode).toBe(201);
       const volunteerId = profile.json().data.id;
@@ -245,6 +255,42 @@ describe("NGO registration link (be#1318)", () => {
           "This registration link is no longer valid.",
         );
       }
+    });
+
+    it("registers a platform volunteer when the NGO went inactive before the profile", async () => {
+      const person = await fastify.db.personRepository.save(
+        new Person({ firstName: "Late", lastName: `late${suffix}` }),
+      );
+      const user = await fastify.db.userRepository.save(
+        new User({
+          email: mail("late"),
+          password: await hashPassword(PASSWORD),
+          role: UserRole.VOLUNTEER,
+          isActive: true,
+          personId: person.id,
+        }),
+      );
+      const verify = fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        type: "verify",
+        ownerAgentId: inactive.id,
+      });
+      const profile = await fastify.inject({
+        method: "POST",
+        url: `/volunteer/register?token=${verify}`,
+        payload: profileBody,
+      });
+      expect(profile.statusCode).toBe(201);
+      const volunteerId = profile.json().data.id;
+      createdVolunteerIds.push(volunteerId);
+      const volunteer = await fastify.db.volunteerRepository.findOneByOrFail({
+        id: volunteerId,
+      });
+      expect(volunteer.ownerAgentId).toBeNull();
+      expect(
+        await fastify.db.volunteerAuditLogRepository.existsBy({ volunteerId }),
+      ).toBe(false);
     });
 
     it("400s the link on a non-volunteer sign-up", async () => {
