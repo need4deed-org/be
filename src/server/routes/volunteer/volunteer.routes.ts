@@ -355,6 +355,7 @@ export default async function volunteerRoutes(
       }
 
       const { ownerAgentId } = request.body;
+      let ownerChange: Partial<VolunteerAuditLog> | undefined;
       if (
         ownerAgentId !== undefined &&
         ownerAgentId !== volunteer.ownerAgentId
@@ -362,13 +363,31 @@ export default async function volunteerRoutes(
         if (role !== UserRole.ADMIN) {
           throw new UnauthorizedError();
         }
+        const owners = await fastify.db.agentRepository.find({
+          select: { id: true, title: true },
+          where: {
+            id: In(
+              [volunteer.ownerAgentId, ownerAgentId].filter(
+                (agentId) => agentId !== null,
+              ),
+            ),
+          },
+        });
         if (
           ownerAgentId !== null &&
-          !(await fastify.db.agentRepository.existsBy({ id: ownerAgentId }))
+          !owners.some((agent) => agent.id === ownerAgentId)
         ) {
           throw new BadRequestError(`Agent (id:${ownerAgentId}) not found.`);
         }
+        const ownerLabel = (agentId: number | null) => {
+          const agent = owners.find((owner) => owner.id === agentId);
+          return agent ? `${agent.title} (id:${agent.id})` : "need4deed";
+        };
         volunteerData = { ...volunteerData, ownerAgentId };
+        ownerChange = {
+          type: "owner_changed",
+          detail: `Owner changed from ${ownerLabel(volunteer.ownerAgentId)} to ${ownerLabel(ownerAgentId)}.`,
+        };
       }
 
       const personData = patchedPersonData
@@ -431,7 +450,9 @@ export default async function volunteerRoutes(
         getEntitySnapshot(Volunteer, id, snapshotRelations);
       const snapshotBefore = isSelf ? await takeSnapshot() : null;
 
-      const auditLogEntries: Partial<VolunteerAuditLog>[] = [];
+      const auditLogEntries: Partial<VolunteerAuditLog>[] = ownerChange
+        ? [ownerChange]
+        : [];
       if (
         volunteerData?.statusEngagement !== undefined &&
         volunteerData.statusEngagement !== volunteer.statusEngagement

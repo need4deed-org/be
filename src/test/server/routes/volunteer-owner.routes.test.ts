@@ -439,6 +439,44 @@ describe("NGO-owned volunteers (be#1056)", () => {
       expect(cleared.statusCode).toBe(200);
       expect(cleared.json().data.ownerAgentId).toBeNull();
     });
+
+    it("logs who changed the owner, from and to which NGO", async () => {
+      const ownerChanges = () =>
+        fastify.db.volunteerAuditLogRepository.find({
+          where: { volunteerId: volunteers.platform.id, type: "owner_changed" },
+          order: { id: "ASC" },
+        });
+      const before = (await ownerChanges()).length;
+      const admin = await fastify.db.userRepository.findOneByOrFail({
+        email: `owner-admin-${suffix}@test.need4deed.org`,
+      });
+      const owner = `${agents.owner.title} (id:${agents.owner.id})`;
+
+      await patchOwner("admin", agents.owner.id);
+      await patchOwner("admin", agents.owner.id);
+      await patchOwner("admin", null);
+
+      const logged = (await ownerChanges()).slice(before);
+      expect(logged.map((entry) => entry.detail)).toEqual([
+        `Owner changed from need4deed to ${owner}.`,
+        `Owner changed from ${owner} to need4deed.`,
+      ]);
+      expect(logged.map((entry) => entry.actorUserId)).toEqual([
+        admin.id,
+        admin.id,
+      ]);
+    });
+
+    it("logs nothing for a rejected owner change", async () => {
+      const count = () =>
+        fastify.db.volunteerAuditLogRepository.countBy({
+          volunteerId: volunteers.platform.id,
+          type: "owner_changed",
+        });
+      const before = await count();
+      await patchOwner("coordinator", agents.owner.id);
+      expect(await count()).toBe(before);
+    });
   });
 
   it("lets an NGO member switch sharing on its own agent", async () => {
