@@ -27,33 +27,45 @@ const MERIDIEMS: Record<Lang, string> = {
 const DAY_PART =
   "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
-const PERIOD_OF: Record<string, string> = {
-  tag: "day",
-  täglich: "day",
-  day: "day",
-  daily: "day",
-  woche: "week",
-  wöchentlich: "week",
-  week: "week",
-  weekly: "week",
-  monat: "month",
-  monatlich: "month",
-  month: "month",
-  monthly: "month",
-  jahr: "year",
-  jährlich: "year",
-  year: "year",
-  yearly: "year",
-  annually: "year",
+const REPEAT_PERIODS: Record<string, { nouns: string[]; adverbs: string[] }> = {
+  day: {
+    nouns: ["tag", "day"],
+    adverbs: ["täglich", "daily", "every day", "each day", "jeden tag"],
+  },
+  week: {
+    nouns: ["woche", "week"],
+    adverbs: ["wöchentlich", "weekly", "every week", "each week", "jede woche"],
+  },
+  month: {
+    nouns: ["monat", "month"],
+    adverbs: [
+      "monatlich",
+      "monthly",
+      "every month",
+      "each month",
+      "jeden monat",
+    ],
+  },
+  year: {
+    nouns: ["jahr", "year"],
+    adverbs: [
+      "jährlich",
+      "yearly",
+      "annually",
+      "every year",
+      "each year",
+      "jedes jahr",
+    ],
+  },
 };
-const PERIOD_ADVERBS: Record<string, string[]> = {
-  day: ["daily", "täglich"],
-  week: ["weekly", "wöchentlich"],
-  month: ["monthly", "monatlich"],
-  year: ["yearly", "annually", "jährlich"],
-};
+const PERIOD_WORDS = Object.values(REPEAT_PERIODS).flatMap(
+  ({ nouns, adverbs }) => [...nouns, ...adverbs],
+);
+const REPEAT_SUFFIX =
+  "(?:[x×](?![\\p{L}\\d])|\\s+[x×](?![\\p{L}\\d])(?!\\s*\\d)|\\s*mal(?!\\p{L})|\\s+times?(?!\\p{L}))";
+const REPEAT_PERIOD = `(?:\\s*/\\s*|\\s+(?:(?:pro|im|am|die|in\\s+der|a|per|each|every|jede[nms]?)\\s+)?)(?<period>${PERIOD_WORDS.join("|")})(?!\\p{L})`;
 const REPEAT_COUNT = new RegExp(
-  `(?<![.,\\d])\\b(?<count>\\d{1,2})\\s*[x×](?![\\p{L}\\d])(?!\\s*\\d)(?:\\s+(?:(?:pro|im|in\\s+der|a|per|each|every)\\s+)?(?<period>${Object.keys(PERIOD_OF).join("|")})(?!\\p{L}))?`,
+  `(?<![.,\\d])\\b(?<count>\\d{1,2})(?:\\s*[-–]\\s*(?<countEnd>\\d{1,2}))?${REPEAT_SUFFIX}(?:${REPEAT_PERIOD})?`,
   "giu",
 );
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
@@ -297,20 +309,27 @@ function numberPresent(output: string, value: number): boolean {
   );
 }
 
+function periodAdverbs(period: string): string[] {
+  const word = period.toLowerCase().replace(/\s+/g, " ");
+  return (
+    Object.values(REPEAT_PERIODS).find(
+      ({ nouns, adverbs }) => nouns.includes(word) || adverbs.includes(word),
+    )?.adverbs ?? []
+  );
+}
+
 function repeatPresent(
   output: string,
   count: number,
-  period?: string,
+  adverbs: string[] = [],
 ): boolean {
-  const adverbs =
-    count === 1 && period
-      ? PERIOD_ADVERBS[PERIOD_OF[period.toLowerCase()]]
-      : [];
   return (
-    numberPresent(output, count) ||
-    [...(REPEAT_WORDS[count] ?? []), ...adverbs].some((word) =>
-      hasWord(output, word),
-    )
+    hasNumber(output, String(count)) ||
+    (REPEAT_WORDS[count] ?? []).some((word) => hasWord(output, word)) ||
+    (NUMBER_WORDS[count] ?? []).some((word) =>
+      hasWord(output, `${word}\\s+(?:times?|mal)`),
+    ) ||
+    adverbs.some((adverb) => hasWord(output, adverb.replace(/ /g, "\\s+")))
   );
 }
 
@@ -527,7 +546,13 @@ function missingToken(
   }
   rest = rest.replace(fullHour, " ");
   for (const { groups = {} } of rest.matchAll(REPEAT_COUNT)) {
-    if (!repeatPresent(output, Number(groups.count), groups.period)) {
+    const { count, countEnd, period } = groups;
+    const adverbs =
+      count === "1" && !countEnd && period ? periodAdverbs(period) : [];
+    if (
+      !repeatPresent(output, Number(count), adverbs) ||
+      (countEnd !== undefined && !repeatPresent(output, Number(countEnd)))
+    ) {
       return "number_missing";
     }
   }
@@ -554,8 +579,8 @@ export function validateTranslation(
     status: "invalid",
     code,
   });
-  const src = source.trim();
-  const out = output.trim();
+  const src = source.normalize("NFC").trim();
+  const out = output.normalize("NFC").trim();
 
   if (!out) {
     return invalid("empty");
