@@ -7,6 +7,7 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { logMatchChangeSafely } from "../../../data/utils/log-match-change";
+import { hasRecentOnetimerMatch } from "./onetimer-active-period";
 
 export async function syncVolunteerEngagement(
   manager: EntityManager,
@@ -44,6 +45,10 @@ export async function syncVolunteerEngagement(
         VolunteerStateEngagementType.ACTIVE,
       );
     }
+    return;
+  }
+
+  if (await hasRecentOnetimerMatch(manager, volunteerId)) {
     return;
   }
 

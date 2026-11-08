@@ -19,6 +19,9 @@
         "statusEngagement": {
           "$ref": "VolunteerStateEngagementType#"
         },
+        "activeFromOnetimer": {
+          "type": "boolean"
+        },
         "statusCommunication": {
           "$ref": "VolunteerStateCommunicationType#"
         },

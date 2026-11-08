@@ -69,6 +69,7 @@ import {
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
+import { findVolunteerIdsActiveFromOnetimer } from "../../utils/data/onetimer-active-period";
 import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import {
@@ -265,7 +266,17 @@ export default async function volunteerRoutes(
       if (visibility) {
         maskPii(volunteers, visibility);
       }
-      const data = volunteers.map(volunteerListSerializer).filter(Boolean);
+      const activeFromOnetimer = await findVolunteerIdsActiveFromOnetimer(
+        volunteerRepository.manager,
+        ids,
+      );
+      const data = volunteers
+        .map(volunteerListSerializer)
+        .filter(Boolean)
+        .map((volunteer) => ({
+          ...volunteer,
+          activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
+        }));
 
       reply.status(200).send({
         message: `Volunteers page ${request.query.page}`,

@@ -114,6 +114,19 @@ describe("syncVolunteerEngagement", () => {
     );
   });
 
+  it.each(["follow", "release"] as const)(
+    "%s mode keeps Active while a recent accompanying or event holds it",
+    async (mode) => {
+      exists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      await syncVolunteerEngagement(manager, 7, mode);
+
+      expect(exists).toHaveBeenCalledTimes(2);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    },
+  );
+
   it("writes no audit row when the volunteer wasn't Active", async () => {
     exists.mockResolvedValue(false);
     update.mockResolvedValue({ affected: 0 });

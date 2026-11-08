@@ -177,7 +177,7 @@ describe("scanExpiredOnetimers", () => {
     );
   });
 
-  it("releases each finished volunteer back to available and logs the change", async () => {
+  it("keeps each finished volunteer Active for 28 days after the date", async () => {
     const first = await ctx.fixtures.volunteer(
       VolunteerStateEngagementType.ACTIVE,
     );
@@ -197,10 +197,28 @@ describe("scanExpiredOnetimers", () => {
 
     for (const volunteer of [first, second]) {
       expect(await ctx.fixtures.engagement(volunteer)).toBe(
-        VolunteerStateEngagementType.AVAILABLE,
+        VolunteerStateEngagementType.ACTIVE,
       );
-      expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(1);
+      expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(0);
     }
+  });
+
+  it("releases a volunteer to available and logs it when the date is more than 28 days ago", async () => {
+    const volunteer = await ctx.fixtures.volunteer(
+      VolunteerStateEngagementType.ACTIVE,
+    );
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: new Date(Date.now() - 40 * DAY),
+      status: OpportunityStatusType.ACTIVE,
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.ACTIVE }],
+    });
+
+    await scanExpiredOnetimers(ctx.fastify);
+
+    expect(await ctx.fixtures.engagement(volunteer)).toBe(
+      VolunteerStateEngagementType.AVAILABLE,
+    );
+    expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(1);
   });
 
   it("keeps a volunteer engaged who is still active on another opportunity", async () => {

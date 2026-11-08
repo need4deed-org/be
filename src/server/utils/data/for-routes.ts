@@ -57,6 +57,7 @@ import {
 import { tryCatch } from "../../../services/utils";
 import { maskPii } from "../pii/mask";
 import { CallerVisibility } from "../pii/visible-persons";
+import { findVolunteerIdsActiveFromOnetimer } from "./onetimer-active-period";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -744,9 +745,15 @@ export async function fetchVolunteerById(
     maskPii(comments, maskContext);
   }
 
-  const data = volunteerSerializer(volunteer, comments, timedEvents);
+  const activeFromOnetimer = await findVolunteerIdsActiveFromOnetimer(
+    volunteerRepository.manager,
+    [volunteer.id],
+  );
 
-  return data;
+  return {
+    ...volunteerSerializer(volunteer, comments, timedEvents),
+    activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
+  };
 }
 
 export async function getGerman(): Promise<Language> {

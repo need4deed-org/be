@@ -6,6 +6,7 @@ import { berlinTimeZone } from "../../config";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
+import { releaseLapsedOnetimerEngagement } from "../../services/jobs/release-lapsed-onetimer-engagement";
 import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
 import { scanPostMatchCheckup } from "../../services/jobs/scan-post-match-checkup";
@@ -38,6 +39,10 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                 {
                   name: "scanExpiredOnetimers",
                   run: () => scanExpiredOnetimers(fastify),
+                },
+                {
+                  name: "releaseLapsedOnetimerEngagement",
+                  run: () => releaseLapsedOnetimerEngagement(fastify),
                 },
                 {
                   name: "scanStalePending",
