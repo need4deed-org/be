@@ -99,7 +99,7 @@ export function parseArgs(argv: string[]): BackfillMatchAuditLogOptions {
       options.apply = true;
       continue;
     }
-    if (!(arg in VALUE_EXAMPLES)) {
+    if (!Object.hasOwn(VALUE_EXAMPLES, arg)) {
       unknown.push(arg);
       continue;
     }

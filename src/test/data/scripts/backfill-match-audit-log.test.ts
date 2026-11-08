@@ -43,6 +43,9 @@ describe("backfill-match-audit-log parseArgs", () => {
       "Unknown argument(s): --imported-on=2026-05-27",
     );
     expect(() => parseArgs(["--aply"])).toThrow("Unknown argument(s): --aply");
+    expect(() => parseArgs(["constructor"])).toThrow(
+      "Unknown argument(s): constructor",
+    );
   });
 
   it("parses --cutoff and requires a zone", () => {
