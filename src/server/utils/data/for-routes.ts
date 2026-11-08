@@ -57,6 +57,7 @@ import {
 import { tryCatch } from "../../../services/utils";
 import { maskPii } from "../pii/mask";
 import { CallerVisibility } from "../pii/visible-persons";
+import { findVolunteerIdsActiveFromOnetimer } from "./onetimer-active-period";
 
 export { getPostcode } from "../../../data/utils";
 
@@ -736,17 +737,23 @@ export async function fetchVolunteerById(
 
   await addTranslatedFields([volunteer], isoCode);
 
-  const timedEvents = await getTimedEvents(volunteer);
-  const comments = await getVolunteerComments(volunteer);
+  const [timedEvents, comments, activeFromOnetimer] = await Promise.all([
+    getTimedEvents(volunteer),
+    getVolunteerComments(volunteer),
+    findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, [
+      volunteer.id,
+    ]),
+  ]);
 
   if (maskContext) {
     maskPii(volunteer, maskContext);
     maskPii(comments, maskContext);
   }
 
-  const data = volunteerSerializer(volunteer, comments, timedEvents);
-
-  return data;
+  return {
+    ...volunteerSerializer(volunteer, comments, timedEvents),
+    activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
+  };
 }
 
 export async function getGerman(): Promise<Language> {

@@ -69,6 +69,8 @@ import {
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
+import { engagementChangeDetail } from "../../utils/data/engagement-change-detail";
+import { findVolunteerIdsActiveFromOnetimer } from "../../utils/data/onetimer-active-period";
 import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import {
@@ -253,19 +255,28 @@ export default async function volunteerRoutes(
       });
       const ids = idRows.map((v) => v.id);
 
-      const volunteers = ids.length
-        ? await volunteerRepository.find({
-            where: { id: In(ids) },
-            relations: volunteerListRelations(listType ?? "card"),
-            relationLoadStrategy: "query",
-            order,
-          })
-        : [];
+      const [volunteers, activeFromOnetimer] = await Promise.all([
+        ids.length
+          ? volunteerRepository.find({
+              where: { id: In(ids) },
+              relations: volunteerListRelations(listType ?? "card"),
+              relationLoadStrategy: "query",
+              order,
+            })
+          : [],
+        findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, ids),
+      ]);
 
       if (visibility) {
         maskPii(volunteers, visibility);
       }
-      const data = volunteers.map(volunteerListSerializer).filter(Boolean);
+      const data = volunteers
+        .map(volunteerListSerializer)
+        .filter(Boolean)
+        .map((volunteer) => ({
+          ...volunteer,
+          activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
+        }));
 
       reply.status(200).send({
         message: `Volunteers page ${request.query.page}`,
@@ -464,7 +475,10 @@ export default async function volunteerRoutes(
       ) {
         auditLogEntries.push({
           type: "availability_changed",
-          detail: `Status changed from ${volunteer.statusEngagement} to ${volunteerData.statusEngagement}.`,
+          detail: engagementChangeDetail(
+            volunteer.statusEngagement,
+            volunteerData.statusEngagement,
+          ),
         });
       }
       let hasContactChange = false;

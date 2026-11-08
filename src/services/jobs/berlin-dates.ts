@@ -1,7 +1,7 @@
 import { addWorkingDays } from "need4deed-sdk";
 import { berlinTimeZone } from "../../config";
 
-function addDays(date: Date, n: number): Date {
+export function addDays(date: Date, n: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
 }
 

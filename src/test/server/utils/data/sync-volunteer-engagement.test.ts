@@ -7,10 +7,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../../data/entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
+import { hasRecentOnetimerMatch } from "../../../../server/utils/data/onetimer-active-period";
 import {
   syncEngagementForMatchChange,
   syncVolunteerEngagement,
 } from "../../../../server/utils/data/sync-volunteer-engagement";
+
+vi.mock("../../../../server/utils/data/onetimer-active-period", () => ({
+  hasRecentOnetimerMatch: vi.fn(),
+}));
 
 const exists = vi.fn();
 const update = vi.fn();
@@ -114,6 +119,20 @@ describe("syncVolunteerEngagement", () => {
     );
   });
 
+  it.each(["follow", "release"] as const)(
+    "%s mode keeps Active while a recent accompanying or event holds it",
+    async (mode) => {
+      exists.mockResolvedValue(false);
+      vi.mocked(hasRecentOnetimerMatch).mockResolvedValueOnce(true);
+
+      await syncVolunteerEngagement(manager, 7, mode);
+
+      expect(hasRecentOnetimerMatch).toHaveBeenCalledWith(manager, 7);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    },
+  );
+
   it("writes no audit row when the volunteer wasn't Active", async () => {
     exists.mockResolvedValue(false);
     update.mockResolvedValue({ affected: 0 });
@@ -152,6 +171,7 @@ describe("syncEngagementForMatchChange", () => {
   it("leaves engagement alone for transitions that don't touch Active", async () => {
     await syncEngagementForMatchChange(manager, 7, MATCHED, PAST);
     await syncEngagementForMatchChange(manager, 7, PENDING, undefined);
+    await syncEngagementForMatchChange(manager, 7, PAST, undefined);
     expect(exists).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });

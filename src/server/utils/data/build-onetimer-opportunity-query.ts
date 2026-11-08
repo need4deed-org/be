@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
-import { OpportunityType } from "need4deed-sdk";
 import { SelectQueryBuilder } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import { ONETIMER_OPPORTUNITY_TYPES } from "./onetimer-statuses";
 
 export function buildOnetimerOpportunityQuery(
   fastify: FastifyInstance,
@@ -14,6 +14,6 @@ export function buildOnetimerOpportunityQuery(
       "opportunityVolunteer",
     )
     .where("opportunity.type IN (:...types)", {
-      types: [OpportunityType.ACCOMPANYING, OpportunityType.EVENTS],
+      types: ONETIMER_OPPORTUNITY_TYPES,
     });
 }
