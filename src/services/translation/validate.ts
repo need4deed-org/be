@@ -8,6 +8,9 @@ export type ValidationResult =
 
 export const SAME_LANGUAGE_MIN_WORDS = 12;
 export const SAME_LANGUAGE_MAX_SIMILARITY = 0.6;
+// Names, addresses and numbers stay verbatim in a real translation, so a
+// text whose hints read source → target may be this similar (be#1320).
+export const TRANSLATED_MAX_SIMILARITY = 0.75;
 const LENGTH_RATIO_MIN = 0.5;
 const LENGTH_RATIO_MAX = 2;
 const LENGTH_RATIO_MIN_CHARS = 20;
@@ -468,12 +471,14 @@ function rangePresent(
   return false;
 }
 
+const otherLang = (lang: Lang): Lang => (lang === Lang.DE ? Lang.EN : Lang.DE);
+
 function missingToken(
   source: string,
   output: string,
   targetLang: Lang,
 ): TranslationErrorCode | undefined {
-  const sourceLang = targetLang === Lang.DE ? Lang.EN : Lang.DE;
+  const sourceLang = otherLang(targetLang);
   const { time, fullHour, hourRange } = SOURCE_TIME_PATTERNS[sourceLang];
   const squash = (s: string) => s.replace(/[ /-]/g, "");
   const squashedOutput = squash(output);
@@ -608,17 +613,16 @@ export function validateTranslation(
       : { status: "ok" };
   }
   const hint = languageHint(out);
-  const sourceHint = languageHint(src);
-  const translated =
-    sourceHint !== undefined &&
-    sourceHint !== targetLang &&
-    hint === targetLang;
-  if (
-    !translated &&
-    words >= SAME_LANGUAGE_MIN_WORDS &&
-    similarity(src, out) > SAME_LANGUAGE_MAX_SIMILARITY
-  ) {
-    return invalid("source_is_target");
+  if (words >= SAME_LANGUAGE_MIN_WORDS) {
+    const score = similarity(src, out);
+    const readsTranslated = () =>
+      hint === targetLang && languageHint(src) === otherLang(targetLang);
+    if (
+      score > TRANSLATED_MAX_SIMILARITY ||
+      (score > SAME_LANGUAGE_MAX_SIMILARITY && !readsTranslated())
+    ) {
+      return invalid("source_is_target");
+    }
   }
   if (hint !== undefined && hint !== targetLang) {
     return invalid("wrong_language");

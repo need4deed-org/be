@@ -5,7 +5,11 @@ import {
   similarity,
   wordCount,
 } from "../../../services/translation/similarity";
-import { validateTranslation } from "../../../services/translation/validate";
+import {
+  SAME_LANGUAGE_MAX_SIMILARITY,
+  TRANSLATED_MAX_SIMILARITY,
+  validateTranslation,
+} from "../../../services/translation/validate";
 
 // Real opportunity texts and outputs from the be#1065 spike (public listing).
 const MENS_CAFE_DE =
@@ -670,16 +674,29 @@ describe("validateTranslation", () => {
   });
 
   it("accepts a similar output when the hints show a real translation", () => {
-    expectCode(
-      "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)",
-      "Appointment details:\nTuesday, 18 August 2026, at 09:00 AM.\nLocation: DHZC Clinic for Cardiology, Angiology and Intensive Care Medicine. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)",
-      Lang.EN,
-    ).toEqual({ status: "ok" });
+    // be#1320 / opportunity 972: clinic name and address stay verbatim.
+    const source =
+      "Termindetails:\nDienstag, 18 August 2026, um 09:00 Uhr.\nOrt: DHZC Klinik für Kardiologie, Angiologie und Intensivmedizin. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(Für diesen Termin hat er bereits einen Überweisungsschein.)";
+    const output =
+      "Appointment details:\nTuesday, 18 August 2026, at 09:00 AM.\nLocation: DHZC Clinic for Cardiology, Angiology and Intensive Care Medicine. Campus Virchow Klinikum - Augustenburger Platz 1 - 13353 Berlin\n(They already have a referral form for this appointment.)";
+    const score = similarity(source, output);
+    expect(score).toBeGreaterThan(SAME_LANGUAGE_MAX_SIMILARITY);
+    expect(score).toBeLessThanOrEqual(TRANSLATED_MAX_SIMILARITY);
+    expectCode(source, output, Lang.EN).toEqual({ status: "ok" });
   });
 
-  it("still rejects a near-copy that keeps the source language", () => {
-    const nearCopy = CREATIVE_DE.replace("Lust hat", "Freude hat");
-    expectCode(CREATIVE_DE, nearCopy, Lang.EN).toMatchObject({
+  it("still rejects a half translation even when the hints read de → en", () => {
+    // Only the sentence frame is translated, the item list stays German.
+    const items =
+      "Winterjacken, Handschuhe, Wollmützen, Schals, Winterstiefel, Bettdecken, Kopfkissen, Bettwäsche, Handtücher, Zahnbürsten, Zahnpasta, Duschgel";
+    const source = `Wir suchen für die Unterkunft dringend: ${items} und Shampoo.`;
+    const output = `We are urgently looking for the shelter: ${items} and Shampoo.`;
+    expect(languageHint(source)).toBe(Lang.DE);
+    expect(languageHint(output)).toBe(Lang.EN);
+    expect(similarity(source, output)).toBeGreaterThan(
+      TRANSLATED_MAX_SIMILARITY,
+    );
+    expectCode(source, output, Lang.EN).toMatchObject({
       code: "source_is_target",
     });
   });
