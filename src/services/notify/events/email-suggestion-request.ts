@@ -1,4 +1,4 @@
-import { EntityTableName, Lang } from "need4deed-sdk";
+import { EntityTableName } from "need4deed-sdk";
 import {
   emailFromNotify,
   emailSuggestionRequestManifestUrl,
@@ -11,6 +11,7 @@ import {
   createManifestLoader,
   renderEmail,
   resolveLocale,
+  resolveManifestLabel,
   type LocalizedValue,
   type Manifest,
 } from "../email-template";
@@ -32,21 +33,10 @@ export interface EmailSuggestionRequestInput {
   opportunityTitle: string;
 }
 
-function resolveLabel(
+const resolveLabel = (
   manifest: Manifest | null,
   key: keyof SuggestionRequestLabels,
-): LocalizedValue {
-  const pick = (lang: Lang): string => {
-    const entry = (manifest as Record<string, unknown> | null)?.[lang] as
-      | { labels?: Record<string, unknown> }
-      | undefined;
-    const override = entry?.labels?.[key];
-    return typeof override === "string" && override.trim()
-      ? override
-      : BUILTIN[lang].labels[key];
-  };
-  return { [Lang.EN]: pick(Lang.EN), [Lang.DE]: pick(Lang.DE) };
-}
+): LocalizedValue => resolveManifestLabel(manifest, BUILTIN, key);
 
 export async function sendEmailSuggestionRequest(
   email: EmailTransport,

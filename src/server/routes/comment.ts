@@ -11,8 +11,7 @@ import { commentSerializer } from "../../services";
 import { responseErrors } from "../schema";
 import { notifyTaggedByEmail, STAFF_ROLES, syncCommentTags } from "../utils";
 import {
-  isCommentOnOwnedVolunteer,
-  narrowToOwnedVolunteers,
+  commentReadWhere,
   resolveCommentReadScope,
 } from "../utils/data/comment-read-scope";
 
@@ -124,15 +123,14 @@ export default async function commentRoutes(
           }
         }
 
-        const where: FindOptionsWhere<Comment> = {
+        const base: FindOptionsWhere<Comment> = {
           userId,
           entityId,
           entityType,
           ...(commentIdFilter ? { id: In(commentIdFilter) } : {}),
         };
-        if (readScope !== "all") {
-          narrowToOwnedVolunteers(where, readScope);
-        }
+        const where =
+          readScope === "all" ? base : commentReadWhere(base, readScope);
         const [comments, count] = await commentRepository.findAndCount({
           where,
           relations: ["user", "user.person", "language", "commentPerson"],
@@ -181,19 +179,18 @@ export default async function commentRoutes(
           });
         }
 
-        const commentRepository = fastify.db.commentRepository;
-        const comment = await commentRepository.findOne({
-          where: { id },
-          relations: ["user", "user.person", "language", "commentPerson"],
-        });
-
         const readScope = await resolveCommentReadScope(request);
-        const canRead =
-          !!comment &&
-          (readScope === "all" ||
-            (readScope !== "none" &&
-              (await isCommentOnOwnedVolunteer(request, comment, readScope))));
-        if (!comment || !canRead) {
+        const comment =
+          readScope === "none"
+            ? null
+            : await fastify.db.commentRepository.findOne({
+                where:
+                  readScope === "all"
+                    ? { id }
+                    : commentReadWhere({ id }, readScope),
+                relations: ["user", "user.person", "language", "commentPerson"],
+              });
+        if (!comment) {
           return reply
             .status(404)
             .send({ message: `Comment id:${id} not found.` });

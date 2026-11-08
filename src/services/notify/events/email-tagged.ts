@@ -12,6 +12,7 @@ import {
   createManifestLoader,
   renderEmail,
   resolveLocale,
+  resolveManifestLabel,
   type LocalizedValue,
   type Manifest,
 } from "../email-template";
@@ -40,21 +41,10 @@ const COMMENT_ON: Partial<Record<EntityTableName, keyof TaggedLabels>> = {
   [EntityTableName.AGENT]: "commentOnAgent",
 };
 
-function resolveLabel(
+const resolveLabel = (
   manifest: Manifest | null,
   key: keyof TaggedLabels,
-): LocalizedValue {
-  const pick = (lang: Lang): string => {
-    const entry = (manifest as Record<string, unknown> | null)?.[lang] as
-      | { labels?: Record<string, unknown> }
-      | undefined;
-    const override = entry?.labels?.[key];
-    return typeof override === "string" && override.trim()
-      ? override
-      : BUILTIN[lang].labels[key];
-  };
-  return { [Lang.EN]: pick(Lang.EN), [Lang.DE]: pick(Lang.DE) };
-}
+): LocalizedValue => resolveManifestLabel(manifest, BUILTIN, key);
 
 const CARD_PATH: Partial<Record<EntityTableName, string>> = {
   [EntityTableName.VOLUNTEER]: "volunteers",

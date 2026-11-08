@@ -6,7 +6,12 @@ import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { isStaffRole } from "./is-staff-role";
 import { andIntoWhere } from "./merge-into-where";
 
-type CommentReadScope = "all" | "none" | { ownerAgentIds: number[] };
+type AgentReadScope = {
+  userId: number;
+  personId: number | null;
+  ownerAgentIds: number[];
+};
+type CommentReadScope = "all" | "none" | AgentReadScope;
 
 export async function resolveCommentReadScope(
   request: FastifyRequest,
@@ -15,20 +20,30 @@ export async function resolveCommentReadScope(
   if (isStaffRole(authUser?.role)) {
     return "all";
   }
-  if (authUser?.role !== UserRole.AGENT) {
+  if (!authUser || authUser.role !== UserRole.AGENT) {
     return "none";
   }
-  const ownerAgentIds = await getCallerAgentIds(request, authUser.personId);
-  return ownerAgentIds.length > 0 ? { ownerAgentIds } : "none";
+  return {
+    userId: authUser.id,
+    personId: authUser.personId ?? null,
+    ownerAgentIds: await getCallerAgentIds(request, authUser.personId),
+  };
 }
 
-export function narrowToOwnedVolunteers(
-  where: FindOptionsWhere<Comment>,
-  { ownerAgentIds }: { ownerAgentIds: number[] },
-): void {
-  andIntoWhere(where, "entityType", Equal(EntityTableName.VOLUNTEER));
+// NGO members read only comments tagging them on their own volunteers, plus their own: other notes stay staff-only.
+export function commentReadWhere(
+  base: FindOptionsWhere<Comment>,
+  { userId, personId, ownerAgentIds }: AgentReadScope,
+): FindOptionsWhere<Comment>[] {
+  const authored = { ...base };
+  andIntoWhere(authored, "userId", Equal(userId));
+  if (!personId || ownerAgentIds.length === 0) {
+    return [authored];
+  }
+  const taggedOnOwned = { ...base };
+  andIntoWhere(taggedOnOwned, "entityType", Equal(EntityTableName.VOLUNTEER));
   andIntoWhere(
-    where,
+    taggedOnOwned,
     "entityId",
     Raw(
       (column) =>
@@ -36,21 +51,14 @@ export function narrowToOwnedVolunteers(
       { commentOwnerAgentIds: ownerAgentIds },
     ),
   );
-}
-
-export async function isCommentOnOwnedVolunteer(
-  request: FastifyRequest,
-  comment: Pick<Comment, "entityType" | "entityId">,
-  { ownerAgentIds }: { ownerAgentIds: number[] },
-): Promise<boolean> {
-  if (comment.entityType !== EntityTableName.VOLUNTEER) {
-    return false;
-  }
-  const volunteer = await request.server.db.volunteerRepository.findOne({
-    select: { id: true, ownerAgentId: true },
-    where: { id: comment.entityId },
-  });
-  return (
-    !!volunteer?.ownerAgentId && ownerAgentIds.includes(volunteer.ownerAgentId)
+  andIntoWhere(
+    taggedOnOwned,
+    "id",
+    Raw(
+      (column) =>
+        `${column} IN (SELECT comment_id FROM comment_person WHERE person_id = :commentReaderPersonId)`,
+      { commentReaderPersonId: personId },
+    ),
   );
+  return [taggedOnOwned, authored];
 }

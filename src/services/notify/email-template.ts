@@ -19,6 +19,23 @@ export type LocalizedValue = Record<Lang, string>;
 export type TemplateVar = string | number | LocalizedValue | null | undefined;
 export type TemplateVars = Record<string, TemplateVar>;
 
+export function resolveManifestLabel<K extends string>(
+  manifest: Manifest | null,
+  builtin: Record<Lang, { labels: Record<K, string> }>,
+  key: K,
+): LocalizedValue {
+  const pick = (lang: Lang): string => {
+    const entry = (manifest as Record<string, unknown> | null)?.[lang] as
+      | { labels?: Record<string, unknown> }
+      | undefined;
+    const override = entry?.labels?.[key];
+    return typeof override === "string" && override.trim()
+      ? override
+      : builtin[lang].labels[key];
+  };
+  return { [Lang.EN]: pick(Lang.EN), [Lang.DE]: pick(Lang.DE) };
+}
+
 const DEFAULT_LOCALE = Lang.DE;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)(?:\.(\w+))?\s*\}\}/g;
 

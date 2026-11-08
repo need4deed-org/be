@@ -29,9 +29,9 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type AgentKey = "requester" | "owner" | "loner";
+type AgentKey = "requester" | "owner" | "loner" | "silent";
 type Caller = "requester" | "owner" | "coordinator";
-type VolunteerKey = "owned" | "platform" | "own" | "loner";
+type VolunteerKey = "owned" | "platform" | "own" | "loner" | "silent";
 type OpportunityKey = "open" | "past" | "linked" | "owners";
 
 describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
@@ -74,6 +74,7 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
       requester: true,
       owner: true,
       loner: false,
+      silent: true,
     };
     for (const key of Object.keys(sharing) as AgentKey[]) {
       agents[key] = await fastify.db.agentRepository.save(
@@ -120,11 +121,34 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
         ?.value as string;
     }
 
+    const silentMember = await fastify.db.personRepository.save(
+      new Person({ firstName: "Silent", lastName: `member${suffix}` }),
+    );
+    volunteerPersons.push(silentMember);
+    await fastify.db.userRepository.save(
+      new User({
+        email: `request-silent-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.AGENT,
+        isActive: false,
+        personId: silentMember.id,
+      }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agents.silent.id,
+        personId: silentMember.id,
+        role: AgentRoleType.VOLUNTEER_COORDINATOR,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
     const owners: Record<VolunteerKey, number | null> = {
       owned: agents.owner.id,
       platform: null,
       own: agents.requester.id,
       loner: agents.loner.id,
+      silent: agents.silent.id,
     };
     for (const [key, ownerAgentId] of Object.entries(owners) as [
       VolunteerKey,
@@ -255,6 +279,18 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
     );
   });
 
+  it("409s a repeated request for the same volunteer and opportunity", async () => {
+    expect(
+      (await requestSuggestion("requester", "owned", "open")).statusCode,
+    ).toBe(409);
+  });
+
+  it("400s when the owning NGO has no active member to ask", async () => {
+    expect(
+      (await requestSuggestion("requester", "silent", "open")).statusCode,
+    ).toBe(400);
+  });
+
   it("400s a platform volunteer, who stays with the coordinator flow", async () => {
     expect(
       (await requestSuggestion("requester", "platform", "open")).statusCode,
@@ -298,92 +334,99 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
   });
 
   describe("comments on owned volunteers", () => {
-    let ownedComment: Comment;
-    let otherComment: Comment;
+    const notes = {} as Record<
+      "tagged" | "untagged" | "taggedOnPlatform" | "byRequester",
+      Comment
+    >;
 
-    const getComments = (as: Caller, query: string) =>
+    const getComment = (as: Caller, id: number) =>
       fastify.inject({
         method: "GET",
-        url: `/comment?${query}`,
+        url: `/comment/${id}`,
         cookies: { [accessCookieName]: cookies[as] },
       });
-    const commentIds = async (as: Caller, query: string) => {
-      const res = await getComments(as, query);
+    const commentIds = async (as: Caller, volunteer: VolunteerKey) => {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/comment?entityType=volunteer&entityId=${volunteers[volunteer].id}`,
+        cookies: { [accessCookieName]: cookies[as] },
+      });
       expect(res.statusCode).toBe(200);
       return (res.json().data as { id: number }[]).map(({ id }) => id);
     };
 
     beforeAll(async () => {
-      [ownedComment, otherComment] = await fastify.db.commentRepository.save(
-        [volunteers.owned.id, volunteers.platform.id].map((entityId) =>
+      const setup = {
+        tagged: { volunteer: "owned", author: "coordinator", tag: true },
+        untagged: { volunteer: "owned", author: "coordinator", tag: false },
+        taggedOnPlatform: {
+          volunteer: "platform",
+          author: "coordinator",
+          tag: true,
+        },
+        byRequester: { volunteer: "owned", author: "requester", tag: false },
+      } as const;
+      for (const [key, { volunteer, author, tag }] of Object.entries(setup)) {
+        const comment = await fastify.db.commentRepository.save(
           fastify.db.commentRepository.create({
-            text: `Coordinator note ${suffix}`,
+            text: `Note ${key} ${suffix}`,
             entityType: EntityTableName.VOLUNTEER,
-            entityId,
-            user: { id: users.coordinator.id },
+            entityId: volunteers[volunteer].id,
+            user: { id: users[author].id },
           }),
-        ),
+        );
+        if (tag) {
+          await fastify.db.commentRepository.manager
+            .getRepository(CommentPerson)
+            .save(
+              new CommentPerson({
+                commentId: comment.id,
+                personId: persons.owner.id,
+              }),
+            );
+        }
+        notes[key as keyof typeof notes] = comment;
+      }
+    });
+
+    it("shows the owning NGO comments tagging them on its volunteers", async () => {
+      expect(await commentIds("owner", "owned")).toContain(notes.tagged.id);
+      expect((await getComment("owner", notes.tagged.id)).statusCode).toBe(200);
+    });
+
+    it("keeps other notes on its volunteers staff-only", async () => {
+      expect(await commentIds("owner", "owned")).not.toContain(
+        notes.untagged.id,
+      );
+      expect((await getComment("owner", notes.untagged.id)).statusCode).toBe(
+        404,
       );
     });
 
-    it("lets the owning NGO read them", async () => {
+    it("hides a tag on a volunteer the NGO doesn't own", async () => {
+      expect(await commentIds("owner", "platform")).toEqual([]);
       expect(
-        await commentIds(
-          "owner",
-          `entityType=volunteer&entityId=${volunteers.owned.id}`,
-        ),
-      ).toContain(ownedComment.id);
-      const res = await fastify.inject({
-        method: "GET",
-        url: `/comment/${ownedComment.id}`,
-        cookies: { [accessCookieName]: cookies.owner },
-      });
-      expect(res.statusCode).toBe(200);
+        (await getComment("owner", notes.taggedOnPlatform.id)).statusCode,
+      ).toBe(404);
     });
 
-    it("hides other volunteers' comments from the NGO", async () => {
+    it("lets an NGO read what it wrote, and nothing else on another NGO's volunteer", async () => {
+      const ids = await commentIds("requester", "owned");
+      expect(ids).toContain(notes.byRequester.id);
+      expect(ids).not.toContain(notes.tagged.id);
       expect(
-        await commentIds(
-          "owner",
-          `entityType=volunteer&entityId=${volunteers.platform.id}`,
-        ),
-      ).toEqual([]);
-      expect(
-        await commentIds(
-          "owner",
-          `entityType=opportunity&entityId=${volunteers.owned.id}`,
-        ),
-      ).toEqual([]);
-      const res = await fastify.inject({
-        method: "GET",
-        url: `/comment/${otherComment.id}`,
-        cookies: { [accessCookieName]: cookies.owner },
-      });
-      expect(res.statusCode).toBe(404);
-    });
-
-    it("hides them from a sharing NGO that doesn't own the volunteer", async () => {
-      expect(
-        await commentIds(
-          "requester",
-          `entityType=volunteer&entityId=${volunteers.owned.id}`,
-        ),
-      ).toEqual([]);
-      const res = await fastify.inject({
-        method: "GET",
-        url: `/comment/${ownedComment.id}`,
-        cookies: { [accessCookieName]: cookies.requester },
-      });
-      expect(res.statusCode).toBe(404);
+        (await getComment("requester", notes.byRequester.id)).statusCode,
+      ).toBe(200);
     });
 
     it("keeps a coordinator's full view", async () => {
-      expect(
-        await commentIds(
-          "coordinator",
-          `entityType=volunteer&entityId=${volunteers.platform.id}`,
-        ),
-      ).toContain(otherComment.id);
+      expect(await commentIds("coordinator", "owned")).toEqual(
+        expect.arrayContaining([
+          notes.tagged.id,
+          notes.untagged.id,
+          notes.byRequester.id,
+        ]),
+      );
     });
   });
 });
