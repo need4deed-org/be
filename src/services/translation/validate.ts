@@ -311,18 +311,16 @@ function rangeEndMatches(
   end: number,
   endClock: Clock,
   outputLang: Lang,
+  bareEndReadable: boolean,
 ): boolean {
   if (groups.end24 !== undefined) {
     return !endClock.meridiem && !endClock.oClock;
   }
   const h = end % 12 || 12;
-  if (endClock.meridiem || endClock.dayPart) {
+  if (endClock.meridiem || endClock.dayPart || endHasMinutes(groups)) {
     return clockMatches(h, end, endClock, outputLang);
   }
-  return (
-    h === end ||
-    (endHasMinutes(groups) && clockMatches(h, end, endClock, outputLang))
-  );
+  return h === end && bareEndReadable;
 }
 
 function borrowsEndMeridiem(
@@ -337,9 +335,13 @@ function borrowsEndMeridiem(
     return false;
   }
   if (endClock.dayPart || (!startClock.uhr && endClock.meridiem)) {
-    return sameHour(clockHour(h, endClock), start);
+    return sameHour(rangeStart(h, end, endClock), start);
   }
-  return !startClock.uhr && end > 12 && sameHour(hour24(h, "pm"), start);
+  return (
+    !startClock.uhr &&
+    end > 12 &&
+    sameHour(rangeStart(h, end, { meridiem: "pm" }), start)
+  );
 }
 
 function rangePresent(
@@ -349,6 +351,7 @@ function rangePresent(
   end: number,
   endMinutes: string,
   outputLang: Lang,
+  bareEndReadable: boolean,
 ): boolean {
   for (const h of hourVariants(start)) {
     for (const { groups = {} } of output.matchAll(
@@ -359,7 +362,7 @@ function rangePresent(
       const ownClock =
         startClock.meridiem || startClock.dayPart || sameHour(Number(h), start);
       if (
-        rangeEndMatches(groups, end, endClock, outputLang) &&
+        rangeEndMatches(groups, end, endClock, outputLang, bareEndReadable) &&
         (ownClock
           ? clockMatches(Number(h), start, startClock, outputLang)
           : borrowsEndMeridiem(
@@ -422,8 +425,20 @@ function missingToken(
     const start = rangeStart(Number(groups.hour), end, endClock);
     const startMinutes = groups.minutes || "00";
     const endMinutes = groups.endMinutes || "00";
+    const durationLike = !Object.values(endClock).some(Boolean);
+    // English readers take a bare 12-hour clock end as pm, unless it is noon.
+    const bareEndReadable =
+      durationLike || targetLang === Lang.DE || end === 12;
     if (
-      !rangePresent(output, start, startMinutes, end, endMinutes, targetLang)
+      !rangePresent(
+        output,
+        start,
+        startMinutes,
+        end,
+        endMinutes,
+        targetLang,
+        bareEndReadable,
+      )
     ) {
       return "time_missing";
     }
