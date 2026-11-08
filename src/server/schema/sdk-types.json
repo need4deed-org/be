@@ -1016,6 +1016,64 @@
       "required": ["opportunityId"],
       "additionalProperties": false
     },
+    "ApiVolunteerImportRow": {
+      "$id": "ApiVolunteerImportRow",
+      "type": "object",
+      "properties": {
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "postcode": { "type": "string" }
+      },
+      "required": ["firstName", "email", "postcode"],
+      "additionalProperties": false
+    },
+    "ApiVolunteerImportPost": {
+      "$id": "ApiVolunteerImportPost",
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 500,
+          "items": { "$ref": "ApiVolunteerImportRow#" }
+        },
+        "dryRun": { "type": "boolean" }
+      },
+      "required": ["rows"],
+      "additionalProperties": false
+    },
+    "ApiVolunteerImportRowResult": {
+      "$id": "ApiVolunteerImportRowResult",
+      "type": "object",
+      "properties": {
+        "row": { "type": "integer" },
+        "email": { "type": "string" },
+        "outcome": { "enum": ["created", "skipped", "invalid"] },
+        "skipReason": { "enum": ["already-volunteer", "duplicate-in-import"] },
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "volunteerId": { "type": "integer" }
+      },
+      "required": ["row", "email", "outcome"],
+      "additionalProperties": false
+    },
+    "ApiVolunteerImportResult": {
+      "$id": "ApiVolunteerImportResult",
+      "type": "object",
+      "properties": {
+        "dryRun": { "type": "boolean" },
+        "created": { "type": "integer" },
+        "skipped": { "type": "integer" },
+        "invalid": { "type": "integer" },
+        "rows": {
+          "type": "array",
+          "items": { "$ref": "ApiVolunteerImportRowResult#" }
+        }
+      },
+      "required": ["dryRun", "created", "skipped", "invalid", "rows"],
+      "additionalProperties": false
+    },
     "ApiVolunteerOpportunityPost": {
       "$id": "ApiVolunteerOpportunityPost",
       "type": "object",
