@@ -50,7 +50,7 @@ function sourceTimePatterns(lang: Lang) {
       "giu",
     ),
     hourRange: new RegExp(
-      `(?<![.:,\\d])\\b(?<hour>\\d{1,2})(?:[.:](?<minutes>\\d{2}))?(?![.:,]\\d)\\s*${RANGE_CONNECTOR}\\s*(?<endHour>\\d{1,2})(?:[.:](?<endMinutes>\\d{2}))?(?:\\s*h\\b|${clockSuffix(lang, "end", true)})`,
+      `(?<![.:,\\d])\\b(?<hour>\\d{1,2})(?:[.:](?<minutes>\\d{2}))?(?![.:,]\\d)(?:\\s*h\\b)?\\s*${RANGE_CONNECTOR}\\s*(?<endHour>\\d{1,2})(?:[.:](?<endMinutes>\\d{2}))?(?:\\s*h\\b|${clockSuffix(lang, "end", true)})`,
       "giu",
     ),
   };
@@ -116,10 +116,9 @@ type Clock = {
   oClock?: string;
 };
 
-function toClock(
-  groups: Record<string, string | undefined> = {},
-  prefix = "",
-): Clock {
+type Groups = Record<string, string | undefined>;
+
+function toClock(groups: Groups = {}, prefix = ""): Clock {
   const group = (name: string) => groups[groupName(prefix, name)];
   return {
     meridiem: group("meridiem"),
@@ -303,8 +302,6 @@ function rangePattern(
   });
 }
 
-type Groups = Record<string, string | undefined>;
-
 function endHasMinutes(groups: Groups): boolean {
   return /[.:]/.test(groups.end12 ?? groups.end24 ?? "");
 }
@@ -329,29 +326,20 @@ function rangeEndMatches(
 }
 
 function borrowsEndMeridiem(
-  groups: Groups,
+  h: number,
+  start: number,
   end: number,
+  groups: Groups,
   startClock: Clock,
   endClock: Clock,
-  outputLang: Lang,
 ): boolean {
   if (groups.end12 === undefined) {
     return false;
   }
-  if (endClock.dayPart) {
-    return true;
+  if (endClock.dayPart || (!startClock.uhr && endClock.meridiem)) {
+    return sameHour(clockHour(h, endClock), start);
   }
-  if (startClock.uhr) {
-    return false;
-  }
-  return (
-    Boolean(endClock.meridiem) ||
-    (outputLang === Lang.EN &&
-      end > 12 &&
-      !endClock.uhr &&
-      !endClock.oClock &&
-      endHasMinutes(groups))
-  );
+  return !startClock.uhr && end > 12 && sameHour(hour24(h, "pm"), start);
 }
 
 function rangePresent(
@@ -374,7 +362,14 @@ function rangePresent(
         rangeEndMatches(groups, end, endClock, outputLang) &&
         (ownClock
           ? clockMatches(Number(h), start, startClock, outputLang)
-          : borrowsEndMeridiem(groups, end, startClock, endClock, outputLang))
+          : borrowsEndMeridiem(
+              Number(h),
+              start,
+              end,
+              groups,
+              startClock,
+              endClock,
+            ))
       ) {
         return true;
       }
