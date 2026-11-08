@@ -27,7 +27,35 @@ const MERIDIEMS: Record<Lang, string> = {
 const DAY_PART =
   "morgens|früh|vormittags|mittags|nachmittags|abends|nachts|am\\s+(?:morgen|vormittag|mittag|nachmittag|abend)|in\\s+der\\s+nacht";
 const H_HOUR = /\b(\d{1,2})\s*h\b/gi;
-const REPEAT_COUNT = /\b(\d{1,2})\s*[x×](?![\p{L}\d])/giu;
+const PERIOD_OF: Record<string, string> = {
+  tag: "day",
+  täglich: "day",
+  day: "day",
+  daily: "day",
+  woche: "week",
+  wöchentlich: "week",
+  week: "week",
+  weekly: "week",
+  monat: "month",
+  monatlich: "month",
+  month: "month",
+  monthly: "month",
+  jahr: "year",
+  jährlich: "year",
+  year: "year",
+  yearly: "year",
+  annually: "year",
+};
+const PERIOD_ADVERBS: Record<string, string[]> = {
+  day: ["daily", "täglich"],
+  week: ["weekly", "wöchentlich"],
+  month: ["monthly", "monatlich"],
+  year: ["yearly", "annually", "jährlich"],
+};
+const REPEAT_COUNT = new RegExp(
+  `(?<![.,\\d])\\b(?<count>\\d{1,2})\\s*[x×](?![\\p{L}\\d])(?!\\s*\\d)(?:\\s+(?:(?:pro|im|in\\s+der|a|per|each|every)\\s+)?(?<period>${Object.keys(PERIOD_OF).join("|")})(?!\\p{L}))?`,
+  "giu",
+);
 const RANGE_CONNECTOR = "(?:-|–|—|bis|und|oder|to|until|till|and|or)(?!\\p{L})";
 
 function groupName(prefix: string, group: string): string {
@@ -90,7 +118,7 @@ const NUMBER_WORDS: Record<number, string[]> = {
 const REPEAT_WORDS: Record<number, string[]> = {
   1: ["once", "einmal"],
   2: ["twice", "zweimal"],
-  3: ["dreimal"],
+  3: ["thrice", "dreimal"],
   4: ["viermal"],
   5: ["fünfmal"],
   6: ["sechsmal"],
@@ -269,10 +297,20 @@ function numberPresent(output: string, value: number): boolean {
   );
 }
 
-function repeatPresent(output: string, count: number): boolean {
+function repeatPresent(
+  output: string,
+  count: number,
+  period?: string,
+): boolean {
+  const adverbs =
+    count === 1 && period
+      ? PERIOD_ADVERBS[PERIOD_OF[period.toLowerCase()]]
+      : [];
   return (
     numberPresent(output, count) ||
-    (REPEAT_WORDS[count] ?? []).some((word) => hasWord(output, word))
+    [...(REPEAT_WORDS[count] ?? []), ...adverbs].some((word) =>
+      hasWord(output, word),
+    )
   );
 }
 
@@ -488,8 +526,8 @@ function missingToken(
     }
   }
   rest = rest.replace(fullHour, " ");
-  for (const [, count] of rest.matchAll(REPEAT_COUNT)) {
-    if (!repeatPresent(output, Number(count))) {
+  for (const { groups = {} } of rest.matchAll(REPEAT_COUNT)) {
+    if (!repeatPresent(output, Number(groups.count), groups.period)) {
       return "number_missing";
     }
   }

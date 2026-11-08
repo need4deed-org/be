@@ -243,6 +243,13 @@ describe("validateTranslation", () => {
       ["Meeting 2x a week", "Treffen zweimal pro Woche", Lang.DE],
       ["Meeting 3x a week", "Treffen dreimal pro Woche", Lang.DE],
       ["Meeting 3x a week", "Treffen 3 Mal pro Woche", Lang.DE],
+      ["Treffen 3x pro Woche", "Meeting thrice a week", Lang.EN],
+      ["Sprachcafé 1x wöchentlich", "Language café weekly", Lang.EN],
+      ["Treffen 1x im Monat", "Meeting monthly", Lang.EN],
+      ["Meeting 1x a week", "Treffen wöchentlich", Lang.DE],
+      ["Raum 3 x 4 m groß", "Room 3 x 4 m in size", Lang.EN],
+      ["Erreichbar 24x7", "Available 24x7", Lang.EN],
+      ["Preis 1,5x so hoch", "Price 1.5x as high", Lang.EN],
     ] as const) {
       expectCode(source, output, target).toEqual({ status: "ok" });
     }
@@ -255,6 +262,10 @@ describe("validateTranslation", () => {
       ["Meeting 3x a week", "Treffen zweimal pro Woche", Lang.DE],
       ["Wir suchen 1 Person", "We are looking for someone once", Lang.EN],
       ["Wir suchen 2 Personen", "We are looking for people twice", Lang.EN],
+      ["Treffen 2x pro Woche", "Meeting weekly", Lang.EN],
+      ["Treffen 1x im Monat", "Meeting weekly", Lang.EN],
+      ["Treffen 1x", "Meeting weekly", Lang.EN],
+      ["Raum 3 x 4 m groß", "Room thrice 4 m in size", Lang.EN],
     ] as const) {
       expectCode(source, output, target).toMatchObject({
         code: "number_missing",
