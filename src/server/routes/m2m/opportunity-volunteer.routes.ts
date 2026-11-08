@@ -28,7 +28,11 @@ import { UNRESOLVED_PLACEHOLDER_RE } from "../../../services/notify/validate-ema
 import { errorName } from "../../../services/utils";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyMessage } from "../../types";
-import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
+import {
+  assertAgentCanSuggest,
+  isOwnersPendingSuggestion,
+} from "../../utils/data/assert-agent-can-suggest";
+import { agentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
@@ -283,19 +287,23 @@ async function assertCanChangeMatch(
     return;
   }
   const opportunity = await fastify.db.opportunityRepository.findOne({
-    select: { id: true, agentId: true },
+    relations: { agent: true },
+    select: {
+      id: true,
+      agentId: true,
+      agent: { id: true, engagementStatus: true },
+    },
     where: { id: ov.opportunityId },
   });
-  await assertAgentOwnsOpportunity(
-    request,
-    ov.opportunityId,
-    opportunity?.agentId,
-  );
-  const agent = await fastify.db.agentRepository.findOne({
-    select: { id: true, engagementStatus: true },
-    where: { id: opportunity?.agentId },
-  });
-  if (agent?.engagementStatus === AgentEngagementStatusType.INACTIVE) {
+  if (!(await agentOwnsOpportunity(request, opportunity?.agentId))) {
+    if (change === "remove" && (await isOwnersPendingSuggestion(request, ov))) {
+      return;
+    }
+    throw new NotFoundError(`Opportunity (id:${ov.opportunityId}) not found.`);
+  }
+  if (
+    opportunity?.agent?.engagementStatus === AgentEngagementStatusType.INACTIVE
+  ) {
     throw new UnauthorizedError("This NGO is inactive.");
   }
   const isAllowed =
@@ -321,7 +329,11 @@ export default async function m2mOpportunityVolunteerRoutes(
   }>(
     "/",
     {
-      preValidation: async (request) => assertCoordinator(request),
+      preValidation: async (request) => {
+        if (request.authUser?.role !== UserRole.AGENT) {
+          assertCoordinator(request);
+        }
+      },
       schema: {
         body: { $ref: "ApiVolunteerOpportunityPost#" },
         response: responseSchema({ statusCode: 201 }),
@@ -333,6 +345,10 @@ export default async function m2mOpportunityVolunteerRoutes(
 
       const { emailNote, ...body } = request.body;
       const { opportunityId, volunteerId } = body;
+
+      if (request.authUser?.role === UserRole.AGENT) {
+        await assertAgentCanSuggest(request, request.body);
+      }
 
       if (
         await opportunityVolunteerRepository.findOneBy({

@@ -1,10 +1,7 @@
 import { FastifyRequest } from "fastify";
-import {
-  AgentEngagementStatusType,
-  AgentMembershipStatus,
-  UserRole,
-} from "need4deed-sdk";
+import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
+import { getSharingPeerAgentIds } from "../data/live-sharing-agents";
 import { resolveCallerMask } from "./pre-serialization";
 import { CallerVisibility } from "./visible-persons";
 
@@ -28,23 +25,10 @@ export async function resolveVolunteerVisibility(
     return visibility;
   }
   withSharingOwners.add(visibility);
-  const sharing: { id: number }[] =
-    await request.server.db.agentRepository.manager.query(
-      `WITH live_sharing AS (
-         SELECT a.id FROM agent a
-          WHERE a.shares_volunteers
-            AND a.engagement_status <> $2
-            AND EXISTS (SELECT 1 FROM agent_person ap
-                         WHERE ap.agent_id = a.id AND ap.status = $3))
-       SELECT id FROM live_sharing
-        WHERE EXISTS (SELECT 1 FROM live_sharing own WHERE own.id = ANY($1))`,
-      [
-        [...visibility.agentIds],
-        AgentEngagementStatusType.INACTIVE,
-        AgentMembershipStatus.ACTIVE,
-      ],
-    );
-  sharing.forEach((a) => visibility.ownerAgentIds.add(Number(a.id)));
+  const sharing = await getSharingPeerAgentIds(request, [
+    ...visibility.agentIds,
+  ]);
+  sharing.forEach((id) => visibility.ownerAgentIds.add(id));
   return visibility;
 }
 
