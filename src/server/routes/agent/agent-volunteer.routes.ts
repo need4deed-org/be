@@ -1,16 +1,18 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { ApiVolunteerOpportunityGet } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
-import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
 import {
   assertAgentMemberOrStaffOr404,
   assertAgentVisible,
+  commuteFor,
+  loadCommuteRangesForCaller,
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
-import { makePiiSerialization } from "../../utils/pii/pre-serialization";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default function agentVolunteerRoutes(
   fastify: FastifyInstance,
@@ -18,7 +20,7 @@ export default function agentVolunteerRoutes(
 ) {
   fastify.get<{
     Params: ParamsId;
-    Reply: ReplyData<OpportunityVolunteer[]>;
+    Reply: ReplyData<ApiVolunteerOpportunityGet[]>;
   }>(
     "/",
     {
@@ -26,9 +28,6 @@ export default function agentVolunteerRoutes(
         params: idParamSchema,
         response: responseSchema("ApiOpportunityVolunteerGet#", true, false),
       },
-      preSerialization: makePiiSerialization(
-        opportunityOpportunityVolunteerDTO,
-      ),
     },
     async (request, reply) => {
       const { id } = request.params;
@@ -61,9 +60,22 @@ export default function agentVolunteerRoutes(
         maskVolunteerIdentities(volunteers);
       }
 
+      const commutes = await loadCommuteRangesForCaller(
+        request,
+        volunteers.map(({ volunteerId, opportunityId }) => ({
+          volunteerId,
+          opportunityId,
+          opportunityAgentId: id,
+        })),
+      );
+      await maskForCaller(request, volunteers);
+
       return reply.status(200).send({
         message: `Volunteers linked to agent (id:${id}) via its opportunities.`,
-        data: volunteers,
+        data: volunteers.map((volunteer) => ({
+          ...opportunityOpportunityVolunteerDTO(volunteer),
+          ...commuteFor(commutes, volunteer),
+        })),
       });
     },
   );
