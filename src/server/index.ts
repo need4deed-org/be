@@ -76,7 +76,9 @@ const decodeTrustProxyEnv = (
   return normalized;
 };
 
-export async function createServer(): Promise<FastifyInstance> {
+export async function createServer({
+  scheduler = !isTest,
+}: { scheduler?: boolean } = {}): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     pluginTimeout,
     querystringParser: (str) => qs.parse(str),
@@ -179,7 +181,7 @@ export async function createServer(): Promise<FastifyInstance> {
     });
   }
   await fastifyInstance.register(notifyPlugin);
-  if (!isTest) {
+  if (scheduler) {
     await fastifyInstance.register(schedulerDailyPlugin);
   }
   await fastifyInstance.register(translationPlugin);
