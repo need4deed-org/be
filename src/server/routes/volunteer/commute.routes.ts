@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerCommute, ApiVolunteerCommuteQuery } from "need4deed-sdk";
 import { In } from "typeorm";
-import { NotFoundError, UnauthorizedError } from "../../../config";
+import { NotFoundError } from "../../../config";
 import {
   idParamSchema,
   responseSchema,
@@ -56,13 +56,8 @@ export default function volunteerCommuteRoutes(
           opportunityAgentId: agentId,
         })),
       );
-      if (!commutes) {
-        throw new UnauthorizedError(
-          "Commutes are only available to coordinators, admins and NGOs.",
-        );
-      }
       const allowed = (opportunityId: number) =>
-        commutes.has(commutePairKey({ volunteerId, opportunityId }));
+        !!commutes?.has(commutePairKey({ volunteerId, opportunityId }));
 
       return reply.status(200).send({
         message: `Commutes for volunteer (id:${volunteerId}).`,

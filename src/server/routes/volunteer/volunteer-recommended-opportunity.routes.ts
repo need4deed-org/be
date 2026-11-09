@@ -16,7 +16,11 @@ import {
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { andIntoWhere, commuteOf, loadCommuteRanges } from "../../utils";
+import {
+  andIntoWhere,
+  commuteOf,
+  loadCommuteRangesForCaller,
+} from "../../utils";
 import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import {
   dtoOpportunityListForCaller,
@@ -109,10 +113,12 @@ export default function volunteerRecommendedOpportunityRoutes(
         requestLanguage(request.query),
       );
 
-      const commutes = await loadCommuteRanges(
-        data.map(({ id: opportunityId }) => ({
+      const commutes = await loadCommuteRangesForCaller(
+        request,
+        recommended.map(({ id: opportunityId, agentId }) => ({
           volunteerId: id,
-          opportunityId: Number(opportunityId),
+          opportunityId,
+          opportunityAgentId: agentId,
         })),
       );
 
