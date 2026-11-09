@@ -17,6 +17,7 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
+import { commuteFor, loadCommuteRangesForCaller } from "../../utils";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 import {
   requestLanguage,
@@ -67,13 +68,26 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      await translateOpportunities(
-        fastify,
-        opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
-        requestLanguage(request.query),
-      );
+      const [, commutes] = await Promise.all([
+        translateOpportunities(
+          fastify,
+          opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
+          requestLanguage(request.query),
+        ),
+        loadCommuteRangesForCaller(
+          request,
+          opportunities.map(({ volunteerId, opportunityId, opportunity }) => ({
+            volunteerId,
+            opportunityId,
+            opportunityAgentId: opportunity?.agentId,
+          })),
+        ),
+      ]);
       await maskForCaller(request, opportunities);
-      const data = opportunities.map(volunteerOpportunityVolunteerDTO);
+      const data = opportunities.map((opportunity) => ({
+        ...volunteerOpportunityVolunteerDTO(opportunity),
+        ...commuteFor(commutes, opportunity),
+      }));
 
       return reply.status(200).send({
         message: `Opportunities for volunteer id:${volunteerId}.`,

@@ -1,17 +1,18 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { ApiVolunteerOpportunityGet, UserRole } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
-import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import {
   assertAgentOwnsOpportunity,
   assertOwnedVolunteerSeesOpportunity,
+  commuteFor,
+  loadCommuteRangesForCaller,
   maskVolunteerIdentities,
   resolveOwnedVolunteerScope,
   shouldMaskInactiveAgentData,
 } from "../../utils";
-import { makePiiSerialization } from "../../utils/pii/pre-serialization";
+import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";
 
@@ -21,7 +22,7 @@ export default function opportunityOpportunityVolunteerRoutes(
 ) {
   fastify.get<{
     Params: { id: number };
-    Reply: { message: string; data: OpportunityVolunteer[] };
+    Reply: { message: string; data: ApiVolunteerOpportunityGet[] };
   }>(
     "/",
     {
@@ -29,9 +30,6 @@ export default function opportunityOpportunityVolunteerRoutes(
         params: idParamSchema,
         response: responseSchema("ApiOpportunityVolunteerGet#", true, false),
       },
-      preSerialization: makePiiSerialization(
-        opportunityOpportunityVolunteerDTO,
-      ),
     },
     async (request, reply) => {
       const opportunityId = request.params.id;
@@ -85,9 +83,22 @@ export default function opportunityOpportunityVolunteerRoutes(
         maskVolunteerIdentities(volunteers);
       }
 
+      const commutes = await loadCommuteRangesForCaller(
+        request,
+        volunteers.map(({ volunteerId, opportunityId, opportunity }) => ({
+          volunteerId,
+          opportunityId,
+          opportunityAgentId: opportunity?.agentId,
+        })),
+      );
+      await maskForCaller(request, volunteers);
+
       return reply.status(200).send({
         message: `Volunteers for opportunity id:${opportunityId}.`,
-        data: volunteers,
+        data: volunteers.map((volunteer) => ({
+          ...opportunityOpportunityVolunteerDTO(volunteer),
+          ...commuteFor(commutes, volunteer),
+        })),
       });
     },
   );

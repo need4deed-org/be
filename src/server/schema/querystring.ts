@@ -34,6 +34,20 @@ export const recommendedOpportunitiesQuerySchema = {
   additionalProperties: false,
 };
 
+export const volunteerCommuteQuerySchema = {
+  type: "object",
+  properties: {
+    opportunity: {
+      type: "array",
+      items: { type: "integer", minimum: 1 },
+      minItems: 1,
+      maxItems: 20,
+    },
+  },
+  required: ["opportunity"],
+  additionalProperties: false,
+};
+
 export const paginationQuerySchema = {
   type: "object",
   properties: paginationProps,

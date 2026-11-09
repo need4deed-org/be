@@ -9,6 +9,7 @@ export * from "./assert-agent-owns-opportunity";
 export * from "./assert-agent-visible";
 export * from "./assert-communication-author";
 export * from "./assert-email-available";
+export * from "./commute-range";
 export * from "./commute-where";
 export * from "./create-agent-contact";
 export * from "./ensure-domain-organization";

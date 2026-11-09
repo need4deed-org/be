@@ -5,6 +5,7 @@ export const RoutePrefix = {
   APPRECIATION: "/appreciation",
   COMMENT: "/comment",
   COMMUNICATION: "/communication",
+  COMMUTE: "/commute",
   CONTACT: "/contact",
   DISTRICT_GEOMETRY: "/district-geometry",
   DOC: "/doc",

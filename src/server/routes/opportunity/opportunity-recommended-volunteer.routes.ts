@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiRecommendedMatchesQuery,
-  ApiVolunteerGetList,
+  ApiRecommendedVolunteer,
   OpportunityStatusType,
   UserRole,
   VolunteerStateEngagementType,
@@ -20,7 +20,9 @@ import {
   andIntoWhere,
   assertAgentOwnsOpportunity,
   assertRoleIn,
+  commuteOf,
   getVolunteerWhere,
+  loadCommuteRangesForCaller,
 } from "../../utils";
 import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import { orderByIds } from "../../utils/data/order-by-ids";
@@ -44,14 +46,14 @@ export default function opportunityRecommendedVolunteerRoutes(
   fastify.get<{
     Params: ParamsId;
     Querystring: Required<ApiRecommendedMatchesQuery>;
-    Reply: ReplyData<ApiVolunteerGetList[]>;
+    Reply: ReplyData<ApiRecommendedVolunteer[]>;
   }>(
     "/",
     {
       schema: {
         params: idParamSchema,
         querystring: recommendedVolunteersQuerySchema,
-        response: responseSchema("volunteer-api#", true, false),
+        response: responseSchema("ApiRecommendedVolunteer#", true, false),
       },
     },
     async (request, reply) => {
@@ -131,9 +133,27 @@ export default function opportunityRecommendedVolunteerRoutes(
         maskPii(recommended, visibility);
       }
 
+      const commutes = await loadCommuteRangesForCaller(
+        request,
+        recommended.map(({ id: volunteerId }) => ({
+          volunteerId,
+          opportunityId: id,
+          opportunityAgentId: opportunity.agentId,
+        })),
+      );
+
       return reply.status(200).send({
         message,
-        data: recommended.map(volunteerListSerializer).filter(Boolean),
+        data: recommended
+          .map(volunteerListSerializer)
+          .filter(Boolean)
+          .map((volunteer) => ({
+            ...volunteer,
+            commute: commuteOf(commutes, {
+              volunteerId: Number(volunteer.id),
+              opportunityId: id,
+            }),
+          })),
       });
     },
   );
