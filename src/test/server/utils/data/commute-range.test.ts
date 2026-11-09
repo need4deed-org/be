@@ -52,6 +52,12 @@ describe("loadCommuteRanges", () => {
     ]);
   });
 
+  it("treats a pair in the same postcode as 0 to 5 minutes", async () => {
+    const pairs = [pair("commuter", "ownHome")];
+    const ranges = await loadCommuteRanges(pairs);
+    expect(ranges.get(commutePairKey(pairs[0]))).toEqual({ min: 0, max: 5 });
+  });
+
   it.each([
     ["the volunteer has no postcode", "nowhere", "ownWork"],
     ["the opportunity has no postcode", "commuter", "ownNoPostcode"],

@@ -517,7 +517,7 @@ describe("recommended matches (be#1184)", () => {
     });
 
     it.each(["coordinator", "agent"] as const)(
-      "carries the commute for each volunteer to a %s, null without travel time",
+      "carries the commute for each volunteer to a %s, 0 to 5 minutes in the same postcode",
       async (as) => {
         const res = await recommend("regular", as);
         expect(res.statusCode).toBe(200);
@@ -527,7 +527,9 @@ describe("recommended matches (be#1184)", () => {
         const ourIds = new Set(Object.values(volunteers).map(({ id }) => id));
         data
           .filter(({ id }) => ourIds.has(id))
-          .forEach(({ commute }) => expect(commute).toBeNull());
+          .forEach(({ commute }) =>
+            expect(commute).toEqual({ min: 0, max: 5 }),
+          );
       },
     );
 

@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { AgentEngagementStatusType } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import { createServer } from "../../../server";
@@ -68,6 +69,25 @@ describe("commute range on volunteer-opportunity pairs", () => {
       expect(
         commuteByVolunteer(res.json().data)[f.volunteers.commuter.id],
       ).toEqual(RANGE_27);
+    });
+
+    it("hides the commute from an NGO whose agent is inactive", async () => {
+      await fastify.db.agentRepository.update(f.agent.id, {
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+      });
+      try {
+        for (const path of [url(), `/agent/${f.agent.id}/volunteer-linked`]) {
+          const res = await f.get("agent", path);
+          expect(res.statusCode).toBe(200);
+          const rows: PairRow[] = res.json().data;
+          expect(rows.length).toBeGreaterThan(0);
+          rows.forEach((row) => expect(row).not.toHaveProperty("commute"));
+        }
+      } finally {
+        await fastify.db.agentRepository.update(f.agent.id, {
+          engagementStatus: AgentEngagementStatusType.ACTIVE,
+        });
+      }
     });
 
     it("does not show a volunteer any commute", async () => {
@@ -223,6 +243,17 @@ describe("commute range on volunteer-opportunity pairs", () => {
         `/volunteer/999999999/commute?opportunity=${f.opportunities.ownWork.id}`,
       );
       expect(res.statusCode).toBe(404);
+    });
+
+    it("caps the number of opportunities at 20", async () => {
+      const res = await f.get(
+        "coordinator",
+        url(
+          "commuter",
+          Array.from({ length: 21 }, (_, i) => i + 1),
+        ),
+      );
+      expect(res.statusCode).toBe(400);
     });
 
     it.each([

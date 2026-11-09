@@ -10,8 +10,8 @@ import {
 import { ParamsId, ReplyData } from "../../types";
 import {
   commuteOf,
-  loadCommuteRanges,
-  resolveCommuteAccess,
+  commutePairKey,
+  loadCommuteRangesForCaller,
 } from "../../utils";
 
 export default function volunteerCommuteRoutes(
@@ -32,12 +32,6 @@ export default function volunteerCommuteRoutes(
       },
     },
     async (request, reply) => {
-      const access = await resolveCommuteAccess(request);
-      if (!access) {
-        throw new UnauthorizedError(
-          "Commutes are only available to coordinators, admins and NGOs.",
-        );
-      }
       const { id: volunteerId } = request.params;
       if (
         !(await fastify.db.volunteerRepository.existsBy({ id: volunteerId }))
@@ -52,25 +46,28 @@ export default function volunteerCommuteRoutes(
         where: { id: In(requestedIds) },
         select: { id: true, agentId: true },
       });
-      const allowedIds = new Set(
-        opportunities
-          .filter(({ agentId }) => access(agentId))
-          .map(({ id }) => id),
+      const commutes = await loadCommuteRangesForCaller(
+        request,
+        opportunities.map(({ id: opportunityId, agentId }) => ({
+          volunteerId,
+          opportunityId,
+          opportunityAgentId: agentId,
+        })),
       );
-      const pairs = [...allowedIds].map((opportunityId) => ({
-        volunteerId,
-        opportunityId,
-      }));
-      const commutes = await loadCommuteRanges(pairs);
+      if (!commutes) {
+        throw new UnauthorizedError(
+          "Commutes are only available to coordinators, admins and NGOs.",
+        );
+      }
+      const allowed = (opportunityId: number) =>
+        commutes.has(commutePairKey({ volunteerId, opportunityId }));
 
       return reply.status(200).send({
         message: `Commutes for volunteer (id:${volunteerId}).`,
-        data: requestedIds
-          .filter((opportunityId) => allowedIds.has(opportunityId))
-          .map((opportunityId) => ({
-            opportunityId,
-            commute: commuteOf(commutes, { volunteerId, opportunityId }),
-          })),
+        data: requestedIds.filter(allowed).map((opportunityId) => ({
+          opportunityId,
+          commute: commuteOf(commutes, { volunteerId, opportunityId }),
+        })),
       });
     },
   );

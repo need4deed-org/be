@@ -56,18 +56,21 @@ export default function agentVolunteerRoutes(
         ],
       });
 
-      if (shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
+      const masked = shouldMaskInactiveAgentData(agent, request.authUser?.role);
+      if (masked) {
         maskVolunteerIdentities(volunteers);
       }
 
-      const commutes = await loadCommuteRangesForCaller(
-        request,
-        volunteers.map(({ volunteerId, opportunityId }) => ({
-          volunteerId,
-          opportunityId,
-          opportunityAgentId: id,
-        })),
-      );
+      const commutes = masked
+        ? null
+        : await loadCommuteRangesForCaller(
+            request,
+            volunteers.map(({ volunteerId, opportunityId }) => ({
+              volunteerId,
+              opportunityId,
+              opportunityAgentId: id,
+            })),
+          );
       await maskForCaller(request, volunteers);
 
       return reply.status(200).send({

@@ -34,7 +34,7 @@ export async function loadCommuteRanges(
     return ranges;
   }
   const rows = await dataSource.query<
-    { volunteerId: number; opportunityId: number; minutes: number }[]
+    { volunteerId: number; opportunityId: number; minutes: number | null }[]
   >(
     `WITH pair AS (
        SELECT DISTINCT volunteer_id, opportunity_id
@@ -52,11 +52,12 @@ export async function loadCommuteRanges(
      )
      SELECT pair.volunteer_id AS "volunteerId",
             pair.opportunity_id AS "opportunityId",
-            pc.minutes
+            CASE WHEN vp.postcode_id = op.postcode_id THEN 0
+                 ELSE pc.minutes END AS minutes
        FROM pair
        JOIN volunteer_postcode vp ON vp.id = pair.volunteer_id
        JOIN opportunity_postcode op ON op.id = pair.opportunity_id
-       JOIN postcode_commute pc
+       LEFT JOIN postcode_commute pc
          ON pc.from_postcode_id = vp.postcode_id
         AND pc.to_postcode_id = op.postcode_id`,
     [
@@ -70,11 +71,9 @@ export async function loadCommuteRanges(
   return ranges;
 }
 
-export type CommuteAccess = (
-  opportunityAgentId: number | null | undefined,
-) => boolean;
+type CommuteAccess = (opportunityAgentId: number | null | undefined) => boolean;
 
-export async function resolveCommuteAccess(
+async function resolveCommuteAccess(
   request: FastifyRequest,
 ): Promise<CommuteAccess | null> {
   const role = request.authUser?.role;

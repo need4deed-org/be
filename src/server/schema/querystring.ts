@@ -41,7 +41,7 @@ export const volunteerCommuteQuerySchema = {
       type: "array",
       items: { type: "integer", minimum: 1 },
       minItems: 1,
-      maxItems: 100,
+      maxItems: 20,
     },
   },
   required: ["opportunity"],

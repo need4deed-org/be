@@ -36,6 +36,7 @@ export type CommuteVolunteerKey =
   | "noCommute"
   | "owned";
 export type CommuteOpportunityKey =
+  | "ownHome"
   | "ownWork"
   | "ownOther"
   | "ownNoPostcode"
@@ -64,6 +65,7 @@ const OPPORTUNITY_PLACE: Record<
   CommuteOpportunityKey,
   { deal: PostcodeKey | null; foreign?: boolean }
 > = {
+  ownHome: { deal: "home" },
   ownWork: { deal: "work" },
   ownOther: { deal: "workOther" },
   ownNoPostcode: { deal: null },

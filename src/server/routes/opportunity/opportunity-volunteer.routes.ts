@@ -79,18 +79,22 @@ export default function opportunityOpportunityVolunteerRoutes(
       });
 
       const agent = volunteers[0]?.opportunity?.agent;
-      if (agent && shouldMaskInactiveAgentData(agent, request.authUser?.role)) {
+      const masked =
+        !!agent && shouldMaskInactiveAgentData(agent, request.authUser?.role);
+      if (masked) {
         maskVolunteerIdentities(volunteers);
       }
 
-      const commutes = await loadCommuteRangesForCaller(
-        request,
-        volunteers.map(({ volunteerId, opportunityId, opportunity }) => ({
-          volunteerId,
-          opportunityId,
-          opportunityAgentId: opportunity?.agentId,
-        })),
-      );
+      const commutes = masked
+        ? null
+        : await loadCommuteRangesForCaller(
+            request,
+            volunteers.map(({ volunteerId, opportunityId, opportunity }) => ({
+              volunteerId,
+              opportunityId,
+              opportunityAgentId: opportunity?.agentId,
+            })),
+          );
       await maskForCaller(request, volunteers);
 
       return reply.status(200).send({
