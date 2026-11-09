@@ -70,29 +70,36 @@ export async function loadCommuteRanges(
   return ranges;
 }
 
-export async function loadCommuteRangesForCaller(
+export type CommuteAccess = (
+  opportunityAgentId: number | null | undefined,
+) => boolean;
+
+export async function resolveCommuteAccess(
   request: FastifyRequest,
-  pairs: OpportunityCommutePair[],
-): Promise<CommuteRanges | null> {
+): Promise<CommuteAccess | null> {
   const role = request.authUser?.role;
   if (isStaffRole(role)) {
-    return loadCommuteRanges(pairs);
+    return () => true;
   }
   if (role !== UserRole.AGENT) {
     return null;
   }
-  const visibility = await resolveCallerMask(request);
-  const ranges = await loadCommuteRanges(
-    pairs.filter(
-      ({ opportunityAgentId }) =>
-        !!opportunityAgentId && !!visibility?.agentIds.has(opportunityAgentId),
-    ),
+  const agentIds = (await resolveCallerMask(request))?.agentIds;
+  return (opportunityAgentId) =>
+    !!opportunityAgentId && !!agentIds?.has(opportunityAgentId);
+}
+
+export async function loadCommuteRangesForCaller(
+  request: FastifyRequest,
+  pairs: OpportunityCommutePair[],
+): Promise<CommuteRanges | null> {
+  const access = await resolveCommuteAccess(request);
+  if (!access) {
+    return null;
+  }
+  return loadCommuteRanges(
+    pairs.filter(({ opportunityAgentId }) => access(opportunityAgentId)),
   );
-  pairs.forEach((pair) => {
-    const key = commutePairKey(pair);
-    ranges.set(key, ranges.get(key) ?? null);
-  });
-  return ranges;
 }
 
 export function commuteOf(

@@ -85,6 +85,7 @@ import { volunteerDistrictRoutes } from "../district-map.routes";
 import volunteerAppreciationRoutes from "./appreciation.routes";
 import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
+import volunteerCommuteRoutes from "./commute.routes";
 import volunteerDocRoutes from "./doc.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -129,6 +130,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerRecommendedOpportunityRoutes, {
     prefix: `/:id${RoutePrefix.RECOMMENDED_OPPORTUNITIES}`,
+  });
+
+  await fastify.register(volunteerCommuteRoutes, {
+    prefix: `/:id${RoutePrefix.COMMUTE}`,
   });
 
   await fastify.register(volunteerCommunicationRoutes, {

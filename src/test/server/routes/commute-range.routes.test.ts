@@ -147,4 +147,107 @@ describe("commute range on volunteer-opportunity pairs", () => {
       expect(await countCommuteQueries(() => f.get("agent", url()))).toBe(1);
     });
   });
+
+  describe("GET /volunteer/:id/commute", () => {
+    const url = (
+      volunteer: keyof CommutePairsFixture["volunteers"],
+      opportunityIds: number[],
+    ) =>
+      `/volunteer/${f.volunteers[volunteer].id}/commute?${opportunityIds
+        .map((id) => `opportunity=${id}`)
+        .join("&")}`;
+
+    it("gives a coordinator the range per requested opportunity, in order", async () => {
+      const res = await f.get(
+        "coordinator",
+        url("commuter", [
+          f.opportunities.foreignWork.id,
+          f.opportunities.ownOther.id,
+          f.opportunities.ownNoPostcode.id,
+          f.opportunities.ownOther.id,
+          999999999,
+        ]),
+      );
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([
+        { opportunityId: f.opportunities.foreignWork.id, commute: RANGE_27 },
+        { opportunityId: f.opportunities.ownOther.id, commute: RANGE_30 },
+        { opportunityId: f.opportunities.ownNoPostcode.id, commute: null },
+      ]);
+    });
+
+    it("accepts a single opportunity", async () => {
+      const res = await f.get(
+        "agent",
+        url("dealOnly", [f.opportunities.ownWork.id]),
+      );
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([
+        { opportunityId: f.opportunities.ownWork.id, commute: RANGE_27 },
+      ]);
+    });
+
+    it("leaves out another NGO's opportunities for an NGO user", async () => {
+      const res = await f.get(
+        "agent",
+        url("commuter", [
+          f.opportunities.ownWork.id,
+          f.opportunities.foreignWork.id,
+        ]),
+      );
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toEqual([
+        { opportunityId: f.opportunities.ownWork.id, commute: RANGE_27 },
+      ]);
+    });
+
+    it("hides a volunteer the NGO cannot see", async () => {
+      const res = await f.get(
+        "otherAgent",
+        url("owned", [f.opportunities.foreignWork.id]),
+      );
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("is not available to volunteers", async () => {
+      const res = await f.get(
+        "owned",
+        url("owned", [f.opportunities.ownWork.id]),
+      );
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("404s for an unknown volunteer", async () => {
+      const res = await f.get(
+        "coordinator",
+        `/volunteer/999999999/commute?opportunity=${f.opportunities.ownWork.id}`,
+      );
+      expect(res.statusCode).toBe(404);
+    });
+
+    it.each([
+      ["no opportunity", ""],
+      ["a non-numeric opportunity", "?opportunity=abc"],
+    ])("rejects %s with 400", async (_, query) => {
+      const res = await f.get(
+        "coordinator",
+        `/volunteer/${f.volunteers.commuter.id}/commute${query}`,
+      );
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("looks the ranges up in a single query", async () => {
+      expect(
+        await countCommuteQueries(() =>
+          f.get(
+            "coordinator",
+            url(
+              "commuter",
+              Object.values(f.opportunities).map(({ id }) => id),
+            ),
+          ),
+        ),
+      ).toBe(1);
+    });
+  });
 });
