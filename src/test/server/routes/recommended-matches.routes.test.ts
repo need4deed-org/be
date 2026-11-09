@@ -9,6 +9,7 @@ import {
   OpportunityType,
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
+  toCommuteRange,
   UserRole,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
@@ -17,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import PostcodeCommute from "../../../data/entity/location/postcode-commute.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
@@ -69,6 +71,8 @@ describe("recommended matches (be#1184)", () => {
   const accompanyings: Accompanying[] = [];
   const onetimers: Onetimer[] = [];
   const cookies = {} as Record<Caller, string>;
+  let appointmentCommute: PostcodeCommute | null = null;
+  let insertedAppointmentCommute = false;
 
   const get = (url: string, as: Caller) =>
     fastify.inject({
@@ -245,6 +249,21 @@ describe("recommended matches (be#1184)", () => {
     postcodeId = (
       await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
     ).id;
+    if (postcodeId !== appointmentPostcode.id) {
+      const commuteRepository = getRepository(dataSource, PostcodeCommute);
+      const pair = {
+        fromPostcodeId: postcodeId,
+        toPostcodeId: appointmentPostcode.id,
+      };
+      const inserted = await commuteRepository
+        .createQueryBuilder()
+        .insert()
+        .values(new PostcodeCommute({ ...pair, minutes: 42 }))
+        .orIgnore()
+        .execute();
+      insertedAppointmentCommute = inserted.identifiers.some(Boolean);
+      appointmentCommute = await commuteRepository.findOneBy(pair);
+    }
     const languages = await fastify.db.languageRepository.find({
       where: { isoCode: In([...RARE_LANGUAGES, "de"]) },
     });
@@ -385,6 +404,12 @@ describe("recommended matches (be#1184)", () => {
   });
 
   afterAll(async () => {
+    if (insertedAppointmentCommute && appointmentCommute) {
+      await getRepository(dataSource, PostcodeCommute).delete({
+        fromPostcodeId: appointmentCommute.fromPostcodeId,
+        toPostcodeId: appointmentCommute.toPostcodeId,
+      });
+    }
     await fastify.db.opportunityVolunteerRepository.delete({
       id: In(links.map(({ id }) => id)),
     });
@@ -491,6 +516,21 @@ describe("recommended matches (be#1184)", () => {
       expect(res.json().data).toEqual([]);
     });
 
+    it.each(["coordinator", "agent"] as const)(
+      "carries the commute for each volunteer to a %s, null without travel time",
+      async (as) => {
+        const res = await recommend("regular", as);
+        expect(res.statusCode).toBe(200);
+        const data: { id: number; commute: unknown }[] = res.json().data;
+        expect(data.length).toBeGreaterThan(0);
+        data.forEach((row) => expect(row).toHaveProperty("commute"));
+        const ourIds = new Set(Object.values(volunteers).map(({ id }) => id));
+        data
+          .filter(({ id }) => ourIds.has(id))
+          .forEach(({ commute }) => expect(commute).toBeNull());
+      },
+    );
+
     it("hides another NGO's opportunity from an NGO user", async () => {
       const res = await recommend("otherAgents", "agent");
       expect(res.statusCode).toBe(404);
@@ -526,6 +566,17 @@ describe("recommended matches (be#1184)", () => {
         );
       expect(item.postcode).toBe(appointmentPostcode.value);
       expect(item.district.id).toBe(districtId);
+    });
+
+    it("carries the commute to each opportunity", async () => {
+      const res = await recommend("accompanyingOnly", "coordinator");
+      expect(res.statusCode).toBe(200);
+      const data: { id: number; commute: unknown }[] = res.json().data;
+      data.forEach((row) => expect(row).toHaveProperty("commute"));
+      const item = data.find(({ id }) => id === opportunities.accompanying.id);
+      expect(item?.commute).toEqual(
+        toCommuteRange(appointmentCommute?.minutes),
+      );
     });
 
     it("skips events that are already over", async () => {

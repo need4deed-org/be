@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
-  ApiOpportunityGetList,
   ApiRecommendedMatchesQuery,
+  ApiRecommendedOpportunity,
   OpportunityStatusType,
   UserRole,
   VolunteerStateEngagementType,
@@ -16,7 +16,7 @@ import {
   responseSchema,
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
-import { andIntoWhere } from "../../utils";
+import { andIntoWhere, commuteOf, loadCommuteRanges } from "../../utils";
 import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import {
   dtoOpportunityListForCaller,
@@ -39,7 +39,7 @@ export default function volunteerRecommendedOpportunityRoutes(
   fastify.get<{
     Params: ParamsId;
     Querystring: Required<ApiRecommendedMatchesQuery> & { language?: string };
-    Reply: ReplyData<ApiOpportunityGetList[]>;
+    Reply: ReplyData<ApiRecommendedOpportunity[]>;
   }>(
     "/",
     {
@@ -47,7 +47,7 @@ export default function volunteerRecommendedOpportunityRoutes(
       schema: {
         params: idParamSchema,
         querystring: recommendedOpportunitiesQuerySchema,
-        response: responseSchema("ApiOpportunityGetList#", true, false),
+        response: responseSchema("ApiRecommendedOpportunity#", true, false),
       },
     },
     async (request, reply) => {
@@ -109,9 +109,22 @@ export default function volunteerRecommendedOpportunityRoutes(
         requestLanguage(request.query),
       );
 
+      const commutes = await loadCommuteRanges(
+        data.map(({ id: opportunityId }) => ({
+          volunteerId: id,
+          opportunityId: Number(opportunityId),
+        })),
+      );
+
       return reply.status(200).send({
         message,
-        data,
+        data: data.map((opportunity) => ({
+          ...opportunity,
+          commute: commuteOf(commutes, {
+            volunteerId: id,
+            opportunityId: Number(opportunity.id),
+          }),
+        })),
       });
     },
   );

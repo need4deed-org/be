@@ -95,9 +95,16 @@ export async function loadCommuteRangesForCaller(
   return ranges;
 }
 
+export function commuteOf(
+  ranges: CommuteRanges | null,
+  pair: CommutePair,
+): ApiCommuteRange | null {
+  return ranges?.get(commutePairKey(pair)) ?? null;
+}
+
 export function commuteFor(
   ranges: CommuteRanges | null,
   pair: CommutePair,
 ): { commute?: ApiCommuteRange | null } {
-  return ranges ? { commute: ranges.get(commutePairKey(pair)) ?? null } : {};
+  return ranges ? { commute: commuteOf(ranges, pair) } : {};
 }
