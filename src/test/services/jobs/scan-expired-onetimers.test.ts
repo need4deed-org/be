@@ -245,6 +245,42 @@ describe("scanExpiredOnetimers", () => {
     expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(0);
   });
 
+  it("leaves a temporarily unavailable volunteer as they are when a matched onetimer expires", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: expired(),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: expired(),
+      type: OpportunityType.REGULAR,
+      status: OpportunityStatusType.ACTIVE,
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.ACTIVE }],
+    });
+    const dateReturn = new Date(Date.now() + 30 * DAY);
+    await ctx.fastify.db.volunteerRepository.update(
+      { id: volunteer.id },
+      {
+        statusEngagement: VolunteerStateEngagementType.TEMP_UNAVAILABLE,
+        dateReturn,
+      },
+    );
+    const logsBefore = (await ctx.fixtures.engagementLogs(volunteer)).length;
+
+    await scanExpiredOnetimers(ctx.fastify);
+
+    const after = await ctx.fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteer.id,
+    });
+    expect(after.statusEngagement).toBe(
+      VolunteerStateEngagementType.TEMP_UNAVAILABLE,
+    );
+    expect(after.dateReturn).toEqual(dateReturn);
+    expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(
+      logsBefore,
+    );
+  });
+
   it("keeps processing the remaining opportunities when one fails", async () => {
     const failingVolunteer = await ctx.fixtures.volunteer();
     const succeedingVolunteer = await ctx.fixtures.volunteer();

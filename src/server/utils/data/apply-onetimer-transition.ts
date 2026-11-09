@@ -8,7 +8,6 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { lockParents } from "../../../data/subscribers/opportunity-volunteer.subscriber";
 import logger from "../../../logger";
-import { syncVolunteerEngagement } from "./sync-volunteer-engagement";
 
 interface VolunteerStatusUpdate {
   volunteer: Pick<OpportunityVolunteer, "id" | "volunteerId" | "status">;
@@ -74,7 +73,6 @@ export async function applyOnetimerTransition(
             a.volunteer.volunteerId - b.volunteer.volunteerId ||
             a.volunteer.id - b.volunteer.id,
         );
-        const applied: VolunteerStatusUpdate[] = [];
         for (const update of ordered) {
           if (
             currentStatus.get(update.volunteer.id) !== update.volunteer.status
@@ -85,13 +83,6 @@ export async function applyOnetimerTransition(
             id: update.volunteer.id,
             status: update.status,
           });
-          applied.push(update);
-        }
-
-        for (const volunteerId of new Set(
-          applied.map(({ volunteer }) => volunteer.volunteerId),
-        )) {
-          await syncVolunteerEngagement(manager, volunteerId);
         }
         return "applied";
       },
