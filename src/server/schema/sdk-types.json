@@ -804,6 +804,58 @@
       "required": ["status"],
       "additionalProperties": false
     },
+    "ApiCommuteRange": {
+      "$id": "ApiCommuteRange",
+      "type": "object",
+      "properties": {
+        "min": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["min", "max"]
+    },
+    "ApiVolunteerCommute": {
+      "$id": "ApiVolunteerCommute",
+      "type": "object",
+      "properties": {
+        "opportunityId": { "type": "integer", "minimum": 1 },
+        "commute": {
+          "anyOf": [{ "$ref": "ApiCommuteRange#" }, { "type": "null" }]
+        }
+      },
+      "required": ["opportunityId", "commute"]
+    },
+    "ApiRecommendedVolunteer": {
+      "$id": "ApiRecommendedVolunteer",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiVolunteerGetList#" },
+        {
+          "type": "object",
+          "properties": {
+            "commute": {
+              "anyOf": [{ "$ref": "ApiCommuteRange#" }, { "type": "null" }]
+            }
+          },
+          "required": ["commute"]
+        }
+      ]
+    },
+    "ApiRecommendedOpportunity": {
+      "$id": "ApiRecommendedOpportunity",
+      "type": "object",
+      "allOf": [
+        { "$ref": "ApiOpportunityGetList#" },
+        {
+          "type": "object",
+          "properties": {
+            "commute": {
+              "anyOf": [{ "$ref": "ApiCommuteRange#" }, { "type": "null" }]
+            }
+          },
+          "required": ["commute"]
+        }
+      ]
+    },
     "ApiVolunteerOpportunityGet": {
       "$id": "ApiVolunteerOpportunityGet",
       "type": "object",
@@ -816,6 +868,9 @@
           "properties": {
             "title": {
               "type": "string"
+            },
+            "commute": {
+              "anyOf": [{ "$ref": "ApiCommuteRange#" }, { "type": "null" }]
             }
           }
         }
@@ -887,6 +942,9 @@
               "items": {
                 "$ref": "ApiLanguage#"
               }
+            },
+            "commute": {
+              "anyOf": [{ "$ref": "ApiCommuteRange#" }, { "type": "null" }]
             }
           }
         }
