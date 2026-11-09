@@ -4,7 +4,10 @@ import {
 } from "need4deed-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { applyOnetimerTransition } from "../../../server/utils/data/apply-onetimer-transition";
+import { activationPlan } from "../../../services/jobs/activate-due-onetimers";
+import { expiryPlan } from "../../../services/jobs/scan-expired-onetimers";
 import { setupOnetimerJobTest } from "../../services/jobs/onetimer-fixtures";
+import { DAY } from "../../time";
 
 vi.mock(
   "../../../server/utils/data/build-onetimer-opportunity-query",
@@ -14,27 +17,26 @@ vi.mock(
     ).scopeOnetimerQuery(await importOriginal()),
 );
 
-describe("applyOnetimerTransition with rows changed after the job read them", () => {
+describe("applyOnetimerTransition decides on the rows as they are under the lock", () => {
   const ctx = setupOnetimerJobTest();
-
-  const activate = (
-    opportunity: Parameters<typeof applyOnetimerTransition>[1],
-    matches: Parameters<
-      typeof applyOnetimerTransition
-    >[3][number]["volunteer"][],
-  ) =>
+  const lastWeek = () => new Date(Date.now() - 7 * DAY);
+  const endOfToday = () => new Date(Date.now() + DAY / 2);
+  const expire = (id: number) =>
     applyOnetimerTransition(
       ctx.fastify,
-      opportunity,
-      OpportunityStatusType.ACTIVE,
-      matches.map((volunteer) => ({
-        volunteer,
-        status: OpportunityVolunteerStatusType.ACTIVE,
-      })),
-      "test transition failed",
+      id,
+      expiryPlan(new Date()),
+      "expire failed",
+    );
+  const activate = (id: number) =>
+    applyOnetimerTransition(
+      ctx.fastify,
+      id,
+      activationPlan(endOfToday()),
+      "activate failed",
     );
 
-  it("skips an opportunity a coordinator changed meanwhile, leaving it and its match as they are", async () => {
+  it("skips an opportunity a coordinator closed meanwhile, leaving its match as it is", async () => {
     const volunteer = await ctx.fixtures.volunteer();
     const {
       opportunity,
@@ -48,7 +50,7 @@ describe("applyOnetimerTransition with rows changed after the job read them", ()
       { status: OpportunityStatusType.INACTIVE },
     );
 
-    expect(await activate(opportunity, [match])).toBe("skipped");
+    expect(await activate(opportunity.id)).toBe("skipped");
     expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
       OpportunityStatusType.INACTIVE,
     );
@@ -58,55 +60,79 @@ describe("applyOnetimerTransition with rows changed after the job read them", ()
     expect(ctx.loggerError).not.toHaveBeenCalled();
   });
 
-  it("leaves a match a coordinator changed meanwhile, and still moves the others", async () => {
-    const [changed, untouched] = [
-      await ctx.fixtures.volunteer(),
-      await ctx.fixtures.volunteer(),
-    ];
-    const { opportunity, matches } = await ctx.fixtures.onetimer(ctx.agent, {
-      date: new Date(),
-      matches: [
-        { volunteer: changed, status: OpportunityVolunteerStatusType.MATCHED },
-        {
-          volunteer: untouched,
-          status: OpportunityVolunteerStatusType.MATCHED,
-        },
-      ],
+  it("skips a onetimer rescheduled into the future meanwhile", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    const { opportunity } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: lastWeek(),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
     });
-    await ctx.fastify.db.opportunityVolunteerRepository.save({
-      id: matches[0].id,
-      status: OpportunityVolunteerStatusType.PENDING,
-    });
+    await ctx.fastify.db.onetimerRepository.update(
+      { id: opportunity.onetimerId },
+      { date: new Date(Date.now() + 30 * DAY) },
+    );
 
-    expect(await activate(opportunity, matches)).toBe("applied");
-    expect(await ctx.fixtures.matchStatus(matches[0])).toBe(
-      OpportunityVolunteerStatusType.PENDING,
-    );
-    expect(await ctx.fixtures.matchStatus(matches[1])).toBe(
-      OpportunityVolunteerStatusType.ACTIVE,
-    );
+    expect(await expire(opportunity.id)).toBe("skipped");
     expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
-      OpportunityStatusType.ACTIVE,
+      OpportunityStatusType.SEARCHING,
     );
   });
 
-  it("does not re-insert a match deleted meanwhile", async () => {
+  it("closes as INACTIVE when the only matched volunteer was moved back to pending meanwhile", async () => {
     const volunteer = await ctx.fixtures.volunteer();
     const {
       opportunity,
       matches: [match],
     } = await ctx.fixtures.onetimer(ctx.agent, {
-      date: new Date(),
+      date: lastWeek(),
       matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
     });
-    await ctx.fastify.db.opportunityVolunteerRepository.delete({
+    await ctx.fastify.db.opportunityVolunteerRepository.save({
       id: match.id,
+      status: OpportunityVolunteerStatusType.PENDING,
     });
 
-    expect(await activate(opportunity, [match])).toBe("applied");
+    expect(await expire(opportunity.id)).toBe("applied");
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.INACTIVE,
+    );
+    expect(await ctx.fixtures.matchStatus(match)).toBe(
+      OpportunityVolunteerStatusType.PENDING,
+    );
+  });
+
+  it("includes a match added meanwhile and doesn't re-create a deleted one", async () => {
+    const [removed, added] = [
+      await ctx.fixtures.volunteer(),
+      await ctx.fixtures.volunteer(),
+    ];
+    const {
+      opportunity,
+      matches: [deleted],
+    } = await ctx.fixtures.onetimer(ctx.agent, {
+      date: lastWeek(),
+      matches: [
+        { volunteer: removed, status: OpportunityVolunteerStatusType.MATCHED },
+      ],
+    });
+    await ctx.fastify.db.opportunityVolunteerRepository.delete({
+      id: deleted.id,
+    });
+    const late = await ctx.fastify.db.opportunityVolunteerRepository.save({
+      opportunityId: opportunity.id,
+      volunteerId: added.id,
+      status: OpportunityVolunteerStatusType.MATCHED,
+    });
+
+    expect(await expire(opportunity.id)).toBe("applied");
+    expect(await ctx.fixtures.opportunityStatus(opportunity)).toBe(
+      OpportunityStatusType.PAST,
+    );
+    expect(await ctx.fixtures.matchStatus(late)).toBe(
+      OpportunityVolunteerStatusType.PAST,
+    );
     expect(
       await ctx.fastify.db.opportunityVolunteerRepository.existsBy({
-        id: match.id,
+        id: deleted.id,
       }),
     ).toBe(false);
   });

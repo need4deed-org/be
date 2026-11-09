@@ -49,7 +49,9 @@ describe("scanExpiredOnetimers", () => {
         OpportunityVolunteerStatusType.PAST,
       );
       expect(ctx.loggerInfo).toHaveBeenCalledWith(
-        expect.stringContaining("processed 1 expired opportunities"),
+        expect.stringContaining(
+          "scanExpiredOnetimers: 1 candidates, 1 applied",
+        ),
       );
     },
   );
@@ -303,7 +305,11 @@ describe("scanExpiredOnetimers", () => {
         OpportunityStatusType.INACTIVE,
       );
     } finally {
-      process.env.TZ = serverTimeZone;
+      if (serverTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = serverTimeZone;
+      }
     }
   });
 

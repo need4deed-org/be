@@ -42,7 +42,7 @@ describe("activateDueOnetimers", () => {
       OpportunityVolunteerStatusType.ACTIVE,
     );
     expect(ctx.loggerInfo).toHaveBeenCalledWith(
-      expect.stringContaining("processed 1 due opportunities"),
+      expect.stringContaining("activateDueOnetimers: 1 candidates, 1 applied"),
     );
   });
 
