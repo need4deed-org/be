@@ -49,7 +49,9 @@ describe("scanExpiredOnetimers", () => {
         OpportunityVolunteerStatusType.PAST,
       );
       expect(ctx.loggerInfo).toHaveBeenCalledWith(
-        expect.stringContaining("processed 1 expired opportunities"),
+        expect.stringContaining(
+          "scanExpiredOnetimers: 1 candidates, 1 applied",
+        ),
       );
     },
   );
@@ -243,6 +245,72 @@ describe("scanExpiredOnetimers", () => {
       VolunteerStateEngagementType.ACTIVE,
     );
     expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(0);
+  });
+
+  it("leaves a temporarily unavailable volunteer as they are when a matched onetimer expires", async () => {
+    const volunteer = await ctx.fixtures.volunteer();
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: expired(),
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.MATCHED }],
+    });
+    await ctx.fixtures.onetimer(ctx.agent, {
+      date: expired(),
+      type: OpportunityType.REGULAR,
+      status: OpportunityStatusType.ACTIVE,
+      matches: [{ volunteer, status: OpportunityVolunteerStatusType.ACTIVE }],
+    });
+    const dateReturn = new Date(Date.now() + 30 * DAY);
+    await ctx.fastify.db.volunteerRepository.update(
+      { id: volunteer.id },
+      {
+        statusEngagement: VolunteerStateEngagementType.TEMP_UNAVAILABLE,
+        dateReturn,
+      },
+    );
+    const logsBefore = (await ctx.fixtures.engagementLogs(volunteer)).length;
+
+    await scanExpiredOnetimers(ctx.fastify);
+
+    const after = await ctx.fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteer.id,
+    });
+    expect(after.statusEngagement).toBe(
+      VolunteerStateEngagementType.TEMP_UNAVAILABLE,
+    );
+    expect(after.dateReturn).toEqual(dateReturn);
+    expect(await ctx.fixtures.engagementLogs(volunteer)).toHaveLength(
+      logsBefore,
+    );
+  });
+
+  it("cuts off at Berlin midnight of the previous working day, on a UTC server too", async () => {
+    const serverTimeZone = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      const friday = new Date(2026, 10, 13);
+      const { opportunity: kept } = await ctx.fixtures.onetimer(ctx.agent, {
+        date: new Date("2026-11-11T23:30:00Z"),
+      });
+      const { opportunity: expiredBefore } = await ctx.fixtures.onetimer(
+        ctx.agent,
+        { date: new Date("2026-11-11T22:30:00Z") },
+      );
+
+      await scanExpiredOnetimers(ctx.fastify, friday);
+
+      expect(await ctx.fixtures.opportunityStatus(kept)).toBe(
+        OpportunityStatusType.SEARCHING,
+      );
+      expect(await ctx.fixtures.opportunityStatus(expiredBefore)).toBe(
+        OpportunityStatusType.INACTIVE,
+      );
+    } finally {
+      if (serverTimeZone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = serverTimeZone;
+      }
+    }
   });
 
   it("keeps processing the remaining opportunities when one fails", async () => {

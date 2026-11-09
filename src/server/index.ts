@@ -4,7 +4,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify, { FastifyInstance } from "fastify";
 import qs from "qs";
-import { isProd, pluginTimeout, selfUrl } from "../config/constants";
+import { isProd, isTest, pluginTimeout, selfUrl } from "../config/constants";
 import logger from "../logger";
 import cors, { corsOptions } from "./plugins/cors";
 import jwtPlugin from "./plugins/jwt";
@@ -76,7 +76,9 @@ const decodeTrustProxyEnv = (
   return normalized;
 };
 
-export async function createServer(): Promise<FastifyInstance> {
+export async function createServer({
+  scheduler = !isTest,
+}: { scheduler?: boolean } = {}): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     pluginTimeout,
     querystringParser: (str) => qs.parse(str),
@@ -179,7 +181,9 @@ export async function createServer(): Promise<FastifyInstance> {
     });
   }
   await fastifyInstance.register(notifyPlugin);
-  await fastifyInstance.register(schedulerDailyPlugin);
+  if (scheduler) {
+    await fastifyInstance.register(schedulerDailyPlugin);
+  }
   await fastifyInstance.register(translationPlugin);
   await fastifyInstance.register(healthRoutes, {
     prefix: RoutePrefix.HEALTH_CHECK,

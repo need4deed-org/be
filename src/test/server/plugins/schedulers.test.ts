@@ -63,7 +63,7 @@ describe("cron schedulers", () => {
 
   beforeAll(async () => {
     const schedule = vi.spyOn(cron, "schedule");
-    fastify = await createServer();
+    fastify = await createServer({ scheduler: true });
     await fastify.ready();
     for (const [expression, callback] of schedule.mock.calls) {
       callbacks.set(expression as string, callback as () => Promise<void>);

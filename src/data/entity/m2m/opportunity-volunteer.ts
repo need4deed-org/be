@@ -45,6 +45,7 @@ export default class OpportunityVolunteer {
     (opportunity) => opportunity.opportunityVolunteer,
     {
       onDelete: "CASCADE",
+      orphanedRowAction: "disable",
     },
   )
   @JoinColumn({ name: "opportunity_id" })
@@ -55,6 +56,7 @@ export default class OpportunityVolunteer {
 
   @ManyToOne(() => Volunteer, (volunteer) => volunteer.opportunityVolunteer, {
     onDelete: "CASCADE",
+    orphanedRowAction: "disable",
   })
   @JoinColumn({ name: "volunteer_id" })
   volunteer: Volunteer;
