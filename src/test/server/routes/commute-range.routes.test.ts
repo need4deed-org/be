@@ -105,4 +105,46 @@ describe("commute range on volunteer-opportunity pairs", () => {
       expect(await countCommuteQueries(() => f.get("agent", url()))).toBe(1);
     });
   });
+
+  describe("GET /volunteer/:id/opportunity-linked", () => {
+    const url = () =>
+      `/volunteer/${f.volunteers.commuter.id}/opportunity-linked`;
+
+    it("gives a coordinator the range per linked opportunity", async () => {
+      const res = await f.get("coordinator", url());
+      expect(res.statusCode).toBe(200);
+      expect(commuteByOpportunity(res.json().data)).toEqual({
+        [f.opportunities.ownWork.id]: RANGE_27,
+        [f.opportunities.ownOther.id]: RANGE_30,
+        [f.opportunities.ownNoPostcode.id]: null,
+        [f.opportunities.foreignWork.id]: RANGE_27,
+      });
+    });
+
+    it("gives an NGO ranges only on its own opportunities", async () => {
+      const res = await f.get("agent", url());
+      expect(res.statusCode).toBe(200);
+      expect(commuteByOpportunity(res.json().data)).toEqual({
+        [f.opportunities.ownWork.id]: RANGE_27,
+        [f.opportunities.ownOther.id]: RANGE_30,
+        [f.opportunities.ownNoPostcode.id]: null,
+        [f.opportunities.foreignWork.id]: null,
+      });
+    });
+
+    it("does not show a volunteer their own commutes", async () => {
+      const res = await f.get(
+        "owned",
+        `/volunteer/${f.volunteers.owned.id}/opportunity-linked`,
+      );
+      expect(res.statusCode).toBe(200);
+      const rows: PairRow[] = res.json().data;
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => expect(row).not.toHaveProperty("commute"));
+    });
+
+    it("looks the ranges up in a single query", async () => {
+      expect(await countCommuteQueries(() => f.get("agent", url()))).toBe(1);
+    });
+  });
 });
