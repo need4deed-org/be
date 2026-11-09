@@ -9,6 +9,7 @@ import {
 } from "../../schema";
 import { ParamsId, ReplyData } from "../../types";
 import {
+  assertRoleIn,
   commuteOf,
   commutePairKey,
   loadCommuteRangesForCaller,
@@ -32,6 +33,7 @@ export default function volunteerCommuteRoutes(
       },
     },
     async (request, reply) => {
+      assertRoleIn(request);
       const { id: volunteerId } = request.params;
       if (
         !(await fastify.db.volunteerRepository.existsBy({ id: volunteerId }))

@@ -68,19 +68,21 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      await translateOpportunities(
-        fastify,
-        opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
-        requestLanguage(request.query),
-      );
-      const commutes = await loadCommuteRangesForCaller(
-        request,
-        opportunities.map(({ volunteerId, opportunityId, opportunity }) => ({
-          volunteerId,
-          opportunityId,
-          opportunityAgentId: opportunity?.agentId,
-        })),
-      );
+      const [, commutes] = await Promise.all([
+        translateOpportunities(
+          fastify,
+          opportunities.map(({ opportunity }) => opportunity).filter(Boolean),
+          requestLanguage(request.query),
+        ),
+        loadCommuteRangesForCaller(
+          request,
+          opportunities.map(({ volunteerId, opportunityId, opportunity }) => ({
+            volunteerId,
+            opportunityId,
+            opportunityAgentId: opportunity?.agentId,
+          })),
+        ),
+      ]);
       await maskForCaller(request, opportunities);
       const data = opportunities.map((opportunity) => ({
         ...volunteerOpportunityVolunteerDTO(opportunity),

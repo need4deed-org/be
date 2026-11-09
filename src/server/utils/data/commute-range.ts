@@ -1,5 +1,11 @@
 import { FastifyRequest } from "fastify";
-import { ApiCommuteRange, toCommuteRange, UserRole } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  ApiCommuteRange,
+  toCommuteRange,
+  UserRole,
+} from "need4deed-sdk";
+import { In, Not } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import { resolveCallerMask } from "../pii/pre-serialization";
 import {
@@ -83,9 +89,24 @@ async function resolveCommuteAccess(
   if (role !== UserRole.AGENT) {
     return null;
   }
-  const agentIds = (await resolveCallerMask(request))?.agentIds;
+  const memberAgentIds = [
+    ...((await resolveCallerMask(request))?.agentIds ?? []),
+  ];
+  const activeAgentIds = new Set(
+    memberAgentIds.length
+      ? (
+          await request.server.db.agentRepository.find({
+            select: { id: true },
+            where: {
+              id: In(memberAgentIds),
+              engagementStatus: Not(AgentEngagementStatusType.INACTIVE),
+            },
+          })
+        ).map(({ id }) => id)
+      : [],
+  );
   return (opportunityAgentId) =>
-    !!opportunityAgentId && !!agentIds?.has(opportunityAgentId);
+    !!opportunityAgentId && activeAgentIds.has(opportunityAgentId);
 }
 
 export async function loadCommuteRangesForCaller(

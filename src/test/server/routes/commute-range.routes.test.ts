@@ -76,13 +76,22 @@ describe("commute range on volunteer-opportunity pairs", () => {
         engagementStatus: AgentEngagementStatusType.INACTIVE,
       });
       try {
-        for (const path of [url(), `/agent/${f.agent.id}/volunteer-linked`]) {
+        for (const path of [
+          url(),
+          `/agent/${f.agent.id}/volunteer-linked`,
+          `/volunteer/${f.volunteers.commuter.id}/opportunity-linked`,
+        ]) {
           const res = await f.get("agent", path);
           expect(res.statusCode).toBe(200);
           const rows: PairRow[] = res.json().data;
           expect(rows.length).toBeGreaterThan(0);
-          rows.forEach((row) => expect(row).not.toHaveProperty("commute"));
+          rows.forEach((row) => expect(row.commute).toBeNull());
         }
+        const commute = await f.get(
+          "agent",
+          `/volunteer/${f.volunteers.commuter.id}/commute?opportunity=${f.opportunities.ownWork.id}`,
+        );
+        expect(commute.json().data).toEqual([]);
       } finally {
         await fastify.db.agentRepository.update(f.agent.id, {
           engagementStatus: AgentEngagementStatusType.ACTIVE,

@@ -577,7 +577,9 @@ describe("recommended matches (be#1184)", () => {
       data.forEach((row) => expect(row).toHaveProperty("commute"));
       const item = data.find(({ id }) => id === opportunities.accompanying.id);
       expect(item?.commute).toEqual(
-        toCommuteRange(appointmentCommute?.minutes),
+        postcodeId === appointmentPostcode.id
+          ? { min: 0, max: 5 }
+          : toCommuteRange(appointmentCommute?.minutes),
       );
     });
 
