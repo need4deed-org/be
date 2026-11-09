@@ -281,6 +281,32 @@ describe("scanExpiredOnetimers", () => {
     );
   });
 
+  it("cuts off at Berlin midnight of the previous working day, on a UTC server too", async () => {
+    const serverTimeZone = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      const friday = new Date(2026, 10, 13);
+      const { opportunity: kept } = await ctx.fixtures.onetimer(ctx.agent, {
+        date: new Date("2026-11-11T23:30:00Z"),
+      });
+      const { opportunity: expiredBefore } = await ctx.fixtures.onetimer(
+        ctx.agent,
+        { date: new Date("2026-11-11T22:30:00Z") },
+      );
+
+      await scanExpiredOnetimers(ctx.fastify, friday);
+
+      expect(await ctx.fixtures.opportunityStatus(kept)).toBe(
+        OpportunityStatusType.SEARCHING,
+      );
+      expect(await ctx.fixtures.opportunityStatus(expiredBefore)).toBe(
+        OpportunityStatusType.INACTIVE,
+      );
+    } finally {
+      process.env.TZ = serverTimeZone;
+    }
+  });
+
   it("keeps processing the remaining opportunities when one fails", async () => {
     const failingVolunteer = await ctx.fixtures.volunteer();
     const succeedingVolunteer = await ctx.fixtures.volunteer();

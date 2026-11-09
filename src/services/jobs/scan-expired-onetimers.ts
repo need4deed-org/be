@@ -12,19 +12,19 @@ import {
   ONETIMER_ENGAGED_VOLUNTEER_STATUSES,
   ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
 } from "../../server/utils/data/onetimer-statuses";
+import { berlinDayBoundaries } from "./berlin-dates";
 
 export async function scanExpiredOnetimers(
   fastify: FastifyInstance,
+  today: Date = berlinToday(),
 ): Promise<void> {
-  const dayBeforeToday = addWorkingDays(berlinToday(), -1);
+  const { startOfDay: cutoff } = berlinDayBoundaries(addWorkingDays(today, -1));
 
   const expiredOpportunities = await buildOnetimerOpportunityQuery(fastify)
     .andWhere("opportunity.status NOT IN (:...terminalStatuses)", {
       terminalStatuses: ONETIMER_TERMINAL_OPPORTUNITY_STATUSES,
     })
-    .andWhere("onetimer.date < :yesterday", {
-      yesterday: dayBeforeToday,
-    })
+    .andWhere("onetimer.date < :cutoff", { cutoff })
     .getMany();
 
   if (!expiredOpportunities.length) {
