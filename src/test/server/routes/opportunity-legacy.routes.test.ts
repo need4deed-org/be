@@ -4,11 +4,13 @@ import {
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import DealDistrict from "../../../data/entity/m2m/deal-district";
 import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -16,6 +18,7 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { DealType } from "../../../data/types";
 import { getRepository } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 // be#780: GET /opportunity/legacy is public/unauthenticated and unconditionally
 // serialized whatever "accompanying" row it found linked to an opportunity,
@@ -295,5 +298,98 @@ describe("POST /opportunity/legacy resolves district for a brand-new agent", () 
     createdAgentId = saved.agentId ?? undefined;
 
     expect(saved.districtId).toBe(district.id);
+  });
+});
+
+describe("GET /opportunity/legacy fills berlin_locations from the own district", () => {
+  let fastify: FastifyInstance;
+  const suffix = randomNumericSuffix();
+
+  let ownDistrict: District;
+  let dealDistrictEntity: District;
+  let deal: Deal;
+  let emptyDeal: Deal;
+  let stored: Opportunity;
+  let legacy: Opportunity;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const districtRepository = fastify.db.districtRepository;
+    ownDistrict = await districtRepository.save(
+      new District({ title: `Own District (legacy-1341) ${suffix}` }),
+    );
+    dealDistrictEntity = await districtRepository.save(
+      new District({ title: `Deal District (legacy-1341) ${suffix}` }),
+    );
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+    });
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    emptyDeal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    await getRepository(dataSource, DealDistrict).save(
+      new DealDistrict({ dealId: deal.id, districtId: dealDistrictEntity.id }),
+    );
+
+    const base = {
+      type: OpportunityType.REGULAR,
+      status: OpportunityStatusType.SEARCHING,
+    };
+    stored = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        ...base,
+        title: `Stored district (legacy-1341) ${suffix}`,
+        dealId: emptyDeal.id,
+        districtId: ownDistrict.id,
+      }),
+    );
+    legacy = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        ...base,
+        title: `Deal district (legacy-1341) ${suffix}`,
+        dealId: deal.id,
+        districtId: ownDistrict.id,
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityRepository.delete({
+      id: In([stored.id, legacy.id]),
+    });
+    await getRepository(dataSource, DealDistrict).delete({ dealId: deal.id });
+    await fastify.db.dealRepository.delete({ id: In([deal.id, emptyDeal.id]) });
+    await fastify.db.districtRepository.delete({
+      id: In([ownDistrict.id, dealDistrictEntity.id]),
+    });
+    await fastify.close();
+  });
+
+  async function getEntry(id: number) {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/legacy",
+    });
+    expect(res.statusCode).toBe(200);
+    const entry = res.json().find((e: { id: number }) => e.id === id);
+    expect(entry).toBeDefined();
+    return entry;
+  }
+
+  it("uses the own district when the deal has no dealDistrict rows", async () => {
+    expect((await getEntry(stored.id)).berlin_locations).toEqual([
+      ownDistrict.title,
+    ]);
+  });
+
+  it("keeps dealDistrict titles when present", async () => {
+    expect((await getEntry(legacy.id)).berlin_locations).toEqual([
+      dealDistrictEntity.title,
+    ]);
   });
 });

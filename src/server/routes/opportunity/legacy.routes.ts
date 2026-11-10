@@ -316,9 +316,12 @@ export default async function opportunityLegacyRoutes(
             .map((ps) => ps.skill?.title ?? null)
             .filter(Boolean);
 
-          const berlin_locations = (deal.dealDistrict ?? [])
+          const dealDistricts = (deal.dealDistrict ?? [])
             .map((ld) => ld.district?.title ?? null)
             .filter(Boolean);
+          const berlin_locations = dealDistricts.length
+            ? dealDistricts
+            : [raw.district?.title].filter(Boolean);
 
           const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
@@ -370,6 +373,7 @@ export default async function opportunityLegacyRoutes(
           "deal.dealSkill.skill",
           "deal.dealTimeslot.timeslot",
           "deal.dealDistrict.district",
+          "district",
           "accompanying",
           "onetimer",
         ],
