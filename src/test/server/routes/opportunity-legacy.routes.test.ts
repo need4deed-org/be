@@ -308,6 +308,7 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
   let ownDistrict: District;
   let dealDistrictEntity: District;
   let deal: Deal;
+  let emptyDeal: Deal;
   let stored: Opportunity;
   let legacy: Opportunity;
 
@@ -315,7 +316,7 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     fastify = await createServer();
     await fastify.ready();
 
-    const districtRepository = getRepository(dataSource, District);
+    const districtRepository = fastify.db.districtRepository;
     ownDistrict = await districtRepository.save(
       new District({ title: `Own District (legacy-1341) ${suffix}` }),
     );
@@ -326,6 +327,9 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
       where: {},
     });
     deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+    );
+    emptyDeal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );
     await getRepository(dataSource, DealDistrict).save(
@@ -340,6 +344,7 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
       new Opportunity({
         ...base,
         title: `Stored district (legacy-1341) ${suffix}`,
+        dealId: emptyDeal.id,
         districtId: ownDistrict.id,
       }),
     );
@@ -358,8 +363,8 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
       id: In([stored.id, legacy.id]),
     });
     await getRepository(dataSource, DealDistrict).delete({ dealId: deal.id });
-    await fastify.db.dealRepository.delete({ id: deal.id });
-    await getRepository(dataSource, District).delete({
+    await fastify.db.dealRepository.delete({ id: In([deal.id, emptyDeal.id]) });
+    await fastify.db.districtRepository.delete({
       id: In([ownDistrict.id, dealDistrictEntity.id]),
     });
     await fastify.close();
@@ -371,17 +376,19 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
       url: "/opportunity/legacy",
     });
     expect(res.statusCode).toBe(200);
-    return res.json().find((e: { id: number }) => e.id === id);
+    const entry = res.json().find((e: { id: number }) => e.id === id);
+    expect(entry).toBeDefined();
+    return entry;
   }
 
-  it("uses the stored district when there are no dealDistrict rows", async () => {
-    expect((await getEntry(stored.id))?.berlin_locations).toEqual([
+  it("uses the own district when the deal has no dealDistrict rows", async () => {
+    expect((await getEntry(stored.id)).berlin_locations).toEqual([
       ownDistrict.title,
     ]);
   });
 
   it("keeps dealDistrict titles when present", async () => {
-    expect((await getEntry(legacy.id))?.berlin_locations).toEqual([
+    expect((await getEntry(legacy.id)).berlin_locations).toEqual([
       dealDistrictEntity.title,
     ]);
   });
