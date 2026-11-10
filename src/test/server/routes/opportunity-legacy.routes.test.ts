@@ -18,6 +18,7 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { DealType } from "../../../data/types";
 import { getRepository } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 // be#780: GET /opportunity/legacy is public/unauthenticated and unconditionally
 // serialized whatever "accompanying" row it found linked to an opportunity,
@@ -300,19 +301,14 @@ describe("POST /opportunity/legacy resolves district for a brand-new agent", () 
   });
 });
 
-// be#1341: app-created opportunities have no dealDistrict rows, so the public
-// cards showed an empty Bezirk. berlin_locations falls back to the
-// opportunity's own district (backfilled the same way as the list endpoint).
 describe("GET /opportunity/legacy fills berlin_locations from the own district", () => {
   let fastify: FastifyInstance;
-  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const suffix = randomNumericSuffix();
 
   let ownDistrict: District;
   let dealDistrictEntity: District;
-  let agent: Agent;
   let deal: Deal;
   let stored: Opportunity;
-  let backfilled: Opportunity;
   let legacy: Opportunity;
 
   beforeAll(async () => {
@@ -325,12 +321,6 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     );
     dealDistrictEntity = await districtRepository.save(
       new District({ title: `Deal District (legacy-1341) ${suffix}` }),
-    );
-    agent = await fastify.db.agentRepository.save(
-      new Agent({
-        title: `Test Agent (legacy-1341) ${suffix}`,
-        districtId: ownDistrict.id,
-      }),
     );
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
@@ -353,13 +343,6 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
         districtId: ownDistrict.id,
       }),
     );
-    backfilled = await fastify.db.opportunityRepository.save(
-      new Opportunity({
-        ...base,
-        title: `Backfilled district (legacy-1341) ${suffix}`,
-        agentId: agent.id,
-      }),
-    );
     legacy = await fastify.db.opportunityRepository.save(
       new Opportunity({
         ...base,
@@ -372,11 +355,10 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
 
   afterAll(async () => {
     await fastify.db.opportunityRepository.delete({
-      id: In([stored.id, backfilled.id, legacy.id]),
+      id: In([stored.id, legacy.id]),
     });
     await getRepository(dataSource, DealDistrict).delete({ dealId: deal.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
-    await fastify.db.agentRepository.delete({ id: agent.id });
     await getRepository(dataSource, District).delete({
       id: In([ownDistrict.id, dealDistrictEntity.id]),
     });
@@ -396,16 +378,6 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     expect((await getEntry(stored.id))?.berlin_locations).toEqual([
       ownDistrict.title,
     ]);
-  });
-
-  it("backfills and persists a missing district (from the agent)", async () => {
-    expect((await getEntry(backfilled.id))?.berlin_locations).toEqual([
-      ownDistrict.title,
-    ]);
-    const saved = await fastify.db.opportunityRepository.findOneByOrFail({
-      id: backfilled.id,
-    });
-    expect(saved.districtId).toBe(ownDistrict.id);
   });
 
   it("keeps dealDistrict titles when present", async () => {

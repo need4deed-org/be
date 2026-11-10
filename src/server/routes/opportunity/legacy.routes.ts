@@ -33,7 +33,6 @@ import {
   getOpportunityOrphanageAgent,
   getOrCreateSubmitterPerson,
   syncAgentDistrictFromPostcode,
-  updateBackfilledColumn,
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
@@ -210,7 +209,6 @@ export default async function opportunityLegacyRoutes(
     async (request, reply) => {
       function parseOpportunityLegacyResponse(
         rawList: Opportunity[],
-        districtTitles: Map<number, string>,
       ): OpportunityLegacyResponse[] {
         const STATUS_MAP = {
           "opp-new": "New",
@@ -321,16 +319,9 @@ export default async function opportunityLegacyRoutes(
           const dealDistricts = (deal.dealDistrict ?? [])
             .map((ld) => ld.district?.title ?? null)
             .filter(Boolean);
-          // be#1341: app-created opportunities have no dealDistrict rows;
-          // their Bezirk is the opportunity's own (backfilled) district.
-          const ownDistrict = raw.districtId
-            ? districtTitles.get(raw.districtId)
-            : undefined;
           const berlin_locations = dealDistricts.length
             ? dealDistricts
-            : ownDistrict
-              ? [ownDistrict]
-              : [];
+            : [raw.district?.title].filter(Boolean);
 
           const { timeslots, schedule_str } = parseTimeslots(deal.dealTimeslot);
           const { accomp_information, accomp_translation, accomp_datetime } =
@@ -383,13 +374,10 @@ export default async function opportunityLegacyRoutes(
           "deal.dealTimeslot.timeslot",
           "deal.dealDistrict.district",
           "district",
-          "address.postcode.districtPostcode",
-          "accompanying.postcode.districtPostcode",
-          "agent.address.postcode",
+          "accompanying",
           "onetimer",
         ],
       });
-      const districtTitles = await resolveOwnDistricts(fastify, opportunities);
       await translateOpportunities(
         fastify,
         opportunities,
@@ -397,45 +385,7 @@ export default async function opportunityLegacyRoutes(
       );
       return reply
         .status(200)
-        .send(parseOpportunityLegacyResponse(opportunities, districtTitles));
+        .send(parseOpportunityLegacyResponse(opportunities));
     },
   );
-}
-
-// Backfills opportunity.districtId where missing (same rules as the list
-// endpoint) and returns the titles of every opportunity's own district.
-async function resolveOwnDistricts(
-  fastify: FastifyInstance,
-  opportunities: Opportunity[],
-): Promise<Map<number, string>> {
-  const { addDistrictToOpportunity, updates } =
-    getDistrictToOpportunityHandler();
-  await Promise.all(opportunities.map(addDistrictToOpportunity));
-  await updateBackfilledColumn(
-    fastify.db.opportunityRepository,
-    updates,
-    "districtId",
-  );
-
-  const titles = new Map<number, string>();
-  const missing = new Set<number>();
-  for (const { district, districtId } of opportunities) {
-    if (!districtId) {
-      continue;
-    }
-    if (district?.id === districtId) {
-      titles.set(districtId, district.title);
-    } else {
-      missing.add(districtId);
-    }
-  }
-  if (missing.size) {
-    const districts = await fastify.db.districtRepository.findBy({
-      id: In([...missing]),
-    });
-    for (const { id, title } of districts) {
-      titles.set(id, title);
-    }
-  }
-  return titles;
 }
