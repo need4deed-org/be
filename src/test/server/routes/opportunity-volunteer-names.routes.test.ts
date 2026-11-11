@@ -25,7 +25,7 @@ import { randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
-type Caller = "coordinator" | "agent" | "volunteer";
+type Caller = "coordinator" | "agent" | "volunteer" | "user";
 
 describe("GET /opportunity volunteerNames", () => {
   let fastify: FastifyInstance;
@@ -140,6 +140,8 @@ describe("GET /opportunity volunteerNames", () => {
     await saveVolunteer(volunteerPerson, postcode.id);
     await login("volunteer", UserRole.VOLUNTEER, volunteerPerson);
 
+    await login("user", UserRole.USER, await savePerson("PlainUser"));
+
     await login(
       "coordinator",
       UserRole.COORDINATOR,
@@ -190,7 +192,10 @@ describe("GET /opportunity volunteerNames", () => {
     ]);
   });
 
-  it("gives a volunteer no entries, not even masked ones", async () => {
-    expect(await volunteerNamesFor("volunteer")).toEqual([]);
-  });
+  it.each<Caller>(["volunteer", "user"])(
+    "gives a %s no entries, not even masked ones",
+    async (caller) => {
+      expect(await volunteerNamesFor(caller)).toEqual([]);
+    },
+  );
 });
