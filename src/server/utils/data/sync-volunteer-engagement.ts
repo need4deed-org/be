@@ -8,6 +8,7 @@ import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-lo
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { logMatchChangeSafely } from "../../../data/utils/log-match-change";
 import { engagementChangeDetail } from "./engagement-change-detail";
+import { isVolunteerDeactivated } from "./is-volunteer-deactivated";
 import { hasRecentOnetimerMatch } from "./onetimer-active-period";
 
 export async function syncVolunteerEngagement(
@@ -23,6 +24,9 @@ export async function syncVolunteerEngagement(
     return;
   }
   if (hasActiveMatch) {
+    if (await isVolunteerDeactivated(manager, volunteerId)) {
+      return;
+    }
     const previous = await manager.findOne(Volunteer, {
       select: { id: true, statusEngagement: true },
       where: { id: volunteerId },

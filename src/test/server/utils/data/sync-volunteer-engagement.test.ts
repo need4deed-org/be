@@ -16,6 +16,9 @@ import {
 vi.mock("../../../../server/utils/data/onetimer-active-period", () => ({
   hasRecentOnetimerMatch: vi.fn(),
 }));
+vi.mock("../../../../server/utils/data/is-volunteer-deactivated", () => ({
+  isVolunteerDeactivated: vi.fn().mockResolvedValue(false),
+}));
 
 const exists = vi.fn();
 const update = vi.fn();
