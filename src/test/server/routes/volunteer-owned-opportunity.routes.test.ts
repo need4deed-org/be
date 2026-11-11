@@ -231,12 +231,12 @@ describe("Owned volunteers only see their NGO's opportunities", () => {
     });
   });
 
-  it("scopes an opportunity's linked volunteers the same way", async () => {
+  it("never lists an opportunity's linked volunteers to an owned volunteer", async () => {
     const linked = (key: OpportunityKey) =>
       get(`/opportunity/${opportunities[key].id}/volunteer-linked`, "owned");
-    expect((await linked("own")).statusCode).toBe(200);
-    expect((await linked("suggested")).statusCode).toBe(200);
-    expect((await linked("unrelated")).statusCode).toBe(404);
+    expect((await linked("own")).statusCode).toBe(403);
+    expect((await linked("suggested")).statusCode).toBe(403);
+    expect((await linked("unrelated")).statusCode).toBe(403);
   });
 
   it("counts only visible opportunities in the district aggregate", async () => {

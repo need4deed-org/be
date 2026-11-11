@@ -51,6 +51,7 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
   let coordinatorCookie: string;
   let agentRolePerson: Person;
   let agentRoleCookie: string;
+  let volunteerCookie: string;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -164,6 +165,25 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
         status: AgentMembershipStatus.ACTIVE,
       }),
     );
+
+    await fastify.db.userRepository.save(
+      new User({
+        email: `volunteer-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    const volunteerLoginRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `volunteer-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    volunteerCookie = getCookie(volunteerLoginRes.cookies, accessCookieName);
   });
 
   afterAll(async () => {
@@ -173,6 +193,7 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     });
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
@@ -181,6 +202,70 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     await fastify.db.userRepository.delete({ personId: agentRolePerson.id });
     await fastify.db.personRepository.delete({ id: agentRolePerson.id });
     await fastify.close();
+  });
+
+  it("403s a volunteer, even one matched to the opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s a volunteer for an opportunity that doesn't exist, so it can't probe which ones do", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/2000000000/volunteer-linked",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("403s a caller with the plain user role", async () => {
+    const userPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "PlainUser" }),
+    );
+    const email = `plainuser-${userPerson.id}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.USER,
+        isActive: true,
+        personId: userPerson.id,
+      }),
+    );
+    try {
+      const loginRes = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity/${opportunity.id}/volunteer-linked`,
+        cookies: {
+          [accessCookieName]: getCookie(loginRes.cookies, accessCookieName),
+        },
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.userRepository.delete({ personId: userPerson.id });
+      await fastify.db.personRepository.delete({ id: userPerson.id });
+    }
+  });
+
+  it("lists the matches for a coordinator", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(
+      res.json().data.map((row: { volunteerId: number }) => row.volunteerId),
+    ).toEqual([volunteer.id]);
   });
 
   it("returns volunteer identity unmasked while the agent is ACTIVE", async () => {
