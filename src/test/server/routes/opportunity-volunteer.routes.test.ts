@@ -213,6 +213,15 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it("403s a volunteer for an opportunity that doesn't exist, so it can't probe which ones do", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/2000000000/volunteer-linked",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
   it("lists the matches for a coordinator", async () => {
     const res = await fastify.inject({
       method: "GET",

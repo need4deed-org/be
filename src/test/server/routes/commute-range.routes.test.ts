@@ -99,6 +99,10 @@ describe("commute range on volunteer-opportunity pairs", () => {
       }
     });
 
+    it("refuses a volunteer", async () => {
+      expect((await f.get("owned", url())).statusCode).toBe(403);
+    });
+
     it("looks the ranges up in a single query", async () => {
       expect(await countCommuteQueries(() => f.get("coordinator", url()))).toBe(
         1,
