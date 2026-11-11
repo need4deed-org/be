@@ -28,7 +28,7 @@ import {
   deleteFixtures,
 } from "../match-fixtures";
 
-const { ACTIVE, MATCHED, PAST } = OpportunityVolunteerStatusType;
+const { ACTIVE, MATCHED, PAST, PENDING } = OpportunityVolunteerStatusType;
 
 const addLogin = (manager: EntityManager, volunteer: Volunteer) =>
   manager.save(
@@ -125,6 +125,27 @@ describe("matching a deactivated volunteer", () => {
 
     moved.volunteerId = volunteer.id;
     await expect(manager.save(moved)).rejects.toBeInstanceOf(
+      DeactivatedVolunteerError,
+    );
+  });
+
+  it("rejects matching a pending suggestion", async () => {
+    const pending = await link(manager, volunteer, opportunity, PENDING);
+    await deactivateLogin(manager, login);
+
+    pending.status = MATCHED;
+    await expect(manager.save(pending)).rejects.toBeInstanceOf(
+      DeactivatedVolunteerError,
+    );
+  });
+
+  it("rejects moving an open link to another opportunity", async () => {
+    const open = await link(manager, volunteer, opportunity, MATCHED);
+    const other = await createOpportunity(manager, `Deactivated ${suffix} c`);
+    await deactivateLogin(manager, login);
+
+    open.opportunityId = other.id;
+    await expect(manager.save(open)).rejects.toBeInstanceOf(
       DeactivatedVolunteerError,
     );
   });

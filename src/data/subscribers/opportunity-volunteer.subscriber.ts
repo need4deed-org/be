@@ -153,8 +153,10 @@ async function rejectDeactivatedVolunteer(
   const opensLink =
     !before ||
     before.status === OpportunityVolunteerStatusType.PAST ||
-    (after?.volunteerId !== undefined &&
-      after.volunteerId !== before.volunteerId);
+    isRepointed(before, after) ||
+    (after?.status !== before.status &&
+      (status === OpportunityVolunteerStatusType.PENDING ||
+        status === OpportunityVolunteerStatusType.MATCHED));
   if (!opensLink) {
     return;
   }
