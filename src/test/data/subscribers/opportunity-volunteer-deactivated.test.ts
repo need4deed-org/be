@@ -176,6 +176,16 @@ describe("matching a deactivated volunteer", () => {
     await expect(manager.save(open)).resolves.toBeDefined();
   });
 
+  it("rejects turning an open link back into a suggestion", async () => {
+    const open = await link(manager, volunteer, opportunity, MATCHED);
+    await deactivateLogin(manager, login);
+
+    open.status = PENDING;
+    await expect(manager.save(open)).rejects.toBeInstanceOf(
+      DeactivatedVolunteerError,
+    );
+  });
+
   it("allows moving an open link back a step", async () => {
     const open = await link(manager, volunteer, opportunity, ACTIVE);
     await deactivateLogin(manager, login);
@@ -229,28 +239,41 @@ describe("matching a deactivated volunteer", () => {
   });
 });
 
-describe("a link insert racing self-deletion", () => {
+describe("a link write racing self-deletion", () => {
   const suffix = randomNumericSuffix();
   const volunteers: Volunteer[] = [];
   const opportunities: Opportunity[] = [];
-  let login: User | undefined;
+  const logins: User[] = [];
 
   beforeAll(async () => {
     if (!dataSource.isInitialized) {
       await dataSource.initialize();
     }
-    const manager = dataSource.manager;
-    volunteers.push(await createVolunteer(manager));
-    opportunities.push(await createOpportunity(manager, `Racing ${suffix}`));
-    login = await addLogin(manager, volunteers[0]);
   });
 
   afterAll(async () => {
-    if (login) {
-      await dataSource.manager.delete(User, login.id);
+    if (logins.length) {
+      await dataSource.manager.delete(
+        User,
+        logins.map(({ id }) => id),
+      );
     }
     await deleteFixtures(dataSource.manager, volunteers, opportunities);
   });
+
+  const fixture = async () => {
+    const manager = dataSource.manager;
+    const volunteer = await createVolunteer(manager);
+    volunteers.push(volunteer);
+    const opportunity = await createOpportunity(
+      manager,
+      `Racing ${suffix} ${volunteers.length}`,
+    );
+    opportunities.push(opportunity);
+    const login = await addLogin(manager, volunteer);
+    logins.push(login);
+    return { volunteer, opportunity, login };
+  };
 
   const waitUntilBlocked = async (pid: number) => {
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -266,12 +289,14 @@ describe("a link insert racing self-deletion", () => {
     throw new Error(`backend ${pid} never blocked`);
   };
 
-  it("is rejected once the deletion commits", async () => {
-    const [volunteer] = volunteers;
-    const [opportunity] = opportunities;
+  const raceSelfDelete = async (
+    volunteer: Volunteer,
+    login: User,
+    write: (manager: EntityManager) => Promise<unknown>,
+  ) => {
     const selfDelete = dataSource.createQueryRunner();
     const coordinator = dataSource.createQueryRunner();
-    let insert: Promise<unknown> | undefined;
+    let pending: Promise<unknown> | undefined;
     await selfDelete.connect();
     await coordinator.connect();
     try {
@@ -283,34 +308,66 @@ describe("a link insert racing self-deletion", () => {
       await deactivateVolunteerProfile(
         selfDelete.manager,
         volunteer.personId,
-        login!.id,
+        login.id,
       );
-      await deactivateLogin(selfDelete.manager, login!);
+      await deactivateLogin(selfDelete.manager, login);
 
       await coordinator.startTransaction();
-      insert = link(coordinator.manager, volunteer, opportunity, MATCHED);
-      insert.catch(() => undefined);
+      pending = write(coordinator.manager);
+      pending.catch(() => undefined);
 
       await waitUntilBlocked(pid);
       await selfDelete.commitTransaction();
 
-      await expect(insert).rejects.toBeInstanceOf(DeactivatedVolunteerError);
+      await expect(pending).rejects.toBeInstanceOf(DeactivatedVolunteerError);
     } finally {
       if (selfDelete.isTransactionActive) {
         await selfDelete.rollbackTransaction();
       }
-      await Promise.allSettled([insert]);
+      await Promise.allSettled([pending]);
       if (coordinator.isTransactionActive) {
         await coordinator.rollbackTransaction();
       }
       await selfDelete.release();
       await coordinator.release();
     }
+  };
+
+  it("rejects a new link once the deletion commits", async () => {
+    const { volunteer, opportunity, login } = await fixture();
+
+    await raceSelfDelete(volunteer, login, (manager) =>
+      link(manager, volunteer, opportunity, MATCHED),
+    );
 
     expect(
       await dataSource.manager.existsBy(OpportunityVolunteer, {
         volunteerId: volunteer.id,
       }),
     ).toBe(false);
+  });
+
+  it("rejects a change to a link the deletion ended meanwhile", async () => {
+    const { volunteer, opportunity, login } = await fixture();
+    const active = await link(
+      dataSource.manager,
+      volunteer,
+      opportunity,
+      ACTIVE,
+    );
+
+    await raceSelfDelete(volunteer, login, (manager) =>
+      manager.save(
+        Object.assign(new OpportunityVolunteer(), active, { status: MATCHED }),
+      ),
+    );
+
+    expect(
+      (
+        await dataSource.manager.findOneByOrFail(OpportunityVolunteer, {
+          id: active.id,
+        })
+      ).status,
+    ).toBe(PAST);
   });
 });
