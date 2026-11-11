@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from "fastify";
-import { ApiOpportunityGetList, Lang } from "need4deed-sdk";
+import { ApiOpportunityGetList, Lang, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getDistrictCentroids } from "../../../data/utils/get-district";
@@ -11,6 +11,7 @@ import {
 import { maskForCaller } from "../pii/pre-serialization";
 import { getCategoryToDealHandler } from "./add-category-to-deal";
 import { getDistrictToOpportunityHandler } from "./add-district-to-opp";
+import { isStaffRole } from "./is-staff-role";
 import { orderByIds } from "./order-by-ids";
 import { translateOpportunities } from "./translate-opportunities";
 import { updateBackfilledColumn } from "./update-backfilled-column";
@@ -93,11 +94,15 @@ export async function dtoOpportunityListForCaller(
     ),
   ]);
 
+  const role = request.authUser?.role;
+  const canSeeMatches = isStaffRole(role) || role === UserRole.AGENT;
+
   return opportunities.map((opportunity) => {
     const districtId = neededDistrictIds.get(opportunity.id);
-    return dtoOpportunityGetList(
+    const dto = dtoOpportunityGetList(
       opportunity,
       districtId !== undefined ? districtCentroids.get(districtId) : undefined,
     );
+    return canSeeMatches ? dto : { ...dto, volunteerNames: [] };
   });
 }
