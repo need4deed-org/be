@@ -7,22 +7,14 @@ export async function isVolunteerDeactivated(
   volunteerId: number,
 ): Promise<boolean> {
   const logins = await manager.find(User, {
-    select: { id: true, createdAt: true, deactivatedAt: true },
+    select: { id: true, isActive: true, deactivatedAt: true },
     where: {
       role: UserRole.VOLUNTEER,
       person: { volunteer: { id: volunteerId } },
     },
   });
-  const latest = (dates: Date[]) =>
-    Math.max(...dates.map((date) => date.getTime()));
-  const deactivations = logins.flatMap(({ deactivatedAt }) =>
-    deactivatedAt ? [deactivatedAt] : [],
-  );
-  const activeIssues = logins
-    .filter(({ deactivatedAt }) => !deactivatedAt)
-    .map(({ createdAt }) => createdAt);
   return (
-    deactivations.length > 0 &&
-    (activeIssues.length === 0 || latest(deactivations) > latest(activeIssues))
+    logins.some(({ deactivatedAt }) => deactivatedAt) &&
+    !logins.some(({ isActive, deactivatedAt }) => isActive && !deactivatedAt)
   );
 }

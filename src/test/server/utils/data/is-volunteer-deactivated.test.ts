@@ -34,7 +34,7 @@ describe("isVolunteerDeactivated", () => {
     personId: number,
     role: UserRole,
     deactivatedAt: Date | null,
-    createdAt = new Date("2026-01-01"),
+    isActive = !deactivatedAt,
   ) =>
     queryRunner.manager.save(
       new User({
@@ -42,9 +42,8 @@ describe("isVolunteerDeactivated", () => {
         password: "",
         personId,
         role,
-        isActive: !deactivatedAt,
+        isActive,
         deactivatedAt,
-        createdAt,
       }),
     );
 
@@ -67,29 +66,16 @@ describe("isVolunteerDeactivated", () => {
     expect(await check()).toBe(true);
   });
 
-  it("is false when a login is issued after the deactivation", async () => {
-    await addUser(
-      volunteer.personId,
-      UserRole.VOLUNTEER,
-      new Date("2026-02-01"),
-    );
-    await addUser(
-      volunteer.personId,
-      UserRole.VOLUNTEER,
-      null,
-      new Date("2026-03-01"),
-    );
+  it("is false while another volunteer login still works", async () => {
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, new Date());
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, null);
 
     expect(await check()).toBe(false);
   });
 
-  it("is true when one of two earlier logins is deactivated", async () => {
-    await addUser(volunteer.personId, UserRole.VOLUNTEER, null);
-    await addUser(
-      volunteer.personId,
-      UserRole.VOLUNTEER,
-      new Date("2026-02-01"),
-    );
+  it("is true when the only other login was never verified", async () => {
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, new Date());
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, null, false);
 
     expect(await check()).toBe(true);
   });

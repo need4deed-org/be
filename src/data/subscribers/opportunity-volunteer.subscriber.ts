@@ -48,11 +48,13 @@ export class OpportunityVolunteerSubscriber
   async beforeUpdate(event: UpdateEvent<OpportunityVolunteer>) {
     const after = event.entity as Partial<OpportunityVolunteer> | undefined;
     await lockParents(event, parentIds(event.databaseEntity, after));
-    await rejectDeactivatedVolunteer(
-      event.manager,
-      event.databaseEntity,
-      after,
-    );
+    if (event.databaseEntity) {
+      await rejectDeactivatedVolunteer(
+        event.manager,
+        event.databaseEntity,
+        after,
+      );
+    }
   }
 
   beforeRemove(event: RemoveEvent<OpportunityVolunteer>) {
@@ -154,7 +156,8 @@ async function rejectDeactivatedVolunteer(
     before.status === OpportunityVolunteerStatusType.PAST ||
     isRepointed(before, after) ||
     (before.status === OpportunityVolunteerStatusType.PENDING &&
-      after?.status === OpportunityVolunteerStatusType.MATCHED);
+      after?.status !== undefined &&
+      after.status !== OpportunityVolunteerStatusType.PENDING);
   if (!opensLink) {
     return;
   }

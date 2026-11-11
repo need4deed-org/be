@@ -139,6 +139,16 @@ describe("matching a deactivated volunteer", () => {
     );
   });
 
+  it("rejects activating a pending suggestion directly", async () => {
+    const pending = await link(manager, volunteer, opportunity, PENDING);
+    await deactivateLogin(manager, login);
+
+    pending.status = ACTIVE;
+    await expect(manager.save(pending)).rejects.toBeInstanceOf(
+      DeactivatedVolunteerError,
+    );
+  });
+
   it("rejects moving an open link to another opportunity", async () => {
     const open = await link(manager, volunteer, opportunity, MATCHED);
     const other = await createOpportunity(manager, `Deactivated ${suffix} c`);
