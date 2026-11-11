@@ -51,6 +51,7 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
   let coordinatorCookie: string;
   let agentRolePerson: Person;
   let agentRoleCookie: string;
+  let volunteerCookie: string;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -164,6 +165,25 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
         status: AgentMembershipStatus.ACTIVE,
       }),
     );
+
+    await fastify.db.userRepository.save(
+      new User({
+        email: `volunteer-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+    const volunteerLoginRes = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: `volunteer-${suffix}@test.need4deed.org`,
+        password: PASSWORD,
+      },
+    });
+    volunteerCookie = getCookie(volunteerLoginRes.cookies, accessCookieName);
   });
 
   afterAll(async () => {
@@ -173,6 +193,7 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     });
     await fastify.db.opportunityRepository.delete({ id: opportunity.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
@@ -181,6 +202,27 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     await fastify.db.userRepository.delete({ personId: agentRolePerson.id });
     await fastify.db.personRepository.delete({ id: agentRolePerson.id });
     await fastify.close();
+  });
+
+  it("403s a volunteer, even one matched to the opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("lists the matches for a coordinator", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${opportunity.id}/volunteer-linked`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(
+      res.json().data.map((row: { volunteerId: number }) => row.volunteerId),
+    ).toEqual([volunteer.id]);
   });
 
   it("returns volunteer identity unmasked while the agent is ACTIVE", async () => {

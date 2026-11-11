@@ -99,14 +99,6 @@ describe("commute range on volunteer-opportunity pairs", () => {
       }
     });
 
-    it("does not show a volunteer any commute", async () => {
-      const res = await f.get("owned", url());
-      expect(res.statusCode).toBe(200);
-      const rows: PairRow[] = res.json().data;
-      expect(rows.length).toBeGreaterThan(0);
-      rows.forEach((row) => expect(row).not.toHaveProperty("commute"));
-    });
-
     it("looks the ranges up in a single query", async () => {
       expect(await countCommuteQueries(() => f.get("coordinator", url()))).toBe(
         1,
