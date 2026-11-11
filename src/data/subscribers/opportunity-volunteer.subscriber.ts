@@ -9,7 +9,6 @@ import {
   UpdateEvent,
 } from "typeorm";
 import { DeactivatedVolunteerError } from "../../config/error";
-import { isVolunteerDeactivated } from "../../server/utils/data/is-volunteer-deactivated";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
@@ -154,12 +153,14 @@ async function rejectDeactivatedVolunteer(
     !before ||
     before.status === OpportunityVolunteerStatusType.PAST ||
     isRepointed(before, after) ||
-    (after?.status !== before.status &&
-      (status === OpportunityVolunteerStatusType.PENDING ||
-        status === OpportunityVolunteerStatusType.MATCHED));
+    (before.status === OpportunityVolunteerStatusType.PENDING &&
+      after?.status === OpportunityVolunteerStatusType.MATCHED);
   if (!opensLink) {
     return;
   }
+  const { isVolunteerDeactivated } = await import(
+    "../../server/utils/data/is-volunteer-deactivated"
+  );
   if (await isVolunteerDeactivated(manager, volunteerId)) {
     throw new DeactivatedVolunteerError();
   }

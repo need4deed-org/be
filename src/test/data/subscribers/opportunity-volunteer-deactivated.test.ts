@@ -166,6 +166,14 @@ describe("matching a deactivated volunteer", () => {
     await expect(manager.save(open)).resolves.toBeDefined();
   });
 
+  it("allows moving an open link back a step", async () => {
+    const open = await link(manager, volunteer, opportunity, ACTIVE);
+    await deactivateLogin(manager, login);
+
+    open.status = MATCHED;
+    await expect(manager.save(open)).resolves.toBeDefined();
+  });
+
   it("allows ending an open link", async () => {
     const open = await link(manager, volunteer, opportunity, MATCHED);
     await deactivateLogin(manager, login);
