@@ -222,6 +222,40 @@ describe("GET /opportunity/:id/volunteer-linked", () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it("403s a caller with the plain user role", async () => {
+    const userPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "PlainUser" }),
+    );
+    const email = `plainuser-${userPerson.id}@test.need4deed.org`;
+    await fastify.db.userRepository.save(
+      new User({
+        email,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.USER,
+        isActive: true,
+        personId: userPerson.id,
+      }),
+    );
+    try {
+      const loginRes = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password: PASSWORD },
+      });
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity/${opportunity.id}/volunteer-linked`,
+        cookies: {
+          [accessCookieName]: getCookie(loginRes.cookies, accessCookieName),
+        },
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await fastify.db.userRepository.delete({ personId: userPerson.id });
+      await fastify.db.personRepository.delete({ id: userPerson.id });
+    }
+  });
+
   it("lists the matches for a coordinator", async () => {
     const res = await fastify.inject({
       method: "GET",

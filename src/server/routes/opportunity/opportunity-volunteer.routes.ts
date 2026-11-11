@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerOpportunityGet, UserRole } from "need4deed-sdk";
-import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
+import { NotFoundError } from "../../../config/error/fastify";
 import { opportunityOpportunityVolunteerDTO } from "../../../services";
 import { idParamSchema, responseSchema } from "../../schema";
 import {
@@ -12,8 +12,6 @@ import {
   shouldMaskInactiveAgentData,
 } from "../../utils";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
-
-const msg400 = "URL param must ba a positive number";
 
 export default function opportunityOpportunityVolunteerRoutes(
   fastify: FastifyInstance,
@@ -33,9 +31,6 @@ export default function opportunityOpportunityVolunteerRoutes(
     async (request, reply) => {
       assertRoleIn(request);
       const opportunityId = request.params.id;
-      if (opportunityId <= 0) {
-        throw new BadRequestError(msg400);
-      }
 
       if (request.authUser?.role === UserRole.AGENT) {
         const opportunity = await fastify.db.opportunityRepository.findOne({
