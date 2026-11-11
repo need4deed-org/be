@@ -57,3 +57,9 @@ export class EmailAlreadySentError extends BaseError {
     super(message, 409);
   }
 }
+
+export class DeactivatedVolunteerError extends BaseError {
+  constructor(message = "Volunteer account has been deactivated.") {
+    super(message, 409);
+  }
+}
