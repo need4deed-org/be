@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import OpportunityVolunteer from "../../../../data/entity/m2m/opportunity-volunteer";
 import VolunteerAuditLog from "../../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
+import { isVolunteerDeactivated } from "../../../../server/utils/data/is-volunteer-deactivated";
 import { hasRecentOnetimerMatch } from "../../../../server/utils/data/onetimer-active-period";
 import {
   syncEngagementForMatchChange,
@@ -15,6 +16,9 @@ import {
 
 vi.mock("../../../../server/utils/data/onetimer-active-period", () => ({
   hasRecentOnetimerMatch: vi.fn(),
+}));
+vi.mock("../../../../server/utils/data/is-volunteer-deactivated", () => ({
+  isVolunteerDeactivated: vi.fn().mockResolvedValue(false),
 }));
 
 const exists = vi.fn();
@@ -52,6 +56,16 @@ describe("syncVolunteerEngagement", () => {
       { id: 7, statusEngagement: VolunteerStateEngagementType.ACTIVE },
       { statusEngagement: VolunteerStateEngagementType.AVAILABLE },
     );
+  });
+
+  it("doesn't promote a deactivated volunteer with an active match", async () => {
+    exists.mockResolvedValue(true);
+    vi.mocked(isVolunteerDeactivated).mockResolvedValueOnce(true);
+
+    await syncVolunteerEngagement(manager, 7);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("sets Active (and clears the return date) when the volunteer has an active match", async () => {

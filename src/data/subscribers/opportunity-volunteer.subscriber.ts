@@ -1,3 +1,4 @@
+import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import {
   EntityManager,
   EntitySubscriberInterface,
@@ -7,6 +8,7 @@ import {
   RemoveEvent,
   UpdateEvent,
 } from "typeorm";
+import { DeactivatedVolunteerError } from "../../config/error";
 import OpportunityVolunteer from "../entity/m2m/opportunity-volunteer";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import Volunteer from "../entity/volunteer/volunteer.entity";
@@ -38,15 +40,30 @@ export class OpportunityVolunteerSubscriber
     return OpportunityVolunteer;
   }
 
-  beforeInsert(event: InsertEvent<OpportunityVolunteer>) {
-    return lockParents(event, parentIds(event.entity));
+  async beforeInsert(event: InsertEvent<OpportunityVolunteer>) {
+    await lockParents(event, parentIds(event.entity));
+    await rejectDeactivatedVolunteer(event.manager, undefined, event.entity);
   }
 
-  beforeUpdate(event: UpdateEvent<OpportunityVolunteer>) {
-    return lockParents(
-      event,
-      parentIds(event.databaseEntity, event.entity ?? undefined),
-    );
+  async beforeUpdate(event: UpdateEvent<OpportunityVolunteer>) {
+    const after = event.entity as Partial<OpportunityVolunteer> | undefined;
+    await lockParents(event, parentIds(event.databaseEntity, after));
+    if (event.databaseEntity) {
+      const current = await event.manager.findOne(OpportunityVolunteer, {
+        select: {
+          id: true,
+          status: true,
+          volunteerId: true,
+          opportunityId: true,
+        },
+        where: { id: event.databaseEntity.id },
+      });
+      await rejectDeactivatedVolunteer(
+        event.manager,
+        current ?? event.databaseEntity,
+        after,
+      );
+    }
   }
 
   beforeRemove(event: RemoveEvent<OpportunityVolunteer>) {
@@ -130,6 +147,35 @@ export async function lockParents(
   }
   for (const id of volunteerIds) {
     await lock(Volunteer, id);
+  }
+}
+
+async function rejectDeactivatedVolunteer(
+  manager: EntityManager,
+  before: Partial<OpportunityVolunteer> | undefined,
+  after: Partial<OpportunityVolunteer> | undefined,
+): Promise<void> {
+  const volunteerId = after?.volunteerId ?? before?.volunteerId;
+  const status = after?.status ?? before?.status;
+  if (!volunteerId || status === OpportunityVolunteerStatusType.PAST) {
+    return;
+  }
+  const opensLink =
+    !before ||
+    before.status === OpportunityVolunteerStatusType.PAST ||
+    isRepointed(before, after) ||
+    (after?.status !== undefined &&
+      after.status !== before.status &&
+      (before.status === OpportunityVolunteerStatusType.PENDING ||
+        after.status === OpportunityVolunteerStatusType.PENDING));
+  if (!opensLink) {
+    return;
+  }
+  const { isVolunteerDeactivated } = await import(
+    "../../server/utils/data/is-volunteer-deactivated"
+  );
+  if (await isVolunteerDeactivated(manager, volunteerId)) {
+    throw new DeactivatedVolunteerError();
   }
 }
 
