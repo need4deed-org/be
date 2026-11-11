@@ -146,15 +146,16 @@ async function rejectDeactivatedVolunteer(
   after: Partial<OpportunityVolunteer> | undefined,
 ): Promise<void> {
   const volunteerId = after?.volunteerId ?? before?.volunteerId;
-  const linksVolunteer =
+  const status = after?.status ?? before?.status;
+  if (!volunteerId || status === OpportunityVolunteerStatusType.PAST) {
+    return;
+  }
+  const opensLink =
     !before ||
+    before.status === OpportunityVolunteerStatusType.PAST ||
     (after?.volunteerId !== undefined &&
       after.volunteerId !== before.volunteerId);
-  const reopens =
-    after?.status !== undefined &&
-    after.status !== before?.status &&
-    after.status !== OpportunityVolunteerStatusType.PAST;
-  if (!volunteerId || !(linksVolunteer || reopens)) {
+  if (!opensLink) {
     return;
   }
   if (await isVolunteerDeactivated(manager, volunteerId)) {

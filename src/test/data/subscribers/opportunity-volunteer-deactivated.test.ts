@@ -129,6 +129,22 @@ describe("matching a deactivated volunteer", () => {
     );
   });
 
+  it("allows recording an ended link", async () => {
+    await deactivateLogin(manager, login);
+
+    await expect(
+      link(manager, volunteer, opportunity, PAST),
+    ).resolves.toBeDefined();
+  });
+
+  it("allows an open link to progress", async () => {
+    const open = await link(manager, volunteer, opportunity, MATCHED);
+    await deactivateLogin(manager, login);
+
+    open.status = ACTIVE;
+    await expect(manager.save(open)).resolves.toBeDefined();
+  });
+
   it("allows ending an open link", async () => {
     const open = await link(manager, volunteer, opportunity, MATCHED);
     await deactivateLogin(manager, login);

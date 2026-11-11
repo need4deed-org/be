@@ -65,6 +65,13 @@ describe("isVolunteerDeactivated", () => {
     expect(await check()).toBe(true);
   });
 
+  it("is false while another volunteer login of the person is active", async () => {
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, new Date());
+    await addUser(volunteer.personId, UserRole.VOLUNTEER, null);
+
+    expect(await check()).toBe(false);
+  });
+
   it("ignores a deactivated login of another role on the same person", async () => {
     await addUser(volunteer.personId, UserRole.COORDINATOR, new Date());
 

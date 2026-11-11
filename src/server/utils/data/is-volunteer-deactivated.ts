@@ -1,16 +1,19 @@
 import { UserRole } from "need4deed-sdk";
-import { EntityManager, IsNull, Not } from "typeorm";
+import { EntityManager } from "typeorm";
 import User from "../../../data/entity/user.entity";
 
-export function isVolunteerDeactivated(
+export async function isVolunteerDeactivated(
   manager: EntityManager,
   volunteerId: number,
 ): Promise<boolean> {
-  return manager.exists(User, {
+  const logins = await manager.find(User, {
+    select: { id: true, deactivatedAt: true },
     where: {
       role: UserRole.VOLUNTEER,
-      deactivatedAt: Not(IsNull()),
       person: { volunteer: { id: volunteerId } },
     },
   });
+  return (
+    logins.length > 0 && logins.every(({ deactivatedAt }) => deactivatedAt)
+  );
 }
