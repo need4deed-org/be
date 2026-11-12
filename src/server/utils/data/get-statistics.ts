@@ -111,11 +111,10 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
   },
 };
 
-// Columns are `timestamp` filled by the database's now(), i.e. session time zone wall time.
 const toLocal = (column: string) =>
-  `((${column}) AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${berlinTimeZone}'`;
+  `(${column}) AT TIME ZONE '${berlinTimeZone}'`;
 const fromLocal = (local: string) =>
-  `((${local}) AT TIME ZONE '${berlinTimeZone}') AT TIME ZONE current_setting('TimeZone')`;
+  `(${local}) AT TIME ZONE '${berlinTimeZone}'`;
 
 async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   const fk = getTranslationFkColumn(EntityTableName.LEAD);

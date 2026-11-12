@@ -36,6 +36,6 @@ export default class PostBookmark {
   @Column()
   personId: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

@@ -128,7 +128,7 @@ export default class FieldTranslation {
   @Column({ type: "varchar", nullable: true })
   model: string | null;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Opportunity, { nullable: true, onDelete: "CASCADE" })

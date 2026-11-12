@@ -42,7 +42,7 @@ export default class Communication {
   @Column({ type: "enum", enum: CommunicationType, nullable: true })
   communicationType?: CommunicationType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   date: Date;
 
   @ManyToOne(() => Volunteer, {

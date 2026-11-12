@@ -34,15 +34,15 @@ export default class RefreshSession {
   @Column({ type: "uuid", nullable: true })
   previousJti: string | null;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   rotatedAt: Date | null;
 
-  @Column({ type: "timestamp" })
+  @Column({ type: "timestamptz" })
   expiresAt: Date;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   revokedAt: Date | null;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
 }

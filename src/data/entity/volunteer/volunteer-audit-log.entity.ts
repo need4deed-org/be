@@ -68,6 +68,6 @@ export default class VolunteerAuditLog {
   @Column({ nullable: true })
   actorUserId?: number;
 
-  @Column({ type: "timestamp" })
+  @Column({ type: "timestamptz" })
   occurredAt: Date;
 }
