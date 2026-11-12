@@ -69,6 +69,6 @@ export default class OpportunityEventRegistration {
   @MaxLength(500)
   message?: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

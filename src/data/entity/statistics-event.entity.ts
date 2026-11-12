@@ -27,7 +27,7 @@ export default class StatisticsEvent {
   @Column({ type: "varchar" })
   metric: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   occurredAt: Date;
 
   @Column({ type: "varchar" })

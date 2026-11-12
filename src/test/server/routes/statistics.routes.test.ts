@@ -31,7 +31,7 @@ const PASSWORD = "test_password";
 async function backdate(table: string, id: number, instant: string) {
   const column = table === "statistics_event" ? "occurred_at" : "created_at";
   await dataSource.query(
-    `UPDATE ${table} SET ${column} = $1::timestamptz AT TIME ZONE current_setting('TimeZone') WHERE id = $2`,
+    `UPDATE ${table} SET ${column} = $1::timestamptz WHERE id = $2`,
     [instant, id],
   );
 }

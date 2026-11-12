@@ -88,10 +88,10 @@ export default class Opportunity {
   @IsString()
   infoConfidential?: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Accompanying, (accompanying) => accompanying.opportunity, {

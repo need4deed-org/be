@@ -124,26 +124,26 @@ export default class Volunteer {
   })
   preferredCommunicationType: VolunteerCommunicationType[];
 
-  @Column({ nullable: true, type: "timestamp" })
+  @Column({ nullable: true, type: "timestamptz" })
   @IsOptional()
   statusVaccinationDate: Date | null;
 
-  @Column({ nullable: true, type: "timestamp" })
+  @Column({ nullable: true, type: "timestamptz" })
   @IsOptional()
   statusCGCApplicationDate: Date | null;
 
-  @Column({ nullable: true, type: "timestamp" })
+  @Column({ nullable: true, type: "timestamptz" })
   @IsOptional()
   statusCGCDate: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: "timestamptz" })
   @IsOptional()
   dateReturn: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Deal)

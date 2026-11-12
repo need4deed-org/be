@@ -111,11 +111,9 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
   },
 };
 
-// Columns are `timestamp` filled by the database's now(), i.e. session time zone wall time.
-const toLocal = (column: string) =>
-  `((${column}) AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${berlinTimeZone}'`;
-const fromLocal = (local: string) =>
-  `((${local}) AT TIME ZONE '${berlinTimeZone}') AT TIME ZONE current_setting('TimeZone')`;
+// timestamptz → Berlin wall time, and Berlin wall time (timestamp) → timestamptz
+const atBerlin = (value: string) =>
+  `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
 
 async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   const fk = getTranslationFkColumn(EntityTableName.LEAD);
@@ -214,7 +212,7 @@ export async function getStatistics(
            date_trunc($1, COALESCE(
              $2::timestamp,
              LEAST(
-               (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
+               (SELECT ${atBerlin(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
                $3::timestamp - interval '1 microsecond'
              ),
              ${nowLocal}
@@ -248,10 +246,10 @@ export async function getStatistics(
     }[]
   > = dataSource.query(
     `WITH src AS (
-       SELECT r.id AS record_id, ${toLocal(source.at)} AS local_at, ${groupKey.key} AS key
+       SELECT r.id AS record_id, ${atBerlin(source.at)} AS local_at, ${groupKey.key} AS key
        FROM ${source.counted ?? source.from} ${groupKey.join ?? ""}
-       WHERE ${source.at} >= ${fromLocal("$2::timestamp")}
-         AND ${source.at} < ${fromLocal("$3::timestamp")} ${filter} ${exclude}
+       WHERE ${source.at} >= ${atBerlin("$2::timestamp")}
+         AND ${source.at} < ${atBerlin("$3::timestamp")} ${filter} ${exclude}
      ),
      counts AS (
        SELECT date_trunc($1, local_at) AS bucket,
