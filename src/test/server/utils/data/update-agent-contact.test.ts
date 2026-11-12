@@ -79,7 +79,7 @@ describe("updateAgentContact address handling (be#1026)", () => {
 });
 
 describe("updateAgentContact postcode resolution", () => {
-  const plz = `9${randomNumericSuffix(4)}`;
+  const plz = `6${randomNumericSuffix(4)}`;
   let preexistingPostcode = false;
   let person: Person;
 

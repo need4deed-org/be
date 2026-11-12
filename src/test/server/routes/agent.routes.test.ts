@@ -490,7 +490,7 @@ describe("PATCH /agent/:id organization details", () => {
   });
 
   describe("address postcode resolution", () => {
-    const plz = `9${randomNumericSuffix(4)}`;
+    const plz = `5${randomNumericSuffix(4)}`;
     let preexistingPostcode = false;
 
     async function agentAddress(): Promise<Address | null> {
