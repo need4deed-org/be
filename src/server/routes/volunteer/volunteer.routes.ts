@@ -555,6 +555,13 @@ export default async function volunteerRoutes(
           );
         }
 
+        if (resolvedPostcode?.id) {
+          await fastify.db.dealRepository.update(
+            { id: dealId },
+            { postcodeId: resolvedPostcode.id },
+          );
+        }
+
         if (languages) {
           const success = await updateOptionList(
             dealId,
