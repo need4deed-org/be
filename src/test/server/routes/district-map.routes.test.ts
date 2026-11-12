@@ -61,7 +61,7 @@ describe("volunteer district map access", () => {
       new Person({ firstName: "Map", lastName: `Volunteer ${suffix}` }),
     );
     volunteerPostcode = await fastify.db.postcodeRepository.save(
-      new Postcode({ value: `9${suffix.padStart(4, "0").slice(-4)}` }),
+      new Postcode({ value: `9${suffix}` }),
     );
     volunteerDistrictPostcode = await fastify.db.agentRepository.manager
       .getRepository(DistrictPostcode)

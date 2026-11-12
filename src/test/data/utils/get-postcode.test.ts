@@ -54,25 +54,6 @@ describe("getPostcode", () => {
     expect(await dataSource.getRepository(Postcode).countBy({ value })).toBe(1);
   });
 
-  it("reuses a stored 4-digit legacy value instead of creating its padded form", async () => {
-    const repository = dataSource.getRepository(Postcode);
-    let legacy: string;
-    do {
-      legacy = String(1000 + Math.floor(Math.random() * 9000));
-    } while (
-      (await repository.existsBy({ value: legacy })) ||
-      (await repository.existsBy({ value: `0${legacy}` }))
-    );
-    const stored = await repository.save(new Postcode({ value: legacy }));
-
-    try {
-      expect((await getPostcode(legacy))?.id).toBe(stored.id);
-      expect(await repository.existsBy({ value: `0${legacy}` })).toBe(false);
-    } finally {
-      await repository.delete({ id: stored.id });
-    }
-  });
-
   it("does not store an invalid postcode when only German ones may be created", async () => {
     const invalid = `Y${randomNumericSuffix()}`;
     expect(await getPostcode(invalid, { createOnlyGerman: true })).toBeNull();

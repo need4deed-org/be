@@ -19,11 +19,8 @@ export async function getPostcode(
 ): Promise<Postcode | null> {
   const postcodeRepository = getRepository(manager, Postcode);
   const value = normalizePostcode(code);
-  const raw = code.trim();
 
-  const stored =
-    (await postcodeRepository.findOneBy({ value })) ??
-    (raw !== value ? await postcodeRepository.findOneBy({ value: raw }) : null);
+  const stored = await postcodeRepository.findOneBy({ value });
   if (stored) {
     return stored;
   }

@@ -390,7 +390,11 @@ export default async function agentRoutes(
             where: { id: agent.addressId },
             relations: ["postcode"],
           });
-          await syncAgentDistrictFromPostcode(agent, address?.postcode);
+          await syncAgentDistrictFromPostcode(
+            agent,
+            address?.postcode,
+            manager,
+          );
         }
 
         await manager.getRepository(Agent).save(agent);

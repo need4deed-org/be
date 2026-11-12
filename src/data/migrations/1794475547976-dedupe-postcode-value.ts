@@ -4,17 +4,27 @@ export class DedupePostcodeValue1794475547976 implements MigrationInterface {
   name = "DedupePostcodeValue1794475547976";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`LOCK TABLE postcode IN EXCLUSIVE MODE`);
+
+    await queryRunner.query(`
+      CREATE TEMP TABLE postcode_normalized ON COMMIT DROP AS
+      SELECT id,
+             CASE WHEN btrim(value) ~ '^[0-9]{4}$' THEN '0' || btrim(value)
+                  ELSE btrim(value) END AS value
+        FROM postcode
+    `);
+
     await queryRunner.query(`
       CREATE TEMP TABLE postcode_dupe ON COMMIT DROP AS
-      SELECT p.id AS dupe_id, k.keep_id
-        FROM postcode p
+      SELECT n.id AS dupe_id, k.keep_id
+        FROM postcode_normalized n
         JOIN (
           SELECT value, min(id) AS keep_id
-            FROM postcode
+            FROM postcode_normalized
            GROUP BY value
           HAVING count(*) > 1
-        ) k ON k.value = p.value
-       WHERE p.id <> k.keep_id
+        ) k ON k.value = n.value
+       WHERE n.id <> k.keep_id
     `);
 
     await queryRunner.query(`
@@ -61,13 +71,14 @@ export class DedupePostcodeValue1794475547976 implements MigrationInterface {
     }
 
     await queryRunner.query(`
-      DELETE FROM postcode_commute
-       WHERE from_postcode_id IN (SELECT dupe_id FROM postcode_dupe)
-          OR to_postcode_id IN (SELECT dupe_id FROM postcode_dupe)
+      DELETE FROM postcode WHERE id IN (SELECT dupe_id FROM postcode_dupe)
     `);
 
     await queryRunner.query(`
-      DELETE FROM postcode WHERE id IN (SELECT dupe_id FROM postcode_dupe)
+      UPDATE postcode p
+         SET value = n.value
+        FROM postcode_normalized n
+       WHERE n.id = p.id AND n.value <> p.value
     `);
   }
 
