@@ -49,7 +49,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
       }
       return result;
     },
-    [new Postcode({ value: "12345" })],
+    existingPostcodes.has("12345") ? [] : [new Postcode({ value: "12345" })],
   );
 
   try {

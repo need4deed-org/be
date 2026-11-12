@@ -27,5 +27,11 @@ export async function getPostcode(
   if (createOnlyGerman && !isValidPLZ(value)) {
     return null;
   }
-  return postcodeRepository.save(new Postcode({ value }));
+  await postcodeRepository
+    .createQueryBuilder()
+    .insert()
+    .values({ value })
+    .orIgnore()
+    .execute();
+  return postcodeRepository.findOneByOrFail({ value });
 }

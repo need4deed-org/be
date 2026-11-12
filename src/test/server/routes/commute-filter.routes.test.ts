@@ -144,16 +144,13 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     const located = (value: string, i: number) =>
       new Postcode({ value, latitude: 52.5 + i / 100, longitude: 13.4 });
     const postcodeRepository = getRepository(dataSource, Postcode);
-    const originDuplicateFirst = await postcodeRepository.save(
-      located(originValue, 0),
-    );
     const [origin, near, far, unmatched] = await postcodeRepository.save(
       [originValue, ...otherValues.slice(0, 3)].map(located),
     );
     withoutCoordinates = await postcodeRepository.save(
       new Postcode({ value: otherValues[3] }),
     );
-    extraPostcodes.push(originDuplicateFirst, withoutCoordinates);
+    extraPostcodes.push(withoutCoordinates);
     Object.assign(postcodes, { origin, near, far, unmatched });
     await getRepository(dataSource, PostcodeCommute).save(
       COMMUTES.map(
