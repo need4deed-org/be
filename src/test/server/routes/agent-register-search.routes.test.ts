@@ -13,6 +13,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 
 // be#885: an INACTIVE agent must not be offered to a new registrant through
 // the self-registration picker, live off the agent's current engagementStatus.
@@ -75,7 +76,7 @@ describe("GET /agent/register/search", () => {
     );
     postcode = await fastify.db.agentRepository.manager
       .getRepository(Postcode)
-      .save(new Postcode({ value: `9${String(Date.now()).slice(-4)}` }));
+      .save(new Postcode({ value: `9${randomNumericSuffix()}` }));
     address = await fastify.db.agentRepository.manager
       .getRepository(Address)
       .save(new Address({ street: "Findable Allee 12a", postcode }));

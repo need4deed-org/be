@@ -10,7 +10,7 @@ import Postcode from "../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
-import { getRepository } from "../../../data/utils";
+import { getRepository, normalizePostcode } from "../../../data/utils";
 import { getNameFields } from "../../../services/dto/utils";
 import { createAddress, patchOrReplaceAddress } from "./for-routes";
 import { escapeLikePattern } from "./person-name-ilike";
@@ -39,7 +39,7 @@ async function syncSubmitterAddress(
   manager: DataSource | EntityManager,
 ): Promise<void> {
   const street = streetFromAddress(body.rac_address);
-  const plz = (body.rac_plz ?? "").trim();
+  const plz = normalizePostcode(body.rac_plz ?? "");
   if (!street && !plz) {
     return;
   }

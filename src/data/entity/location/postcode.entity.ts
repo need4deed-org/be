@@ -1,5 +1,11 @@
 import { IsNotEmpty } from "class-validator";
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
 import { IsPostcode } from "../../../services/validators/custom";
 import { numericTransformer } from "../../lib/numeric-transformer";
 import { Country } from "../../types";
@@ -38,6 +44,7 @@ export default class Postcode {
   latitude?: number;
 
   @Column()
+  @Index({ unique: true })
   @IsNotEmpty()
   @IsPostcode(Country.DE)
   value: string;

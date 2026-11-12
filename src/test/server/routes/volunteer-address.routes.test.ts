@@ -331,6 +331,10 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     min + Math.floor(Math.random() * (max - min + 1));
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
+  const dealPostcodeId = async () =>
+    (await fastify.db.dealRepository.findOneByOrFail({ id: deal.id }))
+      .postcodeId;
+
   const patch = (person: Record<string, unknown>) =>
     fastify.inject({
       method: "PATCH",
@@ -442,6 +446,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     });
     expect(refreshed.phone).toBe(before.phone);
     expect(refreshed.addressId).toBeNull();
+    expect(await dealPostcodeId()).toBe(postcode.id);
   });
 
   it("400s a new address without a postcode", async () => {
@@ -498,6 +503,19 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     });
     expect(refreshed.address?.street).toBe("Suburb Street 3");
     expect(refreshed.address?.postcode?.value).toBe(code);
+    expect(await dealPostcodeId()).toBe(refreshed.address?.postcodeId);
+  });
+
+  it("keeps the deal postcode when only the street changes", async () => {
+    const before = await dealPostcodeId();
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Street Only 3a" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(await dealPostcodeId()).toBe(before);
   });
 
   it("restores the leading zero of a 4-digit postcode before saving it", async () => {
@@ -541,6 +559,7 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       relations: ["address"],
     });
     expect(refreshed.address?.postcodeId).toBe(stored.id);
+    expect(await dealPostcodeId()).toBe(stored.id);
   });
 
   it("400s for a non-numeric postcode id instead of failing in the database", async () => {

@@ -1,9 +1,14 @@
 import { ApiAgentContactPatch } from "need4deed-sdk";
+import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
-import { createAddress, patchOrReplaceAddress } from "./for-routes";
+import {
+  createAddress,
+  patchOrReplaceAddress,
+  resolveAddressPostcode,
+} from "./for-routes";
 
 export async function updateAgentContact(
   membership: AgentPerson,
@@ -20,25 +25,32 @@ export async function updateAgentContact(
       const addressData = input.addressStreet
         ? { street: input.addressStreet }
         : {};
-      const postcodeData = input.addressPostcode
-        ? { value: input.addressPostcode }
-        : {};
+      const postcodeData = await resolveAddressPostcode(
+        input.addressPostcode,
+        manager,
+      );
 
       if (person.addressId) {
-        await patchOrReplaceAddress(
+        const patched = await patchOrReplaceAddress(
           personId,
           { id: person.addressId, ...addressData },
           postcodeData,
           manager,
         );
+        if (!patched) {
+          throw new BadRequestError("Address not saved.");
+        }
       } else {
         const address = await createAddress(addressData, postcodeData, manager);
-        if (address) {
-          await personRepository.update(
-            { id: personId },
-            { addressId: address.id },
+        if (!address) {
+          throw new BadRequestError(
+            "Address not saved: a postcode is required.",
           );
         }
+        await personRepository.update(
+          { id: personId },
+          { addressId: address.id },
+        );
       }
     }
 

@@ -12,6 +12,7 @@ import {
   parserVolunteerSelfRegister,
   VolunteerSelfRegisterBody,
 } from "../../../services/dto/parser-volunteer-self-register";
+import { randomNumericSuffix } from "../../random";
 
 // be#1031/#1033 review: resolveAddress used to check exclusive ownership and
 // fetch+mutate the Person's existing Address up front, then hand a plan (or
@@ -67,7 +68,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   it("does not clobber a concurrent street edit while still applying the postcode change this flow asked for", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const originalPostcode = await getRepository(dataSource, Postcode).save(
-      new Postcode({ value: `9${Date.now() % 10000}` }),
+      new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
     const address = await getRepository(dataSource, Address).save(
       new Address({ street: "Original Street", postcode: originalPostcode }),
@@ -162,7 +163,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   it("clones into a fresh Address instead of patching in place when the Address became shared in the meantime (be#1033 review)", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const originalPostcode = await getRepository(dataSource, Postcode).save(
-      new Postcode({ value: `9${(Date.now() + 1) % 10000}` }),
+      new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
     const address = await getRepository(dataSource, Address).save(
       new Address({ street: "Shared Later St", postcode: originalPostcode }),

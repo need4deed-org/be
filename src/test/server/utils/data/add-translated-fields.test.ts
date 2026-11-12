@@ -13,6 +13,7 @@ import Volunteer from "../../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../../data/types/enums";
 import { createServer } from "../../../../server";
 import { addTranslatedFields } from "../../../../server/utils/data/for-routes";
+import { randomNumericSuffix } from "../../../random";
 
 // Deliberately reuses existing, already-seeded reference rows (language,
 // skill, field_translation) rather than inserting new ones — those tables
@@ -39,8 +40,6 @@ describe("addTranslatedFields", () => {
   let germanSkillTranslationText: string;
   let languageWithNoEnglishTranslation: number;
   let languageWithNoEnglishTranslationTitle: string;
-
-  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -95,7 +94,7 @@ describe("addTranslatedFields", () => {
     languageWithNoEnglishTranslationTitle = languageWithoutEnglish.title;
 
     postcode = await postcodeRepository.save(
-      new Postcode({ value: `1${suffix.slice(-4)}` }),
+      new Postcode({ value: `1${randomNumericSuffix()}` }),
     );
     deal = await dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),

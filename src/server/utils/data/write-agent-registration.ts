@@ -15,6 +15,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
+import { normalizePostcode } from "../../../data/utils/get-postcode";
 import logger from "../../../logger";
 import { syncAgentDistrictFromPostcode } from "./add-district-to-agent";
 import { claimAgent } from "./claim-agent";
@@ -150,7 +151,11 @@ async function assertNoAddressConflict(
   const agents = await manager.getRepository(Agent).find({
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
-  const match = getAgentByAddress(agents, addressStreet, addressPostcode);
+  const match = getAgentByAddress(
+    agents,
+    addressStreet,
+    normalizePostcode(addressPostcode),
+  );
   if (match) {
     throw new AgentAddressConflictError(
       match.id,
@@ -185,7 +190,8 @@ async function createBareAgent(
   if (address || input.addressPostcode) {
     await syncAgentDistrictFromPostcode(
       newAgent,
-      address?.postcodeId ?? ({ value: input.addressPostcode } as Postcode),
+      address?.postcodeId ??
+        ({ value: normalizePostcode(input.addressPostcode!) } as Postcode),
       manager,
     );
   }

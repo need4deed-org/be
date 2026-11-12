@@ -1,3 +1,4 @@
+import { DataSource, EntityManager } from "typeorm";
 import { dataSource } from "../data-source";
 import Postcode from "../entity/location/postcode.entity";
 import { getRepository } from "./get-repository";
@@ -11,9 +12,12 @@ export function normalizePostcode(code: string): string {
 
 export async function getPostcode(
   code: string,
-  { createOnlyGerman = false } = {},
+  {
+    createOnlyGerman = false,
+    manager = dataSource,
+  }: { createOnlyGerman?: boolean; manager?: DataSource | EntityManager } = {},
 ): Promise<Postcode | null> {
-  const postcodeRepository = getRepository(dataSource, Postcode);
+  const postcodeRepository = getRepository(manager, Postcode);
   const value = normalizePostcode(code);
 
   const stored = await postcodeRepository.findOneBy({ value });
@@ -23,5 +27,11 @@ export async function getPostcode(
   if (createOnlyGerman && !isValidPLZ(value)) {
     return null;
   }
-  return postcodeRepository.save(new Postcode({ value }));
+  await postcodeRepository
+    .createQueryBuilder()
+    .insert()
+    .values({ value })
+    .orIgnore()
+    .execute();
+  return postcodeRepository.findOneByOrFail({ value });
 }

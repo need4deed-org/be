@@ -15,6 +15,7 @@ import {
 } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { getTimeslot } from "../../../server/utils";
+import { randomNumericSuffix } from "../../random";
 
 // be#943: POST /volunteer/register?token=<verify-jwt> — the self-service
 // endpoint fe#972's ProfileCompletion form submits to, mirroring
@@ -334,7 +335,7 @@ describe("POST /volunteer/register", () => {
     const { person, token } = await makeRegistrant();
 
     const originalPostcode = await getRepository(dataSource, Postcode).save(
-      new Postcode({ value: `9${Date.now() % 10000}` }),
+      new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
     const address = await getRepository(dataSource, Address).save(
       new Address({ street: "Existing Street 1", postcode: originalPostcode }),

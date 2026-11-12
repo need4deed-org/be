@@ -26,31 +26,13 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
 
   const plzs = (await fetchJsonFromUrl(seedPLZFile)) as PLZJSON[];
 
-  const existingPostcodes = new Set(
-    (await postcodeRepository.find()).map((postcode) => postcode.value),
-  );
-
-  const postcodesForInsert = plzs.reduce(
-    (result: Postcode[], { plz: value, latitude, longitude }) => {
-      if (existingPostcodes.has(value)) {
-        return result;
-      }
-      try {
-        const newPostcode = new Postcode({
-          value,
-          latitude,
-          longitude,
-        });
-        result.push(newPostcode);
-      } catch (error) {
-        throw new Error(
-          `Error creating new postcode ${value}: ${error.message}`,
-        );
-      }
-      return result;
-    },
-    [new Postcode({ value: "12345" })],
-  );
+  const postcodesByValue = new Map<string, Postcode>([
+    ["12345", new Postcode({ value: "12345" })],
+  ]);
+  for (const { plz: value, latitude, longitude } of plzs) {
+    postcodesByValue.set(value, new Postcode({ value, latitude, longitude }));
+  }
+  const postcodesForInsert = [...postcodesByValue.values()];
 
   try {
     await postcodeRepository.insert(postcodesForInsert);
