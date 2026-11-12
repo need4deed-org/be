@@ -64,7 +64,7 @@ import { maskPii } from "../pii/mask";
 import { CallerVisibility } from "../pii/visible-persons";
 import { findVolunteerIdsActiveFromOnetimer } from "./onetimer-active-period";
 
-export { getPostcode };
+export { getPostcode } from "../../../data/utils";
 
 export async function getProfileEntityByTitle<
   E extends new () => { title: string; id: number },

@@ -282,4 +282,30 @@ describe("createAgentContact links an existing AGENT user (be#1048)", () => {
     expect(membership.person.firstName).toBe("No");
     createdPersonIds.push(membership.personId);
   });
+
+  it("rejects an invalid postcode instead of creating the contact without an address", async () => {
+    const targetAgent = await dataSource
+      .getRepository(Agent)
+      .save(new Agent({ title: `Invalid-PLZ NGO ${suffix}` }));
+    createdAgentIds.push(targetAgent.id);
+
+    await expect(
+      createAgentContact(
+        targetAgent.id,
+        {
+          firstName: "Bad",
+          lastName: `Postcode ${suffix}`,
+          role: AgentRoleType.OTHER,
+          addressStreet: "Nowhere 1",
+          addressPostcode: "00999",
+        },
+        UserRole.COORDINATOR,
+      ),
+    ).rejects.toThrow("invalid postcode");
+    expect(
+      await dataSource
+        .getRepository(Person)
+        .existsBy({ lastName: `Postcode ${suffix}` }),
+    ).toBe(false);
+  });
 });

@@ -9,9 +9,13 @@ export class DedupePostcodeValue1794475547976 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TEMP TABLE postcode_normalized ON COMMIT DROP AS
       SELECT id,
-             CASE WHEN btrim(value) ~ '^[0-9]{4}$' THEN '0' || btrim(value)
-                  ELSE btrim(value) END AS value
-        FROM postcode
+             CASE WHEN trimmed ~ '^[0-9]{4}$' THEN '0' || trimmed
+                  ELSE trimmed END AS value
+        FROM (
+          SELECT id,
+                 regexp_replace(value, '^[\\s\\u00a0\\ufeff]+|[\\s\\u00a0\\ufeff]+$', '', 'g') AS trimmed
+            FROM postcode
+        ) t
     `);
 
     await queryRunner.query(`

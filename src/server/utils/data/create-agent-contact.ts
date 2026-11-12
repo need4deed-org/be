@@ -9,7 +9,7 @@ import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import { claimAgent } from "./claim-agent";
-import { createAddress } from "./for-routes";
+import { createAddress, resolveAddressPostcode } from "./for-routes";
 import { isStaffRole } from "./is-staff-role";
 
 async function findExistingAgentUserPerson(
@@ -77,7 +77,7 @@ export async function createAgentContact(
     if (input.addressStreet && input.addressPostcode) {
       const address = await createAddress(
         { street: input.addressStreet },
-        { value: input.addressPostcode },
+        await resolveAddressPostcode(input.addressPostcode, manager),
         manager,
       );
       addressId = address?.id;
