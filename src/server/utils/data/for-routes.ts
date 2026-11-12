@@ -47,7 +47,12 @@ import Language from "../../../data/entity/profile/language.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { getRepository, getRRULE, getStartEnd } from "../../../data/utils";
+import {
+  getPostcode,
+  getRepository,
+  getRRULE,
+  getStartEnd,
+} from "../../../data/utils";
 import logger from "../../../logger";
 import { volunteerSerializer } from "../../../services";
 import {
@@ -59,7 +64,7 @@ import { maskPii } from "../pii/mask";
 import { CallerVisibility } from "../pii/visible-persons";
 import { findVolunteerIdsActiveFromOnetimer } from "./onetimer-active-period";
 
-export { getPostcode } from "../../../data/utils";
+export { getPostcode };
 
 export async function getProfileEntityByTitle<
   E extends new () => { title: string; id: number },
@@ -379,24 +384,48 @@ export async function patchAddress(
   postcodeData: Partial<Postcode>,
   manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const postcodeRepository = getRepository(manager, Postcode);
-
   const address = { ...addressData } as Address;
 
-  if (postcodeData) {
-    if (postcodeData.id) {
-      address.postcodeId = postcodeData.id;
-    } else if (postcodeData.value) {
-      const postcode = await postcodeRepository.findOneBy({
-        value: postcodeData.value,
-      });
-      if (postcode) {
-        address.postcodeId = postcode.id;
-      }
+  if (postcodeData?.id || postcodeData?.value) {
+    const postcodeId = await resolvePostcodeId(postcodeData, manager);
+    if (!postcodeId) {
+      return false;
     }
+    address.postcodeId = postcodeId;
   }
 
   return Boolean(await patchEntity(Address, address, undefined, manager));
+}
+
+export async function resolvePostcodeId(
+  postcodeData: Partial<Postcode> | undefined,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<number | undefined> {
+  if (postcodeData?.id) {
+    return postcodeData.id;
+  }
+  if (!postcodeData?.value) {
+    return undefined;
+  }
+  const postcode = await getPostcode(postcodeData.value, {
+    createOnlyGerman: true,
+    manager,
+  });
+  return postcode?.id;
+}
+
+export async function resolveAddressPostcode(
+  value: string | undefined,
+  manager: DataSource | EntityManager = dataSource,
+): Promise<Partial<Postcode>> {
+  if (!value) {
+    return {};
+  }
+  const id = await resolvePostcodeId({ value }, manager);
+  if (!id) {
+    throw new BadRequestError("Address not saved: invalid postcode.");
+  }
+  return { id };
 }
 
 export async function createAddress(
@@ -405,16 +434,8 @@ export async function createAddress(
   manager: DataSource | EntityManager = dataSource,
 ): Promise<Address | null> {
   const addressRepository = getRepository(manager, Address);
-  const postcodeRepository = getRepository(manager, Postcode);
 
-  let postcodeId = postcodeData?.id;
-  if (!postcodeId && postcodeData?.value) {
-    const postcode = await postcodeRepository.findOneBy({
-      value: postcodeData.value,
-    });
-    postcodeId = postcode?.id;
-  }
-
+  const postcodeId = await resolvePostcodeId(postcodeData, manager);
   if (!postcodeId) {
     return null;
   }

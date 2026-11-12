@@ -488,6 +488,92 @@ describe("PATCH /agent/:id organization details", () => {
       expect(updated.districtId).not.toBe(districtB.id);
     });
   });
+
+  describe("address postcode resolution", () => {
+    const plz = `9${randomNumericSuffix(4)}`;
+    let preexistingPostcode = false;
+
+    async function agentAddress(): Promise<Address | null> {
+      const { addressId } = await fastify.db.agentRepository.findOneByOrFail({
+        id: agent.id,
+      });
+      return addressId
+        ? dataSource
+            .getRepository(Address)
+            .findOne({ where: { id: addressId }, relations: ["postcode"] })
+        : null;
+    }
+
+    beforeAll(async () => {
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { districtId: null, addressId: null },
+      );
+      preexistingPostcode = await dataSource
+        .getRepository(Postcode)
+        .existsBy({ value: plz });
+    });
+
+    afterAll(async () => {
+      const address = await agentAddress();
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { districtId: null, addressId: null },
+      );
+      if (address) {
+        await dataSource.getRepository(Address).delete({ id: address.id });
+      }
+      if (!preexistingPostcode) {
+        await dataSource.getRepository(Postcode).delete({ value: plz });
+      }
+    });
+
+    it("saves a valid German postcode that isn't stored yet", async () => {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { addressStreet: "Teststraße 2", addressPostcode: plz },
+      });
+      expect(res.statusCode).toBe(204);
+
+      const address = await agentAddress();
+      expect(address?.street).toBe("Teststraße 2");
+      expect(address?.postcode.value).toBe(plz);
+    });
+
+    it("rejects an invalid postcode and leaves the existing address unchanged", async () => {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { addressStreet: "Other Street 3", addressPostcode: "00999" },
+      });
+      expect(res.statusCode).toBe(400);
+
+      const address = await agentAddress();
+      expect(address?.street).toBe("Teststraße 2");
+      expect(address?.postcode.value).toBe(plz);
+    });
+
+    it("rejects an invalid postcode when the agent has no address yet", async () => {
+      const address = await agentAddress();
+      await fastify.db.agentRepository.update(
+        { id: agent.id },
+        { addressId: null },
+      );
+      await dataSource.getRepository(Address).delete({ id: address!.id });
+
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/agent/${agent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { addressStreet: "Other Street 3", addressPostcode: "1234x" },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(await agentAddress()).toBeNull();
+    });
+  });
 });
 
 // fe#911: a coordinator can create a bare Agent with no linked Person/User,

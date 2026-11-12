@@ -53,6 +53,7 @@ import {
   getSkipTake,
   isStaffRole,
   patchAddress,
+  resolveAddressPostcode,
   syncAgentDistrictFromPostcode,
   updateAgentLanguages,
   updateAgentServices,
@@ -350,9 +351,10 @@ export default async function agentRoutes(
       await agentRepository.manager.transaction(async (manager) => {
         if (addressStreet || addressPostcode) {
           const addressData = addressStreet ? { street: addressStreet } : {};
-          const postcodeData = addressPostcode
-            ? { value: addressPostcode }
-            : {};
+          const postcodeData = await resolveAddressPostcode(
+            addressPostcode,
+            manager,
+          );
 
           if (agent.addressId) {
             const success = await patchAddress(
