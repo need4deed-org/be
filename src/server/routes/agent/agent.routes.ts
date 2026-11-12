@@ -349,6 +349,12 @@ export default async function agentRoutes(
         request.body;
 
       await agentRepository.manager.transaction(async (manager) => {
+        const addressRepository = getRepository(manager, Address);
+        const postcodeIdBefore = agent.addressId
+          ? (await addressRepository.findOneBy({ id: agent.addressId }))
+              ?.postcodeId
+          : undefined;
+
         if (addressStreet || addressPostcode) {
           const addressData = addressStreet ? { street: addressStreet } : {};
           const postcodeData = await resolveAddressPostcode(
@@ -385,7 +391,6 @@ export default async function agentRoutes(
         Object.assign(agent, parseAgentPatch(request.body));
 
         if (agent.addressId) {
-          const addressRepository = getRepository(manager, Address);
           const address = await addressRepository.findOne({
             where: { id: agent.addressId },
             relations: ["postcode"],
@@ -394,6 +399,7 @@ export default async function agentRoutes(
             agent,
             address?.postcode,
             manager,
+            { clearWhenUnmapped: address?.postcodeId !== postcodeIdBefore },
           );
         }
 

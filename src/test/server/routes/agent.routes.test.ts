@@ -487,6 +487,72 @@ describe("PATCH /agent/:id organization details", () => {
       expect(updated.districtId).toBe(before.districtId);
       expect(updated.districtId).not.toBe(districtB.id);
     });
+
+    describe("moving to a postcode with no district", () => {
+      const unmappedPlz = `7${randomNumericSuffix(4)}`;
+      let preexistingPostcode = false;
+
+      const patchAgent = (payload: Record<string, unknown>) =>
+        fastify.inject({
+          method: "PATCH",
+          url: `/agent/${agent.id}`,
+          cookies: { [accessCookieName]: coordinatorCookie },
+          payload,
+        });
+      const districtId = async () =>
+        (await fastify.db.agentRepository.findOneByOrFail({ id: agent.id }))
+          .districtId;
+
+      beforeAll(async () => {
+        preexistingPostcode = await dataSource
+          .getRepository(Postcode)
+          .existsBy({ value: unmappedPlz });
+      });
+
+      afterAll(async () => {
+        const { addressId } = await fastify.db.agentRepository.findOneByOrFail({
+          id: agent.id,
+        });
+        await fastify.db.agentRepository.update(
+          { id: agent.id },
+          { districtId: null, addressId: null },
+        );
+        if (addressId) {
+          await dataSource.getRepository(Address).delete({ id: addressId });
+        }
+        if (!preexistingPostcode) {
+          await dataSource
+            .getRepository(Postcode)
+            .delete({ value: unmappedPlz });
+        }
+      });
+
+      it("keeps the district on a street-only PATCH", async () => {
+        const res = await patchAgent({ addressStreet: "Teststraße 9" });
+        expect(res.statusCode).toBe(204);
+        expect(await districtId()).toBe(districtA.id);
+      });
+
+      it("clears the district when the postcode changes to one with no district", async () => {
+        const res = await patchAgent({ addressPostcode: unmappedPlz });
+        expect(res.statusCode).toBe(204);
+        expect(await districtId()).toBeNull();
+      });
+
+      it("keeps a district set elsewhere while the unmapped postcode stays the same", async () => {
+        await fastify.db.agentRepository.update(
+          { id: agent.id },
+          { districtId: districtB.id },
+        );
+
+        const res = await patchAgent({
+          addressStreet: "Teststraße 10",
+          addressPostcode: unmappedPlz,
+        });
+        expect(res.statusCode).toBe(204);
+        expect(await districtId()).toBe(districtB.id);
+      });
+    });
   });
 
   describe("address postcode resolution", () => {
