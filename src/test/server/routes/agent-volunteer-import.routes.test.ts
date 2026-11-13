@@ -18,7 +18,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -84,7 +84,7 @@ describe("POST /agent/:id/volunteer-import (be#1332)", () => {
         where: { value: Raw((v) => `${v} ~ '^0[0-9]{4}$'`) },
       })) ??
       (createdPostcode = await fastify.db.postcodeRepository.save(
-        new Postcode({ value: `0${randomNumericSuffix(4)}` }),
+        new Postcode({ value: randomNonReferencePostcode("0") }),
       ));
     postcode = found.value;
     postcodeId = found.id;

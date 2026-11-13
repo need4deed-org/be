@@ -5,7 +5,10 @@ import Postcode from "../../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Person from "../../../../data/entity/person.entity";
 import { updateAgentContact } from "../../../../server/utils/data/update-agent-contact";
-import { randomNumericSuffix } from "../../../random";
+import {
+  randomNonReferencePostcode,
+  randomNumericSuffix,
+} from "../../../random";
 
 // be#1026: PATCH /agent/:id/contact/:membershipId (updateAgentContact) used
 // to patch a caller-supplied Address id in place with no check for whether
@@ -79,7 +82,7 @@ describe("updateAgentContact address handling (be#1026)", () => {
 });
 
 describe("updateAgentContact postcode resolution", () => {
-  const plz = `6${randomNumericSuffix(4)}`;
+  const plz = randomNonReferencePostcode("6");
   let preexistingPostcode = false;
   let person: Person;
 

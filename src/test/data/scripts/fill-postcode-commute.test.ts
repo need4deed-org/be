@@ -13,7 +13,7 @@ import {
   shortestJourneyMinutes,
   VbbJourneysResponse,
 } from "../../../data/scripts/fill-postcode-commute";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode } from "../../random";
 
 const journey = (departure: string | null, arrival: string | null) => ({
   legs: [
@@ -257,7 +257,7 @@ describe("runFill", () => {
       [0, 1, 2].map(
         (i) =>
           new Postcode({
-            value: `9${randomNumericSuffix(4)}`,
+            value: randomNonReferencePostcode("9"),
             latitude: 52.5 + i / 100,
             longitude: 13.4,
           }),
@@ -265,7 +265,7 @@ describe("runFill", () => {
     );
     withoutCoordinates = await dataSource
       .getRepository(Postcode)
-      .save(new Postcode({ value: `9${randomNumericSuffix(4)}` }));
+      .save(new Postcode({ value: randomNonReferencePostcode("9") }));
   });
 
   afterAll(async () => {
