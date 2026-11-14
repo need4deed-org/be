@@ -1,11 +1,14 @@
 import { FastifyInstance } from "fastify";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import { createServer } from "../../../server";
+import { randomNonReferencePostcode } from "../../random";
 
 describe("GET /postcode/check", () => {
   let fastify: FastifyInstance;
+  const onDemandValue = randomNonReferencePostcode("1");
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -13,6 +16,9 @@ describe("GET /postcode/check", () => {
   });
 
   afterAll(async () => {
+    await dataSource
+      .getRepository(Postcode)
+      .delete({ value: In([onDemandValue]) });
     if (fastify) {
       await fastify.close();
     }
@@ -36,14 +42,14 @@ describe("GET /postcode/check", () => {
       .getRepository(Postcode)
       .createQueryBuilder()
       .insert()
-      .values({ value: "10699" })
+      .values({ value: onDemandValue })
       .orIgnore()
       .execute();
 
-    const response = await check("10699");
+    const response = await check(onDemandValue);
 
     expect(response.statusCode, response.body).toBe(200);
-    expect(response.json().data).toEqual({ code: "10699", known: false });
+    expect(response.json().data).toEqual({ code: onDemandValue, known: false });
   });
 
   it("restores the leading zero of a 4-digit PLZ", async () => {

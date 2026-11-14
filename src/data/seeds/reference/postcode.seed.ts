@@ -1,15 +1,12 @@
 import { DataSource } from "typeorm";
 import { seedAllPLZFile, seedPLZFile } from "../../../config/constants";
-import Postcode from "../../entity/location/postcode.entity";
-import { fetchJsonFromUrl, getRepository } from "../../utils";
+import { fetchJsonFromUrl } from "../../utils";
 
 interface PLZJSON {
   plz: string;
   latitude: number;
   longitude: number;
 }
-
-const dummyPostcode = "12345";
 
 export async function seedPostcode(dataSource: DataSource): Promise<void> {
   if (!dataSource) {
@@ -21,9 +18,7 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
     rowsByPLZ.set(row.plz, row);
   }
   for (const row of (await fetchJsonFromUrl(seedPLZFile)) as PLZJSON[]) {
-    if (rowsByPLZ.has(row.plz)) {
-      rowsByPLZ.set(row.plz, row);
-    }
+    rowsByPLZ.set(row.plz, row);
   }
   const rows = [...rowsByPLZ.values()];
 
@@ -49,12 +44,6 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
         rows.map(({ longitude }) => longitude),
       ],
     );
-    await getRepository(dataSource, Postcode)
-      .createQueryBuilder()
-      .insert()
-      .values({ value: dummyPostcode })
-      .orIgnore()
-      .execute();
   } catch (error) {
     throw new Error(`Error seeding postcodes: ${error.message}`);
   }

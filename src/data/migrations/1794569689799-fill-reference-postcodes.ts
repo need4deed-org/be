@@ -19,9 +19,7 @@ export class FillReferencePostcodes1794569689799 implements MigrationInterface {
       rowsByPLZ.set(row.plz, row);
     }
     for (const row of readRows("PLZs.json")) {
-      if (rowsByPLZ.has(row.plz)) {
-        rowsByPLZ.set(row.plz, row);
-      }
+      rowsByPLZ.set(row.plz, row);
     }
     const rows = [...rowsByPLZ.values()];
 
