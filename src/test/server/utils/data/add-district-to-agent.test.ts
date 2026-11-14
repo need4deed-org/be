@@ -99,6 +99,36 @@ describe("syncAgentDistrictFromPostcode", () => {
 
     expect(result.districtId).toBe(1);
   });
+
+  it("clears district/districtId when asked to and no district resolves", async () => {
+    mockedGetDistrictFromPostcode.mockResolvedValue(null);
+
+    const agent = makeAgent({ districtId: 1, district: makeDistrict() as any });
+    const result = await syncAgentDistrictFromPostcode(
+      agent,
+      { id: 99 } as any,
+      undefined,
+      { clearWhenUnmapped: true },
+    );
+
+    expect(result.districtId).toBeNull();
+    expect(result.district).toBeNull();
+  });
+
+  it("still sets the resolved district when asked to clear an unmapped one", async () => {
+    mockedGetDistrictFromPostcode.mockResolvedValue(
+      makeDistrict({ id: 7 }) as any,
+    );
+
+    const result = await syncAgentDistrictFromPostcode(
+      makeAgent({ districtId: 1 }),
+      { id: 5 } as any,
+      undefined,
+      { clearWhenUnmapped: true },
+    );
+
+    expect(result.districtId).toBe(7);
+  });
 });
 
 // Regression guard: addDistrictToAgent (read-time helper) must keep its
