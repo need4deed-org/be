@@ -1,9 +1,31 @@
-// Wide random space (not Date.now()-derived) for test fixture values that
-// must be unique per test run — e.g. a postcode value. Date.now() % 10000
-// only has 10,000 possible values and is correlated across parallel Vitest
-// workers that start at nearly the same wall-clock moment, so two workers
-// can collide on the same value (be#864).
+import { readFileSync } from "fs";
+import { seedAllPLZFile } from "../config/constants";
+
+// Math.random, not Date.now(): parallel workers start at nearly the same moment and collide.
 export function randomNumericSuffix(digits = 6): string {
   const max = 10 ** digits;
   return String(Math.floor(Math.random() * max)).padStart(digits, "0");
+}
+
+let referencePostcodes: Set<string> | undefined;
+
+function getReferencePostcodes(): Set<string> {
+  referencePostcodes ??= new Set(
+    JSON.parse(readFileSync(seedAllPLZFile, "utf-8")) as string[],
+  );
+  return referencePostcodes;
+}
+
+export function randomNonReferencePostcode(prefix = ""): string {
+  if (!/^\d{0,4}$/.test(prefix)) {
+    throw new Error(`Postcode prefix must be 0-4 digits, got "${prefix}"`);
+  }
+  const reference = getReferencePostcodes();
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const value = `${prefix}${randomNumericSuffix(5 - prefix.length)}`;
+    if (!reference.has(value)) {
+      return value;
+    }
+  }
+  throw new Error(`No non-reference postcode found for prefix "${prefix}"`);
 }

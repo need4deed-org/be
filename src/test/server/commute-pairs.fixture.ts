@@ -24,7 +24,7 @@ import User from "../../data/entity/user.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getRepository, hashPassword } from "../../data/utils";
-import { randomNumericSuffix } from "../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../random";
 
 const PASSWORD = "test_password";
 
@@ -99,7 +99,7 @@ export async function createCommutePairsFixture(
   const suffix = randomNumericSuffix();
   const values = new Set<string>();
   while (values.size < 4) {
-    values.add(`7${randomNumericSuffix(4)}`);
+    values.add(randomNonReferencePostcode("7"));
   }
   const [home, noCommute, work, workOther] = await getRepository(
     dataSource,

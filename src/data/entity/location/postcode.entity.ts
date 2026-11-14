@@ -49,6 +49,9 @@ export default class Postcode {
   @IsPostcode(Country.DE)
   value: string;
 
+  @Column({ type: "boolean", default: false })
+  isReference: boolean;
+
   @OneToMany(
     () => DistrictPostcode,
     (districtPostcode) => districtPostcode.postcode,

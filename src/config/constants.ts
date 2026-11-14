@@ -22,6 +22,11 @@ export const seedPLZFile = path.join(
   ...publicFixturesFromHere,
   "PLZs.json",
 );
+export const seedAllPLZFile = path.join(
+  __dirname,
+  ...publicFixturesFromHere,
+  "plzs-all-de.json",
+);
 export const seedDistrictFile = path.join(
   __dirname,
   ...publicFixturesFromHere,

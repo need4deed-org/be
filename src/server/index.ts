@@ -30,6 +30,7 @@ import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
 import postRoutes from "./routes/post.routes";
+import postcodeRoutes from "./routes/postcode.routes";
 import statisticsRoutes from "./routes/statistics.routes";
 import translationRoutes from "./routes/translation.routes";
 import trustedDomainRoutes from "./routes/trusted-domain.routes";
@@ -239,6 +240,9 @@ export async function createServer({
   });
   await fastifyInstance.register(districtGeometryRoutes, {
     prefix: RoutePrefix.DISTRICT_GEOMETRY,
+  });
+  await fastifyInstance.register(postcodeRoutes, {
+    prefix: RoutePrefix.POSTCODE,
   });
 
   await fastifyInstance.ready();
