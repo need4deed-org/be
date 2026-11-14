@@ -37,7 +37,7 @@ export default async function postcodeRoutes(
       });
 
       return reply
-        .header("Cache-Control", "public, max-age=86400")
+        .header("Cache-Control", `public, max-age=${known ? 86400 : 300}`)
         .status(200)
         .send({ message: "Postcode check", data: { code, known } });
     },

@@ -1,5 +1,4 @@
 import { FastifyInstance } from "fastify";
-import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -9,6 +8,7 @@ import { randomNonReferencePostcode } from "../../random";
 describe("GET /postcode/check", () => {
   let fastify: FastifyInstance;
   const onDemandValue = randomNonReferencePostcode("1");
+  let createdOnDemandId: number | undefined;
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -16,9 +16,9 @@ describe("GET /postcode/check", () => {
   });
 
   afterAll(async () => {
-    await dataSource
-      .getRepository(Postcode)
-      .delete({ value: In([onDemandValue]) });
+    if (createdOnDemandId) {
+      await dataSource.getRepository(Postcode).delete(createdOnDemandId);
+    }
     if (fastify) {
       await fastify.close();
     }
@@ -38,13 +38,15 @@ describe("GET /postcode/check", () => {
   });
 
   it("doesn't know a PLZ that only exists as a row created on demand", async () => {
-    await dataSource
+    const { raw } = await dataSource
       .getRepository(Postcode)
       .createQueryBuilder()
       .insert()
       .values({ value: onDemandValue })
       .orIgnore()
+      .returning("id")
       .execute();
+    createdOnDemandId = raw[0]?.id;
 
     const response = await check(onDemandValue);
 

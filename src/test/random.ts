@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import path from "path";
+import { seedAllPLZFile } from "../config/constants";
 
 // Math.random, not Date.now(): parallel workers start at nearly the same moment and collide.
 export function randomNumericSuffix(digits = 6): string {
@@ -11,21 +11,7 @@ let referencePostcodes: Set<string> | undefined;
 
 function getReferencePostcodes(): Set<string> {
   referencePostcodes ??= new Set(
-    (
-      JSON.parse(
-        readFileSync(
-          path.join(
-            __dirname,
-            "..",
-            "..",
-            "public",
-            "data",
-            "plzs-all-de.json",
-          ),
-          "utf-8",
-        ),
-      ) as { plz: string }[]
-    ).map(({ plz }) => plz),
+    JSON.parse(readFileSync(seedAllPLZFile, "utf-8")) as string[],
   );
   return referencePostcodes;
 }

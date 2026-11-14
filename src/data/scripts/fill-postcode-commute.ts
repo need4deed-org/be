@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { berlinToday, isWorkingDay } from "need4deed-sdk";
-import { Between, DataSource, In, IsNull, Not } from "typeorm";
+import { DataSource, In, IsNull, Not } from "typeorm";
 import logger from "../../logger";
 import { berlinDayBoundaries } from "../../services/jobs/berlin-dates";
 import { dataSource } from "../data-source";
@@ -189,7 +189,7 @@ async function findPoints(
     where: {
       latitude: Not(IsNull()),
       longitude: Not(IsNull()),
-      value: postcodes ? In(postcodes) : Between("10115", "14199"),
+      ...(postcodes ? { value: In(postcodes) } : {}),
     },
     order: { id: "ASC" },
   });
