@@ -17,11 +17,15 @@ function getReferencePostcodes(): Set<string> {
 }
 
 export function randomNonReferencePostcode(prefix = ""): string {
+  if (!/^\d{0,4}$/.test(prefix)) {
+    throw new Error(`Postcode prefix must be 0-4 digits, got "${prefix}"`);
+  }
   const reference = getReferencePostcodes();
-  for (;;) {
+  for (let attempt = 0; attempt < 1000; attempt++) {
     const value = `${prefix}${randomNumericSuffix(5 - prefix.length)}`;
     if (!reference.has(value)) {
       return value;
     }
   }
+  throw new Error(`No non-reference postcode found for prefix "${prefix}"`);
 }

@@ -22,7 +22,7 @@ export default async function postcodeRoutes(
     {
       config: {
         public: true,
-        rateLimit: { max: 30, timeWindow: "1 minute" },
+        rateLimit: { max: 120, timeWindow: "1 minute" },
       } as FastifyContextConfig,
       schema: {
         querystring: postcodeCheckQuerySchema,

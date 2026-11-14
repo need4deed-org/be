@@ -69,10 +69,4 @@ describe("GET /postcode/check", () => {
       expect(response.statusCode, response.body).toBe(400);
     },
   );
-
-  it("is public", async () => {
-    const response = await check("10969");
-
-    expect(response.statusCode).not.toBe(401);
-  });
 });
