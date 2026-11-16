@@ -22,7 +22,16 @@ function columns(rows: PLZRow[]): [string[], number[], number[]] {
   ];
 }
 
-// Fills only NULLs so Berlin keeps its PLZs.json coordinates.
+function centroids(): PLZRow[] {
+  const rows = new Map<string, PLZRow>();
+  for (const file of ["plzs-all-de.json", "PLZs.json"]) {
+    for (const row of readJson<PLZRow[]>(file)) {
+      rows.set(row.plz, row);
+    }
+  }
+  return [...rows.values()];
+}
+
 export class FillPostcodeCentroids1794857736806 implements MigrationInterface {
   name = "FillPostcodeCentroids1794857736806";
 
@@ -36,7 +45,7 @@ export class FillPostcodeCentroids1794857736806 implements MigrationInterface {
        WHERE p.value = t.value
          AND p.latitude IS NULL AND p.longitude IS NULL
       `,
-      columns(readJson<PLZRow[]>("plzs-all-de.json")),
+      columns(centroids()),
     );
   }
 
