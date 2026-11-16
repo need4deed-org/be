@@ -27,6 +27,7 @@ interface CommuteSourcePostcode {
   postcodeId: number | null;
   postcodeValue: string | null;
   inCommuteArea: boolean | null;
+  hasCoordinates: boolean | null;
 }
 
 export interface CommuteFilter {
@@ -67,12 +68,14 @@ export async function resolveCommuteFilter(
   const sourceQuery =
     sourceKey === QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
       ? `SELECT pc.id AS "postcodeId", pc.value AS "postcodeValue",
-           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea"
+           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea",
+           pc.latitude IS NOT NULL AND pc.longitude IS NOT NULL AS "hasCoordinates"
          ${opportunityLocationJoins}
          LEFT JOIN postcode pc ON pc.id = ${opportunityPostcodeId}
          WHERE o.id = $1`
       : `SELECT pc.id AS "postcodeId", pc.value AS "postcodeValue",
-           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea"
+           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea",
+           pc.latitude IS NOT NULL AND pc.longitude IS NOT NULL AS "hasCoordinates"
          ${volunteerLocationJoins}
          LEFT JOIN postcode pc ON pc.id = ${volunteerPostcodeId}
          WHERE v.id = $1`;
@@ -92,6 +95,11 @@ export async function resolveCommuteFilter(
   if (!source.inCommuteArea) {
     throw new BadRequestError(
       `Commute postcode "${source.postcodeValue ?? postcodeId}" is outside the commute area.`,
+    );
+  }
+  if (!source.hasCoordinates) {
+    throw new BadRequestError(
+      `Commute postcode "${source.postcodeValue ?? postcodeId}" has no coordinates.`,
     );
   }
   return { postcodeIds: [postcodeId], maxMinutes };

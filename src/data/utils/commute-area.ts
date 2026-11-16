@@ -2,10 +2,10 @@ import berlinDistricts from "../../../public/data/districts-berlin.json";
 import listedBerlinPLZs from "../../../public/data/PLZs.json";
 
 const listedPLZs = listedBerlinPLZs.map(({ plz }) => plz);
-const commuteAreaPLZs = new Set([
-  ...berlinDistricts.flatMap(({ plzs }) => plzs),
-  ...listedPLZs,
-]);
+export const berlinDistrictPLZs = new Set(
+  berlinDistricts.flatMap(({ plzs }) => plzs),
+);
+const commuteAreaPLZs = new Set([...berlinDistrictPLZs, ...listedPLZs]);
 
 export function getCommuteAreaListedPLZs(): string[] {
   return listedPLZs;

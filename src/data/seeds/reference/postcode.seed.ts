@@ -9,6 +9,8 @@ interface PLZJSON {
 }
 
 const placeholderPostcode = "12345";
+const missingCoordinates =
+  "postcode.latitude IS NULL AND postcode.longitude IS NULL";
 
 export async function seedPostcode(dataSource: DataSource): Promise<void> {
   if (!dataSource) {
@@ -33,8 +35,10 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
                AS t(value, latitude, longitude)
         ON CONFLICT (value) DO UPDATE
            SET is_reference = true,
-               latitude = COALESCE(postcode.latitude, EXCLUDED.latitude),
-               longitude = COALESCE(postcode.longitude, EXCLUDED.longitude)
+               latitude = CASE WHEN ${missingCoordinates}
+                          THEN EXCLUDED.latitude ELSE postcode.latitude END,
+               longitude = CASE WHEN ${missingCoordinates}
+                           THEN EXCLUDED.longitude ELSE postcode.longitude END
         `,
         [
           rows.map(({ plz }) => plz),
