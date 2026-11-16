@@ -12,9 +12,11 @@ export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
     phone: apiPerson.phone,
     landline: apiPerson.landline,
     avatarUrl: apiPerson.avatarUrl,
-    preferredCommunicationType: Array.isArray(apiPerson.preferredComm)
-      ? apiPerson.preferredComm
-      : [apiPerson.preferredComm].filter(Boolean),
+    ...(apiPerson.preferredComm !== undefined && {
+      preferredCommunicationType: Array.isArray(apiPerson.preferredComm)
+        ? apiPerson.preferredComm
+        : [apiPerson.preferredComm].filter(Boolean),
+    }),
     ...(apiPerson.address
       ? {
           address: {

@@ -151,9 +151,10 @@ export default async function personRoutes(
               {
                 id: person.id,
                 addressId: person.addressId,
-                ...(person.address && {
-                  address: { postcodeId: person.address.postcodeId },
-                }),
+                ...(request.body.address &&
+                  person.address && {
+                    address: { postcodeId: person.address.postcodeId },
+                  }),
               },
               dtoParsePerson(request.body),
             ),
