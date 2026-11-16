@@ -25,7 +25,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -529,7 +529,7 @@ describe("opportunity own address (be#1291)", () => {
     beforeAll(async () => {
       let value: string;
       do {
-        value = `8${randomNumericSuffix(4)}`;
+        value = randomNonReferencePostcode("8");
       } while (await fastify.db.postcodeRepository.findOneBy({ value }));
       unlinkedPostcode = await fastify.db.postcodeRepository.save(
         new Postcode({ value }),

@@ -15,7 +15,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -490,7 +490,7 @@ describe("PATCH /agent/:id organization details", () => {
   });
 
   describe("address postcode resolution", () => {
-    const plz = `5${randomNumericSuffix(4)}`;
+    const plz = randomNonReferencePostcode("5");
     let preexistingPostcode = false;
 
     async function agentAddress(): Promise<Address | null> {

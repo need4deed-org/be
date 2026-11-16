@@ -23,6 +23,7 @@ export const RoutePrefix = {
   ORGANIZATION: "/organization",
   OPTION: "/option",
   PERSON: "/person",
+  POSTCODE: "/postcode",
   REGISTRATION_LINK: "/registration-link",
   REGISTRATIONS: "/registrations",
   POST: "/post",
