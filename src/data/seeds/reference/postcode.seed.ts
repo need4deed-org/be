@@ -24,7 +24,9 @@ export async function seedPostcode(dataSource: DataSource): Promise<void> {
     ).values(),
   ];
   const referenceValues = new Set(
-    (await fetchJsonFromUrl(seedAllPLZFile)) as string[],
+    ((await fetchJsonFromUrl(seedAllPLZFile)) as PLZJSON[]).map(
+      ({ plz }) => plz,
+    ),
   );
   berlinRows.forEach(({ plz }) => referenceValues.add(plz));
 
