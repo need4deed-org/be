@@ -226,4 +226,28 @@ describe("PATCH /person/:id representative role", () => {
     });
     expect(membership.role).toBe(AgentRoleType.SOCIAL_WORKER);
   });
+
+  it("lets an admin rename a person who has no address", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "No", lastName: "Address" }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/person/${person.id}`,
+        cookies: { [accessCookieName]: adminCookie },
+        payload: { firstName: "Renamed", lastName: "Coordinator" },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const reloaded = await fastify.db.personRepository.findOneByOrFail({
+        id: person.id,
+      });
+      expect(reloaded.firstName).toBe("Renamed");
+      expect(reloaded.lastName).toBe("Coordinator");
+      expect(reloaded.addressId).toBeNull();
+    } finally {
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+  });
 });
