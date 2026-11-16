@@ -12,8 +12,10 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import District from "../../../data/entity/location/district.entity";
 import PostcodeCommute from "../../../data/entity/location/postcode-commute.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import Accompanying from "../../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -99,11 +101,12 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
   let agent: Agent;
   let agentNear: Agent;
   let commuteOpportunity: Opportunity;
-  let opportunityWithoutCoordinates: Opportunity;
-  let volunteerWithoutCoordinates: Volunteer;
+  let opportunityOutsideCommuteArea: Opportunity;
+  let volunteerOutsideCommuteArea: Volunteer;
   const postcodes = {} as Record<PostcodeKey, Postcode>;
   const extraPostcodes: Postcode[] = [];
-  let withoutCoordinates: Postcode;
+  let outsideCommuteArea: Postcode;
+  let district: District;
   const volunteers = {} as Record<VolunteerKey, Volunteer>;
   const opportunities = {} as Record<OpportunityKey, Opportunity>;
   const persons: Person[] = [];
@@ -147,10 +150,19 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     const [origin, near, far, unmatched] = await postcodeRepository.save(
       [originValue, ...otherValues.slice(0, 3)].map(located),
     );
-    withoutCoordinates = await postcodeRepository.save(
-      new Postcode({ value: otherValues[3] }),
+    outsideCommuteArea = await postcodeRepository.save(
+      new Postcode({ value: otherValues[3], latitude: 48.1, longitude: 11.6 }),
     );
-    extraPostcodes.push(withoutCoordinates);
+    extraPostcodes.push(outsideCommuteArea);
+    district = await getRepository(dataSource, District).save(
+      new District({ title: `Commute District ${suffix}` }),
+    );
+    await getRepository(dataSource, DistrictPostcode).save(
+      [origin, near, far, unmatched].map(
+        ({ id }) =>
+          new DistrictPostcode({ postcodeId: id, districtId: district.id }),
+      ),
+    );
     Object.assign(postcodes, { origin, near, far, unmatched });
     await getRepository(dataSource, PostcodeCommute).save(
       COMMUTES.map(
@@ -255,24 +267,24 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
         agentId: agent.id,
       }),
     );
-    const withoutCoordinatesDeal = await fastify.db.dealRepository.save(
+    const outsideCommuteAreaDeal = await fastify.db.dealRepository.save(
       new Deal({
         type: DealType.VOLUNTEER,
-        postcodeId: withoutCoordinates.id,
+        postcodeId: outsideCommuteArea.id,
       }),
     );
-    deals.push(withoutCoordinatesDeal);
-    opportunityWithoutCoordinates = await fastify.db.opportunityRepository.save(
+    deals.push(outsideCommuteAreaDeal);
+    opportunityOutsideCommuteArea = await fastify.db.opportunityRepository.save(
       new Opportunity({
-        title: `Commute no coordinates ${suffix}`,
+        title: `Commute outside area ${suffix}`,
         type: OpportunityType.REGULAR,
         status: OpportunityStatusType.SEARCHING,
-        dealId: withoutCoordinatesDeal.id,
+        dealId: outsideCommuteAreaDeal.id,
         agentId: agent.id,
       }),
     );
     const volunteerAddress = await getRepository(dataSource, Address).save(
-      new Address({ postcodeId: withoutCoordinates.id }),
+      new Address({ postcodeId: outsideCommuteArea.id }),
     );
     addresses.push(volunteerAddress);
     const volunteerPerson = await fastify.db.personRepository.save(
@@ -283,9 +295,9 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       }),
     );
     persons.push(volunteerPerson);
-    volunteerWithoutCoordinates = await fastify.db.volunteerRepository.save(
+    volunteerOutsideCommuteArea = await fastify.db.volunteerRepository.save(
       new Volunteer({
-        dealId: withoutCoordinatesDeal.id,
+        dealId: outsideCommuteAreaDeal.id,
         personId: volunteerPerson.id,
       }),
     );
@@ -340,14 +352,14 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       id: ids([
         ...Object.values(opportunities),
         commuteOpportunity,
-        opportunityWithoutCoordinates,
+        opportunityOutsideCommuteArea,
       ]),
     });
     await getRepository(dataSource, Accompanying).delete({
       id: ids(accompanyings),
     });
     await fastify.db.volunteerRepository.delete({
-      id: ids([...Object.values(volunteers), volunteerWithoutCoordinates]),
+      id: ids([...Object.values(volunteers), volunteerOutsideCommuteArea]),
     });
     await fastify.db.dealRepository.delete({ id: ids(deals) });
     await fastify.db.personRepository.delete({ id: ids(persons) });
@@ -356,6 +368,7 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
     await getRepository(dataSource, Postcode).delete({
       id: ids([...Object.values(postcodes), ...extraPostcodes]),
     });
+    await getRepository(dataSource, District).delete({ id: district.id });
     await fastify.db.userRepository.delete({ personId: coordinator.id });
     await fastify.db.personRepository.delete({ id: coordinator.id });
     await fastify.db.userRepository.delete({ personId: agentPerson.id });
@@ -427,15 +440,17 @@ describe("commute filters on GET /volunteer and GET /opportunity", () => {
       );
     });
 
-    it("rejects a commute source postcode without coordinates with 400", async () => {
-      const noCoordinatesSourceId =
+    it("rejects a commute source postcode outside the commute area with 400", async () => {
+      const outsideCommuteAreaSourceId =
         list === "/volunteer"
-          ? opportunityWithoutCoordinates.id
-          : volunteerWithoutCoordinates.id;
-      const res = await get(`${list}?${filterQuery(noCoordinatesSourceId)}`);
+          ? opportunityOutsideCommuteArea.id
+          : volunteerOutsideCommuteArea.id;
+      const res = await get(
+        `${list}?${filterQuery(outsideCommuteAreaSourceId)}`,
+      );
       expect(res.statusCode).toBe(400);
       expect(res.json().message).toBe(
-        `Commute postcode "${withoutCoordinates.value}" has no coordinates.`,
+        `Commute postcode "${outsideCommuteArea.value}" is outside the commute area.`,
       );
     });
   });

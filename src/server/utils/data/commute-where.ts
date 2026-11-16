@@ -2,6 +2,10 @@ import { QueryParamsKeys, UserRole } from "need4deed-sdk";
 import { Raw } from "typeorm";
 import { BadRequestError, UnauthorizedError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
+import {
+  getCommuteAreaListedPLZs,
+  inCommuteAreaSql,
+} from "../../../data/utils/commute-area";
 import { QuerystringCommuteFiltering } from "../../types";
 import { isStaffRole } from "./is-staff-role";
 
@@ -22,8 +26,7 @@ export const volunteerPostcodeId = "COALESCE(a.postcode_id, d.postcode_id)";
 interface CommuteSourcePostcode {
   postcodeId: number | null;
   postcodeValue: string | null;
-  latitude: number | string | null;
-  longitude: number | string | null;
+  inCommuteArea: boolean | null;
 }
 
 export interface CommuteFilter {
@@ -64,18 +67,18 @@ export async function resolveCommuteFilter(
   const sourceQuery =
     sourceKey === QueryParamsKeys.COMMUTE_OPPORTUNITY_ID
       ? `SELECT pc.id AS "postcodeId", pc.value AS "postcodeValue",
-           pc.latitude AS latitude, pc.longitude AS longitude
+           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea"
          ${opportunityLocationJoins}
          LEFT JOIN postcode pc ON pc.id = ${opportunityPostcodeId}
          WHERE o.id = $1`
       : `SELECT pc.id AS "postcodeId", pc.value AS "postcodeValue",
-           pc.latitude AS latitude, pc.longitude AS longitude
+           ${inCommuteAreaSql("pc", "$2")} AS "inCommuteArea"
          ${volunteerLocationJoins}
          LEFT JOIN postcode pc ON pc.id = ${volunteerPostcodeId}
          WHERE v.id = $1`;
   const [source] = await dataSource.query<CommuteSourcePostcode[]>(
     sourceQuery,
-    [sourceId],
+    [sourceId, getCommuteAreaListedPLZs()],
   );
   if (!source) {
     throw new BadRequestError(`Unknown commute ${sourceName} "${sourceId}".`);
@@ -86,13 +89,9 @@ export async function resolveCommuteFilter(
       `Commute ${sourceName} "${sourceId}" has no postcode.`,
     );
   }
-  const latitude =
-    source.latitude === null ? Number.NaN : Number(source.latitude);
-  const longitude =
-    source.longitude === null ? Number.NaN : Number(source.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  if (!source.inCommuteArea) {
     throw new BadRequestError(
-      `Commute postcode "${source.postcodeValue ?? postcodeId}" has no coordinates.`,
+      `Commute postcode "${source.postcodeValue ?? postcodeId}" is outside the commute area.`,
     );
   }
   return { postcodeIds: [postcodeId], maxMinutes };
