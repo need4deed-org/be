@@ -49,7 +49,7 @@ export class FillPostcodeCentroids1794857736806 implements MigrationInterface {
     );
   }
 
-  // A non-Berlin PLZ still holding the file's centroid can only come from up().
+  // Also clears seeded centroids: the seed writes the same file values.
   public async down(queryRunner: QueryRunner): Promise<void> {
     const berlin = new Set(
       readJson<PLZRow[]>("PLZs.json").map(({ plz }) => plz),

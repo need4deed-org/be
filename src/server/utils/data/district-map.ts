@@ -1,9 +1,11 @@
 import districtGeometry from "../../../../public/data/district-geometry.json";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
-import { berlinDistrictPLZs } from "../../../data/utils/commute-area";
+import {
+  berlinDistrictPLZs,
+  getCommuteAreaCoordinates,
+} from "../../../data/utils/commute-area";
 import { firstDistrictPostcode } from "../../../data/utils/get-district";
-import { getCoordinates } from "../../../services/dto/utils";
 
 type PostcodeWithDistricts = Postcode & {
   districtPostcode?: DistrictPostcode[];
@@ -100,7 +102,7 @@ export function getDistrictLocationBucket({
     return { bucket: "remote" };
   }
 
-  const { latitude, longitude } = getCoordinates(postcode);
+  const { latitude, longitude } = getCommuteAreaCoordinates(postcode);
   if (
     berlinDistrictPLZs.has(postcode.value) ||
     (latitude !== null &&

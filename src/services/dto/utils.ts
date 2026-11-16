@@ -12,7 +12,7 @@ import { berlinTimeZone } from "../../config";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import { isByDayCode } from "../../data/utils/by-day-code";
-import { isInCommuteArea } from "../../data/utils/commute-area";
+import { getCommuteAreaCoordinates } from "../../data/utils/commute-area";
 
 export function getAvailability(
   dealTimeslot: DealTimeslot[],
@@ -290,20 +290,7 @@ export function getOptionItems<T>(
   }));
 }
 
-// Outside the commute area a pin falls back to its district centroid (e.g. fallback PLZ 12345).
-export function getCoordinates(postcode?: {
-  value?: string;
-  latitude?: number | null;
-  longitude?: number | null;
-}): { latitude: number | null; longitude: number | null } {
-  if (!isInCommuteArea(postcode?.value)) {
-    return { latitude: null, longitude: null };
-  }
-  return {
-    latitude: postcode?.latitude ?? null,
-    longitude: postcode?.longitude ?? null,
-  };
-}
+export const getCoordinates = getCommuteAreaCoordinates;
 
 const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   [Lang.DE]: {
