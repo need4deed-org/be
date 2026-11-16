@@ -12,9 +12,11 @@ export class FillReferencePostcodes1794569689799 implements MigrationInterface {
   name = "FillReferencePostcodes1794569689799";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const values = new Set(readJson<string[]>("plzs-all-de.json"));
-    for (const { plz } of readJson<{ plz: string }[]>("PLZs.json")) {
-      values.add(plz);
+    const values = new Set<string>();
+    for (const file of ["plzs-all-de.json", "PLZs.json"]) {
+      for (const { plz } of readJson<{ plz: string }[]>(file)) {
+        values.add(plz);
+      }
     }
 
     await queryRunner.query(

@@ -1806,22 +1806,17 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
   let coordinatorCookie: string;
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-  const numericSuffix = randomNumericSuffix();
-  const LAT = 52.52;
-  const LON = 13.405;
+  let LAT: number;
+  let LON: number;
 
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
 
     const postcodeRepository = getRepository(dataSource, Postcode);
-    postcode = await postcodeRepository.save(
-      new Postcode({
-        value: `1${numericSuffix}`,
-        latitude: LAT,
-        longitude: LON,
-      }),
-    );
+    postcode = await postcodeRepository.findOneByOrFail({ value: "10115" });
+    LAT = postcode.latitude as number;
+    LON = postcode.longitude as number;
     const addressRepository = getRepository(dataSource, Address);
     address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -1887,7 +1882,6 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await getRepository(dataSource, Address).delete({ id: address.id });
-    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
     await fastify.close();
   });
 
@@ -2084,8 +2078,8 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
   // Agent's own coordinates — visible only to a caller who can see this
   // agent. Deliberately different from the district centroid below so the
   // two outcomes are unambiguous.
-  const AGENT_LAT = 52.52;
-  const AGENT_LON = 13.405;
+  let AGENT_LAT: number;
+  let AGENT_LON: number;
   const DISTRICT_LAT = 52.4;
   const DISTRICT_LON = 13.3;
 
@@ -2116,13 +2110,11 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
       }),
     );
 
-    agentPostcode = await postcodeRepository.save(
-      new Postcode({
-        value: `2${numericSuffix}`,
-        latitude: AGENT_LAT,
-        longitude: AGENT_LON,
-      }),
-    );
+    agentPostcode = await postcodeRepository.findOneByOrFail({
+      value: "10115",
+    });
+    AGENT_LAT = agentPostcode.latitude as number;
+    AGENT_LON = agentPostcode.longitude as number;
     agentAddress = await addressRepository.save(
       new Address({ postcodeId: agentPostcode.id }),
     );
@@ -2205,7 +2197,6 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
       dataSource.getRepository(DistrictPostcode);
     await districtPostcodeRepository.delete({ id: mapping.id });
     await dataSource.getRepository(District).delete({ id: district.id });
-    await getRepository(dataSource, Postcode).delete({ id: agentPostcode.id });
     await getRepository(dataSource, Postcode).delete({
       id: districtPostcode.id,
     });

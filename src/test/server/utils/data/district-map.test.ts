@@ -45,8 +45,9 @@ describe("getDistrictLocationBucket", () => {
     });
   });
 
-  it("classifies an unmapped point inside Berlin as unassigned", () => {
+  it("classifies an unmapped commute-area point inside Berlin as unassigned", () => {
     const postcode = createPostcode({
+      value: "15569",
       latitude: 52.52,
       longitude: 13.405,
     });
@@ -55,6 +56,24 @@ describe("getDistrictLocationBucket", () => {
       bucket: "unassignedBerlin",
     });
   });
+
+  it.each([
+    ["a large recipient elsewhere", "60647"],
+    ["the 12345 fallback", "12345"],
+  ])(
+    "ignores a centroid inside Berlin for %s outside the commute area",
+    (_, value) => {
+      const postcode = createPostcode({
+        value,
+        latitude: 52.52,
+        longitude: 13.405,
+      });
+
+      expect(getDistrictLocationBucket({ postcode })).toEqual({
+        bucket: "outsideBerlin",
+      });
+    },
+  );
 
   it("classifies a known postcode outside Berlin separately", () => {
     const postcode = createPostcode({

@@ -341,7 +341,9 @@ describe("dtoAgentGetList", () => {
   describe("map-pin lat/lon (be#1083)", () => {
     const geocoded = {
       ...mockAgentBase,
-      address: { postcode: { latitude: 52.5, longitude: 13.4 } },
+      address: {
+        postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+      },
     } as any;
     const notGeocoded = {
       ...mockAgentBase,
@@ -389,7 +391,9 @@ describe("dtoAgentGetList", () => {
     expect(
       getAgentDistrictIdNeedingCentroid({
         ...mockAgentBase,
-        address: { postcode: { latitude: 52.5, longitude: 13.4 } },
+        address: {
+          postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+        },
       } as any),
     ).toBeUndefined();
     expect(getAgentDistrictIdNeedingCentroid({ ...mockAgentBase } as any)).toBe(

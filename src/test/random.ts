@@ -11,7 +11,9 @@ let referencePostcodes: Set<string> | undefined;
 
 function getReferencePostcodes(): Set<string> {
   referencePostcodes ??= new Set(
-    JSON.parse(readFileSync(seedAllPLZFile, "utf-8")) as string[],
+    (
+      JSON.parse(readFileSync(seedAllPLZFile, "utf-8")) as { plz: string }[]
+    ).map(({ plz }) => plz),
   );
   return referencePostcodes;
 }

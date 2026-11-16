@@ -265,21 +265,17 @@ describe("GET /volunteer", () => {
   const lastName = `MapPin-${suffix}`;
   const numericSuffix = randomNumericSuffix();
   const phone = `+49 30 ${numericSuffix}`;
-  const LAT = 52.52;
-  const LON = 13.405;
+  let LAT: number;
+  let LON: number;
 
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
 
     const postcodeRepository = getRepository(dataSource, Postcode);
-    postcode = await postcodeRepository.save(
-      new Postcode({
-        value: `1${numericSuffix}`,
-        latitude: LAT,
-        longitude: LON,
-      }),
-    );
+    postcode = await postcodeRepository.findOneByOrFail({ value: "10115" });
+    LAT = postcode.latitude as number;
+    LON = postcode.longitude as number;
 
     const addressRepository = getRepository(dataSource, Address);
     address = await addressRepository.save(
@@ -370,7 +366,6 @@ describe("GET /volunteer", () => {
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.personRepository.delete({ id: volunteerPerson.id });
     await getRepository(dataSource, Address).delete({ id: address.id });
-    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
     await fastify.close();
   });
 

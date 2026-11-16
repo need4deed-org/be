@@ -12,6 +12,7 @@ import { berlinTimeZone } from "../../config";
 import DealLanguage from "../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../data/entity/m2m/deal-timeslot";
 import { isByDayCode } from "../../data/utils/by-day-code";
+import { getCommuteAreaCoordinates } from "../../data/utils/commute-area";
 
 export function getAvailability(
   dealTimeslot: DealTimeslot[],
@@ -289,15 +290,7 @@ export function getOptionItems<T>(
   }));
 }
 
-export function getCoordinates(postcode?: {
-  latitude?: number | null;
-  longitude?: number | null;
-}): { latitude: number | null; longitude: number | null } {
-  return {
-    latitude: postcode?.latitude ?? null,
-    longitude: postcode?.longitude ?? null,
-  };
-}
+export const getCoordinates = getCommuteAreaCoordinates;
 
 const STANDALONE_LABELS: Record<Lang, Record<TranslatedIntoType, string>> = {
   [Lang.DE]: {
