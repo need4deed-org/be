@@ -1,13 +1,18 @@
-import { readFileSync } from "fs";
-import { seedPLZFile } from "../../config/constants";
+import berlinDistricts from "../../../public/data/districts-berlin.json";
+import listedBerlinPLZs from "../../../public/data/PLZs.json";
 
-let listedPLZs: string[] | undefined;
+const listedPLZs = listedBerlinPLZs.map(({ plz }) => plz);
+const commuteAreaPLZs = new Set([
+  ...berlinDistricts.flatMap(({ plzs }) => plzs),
+  ...listedPLZs,
+]);
 
 export function getCommuteAreaListedPLZs(): string[] {
-  listedPLZs ??= (
-    JSON.parse(readFileSync(seedPLZFile, "utf-8")) as { plz: string }[]
-  ).map(({ plz }) => plz);
   return listedPLZs;
+}
+
+export function isInCommuteArea(value: string | undefined): boolean {
+  return value !== undefined && commuteAreaPLZs.has(value);
 }
 
 export function inCommuteAreaSql(

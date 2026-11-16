@@ -912,6 +912,7 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
                 id: true,
                 postcode: {
                   id: true,
+                  value: true,
                   latitude: true,
                   longitude: true,
                   districtPostcode: { id: true, districtId: true },

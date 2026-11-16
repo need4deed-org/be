@@ -441,7 +441,11 @@ describe("dtoOpportunityGetList", () => {
       const opportunity = {
         ...baseOpportunity,
         status: "opp-active",
-        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        agent: {
+          address: {
+            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+          },
+        },
       };
       const result = dtoOpportunityGetList(opportunity as any);
       expect(result.lat).toBeNull();
@@ -452,7 +456,11 @@ describe("dtoOpportunityGetList", () => {
       const opportunity = {
         ...baseOpportunity,
         status: "opp-new",
-        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        agent: {
+          address: {
+            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+          },
+        },
       };
       const result = dtoOpportunityGetList(opportunity as any);
       expect(result.lat).toBe(52.5);
@@ -496,7 +504,11 @@ describe("dtoOpportunityGetList", () => {
         type: "accompanying",
         status: "opp-searching",
         districtId: 5,
-        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        agent: {
+          address: {
+            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+          },
+        },
         accompanying: {
           postcode: {
             value: "12043",
@@ -536,7 +548,11 @@ describe("dtoOpportunityGetList", () => {
         ...baseOpportunity,
         status: "opp-searching",
         districtId: 5,
-        agent: { address: { postcode: { latitude: 52.5, longitude: 13.4 } } },
+        agent: {
+          address: {
+            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+          },
+        },
         address: {
           postcode: {
             value: "10247",

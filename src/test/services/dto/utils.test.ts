@@ -7,6 +7,7 @@ import {
   formatScheduleDe,
   formatScheduleLocalized,
   getAvailability,
+  getCoordinates,
 } from "../../../services/dto/utils";
 
 describe("getNameFields", () => {
@@ -303,5 +304,30 @@ describe("getAvailability one-time slot", () => {
     ]);
 
     expect(slot.daytime).toBe(expected);
+  });
+});
+
+describe("getCoordinates", () => {
+  it("keeps the coordinates of a Berlin district PLZ", () => {
+    expect(
+      getCoordinates({ value: "10115", latitude: 52.5, longitude: 13.4 }),
+    ).toEqual({ latitude: 52.5, longitude: 13.4 });
+  });
+
+  it("keeps the coordinates of a PLZs.json PLZ outside the districts", () => {
+    expect(
+      getCoordinates({ value: "15537", latitude: 52.4, longitude: 13.7 }),
+    ).toEqual({ latitude: 52.4, longitude: 13.7 });
+  });
+
+  it.each([
+    ["outside Berlin", "80331"],
+    ["the 12345 fallback", "12345"],
+    ["missing", undefined],
+  ])("drops the coordinates of a PLZ %s", (_, value) => {
+    expect(getCoordinates({ value, latitude: 48.1, longitude: 11.6 })).toEqual({
+      latitude: null,
+      longitude: null,
+    });
   });
 });
