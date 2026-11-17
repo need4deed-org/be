@@ -2,7 +2,7 @@ import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner
 import { vi } from "vitest";
 
 const TO_MANY_JOIN =
-  /JOIN "public"\."(deal_activity|deal_skill|deal_language|deal_timeslot|deal_district|opportunity_volunteer|agent_person)"/g;
+  /JOIN (?:"[^"]+"\.)?"(deal_activity|deal_skill|deal_language|deal_timeslot|deal_district|opportunity_volunteer|agent_person|opportunity|user)"/g;
 
 export async function captureSql(
   fn: () => Promise<unknown>,

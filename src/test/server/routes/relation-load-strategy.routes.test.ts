@@ -8,7 +8,7 @@ import {
   VolunteerStateCommunicationType,
   VolunteerStateEngagementType,
 } from "need4deed-sdk";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
@@ -28,12 +28,13 @@ import { randomNumericSuffix } from "../../random";
 import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
-describe("endpoints loading several to-many lists (be#1362)", () => {
+
+describe("endpoints loading several to-many lists", () => {
   let fastify: FastifyInstance;
   let agent: Agent;
   let opportunity: Opportunity;
   let volunteer: Volunteer;
-  let activities: Activity[];
+  let opportunityVolunteer: OpportunityVolunteer;
   let cookie: string;
   const cleanup: (() => Promise<unknown>)[] = [];
 
@@ -46,14 +47,23 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
     agent = await db.agentRepository.save(
       new Agent({ title: `Relation load agent ${suffix}` }),
     );
+    cleanup.push(() => db.agentRepository.delete(agent.id));
     const postcode = await db.postcodeRepository.findOneOrFail({ where: {} });
     const [opportunityDeal, volunteerDeal] = await db.dealRepository.save([
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     ]);
+    cleanup.push(() =>
+      db.dealRepository.delete([opportunityDeal.id, volunteerDeal.id]),
+    );
 
-    activities = await getRepository(dataSource, Activity).save(
+    const activities = await getRepository(dataSource, Activity).save(
       [1, 2].map((n) => new Activity({ title: `Activity ${n} ${suffix}` })),
+    );
+    cleanup.push(() =>
+      getRepository(dataSource, Activity).delete(
+        activities.map(({ id }) => id),
+      ),
     );
     const districts = await db.districtRepository.find({ take: 2 });
     const [dealActivities, dealDistricts] = await Promise.all([
@@ -70,6 +80,16 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
         ),
       ),
     ]);
+    cleanup.push(
+      () =>
+        getRepository(dataSource, DealActivity).delete(
+          dealActivities.map(({ id }) => id),
+        ),
+      () =>
+        getRepository(dataSource, DealDistrict).delete(
+          dealDistricts.map(({ id }) => id),
+        ),
+    );
 
     opportunity = await db.opportunityRepository.save(
       new Opportunity({
@@ -80,10 +100,12 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
         dealId: opportunityDeal.id,
       }),
     );
+    cleanup.push(() => db.opportunityRepository.delete(opportunity.id));
 
     const person = await db.personRepository.save(
       new Person({ firstName: "Relation", lastName: `Volunteer ${suffix}` }),
     );
+    cleanup.push(() => db.personRepository.delete(person.id));
     volunteer = await db.volunteerRepository.save(
       new Volunteer({
         personId: person.id,
@@ -93,16 +115,27 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
         statusCommunication: VolunteerStateCommunicationType.CALLED,
       }),
     );
-    const opportunityVolunteer = await db.opportunityVolunteerRepository.save(
+    cleanup.push(
+      () => db.volunteerRepository.delete(volunteer.id),
+      () => db.communicationRepository.delete({ volunteerId: volunteer.id }),
+    );
+    opportunityVolunteer = await db.opportunityVolunteerRepository.save(
       new OpportunityVolunteer({
         opportunityId: opportunity.id,
         volunteerId: volunteer.id,
         status: OpportunityVolunteerStatusType.PENDING,
       }),
     );
+    cleanup.push(() =>
+      db.opportunityVolunteerRepository.delete(opportunityVolunteer.id),
+    );
 
     const coordinator = await db.personRepository.save(
       new Person({ firstName: "Relation", lastName: `Coordinator ${suffix}` }),
+    );
+    cleanup.push(
+      () => db.personRepository.delete({ id: coordinator.id }),
+      () => db.userRepository.delete({ personId: coordinator.id }),
     );
     const email = `relation-load-${suffix}@test.need4deed.org`;
     await db.userRepository.save(
@@ -124,32 +157,10 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
       throw new Error("coordinator login returned no access cookie");
     }
     cookie = value;
-    cleanup.push(
-      () => db.userRepository.delete({ personId: coordinator.id }),
-      () => db.personRepository.delete({ id: coordinator.id }),
-      () => db.opportunityVolunteerRepository.delete(opportunityVolunteer.id),
-      () => db.volunteerRepository.delete(volunteer.id),
-      () => db.personRepository.delete(person.id),
-      () => db.opportunityRepository.delete(opportunity.id),
-      () =>
-        getRepository(dataSource, DealActivity).delete(
-          dealActivities.map(({ id }) => id),
-        ),
-      () =>
-        getRepository(dataSource, DealDistrict).delete(
-          dealDistricts.map(({ id }) => id),
-        ),
-      () =>
-        getRepository(dataSource, Activity).delete(
-          activities.map(({ id }) => id),
-        ),
-      () => db.dealRepository.delete([opportunityDeal.id, volunteerDeal.id]),
-      () => db.agentRepository.delete(agent.id),
-    );
   });
 
   afterAll(async () => {
-    for (const step of cleanup) {
+    for (const step of cleanup.reverse()) {
       await step();
     }
     await fastify?.close();
@@ -189,6 +200,28 @@ describe("endpoints loading several to-many lists (be#1362)", () => {
     });
 
     expect(status).toBe(200);
+    expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+  });
+
+  it("PATCH /opportunity-volunteer/:id to matched joins at most one to-many list per query", async () => {
+    const introduction = vi
+      .spyOn(fastify.notify, "emailIntroduction")
+      .mockResolvedValue(undefined);
+    let status = 0;
+    const queries = await captureSql(async () => {
+      status = (
+        await fastify.inject({
+          method: "PATCH",
+          url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+          payload: { status: OpportunityVolunteerStatusType.MATCHED },
+          cookies: { [accessCookieName]: cookie },
+        })
+      ).statusCode;
+      await vi.waitFor(() => expect(introduction).toHaveBeenCalledOnce());
+    });
+    introduction.mockRestore();
+
+    expect(status).toBe(204);
     expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
   });
 });
