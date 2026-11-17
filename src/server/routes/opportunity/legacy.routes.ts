@@ -367,6 +367,8 @@ export default async function opportunityLegacyRoutes(
           ]),
         },
         take: 300,
+        // One query per relation: five joined deal lists multiply rows (be#1362).
+        relationLoadStrategy: "query",
         relations: [
           "deal.dealLanguage.language",
           "deal.dealActivity.activity",

@@ -184,6 +184,9 @@ async function sendMatchedEmails(
       "opportunity.onetimer",
       "opportunity.district",
     ],
+    // One query per relation: both deals' lists and the agent's members
+    // joined in one go multiply rows (be#1362).
+    relationLoadStrategy: "query",
   });
   if (!ov) {
     return "no-match";
