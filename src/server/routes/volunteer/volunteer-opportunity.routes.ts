@@ -72,6 +72,7 @@ export default async function volunteerOpportunityRoutes(
         where,
         relations,
         relationLoadStrategy: "query",
+        order: { id: "ASC" },
         skip,
         take,
       });

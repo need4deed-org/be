@@ -203,25 +203,53 @@ describe("endpoints loading several to-many lists", () => {
     expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
   });
 
+  it.each([
+    ["GET /volunteer/opportunity", listUrl],
+    ["GET /opportunity/legacy", () => "/opportunity/legacy"],
+  ])("%s pages in ascending id order", async (_, url) => {
+    let res!: Awaited<ReturnType<typeof get>>;
+    const queries = await captureSql(async () => {
+      res = await get(url());
+    });
+
+    expect(res.statusCode).toBe(200);
+    const paged = queries.filter(
+      (q) => /\bLIMIT\b/.test(q) && /FROM (?:"[^"]+"\.)?"opportunity"/.test(q),
+    );
+    expect(paged.length).toBeGreaterThan(0);
+    for (const q of paged) {
+      expect(q).toMatch(/ORDER BY .*"(?:\w+_)?id" ASC/);
+    }
+    const body = res.json();
+    const ids: number[] = (Array.isArray(body) ? body : body.data).map(
+      ({ id }: { id: number }) => id,
+    );
+    expect(ids).toContain(opportunity.id);
+    expect(ids).toEqual([...ids].sort((x, y) => x - y));
+  });
+
   it("PATCH /opportunity-volunteer/:id to matched joins at most one to-many list per query", async () => {
     const introduction = vi
       .spyOn(fastify.notify, "emailIntroduction")
       .mockResolvedValue(undefined);
-    let status = 0;
-    const queries = await captureSql(async () => {
-      status = (
-        await fastify.inject({
-          method: "PATCH",
-          url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
-          payload: { status: OpportunityVolunteerStatusType.MATCHED },
-          cookies: { [accessCookieName]: cookie },
-        })
-      ).statusCode;
-      await vi.waitFor(() => expect(introduction).toHaveBeenCalledOnce());
-    });
-    introduction.mockRestore();
+    try {
+      let status = 0;
+      const queries = await captureSql(async () => {
+        status = (
+          await fastify.inject({
+            method: "PATCH",
+            url: `/opportunity-volunteer/${opportunityVolunteer.id}`,
+            payload: { status: OpportunityVolunteerStatusType.MATCHED },
+            cookies: { [accessCookieName]: cookie },
+          })
+        ).statusCode;
+        await vi.waitFor(() => expect(introduction).toHaveBeenCalledOnce());
+      });
 
-    expect(status).toBe(204);
-    expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+      expect(status).toBe(204);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+    } finally {
+      introduction.mockRestore();
+    }
   });
 });
