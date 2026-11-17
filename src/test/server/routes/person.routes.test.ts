@@ -1,5 +1,9 @@
 import { FastifyInstance } from "fastify";
-import { AgentRoleType, UserRole } from "need4deed-sdk";
+import {
+  AgentRoleType,
+  PreferredCommunicationType,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -225,5 +229,36 @@ describe("PATCH /person/:id representative role", () => {
       agentId: agent.id,
     });
     expect(membership.role).toBe(AgentRoleType.SOCIAL_WORKER);
+  });
+
+  it("lets an admin rename a person who has no address, keeping their contact preferences", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "No",
+        lastName: "Address",
+        preferredCommunicationType: [PreferredCommunicationType.EMAIL],
+      }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/person/${person.id}`,
+        cookies: { [accessCookieName]: adminCookie },
+        payload: { firstName: "Renamed", lastName: "Coordinator" },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const reloaded = await fastify.db.personRepository.findOneByOrFail({
+        id: person.id,
+      });
+      expect(reloaded.firstName).toBe("Renamed");
+      expect(reloaded.lastName).toBe("Coordinator");
+      expect(reloaded.addressId).toBeNull();
+      expect(reloaded.preferredCommunicationType).toEqual([
+        PreferredCommunicationType.EMAIL,
+      ]);
+    } finally {
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
   });
 });
