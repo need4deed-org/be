@@ -71,9 +71,6 @@ export default async function volunteerOpportunityRoutes(
       const [opportunities, count] = await opportunityRepository.findAndCount({
         where,
         relations,
-        // One query per relation, as the /opportunity list loads them: joined
-        // deal lists multiply rows, and a join shared with a deal filter would
-        // load only the matching options (be#1362).
         relationLoadStrategy: "query",
         skip,
         take,

@@ -368,8 +368,6 @@ export default async function opportunityRoutes(
       const opportunity = await opportunityRepository.findOne({
         where: { id },
         relations,
-        // One query per relation: deal lists, agent members and linked
-        // volunteers joined in one go multiply rows (be#1362).
         relationLoadStrategy: "query",
       });
 

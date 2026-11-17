@@ -30,6 +30,8 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
+import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
 
@@ -280,8 +282,8 @@ describe("GET /agent/:id/volunteer-linked", () => {
     expect(item.locations).toEqual([]);
   });
 
-  it("returns every option once for a volunteer with many options", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  it("returns every option once for a volunteer with many options, joining at most one list per query", async () => {
+    const suffix = randomNumericSuffix();
     const skills = await getRepository(dataSource, Skill).save(
       [1, 2, 3].map((n) => new Skill({ title: `Skill ${n} ${suffix}` })),
     );
@@ -298,45 +300,61 @@ describe("GET /agent/:id/volunteer-linked", () => {
           }),
       ),
     );
-    await getRepository(dataSource, DealSkill).save(
-      skills.map(({ id }) => new DealSkill({ dealId: deal.id, skillId: id })),
-    );
-    await getRepository(dataSource, DealActivity).save(
-      activities.map(
-        ({ id }) => new DealActivity({ dealId: deal.id, activityId: id }),
+    const [dealSkills, dealActivities, dealTimeslots] = await Promise.all([
+      getRepository(dataSource, DealSkill).save(
+        skills.map(({ id }) => new DealSkill({ dealId: deal.id, skillId: id })),
       ),
-    );
-    await getRepository(dataSource, DealTimeslot).save(
-      timeslots.map(
-        ({ id }) => new DealTimeslot({ dealId: deal.id, timeslotId: id }),
+      getRepository(dataSource, DealActivity).save(
+        activities.map(
+          ({ id }) => new DealActivity({ dealId: deal.id, activityId: id }),
+        ),
       ),
-    );
+      getRepository(dataSource, DealTimeslot).save(
+        timeslots.map(
+          ({ id }) => new DealTimeslot({ dealId: deal.id, timeslotId: id }),
+        ),
+      ),
+    ]);
 
     try {
-      const res = await fastify.inject({
-        method: "GET",
-        url: `/agent/${agent.id}/volunteer-linked`,
-        cookies: { [accessCookieName]: coordinatorCookie },
+      let res!: Awaited<ReturnType<typeof fastify.inject>>;
+      const queries = await captureSql(async () => {
+        res = await fastify.inject({
+          method: "GET",
+          url: `/agent/${agent.id}/volunteer-linked`,
+          cookies: { [accessCookieName]: coordinatorCookie },
+        });
       });
 
       expect(res.statusCode).toBe(200);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
       const [item] = res.json().data;
       const ids = (options: { id: number }[]) =>
         options.map(({ id }) => id).sort((a, b) => a - b);
       expect(ids(item.skills)).toEqual(ids(skills));
       expect(ids(item.activities)).toEqual(ids(activities));
-      expect(item.availability.length).toBeGreaterThan(0);
+      expect(ids(item.availability)).toEqual(ids(timeslots));
     } finally {
-      await getRepository(dataSource, DealSkill).delete({ dealId: deal.id });
-      await getRepository(dataSource, DealActivity).delete({ dealId: deal.id });
-      await getRepository(dataSource, DealTimeslot).delete({ dealId: deal.id });
-      await getRepository(dataSource, Skill).delete(skills.map(({ id }) => id));
-      await getRepository(dataSource, Activity).delete(
-        activities.map(({ id }) => id),
-      );
-      await getRepository(dataSource, Timeslot).delete(
-        timeslots.map(({ id }) => id),
-      );
+      await Promise.all([
+        getRepository(dataSource, DealSkill).delete(
+          dealSkills.map(({ id }) => id),
+        ),
+        getRepository(dataSource, DealActivity).delete(
+          dealActivities.map(({ id }) => id),
+        ),
+        getRepository(dataSource, DealTimeslot).delete(
+          dealTimeslots.map(({ id }) => id),
+        ),
+      ]);
+      await Promise.all([
+        getRepository(dataSource, Skill).delete(skills.map(({ id }) => id)),
+        getRepository(dataSource, Activity).delete(
+          activities.map(({ id }) => id),
+        ),
+        getRepository(dataSource, Timeslot).delete(
+          timeslots.map(({ id }) => id),
+        ),
+      ]);
     }
   });
 

@@ -47,8 +47,6 @@ export default async function agentOpportunityRoutes(
       const agent = await agentRepository.findOne({
         where: { id },
         relations,
-        // One query per relation: every opportunity's volunteers and deal
-        // lists joined in one go multiply into rows per agent (be#1362).
         relationLoadStrategy: "query",
       });
 
