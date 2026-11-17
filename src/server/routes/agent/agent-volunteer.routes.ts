@@ -46,6 +46,8 @@ export default function agentVolunteerRoutes(
         where: {
           opportunity: { agentId: id },
         },
+        // One query per relation: joining all five lists multiplies rows per volunteer.
+        relationLoadStrategy: "query",
         relations: [
           "volunteer.person",
           "volunteer.deal.dealActivity.activity",

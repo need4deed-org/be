@@ -12,16 +12,23 @@ import {
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import Activity from "../../../data/entity/profile/activity.entity";
+import Skill from "../../../data/entity/profile/skill.entity";
+import Timeslot from "../../../data/entity/time/timeslot.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 
 const PASSWORD = "test_password";
@@ -271,6 +278,66 @@ describe("GET /agent/:id/volunteer-linked", () => {
     expect(item.languages).toEqual([]);
     expect(item.availability).toEqual([]);
     expect(item.locations).toEqual([]);
+  });
+
+  it("returns every option once for a volunteer with many options", async () => {
+    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const skills = await getRepository(dataSource, Skill).save(
+      [1, 2, 3].map((n) => new Skill({ title: `Skill ${n} ${suffix}` })),
+    );
+    const activities = await getRepository(dataSource, Activity).save(
+      [1, 2, 3].map((n) => new Activity({ title: `Activity ${n} ${suffix}` })),
+    );
+    const timeslots = await getRepository(dataSource, Timeslot).save(
+      ["MO", "WE", "FR"].map(
+        (day) =>
+          new Timeslot({
+            rrule: `FREQ=WEEKLY;BYDAY=${day};`,
+            start: new Date(2026, 0, 5, 8, 0),
+            end: new Date(2026, 0, 5, 11, 0),
+          }),
+      ),
+    );
+    await getRepository(dataSource, DealSkill).save(
+      skills.map(({ id }) => new DealSkill({ dealId: deal.id, skillId: id })),
+    );
+    await getRepository(dataSource, DealActivity).save(
+      activities.map(
+        ({ id }) => new DealActivity({ dealId: deal.id, activityId: id }),
+      ),
+    );
+    await getRepository(dataSource, DealTimeslot).save(
+      timeslots.map(
+        ({ id }) => new DealTimeslot({ dealId: deal.id, timeslotId: id }),
+      ),
+    );
+
+    try {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/agent/${agent.id}/volunteer-linked`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const [item] = res.json().data;
+      const ids = (options: { id: number }[]) =>
+        options.map(({ id }) => id).sort((a, b) => a - b);
+      expect(ids(item.skills)).toEqual(ids(skills));
+      expect(ids(item.activities)).toEqual(ids(activities));
+      expect(item.availability.length).toBeGreaterThan(0);
+    } finally {
+      await getRepository(dataSource, DealSkill).delete({ dealId: deal.id });
+      await getRepository(dataSource, DealActivity).delete({ dealId: deal.id });
+      await getRepository(dataSource, DealTimeslot).delete({ dealId: deal.id });
+      await getRepository(dataSource, Skill).delete(skills.map(({ id }) => id));
+      await getRepository(dataSource, Activity).delete(
+        activities.map(({ id }) => id),
+      );
+      await getRepository(dataSource, Timeslot).delete(
+        timeslots.map(({ id }) => id),
+      );
+    }
   });
 
   it("returns an empty array for an agent with no matched volunteers", async () => {
