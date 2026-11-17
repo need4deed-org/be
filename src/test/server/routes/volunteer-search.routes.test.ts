@@ -89,7 +89,9 @@ describe("GET /volunteer search across profile fields", () => {
         payload: { email, password: PASSWORD },
       });
       const cookie = res.cookies.find((c) => c.name === accessCookieName);
-      if (!cookie) throw new Error("login failed");
+      if (!cookie) {
+        throw new Error("login failed");
+      }
       return cookie.value;
     };
     coordinatorCookie = await login(UserRole.COORDINATOR, "coordinator");
@@ -97,7 +99,9 @@ describe("GET /volunteer search across profile fields", () => {
   });
 
   afterAll(async () => {
-    if (!deal) return;
+    if (!deal) {
+      return;
+    }
     await getRepository(dataSource, DealSkill).delete({ dealId: deal.id });
     await getRepository(dataSource, Skill).delete({ id: skill.id });
     await fastify.db.volunteerRepository.delete({ id: volunteer.id });

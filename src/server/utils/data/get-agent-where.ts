@@ -1,4 +1,4 @@
-import { FindOptionsWhere, ILike, In } from "typeorm";
+import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -6,6 +6,8 @@ import { getRepository } from "../../../data/utils";
 import { QuerystringAgentFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
+import { andIntoWhere } from "./merge-into-where";
+import { escapeLikePattern } from "./person-name-ilike";
 
 export async function getAgentWhere(
   filter: QuerystringAgentFiltering["filter"],
@@ -33,7 +35,7 @@ export async function getAgentWhere(
     );
   }
 
-  return {
+  const where = {
     ...(filter?.type
       ? {
           agentTypeId: normalizeStringArrayInput(filter.type),
@@ -42,11 +44,6 @@ export async function getAgentWhere(
     ...(filter?.status
       ? {
           trustLevel: normalizeStringArrayInput(filter.status),
-        }
-      : {}),
-    ...(filter?.search
-      ? {
-          title: ILike(`%${filter.search}%`),
         }
       : {}),
     ...(filter?.street
@@ -75,4 +72,31 @@ export async function getAgentWhere(
         }
       : {}),
   } as FindOptionsWhere<Agent>;
+
+  if (filter?.search) {
+    andIntoWhere(
+      where,
+      "id",
+      Raw(getAgentSearchSql(visibility === null), {
+        searchPattern: `%${escapeLikePattern(filter.search)}%`,
+      }),
+    );
+  }
+  return where;
 }
+
+const getAgentSearchSql = (includeStreet: boolean) => (column: string) =>
+  `${column} IN (
+  SELECT a.id FROM agent a
+   WHERE a.title ILIKE :searchPattern
+      OR a.info ILIKE :searchPattern
+      OR EXISTS (SELECT 1 FROM district d WHERE d.id = a.district_id AND d.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_type t WHERE t.id = a.agent_type_id AND t.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM organization o WHERE o.id = a.organization_id AND o.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_language j JOIN language l ON l.id = j.language_id WHERE j.agent_id = a.id AND l.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_service j JOIN service s ON s.id = j.service_id WHERE j.agent_id = a.id AND s.title ILIKE :searchPattern)${
+        includeStreet
+          ? `
+      OR EXISTS (SELECT 1 FROM address ad WHERE ad.id = a.address_id AND ad.street ILIKE :searchPattern)`
+          : ""
+      })`;

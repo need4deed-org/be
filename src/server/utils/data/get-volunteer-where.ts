@@ -4,7 +4,8 @@ import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
 import { dealIdIn } from "./get-availability-deal-ids";
-import { getVolunteerSearchFragment, SqlIdFragment } from "./volunteer-search";
+import { andIntoWhere } from "./merge-into-where";
+import { getVolunteerSearchFragment } from "./volunteer-search";
 
 const NO_OWNER = "none";
 
@@ -24,13 +25,12 @@ export function getVolunteerWhere(
   visibility: CallerVisibility | null = null,
   availabilityDealIds: number[] | null = null,
 ): FindOptionsWhere<Volunteer> {
-  const where = getVolunteerFilterWhere(filter);
   const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
   const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
   const requestsNoOwner = requested?.includes(NO_OWNER) ?? false;
 
-  return {
-    ...where,
+  const where: FindOptionsWhere<Volunteer> = {
+    ...getVolunteerFilterWhere(filter),
     ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
     ...(requested
       ? {
@@ -41,36 +41,33 @@ export function getVolunteerWhere(
           ),
         }
       : {}),
-    ...getIdWhere([
-      ...(filter?.search
-        ? [getVolunteerSearchFragment(filter.search, visibility)]
-        : []),
-      ...(visibility
-        ? [
-            {
-              sql: "SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons)",
-              params: {
-                visibleOwners: [...visibility.ownerAgentIds],
-                visiblePersons: [...visibility.personIds],
-              },
-            },
-          ]
-        : []),
-    ]),
   };
-}
-
-function getIdWhere(fragments: SqlIdFragment[]): FindOptionsWhere<Volunteer> {
-  if (!fragments.length) {
-    return {};
+  if (filter?.search) {
+    const { sql, params } = getVolunteerSearchFragment(
+      filter.search,
+      visibility,
+    );
+    andIntoWhere(
+      where,
+      "id",
+      Raw((column) => `${column} IN (${sql})`, params),
+    );
   }
-  return {
-    id: Raw(
-      (column) =>
-        fragments.map(({ sql }) => `${column} IN (${sql})`).join(" AND "),
-      Object.assign({}, ...fragments.map(({ params }) => params)),
-    ),
-  };
+  if (visibility) {
+    andIntoWhere(
+      where,
+      "id",
+      Raw(
+        (column) =>
+          `${column} IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
+        {
+          visibleOwners: [...visibility.ownerAgentIds],
+          visiblePersons: [...visibility.personIds],
+        },
+      ),
+    );
+  }
+  return where;
 }
 
 export function getVolunteerFilterWhere(

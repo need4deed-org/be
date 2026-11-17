@@ -4,7 +4,7 @@ import { escapeLikePattern } from "./person-name-ilike";
 const PHONE_LIKE = /^[\d\s+()\-./]+$/;
 const MIN_PHONE_DIGITS = 3;
 
-export type SqlIdFragment = {
+type SqlIdFragment = {
   sql: string;
   params: Record<string, unknown>;
 };

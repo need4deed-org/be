@@ -88,11 +88,15 @@ describe("volunteer search", () => {
 
   it("ANDs the search with a masked caller's visibility", () => {
     const where = getVolunteerWhere({ search: "ann" }, visibility([7], [4]));
-    const id = (where as unknown as { id?: { _getSql: (a: string) => string } })
-      .id;
-    const sql = id?._getSql("Volunteer.id") ?? "";
-    expect(sql.match(/Volunteer\.id IN \(/g)).toHaveLength(2);
-    expect(sql).toContain(") AND Volunteer.id IN (");
+    const id = (
+      where as unknown as {
+        id?: { _type: string; _value: { _getSql: (a: string) => string }[] };
+      }
+    ).id;
+    expect(id?._type).toBe("and");
+    const [search, scope] = id?._value ?? [];
+    expect(search._getSql("Volunteer.id")).toContain("p.first_name ILIKE");
+    expect(scope._getSql("Volunteer.id")).toContain("owner_agent_id IS NULL");
   });
 
   it("keeps filters without a search on the deal", () => {
