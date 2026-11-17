@@ -374,9 +374,18 @@ describe("refresh-token rotation", () => {
 });
 
 describe("deleteExpiredRefreshSessions", () => {
-  it("deletes expired sessions, keeping live and revoked ones", async () => {
-    const fastify = await createServer();
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    fastify = await createServer();
     await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  it("deletes expired sessions, keeping live and revoked ones", async () => {
     const manager = fastify.db.refreshSessionRepository.manager;
     const email = `refresh-prune-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
     try {
@@ -419,7 +428,6 @@ describe("deleteExpiredRefreshSessions", () => {
     } finally {
       await fastify.db.userRepository.delete({ email });
       await fastify.db.personRepository.delete({ email });
-      await fastify.close();
     }
   });
 });
