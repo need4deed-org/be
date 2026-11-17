@@ -1,11 +1,12 @@
 import { UserRole } from "need4deed-sdk";
-import { ILike, In } from "typeorm";
+import { In } from "typeorm";
 import { describe, expect, it } from "vitest";
 import {
   getVolunteerFilterWhere,
   getVolunteerWhere,
   normalizeVolunteerStatusFilter,
 } from "../../../../server/utils/data/get-volunteer-where";
+import { getVolunteerSearchFragment } from "../../../../server/utils/data/volunteer-search";
 import { CallerVisibility } from "../../../../server/utils/pii/visible-persons";
 
 function visibility(
@@ -23,7 +24,7 @@ function visibility(
   };
 }
 
-describe("getVolunteerWhere search (be#666, be#972)", () => {
+describe("volunteer search", () => {
   it("normalizes frontend engagement and match status filters", () => {
     expect(normalizeVolunteerStatusFilter("new")).toBe("vol-new");
     expect(normalizeVolunteerStatusFilter(["new", "vol-active"])).toEqual([
@@ -33,83 +34,69 @@ describe("getVolunteerWhere search (be#666, be#972)", () => {
     expect(normalizeVolunteerStatusFilter(undefined)).toBeUndefined();
   });
 
-  it("matches name/email across all persons for a privileged caller", () => {
-    expect(getVolunteerFilterWhere({ search: "ann" }, null)).toEqual({
-      person: [
-        { firstName: ILike("%ann%") },
-        { lastName: ILike("%ann%") },
-        { email: ILike("%ann%") },
-        { phone: ILike("%ann%") },
-      ],
-    });
+  it("matches person fields, deal options, owner NGO and notes for a privileged caller", () => {
+    const { sql, params } = getVolunteerSearchFragment("ann", null);
+    for (const part of [
+      "p.first_name ILIKE :searchPattern",
+      "p.phone ILIKE :searchPattern",
+      "JOIN language o",
+      "JOIN skill o",
+      "JOIN activity o",
+      "JOIN district o",
+      "a.id = v.owner_agent_id",
+      "v.info_about ILIKE :searchPattern",
+    ]) {
+      expect(sql).toContain(part);
+    }
+    expect(sql).not.toContain(":searchPersonIds");
+    expect(params.searchPattern).toBe("%ann%");
   });
 
-  it("scopes each search branch to persons visible to a masked caller", () => {
-    expect(
-      getVolunteerFilterWhere({ search: "ann" }, visibility([7, 9])),
-    ).toEqual({
-      person: [
-        { firstName: ILike("%ann%"), id: In([7, 9]) },
-        { lastName: ILike("%ann%"), id: In([7, 9]) },
-        { email: ILike("%ann%"), id: In([7, 9]) },
-        { phone: ILike("%ann%"), id: In([7, 9]) },
-      ],
-    });
-  });
-
-  it("matches nothing for a masked caller who can see no person", () => {
-    expect(getVolunteerFilterWhere({ search: "ann" }, visibility([]))).toEqual({
-      person: [
-        { firstName: ILike("%ann%"), id: In([-1]) },
-        { lastName: ILike("%ann%"), id: In([-1]) },
-        { email: ILike("%ann%"), id: In([-1]) },
-        { phone: ILike("%ann%"), id: In([-1]) },
-      ],
-    });
-  });
-
-  it("escapes LIKE metacharacters in filter.search", () => {
-    const where = getVolunteerFilterWhere({ search: "a_b%" }, null);
-    expect(where.person?.[0]).toEqual({ firstName: ILike("%a\\_b\\%%") });
-  });
-
-  describe("formatting-insensitive phone match", () => {
-    const phoneDigitsBranch = (search: string) =>
-      getVolunteerFilterWhere({ search }, null).person?.[4] as
-        | { phone: { _type: string; _objectLiteralParameters: unknown } }
-        | undefined;
-
-    it.each(["+4930123", "+49 (30) 123-4", "030/123.45"])(
-      "adds a digits-only phone branch for phone-like input %j",
-      (search) => {
-        const branch = phoneDigitsBranch(search);
-        expect(branch?.phone._type).toBe("raw");
-        expect(branch?.phone._objectLiteralParameters).toEqual({
-          phoneDigits: `%${search.replace(/\D/g, "")}%`,
-        });
-      },
+  it("scopes person fields to visible persons and skips notes for a masked caller", () => {
+    const { sql, params } = getVolunteerSearchFragment(
+      "ann",
+      visibility([7, 9]),
     );
+    expect(sql).toContain("p.id = ANY(:searchPersonIds) AND (");
+    expect(sql).not.toContain("info_about");
+    expect(params.searchPersonIds).toEqual([7, 9]);
+  });
 
-    it.each(["ann", "Ann 030", "12", "+ -"])(
-      "adds no digits-only phone branch for %j",
-      (search) => {
-        expect(phoneDigitsBranch(search)).toBeUndefined();
-      },
+  it("escapes LIKE metacharacters", () => {
+    expect(getVolunteerSearchFragment("a_b%", null).params.searchPattern).toBe(
+      "%a\\_b\\%%",
     );
+  });
 
-    it("scopes the phone branch to visible persons too", () => {
-      const where = getVolunteerFilterWhere(
-        { search: "030 123" },
-        visibility([7]),
+  it.each(["+4930123", "+49 (30) 123-4", "030/123.45"])(
+    "adds a digits-only phone match for %j",
+    (search) => {
+      const { sql, params } = getVolunteerSearchFragment(search, null);
+      expect(sql).toContain("LIKE :searchDigits");
+      expect(params.searchDigits).toBe(`%${search.replace(/\D/g, "")}%`);
+    },
+  );
+
+  it.each(["ann", "Ann 030", "12", "+ -"])(
+    "adds no digits-only phone match for %j",
+    (search) => {
+      expect(getVolunteerSearchFragment(search, null).sql).not.toContain(
+        ":searchDigits",
       );
-      expect(where.person?.[4]).toMatchObject({ id: In([7]) });
-    });
+    },
+  );
+
+  it("ANDs the search with a masked caller's visibility", () => {
+    const where = getVolunteerWhere({ search: "ann" }, visibility([7], [4]));
+    const id = (where as unknown as { id?: { _getSql: (a: string) => string } })
+      .id;
+    const sql = id?._getSql("Volunteer.id") ?? "";
+    expect(sql.match(/Volunteer\.id IN \(/g)).toHaveLength(2);
+    expect(sql).toContain(") AND Volunteer.id IN (");
   });
 
-  it("does not scope a masked caller's query without a search", () => {
-    expect(
-      getVolunteerFilterWhere({ district: ["3"] }, visibility([])),
-    ).toEqual({
+  it("keeps filters without a search on the deal", () => {
+    expect(getVolunteerFilterWhere({ district: ["3"] })).toEqual({
       deal: { dealDistrict: { district: { id: In(["3"]) } } },
     });
   });
