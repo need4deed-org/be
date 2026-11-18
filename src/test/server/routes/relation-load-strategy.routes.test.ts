@@ -372,6 +372,9 @@ describe("endpoints loading several to-many lists", () => {
       });
 
       expect(status).toBe(201);
+      const [ov] = suggestion.mock.calls[0];
+      expect(ov.volunteer?.person?.users).toEqual(expect.any(Array));
+      expect(ov.opportunity?.id).toBe(linkedOpportunity.id);
       expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
     } finally {
       suggestion.mockRestore();

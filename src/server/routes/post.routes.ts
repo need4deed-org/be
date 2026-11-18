@@ -57,11 +57,7 @@ import {
 } from "../utils/data/get-post-where";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
-import {
-  attachLinkedOpportunities,
-  attachTaggedAgents,
-  attachTaggedPersons,
-} from "../utils/data/post-lists";
+import { attachPostLists, attachTaggedAgents } from "../utils/data/post-lists";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
@@ -204,11 +200,9 @@ export default async function postRoutes(
       }
 
       await Promise.all([
-        attachTaggedPersons(fastify, orderedPosts),
-        attachLinkedOpportunities(fastify, orderedPosts),
+        attachPostLists(fastify, orderedPosts),
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
-        attachTaggedAgents(fastify, orderedPosts),
       ]);
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
