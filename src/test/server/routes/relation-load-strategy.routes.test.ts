@@ -35,6 +35,10 @@ describe("endpoints loading several to-many lists", () => {
   let opportunity: Opportunity;
   let volunteer: Volunteer;
   let opportunityVolunteer: OpportunityVolunteer;
+  let linkedOpportunity: Opportunity;
+  let taggedPersonIds: number[];
+  let postId: number;
+  let suffix: string;
   let cookie: string;
   const cleanup: (() => Promise<unknown>)[] = [];
 
@@ -42,7 +46,7 @@ describe("endpoints loading several to-many lists", () => {
     fastify = await createServer();
     await fastify.ready();
     const db = fastify.db;
-    const suffix = randomNumericSuffix();
+    suffix = randomNumericSuffix();
 
     agent = await db.agentRepository.save(
       new Agent({ title: `Relation load agent ${suffix}` }),
@@ -104,6 +108,14 @@ describe("endpoints loading several to-many lists", () => {
       }),
     );
     cleanup.push(() => db.opportunityRepository.delete(opportunity.id));
+    linkedOpportunity = await db.opportunityRepository.save(
+      new Opportunity({
+        title: `Relation load linked opportunity ${suffix}`,
+        type: OpportunityType.REGULAR,
+        agentId: agent.id,
+      }),
+    );
+    cleanup.push(() => db.opportunityRepository.delete(linkedOpportunity.id));
 
     const person = await db.personRepository.save(
       new Person({ firstName: "Relation", lastName: `Volunteer ${suffix}` }),
@@ -160,6 +172,9 @@ describe("endpoints loading several to-many lists", () => {
       throw new Error("coordinator login returned no access cookie");
     }
     cookie = value;
+
+    taggedPersonIds = [person.id, coordinator.id];
+    postId = (await createPost()).json().data.id;
   });
 
   afterAll(async () => {
@@ -175,6 +190,24 @@ describe("endpoints loading several to-many lists", () => {
       url,
       cookies: { [accessCookieName]: cookie },
     });
+
+  const createPost = async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: cookie },
+      payload: {
+        text: `Relation load post ${suffix}`,
+        taggedPersonIds,
+        linkedOpportunityIds: [opportunity.id, linkedOpportunity.id],
+      },
+    });
+    const id = res.json().data?.id;
+    if (id) {
+      cleanup.push(() => fastify.db.postRepository.delete(id));
+    }
+    return res;
+  };
 
   const listUrl = () =>
     `/volunteer/opportunity?type=regular&status=${OpportunityStatusType.SEARCHING}&agentId=${agent.id}`;
@@ -196,6 +229,11 @@ describe("endpoints loading several to-many lists", () => {
     ["GET /volunteer/:id", () => `/volunteer/${volunteer.id}`],
     ["GET /volunteer/opportunity", listUrl],
     ["GET /opportunity/legacy", () => "/opportunity/legacy"],
+    ["GET /post", () => "/post"],
+    [
+      "GET /post?search",
+      () => `/post?search=${encodeURIComponent(`Volunteer ${suffix}`)}`,
+    ],
   ])("%s joins at most one to-many list per query", async (_, url) => {
     let status = 0;
     const queries = await captureSql(async () => {
@@ -253,6 +291,67 @@ describe("endpoints loading several to-many lists", () => {
       expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
     } finally {
       introduction.mockRestore();
+    }
+  });
+
+  it("POST /post joins at most one to-many list per query", async () => {
+    let status = 0;
+    const queries = await captureSql(async () => {
+      status = (await createPost()).statusCode;
+    });
+
+    expect(status).toBe(201);
+    expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+  });
+
+  it("PATCH /post/:id joins at most one to-many list per query", async () => {
+    let status = 0;
+    const queries = await captureSql(async () => {
+      status = (
+        await fastify.inject({
+          method: "PATCH",
+          url: `/post/${postId}`,
+          cookies: { [accessCookieName]: cookie },
+          payload: { text: `Relation load post ${suffix} edited` },
+        })
+      ).statusCode;
+    });
+
+    expect(status).toBe(200);
+    expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+  });
+
+  it("POST /opportunity-volunteer as pending joins at most one to-many list per query", async () => {
+    const suggestion = vi
+      .spyOn(fastify.notify, "emailSuggestion")
+      .mockResolvedValue(undefined);
+    cleanup.push(() =>
+      fastify.db.opportunityVolunteerRepository.delete({
+        opportunityId: linkedOpportunity.id,
+      }),
+    );
+    try {
+      let status = 0;
+      const queries = await captureSql(async () => {
+        status = (
+          await fastify.inject({
+            method: "POST",
+            url: "/opportunity-volunteer",
+            cookies: { [accessCookieName]: cookie },
+            payload: {
+              opportunityId: linkedOpportunity.id,
+              volunteerId: volunteer.id,
+              status: OpportunityVolunteerStatusType.PENDING,
+            },
+          })
+        ).statusCode;
+        await vi.waitFor(() => expect(suggestion).toHaveBeenCalledOnce());
+      });
+
+      expect(status).toBe(201);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+    } finally {
+      suggestion.mockRestore();
     }
   });
 });

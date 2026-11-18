@@ -23,6 +23,7 @@ import Skill from "../../../data/entity/profile/skill.entity";
 import User from "../../../data/entity/user.entity";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
 
@@ -763,6 +764,41 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     // representative (existingContact).
     expect(saved.contactPersonId).toBe(memberPerson.id);
     expect(saved.contactPersonId).not.toBe(existingContact.id);
+  });
+
+  it("loads the new-opportunity email's people without joining two of their lists in one query", async () => {
+    const newRegular = vi
+      .spyOn(fastify.notify, "emailNewRegular")
+      .mockResolvedValue(undefined);
+    try {
+      let res!: Awaited<ReturnType<typeof fastify.inject>>;
+      const queries = await captureSql(async () => {
+        res = await fastify.inject({
+          method: "POST",
+          url: "/opportunity/",
+          cookies: { [accessCookieName]: memberCookie },
+          payload: {
+            title: `Test Opportunity (email relations) ${suffix}`,
+            opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+            volunteers_number: 1,
+            category: "",
+            category_id: "",
+            language: "en",
+            agent_id: agent.id,
+          },
+        });
+        await vi.waitFor(() => expect(newRegular).toHaveBeenCalledOnce());
+      });
+
+      expect(res.statusCode).toBe(201);
+      createdOpportunityIds.push(res.json().data.id);
+      const [opportunity] = newRegular.mock.calls[0];
+      expect(opportunity.submittedByPerson?.users).toHaveLength(1);
+      expect(opportunity.agent?.agentPerson).toHaveLength(2);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+    } finally {
+      newRegular.mockRestore();
+    }
   });
 });
 

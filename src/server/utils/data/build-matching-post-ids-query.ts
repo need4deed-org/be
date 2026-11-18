@@ -20,23 +20,41 @@ export function buildMatchingPostIdsQuery(
   }
 
   if (search) {
-    const pattern = `%${escapeLikePattern(search)}%`;
+    const replyMatch = qb
+      .subQuery()
+      .select("1")
+      .from(Post, "reply")
+      .where("reply.rootId = post.id")
+      .andWhere("reply.text ILIKE :search")
+      .getQuery();
+    const taggedPersonMatch = qb
+      .subQuery()
+      .select("1")
+      .from(Post, "taggedPost")
+      .innerJoin("taggedPost.taggedPersons", "taggedPerson")
+      .where("taggedPost.id = post.id")
+      .andWhere(personNameIlikeCondition("taggedPerson"))
+      .getQuery();
+    const opportunityMatch = qb
+      .subQuery()
+      .select("1")
+      .from(Post, "linkedPost")
+      .innerJoin("linkedPost.linkedOpportunities", "opportunity")
+      .where("linkedPost.id = post.id")
+      .andWhere("opportunity.title ILIKE :search")
+      .getQuery();
     qb.leftJoin("post.author", "author")
-      .leftJoin("post.taggedPersons", "taggedPerson")
-      .leftJoin("post.linkedOpportunities", "opportunity")
-      .leftJoin("post.descendantReplies", "reply")
       .andWhere(
         new Brackets((sub) => {
           sub
-            .where("post.text ILIKE :search", { search: pattern })
-            .orWhere("reply.text ILIKE :search", { search: pattern })
-            .orWhere(personNameIlikeCondition("author"), { search: pattern })
-            .orWhere(personNameIlikeCondition("taggedPerson"), {
-              search: pattern,
-            })
-            .orWhere("opportunity.title ILIKE :search", { search: pattern });
+            .where("post.text ILIKE :search")
+            .orWhere(`EXISTS ${replyMatch}`)
+            .orWhere(personNameIlikeCondition("author"))
+            .orWhere(`EXISTS ${taggedPersonMatch}`)
+            .orWhere(`EXISTS ${opportunityMatch}`);
         }),
-      );
+      )
+      .setParameter("search", `%${escapeLikePattern(search)}%`);
   }
 
   return qb;

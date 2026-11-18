@@ -115,6 +115,7 @@ All route prefixes are defined in `RoutePrefix` in `src/server/types/enums.ts`. 
 - **Never duplicate SDK types** — import from `need4deed-sdk`
 - **Trunk-based:** `develop` is the only long-lived branch; target it. Prod releases go through `infra` (`release-prod`), not a branch here
 - **Never log `req.body`** wholesale — may contain personal data
+- **No Cartesian loads:** a `find` or query builder that loads two or more to-many relations (`OneToMany`/`ManyToMany`, at any depth) multiplies rows when they are joined, which has run prod out of memory. Use `relationLoadStrategy: "query"`, or load the lists in a second query for the page's ids. With `"query"`, give paged finds an explicit `order`. Filter on a to-many relation with `EXISTS`, not a join. Guard new load paths with `captureSql`/`maxToManyJoins` from `src/test/sql-capture.ts`
 - **Migration file names must use kebab-case** — e.g. `add-postcode-to-accompanying`, never PascalCase
 - Branch naming: `<issue-number>-short-description` (e.g. `502-add-postcode-to-accompanying`)
 - Default branch is `develop`
