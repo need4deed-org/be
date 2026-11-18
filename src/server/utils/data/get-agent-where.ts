@@ -7,6 +7,7 @@ import { QuerystringAgentFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
 import { andIntoWhere } from "./merge-into-where";
+import { optionTitleMatch } from "./option-search-sql";
 import { escapeLikePattern } from "./person-name-ilike";
 
 export async function getAgentWhere(
@@ -91,10 +92,10 @@ const getAgentSearchSql = (includeStreet: boolean) => (column: string) =>
    WHERE a.title ILIKE :searchPattern
       OR a.info ILIKE :searchPattern
       OR EXISTS (SELECT 1 FROM district d WHERE d.id = a.district_id AND d.title ILIKE :searchPattern)
-      OR EXISTS (SELECT 1 FROM agent_type t WHERE t.id = a.agent_type_id AND t.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_type t WHERE t.id = a.agent_type_id AND ${optionTitleMatch("t", "agent_type")})
       OR EXISTS (SELECT 1 FROM organization o WHERE o.id = a.organization_id AND o.title ILIKE :searchPattern)
-      OR EXISTS (SELECT 1 FROM agent_language j JOIN language l ON l.id = j.language_id WHERE j.agent_id = a.id AND l.title ILIKE :searchPattern)
-      OR EXISTS (SELECT 1 FROM agent_service j JOIN service s ON s.id = j.service_id WHERE j.agent_id = a.id AND s.title ILIKE :searchPattern)${
+      OR EXISTS (SELECT 1 FROM agent_language j JOIN language l ON l.id = j.language_id WHERE j.agent_id = a.id AND ${optionTitleMatch("l", "language")})
+      OR EXISTS (SELECT 1 FROM agent_service j JOIN service s ON s.id = j.service_id WHERE j.agent_id = a.id AND ${optionTitleMatch("s", "service")})${
         includeStreet
           ? `
       OR EXISTS (SELECT 1 FROM address ad WHERE ad.id = a.address_id AND ad.street ILIKE :searchPattern)`

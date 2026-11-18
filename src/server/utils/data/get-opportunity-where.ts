@@ -18,6 +18,7 @@ import {
 } from "../../types";
 import { normalizeStringArrayInput } from "./for-routes";
 import { dealIdIn } from "./get-availability-deal-ids";
+import { dealOptionMatch } from "./option-search-sql";
 import { parseDateOnly } from "./parse-date-only";
 import { escapeLikePattern } from "./person-name-ilike";
 
@@ -73,17 +74,14 @@ export function getSearchBranches(
   return branches;
 }
 
-const dealOptionMatch = (joinTable: string, optionTable: string) =>
-  `EXISTS (SELECT 1 FROM ${joinTable} j JOIN ${optionTable} o ON o.id = j.${optionTable}_id WHERE j.deal_id = op.deal_id AND o.title ILIKE :searchPattern)`;
-
 const PROFILE_SEARCH_SQL = (alias: string) => `${alias} IN (
   SELECT op.id FROM opportunity op
    WHERE EXISTS (SELECT 1 FROM agent a WHERE a.id = op.agent_id AND a.title ILIKE :searchPattern)
       OR EXISTS (SELECT 1 FROM district d WHERE d.id = op.district_id AND d.title ILIKE :searchPattern)
-      OR ${dealOptionMatch("deal_district", "district")}
-      OR ${dealOptionMatch("deal_language", "language")}
-      OR ${dealOptionMatch("deal_skill", "skill")}
-      OR ${dealOptionMatch("deal_activity", "activity")})`;
+      OR ${dealOptionMatch("op.deal_id", "deal_district", "district")}
+      OR ${dealOptionMatch("op.deal_id", "deal_language", "language")}
+      OR ${dealOptionMatch("op.deal_id", "deal_skill", "skill")}
+      OR ${dealOptionMatch("op.deal_id", "deal_activity", "activity")})`;
 
 function getProfileSearchBranch(
   pattern: string,

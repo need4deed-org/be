@@ -37,7 +37,7 @@ describe("volunteer search", () => {
   it("matches person fields, deal options, owner NGO and notes for a privileged caller", () => {
     const { sql, params } = getVolunteerSearchFragment("ann", null);
     for (const part of [
-      "p.first_name ILIKE :searchPattern",
+      "NULLIF(p.last_name, '')) ILIKE :searchPattern",
       "p.phone ILIKE :searchPattern",
       "JOIN language o",
       "JOIN skill o",
@@ -95,7 +95,7 @@ describe("volunteer search", () => {
     ).id;
     expect(id?._type).toBe("and");
     const [search, scope] = id?._value ?? [];
-    expect(search._getSql("Volunteer.id")).toContain("p.first_name ILIKE");
+    expect(search._getSql("Volunteer.id")).toContain("NULLIF(p.first_name");
     expect(scope._getSql("Volunteer.id")).toContain("owner_agent_id IS NULL");
   });
 
