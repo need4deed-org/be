@@ -157,8 +157,8 @@ export default async function postRoutes(
           .where("post.parentId IS NULL")
           .orderBy("post.createdAt", "DESC")
           .addOrderBy("post.id", "DESC")
-          .offset(skip)
-          .limit(take);
+          .skip(skip)
+          .take(take);
         if (authorId !== undefined) {
           qb.andWhere("post.authorId = :authorId", { authorId });
         }
