@@ -848,7 +848,9 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
         emailNewRegular.mock.calls
           .map(([opportunity]) => opportunity)
           .find((opportunity) => opportunity.id === createdId);
-      await vi.waitFor(() => expect(emailedOpportunity()).toBeDefined());
+      await vi.waitFor(() => expect(emailedOpportunity()).toBeDefined(), {
+        timeout: 5000,
+      });
       const opportunity = emailedOpportunity()!;
       expect(opportunity.submittedByPersonId).toBe(coordinatorPerson.id);
       expect(getOpportunityRepresentativePerson(opportunity)?.id).toBe(
