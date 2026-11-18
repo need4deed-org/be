@@ -368,6 +368,7 @@ export default async function opportunityRoutes(
       const opportunity = await opportunityRepository.findOne({
         where: { id },
         relations,
+        relationLoadStrategy: "query",
       });
 
       if (!opportunity) {

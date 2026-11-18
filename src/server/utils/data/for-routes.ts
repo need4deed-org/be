@@ -750,6 +750,7 @@ export async function fetchVolunteerById(
   const volunteer = await volunteerRepository.findOne({
     where: { id },
     relations,
+    relationLoadStrategy: "query",
   });
 
   if (!volunteer) {

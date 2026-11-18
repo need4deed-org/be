@@ -247,7 +247,10 @@ describe("recommended matches (be#1184)", () => {
       value: singleDistrictPostcode.value,
     };
     postcodeId = (
-      await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
+      await fastify.db.postcodeRepository.findOneOrFail({
+        where: {},
+        order: { id: "ASC" },
+      })
     ).id;
     if (postcodeId !== appointmentPostcode.id) {
       const commuteRepository = getRepository(dataSource, PostcodeCommute);

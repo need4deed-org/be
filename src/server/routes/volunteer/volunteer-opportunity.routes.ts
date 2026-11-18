@@ -71,6 +71,8 @@ export default async function volunteerOpportunityRoutes(
       const [opportunities, count] = await opportunityRepository.findAndCount({
         where,
         relations,
+        relationLoadStrategy: "query",
+        order: { id: "ASC" },
         skip,
         take,
       });

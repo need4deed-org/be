@@ -68,7 +68,10 @@ describe("#new-volunteers-opportunities notice on profile edits by volunteers an
     await fastify.ready();
 
     const { id: postcodeId } =
-      await fastify.db.postcodeRepository.findOneOrFail({ where: {} });
+      await fastify.db.postcodeRepository.findOneOrFail({
+        where: {},
+        order: { id: "ASC" },
+      });
     const password = await hashPassword(PASSWORD);
 
     const volunteerDeal = await fastify.db.dealRepository.save(

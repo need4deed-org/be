@@ -367,6 +367,8 @@ export default async function opportunityLegacyRoutes(
           ]),
         },
         take: 300,
+        order: { id: "ASC" },
+        relationLoadStrategy: "query",
         relations: [
           "deal.dealLanguage.language",
           "deal.dealActivity.activity",

@@ -44,7 +44,11 @@ export default async function agentOpportunityRoutes(
         "opportunity.deal.dealTimeslot.timeslot",
         "opportunity.district",
       ];
-      const agent = await agentRepository.findOne({ where: { id }, relations });
+      const agent = await agentRepository.findOne({
+        where: { id },
+        relations,
+        relationLoadStrategy: "query",
+      });
 
       if (!agent) {
         throw new NotFoundError(`Agent (id:${id}) not found.`);

@@ -184,6 +184,7 @@ async function sendMatchedEmails(
       "opportunity.onetimer",
       "opportunity.district",
     ],
+    relationLoadStrategy: "query",
   });
   if (!ov) {
     return "no-match";

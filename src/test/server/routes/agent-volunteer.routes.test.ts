@@ -12,17 +12,26 @@ import {
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
+import DealActivity from "../../../data/entity/m2m/deal-activity";
+import DealSkill from "../../../data/entity/m2m/deal-skill";
+import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
+import Activity from "../../../data/entity/profile/activity.entity";
+import Skill from "../../../data/entity/profile/skill.entity";
+import Timeslot from "../../../data/entity/time/timeslot.entity";
 import User from "../../../data/entity/user.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
+import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
 
@@ -271,6 +280,82 @@ describe("GET /agent/:id/volunteer-linked", () => {
     expect(item.languages).toEqual([]);
     expect(item.availability).toEqual([]);
     expect(item.locations).toEqual([]);
+  });
+
+  it("returns every option once for a volunteer with many options, joining at most one list per query", async () => {
+    const suffix = randomNumericSuffix();
+    const skills = await getRepository(dataSource, Skill).save(
+      [1, 2, 3].map((n) => new Skill({ title: `Skill ${n} ${suffix}` })),
+    );
+    const activities = await getRepository(dataSource, Activity).save(
+      [1, 2, 3].map((n) => new Activity({ title: `Activity ${n} ${suffix}` })),
+    );
+    const timeslots = await getRepository(dataSource, Timeslot).save(
+      ["MO", "WE", "FR"].map(
+        (day) =>
+          new Timeslot({
+            rrule: `FREQ=WEEKLY;BYDAY=${day};`,
+            start: new Date(2026, 0, 5, 8, 0),
+            end: new Date(2026, 0, 5, 11, 0),
+          }),
+      ),
+    );
+    const [dealSkills, dealActivities, dealTimeslots] = await Promise.all([
+      getRepository(dataSource, DealSkill).save(
+        skills.map(({ id }) => new DealSkill({ dealId: deal.id, skillId: id })),
+      ),
+      getRepository(dataSource, DealActivity).save(
+        activities.map(
+          ({ id }) => new DealActivity({ dealId: deal.id, activityId: id }),
+        ),
+      ),
+      getRepository(dataSource, DealTimeslot).save(
+        timeslots.map(
+          ({ id }) => new DealTimeslot({ dealId: deal.id, timeslotId: id }),
+        ),
+      ),
+    ]);
+
+    try {
+      let res!: Awaited<ReturnType<typeof fastify.inject>>;
+      const queries = await captureSql(async () => {
+        res = await fastify.inject({
+          method: "GET",
+          url: `/agent/${agent.id}/volunteer-linked`,
+          cookies: { [accessCookieName]: coordinatorCookie },
+        });
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+      const [item] = res.json().data;
+      const ids = (options: { id: number }[]) =>
+        options.map(({ id }) => id).sort((a, b) => a - b);
+      expect(ids(item.skills)).toEqual(ids(skills));
+      expect(ids(item.activities)).toEqual(ids(activities));
+      expect(ids(item.availability)).toEqual(ids(timeslots));
+    } finally {
+      await Promise.all([
+        getRepository(dataSource, DealSkill).delete(
+          dealSkills.map(({ id }) => id),
+        ),
+        getRepository(dataSource, DealActivity).delete(
+          dealActivities.map(({ id }) => id),
+        ),
+        getRepository(dataSource, DealTimeslot).delete(
+          dealTimeslots.map(({ id }) => id),
+        ),
+      ]);
+      await Promise.all([
+        getRepository(dataSource, Skill).delete(skills.map(({ id }) => id)),
+        getRepository(dataSource, Activity).delete(
+          activities.map(({ id }) => id),
+        ),
+        getRepository(dataSource, Timeslot).delete(
+          timeslots.map(({ id }) => id),
+        ),
+      ]);
+    }
   });
 
   it("returns an empty array for an agent with no matched volunteers", async () => {

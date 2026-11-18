@@ -26,7 +26,10 @@ describe("updateAgentContact address handling (be#1026)", () => {
 
   it("re-points the contact to a fresh Address instead of patching one shared with another Person", async () => {
     const postcodeRepository = dataSource.getRepository(Postcode);
-    const postcode = await postcodeRepository.findOneOrFail({ where: {} });
+    const postcode = await postcodeRepository.findOneOrFail({
+      where: {},
+      order: { id: "ASC" },
+    });
 
     const addressRepository = dataSource.getRepository(Address);
     const shared = await addressRepository.save(
