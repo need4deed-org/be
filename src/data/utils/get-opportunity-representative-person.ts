@@ -22,16 +22,15 @@ export function getAgentContactPerson(agent?: Agent): Person | undefined {
   );
 }
 
-// A submitter only speaks for the NGO while they are an active member of it:
-// staff creating on an NGO's behalf (fe#1257) or ex-members are skipped, and
-// without loaded memberships there is nothing to verify, so skip too (be#1368).
-function isActiveAgentMember(agent: Agent | undefined, person?: Person) {
+export function isActiveMemberOf(
+  agent: Agent | undefined,
+  personId: number | undefined,
+): boolean {
   return (
-    person !== undefined &&
+    personId !== undefined &&
     (agent?.agentPerson ?? []).some(
-      ({ status, personId, person: memberPerson }) =>
-        status === AgentMembershipStatus.ACTIVE &&
-        (personId ?? memberPerson?.id) === person.id,
+      (ap) =>
+        ap.personId === personId && ap.status === AgentMembershipStatus.ACTIVE,
     )
   );
 }
@@ -40,13 +39,15 @@ export function getOpportunityRepresentativePerson(
   opportunity: Opportunity,
   { includeSubmitter = true }: { includeSubmitter?: boolean } = {},
 ): Person | undefined {
+  const submitter = includeSubmitter
+    ? (opportunity.submittedByPerson ?? undefined)
+    : undefined;
+  const submitterIsMember = isActiveMemberOf(opportunity.agent, submitter?.id);
   const candidates = [
     opportunity.contactPerson,
-    includeSubmitter &&
-    isActiveAgentMember(opportunity.agent, opportunity.submittedByPerson)
-      ? opportunity.submittedByPerson
-      : undefined,
+    submitterIsMember ? submitter : undefined,
     getAgentContactPerson(opportunity.agent),
+    submitterIsMember ? undefined : submitter,
   ];
   return candidates.find((person) => person?.email) ?? candidates.find(Boolean);
 }

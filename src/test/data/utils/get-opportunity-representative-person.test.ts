@@ -4,6 +4,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import {
   getAgentContactPerson,
   getOpportunityRepresentativePerson,
+  isActiveMemberOf,
 } from "../../../data/utils/get-opportunity-representative-person";
 
 const member = (
@@ -11,7 +12,7 @@ const member = (
   email: string | undefined,
   role = AgentRoleType.VOLUNTEER_COORDINATOR,
   status = AgentMembershipStatus.ACTIVE,
-) => ({ role, status, person: { id, email } });
+) => ({ role, status, personId: id, person: { id, email } });
 
 const agentOf = (...agentPerson: ReturnType<typeof member>[]) =>
   new Agent({ agentPerson } as unknown as Partial<Agent>);
@@ -86,7 +87,7 @@ describe("getOpportunityRepresentativePerson", () => {
     expect(result?.id).toBe(1);
   });
 
-  it("skips a submitter who is not a member of the agent, e.g. staff (be#1368)", () => {
+  it("prefers an active agent member over a submitter who is not a member, e.g. staff", () => {
     const opportunity = {
       contactPerson: { id: 1, email: undefined },
       submittedByPerson: { id: 2, email: "coordinator@need4deed.org" },
@@ -98,7 +99,7 @@ describe("getOpportunityRepresentativePerson", () => {
     expect(result?.id).toBe(3);
   });
 
-  it("skips a submitter whose membership is still pending (be#1368)", () => {
+  it("prefers an active agent member over a pending submitter", () => {
     const opportunity = {
       contactPerson: { id: 1, email: undefined },
       submittedByPerson: { id: 2, email: "pending@center.de" },
@@ -119,16 +120,40 @@ describe("getOpportunityRepresentativePerson", () => {
     expect(result?.id).toBe(3);
   });
 
-  it("skips the submitter when the agent memberships are not loaded (be#1368)", () => {
+  it("falls back to a non-member submitter when nobody at the agent has an email", () => {
     const opportunity = {
       contactPerson: { id: 1, email: undefined },
-      submittedByPerson: { id: 2, email: "submitter@center.de" },
-      agent: undefined,
+      submittedByPerson: { id: 2, email: "coordinator@need4deed.org" },
+      agent: agentOf(member(1, undefined)),
     };
 
     const result = getOpportunityRepresentativePerson(opportunity as any);
 
-    expect(result?.id).toBe(1);
+    expect(result?.id).toBe(2);
+  });
+
+  it("falls back to the submitter when the agent memberships are not loaded", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: { id: 2, email: "submitter@center.de" },
+      agent: new Agent({} as Partial<Agent>),
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any);
+
+    expect(result?.id).toBe(2);
+  });
+
+  it("handles a null submitter loaded by the query relation strategy", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: null,
+      agent: agentOf(member(3, "member@center.de")),
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any);
+
+    expect(result?.id).toBe(3);
   });
 
   it("leaves the submitter out when asked to", () => {
@@ -178,5 +203,28 @@ describe("getAgentContactPerson", () => {
 
   it("is undefined without an agent", () => {
     expect(getAgentContactPerson(undefined)).toBeUndefined();
+  });
+});
+
+describe("isActiveMemberOf", () => {
+  const agent = agentOf(
+    member(1, "active@center.de"),
+    member(
+      2,
+      "pending@center.de",
+      AgentRoleType.VOLUNTEER_COORDINATOR,
+      AgentMembershipStatus.PENDING,
+    ),
+  );
+
+  it("is true only for an active member", () => {
+    expect(isActiveMemberOf(agent, 1)).toBe(true);
+    expect(isActiveMemberOf(agent, 2)).toBe(false);
+    expect(isActiveMemberOf(agent, 3)).toBe(false);
+  });
+
+  it("is false without a person id or memberships", () => {
+    expect(isActiveMemberOf(agent, undefined)).toBe(false);
+    expect(isActiveMemberOf(undefined, 1)).toBe(false);
   });
 });
