@@ -147,13 +147,19 @@ describe("opportunity writes queue translations", () => {
       ).id;
     }
     postcodeValue = (
-      await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
+      await fastify.db.postcodeRepository.findOneOrFail({
+        where: {},
+        order: { id: "ASC" },
+      })
     ).value;
     // POST /opportunity needs the NGO's address to have a postcode.
     address = await dataSource.manager.save(
       new Address({
         postcodeId: (
-          await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
+          await fastify.db.postcodeRepository.findOneOrFail({
+            where: {},
+            order: { id: "ASC" },
+          })
         ).id,
       }),
     );

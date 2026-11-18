@@ -48,7 +48,10 @@ describe("endpoints loading several to-many lists", () => {
       new Agent({ title: `Relation load agent ${suffix}` }),
     );
     cleanup.push(() => db.agentRepository.delete(agent.id));
-    const postcode = await db.postcodeRepository.findOneOrFail({ where: {} });
+    const postcode = await db.postcodeRepository.findOneOrFail({
+      where: {},
+      order: { id: "ASC" },
+    });
     const [opportunityDeal, volunteerDeal] = await db.dealRepository.save([
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
