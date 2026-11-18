@@ -2,7 +2,7 @@ import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner
 import { vi } from "vitest";
 
 const TO_MANY_JOIN =
-  /JOIN (?:"[^"]+"\.)?"(deal_activity|deal_skill|deal_language|deal_timeslot|deal_district|opportunity_volunteer|agent_person|opportunity|user)"/g;
+  /JOIN (?:"[^"]+"\.)?"(deal_activity|deal_skill|deal_language|deal_timeslot|deal_district|opportunity_volunteer|agent_person|opportunity|user|post_person|post_agent|post_opportunity)"/g;
 
 export async function captureSql(
   fn: () => Promise<unknown>,
@@ -26,5 +26,36 @@ export async function captureSql(
   return queries;
 }
 
+function withoutExistsSubqueries(sql: string): string {
+  let out = "";
+  let i = 0;
+  const exists = /\bEXISTS\s*\(/gi;
+  while (i < sql.length) {
+    exists.lastIndex = i;
+    const match = exists.exec(sql);
+    if (!match) {
+      return out + sql.slice(i);
+    }
+    out += sql.slice(i, match.index);
+    let depth = 0;
+    let j = match.index + match[0].length - 1;
+    do {
+      if (sql[j] === "(") {
+        depth++;
+      } else if (sql[j] === ")") {
+        depth--;
+      }
+      j++;
+    } while (depth > 0 && j < sql.length);
+    i = j;
+  }
+  return out;
+}
+
 export const maxToManyJoins = (queries: string[]): number =>
-  Math.max(0, ...queries.map((q) => q.match(TO_MANY_JOIN)?.length ?? 0));
+  Math.max(
+    0,
+    ...queries.map(
+      (q) => withoutExistsSubqueries(q).match(TO_MANY_JOIN)?.length ?? 0,
+    ),
+  );

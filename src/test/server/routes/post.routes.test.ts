@@ -991,9 +991,6 @@ describe("POST /post", () => {
   });
 
   it("lists a post with multiple tagged persons and opportunities exactly once (no search)", async () => {
-    // Regression test for the plain (non-search) listing path: buildPostQuery's
-    // leftJoinAndSelect + getManyAndCount must collapse the to-many-relation
-    // fan-out on its own (no search param, so no manual GROUP BY applies here).
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
     const agent = await fastify.db.agentRepository.save(

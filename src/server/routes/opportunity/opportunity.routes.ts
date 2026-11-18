@@ -152,6 +152,7 @@ async function sendNewOpportunityEmail(
 ): Promise<void> {
   const opp = await fastify.db.opportunityRepository.findOne({
     where: { id },
+    relationLoadStrategy: "query",
     relations,
   });
   if (!opp) {
