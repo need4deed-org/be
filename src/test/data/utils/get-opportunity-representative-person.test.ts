@@ -36,7 +36,10 @@ describe("getOpportunityRepresentativePerson", () => {
     const opportunity = {
       contactPerson: undefined,
       submittedByPerson: { id: 2, email: "submitter@center.de" },
-      agent: { representative: { person: { id: 3, email: "rep@center.de" } } },
+      agent: agentOf(
+        member(3, "rep@center.de"),
+        member(2, "submitter@center.de"),
+      ),
     };
 
     const result = getOpportunityRepresentativePerson(opportunity as any);
@@ -60,7 +63,10 @@ describe("getOpportunityRepresentativePerson", () => {
     const opportunity = {
       contactPerson: { id: 1, email: undefined },
       submittedByPerson: { id: 2, email: "submitter@center.de" },
-      agent: { representative: { person: { id: 3, email: "rep@center.de" } } },
+      agent: agentOf(
+        member(3, "rep@center.de"),
+        member(2, "submitter@center.de"),
+      ),
     };
 
     const result = getOpportunityRepresentativePerson(opportunity as any);
@@ -73,6 +79,51 @@ describe("getOpportunityRepresentativePerson", () => {
       contactPerson: { id: 1, email: undefined },
       submittedByPerson: undefined,
       agent: { representative: undefined },
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any);
+
+    expect(result?.id).toBe(1);
+  });
+
+  it("skips a submitter who is not a member of the agent, e.g. staff (be#1368)", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: { id: 2, email: "coordinator@need4deed.org" },
+      agent: agentOf(member(1, undefined), member(3, "member@center.de")),
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any);
+
+    expect(result?.id).toBe(3);
+  });
+
+  it("skips a submitter whose membership is still pending (be#1368)", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: { id: 2, email: "pending@center.de" },
+      agent: agentOf(
+        member(1, undefined),
+        member(
+          2,
+          "pending@center.de",
+          AgentRoleType.VOLUNTEER_COORDINATOR,
+          AgentMembershipStatus.PENDING,
+        ),
+        member(3, "member@center.de"),
+      ),
+    };
+
+    const result = getOpportunityRepresentativePerson(opportunity as any);
+
+    expect(result?.id).toBe(3);
+  });
+
+  it("skips the submitter when the agent memberships are not loaded (be#1368)", () => {
+    const opportunity = {
+      contactPerson: { id: 1, email: undefined },
+      submittedByPerson: { id: 2, email: "submitter@center.de" },
+      agent: undefined,
     };
 
     const result = getOpportunityRepresentativePerson(opportunity as any);

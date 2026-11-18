@@ -22,13 +22,30 @@ export function getAgentContactPerson(agent?: Agent): Person | undefined {
   );
 }
 
+// A submitter only speaks for the NGO while they are an active member of it:
+// staff creating on an NGO's behalf (fe#1257) or ex-members are skipped, and
+// without loaded memberships there is nothing to verify, so skip too (be#1368).
+function isActiveAgentMember(agent: Agent | undefined, person?: Person) {
+  return (
+    person !== undefined &&
+    (agent?.agentPerson ?? []).some(
+      ({ status, personId, person: memberPerson }) =>
+        status === AgentMembershipStatus.ACTIVE &&
+        (personId ?? memberPerson?.id) === person.id,
+    )
+  );
+}
+
 export function getOpportunityRepresentativePerson(
   opportunity: Opportunity,
   { includeSubmitter = true }: { includeSubmitter?: boolean } = {},
 ): Person | undefined {
   const candidates = [
     opportunity.contactPerson,
-    includeSubmitter ? opportunity.submittedByPerson : undefined,
+    includeSubmitter &&
+    isActiveAgentMember(opportunity.agent, opportunity.submittedByPerson)
+      ? opportunity.submittedByPerson
+      : undefined,
     getAgentContactPerson(opportunity.agent),
   ];
   return candidates.find((person) => person?.email) ?? candidates.find(Boolean);
