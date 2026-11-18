@@ -35,7 +35,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../../data/entity/opportunity/onetimer.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
-  isActiveMemberOf,
+  hasActiveMembership,
   logMatchChangeSafely,
   updateVolunteerMatching,
 } from "../../../data/utils";
@@ -629,7 +629,7 @@ export default async function opportunityRoutes(
       opportunity.agentId = agentId;
       opportunity.submittedByPersonId =
         body.submitted_by_id ?? request.authUser?.personId;
-      opportunity.contactPersonId = isActiveMemberOf(
+      opportunity.contactPersonId = hasActiveMembership(
         agent,
         opportunity.submittedByPersonId,
       )

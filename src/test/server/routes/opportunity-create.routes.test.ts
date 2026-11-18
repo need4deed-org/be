@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentMembershipStatus,
   AgentRoleType,
   AgentVolunteerSearchType,
   OpportunityLegacyType,
@@ -21,7 +22,11 @@ import Activity from "../../../data/entity/profile/activity.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import Skill from "../../../data/entity/profile/skill.entity";
 import User from "../../../data/entity/user.entity";
-import { getRepository, hashPassword } from "../../../data/utils";
+import {
+  getOpportunityRepresentativePerson,
+  getRepository,
+  hashPassword,
+} from "../../../data/utils";
 import { createServer } from "../../../server";
 
 const PASSWORD = "test_password";
@@ -763,6 +768,103 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     // representative (existingContact).
     expect(saved.contactPersonId).toBe(memberPerson.id);
     expect(saved.contactPersonId).not.toBe(existingContact.id);
+  });
+
+  it("sets contact_person_id to the representative when submitted_by_id is only a pending member", async () => {
+    const agentPersonRepository = getRepository(dataSource, AgentPerson);
+    await agentPersonRepository.update(
+      { agentId: agent.id, personId: memberPerson.id },
+      { status: AgentMembershipStatus.PENDING },
+    );
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity/",
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          title: `Test Opportunity (contact-freeze pending) ${suffix}`,
+          opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+          volunteers_number: 1,
+          category: "",
+          category_id: "",
+          language: "en",
+          agent_id: agent.id,
+          submitted_by_id: memberPerson.id,
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const createdId = res.json().data.id;
+      createdOpportunityIds.push(createdId);
+
+      const saved = await getRepository(dataSource, Opportunity).findOneOrFail({
+        where: { id: createdId },
+      });
+      expect(saved.submittedByPersonId).toBe(memberPerson.id);
+      expect(saved.contactPersonId).toBe(existingContact.id);
+    } finally {
+      await agentPersonRepository.update(
+        { agentId: agent.id, personId: memberPerson.id },
+        { status: AgentMembershipStatus.ACTIVE },
+      );
+    }
+  });
+
+  it("emails an active agent member, not the staff submitter, when the representative has no email (be#1368)", async () => {
+    const personRepository = fastify.db.personRepository;
+    const coordinatorEmail = `coordinator-person-${suffix}@test.need4deed.org`;
+    await personRepository.update(
+      { id: existingContact.id },
+      { email: null as unknown as string },
+    );
+    await personRepository.update(
+      { id: coordinatorPerson.id },
+      { email: coordinatorEmail },
+    );
+    const emailNewRegular = vi
+      .spyOn(fastify.notify, "emailNewRegular")
+      .mockResolvedValue(undefined);
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity/",
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          title: `Test Opportunity (contact-freeze staff email) ${suffix}`,
+          opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+          volunteers_number: 1,
+          category: "",
+          category_id: "",
+          language: "en",
+          agent_id: agent.id,
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const createdId = res.json().data.id;
+      createdOpportunityIds.push(createdId);
+
+      const emailedOpportunity = () =>
+        emailNewRegular.mock.calls
+          .map(([opportunity]) => opportunity)
+          .find((opportunity) => opportunity.id === createdId);
+      await vi.waitFor(() => expect(emailedOpportunity()).toBeDefined());
+      const opportunity = emailedOpportunity()!;
+      expect(opportunity.submittedByPersonId).toBe(coordinatorPerson.id);
+      expect(getOpportunityRepresentativePerson(opportunity)?.id).toBe(
+        memberPerson.id,
+      );
+    } finally {
+      emailNewRegular.mockRestore();
+      await personRepository.update(
+        { id: existingContact.id },
+        { email: `alice-contact-freeze-${suffix}@test.need4deed.org` },
+      );
+      await personRepository.update(
+        { id: coordinatorPerson.id },
+        { email: null as unknown as string },
+      );
+    }
   });
 });
 

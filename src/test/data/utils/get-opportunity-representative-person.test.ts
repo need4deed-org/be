@@ -4,7 +4,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import {
   getAgentContactPerson,
   getOpportunityRepresentativePerson,
-  isActiveMemberOf,
+  hasActiveMembership,
 } from "../../../data/utils/get-opportunity-representative-person";
 
 const member = (
@@ -206,7 +206,7 @@ describe("getAgentContactPerson", () => {
   });
 });
 
-describe("isActiveMemberOf", () => {
+describe("hasActiveMembership", () => {
   const agent = agentOf(
     member(1, "active@center.de"),
     member(
@@ -218,13 +218,13 @@ describe("isActiveMemberOf", () => {
   );
 
   it("is true only for an active member", () => {
-    expect(isActiveMemberOf(agent, 1)).toBe(true);
-    expect(isActiveMemberOf(agent, 2)).toBe(false);
-    expect(isActiveMemberOf(agent, 3)).toBe(false);
+    expect(hasActiveMembership(agent, 1)).toBe(true);
+    expect(hasActiveMembership(agent, 2)).toBe(false);
+    expect(hasActiveMembership(agent, 3)).toBe(false);
   });
 
   it("is false without a person id or memberships", () => {
-    expect(isActiveMemberOf(agent, undefined)).toBe(false);
-    expect(isActiveMemberOf(undefined, 1)).toBe(false);
+    expect(hasActiveMembership(agent, undefined)).toBe(false);
+    expect(hasActiveMembership(undefined, 1)).toBe(false);
   });
 });

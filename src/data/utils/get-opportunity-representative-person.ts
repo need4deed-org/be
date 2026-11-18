@@ -22,7 +22,7 @@ export function getAgentContactPerson(agent?: Agent): Person | undefined {
   );
 }
 
-export function isActiveMemberOf(
+export function hasActiveMembership(
   agent: Agent | undefined,
   personId: number | undefined,
 ): boolean {
@@ -42,12 +42,10 @@ export function getOpportunityRepresentativePerson(
   const submitter = includeSubmitter
     ? (opportunity.submittedByPerson ?? undefined)
     : undefined;
-  const submitterIsMember = isActiveMemberOf(opportunity.agent, submitter?.id);
-  const candidates = [
-    opportunity.contactPerson,
-    submitterIsMember ? submitter : undefined,
-    getAgentContactPerson(opportunity.agent),
-    submitterIsMember ? undefined : submitter,
-  ];
+  const contactPerson = opportunity.contactPerson;
+  const agentContact = getAgentContactPerson(opportunity.agent);
+  const candidates = hasActiveMembership(opportunity.agent, submitter?.id)
+    ? [contactPerson, submitter, agentContact]
+    : [contactPerson, agentContact, submitter];
   return candidates.find((person) => person?.email) ?? candidates.find(Boolean);
 }
