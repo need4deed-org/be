@@ -22,14 +22,33 @@ export function getAgentContactPerson(agent?: Agent): Person | undefined {
   );
 }
 
+export function hasActiveMembership(
+  agent: Agent | undefined,
+  personId: number | null | undefined,
+): boolean {
+  return (
+    personId !== null &&
+    personId !== undefined &&
+    (agent?.agentPerson ?? []).some(
+      (ap) =>
+        ap.personId === personId && ap.status === AgentMembershipStatus.ACTIVE,
+    )
+  );
+}
+
 export function getOpportunityRepresentativePerson(
   opportunity: Opportunity,
   { includeSubmitter = true }: { includeSubmitter?: boolean } = {},
 ): Person | undefined {
+  const submitter = includeSubmitter
+    ? (opportunity.submittedByPerson ?? undefined)
+    : undefined;
+  const agentContact = getAgentContactPerson(opportunity.agent);
   const candidates = [
     opportunity.contactPerson,
-    includeSubmitter ? opportunity.submittedByPerson : undefined,
-    getAgentContactPerson(opportunity.agent),
+    ...(hasActiveMembership(opportunity.agent, submitter?.id)
+      ? [submitter, agentContact]
+      : [agentContact, submitter]),
   ];
   return candidates.find((person) => person?.email) ?? candidates.find(Boolean);
 }
