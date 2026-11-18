@@ -57,6 +57,7 @@ async function sendSuggestionEmail(
   logger.debug(`emailSuggestion side-effect triggered (ov ${id})`);
   const ov = await opportunityVolunteerRepository.findOne({
     where: { id },
+    relationLoadStrategy: "query",
     relations: [
       "volunteer.person",
       "volunteer.person.users",

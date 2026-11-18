@@ -43,7 +43,7 @@ import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
-import { buildPostQuery } from "../utils/data/build-post-query";
+import { attachPostTags, buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
 import {
@@ -201,6 +201,7 @@ export default async function postRoutes(
       }
 
       await Promise.all([
+        attachPostTags(fastify, orderedPosts),
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
         attachTaggedAgents(fastify, orderedPosts),
@@ -275,6 +276,7 @@ export default async function postRoutes(
 
       const full = await fastify.db.postRepository.findOne({
         where: { id: saved.id },
+        relationLoadStrategy: "query",
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
 
@@ -326,6 +328,7 @@ export default async function postRoutes(
 
       const post = await fastify.db.postRepository.findOne({
         where: getRootPostWhere(id),
+        relationLoadStrategy: "query",
         relations: [
           "author",
           "taggedPersons",
