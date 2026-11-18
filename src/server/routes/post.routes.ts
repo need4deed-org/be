@@ -43,7 +43,7 @@ import { assertCanManagePost } from "../utils/data/assert-can-manage-post";
 import { attachBookmarkData } from "../utils/data/attach-bookmark-data";
 import { attachReactionData } from "../utils/data/attach-reaction-data";
 import { buildMatchingPostIdsQuery } from "../utils/data/build-matching-post-ids-query";
-import { attachPostTags, buildPostQuery } from "../utils/data/build-post-query";
+import { buildPostQuery } from "../utils/data/build-post-query";
 import { deletePostBookmark } from "../utils/data/delete-post-bookmark";
 import { deletePostReaction } from "../utils/data/delete-post-reaction";
 import {
@@ -57,6 +57,11 @@ import {
 } from "../utils/data/get-post-where";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
+import {
+  attachLinkedOpportunities,
+  attachTaggedAgents,
+  attachTaggedPersons,
+} from "../utils/data/post-lists";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
@@ -65,7 +70,6 @@ import {
   mergePersons,
   resolveTaggedAgentIds,
 } from "../utils/data/tag-agents";
-import { attachTaggedAgents } from "../utils/data/tagged-agents";
 import {
   requestLanguage,
   translateOpportunities,
@@ -157,8 +161,8 @@ export default async function postRoutes(
           .where("post.parentId IS NULL")
           .orderBy("post.createdAt", "DESC")
           .addOrderBy("post.id", "DESC")
-          .skip(skip)
-          .take(take);
+          .offset(skip)
+          .limit(take);
         if (authorId !== undefined) {
           qb.andWhere("post.authorId = :authorId", { authorId });
         }
@@ -167,7 +171,6 @@ export default async function postRoutes(
         const idsQb = buildMatchingPostIdsQuery(fastify, filter)
           .select("post.id", "id")
           .addSelect("COUNT(*) OVER()", "totalCount")
-          .groupBy("post.id")
           .orderBy("post.createdAt", "DESC")
           .addOrderBy("post.id", "DESC")
           .offset(skip)
@@ -183,7 +186,7 @@ export default async function postRoutes(
           : Number(
               (
                 await buildMatchingPostIdsQuery(fastify, filter)
-                  .select("COUNT(DISTINCT post.id)", "count")
+                  .select("COUNT(*)", "count")
                   .getRawOne<{ count: string }>()
               )?.count ?? 0,
             );
@@ -201,7 +204,8 @@ export default async function postRoutes(
       }
 
       await Promise.all([
-        attachPostTags(fastify, orderedPosts),
+        attachTaggedPersons(fastify, orderedPosts),
+        attachLinkedOpportunities(fastify, orderedPosts),
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
         attachTaggedAgents(fastify, orderedPosts),

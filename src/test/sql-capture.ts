@@ -29,14 +29,16 @@ export async function captureSql(
 function withoutExistsSubqueries(sql: string): string {
   let out = "";
   let i = 0;
+  const exists = /\bEXISTS\s*\(/gi;
   while (i < sql.length) {
-    const at = sql.indexOf("EXISTS (", i);
-    if (at === -1) {
+    exists.lastIndex = i;
+    const match = exists.exec(sql);
+    if (!match) {
       return out + sql.slice(i);
     }
-    out += sql.slice(i, at);
+    out += sql.slice(i, match.index);
     let depth = 0;
-    let j = at + "EXISTS ".length;
+    let j = match.index + match[0].length - 1;
     do {
       if (sql[j] === "(") {
         depth++;

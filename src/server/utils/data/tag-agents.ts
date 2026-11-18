@@ -10,7 +10,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { isStaffRole } from "./is-staff-role";
-import { getTaggedAgentIds } from "./tagged-agents";
+import { getTaggedAgentIds } from "./post-lists";
 import { validateRelationIds } from "./validate-relation-ids";
 
 export function canTagAgents(role: UserRole | undefined): boolean {

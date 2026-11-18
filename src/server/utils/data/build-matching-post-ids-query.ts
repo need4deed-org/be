@@ -1,5 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { Brackets, SelectQueryBuilder } from "typeorm";
+import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
+import Person from "../../../data/entity/person.entity";
 import Post from "../../../data/entity/post.entity";
 import { QuerystringPostList } from "../../types";
 import {
@@ -30,17 +32,21 @@ export function buildMatchingPostIdsQuery(
     const taggedPersonMatch = qb
       .subQuery()
       .select("1")
-      .from(Post, "taggedPost")
-      .innerJoin("taggedPost.taggedPersons", "taggedPerson")
-      .where("taggedPost.id = post.id")
+      .from("post_person", "pp")
+      .innerJoin(Person, "taggedPerson", "taggedPerson.id = pp.person_id")
+      .where("pp.post_id = post.id")
       .andWhere(personNameIlikeCondition("taggedPerson"))
       .getQuery();
     const opportunityMatch = qb
       .subQuery()
       .select("1")
-      .from(Post, "linkedPost")
-      .innerJoin("linkedPost.linkedOpportunities", "opportunity")
-      .where("linkedPost.id = post.id")
+      .from("post_opportunity", "po")
+      .innerJoin(
+        Opportunity,
+        "opportunity",
+        "opportunity.id = po.opportunity_id",
+      )
+      .where("po.post_id = post.id")
       .andWhere("opportunity.title ILIKE :search")
       .getQuery();
     qb.leftJoin("post.author", "author")

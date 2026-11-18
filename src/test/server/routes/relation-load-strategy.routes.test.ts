@@ -229,11 +229,6 @@ describe("endpoints loading several to-many lists", () => {
     ["GET /volunteer/:id", () => `/volunteer/${volunteer.id}`],
     ["GET /volunteer/opportunity", listUrl],
     ["GET /opportunity/legacy", () => "/opportunity/legacy"],
-    ["GET /post", () => "/post"],
-    [
-      "GET /post?search",
-      () => `/post?search=${encodeURIComponent(`Volunteer ${suffix}`)}`,
-    ],
   ])("%s joins at most one to-many list per query", async (_, url) => {
     let status = 0;
     const queries = await captureSql(async () => {
@@ -243,6 +238,34 @@ describe("endpoints loading several to-many lists", () => {
     expect(status).toBe(200);
     expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
   });
+
+  it.each([
+    ["GET /post", () => `/post?authorId=${taggedPersonIds[1]}`],
+    [
+      "GET /post?search",
+      () => `/post?search=${encodeURIComponent(`Volunteer ${suffix}`)}`,
+    ],
+  ])(
+    "%s returns the post's lists and joins at most one to-many list per query",
+    async (_, url) => {
+      let res!: Awaited<ReturnType<typeof get>>;
+      const queries = await captureSql(async () => {
+        res = await get(url());
+      });
+
+      expect(res.statusCode).toBe(200);
+      const post = res
+        .json()
+        .data.find(({ id }: { id: number }) => id === postId);
+      expect(
+        post?.taggedPersons.map(({ id }: { id: number }) => id).sort(),
+      ).toEqual([...taggedPersonIds].sort());
+      expect(
+        post?.linkedOpportunities.map(({ id }: { id: number }) => id).sort(),
+      ).toEqual([opportunity.id, linkedOpportunity.id].sort());
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+    },
+  );
 
   it.each([
     ["GET /volunteer/opportunity", listUrl],
