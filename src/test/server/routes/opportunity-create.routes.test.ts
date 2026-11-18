@@ -152,6 +152,7 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
     const addressRepository = getRepository(dataSource, Address);
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -292,6 +293,7 @@ describe("POST /opportunity resolves district from the agent at creation", () =>
     const addressRepository = getRepository(dataSource, Address);
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -395,6 +397,7 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
     const addressRepository = getRepository(dataSource, Address);
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     postcodeValue = postcode.value;
     const address = await addressRepository.save(
@@ -572,6 +575,7 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     const addressRepository = getRepository(dataSource, Address);
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -823,6 +827,7 @@ describe("POST /opportunity cascades a new agent to SEARCHING (be#862)", () => {
     const addressRepository = getRepository(dataSource, Address);
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -973,6 +978,7 @@ describe("POST /opportunity saves an own address (be#1291)", () => {
     );
     const agentPostcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     const agentAddress = await getRepository(dataSource, Address).save(
       new Address({ postcodeId: agentPostcode.id }),
