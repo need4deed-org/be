@@ -6,6 +6,7 @@ export const responseErrors = {
     properties: {
       error: { type: "string" },
       message: { type: "string" },
+      code: { type: "string" },
       errors: { type: "array", items: { type: "string" } },
     },
   },

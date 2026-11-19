@@ -1713,11 +1713,7 @@ describe("DELETE /user/:id (be#583)", () => {
     }
   });
 
-  // This endpoint deliberately does not use fastify.authenticate's
-  // allowSelf ADMIN bypass (be#1007 review): it's a destructive action with
-  // no reactivation path, so even an ADMIN may only deactivate their own
-  // account here, never target another user's id.
-  it("rejects an ADMIN deactivating another account (no self-check bypass for this route)", async () => {
+  it("rejects an ADMIN deleting a volunteer account", async () => {
     const admin = await fastify.db.userRepository.save(
       new User({
         email: `admin-${suffix}@example.com`,
@@ -1743,7 +1739,8 @@ describe("DELETE /user/:id (be#583)", () => {
         cookies: { access: adminToken },
       });
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe("not_manageable");
 
       const untouched = await fastify.db.userRepository.findOneOrFail({
         where: { id: other.id },
