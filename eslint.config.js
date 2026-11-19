@@ -23,11 +23,21 @@ const unboundLoggerRules = [
   },
 ];
 
-const requestUserRule = {
-  selector: "MemberExpression[object.name='request'][property.name='user']",
-  message:
-    "Use request.authUser (loaded from the DB, set for JWT and API-key auth); request.user is the raw JWT payload and is unset for API-key callers.",
-};
+const requestUserMessage =
+  "Use request.authUser (loaded from the DB, set for JWT and API-key auth); request.user is the raw JWT payload and is unset for API-key callers.";
+
+const requestUserRules = [
+  {
+    selector:
+      "MemberExpression[object.name=/^req(uest)?$/][property.name='user'], MemberExpression[object.name=/^req(uest)?$/][computed=true][property.value='user']",
+    message: requestUserMessage,
+  },
+  {
+    selector:
+      "VariableDeclarator[init.name=/^req(uest)?$/] > ObjectPattern > Property[key.name='user']",
+    message: requestUserMessage,
+  },
+];
 
 module.exports = [
   { ignores: ["dist", "node_modules", "dev/**", "**/dev.*.ts"] },
@@ -94,7 +104,11 @@ module.exports = [
       ],
 
       "sort-keys": "off",
-      "no-restricted-syntax": ["error", ...unboundLoggerRules, requestUserRule],
+      "no-restricted-syntax": [
+        "error",
+        ...unboundLoggerRules,
+        ...requestUserRules,
+      ],
     },
   },
   {

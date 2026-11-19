@@ -395,13 +395,17 @@ export default async function commentRoutes(
         }
 
         if (taggedPersonIds !== undefined) {
+          const tagger = await fastify.db.userRepository.findOneOrFail({
+            where: { id: user.id },
+            relations: ["person"],
+          });
           notifyCommentTags(
             fastify,
             reloaded,
             (reloaded.commentPerson ?? [])
               .map((cp) => cp.personId)
               .filter((personId) => !previousPersonIds.includes(personId)),
-            user,
+            tagger,
           );
         }
 
