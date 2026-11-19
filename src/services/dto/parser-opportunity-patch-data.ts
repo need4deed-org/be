@@ -12,6 +12,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
+import { sourceTextOf, textLength } from "../translation/queue";
 import { getDateObj } from "../utils";
 import { getOpportunityDescription } from "./dto-opportunity";
 
@@ -43,9 +44,8 @@ function assertChangedTextLength(
 ) {
   for (const value of values) {
     if (
-      value &&
-      [...value].length > maxLength &&
-      value.trim() !== (current ?? "").trim()
+      textLength(value) > maxLength &&
+      sourceTextOf(value) !== sourceTextOf(current)
     ) {
       throw new BadRequestError(
         `A ${label} can't be longer than ${maxLength} characters.`,

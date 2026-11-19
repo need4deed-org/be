@@ -25,6 +25,10 @@ export function sourceTextOf(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+export function textLength(value: unknown): number {
+  return [...sourceTextOf(value)].length;
+}
+
 export function pendingRow(sourceHash: string, attempts = 0) {
   return {
     origin: TranslationOrigin.MACHINE,

@@ -7,7 +7,7 @@ import {
 import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../config";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
-import { SourceEntity, sourceTextOf, storeHuman } from "./queue";
+import { SourceEntity, sourceTextOf, storeHuman, textLength } from "./queue";
 import { getMachineEntry } from "./registry";
 import { resolve } from "./resolve";
 
@@ -21,9 +21,9 @@ export function assertTranslationLength(
   text: string,
 ) {
   const maxLength = translationMaxLength[entityType]?.[fieldName];
-  if (maxLength !== undefined && [...text].length > maxLength) {
+  if (maxLength !== undefined && textLength(text) > maxLength) {
     throw new BadRequestError(
-      `A ${fieldName} translation can't be longer than ${maxLength} characters.`,
+      `This translation can't be longer than ${maxLength} characters.`,
     );
   }
 }

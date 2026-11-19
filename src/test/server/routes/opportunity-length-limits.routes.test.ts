@@ -36,6 +36,8 @@ describe("opportunity title and description length limits", () => {
   let address: Address;
   let person: Person;
   let postcodeId: number;
+  let postcodeValue: string;
+  const createdAgents: number[] = [];
   const suffix = randomNumericSuffix();
   const created: number[] = [];
   const deals: number[] = [];
@@ -101,6 +103,13 @@ describe("opportunity title and description length limits", () => {
         opportunity_type: OpportunityLegacyType.VOLUNTEERING,
         vo_information: "Volunteering text",
         volunteers_number: 1,
+        category: "",
+        category_id: "",
+        languages: [],
+        activities: [],
+        skills: [],
+        rac_address: `Laengenstrasse-${suffix} 1`,
+        rac_plz: postcodeValue,
         ...fields,
       },
     });
@@ -113,12 +122,12 @@ describe("opportunity title and description length limits", () => {
         await dataSource.manager.findOneByOrFail(Language, { isoCode: lang })
       ).id;
     }
-    postcodeId = (
-      await fastify.db.postcodeRepository.findOneOrFail({
-        where: {},
-        order: { id: "ASC" },
-      })
-    ).id;
+    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
+      where: {},
+      order: { id: "ASC" },
+    });
+    postcodeId = postcode.id;
+    postcodeValue = postcode.value;
     address = await dataSource.manager.save(new Address({ postcodeId }));
     agent = await fastify.db.agentRepository.save(
       new Agent({
@@ -154,6 +163,9 @@ describe("opportunity title and description length limits", () => {
     for (const id of deals) {
       await fastify.db.dealRepository.delete({ id });
     }
+    for (const id of createdAgents) {
+      await fastify.db.agentRepository.delete({ id });
+    }
     await fastify.db.userRepository.delete({ personId: person.id });
     await fastify.db.personRepository.delete({ id: person.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
@@ -176,6 +188,20 @@ describe("opportunity title and description length limits", () => {
       ["vo_information", { vo_information: tooLongDescription }],
     ])("rejects a too long %s", async (_, fields) => {
       expect((await createLegacy(fields)).statusCode).toBe(400);
+    });
+
+    it("still accepts a null description", async () => {
+      const res = await createLegacy({ vo_information: null });
+
+      expect(res.statusCode).toBe(200);
+      const opportunity =
+        await fastify.db.opportunityRepository.findOneByOrFail({
+          id: res.json().data.id,
+        });
+      created.push(opportunity.id);
+      if (opportunity.agentId) {
+        createdAgents.push(opportunity.agentId);
+      }
     });
 
     it("rejects a title that isn't a string", async () => {
@@ -226,6 +252,36 @@ describe("opportunity title and description length limits", () => {
           })
         ).title,
       ).toBe(title);
+    });
+
+    it("keeps an unchanged accompanying description over the limit editable", async () => {
+      const legacy = "a".repeat(1322);
+      const opportunity = await saved({
+        type: OpportunityType.ACCOMPANYING,
+        info: undefined,
+        infoConfidential: legacy,
+      });
+
+      const res = await patch(opportunity.id, {
+        description: legacy,
+        numberVolunteers: 2,
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(
+        await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunity.id,
+        }),
+      ).toMatchObject({ infoConfidential: legacy, numberVolunteers: 2 });
+    });
+
+    it("counts a description without surrounding whitespace", async () => {
+      const opportunity = await saved();
+      const description = `${"d".repeat(OPPORTUNITY_DESCRIPTION_MAX_LENGTH)}\n`;
+
+      const res = await patch(opportunity.id, { description });
+
+      expect(res.statusCode).toBe(204);
     });
 
     it("rejects a changed too long description", async () => {

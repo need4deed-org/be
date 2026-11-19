@@ -7,9 +7,12 @@ import { responseErrors } from "./responseErrors";
 export const opportunityLegacyBodySchema = {
   type: "object",
   properties: {
-    title: { type: "string", maxLength: OPPORTUNITY_TITLE_MAX_LENGTH },
+    title: {
+      type: ["string", "null"],
+      maxLength: OPPORTUNITY_TITLE_MAX_LENGTH,
+    },
     vo_information: {
-      type: "string",
+      type: ["string", "null"],
       maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
     },
   },
