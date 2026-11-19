@@ -36,7 +36,7 @@ export async function findDomainOrganizationId(
 async function getAgentMemberDomains(
   db: Queryable,
   agentId: number,
-): Promise<string[]> {
+): Promise<string[][]> {
   const rows: { emails: (string | null)[] }[] = await db.query(
     `SELECT CASE WHEN coalesce(p."email", '') <> '' THEN ARRAY[p."email"]
                  ELSE coalesce(array_agg(u."email") FILTER (WHERE u."email" IS NOT NULL), '{}')
@@ -53,7 +53,7 @@ async function getAgentMemberDomains(
       AgentRoleType.VOLUNTEER_COORDINATOR,
     ],
   );
-  return rows.flatMap(({ emails }) =>
+  return rows.map(({ emails }) =>
     emails.map(emailDomain).filter((d): d is string => !!d),
   );
 }
@@ -62,19 +62,16 @@ export async function findAgentDomainOrganizationId(
   db: Queryable,
   agentId: number,
 ): Promise<number | null> {
-  const [representativeDomain, ...memberDomains] = await getAgentMemberDomains(
-    db,
-    agentId,
-  );
-  const representativeOrganizationId = await findDomainOrganizationId(
-    db,
-    representativeDomain ?? null,
-  );
-  if (representativeOrganizationId) {
-    return representativeOrganizationId;
+  const [representativeDomains = [], ...memberDomains] =
+    await getAgentMemberDomains(db, agentId);
+  for (const domain of representativeDomains) {
+    const id = await findDomainOrganizationId(db, domain);
+    if (id) {
+      return id;
+    }
   }
   const memberOrganizationIds = new Set<number>();
-  for (const domain of new Set(memberDomains)) {
+  for (const domain of new Set(memberDomains.flat())) {
     const id = await findDomainOrganizationId(db, domain);
     if (id) {
       memberOrganizationIds.add(id);

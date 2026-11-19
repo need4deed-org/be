@@ -9,6 +9,7 @@ import { UnauthorizedError } from "../../config";
 import { idParamSchema, responseSchema } from "../schema";
 import { ParamsId, ReplyData } from "../types";
 import { getOrganizationProfile } from "../utils/data/get-organization-profile";
+import { isStaffRole } from "../utils/data/is-staff-role";
 import { listOrganizations } from "../utils/data/list-organizations";
 import { patchOrganization } from "../utils/data/patch-organization";
 
@@ -39,7 +40,8 @@ export default async function organizationRoutes(
       },
     },
     async (request, reply) => {
-      if (request.authUser?.role === UserRole.VOLUNTEER) {
+      const role = request.authUser?.role;
+      if (!isStaffRole(role) && role !== UserRole.AGENT) {
         throw new UnauthorizedError();
       }
       const { id } = request.params;

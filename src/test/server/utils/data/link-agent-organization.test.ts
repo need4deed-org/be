@@ -156,6 +156,16 @@ describe("linkAgentToDomainOrganization", () => {
     expect(await organizationIdOf(agent)).toBeNull();
   });
 
+  it("doesn't let a member stand in for a coordinator without email", async () => {
+    const agent = await createAgent([
+      {},
+      { email: `a@${domain}`, role: AgentRoleType.OTHER },
+      { email: `b@other-${suffix}.example`, role: AgentRoleType.OTHER },
+    ]);
+    await linkAgentToDomainOrganization(dataSource.manager, agent.id);
+    expect(await organizationIdOf(agent)).toBeNull();
+  });
+
   it("never overwrites an existing link", async () => {
     const agent = await createAgent(
       [{ email: `lead@${domain}` }],

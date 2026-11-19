@@ -129,12 +129,10 @@ export default function agentContactRoutes(
       }
 
       const updated = await updateAgentContact(membership, request.body);
-      if (request.body.email) {
-        await linkAgentToDomainOrganization(
-          fastify.db.agentRepository.manager,
-          agentId,
-        );
-      }
+      await linkAgentToDomainOrganization(
+        fastify.db.agentRepository.manager,
+        agentId,
+      );
       updated.agent = agent;
       await maskForCaller(request, updated);
 

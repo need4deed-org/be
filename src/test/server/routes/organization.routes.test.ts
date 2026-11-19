@@ -12,6 +12,7 @@ import Service from "../../../data/entity/profile/service.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
 
@@ -34,6 +35,7 @@ describe("organization.routes", () => {
   let agentCookie: string;
   let coordinatorCookie: string;
   let volunteerCookie: string;
+  let userCookie: string;
   let claimedAgent: Agent;
   let unclaimedAgent: Agent;
   let domainAgent: Agent;
@@ -118,6 +120,14 @@ describe("organization.routes", () => {
         isActive: true,
       }),
     );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `org-user-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.USER,
+        isActive: true,
+      }),
+    );
     postcodeValue = postcode.value;
 
     const agentRepository = dataSource.getRepository(Agent);
@@ -155,6 +165,7 @@ describe("organization.routes", () => {
 
     agentCookie = await login(`org-agent-${suffix}@test.need4deed.org`);
     volunteerCookie = await login(`org-volunteer-${suffix}@test.need4deed.org`);
+    userCookie = await login(`org-user-${suffix}@test.need4deed.org`);
     coordinatorCookie = await login(
       `org-coordinator-${suffix}@test.need4deed.org`,
     );
@@ -167,6 +178,9 @@ describe("organization.routes", () => {
     await fastify.db.userRepository.delete({ personId: ownerPerson.id });
     await fastify.db.userRepository.delete({
       email: `org-volunteer-${suffix}@test.need4deed.org`,
+    });
+    await fastify.db.userRepository.delete({
+      email: `org-user-${suffix}@test.need4deed.org`,
     });
     await fastify.db.userRepository.delete({
       email: `org-coordinator-${suffix}@test.need4deed.org`,
@@ -280,6 +294,22 @@ describe("organization.routes", () => {
       expect(res.json().data).toMatchObject({ agents: [], services: [] });
     });
 
+    it("loads the Einrichtungen and services without a Cartesian join", async () => {
+      const queries = await captureSql(async () => {
+        expect((await get(orgA.id, coordinatorCookie)).statusCode).toBe(200);
+      });
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+      expect(
+        queries.some(
+          (q) => q.includes("agent_service") && q.includes("agent_person"),
+        ),
+      ).toBe(false);
+    });
+
+    it("rejects plain users", async () => {
+      expect((await get(orgA.id, userCookie)).statusCode).toBe(403);
+    });
+
     it("rejects volunteers and unauthenticated requests", async () => {
       expect((await get(orgA.id, volunteerCookie)).statusCode).toBe(403);
       expect((await get(orgA.id)).statusCode).toBe(401);
@@ -369,6 +399,49 @@ describe("organization.routes", () => {
     it("clears nullable fields with null", async () => {
       expect((await patch({ email: null, phone: "" })).statusCode).toBe(204);
       expect(await reload()).toMatchObject({ email: null, phone: null });
+    });
+
+    it("clears the street alone and keeps the postcode", async () => {
+      expect((await patch({ addressStreet: null })).statusCode).toBe(204);
+      const organization = await reload();
+      const address = await dataSource
+        .getRepository(Address)
+        .findOneByOrFail({ id: organization.addressId! });
+      expect(address.street).toBeNull();
+      expect(address.postcodeId).toBe(addressB.postcodeId);
+    });
+
+    it("rejects clearing the postcode alone", async () => {
+      expect((await patch({ addressPostcode: null })).statusCode).toBe(400);
+      expect((await reload()).addressId).toBe(addressB.id);
+    });
+
+    it("gives a shared address its own copy instead of editing it", async () => {
+      const sharedAgent = await dataSource.getRepository(Agent).save(
+        new Agent({
+          title: `Shared Address ${suffix}`,
+          addressId: addressB.id,
+        }),
+      );
+      try {
+        expect(
+          (await patch({ addressStreet: "Eigene Straße 2" })).statusCode,
+        ).toBe(204);
+        const organization = await reload();
+        expect(organization.addressId).not.toBe(addressB.id);
+        const untouched = await dataSource
+          .getRepository(Address)
+          .findOneByOrFail({ id: addressB.id });
+        expect(untouched.street).not.toBe("Eigene Straße 2");
+        await dataSource
+          .getRepository(Organization)
+          .update({ id: orgB.id }, { addressId: addressB.id });
+        await dataSource
+          .getRepository(Address)
+          .delete({ id: organization.addressId! });
+      } finally {
+        await dataSource.getRepository(Agent).delete({ id: sharedAgent.id });
+      }
     });
 
     it("updates the address and clears it with nulls", async () => {
