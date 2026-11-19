@@ -19,11 +19,16 @@ export function assertTranslationLength(
   entityType: TranslatedEntityType,
   fieldName: string,
   text: string,
+  current?: string | null,
 ) {
   const maxLength = translationMaxLength[entityType]?.[fieldName];
-  if (maxLength !== undefined && textLength(text) > maxLength) {
+  if (maxLength === undefined) {
+    return;
+  }
+  const allowed = Math.max(maxLength, textLength(current));
+  if (textLength(text) > allowed) {
     throw new BadRequestError(
-      `This translation can't be longer than ${maxLength} characters.`,
+      `This translation can't be longer than ${allowed} characters.`,
     );
   }
 }
@@ -74,7 +79,12 @@ export async function writeHumanTranslations(
         `${fieldName} has no original text to translate; edit it in the original language.`,
       );
     }
-    assertTranslationLength(entityType, fieldName, text);
+    assertTranslationLength(
+      entityType,
+      fieldName,
+      text,
+      sourceTextOf(served[fieldName]),
+    );
   }
   for (const [fieldName, text] of changed) {
     await storeHuman(manager, fk, source, idOf[lang], fieldName, text);

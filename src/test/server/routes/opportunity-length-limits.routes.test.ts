@@ -284,6 +284,27 @@ describe("opportunity title and description length limits", () => {
       expect(res.statusCode).toBe(204);
     });
 
+    it("lets an over-limit description shrink but not grow", async () => {
+      const opportunity = await saved({ info: "l".repeat(1322) });
+
+      const grown = await patch(opportunity.id, {
+        description: "l".repeat(1323),
+      });
+      const shrunk = await patch(opportunity.id, {
+        description: "l".repeat(900),
+      });
+
+      expect(grown.statusCode).toBe(400);
+      expect(shrunk.statusCode).toBe(204);
+      expect(
+        (
+          await fastify.db.opportunityRepository.findOneByOrFail({
+            id: opportunity.id,
+          })
+        ).info,
+      ).toBe("l".repeat(900));
+    });
+
     it("rejects a changed too long description", async () => {
       const opportunity = await saved();
 

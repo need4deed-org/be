@@ -195,9 +195,12 @@ export async function editTranslation(
   return manager.transaction(async (tx) => {
     const { row, entityType, entry } = await findTranslationRow(tx, id);
     const translation = translationText(text);
-    if (translation !== sourceTextOf(row.translation)) {
-      assertTranslationLength(entityType, row.fieldName, translation);
-    }
+    assertTranslationLength(
+      entityType,
+      row.fieldName,
+      translation,
+      row.translation,
+    );
     const done = {
       translation,
       status: TranslationStatus.DONE,

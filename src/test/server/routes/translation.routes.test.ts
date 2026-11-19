@@ -554,6 +554,31 @@ describe("/translation coordinator review", () => {
       });
     });
 
+    it("lets an over-limit machine translation shrink but not grow", async () => {
+      const opportunity = await queued();
+      const max = OPPORTUNITY_TRANSLATION_MAX_LENGTH.title;
+      await dataSource.manager.update(
+        FieldTranslation,
+        { opportunityId: opportunity.id, fieldName: "title" },
+        { status: TranslationStatus.DONE, translation: "x".repeat(max + 10) },
+      );
+      const row = await titleRow(opportunity.id);
+
+      const grown = await patch(
+        row.id,
+        "x".repeat(max + 11),
+        opportunity.title,
+      );
+      const shrunk = await patch(
+        row.id,
+        "x".repeat(max + 5),
+        opportunity.title,
+      );
+
+      expect(grown.statusCode).toBe(400);
+      expect(shrunk.statusCode).toBe(200);
+    });
+
     it("confirms a machine translation by saving its current text", async () => {
       const opportunity = await queued();
       const row = await translatedTitle(opportunity);
