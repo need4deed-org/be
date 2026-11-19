@@ -6,6 +6,7 @@ import {
   EntityTableName,
   Lang,
   OpportunityType,
+  OpportunityVolunteerStatusType,
   OptionTitle,
   ProfileVolunteeringType,
   STATISTICS_TOTAL_KEY,
@@ -60,6 +61,27 @@ interface MetricSource {
 
 const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
 
+const MATCHED_STATUSES_SQL = `(${[
+  OpportunityVolunteerStatusType.MATCHED,
+  OpportunityVolunteerStatusType.ACTIVE,
+  OpportunityVolunteerStatusType.PAST,
+]
+  .map((status) => `'${status}'`)
+  .join(", ")})`;
+
+const OPPORTUNITY_KEYS: MetricSource["keys"] = {
+  [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+  [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
+  [StatisticsGroupBy.DISTRICT]: {
+    join: `LEFT JOIN agent a ON a.id = r.agent_id
+           LEFT JOIN district d ON d.id = COALESCE(
+             r.district_id,
+             CASE WHEN r.address_id IS NULL THEN a.district_id END
+           )`,
+    key: "d.id::text",
+  },
+};
+
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
     from: "volunteer r",
@@ -84,18 +106,7 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.REQUESTS]: {
     from: "opportunity r",
     at: "r.created_at",
-    keys: {
-      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
-      [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
-      [StatisticsGroupBy.DISTRICT]: {
-        join: `LEFT JOIN agent a ON a.id = r.agent_id
-               LEFT JOIN district d ON d.id = COALESCE(
-                 r.district_id,
-                 CASE WHEN r.address_id IS NULL THEN a.district_id END
-               )`,
-        key: "d.id::text",
-      },
-    },
+    keys: OPPORTUNITY_KEYS,
   },
   [StatisticsMetric.LEAD_FROM]: {
     from: "statistics_event r",
@@ -108,6 +119,42 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
         key: "lf.id::text",
       },
     },
+  },
+  [StatisticsMetric.MATCHED_VOLUNTEERS]: {
+    from: "opportunity_volunteer r",
+    counted: `(
+      SELECT ov.volunteer_id AS id, ov.opportunity_id, ov.status, ov.created_at
+      FROM opportunity_volunteer ov
+    ) r`,
+    at: "r.created_at",
+    filter: `r.status IN ${MATCHED_STATUSES_SQL}`,
+    keys: {
+      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+      [StatisticsGroupBy.OPPORTUNITY_TYPE]: {
+        join: "JOIN opportunity o ON o.id = r.opportunity_id",
+        key: "o.type::text",
+      },
+    },
+  },
+  [StatisticsMetric.MATCHED_OPPORTUNITIES]: {
+    from: `(
+      SELECT o.*, min(ov.created_at) AS matched_at
+      FROM opportunity o
+      JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
+      WHERE ov.status IN ${MATCHED_STATUSES_SQL}
+      GROUP BY o.id
+    ) r`,
+    at: "r.matched_at",
+    keys: OPPORTUNITY_KEYS,
+  },
+  [StatisticsMetric.UNMATCHED_OPPORTUNITIES]: {
+    from: "opportunity r",
+    at: "r.created_at",
+    filter: `NOT EXISTS (
+      SELECT 1 FROM opportunity_volunteer ov
+      WHERE ov.opportunity_id = r.id AND ov.status IN ${MATCHED_STATUSES_SQL}
+    )`,
+    keys: OPPORTUNITY_KEYS,
   },
 };
 
