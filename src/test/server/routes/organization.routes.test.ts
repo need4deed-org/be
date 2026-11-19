@@ -74,7 +74,7 @@ describe("organization.routes", () => {
     );
 
     addressA = await addressRepository.save(
-      new Address({ postcodeId: postcode.id }),
+      new Address({ postcodeId: postcode.id, street: "Trägerweg 1" }),
     );
     addressB = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -288,6 +288,7 @@ describe("organization.routes", () => {
       expect(data.agents.map((a: { id: number }) => a.id)).toEqual([
         claimedAgent.id,
       ]);
+      expect(data.address.street).toBe("Trägerweg 1");
       expect(data.services.map((s: { id: number }) => s.id)).toEqual(
         services.map(({ id }) => id),
       );
@@ -459,9 +460,19 @@ describe("organization.routes", () => {
       expect(address.postcodeId).toBe(addressB.postcodeId);
     });
 
-    it("treats clearing the street of a Träger without address as a no-op", async () => {
-      const res = await patch({ addressStreet: "" }, orgWithoutAddress.id);
-      expect(res.statusCode).toBe(204);
+    it("treats clearing the address of a Träger without one as a no-op", async () => {
+      expect(
+        (await patch({ addressStreet: "" }, orgWithoutAddress.id)).statusCode,
+      ).toBe(204);
+      expect(
+        (await patch({ addressPostcode: null }, orgWithoutAddress.id))
+          .statusCode,
+      ).toBe(204);
+    });
+
+    it("rejects an invalid email or phone", async () => {
+      expect((await patch({ email: "not-an-email" })).statusCode).toBe(400);
+      expect((await patch({ phone: "1" })).statusCode).toBe(400);
     });
 
     it("rejects clearing the postcode alone", async () => {

@@ -35,7 +35,7 @@ vi.mock("../../../../data/utils/get-district", () => ({
 }));
 
 vi.mock("../../../../server/utils/data/link-agent-organization", () => ({
-  linkAgentToDomainOrganization: vi.fn(),
+  linkAgentToDomainOrganizationSafely: vi.fn(),
 }));
 
 const isEmailDomainTrustedMock = vi.fn();

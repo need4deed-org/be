@@ -7,6 +7,9 @@ import { isFreeEmailDomain } from "./free-email-domains";
 
 type Queryable = Pick<EntityManager, "query">;
 
+// Staff join Einrichtungen as members; their own Träger mustn't rub off on them.
+const STAFF_EMAIL_DOMAINS: ReadonlySet<string> = new Set(["need4deed.org"]);
+
 const emailDomain = (email: string | null | undefined) =>
   email
     ?.split("@")
@@ -19,7 +22,7 @@ export async function findDomainOrganizationId(
   db: Queryable,
   domain: string | null,
 ): Promise<number | null> {
-  if (!domain || isFreeEmailDomain(domain)) {
+  if (!domain || isFreeEmailDomain(domain) || STAFF_EMAIL_DOMAINS.has(domain)) {
     return null;
   }
   const titles = domainOrganizationTitles(domain);

@@ -138,6 +138,16 @@ describe("linkAgentToDomainOrganization", () => {
     expect(await organizationIdOf(agent)).toBeNull();
   });
 
+  it("ignores need4deed staff who are members", async () => {
+    const agent = await createAgent([
+      { email: `coordinator-${suffix}@need4deed.org` },
+    ]);
+    expect(
+      await linkAgentToDomainOrganization(dataSource.manager, agent.id),
+    ).toBe(false);
+    expect(await organizationIdOf(agent)).toBeNull();
+  });
+
   it("ignores pending join requests", async () => {
     const agent = await createAgent([
       { email: `pending@${domain}`, status: AgentMembershipStatus.PENDING },

@@ -35,7 +35,7 @@ export async function getOrganizationProfile(
     order: { title: "ASC", id: "ASC" },
   });
   await addAgentTypeServiceTranslations(agents);
-  await maskForCaller(request, organization);
+  await maskForCaller(request, organization.person);
 
   const services = new Map<number, Service>();
   for (const { serviceId, service } of agents.flatMap(

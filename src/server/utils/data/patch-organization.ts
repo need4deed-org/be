@@ -4,6 +4,7 @@ import { BadRequestError, ConflictError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Organization from "../../../data/entity/organization.entity";
+import { isUniqueViolation } from "../../../data/utils/is-unique-violation";
 import { resolveAddressPostcode } from "./for-routes";
 
 type OrganizationColumns = Partial<
@@ -43,7 +44,7 @@ async function resolveAddressId(
   const clearsPostcode = "addressPostcode" in patch && !patch.addressPostcode;
   if (
     (clearsStreet && clearsPostcode) ||
-    (!current && clearsStreet && !patch.addressPostcode)
+    (!current && !patch.addressStreet && !patch.addressPostcode)
   ) {
     if (
       current &&
@@ -134,8 +135,7 @@ export async function patchOrganization(
       }
     });
   } catch (err) {
-    const e = err as { code?: string; detail?: string };
-    if (e.code === "23505" && e.detail?.includes("title")) {
+    if (isUniqueViolation(err) && patch.title !== undefined) {
       throw new ConflictError(`Organization title "${patch.title}" is taken.`);
     }
     throw err;

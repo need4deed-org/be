@@ -1917,8 +1917,20 @@
       "properties": {
         "title": { "type": "string", "minLength": 1 },
         "website": { "anyOf": [{ "const": null }, { "type": "string" }] },
-        "email": { "anyOf": [{ "const": null }, { "type": "string" }] },
-        "phone": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "email": {
+          "anyOf": [
+            { "const": null },
+            { "const": "" },
+            { "type": "string", "format": "email" }
+          ]
+        },
+        "phone": {
+          "anyOf": [
+            { "const": null },
+            { "const": "" },
+            { "type": "string", "minLength": 7, "maxLength": 20 }
+          ]
+        },
         "addressStreet": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "addressPostcode": {
           "anyOf": [{ "const": null }, { "type": "string" }]
@@ -1949,8 +1961,8 @@
           "type": ["object", "null"],
           "properties": {
             "id": { "type": "integer" },
-            "street": { "type": "string" },
-            "city": { "type": "string" },
+            "street": { "type": ["string", "null"] },
+            "city": { "type": ["string", "null"] },
             "postcode": {
               "type": "object",
               "properties": {
