@@ -165,3 +165,24 @@ export function withErrorCodes(text: string, err: unknown): string {
 export function errorSummary(err: unknown): string {
   return withErrorCodes(errorName(err), err);
 }
+
+export function textLength(value: unknown): number {
+  return [...String(value ?? "").trim()].length;
+}
+
+export function assertMaxTextLength(
+  label: string,
+  value: string | null | undefined,
+  current: (string | null | undefined)[],
+  maxLength: number,
+) {
+  const currentLength = Math.max(0, ...current.map(textLength));
+  if (textLength(value) <= Math.max(maxLength, currentLength)) {
+    return;
+  }
+  throw new BadRequestError(
+    currentLength > maxLength
+      ? `A ${label} over ${maxLength} characters can only be shortened (now ${currentLength}).`
+      : `A ${label} can't be longer than ${maxLength} characters.`,
+  );
+}

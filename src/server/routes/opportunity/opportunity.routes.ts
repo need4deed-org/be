@@ -57,7 +57,10 @@ import {
   newOpportunityAddress,
   parseOpportunityAddress,
 } from "../../../services/dto/parser-opportunity-address";
-import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
+import {
+  assertOpportunityTextLengths,
+  assertValidMainCommunicationLanguages,
+} from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -933,6 +936,7 @@ export default async function opportunityRoutes(
                 effectiveType,
                 editLanguage(request.query),
               );
+              assertOpportunityTextLengths(opportunityObj, opportunity);
               const success = await patchEntity(
                 Opportunity,
                 opportunityObj,
