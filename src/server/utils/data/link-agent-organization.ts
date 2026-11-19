@@ -11,12 +11,14 @@ type Queryable = Pick<EntityManager, "query">;
 const STAFF_EMAIL_DOMAINS: ReadonlySet<string> = new Set(["need4deed.org"]);
 
 const emailDomain = (email: string | null | undefined) =>
-  email
-    ?.split("@")
-    .pop()
-    ?.trim()
-    .toLowerCase()
-    .replace(/^www\./, "") || null;
+  email?.includes("@")
+    ? email
+        .split("@")
+        .pop()!
+        .trim()
+        .toLowerCase()
+        .replace(/^www\./, "") || null
+    : null;
 
 export async function findDomainOrganizationId(
   db: Queryable,
@@ -26,13 +28,13 @@ export async function findDomainOrganizationId(
     return null;
   }
   const titles = domainOrganizationTitles(domain);
-  if (titles && titles.length !== 1) {
+  if (!titles || titles.length !== 1) {
     return null;
   }
   const rows: { id: number }[] = await db.query(
     `SELECT "id" FROM "organization"
      WHERE ${websiteDomainSql('"website"')} = $1 OR lower("title") = $2`,
-    [domain, titles ? titles[0].toLowerCase() : null],
+    [domain, titles[0].toLowerCase()],
   );
   return rows.length === 1 ? rows[0].id : null;
 }

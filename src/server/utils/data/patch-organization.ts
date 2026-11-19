@@ -38,7 +38,10 @@ async function resolveAddressId(
 ): Promise<number | null> {
   const repository = manager.getRepository(Address);
   const current = organization.addressId
-    ? await repository.findOneBy({ id: organization.addressId })
+    ? await repository.findOne({
+        where: { id: organization.addressId },
+        lock: { mode: "pessimistic_write" },
+      })
     : null;
   const clearsStreet = "addressStreet" in patch && !patch.addressStreet;
   const clearsPostcode = "addressPostcode" in patch && !patch.addressPostcode;
@@ -72,6 +75,8 @@ async function resolveAddressId(
   const postcodeId = patch.addressPostcode
     ? (await resolveAddressPostcode(patch.addressPostcode, manager)).id
     : current?.postcodeId;
+  const city =
+    current && postcodeId === current.postcodeId ? current.city : null;
   if (!postcodeId) {
     throw new BadRequestError(
       `Address for organization (id=${organization.id}) not saved; a valid postcode is required.`,
@@ -84,6 +89,7 @@ async function resolveAddressId(
   ) {
     await repository.update({ id: current.id }, {
       street,
+      city,
       postcodeId,
     } as Partial<Address>);
     return current.id;
@@ -91,7 +97,7 @@ async function resolveAddressId(
   const created = await repository.save(
     repository.create({
       street,
-      city: current?.city,
+      city,
       postcodeId,
     } as Partial<Address>),
   );
@@ -112,7 +118,7 @@ export async function patchOrganization(
 
       const columns: OrganizationColumns = {};
       if (patch.title !== undefined) {
-        columns.title = patch.title;
+        columns.title = patch.title.trim();
       }
       for (const key of NULLABLE_COLUMNS) {
         if (patch[key] !== undefined) {

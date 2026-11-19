@@ -1915,7 +1915,7 @@
       "$id": "ApiOrganizationPatch",
       "type": "object",
       "properties": {
-        "title": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "pattern": "\\S" },
         "website": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "email": {
           "anyOf": [

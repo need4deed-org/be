@@ -424,6 +424,7 @@ describe("organization.routes", () => {
     it("rejects a null or empty title", async () => {
       expect((await patch({ title: null })).statusCode).toBe(400);
       expect((await patch({ title: "" })).statusCode).toBe(400);
+      expect((await patch({ title: "   " })).statusCode).toBe(400);
       expect((await reload()).title).toBe(orgB.title);
     });
 

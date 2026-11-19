@@ -138,6 +138,21 @@ describe("linkAgentToDomainOrganization", () => {
     expect(await organizationIdOf(agent)).toBeNull();
   });
 
+  it("ignores an email without @", async () => {
+    await dataSource
+      .getRepository(Organization)
+      .update({ id: traeger.id }, { title: `traeger${suffix}` });
+    try {
+      const agent = await createAgent([{ email: `traeger${suffix}` }]);
+      await linkAgentToDomainOrganization(dataSource.manager, agent.id);
+      expect(await organizationIdOf(agent)).toBeNull();
+    } finally {
+      await dataSource
+        .getRepository(Organization)
+        .update({ id: traeger.id }, { title: `Link Träger ${suffix}` });
+    }
+  });
+
   it("ignores need4deed staff who are members", async () => {
     const agent = await createAgent([
       { email: `coordinator-${suffix}@need4deed.org` },
