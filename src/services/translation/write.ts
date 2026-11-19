@@ -6,8 +6,9 @@ import {
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../config";
+import { assertMaxTextLength } from "../utils";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
-import { SourceEntity, sourceTextOf, storeHuman, textLength } from "./queue";
+import { SourceEntity, sourceTextOf, storeHuman } from "./queue";
 import { getMachineEntry } from "./registry";
 import { resolve } from "./resolve";
 
@@ -22,14 +23,8 @@ export function assertTranslationLength(
   current?: string | null,
 ) {
   const maxLength = translationMaxLength[entityType]?.[fieldName];
-  if (maxLength === undefined) {
-    return;
-  }
-  const allowed = Math.max(maxLength, textLength(current));
-  if (textLength(text) > allowed) {
-    throw new BadRequestError(
-      `This translation can't be longer than ${allowed} characters.`,
-    );
+  if (maxLength !== undefined) {
+    assertMaxTextLength("translation", text, [current], maxLength);
   }
 }
 

@@ -12,9 +12,7 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
-import { textLength } from "../translation/queue";
-import { getDateObj } from "../utils";
-import { getOpportunityDescription } from "./dto-opportunity";
+import { assertMaxTextLength, getDateObj } from "../utils";
 
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
 
@@ -22,33 +20,19 @@ export function assertOpportunityTextLengths(
   patch: Partial<Opportunity>,
   current: Opportunity,
 ) {
-  assertTextLength(
+  assertMaxTextLength(
     "title",
-    [patch.title],
-    current.title,
+    patch.title,
+    [current.title],
     OPPORTUNITY_TITLE_MAX_LENGTH,
   );
-  assertTextLength(
-    "description",
-    [patch.info, patch.infoConfidential],
-    getOpportunityDescription(current),
-    OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
-  );
-}
-
-function assertTextLength(
-  label: string,
-  values: (string | null | undefined)[],
-  current: string | null | undefined,
-  maxLength: number,
-) {
-  const allowed = Math.max(maxLength, textLength(current));
-  for (const value of values) {
-    if (textLength(value) > allowed) {
-      throw new BadRequestError(
-        `A ${label} can't be longer than ${allowed} characters.`,
-      );
-    }
+  for (const description of [patch.info, patch.infoConfidential]) {
+    assertMaxTextLength(
+      "description",
+      description,
+      [current.info, current.infoConfidential],
+      OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+    );
   }
 }
 

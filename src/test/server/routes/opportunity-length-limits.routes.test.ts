@@ -305,6 +305,29 @@ describe("opportunity title and description length limits", () => {
       ).toBe("l".repeat(900));
     });
 
+    it("keeps an accompanying description stored in info editable", async () => {
+      const legacy = "i".repeat(800);
+      const opportunity = await saved({
+        type: OpportunityType.ACCOMPANYING,
+        info: legacy,
+        infoConfidential: undefined,
+      });
+
+      const res = await patch(opportunity.id, {
+        statusOpportunity: OpportunityStatusType.SEARCHING,
+      });
+
+      expect(res.statusCode).toBe(204);
+      expect(
+        await fastify.db.opportunityRepository.findOneByOrFail({
+          id: opportunity.id,
+        }),
+      ).toMatchObject({
+        infoConfidential: legacy,
+        status: OpportunityStatusType.SEARCHING,
+      });
+    });
+
     it("rejects a changed too long description", async () => {
       const opportunity = await saved();
 
