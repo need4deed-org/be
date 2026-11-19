@@ -1,5 +1,5 @@
 import * as crypto from "node:crypto";
-import { Lang, UserRole } from "need4deed-sdk";
+import { Lang } from "need4deed-sdk";
 import { berlinDateTimeFormat, defaultPageSize } from "../../config";
 
 export function generateRandomString(length) {
@@ -70,14 +70,6 @@ export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
     return arr;
   }
   return null;
-}
-
-export function validatePermissions<E extends { userId: number }>(
-  entity: E,
-  roles: readonly UserRole[],
-  user: { id: number; role: UserRole },
-) {
-  return entity.userId === user.id || roles?.includes(user.role);
 }
 
 export function getRef(reference: string) {
