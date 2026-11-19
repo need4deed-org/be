@@ -14,6 +14,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -54,9 +55,7 @@ describe("PATCH /person/:id representative role", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),

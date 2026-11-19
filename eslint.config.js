@@ -39,6 +39,22 @@ const requestUserRules = [
   },
 ];
 
+const anyRowMessage =
+  "Use firstSeeded(repository) from src/test/seeded.ts: an empty lookup can return a row another parallel test file just inserted.";
+
+const anyRowLookupRules = [
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(findOne|findOneOrFail)$/] > ObjectExpression > Property[key.name='where'] > ObjectExpression.value[properties.length=0]",
+    message: anyRowMessage,
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name=/^findOneBy(OrFail)?$/] > ObjectExpression.arguments[properties.length=0]",
+    message: anyRowMessage,
+  },
+];
+
 module.exports = [
   { ignores: ["dist", "node_modules", "dev/**", "**/dev.*.ts"] },
   js.configs.recommended,
@@ -115,6 +131,17 @@ module.exports = [
     files: ["src/server/plugins/jwt.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...unboundLoggerRules],
+    },
+  },
+  {
+    files: ["src/test/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...unboundLoggerRules,
+        ...requestUserRules,
+        ...anyRowLookupRules,
+      ],
     },
   },
 ];

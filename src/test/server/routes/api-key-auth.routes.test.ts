@@ -22,6 +22,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword, sha256Hex } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 describe("route handlers identify API-key callers by their DB user", () => {
   let fastify: FastifyInstance | undefined;
@@ -107,10 +108,7 @@ describe("route handlers identify API-key callers by their DB user", () => {
       }),
     );
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
