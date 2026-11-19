@@ -390,7 +390,7 @@ describe("organization.routes", () => {
       }
     });
 
-    it("links an Einrichtung when a contact with the Träger's domain is added", async () => {
+    it("doesn't link on a contact staff typed in", async () => {
       const res = await fastify.inject({
         method: "POST",
         url: `/agent/${domainAgent.id}/contact`,
@@ -406,7 +406,45 @@ describe("organization.routes", () => {
       const agent = await dataSource
         .getRepository(Agent)
         .findOneByOrFail({ id: domainAgent.id });
-      expect(agent.organizationId).toBe(domainOrg.id);
+      expect(agent.organizationId).toBeNull();
+    });
+
+    it("links an Einrichtung when a member who logs in on the Träger's domain is activated", async () => {
+      const member = await fastify.db.personRepository.save(
+        new Person({ firstName: "Domain", lastName: "Member" }),
+      );
+      await fastify.db.userRepository.save(
+        new User({
+          email: `member-${suffix}@contact-${suffix}.example`,
+          password: "x",
+          role: UserRole.AGENT,
+          isActive: true,
+          personId: member.id,
+        }),
+      );
+      const membership = await dataSource.getRepository(AgentPerson).save(
+        new AgentPerson({
+          agentId: domainAgent.id,
+          personId: member.id,
+          role: AgentRoleType.OTHER,
+          status: AgentMembershipStatus.PENDING,
+        }),
+      );
+      try {
+        const res = await fastify.inject({
+          method: "PATCH",
+          url: `/agent/membership/${membership.id}`,
+          cookies: { [accessCookieName]: coordinatorCookie },
+          payload: { status: AgentMembershipStatus.ACTIVE },
+        });
+        expect(res.statusCode).toBe(200);
+        const agent = await dataSource
+          .getRepository(Agent)
+          .findOneByOrFail({ id: domainAgent.id });
+        expect(agent.organizationId).toBe(domainOrg.id);
+      } finally {
+        await fastify.db.userRepository.delete({ personId: member.id });
+      }
     });
   });
 

@@ -44,14 +44,11 @@ async function getAgentMemberDomains(
   agentId: number,
 ): Promise<string[][]> {
   const rows: { emails: (string | null)[] }[] = await db.query(
-    `SELECT CASE WHEN coalesce(p."email", '') <> '' THEN ARRAY[p."email"]
-                 ELSE coalesce(array_agg(u."email") FILTER (WHERE u."email" IS NOT NULL), '{}')
-            END AS "emails"
+    `SELECT coalesce(array_agg(u."email" ORDER BY u."id") FILTER (WHERE u."email" IS NOT NULL), '{}') AS "emails"
      FROM "agent_person" ap
-     JOIN "person" p ON p."id" = ap."person_id"
-     LEFT JOIN "user" u ON u."person_id" = p."id"
+     LEFT JOIN "user" u ON u."person_id" = ap."person_id"
      WHERE ap."agent_id" = $1 AND ap."status" = $2
-     GROUP BY ap."id", p."email", ap."role"
+     GROUP BY ap."id", ap."role"
      ORDER BY (ap."role" = $3) DESC, ap."id"`,
     [
       agentId,

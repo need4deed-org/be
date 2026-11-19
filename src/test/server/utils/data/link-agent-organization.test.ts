@@ -94,8 +94,8 @@ describe("linkAgentToDomainOrganization", () => {
       .delete([traeger.id, otherTraeger.id]);
   });
 
-  it("links an Einrichtung whose contact's email domain is a Träger's website", async () => {
-    const agent = await createAgent([{ email: `lead@${domain}` }]);
+  it("links an Einrichtung whose coordinator logs in on a Träger's domain", async () => {
+    const agent = await createAgent([{ userEmail: `lead@${domain}` }]);
     expect(
       await linkAgentToDomainOrganization(dataSource.manager, agent.id),
     ).toBe(true);
@@ -104,24 +104,24 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("matches a website stored as a full URL", async () => {
     const agent = await createAgent([
-      { email: `Lead@Other-${suffix}.example` },
+      { userEmail: `Lead@Other-${suffix}.example` },
     ]);
     await linkAgentToDomainOrganization(dataSource.manager, agent.id);
     expect(await organizationIdOf(agent)).toBe(otherTraeger.id);
   });
 
-  it("uses a member's login email when the person has none", async () => {
-    const agent = await createAgent([
-      { userEmail: `login-${suffix}@${domain}` },
-    ]);
-    await linkAgentToDomainOrganization(dataSource.manager, agent.id);
-    expect(await organizationIdOf(agent)).toBe(traeger.id);
+  it("ignores the email typed into a contact", async () => {
+    const agent = await createAgent([{ email: `typed@${domain}` }]);
+    expect(
+      await linkAgentToDomainOrganization(dataSource.manager, agent.id),
+    ).toBe(false);
+    expect(await organizationIdOf(agent)).toBeNull();
   });
 
   it("falls back to members' work emails when the contact uses webmail", async () => {
     const agent = await createAgent([
-      { email: `lead-${suffix}@web.de` },
-      { email: `staff@${domain}`, role: AgentRoleType.OTHER },
+      { userEmail: `lead-${suffix}@web.de` },
+      { userEmail: `staff@${domain}`, role: AgentRoleType.OTHER },
     ]);
     await linkAgentToDomainOrganization(dataSource.manager, agent.id);
     expect(await organizationIdOf(agent)).toBe(traeger.id);
@@ -129,8 +129,8 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("never links on webmail alone", async () => {
     const agent = await createAgent([
-      { email: `lead-${suffix}@gmail.com` },
-      { email: `staff-${suffix}@web.de`, role: AgentRoleType.OTHER },
+      { userEmail: `lead-${suffix}@gmail.com` },
+      { userEmail: `staff-${suffix}@web.de`, role: AgentRoleType.OTHER },
     ]);
     expect(
       await linkAgentToDomainOrganization(dataSource.manager, agent.id),
@@ -143,7 +143,7 @@ describe("linkAgentToDomainOrganization", () => {
       .getRepository(Organization)
       .update({ id: traeger.id }, { title: `traeger${suffix}` });
     try {
-      const agent = await createAgent([{ email: `traeger${suffix}` }]);
+      const agent = await createAgent([{ userEmail: `traeger${suffix}` }]);
       await linkAgentToDomainOrganization(dataSource.manager, agent.id);
       expect(await organizationIdOf(agent)).toBeNull();
     } finally {
@@ -155,7 +155,7 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("ignores need4deed staff who are members", async () => {
     const agent = await createAgent([
-      { email: `coordinator-${suffix}@need4deed.org` },
+      { userEmail: `coordinator-${suffix}@need4deed.org` },
     ]);
     expect(
       await linkAgentToDomainOrganization(dataSource.manager, agent.id),
@@ -165,7 +165,7 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("ignores pending join requests", async () => {
     const agent = await createAgent([
-      { email: `pending@${domain}`, status: AgentMembershipStatus.PENDING },
+      { userEmail: `pending@${domain}`, status: AgentMembershipStatus.PENDING },
     ]);
     await linkAgentToDomainOrganization(dataSource.manager, agent.id);
     expect(await organizationIdOf(agent)).toBeNull();
@@ -173,9 +173,9 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("skips members spread over several Träger", async () => {
     const agent = await createAgent([
-      { email: `lead-${suffix}@gmail.com` },
-      { email: `a@${domain}`, role: AgentRoleType.OTHER },
-      { email: `b@other-${suffix}.example`, role: AgentRoleType.OTHER },
+      { userEmail: `lead2-${suffix}@gmail.com` },
+      { userEmail: `a@${domain}`, role: AgentRoleType.OTHER },
+      { userEmail: `b@other-${suffix}.example`, role: AgentRoleType.OTHER },
     ]);
     await linkAgentToDomainOrganization(dataSource.manager, agent.id);
     expect(await organizationIdOf(agent)).toBeNull();
@@ -184,8 +184,8 @@ describe("linkAgentToDomainOrganization", () => {
   it("doesn't let a member stand in for a coordinator without email", async () => {
     const agent = await createAgent([
       {},
-      { email: `a@${domain}`, role: AgentRoleType.OTHER },
-      { email: `b@other-${suffix}.example`, role: AgentRoleType.OTHER },
+      { userEmail: `a2@${domain}`, role: AgentRoleType.OTHER },
+      { userEmail: `b2@other-${suffix}.example`, role: AgentRoleType.OTHER },
     ]);
     await linkAgentToDomainOrganization(dataSource.manager, agent.id);
     expect(await organizationIdOf(agent)).toBeNull();
@@ -193,7 +193,7 @@ describe("linkAgentToDomainOrganization", () => {
 
   it("never overwrites an existing link", async () => {
     const agent = await createAgent(
-      [{ email: `lead@${domain}` }],
+      [{ userEmail: `lead2@${domain}` }],
       otherTraeger.id,
     );
     expect(

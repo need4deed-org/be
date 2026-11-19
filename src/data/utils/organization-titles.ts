@@ -309,6 +309,7 @@ export const BUILTIN_ORGANIZATION_TITLES: OrganizationTitleMap = {
     "Stadtkümmerei GmbH",
     "Gesellschaft für integrierte Stadtentwicklung mbH",
   ],
+  "berlin.de": null,
   "www.berlin.de": "Senatsverwaltung für Bildung, Jugend und Familie",
   "xenion.org": "XENION Psychosoziale Hilfen für politisch Verfolgte e.V.",
   "xochicuicatl.de": "Xochicuicatl e.V.",
