@@ -232,4 +232,40 @@ describe("POST /event-registration", () => {
 
     expect(res.statusCode).toBe(400);
   });
+  it("GET returns only the event's id, title and date, without a login", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/event-registration/${futureEventOpportunityId}`,
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    const { data } = res.json();
+    expect(Object.keys(data).sort()).toEqual(["date", "id", "title"]);
+    expect(data).toMatchObject({
+      id: futureEventOpportunityId,
+      title: `Test event-registration opportunity ${suffix}`,
+    });
+    expect(new Date(data.date).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it.each([
+    ["accompanying", () => accompanyingOpportunityId],
+    ["undated", () => noOnetimerOpportunityId],
+    ["past", () => pastEventOpportunityId],
+    ["no longer open", () => inactiveEventOpportunityId],
+  ])("GET returns 400 for an %s opportunity", async (_label, id) => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/event-registration/${id()}`,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("GET returns 404 for a missing opportunity", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/event-registration/999999999",
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });

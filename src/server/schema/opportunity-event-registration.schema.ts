@@ -48,3 +48,31 @@ export const opportunityEventRegistrationListResponseSchema = {
   },
   ...responseErrors,
 };
+
+export const opportunityEventSummaryParamsSchema = {
+  type: "object",
+  required: ["opportunityId"],
+  properties: { opportunityId: { type: "integer", minimum: 1 } },
+};
+
+export const opportunityEventSummaryResponseSchema = {
+  200: {
+    type: "object",
+    required: ["message", "data"],
+    additionalProperties: false,
+    properties: {
+      message: { type: "string" },
+      data: {
+        type: "object",
+        required: ["id", "title", "date"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer" },
+          title: { type: "string" },
+          date: { type: "string", format: "date-time" },
+        },
+      },
+    },
+  },
+  ...responseErrors,
+};
