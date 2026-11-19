@@ -233,7 +233,7 @@ export default async function commentRoutes(
 
       const newComment = commentRepository.create({
         ...body,
-        user: { id: request.user.id },
+        user: { id: request.authUser!.id },
       });
 
       const errors = await validate(newComment);
@@ -339,16 +339,7 @@ export default async function commentRoutes(
             .send({ message: `Comment id:${id} not found.` });
         }
 
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: request.user.id },
-          relations: ["person"],
-        });
-
-        if (!user) {
-          throw new Error(
-            `Error updating comment ${id}: user ${request.user.id} not found`,
-          );
-        }
+        const user = request.authUser!;
 
         if (user.role !== UserRole.ADMIN && user.id !== comment.user.id) {
           return reply
@@ -540,15 +531,7 @@ export default async function commentRoutes(
             .send({ message: `Comment id:${id} not found.` });
         }
 
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: request.user.id },
-        });
-
-        if (!user) {
-          throw new Error(
-            `Error deleting comment ${id}: user ${request.user.id} not found`,
-          );
-        }
+        const user = request.authUser!;
 
         if (user.role !== UserRole.ADMIN && user.id !== comment.user.id) {
           return reply
