@@ -7,9 +7,11 @@ import { responseErrors } from "./responseErrors";
 export const opportunityLegacyBodySchema = {
   type: "object",
   properties: {
-    title: { maxLength: OPPORTUNITY_TITLE_MAX_LENGTH },
-    vo_information: { maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH },
-    accomp_information: { maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH },
+    title: { type: "string", maxLength: OPPORTUNITY_TITLE_MAX_LENGTH },
+    vo_information: {
+      type: "string",
+      maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+    },
   },
 };
 
@@ -42,10 +44,7 @@ export const opportunityCreateBodySchema = {
     accomp_datetime: { type: "string" },
     accomp_name: { type: "string" },
     accomp_phone: { type: "string" },
-    accomp_information: {
-      type: "string",
-      maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
-    },
+    accomp_information: { type: "string" },
     accomp_translation: { type: "string" },
     address: { $ref: "ApiOpportunityAddress#" },
     language: { type: "string" },

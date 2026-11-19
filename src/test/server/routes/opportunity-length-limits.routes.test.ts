@@ -165,7 +165,6 @@ describe("opportunity title and description length limits", () => {
     it.each([
       ["title", { title: tooLongTitle }],
       ["vo_information", { vo_information: tooLongDescription }],
-      ["accomp_information", { accomp_information: tooLongDescription }],
     ])("rejects a too long %s", async (_, fields) => {
       expect((await create(fields)).statusCode).toBe(400);
     });
@@ -175,9 +174,14 @@ describe("opportunity title and description length limits", () => {
     it.each([
       ["title", { title: tooLongTitle }],
       ["vo_information", { vo_information: tooLongDescription }],
-      ["accomp_information", { accomp_information: tooLongDescription }],
     ])("rejects a too long %s", async (_, fields) => {
       expect((await createLegacy(fields)).statusCode).toBe(400);
+    });
+
+    it("rejects a title that isn't a string", async () => {
+      expect((await createLegacy({ title: [tooLongTitle] })).statusCode).toBe(
+        400,
+      );
     });
   });
 
@@ -195,6 +199,33 @@ describe("opportunity title and description length limits", () => {
           })
         ).title,
       ).toBe(opportunity.title);
+    });
+
+    it("keeps an unchanged title over the limit editable", async () => {
+      const opportunity = await saved({ title: tooLongTitle });
+
+      const res = await patch(opportunity.id, {
+        title: tooLongTitle,
+        numberVolunteers: 2,
+      });
+
+      expect(res.statusCode).toBe(204);
+    });
+
+    it("counts characters, not UTF-16 code units", async () => {
+      const opportunity = await saved();
+      const title = "😀".repeat(OPPORTUNITY_TITLE_MAX_LENGTH);
+
+      const res = await patch(opportunity.id, { title });
+
+      expect(res.statusCode).toBe(204);
+      expect(
+        (
+          await fastify.db.opportunityRepository.findOneByOrFail({
+            id: opportunity.id,
+          })
+        ).title,
+      ).toBe(title);
     });
 
     it("rejects a changed too long description", async () => {

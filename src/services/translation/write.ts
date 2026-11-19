@@ -21,7 +21,7 @@ export function assertTranslationLength(
   text: string,
 ) {
   const maxLength = translationMaxLength[entityType]?.[fieldName];
-  if (maxLength !== undefined && text.length > maxLength) {
+  if (maxLength !== undefined && [...text].length > maxLength) {
     throw new BadRequestError(
       `A ${fieldName} translation can't be longer than ${maxLength} characters.`,
     );
@@ -30,7 +30,7 @@ export function assertTranslationLength(
 
 export async function writeHumanTranslations(
   manager: EntityManager,
-  entityType: EntityTableName,
+  entityType: TranslatedEntityType,
   entity: TranslatableEntity,
   lang: Lang,
   fields: Record<string, string | null | undefined>,
@@ -74,11 +74,7 @@ export async function writeHumanTranslations(
         `${fieldName} has no original text to translate; edit it in the original language.`,
       );
     }
-    assertTranslationLength(
-      entityType as TranslatedEntityType,
-      fieldName,
-      text,
-    );
+    assertTranslationLength(entityType, fieldName, text);
   }
   for (const [fieldName, text] of changed) {
     await storeHuman(manager, fk, source, idOf[lang], fieldName, text);

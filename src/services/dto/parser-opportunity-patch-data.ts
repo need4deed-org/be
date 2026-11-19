@@ -21,20 +21,34 @@ export function assertOpportunityTextLengths(
   patch: Partial<Opportunity>,
   current: Opportunity,
 ) {
-  if (patch.title && patch.title.length > OPPORTUNITY_TITLE_MAX_LENGTH) {
-    throw new BadRequestError(
-      `A title can't be longer than ${OPPORTUNITY_TITLE_MAX_LENGTH} characters.`,
-    );
-  }
-  const currentDescription = (getOpportunityDescription(current) ?? "").trim();
-  for (const description of [patch.info, patch.infoConfidential]) {
+  assertChangedTextLength(
+    "title",
+    [patch.title],
+    current.title,
+    OPPORTUNITY_TITLE_MAX_LENGTH,
+  );
+  assertChangedTextLength(
+    "description",
+    [patch.info, patch.infoConfidential],
+    getOpportunityDescription(current),
+    OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+  );
+}
+
+function assertChangedTextLength(
+  label: string,
+  values: (string | null | undefined)[],
+  current: string | null | undefined,
+  maxLength: number,
+) {
+  for (const value of values) {
     if (
-      description &&
-      description.length > OPPORTUNITY_DESCRIPTION_MAX_LENGTH &&
-      description.trim() !== currentDescription
+      value &&
+      [...value].length > maxLength &&
+      value.trim() !== (current ?? "").trim()
     ) {
       throw new BadRequestError(
-        `A description can't be longer than ${OPPORTUNITY_DESCRIPTION_MAX_LENGTH} characters.`,
+        `A ${label} can't be longer than ${maxLength} characters.`,
       );
     }
   }

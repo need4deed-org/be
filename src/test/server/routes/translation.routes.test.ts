@@ -535,6 +535,25 @@ describe("/translation coordinator review", () => {
       },
     );
 
+    it("confirms an unchanged machine translation over the limit", async () => {
+      const opportunity = await queued();
+      const text = "x".repeat(OPPORTUNITY_TRANSLATION_MAX_LENGTH.title + 1);
+      await dataSource.manager.update(
+        FieldTranslation,
+        { opportunityId: opportunity.id, fieldName: "title" },
+        { status: TranslationStatus.DONE, translation: text },
+      );
+      const row = await titleRow(opportunity.id);
+
+      const res = await patch(row.id, text, opportunity.title);
+
+      expect(res.statusCode).toBe(200);
+      expect(await titleRow(opportunity.id)).toMatchObject({
+        origin: TranslationOrigin.HUMAN,
+        translation: text,
+      });
+    });
+
     it("confirms a machine translation by saving its current text", async () => {
       const opportunity = await queued();
       const row = await translatedTitle(opportunity);
