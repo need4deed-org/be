@@ -1,4 +1,8 @@
-import { FastifyInstance } from "fastify";
+import {
+  FastifyInstance,
+  InjectOptions,
+  LightMyRequestResponse,
+} from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,12 +25,24 @@ function getCookie(
   return cookie;
 }
 
-describe("GET /post authorization source", () => {
+type RouteRequest = Pick<InjectOptions, "method" | "url" | "payload">;
+
+type RouteCase = {
+  name: string;
+  request: () => Promise<RouteRequest>;
+  allowedStatus: number;
+  deniedAs: "forbidden" | "empty-list";
+};
+
+describe("post routes authorize on the DB role, not the JWT claim", () => {
   let fastify: FastifyInstance | undefined;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const personIds: number[] = [];
   let authorPersonId: number;
-  let postId: number;
+  let authorAccess: string;
+  let promotedAccess: string;
+  let demotedAccess: string;
+  let listedPostId: number;
 
   const server = () => {
     if (!fastify) {
@@ -64,15 +80,49 @@ describe("GET /post authorization source", () => {
     };
   }
 
-  const listAuthorPosts = (access: string) =>
+  async function staleAccess(
+    label: string,
+    tokenRole: UserRole,
+    dbRole: UserRole,
+  ): Promise<string> {
+    const user = await createUser(label, tokenRole);
+    const { access } = await login(user);
+    await server().db.userRepository.update(user.id, { role: dbRole });
+    return access;
+  }
+
+  const send = (access: string, request: RouteRequest) =>
     server().inject({
-      method: "GET",
-      url: `/post?authorId=${authorPersonId}`,
+      ...request,
       cookies: { [accessCookieName]: access },
     });
 
-  const listedIds = (res: { json: () => { data: { id: number }[] } }) =>
-    res.json().data.map((p) => p.id);
+  async function createPost(): Promise<number> {
+    const res = await send(authorAccess, {
+      method: "POST",
+      url: "/post",
+      payload: { text: "Post for auth-role regression test" },
+    });
+    expect(res.statusCode).toBe(201);
+    return res.json().data.id;
+  }
+
+  async function createReply(postId?: number): Promise<number> {
+    postId ??= await createPost();
+    const res = await send(authorAccess, {
+      method: "POST",
+      url: `/post/${postId}/reply`,
+      payload: { postId, text: "Reply for auth-role regression test" },
+    });
+    expect(res.statusCode).toBe(201);
+    return res.json().data.id;
+  }
+
+  const listAuthorPosts = (access: string) =>
+    send(access, { method: "GET", url: `/post?authorId=${authorPersonId}` });
+
+  const listedIds = (res: LightMyRequestResponse) =>
+    res.json<{ data: { id: number }[] }>().data.map((p) => p.id);
 
   beforeAll(async () => {
     fastify = await createServer();
@@ -80,15 +130,19 @@ describe("GET /post authorization source", () => {
 
     const author = await createUser("author", UserRole.COORDINATOR);
     authorPersonId = author.personId;
-    const { access } = await login(author);
-    const res = await server().inject({
-      method: "POST",
-      url: "/post",
-      cookies: { [accessCookieName]: access },
-      payload: { text: "Post for auth-role regression test" },
-    });
-    expect(res.statusCode).toBe(201);
-    postId = res.json().data.id;
+    authorAccess = (await login(author)).access;
+    listedPostId = await createPost();
+
+    promotedAccess = await staleAccess(
+      "promoted",
+      UserRole.VOLUNTEER,
+      UserRole.COORDINATOR,
+    );
+    demotedAccess = await staleAccess(
+      "demoted",
+      UserRole.COORDINATOR,
+      UserRole.VOLUNTEER,
+    );
   });
 
   afterAll(async () => {
@@ -120,30 +174,160 @@ describe("GET /post authorization source", () => {
       getCookie(refreshRes.cookies, accessCookieName),
     );
     expect(res.statusCode).toBe(200);
-    expect(listedIds(res)).toContain(postId);
+    expect(listedIds(res)).toContain(listedPostId);
   });
 
-  it("lists posts when the DB role was promoted after the token was issued", async () => {
-    const user = await createUser("promoted", UserRole.VOLUNTEER);
-    const { access } = await login(user);
-    await server().db.userRepository.update(user.id, {
-      role: UserRole.COORDINATOR,
+  describe("GET /post", () => {
+    it("lists posts when the DB role was promoted after the token was issued", async () => {
+      const res = await listAuthorPosts(promotedAccess);
+      expect(res.statusCode).toBe(200);
+      expect(listedIds(res)).toContain(listedPostId);
     });
 
-    const res = await listAuthorPosts(access);
-    expect(res.statusCode).toBe(200);
-    expect(listedIds(res)).toContain(postId);
+    it("returns an empty list when the DB role was demoted after the token was issued", async () => {
+      const res = await listAuthorPosts(demotedAccess);
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ data: [], count: 0 });
+    });
   });
 
-  it("returns an empty list when the DB role was demoted after the token was issued", async () => {
-    const user = await createUser("demoted", UserRole.COORDINATOR);
-    const { access } = await login(user);
-    await server().db.userRepository.update(user.id, {
-      role: UserRole.VOLUNTEER,
+  const routeCases: RouteCase[] = [
+    {
+      name: "PATCH /post/:id",
+      request: async () => ({
+        method: "PATCH",
+        url: `/post/${await createPost()}`,
+        payload: { text: "Edited" },
+      }),
+      allowedStatus: 200,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "DELETE /post/:id",
+      request: async () => ({
+        method: "DELETE",
+        url: `/post/${await createPost()}`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "POST /post/:id/bookmark",
+      request: async () => ({
+        method: "POST",
+        url: `/post/${await createPost()}/bookmark`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "DELETE /post/:id/bookmark",
+      request: async () => ({
+        method: "DELETE",
+        url: `/post/${await createPost()}/bookmark`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "GET /post/:id/reply",
+      request: async () => {
+        const postId = await createPost();
+        await createReply(postId);
+        return { method: "GET", url: `/post/${postId}/reply` };
+      },
+      allowedStatus: 200,
+      deniedAs: "empty-list",
+    },
+    {
+      name: "POST /post/:id/reply",
+      request: async () => {
+        const postId = await createPost();
+        return {
+          method: "POST",
+          url: `/post/${postId}/reply`,
+          payload: { postId, text: "Reply" },
+        };
+      },
+      allowedStatus: 201,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "PATCH /post/reply/:id",
+      request: async () => ({
+        method: "PATCH",
+        url: `/post/reply/${await createReply()}`,
+        payload: { text: "Edited reply" },
+      }),
+      allowedStatus: 200,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "DELETE /post/reply/:id",
+      request: async () => ({
+        method: "DELETE",
+        url: `/post/reply/${await createReply()}`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "POST /post/:id/reaction",
+      request: async () => ({
+        method: "POST",
+        url: `/post/${await createPost()}/reaction`,
+        payload: { emoji: "👍" },
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "DELETE /post/:id/reaction",
+      request: async () => ({
+        method: "DELETE",
+        url: `/post/${await createPost()}/reaction`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "POST /post/reply/:id/reaction",
+      request: async () => ({
+        method: "POST",
+        url: `/post/reply/${await createReply()}/reaction`,
+        payload: { emoji: "👍" },
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+    {
+      name: "DELETE /post/reply/:id/reaction",
+      request: async () => ({
+        method: "DELETE",
+        url: `/post/reply/${await createReply()}/reaction`,
+      }),
+      allowedStatus: 204,
+      deniedAs: "forbidden",
+    },
+  ];
+
+  describe.each(routeCases)("$name", ({ request, allowedStatus, deniedAs }) => {
+    it("allows a token whose role was promoted in the DB", async () => {
+      const res = await send(promotedAccess, await request());
+      expect(res.statusCode).toBe(allowedStatus);
+      if (deniedAs === "empty-list") {
+        expect(res.json().data.length).toBeGreaterThan(0);
+      }
     });
 
-    const res = await listAuthorPosts(access);
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ data: [], count: 0 });
+    it("denies a token whose role was demoted in the DB", async () => {
+      const res = await send(demotedAccess, await request());
+      if (deniedAs === "empty-list") {
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data).toEqual([]);
+      } else {
+        expect(res.statusCode).toBe(403);
+      }
+    });
   });
 });
