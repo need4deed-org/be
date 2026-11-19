@@ -24,6 +24,7 @@ import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
 import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
+import myActivityRoutes from "./routes/my-activity.routes";
 import opportunityEventRegistrationRoutes from "./routes/opportunity-event-registration.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
@@ -191,6 +192,9 @@ export async function createServer({
   });
   await fastifyInstance.register(authRoutes, { prefix: RoutePrefix.AUTH });
   await fastifyInstance.register(userRoutes, { prefix: RoutePrefix.USER });
+  await fastifyInstance.register(myActivityRoutes, {
+    prefix: RoutePrefix.USER,
+  });
   await fastifyInstance.register(personRoutes, { prefix: RoutePrefix.PERSON });
   await fastifyInstance.register(postRoutes, { prefix: RoutePrefix.POST });
   await fastifyInstance.register(volunteerRoutes, {
