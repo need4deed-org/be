@@ -6,7 +6,7 @@ import {
   ApiAgentAlreadyRegisteredConflict,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
-import { DataSource, EntityManager, In } from "typeorm";
+import { DataSource, EntityManager, In, Not } from "typeorm";
 import { BadRequestError, BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -149,6 +149,7 @@ async function assertNoAddressConflict(
     return;
   }
   const agents = await manager.getRepository(Agent).find({
+    where: { engagementStatus: Not(AgentEngagementStatusType.INACTIVE) },
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
   const match = getAgentByAddress(

@@ -747,7 +747,7 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     createdAgentIds.push(res.json().data.agentId);
   });
 
-  it("409s on a duplicate title", async () => {
+  it("creates a second agent with the same title", async () => {
     const title = `Duplicate Agent ${suffix}`;
     const first = await fastify.inject({
       method: "POST",
@@ -764,8 +764,9 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
       cookies: { access: coordinatorCookie },
       payload: { title },
     });
-    expect(second.statusCode).toBe(409);
-    expect(second.json()).toMatchObject({ conflict: "title" });
+    expect(second.statusCode).toBe(201);
+    createdAgentIds.push(second.json().data.agentId);
+    expect(second.json().data.agentId).not.toBe(first.json().data.agentId);
   });
 });
 
