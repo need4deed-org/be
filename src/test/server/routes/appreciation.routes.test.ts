@@ -24,6 +24,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword, sha256Hex } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -54,10 +55,7 @@ describe("PATCH /appreciation/:id status reconciliation (be#909)", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
@@ -226,10 +224,7 @@ describe("PATCH/DELETE /appreciation/:id authorize on the DB user", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );

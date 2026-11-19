@@ -29,6 +29,7 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { enqueue } from "../../../services/translation/queue";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "Translation-Test-1!";
 
@@ -99,9 +100,9 @@ describe("opportunity routes in the requested language", () => {
     // An agent with a district: the GET routes then derive and *save* the
     // opportunity's district on the very entity they translate, which is
     // what the "never writes back" test needs.
-    const district = await dataSource.manager.findOneOrFail(District, {
-      where: {},
-    });
+    const district = await firstSeeded(
+      dataSource.manager.getRepository(District),
+    );
     agent = await fastify.db.agentRepository.save(
       new Agent({
         title: `Translation agent ${suffix}`,
@@ -276,9 +277,9 @@ describe("opportunity routes in the requested language", () => {
 
       beforeAll(async () => {
         opportunity = await germanOpportunity(english);
-        const postcode = await dataSource.manager.findOneOrFail(Postcode, {
-          where: {},
-        });
+        const postcode = await firstSeeded(
+          dataSource.manager.getRepository(Postcode),
+        );
         const volunteerPerson = await dataSource.manager.save(
           new Person({
             firstName: "Translation",

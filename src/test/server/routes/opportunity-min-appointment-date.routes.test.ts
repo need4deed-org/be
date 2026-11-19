@@ -19,6 +19,7 @@ import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { minAppointmentDate } from "../../../server/utils/data/min-appointment-date";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { HOUR } from "../../time";
 
 const PASSWORD = "test_password";
@@ -95,9 +96,7 @@ describe("accompanying appointments are at least 7 working days out", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     postcodeValue = postcode.value;
     const address = await getRepository(dataSource, Address).save(
       new Address({ postcodeId: postcode.id }),

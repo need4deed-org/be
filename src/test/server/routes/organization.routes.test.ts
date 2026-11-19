@@ -9,6 +9,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -49,9 +50,7 @@ describe("organization.routes", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const addressRepository = dataSource.getRepository(Address);
     const organizationRepository = dataSource.getRepository(Organization);
 

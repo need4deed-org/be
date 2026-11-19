@@ -26,6 +26,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -67,9 +68,7 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
     );
     vi.spyOn(fastify.notify, "tagged").mockResolvedValue(undefined);
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const sharing: Record<AgentKey, boolean> = {
       requester: true,
       owner: true,

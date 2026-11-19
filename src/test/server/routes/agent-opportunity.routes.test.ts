@@ -27,6 +27,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -71,9 +72,7 @@ describe("GET /agent/:id/opportunity-linked", () => {
       }),
     );
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
@@ -201,18 +200,12 @@ describe("GET /agent/:id/opportunity-linked", () => {
   });
 
   it("returns type, district, languages and activities for the NGO home cards", async () => {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
-    const district = await fastify.db.districtRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    const district = await firstSeeded(fastify.db.districtRepository);
     const language = await fastify.db.languageRepository.findOneByOrFail({
       isoCode: "en",
     });
-    const activity = await getRepository(dataSource, Activity).findOneOrFail({
-      where: {},
-    });
+    const activity = await firstSeeded(getRepository(dataSource, Activity));
     const cardDeal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );
