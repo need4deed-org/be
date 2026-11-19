@@ -22,6 +22,7 @@ async function isAddressShared(
   const [{ shared }]: { shared: boolean }[] = await manager.query(
     `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
          OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
          OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
        AS "shared"`,
     [addressId, organizationId],
@@ -34,9 +35,27 @@ async function resolveAddressId(
   patch: ApiOrganizationPatch,
   manager: EntityManager,
 ): Promise<number | null> {
+  const repository = manager.getRepository(Address);
+  const current = organization.addressId
+    ? await repository.findOneBy({ id: organization.addressId })
+    : null;
   const clearsStreet = "addressStreet" in patch && !patch.addressStreet;
   const clearsPostcode = "addressPostcode" in patch && !patch.addressPostcode;
-  if (clearsStreet && clearsPostcode) {
+  if (
+    (clearsStreet && clearsPostcode) ||
+    (!current && clearsStreet && !patch.addressPostcode)
+  ) {
+    if (
+      current &&
+      !(await isAddressShared(current.id, organization.id, manager))
+    ) {
+      await manager
+        .getRepository(Organization)
+        .update({ id: organization.id }, {
+          addressId: null,
+        } as unknown as Partial<Organization>);
+      await repository.delete({ id: current.id });
+    }
     return null;
   }
   if (clearsPostcode) {
@@ -45,10 +64,6 @@ async function resolveAddressId(
     );
   }
 
-  const repository = manager.getRepository(Address);
-  const current = organization.addressId
-    ? await repository.findOneBy({ id: organization.addressId })
-    : null;
   const street =
     patch.addressStreet !== undefined
       ? patch.addressStreet || null

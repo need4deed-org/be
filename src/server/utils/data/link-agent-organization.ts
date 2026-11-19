@@ -1,6 +1,7 @@
 import { AgentMembershipStatus, AgentRoleType } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { domainOrganizationTitles } from "../../../data/utils/organization-titles";
+import logger from "../../../logger";
 import { websiteDomainSql } from "./ensure-domain-organization";
 import { isFreeEmailDomain } from "./free-email-domains";
 
@@ -22,13 +23,13 @@ export async function findDomainOrganizationId(
     return null;
   }
   const titles = domainOrganizationTitles(domain);
-  if (!titles || titles.length !== 1) {
+  if (titles && titles.length !== 1) {
     return null;
   }
   const rows: { id: number }[] = await db.query(
     `SELECT "id" FROM "organization"
      WHERE ${websiteDomainSql('"website"')} = $1 OR lower("title") = $2`,
-    [domain, titles[0].toLowerCase()],
+    [domain, titles ? titles[0].toLowerCase() : null],
   );
   return rows.length === 1 ? rows[0].id : null;
 }
@@ -96,4 +97,17 @@ export async function linkAgentToDomainOrganization(
     [organizationId, agentId],
   );
   return linked > 0;
+}
+
+export async function linkAgentToDomainOrganizationSafely(
+  db: Queryable,
+  agentId: number,
+): Promise<void> {
+  try {
+    await linkAgentToDomainOrganization(db, agentId);
+  } catch (err) {
+    logger.warn(
+      `link-agent-organization: agent ${agentId} not linked: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 }

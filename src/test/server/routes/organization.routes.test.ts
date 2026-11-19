@@ -1,9 +1,10 @@
 import { FastifyInstance } from "fastify";
-import { AgentRoleType, UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Organization from "../../../data/entity/organization.entity";
@@ -42,6 +43,7 @@ describe("organization.routes", () => {
   let domainOrg: Organization;
   let services: Service[];
   let postcodeValue: string;
+  let orgWithoutAddress: Organization;
 
   let addressA: Address;
   let addressB: Address;
@@ -159,6 +161,9 @@ describe("organization.routes", () => {
         website: `contact-${suffix}.example`,
       }),
     );
+    orgWithoutAddress = await organizationRepository.save(
+      new Organization({ title: `No Address Org ${suffix}` }),
+    );
     domainAgent = await agentRepository.save(
       new Agent({ title: `Domain Einrichtung ${suffix}` }),
     );
@@ -196,7 +201,7 @@ describe("organization.routes", () => {
         domainContacts.map(({ personId }) => personId),
       );
     }
-    await organizationRepository.delete({ id: domainOrg.id });
+    await organizationRepository.delete([domainOrg.id, orgWithoutAddress.id]);
     await organizationRepository.delete({ id: orgA.id });
     await organizationRepository.delete({ id: orgB.id });
     await fastify.db.personRepository.delete({ id: ownerPerson.id });
@@ -341,6 +346,49 @@ describe("organization.routes", () => {
   });
 
   describe("linking by email domain", () => {
+    it("doesn't link on a contact an NGO member typed in", async () => {
+      const memberAgent = await dataSource
+        .getRepository(Agent)
+        .save(new Agent({ title: `Member Einrichtung ${suffix}` }));
+      await dataSource.getRepository(AgentPerson).save(
+        new AgentPerson({
+          agentId: memberAgent.id,
+          personId: ownerPerson.id,
+          role: AgentRoleType.OTHER,
+          status: AgentMembershipStatus.ACTIVE,
+        }),
+      );
+      try {
+        const res = await fastify.inject({
+          method: "POST",
+          url: `/agent/${memberAgent.id}/contact`,
+          cookies: { [accessCookieName]: agentCookie },
+          payload: {
+            firstName: "Typed",
+            lastName: "Contact",
+            role: AgentRoleType.VOLUNTEER_COORDINATOR,
+            email: `lead@contact-${suffix}.example`,
+          },
+        });
+        expect(res.statusCode).toBe(201);
+        const agent = await dataSource
+          .getRepository(Agent)
+          .findOneByOrFail({ id: memberAgent.id });
+        expect(agent.organizationId).toBeNull();
+      } finally {
+        const contacts = await fastify.db.agentPersonRepository.findBy({
+          agentId: memberAgent.id,
+        });
+        await dataSource.getRepository(Agent).delete({ id: memberAgent.id });
+        const typed = contacts
+          .map(({ personId }) => personId)
+          .filter((id) => id !== ownerPerson.id);
+        if (typed.length) {
+          await fastify.db.personRepository.delete(typed);
+        }
+      }
+    });
+
     it("links an Einrichtung when a contact with the Träger's domain is added", async () => {
       const res = await fastify.inject({
         method: "POST",
@@ -409,6 +457,11 @@ describe("organization.routes", () => {
         .findOneByOrFail({ id: organization.addressId! });
       expect(address.street).toBeNull();
       expect(address.postcodeId).toBe(addressB.postcodeId);
+    });
+
+    it("treats clearing the street of a Träger without address as a no-op", async () => {
+      const res = await patch({ addressStreet: "" }, orgWithoutAddress.id);
+      expect(res.statusCode).toBe(204);
     });
 
     it("rejects clearing the postcode alone", async () => {
