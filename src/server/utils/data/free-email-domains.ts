@@ -14,6 +14,19 @@ export const FREE_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
   "mail.com",
   "t-online.de",
   "ukr.net",
+  "web.de",
+  "freenet.de",
+  "posteo.de",
+  "mailbox.org",
+  "arcor.de",
+  "yahoo.de",
+  "hotmail.de",
+  "outlook.de",
+  "gmx.at",
+  "gmx.ch",
+  "me.com",
+  "mac.com",
+  "proton.me",
 ]);
 
 export function isFreeEmailDomain(domain: string | undefined): boolean {

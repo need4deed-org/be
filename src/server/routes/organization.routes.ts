@@ -1,13 +1,16 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
+  ApiOrganizationGet,
   ApiOrganizationGetList,
   ApiOrganizationPatch,
   UserRole,
 } from "need4deed-sdk";
-import { NotFoundError } from "../../config";
+import { UnauthorizedError } from "../../config";
 import { idParamSchema, responseSchema } from "../schema";
 import { ParamsId, ReplyData } from "../types";
+import { getOrganizationProfile } from "../utils/data/get-organization-profile";
 import { listOrganizations } from "../utils/data/list-organizations";
+import { patchOrganization } from "../utils/data/patch-organization";
 
 export default async function organizationRoutes(
   fastify: FastifyInstance,
@@ -27,6 +30,26 @@ export default async function organizationRoutes(
       }),
   );
 
+  fastify.get<{ Params: ParamsId; Reply: ReplyData<ApiOrganizationGet> }>(
+    "/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: responseSchema("ApiOrganizationGet#"),
+      },
+    },
+    async (request, reply) => {
+      if (request.authUser?.role === UserRole.VOLUNTEER) {
+        throw new UnauthorizedError();
+      }
+      const { id } = request.params;
+      return reply.status(200).send({
+        message: `Organization (id:${id}) fetched successfully.`,
+        data: await getOrganizationProfile(request, id),
+      });
+    },
+  );
+
   fastify.patch<{
     Params: ParamsId;
     Body: ApiOrganizationPatch;
@@ -37,23 +60,12 @@ export default async function organizationRoutes(
       preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
+        body: { $ref: "ApiOrganizationPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
-      const { id } = request.params;
-
-      const organizationRepository = fastify.db.organizationRepository;
-      const organization = await organizationRepository.findOneBy({ id });
-
-      if (!organization) {
-        throw new NotFoundError(`Organization (id:${id}) not found.`);
-      }
-
-      const organizationPatched = Object.assign(organization, request.body);
-
-      await organizationRepository.save(organizationPatched);
-
+      await patchOrganization(request.params.id, request.body);
       return reply.status(204).send();
     },
   );

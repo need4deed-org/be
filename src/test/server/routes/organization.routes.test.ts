@@ -1,11 +1,14 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { AgentRoleType, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
+import AgentService from "../../../data/entity/m2m/agent-service";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
+import Service from "../../../data/entity/profile/service.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
@@ -30,6 +33,13 @@ describe("organization.routes", () => {
   let ownerPerson: Person;
   let agentCookie: string;
   let coordinatorCookie: string;
+  let volunteerCookie: string;
+  let claimedAgent: Agent;
+  let unclaimedAgent: Agent;
+  let domainAgent: Agent;
+  let domainOrg: Organization;
+  let services: Service[];
+  let postcodeValue: string;
 
   let addressA: Address;
   let addressB: Address;
@@ -100,7 +110,51 @@ describe("organization.routes", () => {
         isActive: true,
       }),
     );
+    await fastify.db.userRepository.save(
+      new User({
+        email: `org-volunteer-${suffix}@test.need4deed.org`,
+        password: pwHash,
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+      }),
+    );
+    postcodeValue = postcode.value;
+
+    const agentRepository = dataSource.getRepository(Agent);
+    claimedAgent = await agentRepository.save(
+      new Agent({ title: `B Einrichtung ${suffix}`, organizationId: orgA.id }),
+    );
+    unclaimedAgent = await agentRepository.save(
+      new Agent({
+        title: `A Einrichtung ${suffix}`,
+        organizationId: orgA.id,
+        unclaimed: true,
+      }),
+    );
+    services = await dataSource
+      .getRepository(Service)
+      .find({ order: { id: "ASC" }, take: 2 });
+    await dataSource.getRepository(AgentService).save([
+      new AgentService({ agentId: claimedAgent.id, serviceId: services[0].id }),
+      new AgentService({ agentId: claimedAgent.id, serviceId: services[1].id }),
+      new AgentService({
+        agentId: unclaimedAgent.id,
+        serviceId: services[1].id,
+      }),
+    ]);
+
+    domainOrg = await organizationRepository.save(
+      new Organization({
+        title: `Domain Test Org ${suffix}`,
+        website: `contact-${suffix}.example`,
+      }),
+    );
+    domainAgent = await agentRepository.save(
+      new Agent({ title: `Domain Einrichtung ${suffix}` }),
+    );
+
     agentCookie = await login(`org-agent-${suffix}@test.need4deed.org`);
+    volunteerCookie = await login(`org-volunteer-${suffix}@test.need4deed.org`);
     coordinatorCookie = await login(
       `org-coordinator-${suffix}@test.need4deed.org`,
     );
@@ -111,6 +165,24 @@ describe("organization.routes", () => {
     const organizationRepository = dataSource.getRepository(Organization);
 
     await fastify.db.userRepository.delete({ personId: ownerPerson.id });
+    await fastify.db.userRepository.delete({
+      email: `org-volunteer-${suffix}@test.need4deed.org`,
+    });
+    await fastify.db.userRepository.delete({
+      email: `org-coordinator-${suffix}@test.need4deed.org`,
+    });
+    const domainContacts = await fastify.db.agentPersonRepository.findBy({
+      agentId: domainAgent.id,
+    });
+    await dataSource
+      .getRepository(Agent)
+      .delete([claimedAgent.id, unclaimedAgent.id, domainAgent.id]);
+    if (domainContacts.length) {
+      await fastify.db.personRepository.delete(
+        domainContacts.map(({ personId }) => personId),
+      );
+    }
+    await organizationRepository.delete({ id: domainOrg.id });
     await organizationRepository.delete({ id: orgA.id });
     await organizationRepository.delete({ id: orgB.id });
     await fastify.db.personRepository.delete({ id: ownerPerson.id });
@@ -155,7 +227,171 @@ describe("organization.routes", () => {
     });
   });
 
+  describe("GET /organization/:id", () => {
+    const get = (id: number, cookie?: string) =>
+      fastify.inject({
+        method: "GET",
+        url: `/organization/${id}`,
+        cookies: cookie ? { [accessCookieName]: cookie } : undefined,
+      });
+
+    it("returns the Träger with its Einrichtungen, derived services and contact", async () => {
+      const res = await get(orgA.id, coordinatorCookie);
+      expect(res.statusCode).toBe(200);
+      const data = res.json().data;
+      expect(data).toMatchObject({
+        id: orgA.id,
+        title: orgA.title,
+        about: null,
+        email: null,
+        contacts: [
+          {
+            personId: ownerPerson.id,
+            firstName: "Org",
+            lastName: "Owner",
+          },
+        ],
+      });
+      expect(data.agents.map((a: { id: number }) => a.id)).toEqual([
+        unclaimedAgent.id,
+        claimedAgent.id,
+      ]);
+      expect(data.services.map((s: { id: number }) => s.id)).toEqual(
+        services.map(({ id }) => id),
+      );
+      expect(data.address.id).toBeDefined();
+    });
+
+    it("hides unclaimed Einrichtungen and their services from non-staff", async () => {
+      const res = await get(orgA.id, agentCookie);
+      expect(res.statusCode).toBe(200);
+      const data = res.json().data;
+      expect(data.agents.map((a: { id: number }) => a.id)).toEqual([
+        claimedAgent.id,
+      ]);
+      expect(data.services.map((s: { id: number }) => s.id)).toEqual(
+        services.map(({ id }) => id),
+      );
+    });
+
+    it("returns an empty profile for a Träger without Einrichtungen", async () => {
+      const res = await get(orgB.id, coordinatorCookie);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data).toMatchObject({ agents: [], services: [] });
+    });
+
+    it("rejects volunteers and unauthenticated requests", async () => {
+      expect((await get(orgA.id, volunteerCookie)).statusCode).toBe(403);
+      expect((await get(orgA.id)).statusCode).toBe(401);
+    });
+
+    it("404s for a nonexistent organization id", async () => {
+      expect((await get(999999999, coordinatorCookie)).statusCode).toBe(404);
+    });
+
+    it("exposes the Träger on its Einrichtungen", async () => {
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/agent/${claimedAgent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.organization).toEqual({
+        id: orgA.id,
+        title: orgA.title,
+      });
+
+      const unlinked = await fastify.inject({
+        method: "GET",
+        url: `/agent/${domainAgent.id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+      expect(unlinked.json().data.organization).toBeNull();
+    });
+  });
+
+  describe("linking by email domain", () => {
+    it("links an Einrichtung when a contact with the Träger's domain is added", async () => {
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/${domainAgent.id}/contact`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: {
+          firstName: "Domain",
+          lastName: "Contact",
+          role: AgentRoleType.VOLUNTEER_COORDINATOR,
+          email: `lead@contact-${suffix}.example`,
+        },
+      });
+      expect(res.statusCode).toBe(201);
+      const agent = await dataSource
+        .getRepository(Agent)
+        .findOneByOrFail({ id: domainAgent.id });
+      expect(agent.organizationId).toBe(domainOrg.id);
+    });
+  });
+
   describe("PATCH /organization/:id", () => {
+    const patch = (payload: object, id = orgB.id) =>
+      fastify.inject({
+        method: "PATCH",
+        url: `/organization/${id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload,
+      });
+    const reload = () =>
+      dataSource.getRepository(Organization).findOneByOrFail({ id: orgB.id });
+
+    it("rejects a null or empty title", async () => {
+      expect((await patch({ title: null })).statusCode).toBe(400);
+      expect((await patch({ title: "" })).statusCode).toBe(400);
+      expect((await reload()).title).toBe(orgB.title);
+    });
+
+    it("409s when the title belongs to another Träger", async () => {
+      expect((await patch({ title: orgA.title })).statusCode).toBe(409);
+    });
+
+    it("strips unknown keys and saves the known ones", async () => {
+      const res = await patch({
+        email: "office@example.org",
+        phone: "030 1234567",
+        serviceIds: [1],
+        about: "ignored",
+      });
+      expect(res.statusCode).toBe(204);
+      expect(await reload()).toMatchObject({
+        email: "office@example.org",
+        phone: "030 1234567",
+      });
+    });
+
+    it("clears nullable fields with null", async () => {
+      expect((await patch({ email: null, phone: "" })).statusCode).toBe(204);
+      expect(await reload()).toMatchObject({ email: null, phone: null });
+    });
+
+    it("updates the address and clears it with nulls", async () => {
+      expect(
+        (
+          await patch({
+            addressStreet: "Neue Straße 1",
+            addressPostcode: postcodeValue,
+          })
+        ).statusCode,
+      ).toBe(204);
+      const updated = await dataSource
+        .getRepository(Address)
+        .findOneByOrFail({ id: addressB.id });
+      expect(updated.street).toBe("Neue Straße 1");
+
+      expect(
+        (await patch({ addressStreet: null, addressPostcode: null }))
+          .statusCode,
+      ).toBe(204);
+      expect((await reload()).addressId).toBeNull();
+    });
+
     it("rejects an unauthenticated request", async () => {
       const res = await fastify.inject({
         method: "PATCH",

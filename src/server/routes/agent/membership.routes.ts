@@ -15,6 +15,7 @@ import {
 } from "../../schema";
 import { ParamsId } from "../../types";
 import { claimAgent } from "../../utils/data/claim-agent";
+import { linkAgentToDomainOrganization } from "../../utils/data/link-agent-organization";
 
 export default async function agentMembershipRoutes(
   fastify: FastifyInstance,
@@ -76,6 +77,7 @@ export default async function agentMembershipRoutes(
         await manager.save(membership);
         if (membership.status === AgentMembershipStatus.ACTIVE) {
           await claimAgent(membership.agentId, manager);
+          await linkAgentToDomainOrganization(manager, membership.agentId);
         }
       });
       logger.debug(

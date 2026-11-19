@@ -23,6 +23,7 @@ import {
   isStaffRole,
   updateAgentContact,
 } from "../../utils";
+import { linkAgentToDomainOrganization } from "../../utils/data/link-agent-organization";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default function agentContactRoutes(
@@ -61,6 +62,10 @@ export default function agentContactRoutes(
         agentId,
         request.body,
         request.authUser?.role as UserRole,
+      );
+      await linkAgentToDomainOrganization(
+        fastify.db.agentRepository.manager,
+        agentId,
       );
       agentPerson.agent = agent;
       await maskForCaller(request, agentPerson);
@@ -124,6 +129,12 @@ export default function agentContactRoutes(
       }
 
       const updated = await updateAgentContact(membership, request.body);
+      if (request.body.email) {
+        await linkAgentToDomainOrganization(
+          fastify.db.agentRepository.manager,
+          agentId,
+        );
+      }
       updated.agent = agent;
       await maskForCaller(request, updated);
 
