@@ -1,4 +1,8 @@
-import { OpportunityType, TranslationStatus } from "need4deed-sdk";
+import {
+  EntityTableName,
+  OpportunityType,
+  TranslationStatus,
+} from "need4deed-sdk";
 import {
   Between,
   FindOptionsWhere,
@@ -16,6 +20,7 @@ import {
   QuerystringOpportunityFiltering,
   QuerystringOpportunityList,
 } from "../../types";
+import { commentMatch } from "./comment-search-sql";
 import { normalizeStringArrayInput } from "./for-routes";
 import { dealIdIn } from "./get-availability-deal-ids";
 import { dealOptionMatch } from "./option-search-sql";
@@ -74,19 +79,28 @@ export function getSearchBranches(
   return branches;
 }
 
-const PROFILE_SEARCH_SQL = (alias: string) => `${alias} IN (
+const getProfileSearchSql =
+  (searchComments: boolean) => (alias: string) => `${alias} IN (
   SELECT op.id FROM opportunity op
    WHERE EXISTS (SELECT 1 FROM agent a WHERE a.id = op.agent_id AND a.title ILIKE :searchPattern)
       OR EXISTS (SELECT 1 FROM district d WHERE d.id = op.district_id AND d.title ILIKE :searchPattern)
       OR ${dealOptionMatch("op.deal_id", "deal_district", "district")}
       OR ${dealOptionMatch("op.deal_id", "deal_language", "language")}
       OR ${dealOptionMatch("op.deal_id", "deal_skill", "skill")}
-      OR ${dealOptionMatch("op.deal_id", "deal_activity", "activity")})`;
+      OR ${dealOptionMatch("op.deal_id", "deal_activity", "activity")}${
+        searchComments
+          ? `
+      OR ${commentMatch(EntityTableName.OPPORTUNITY, "op.id")}`
+          : ""
+      })`;
 
 function getProfileSearchBranch(
   pattern: string,
+  searchComments: boolean,
 ): FindOptionsWhere<Opportunity> {
-  return { id: Raw(PROFILE_SEARCH_SQL, { searchPattern: pattern }) };
+  return {
+    id: Raw(getProfileSearchSql(searchComments), { searchPattern: pattern }),
+  };
 }
 
 function hasFilterValue(
@@ -178,6 +192,7 @@ export function getOpportunityWhere(
   appointment?: OpportunityAppointmentFilter,
   searchLanguageId?: number,
   availabilityDealIds: number[] | null = null,
+  searchComments = false,
 ): FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[] {
   const dealFilter = getDealWhere(filter);
 
@@ -211,7 +226,7 @@ export function getOpportunityWhere(
   let branches: FindOptionsWhere<Opportunity>[] = searchPattern
     ? [
         ...getSearchBranches(searchPattern, searchLanguageId),
-        getProfileSearchBranch(searchPattern),
+        getProfileSearchBranch(searchPattern, searchComments),
       ].map((branch) => ({
         ...base,
         ...branch,

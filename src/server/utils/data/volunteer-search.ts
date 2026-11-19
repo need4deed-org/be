@@ -1,4 +1,6 @@
+import { EntityTableName } from "need4deed-sdk";
 import { CallerVisibility } from "../pii/visible-persons";
+import { commentMatch } from "./comment-search-sql";
 import { dealOptionMatch } from "./option-search-sql";
 import { escapeLikePattern } from "./person-name-ilike";
 
@@ -36,12 +38,13 @@ export function getVolunteerSearchFragment(
     dealOptionMatch("v.deal_id", "deal_activity", "activity"),
     dealOptionMatch("v.deal_id", "deal_district", "district"),
     "EXISTS (SELECT 1 FROM agent a WHERE a.id = v.owner_agent_id AND a.title ILIKE :searchPattern)",
-    // Free-text profile notes can hold personal details, so only staff search them.
+    // Notes and comments can hold personal details, so only staff search them.
     ...(visibility
       ? []
       : [
           "v.info_about ILIKE :searchPattern",
           "v.info_experience ILIKE :searchPattern",
+          commentMatch(EntityTableName.VOLUNTEER, "v.id"),
         ]),
   ];
 

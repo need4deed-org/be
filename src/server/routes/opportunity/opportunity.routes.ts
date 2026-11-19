@@ -98,6 +98,7 @@ import {
   getSkipTake,
   impliesAgentSearching,
   isActiveAgentMember,
+  isStaffRole,
   mergeIntoWhere,
   patchEntity,
   setAgentSearching,
@@ -500,6 +501,7 @@ export default async function opportunityRoutes(
         request.query.filter,
         requestLanguage(request.query),
         request.query,
+        isStaffRole(request.authUser?.role),
       );
       if (agentIds) {
         mergeIntoWhere(where, { agentId: In(agentIds) });

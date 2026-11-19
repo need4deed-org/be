@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
   AgentEngagementStatusType,
+  EntityTableName,
   OpportunityStatusType,
   OpportunityType,
   UserRole,
@@ -8,6 +9,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -33,6 +35,7 @@ describe("GET /opportunity search across profile fields", () => {
   const suffix = randomNumericSuffix();
   const agentTitle = `Heimfeld-${suffix}`;
   const skillTitle = `Pottery-${suffix}`;
+  const commentToken = `Schlüsselübergabe-${suffix}`;
 
   const search = async (q: string) => {
     const res = await fastify.inject({
@@ -99,6 +102,20 @@ describe("GET /opportunity search across profile fields", () => {
       throw new Error("login failed");
     }
     cookie = accessCookie.value;
+
+    const author = await fastify.db.userRepository.findOneByOrFail({ email });
+    const language = await fastify.db.languageRepository.findOneByOrFail({
+      isoCode: "en",
+    });
+    await getRepository(dataSource, Comment).save(
+      new Comment({
+        text: `${commentToken} on Friday`,
+        entityType: EntityTableName.OPPORTUNITY,
+        entityId: opportunity.id,
+        userId: author.id,
+        languageId: language.id,
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -121,6 +138,10 @@ describe("GET /opportunity search across profile fields", () => {
 
   it("finds an opportunity by one of its skills", async () => {
     expect(await search(skillTitle)).toEqual([opportunity.id]);
+  });
+
+  it("finds an opportunity by a word in a coordinator comment", async () => {
+    expect(await search(commentToken)).toEqual([opportunity.id]);
   });
 
   it("still finds an opportunity by its title", async () => {

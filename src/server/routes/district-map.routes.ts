@@ -631,6 +631,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
         undefined,
         undefined,
         availabilityDealIds,
+        isStaffRole(request.authUser?.role),
       );
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(
@@ -705,6 +706,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
         undefined,
         undefined,
         availabilityDealIds,
+        isStaffRole(request.authUser?.role),
       );
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(

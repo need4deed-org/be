@@ -1,8 +1,13 @@
 import { FastifyInstance } from "fastify";
-import { AgentEngagementStatusType, UserRole } from "need4deed-sdk";
+import {
+  AgentEngagementStatusType,
+  EntityTableName,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
@@ -23,6 +28,30 @@ describe("GET /agent search across profile fields", () => {
   const suffix = randomNumericSuffix();
   const infoToken = `Kinderzimmer-${suffix}`;
   const street = `Ahornweg-${suffix}`;
+  const commentToken = `Hausmeister-${suffix}`;
+  const COORDINATOR_EMAIL = `coordinator-agent-search-${suffix}@test.need4deed.org`;
+
+  const addCoordinatorComment = async (
+    entityType: EntityTableName,
+    entityId: number,
+    text: string,
+  ) => {
+    const author = await fastify.db.userRepository.findOneByOrFail({
+      email: COORDINATOR_EMAIL,
+    });
+    const language = await fastify.db.languageRepository.findOneByOrFail({
+      isoCode: "en",
+    });
+    await getRepository(dataSource, Comment).save(
+      new Comment({
+        text,
+        entityType,
+        entityId,
+        userId: author.id,
+        languageId: language.id,
+      }),
+    );
+  };
 
   const search = async (cookie: string, q: string) => {
     const res = await fastify.inject({
@@ -82,6 +111,11 @@ describe("GET /agent search across profile fields", () => {
     };
     coordinatorCookie = await login(UserRole.COORDINATOR, "coordinator");
     userCookie = await login(UserRole.USER, "user");
+    await addCoordinatorComment(
+      EntityTableName.AGENT,
+      agent.id,
+      `Ask the ${commentToken} for the key`,
+    );
   });
 
   afterAll(async () => {
@@ -107,6 +141,11 @@ describe("GET /agent search across profile fields", () => {
 
   it("does not search the street for a masked caller", async () => {
     expect(await search(userCookie, street)).toEqual([]);
+  });
+
+  it("finds an NGO by a word in a coordinator comment, for staff only", async () => {
+    expect(await search(coordinatorCookie, commentToken)).toEqual([agent.id]);
+    expect(await search(userCookie, commentToken)).toEqual([]);
   });
 
   it("treats LIKE wildcards in the search as plain text", async () => {

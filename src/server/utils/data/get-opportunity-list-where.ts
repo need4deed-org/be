@@ -19,6 +19,7 @@ export async function getOpportunityListWhere(
   filter: QuerystringOpportunityFiltering["filter"],
   lang: Lang,
   appointment?: OpportunityAppointmentFilter,
+  searchComments = false,
 ): Promise<FindOptionsWhere<Opportunity> | FindOptionsWhere<Opportunity>[]> {
   const [searchLanguageId, availabilityDealIds, commute] = await Promise.all([
     filter?.search ? languageIdOf(dataSource.manager, lang) : undefined,
@@ -30,6 +31,7 @@ export async function getOpportunityListWhere(
     appointment,
     searchLanguageId,
     availabilityDealIds,
+    searchComments,
   );
   if (commute) {
     andIntoWhere(where, "id", opportunityCommuteIdWhere(commute));

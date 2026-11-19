@@ -1,3 +1,4 @@
+import { EntityTableName } from "need4deed-sdk";
 import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentService from "../../../data/entity/m2m/agent-service";
@@ -5,6 +6,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getRepository } from "../../../data/utils";
 import { QuerystringAgentFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
+import { commentMatch } from "./comment-search-sql";
 import { normalizeStringArrayInput } from "./for-routes";
 import { andIntoWhere } from "./merge-into-where";
 import { optionTitleMatch } from "./option-search-sql";
@@ -86,7 +88,7 @@ export async function getAgentWhere(
   return where;
 }
 
-const getAgentSearchSql = (includeStreet: boolean) => (column: string) =>
+const getAgentSearchSql = (isStaff: boolean) => (column: string) =>
   `${column} IN (
   SELECT a.id FROM agent a
    WHERE a.title ILIKE :searchPattern
@@ -96,8 +98,9 @@ const getAgentSearchSql = (includeStreet: boolean) => (column: string) =>
       OR EXISTS (SELECT 1 FROM organization o WHERE o.id = a.organization_id AND o.title ILIKE :searchPattern)
       OR EXISTS (SELECT 1 FROM agent_language j JOIN language l ON l.id = j.language_id WHERE j.agent_id = a.id AND ${optionTitleMatch("l", "language")})
       OR EXISTS (SELECT 1 FROM agent_service j JOIN service s ON s.id = j.service_id WHERE j.agent_id = a.id AND ${optionTitleMatch("s", "service")})${
-        includeStreet
+        isStaff
           ? `
-      OR EXISTS (SELECT 1 FROM address ad WHERE ad.id = a.address_id AND ad.street ILIKE :searchPattern)`
+      OR EXISTS (SELECT 1 FROM address ad WHERE ad.id = a.address_id AND ad.street ILIKE :searchPattern)
+      OR ${commentMatch(EntityTableName.AGENT, "a.id")}`
           : ""
       })`;

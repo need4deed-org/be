@@ -1,8 +1,9 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { EntityTableName, UserRole } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import Comment from "../../../data/entity/comment.entity";
 import Deal from "../../../data/entity/deal.entity";
 import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -32,6 +33,30 @@ describe("GET /volunteer search across profile fields", () => {
   const skillTranslation = `Imkerei-${suffix}`;
   const targetEmail = `target-${suffix}@test.need4deed.org`;
   const targetPhoneDigits = `4930${suffix}`;
+  const commentToken = `Komposthaufen-${suffix}`;
+  const COORDINATOR_EMAIL = `coordinator-search-${suffix}@test.need4deed.org`;
+
+  const addCoordinatorComment = async (
+    entityType: EntityTableName,
+    entityId: number,
+    text: string,
+  ) => {
+    const author = await fastify.db.userRepository.findOneByOrFail({
+      email: COORDINATOR_EMAIL,
+    });
+    const language = await fastify.db.languageRepository.findOneByOrFail({
+      isoCode: "en",
+    });
+    await getRepository(dataSource, Comment).save(
+      new Comment({
+        text,
+        entityType,
+        entityId,
+        userId: author.id,
+        languageId: language.id,
+      }),
+    );
+  };
 
   const search = async (cookie: string, q: string) => {
     const res = await fastify.inject({
@@ -115,6 +140,11 @@ describe("GET /volunteer search across profile fields", () => {
     };
     coordinatorCookie = await login(UserRole.COORDINATOR, "coordinator");
     userCookie = await login(UserRole.USER, "user");
+    await addCoordinatorComment(
+      EntityTableName.VOLUNTEER,
+      volunteer.id,
+      `Mentioned the ${commentToken} on the phone`,
+    );
   });
 
   afterAll(async () => {
@@ -155,6 +185,13 @@ describe("GET /volunteer search across profile fields", () => {
 
   it("still finds a volunteer by skill for a masked caller", async () => {
     expect(await search(userCookie, skillTitle)).toContain(volunteer.id);
+  });
+
+  it("finds a volunteer by a word in a coordinator comment, for staff only", async () => {
+    expect(await search(coordinatorCookie, commentToken)).toEqual([
+      volunteer.id,
+    ]);
+    expect(await search(userCookie, commentToken)).toEqual([]);
   });
 
   it("finds a volunteer by full name for staff", async () => {
