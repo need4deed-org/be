@@ -25,6 +25,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { opportunityLegacyBodySchema } from "../../schema";
 import {
   assertAppointmentNotTooSoon,
   getAgentByAddress,
@@ -105,7 +106,10 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    { config: { public: true } as FastifyContextConfig },
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: { body: opportunityLegacyBodySchema },
+    },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,

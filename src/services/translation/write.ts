@@ -1,10 +1,32 @@
-import { EntityTableName, Lang } from "need4deed-sdk";
+import {
+  EntityTableName,
+  Lang,
+  OPPORTUNITY_TRANSLATION_MAX_LENGTH,
+  TranslatedEntityType,
+} from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../config";
 import { languageIds, originalLang, TranslatableEntity } from "./languages";
 import { SourceEntity, sourceTextOf, storeHuman } from "./queue";
 import { getMachineEntry } from "./registry";
 import { resolve } from "./resolve";
+
+const translationMaxLength: Partial<
+  Record<TranslatedEntityType, Record<string, number>>
+> = { [EntityTableName.OPPORTUNITY]: OPPORTUNITY_TRANSLATION_MAX_LENGTH };
+
+export function assertTranslationLength(
+  entityType: TranslatedEntityType,
+  fieldName: string,
+  text: string,
+) {
+  const maxLength = translationMaxLength[entityType]?.[fieldName];
+  if (maxLength !== undefined && text.length > maxLength) {
+    throw new BadRequestError(
+      `A ${fieldName} translation can't be longer than ${maxLength} characters.`,
+    );
+  }
+}
 
 export async function writeHumanTranslations(
   manager: EntityManager,
@@ -52,6 +74,11 @@ export async function writeHumanTranslations(
         `${fieldName} has no original text to translate; edit it in the original language.`,
       );
     }
+    assertTranslationLength(
+      entityType as TranslatedEntityType,
+      fieldName,
+      text,
+    );
   }
   for (const [fieldName, text] of changed) {
     await storeHuman(manager, fk, source, idOf[lang], fieldName, text);

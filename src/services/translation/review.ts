@@ -17,6 +17,7 @@ import { getTranslationConfig } from "./config";
 import { languageIds, originalLang } from "./languages";
 import { pendingRow, SourceEntity, sourceHashOf, sourceTextOf } from "./queue";
 import { translatedEntities, translatedEntityTypes } from "./registry";
+import { assertTranslationLength } from "./write";
 
 async function findTranslationRow(
   manager: EntityManager,
@@ -70,11 +71,16 @@ function currentSource(
   return current;
 }
 
-function translationText(text: string): string {
+function translationText(
+  text: string,
+  entityType: TranslatedEntityType,
+  fieldName: string,
+): string {
   const translation = sourceTextOf(text);
   if (!translation) {
     throw new BadRequestError("A translation can't be empty.");
   }
+  assertTranslationLength(entityType, fieldName, translation);
   return translation;
 }
 
@@ -136,7 +142,7 @@ export async function createTranslation(
   if (!(entry.fields as readonly string[]).includes(fieldName)) {
     throw new BadRequestError(`${entityType} has no translated ${fieldName}.`);
   }
-  const translation = translationText(text);
+  const translation = translationText(text, entityType, fieldName);
   return manager.transaction(async (tx) => {
     const entity = await findEntity(tx, entityType, entityId, entry.machine);
     const { idOf, langOf } = await languageIds(tx);
@@ -190,9 +196,9 @@ export async function editTranslation(
   id: number,
   { text, original }: ApiFieldTranslationPatch,
 ): Promise<ApiFieldTranslation> {
-  const translation = translationText(text);
   return manager.transaction(async (tx) => {
     const { row, entityType, entry } = await findTranslationRow(tx, id);
+    const translation = translationText(text, entityType, row.fieldName);
     const done = {
       translation,
       status: TranslationStatus.DONE,

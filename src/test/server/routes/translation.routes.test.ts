@@ -2,12 +2,14 @@ import { FastifyInstance } from "fastify";
 import {
   EntityTableName,
   Lang,
+  OPPORTUNITY_TRANSLATION_MAX_LENGTH,
   OpportunityStatusType,
   OpportunityType,
   TranslationOrigin,
   TranslationStatus,
   UserRole,
 } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -325,6 +327,32 @@ describe("/translation coordinator review", () => {
       });
     });
 
+    it.each(["title", "info"] as const)(
+      "caps an opportunity %s translation at its sdk limit",
+      async (fieldName) => {
+        const maxLength = OPPORTUNITY_TRANSLATION_MAX_LENGTH[fieldName];
+        const atLimit = await queued();
+        const overLimit = await queued();
+        await dataSource.manager.delete(FieldTranslation, {
+          opportunityId: In([atLimit.id, overLimit.id]),
+          fieldName,
+        });
+        const payload = (opportunity: Opportunity, length: number) => ({
+          entityType: "opportunity",
+          entityId: opportunity.id,
+          fieldName,
+          language: Lang.EN,
+          text: "x".repeat(length),
+          original: opportunity[fieldName],
+        });
+
+        expect((await post(payload(atLimit, maxLength))).statusCode).toBe(201);
+        expect((await post(payload(overLimit, maxLength + 1))).statusCode).toBe(
+          400,
+        );
+      },
+    );
+
     it("creates a reference translation without checking the original", async () => {
       const { id } = await skill();
 
@@ -481,6 +509,31 @@ describe("/translation coordinator review", () => {
         model: null,
       });
     });
+
+    it.each(["title", "info"] as const)(
+      "caps an opportunity %s translation edit at its sdk limit",
+      async (fieldName) => {
+        const maxLength = OPPORTUNITY_TRANSLATION_MAX_LENGTH[fieldName];
+        const opportunity = await queued();
+        await dataSource.manager.update(
+          FieldTranslation,
+          { opportunityId: opportunity.id, fieldName },
+          { status: TranslationStatus.DONE, translation: "Tutoring" },
+        );
+        const row = await dataSource.manager.findOneByOrFail(FieldTranslation, {
+          opportunityId: opportunity.id,
+          fieldName,
+        });
+        const original = opportunity[fieldName] ?? "";
+
+        expect(
+          (await patch(row.id, "x".repeat(maxLength + 1), original)).statusCode,
+        ).toBe(400);
+        expect(
+          (await patch(row.id, "x".repeat(maxLength), original)).statusCode,
+        ).toBe(200);
+      },
+    );
 
     it("confirms a machine translation by saving its current text", async () => {
       const opportunity = await queued();

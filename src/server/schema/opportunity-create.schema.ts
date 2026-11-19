@@ -1,4 +1,17 @@
+import {
+  OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+  OPPORTUNITY_TITLE_MAX_LENGTH,
+} from "need4deed-sdk";
 import { responseErrors } from "./responseErrors";
+
+export const opportunityLegacyBodySchema = {
+  type: "object",
+  properties: {
+    title: { maxLength: OPPORTUNITY_TITLE_MAX_LENGTH },
+    vo_information: { maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH },
+    accomp_information: { maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH },
+  },
+};
 
 export const opportunityCreateBodySchema = {
   type: "object",
@@ -6,13 +19,16 @@ export const opportunityCreateBodySchema = {
   properties: {
     agent_id: { type: "integer", minimum: 1 },
     submitted_by_id: { type: ["integer", "null"], minimum: 1 },
-    title: { type: "string" },
+    title: { type: "string", maxLength: OPPORTUNITY_TITLE_MAX_LENGTH },
     opportunity_type: {
       type: "string",
       enum: ["accompanying", "volunteering"],
     },
     volunteers_number: { type: ["integer", "string"] },
-    vo_information: { type: "string" },
+    vo_information: {
+      type: "string",
+      maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+    },
     category: { type: "string" },
     category_id: { type: ["integer", "string"], minimum: 1 },
     languageIds: { type: "array", items: { type: "integer", minimum: 1 } },
@@ -26,7 +42,10 @@ export const opportunityCreateBodySchema = {
     accomp_datetime: { type: "string" },
     accomp_name: { type: "string" },
     accomp_phone: { type: "string" },
-    accomp_information: { type: "string" },
+    accomp_information: {
+      type: "string",
+      maxLength: OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+    },
     accomp_translation: { type: "string" },
     address: { $ref: "ApiOpportunityAddress#" },
     language: { type: "string" },

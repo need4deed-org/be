@@ -1,14 +1,44 @@
-import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
+import {
+  ApiOpportunityPatch,
+  LangPurpose,
+  OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+  OPPORTUNITY_TITLE_MAX_LENGTH,
+} from "need4deed-sdk";
 import { In, Repository } from "typeorm";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
 import { getDateObj } from "../utils";
+import { getOpportunityDescription } from "./dto-opportunity";
 
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
+
+export function assertOpportunityTextLengths(
+  patch: Partial<Opportunity>,
+  current: Opportunity,
+) {
+  if (patch.title && patch.title.length > OPPORTUNITY_TITLE_MAX_LENGTH) {
+    throw new BadRequestError(
+      `A title can't be longer than ${OPPORTUNITY_TITLE_MAX_LENGTH} characters.`,
+    );
+  }
+  const currentDescription = (getOpportunityDescription(current) ?? "").trim();
+  for (const description of [patch.info, patch.infoConfidential]) {
+    if (
+      description &&
+      description.length > OPPORTUNITY_DESCRIPTION_MAX_LENGTH &&
+      description.trim() !== currentDescription
+    ) {
+      throw new BadRequestError(
+        `A description can't be longer than ${OPPORTUNITY_DESCRIPTION_MAX_LENGTH} characters.`,
+      );
+    }
+  }
+}
 
 export async function assertValidMainCommunicationLanguages(
   languagesMain: { id: number | string }[] | undefined,
