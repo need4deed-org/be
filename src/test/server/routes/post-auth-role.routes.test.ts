@@ -1,7 +1,8 @@
 import { FastifyInstance } from "fastify";
 import { UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { accessCookieName, refreshCookieName } from "../../../config/constants";
+import { accessCookieName } from "../../../config/constants";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -21,18 +22,25 @@ function getCookie(
 }
 
 describe("GET /post authorization source", () => {
-  let fastify: FastifyInstance;
+  let fastify: FastifyInstance | undefined;
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const personIds: number[] = [];
-  const createdPostIds: number[] = [];
+  let authorPersonId: number;
   let postId: number;
 
+  const server = () => {
+    if (!fastify) {
+      throw new Error("server not started");
+    }
+    return fastify;
+  };
+
   async function createUser(label: string, role: UserRole): Promise<User> {
-    const person = await fastify.db.personRepository.save(
+    const person = await server().db.personRepository.save(
       new Person({ firstName: "Test", lastName: label }),
     );
     personIds.push(person.id);
-    return fastify.db.userRepository.save(
+    return server().db.userRepository.save(
       new User({
         email: `${label}-post-auth-role-${suffix}@test.need4deed.org`,
         password: await hashPassword(PASSWORD),
@@ -44,7 +52,7 @@ describe("GET /post authorization source", () => {
   }
 
   async function login(user: User) {
-    const res = await fastify.inject({
+    const res = await server().inject({
       method: "POST",
       url: "/auth/login",
       payload: { email: user.email, password: PASSWORD },
@@ -52,14 +60,14 @@ describe("GET /post authorization source", () => {
     expect(res.statusCode).toBe(200);
     return {
       access: getCookie(res.cookies, accessCookieName),
-      refresh: getCookie(res.cookies, refreshCookieName),
+      refresh: res.json<{ data: { refresh: string } }>().data.refresh,
     };
   }
 
-  const listPosts = (access: string) =>
-    fastify.inject({
+  const listAuthorPosts = (access: string) =>
+    server().inject({
       method: "GET",
-      url: "/post?limit=100",
+      url: `/post?authorId=${authorPersonId}`,
       cookies: { [accessCookieName]: access },
     });
 
@@ -71,8 +79,9 @@ describe("GET /post authorization source", () => {
     await fastify.ready();
 
     const author = await createUser("author", UserRole.COORDINATOR);
+    authorPersonId = author.personId;
     const { access } = await login(author);
-    const res = await fastify.inject({
+    const res = await server().inject({
       method: "POST",
       url: "/post",
       cookies: { [accessCookieName]: access },
@@ -80,17 +89,14 @@ describe("GET /post authorization source", () => {
     });
     expect(res.statusCode).toBe(201);
     postId = res.json().data.id;
-    createdPostIds.push(postId);
   });
 
   afterAll(async () => {
-    if (createdPostIds.length) {
-      await fastify.db.postRepository.delete(createdPostIds);
-    }
-    for (const personId of personIds) {
-      await fastify.db.userRepository.delete({ personId });
+    if (!fastify) {
+      return;
     }
     if (personIds.length) {
+      await fastify.db.userRepository.delete({ personId: In(personIds) });
       await fastify.db.personRepository.delete(personIds);
     }
     await fastify.close();
@@ -100,28 +106,31 @@ describe("GET /post authorization source", () => {
     const coordinator = await createUser("coordinator", UserRole.COORDINATOR);
     const { refresh } = await login(coordinator);
 
-    const refreshRes = await fastify.inject({
+    const refreshRes = await server().inject({
       method: "POST",
       url: "/auth/refresh",
       payload: { refresh },
     });
     expect(refreshRes.statusCode).toBe(200);
-    const refreshedAccess = getCookie(refreshRes.cookies, accessCookieName);
+    expect(
+      server().jwt.decode(refreshRes.json<{ access: string }>().access),
+    ).toMatchObject({ role: UserRole.COORDINATOR, type: "access" });
 
-    const res = await listPosts(refreshedAccess);
+    const res = await listAuthorPosts(
+      getCookie(refreshRes.cookies, accessCookieName),
+    );
     expect(res.statusCode).toBe(200);
-    expect(res.json().count).toBeGreaterThan(0);
     expect(listedIds(res)).toContain(postId);
   });
 
   it("lists posts when the DB role was promoted after the token was issued", async () => {
     const user = await createUser("promoted", UserRole.VOLUNTEER);
     const { access } = await login(user);
-    await fastify.db.userRepository.update(user.id, {
+    await server().db.userRepository.update(user.id, {
       role: UserRole.COORDINATOR,
     });
 
-    const res = await listPosts(access);
+    const res = await listAuthorPosts(access);
     expect(res.statusCode).toBe(200);
     expect(listedIds(res)).toContain(postId);
   });
@@ -129,11 +138,11 @@ describe("GET /post authorization source", () => {
   it("returns an empty list when the DB role was demoted after the token was issued", async () => {
     const user = await createUser("demoted", UserRole.COORDINATOR);
     const { access } = await login(user);
-    await fastify.db.userRepository.update(user.id, {
+    await server().db.userRepository.update(user.id, {
       role: UserRole.VOLUNTEER,
     });
 
-    const res = await listPosts(access);
+    const res = await listAuthorPosts(access);
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ data: [], count: 0 });
   });
