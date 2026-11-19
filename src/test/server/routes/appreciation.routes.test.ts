@@ -56,6 +56,7 @@ describe("PATCH /appreciation/:id status reconciliation (be#909)", () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
 
     const deal = await fastify.db.dealRepository.save(
@@ -227,6 +228,7 @@ describe("PATCH/DELETE /appreciation/:id authorize on the DB user", () => {
 
     const postcode = await fastify.db.postcodeRepository.findOneOrFail({
       where: {},
+      order: { id: "ASC" },
     });
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
