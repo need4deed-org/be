@@ -88,6 +88,7 @@ import volunteerAuditLogRoutes from "./audit-log.routes";
 import volunteerCommunicationRoutes from "./communication.routes";
 import volunteerCommuteRoutes from "./commute.routes";
 import volunteerDocRoutes from "./doc.routes";
+import volunteerEventsRoutes from "./events.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 import volunteerRegisterRoutes from "./register.routes";
@@ -151,6 +152,10 @@ export default async function volunteerRoutes(
 
   await fastify.register(volunteerAuditLogRoutes, {
     prefix: `/:id${RoutePrefix.ACTIVITY_LOG}`,
+  });
+
+  await fastify.register(volunteerEventsRoutes, {
+    prefix: `/:id${RoutePrefix.EVENTS}`,
   });
 
   await fastify.register(volunteerOpportunityVolunteerRoutes, {

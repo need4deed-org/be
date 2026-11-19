@@ -26,6 +26,7 @@ export const RoutePrefix = {
   POSTCODE: "/postcode",
   REGISTRATION_LINK: "/registration-link",
   REGISTRATIONS: "/registrations",
+  EVENTS: "/events",
   POST: "/post",
   RECOMMENDED_OPPORTUNITIES: "/recommended-opportunities",
   RECOMMENDED_VOLUNTEERS: "/recommended-volunteers",

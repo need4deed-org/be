@@ -143,7 +143,6 @@ import {
 } from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
-import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
 import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -288,10 +287,6 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityOpportunityVolunteerRoutes, {
     prefix: `:id${RoutePrefix.VOLUNTEER_LINKED}`,
-  });
-
-  await fastify.register(opportunityEventRegistrationRoutes, {
-    prefix: `:id${RoutePrefix.REGISTRATIONS}`,
   });
 
   await fastify.register(opportunityRecommendedVolunteerRoutes, {

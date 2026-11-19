@@ -1,0 +1,49 @@
+import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { ApiVolunteerEventN4DGet, Lang, UserRole } from "need4deed-sdk";
+import { dtoVolunteerEventN4D } from "../../../services";
+import {
+  idParamSchema,
+  langQuerySchema,
+  volunteerEventN4DListResponseSchema,
+} from "../../schema";
+import { ParamsId, QuerystringEventGet, ReplyData } from "../../types";
+import { getLanguageCode } from "../../utils";
+
+export default async function volunteerEventsRoutes(
+  fastify: FastifyInstance,
+  _options: FastifyPluginOptions,
+) {
+  fastify.get<{
+    Params: ParamsId;
+    Querystring: QuerystringEventGet;
+    Reply: ReplyData<ApiVolunteerEventN4DGet[]>;
+  }>(
+    "/",
+    {
+      preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
+      schema: {
+        params: idParamSchema,
+        querystring: langQuerySchema,
+        response: volunteerEventN4DListResponseSchema,
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const language = getLanguageCode(request.query.language) || Lang.DE;
+
+      const registrations =
+        await fastify.db.eventN4DRegistrationRepository.find({
+          where: { volunteerId: id },
+          relations: ["event.eventTranslation.language"],
+          order: { event: { date: "DESC" }, id: "DESC" },
+        });
+
+      return reply.status(200).send({
+        message: `Events of volunteer id:${id}.`,
+        data: registrations.map((registration) =>
+          dtoVolunteerEventN4D(registration, language),
+        ),
+      });
+    },
+  );
+}
