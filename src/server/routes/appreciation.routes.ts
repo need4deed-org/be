@@ -50,7 +50,7 @@ export default async function appreciationRoutes(
         throw new NotFoundError(`Appreciation with id:${id} not found.`);
       }
 
-      if (!validatePermissions(appreciation, STAFF_ROLES, request.user)) {
+      if (!validatePermissions(appreciation, STAFF_ROLES, request.authUser!)) {
         throw new UnauthorizedError(
           `Permission denied, appreciation with id:${id} not updated.`,
         );
@@ -110,7 +110,7 @@ export default async function appreciationRoutes(
         throw new NotFoundError(`Appreciation with id:${id} not found.`);
       }
 
-      if (!validatePermissions(appreciation, STAFF_ROLES, request.user)) {
+      if (!validatePermissions(appreciation, STAFF_ROLES, request.authUser!)) {
         throw new UnauthorizedError(
           `Permission denied, appreciation with id:${id} not deleted.`,
         );
