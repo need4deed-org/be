@@ -1,11 +1,16 @@
-import { FindOptionsWhere, ILike, In } from "typeorm";
+import { EntityTableName } from "need4deed-sdk";
+import { FindOptionsWhere, ILike, In, Raw } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getRepository } from "../../../data/utils";
 import { QuerystringAgentFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
+import { commentMatch } from "./comment-search-sql";
 import { normalizeStringArrayInput } from "./for-routes";
+import { andIntoWhere } from "./merge-into-where";
+import { optionTitleMatch } from "./option-search-sql";
+import { escapeLikePattern } from "./person-name-ilike";
 
 export async function getAgentWhere(
   filter: QuerystringAgentFiltering["filter"],
@@ -33,7 +38,7 @@ export async function getAgentWhere(
     );
   }
 
-  return {
+  const where = {
     ...(filter?.type
       ? {
           agentTypeId: normalizeStringArrayInput(filter.type),
@@ -42,11 +47,6 @@ export async function getAgentWhere(
     ...(filter?.status
       ? {
           trustLevel: normalizeStringArrayInput(filter.status),
-        }
-      : {}),
-    ...(filter?.search
-      ? {
-          title: ILike(`%${filter.search}%`),
         }
       : {}),
     ...(filter?.street
@@ -75,4 +75,32 @@ export async function getAgentWhere(
         }
       : {}),
   } as FindOptionsWhere<Agent>;
+
+  if (filter?.search) {
+    andIntoWhere(
+      where,
+      "id",
+      Raw(getAgentSearchSql(visibility === null), {
+        searchPattern: `%${escapeLikePattern(filter.search)}%`,
+      }),
+    );
+  }
+  return where;
 }
+
+const getAgentSearchSql = (isStaff: boolean) => (column: string) =>
+  `${column} IN (
+  SELECT a.id FROM agent a
+   WHERE a.title ILIKE :searchPattern
+      OR a.info ILIKE :searchPattern
+      OR EXISTS (SELECT 1 FROM district d WHERE d.id = a.district_id AND d.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_type t WHERE t.id = a.agent_type_id AND ${optionTitleMatch("t", "agent_type")})
+      OR EXISTS (SELECT 1 FROM organization o WHERE o.id = a.organization_id AND o.title ILIKE :searchPattern)
+      OR EXISTS (SELECT 1 FROM agent_language j JOIN language l ON l.id = j.language_id WHERE j.agent_id = a.id AND ${optionTitleMatch("l", "language")})
+      OR EXISTS (SELECT 1 FROM agent_service j JOIN service s ON s.id = j.service_id WHERE j.agent_id = a.id AND ${optionTitleMatch("s", "service")})${
+        isStaff
+          ? `
+      OR EXISTS (SELECT 1 FROM address ad WHERE ad.id = a.address_id AND ad.street ILIKE :searchPattern)
+      OR ${commentMatch(EntityTableName.AGENT, "a.id")}`
+          : ""
+      })`;
