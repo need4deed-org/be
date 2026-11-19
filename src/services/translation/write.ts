@@ -74,11 +74,12 @@ export async function writeHumanTranslations(
         `${fieldName} has no original text to translate; edit it in the original language.`,
       );
     }
+    const servedText = sourceTextOf(served[fieldName]);
     assertTranslationLength(
       entityType,
       fieldName,
       text,
-      sourceTextOf(served[fieldName]),
+      servedText === sourceTextOf(source[fieldName]) ? null : servedText,
     );
   }
   for (const [fieldName, text] of changed) {

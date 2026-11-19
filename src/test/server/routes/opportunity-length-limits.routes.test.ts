@@ -397,6 +397,19 @@ describe("opportunity title and description length limits", () => {
         languageId: ids[Lang.EN],
       });
 
+    it("caps a first translation of a long source at the plain limit", async () => {
+      const opportunity = await saved({
+        originalLanguageId: ids[Lang.DE],
+        info: "g".repeat(infoMax + 500),
+      });
+
+      const res = await patch(opportunity.id, {
+        description: "e".repeat(infoMax + 1),
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
     it("stores a description over the source limit as a translation", async () => {
       const opportunity = await germanWithEnglishInfo("We need volunteers");
       const description = "e".repeat(OPPORTUNITY_DESCRIPTION_MAX_LENGTH + 100);
