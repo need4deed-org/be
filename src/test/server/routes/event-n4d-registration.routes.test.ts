@@ -19,6 +19,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 const DAY = 24 * 60 * 60 * 1000;
@@ -153,9 +154,7 @@ describe("sign-ups for need4deed events", () => {
       }),
     );
     persons.push(person.id);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
