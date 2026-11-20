@@ -6,12 +6,13 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { UnauthorizedError } from "../../config";
-import { idParamSchema, responseSchema } from "../schema";
+import { idParamSchema, langQuerySchema, responseSchema } from "../schema";
 import { ParamsId, ReplyData } from "../types";
 import { getOrganizationProfile } from "../utils/data/get-organization-profile";
 import { isStaffRole } from "../utils/data/is-staff-role";
 import { listOrganizations } from "../utils/data/list-organizations";
 import { patchOrganization } from "../utils/data/patch-organization";
+import { editLanguage } from "../utils/data/translate-opportunities";
 
 export default async function organizationRoutes(
   fastify: FastifyInstance,
@@ -36,6 +37,7 @@ export default async function organizationRoutes(
     {
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         response: responseSchema("ApiOrganizationGet#"),
       },
     },
@@ -62,12 +64,17 @@ export default async function organizationRoutes(
       preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
+        querystring: langQuerySchema,
         body: { $ref: "ApiOrganizationPatch#" },
         response: responseSchema({ statusCode: 204 }),
       },
     },
     async (request, reply) => {
-      await patchOrganization(request.params.id, request.body);
+      await patchOrganization(
+        request.params.id,
+        request.body,
+        editLanguage(request.query),
+      );
       return reply.status(204).send();
     },
   );

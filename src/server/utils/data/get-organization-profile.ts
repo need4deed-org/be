@@ -1,5 +1,5 @@
 import { FastifyRequest } from "fastify";
-import { ApiOrganizationGet, Service } from "need4deed-sdk";
+import { ApiOrganizationGet, EntityTableName, Service } from "need4deed-sdk";
 import { FindOptionsWhere } from "typeorm";
 import { NotFoundError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -11,6 +11,7 @@ import {
 import { maskForCaller } from "../pii/pre-serialization";
 import { addAgentTypeServiceTranslations } from "./add-agent-type-service-translations";
 import { isStaffRole } from "./is-staff-role";
+import { requestLanguage } from "./translate-opportunities";
 
 export async function getOrganizationProfile(
   request: FastifyRequest,
@@ -19,11 +20,18 @@ export async function getOrganizationProfile(
   const { db } = request.server;
   const organization = await db.organizationRepository.findOne({
     where: { id },
-    relations: ["address.postcode", "person"],
+    relations: ["address.postcode", "person", "originalLanguage"],
   });
   if (!organization) {
     throw new NotFoundError(`Organization (id:${id}) not found.`);
   }
+  await request.server.translation.resolve(
+    db.organizationRepository.manager,
+    EntityTableName.ORGANIZATION,
+    [organization],
+    ["about"],
+    requestLanguage(request.query),
+  );
 
   const where: FindOptionsWhere<Agent> = { organizationId: id };
   if (!isStaffRole(request.authUser?.role)) {

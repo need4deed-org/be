@@ -1,15 +1,29 @@
-import { ApiOrganizationPatch } from "need4deed-sdk";
+import {
+  ApiOrganizationPatch,
+  EntityTableName,
+  Lang,
+  ORGANIZATION_ABOUT_MAX_LENGTH,
+} from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { BadRequestError, ConflictError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Organization from "../../../data/entity/organization.entity";
 import { isUniqueViolation } from "../../../data/utils/is-unique-violation";
+import { languageHint } from "../../../services/translation/language-hint";
+import {
+  enqueue,
+  setOriginalLanguage,
+} from "../../../services/translation/queue";
+import { writeHumanTranslations } from "../../../services/translation/write";
+import { assertMaxTextLength } from "../../../services/utils";
 import { resolveAddressPostcode } from "./for-routes";
+import { languageIdOf } from "./translate-opportunities";
 
 type OrganizationColumns = Partial<
-  Record<"title" | "website" | "email" | "phone", string | null> & {
+  Record<"title" | "about" | "website" | "email" | "phone", string | null> & {
     addressId: number | null;
+    originalLanguageId: number;
   }
 >;
 
@@ -104,19 +118,73 @@ async function resolveAddressId(
   return created.id;
 }
 
+async function patchAbout(
+  organization: Organization,
+  about: string | null,
+  lang: Lang | null,
+  manager: EntityManager,
+): Promise<Pick<OrganizationColumns, "about" | "originalLanguageId"> | null> {
+  const text = about?.trim() || null;
+  if (organization.about?.trim() && lang) {
+    const written = await writeHumanTranslations(
+      manager,
+      EntityTableName.ORGANIZATION,
+      organization,
+      lang,
+      { about: text },
+    );
+    if (written !== null) {
+      return null;
+    }
+  }
+  assertMaxTextLength(
+    "description",
+    text,
+    [organization.about],
+    ORGANIZATION_ABOUT_MAX_LENGTH,
+  );
+  if (!text || organization.originalLanguageId) {
+    return { about: text };
+  }
+  return {
+    about: text,
+    originalLanguageId: await languageIdOf(
+      manager,
+      languageHint(text) ?? lang ?? Lang.DE,
+    ),
+  };
+}
+
 export async function patchOrganization(
   id: number,
   patch: ApiOrganizationPatch,
+  lang: Lang | null = null,
 ): Promise<void> {
   try {
     await dataSource.manager.transaction(async (manager) => {
       const repository = manager.getRepository(Organization);
-      const organization = await repository.findOneBy({ id });
+      if (patch.originalLanguage) {
+        await setOriginalLanguage(
+          manager,
+          EntityTableName.ORGANIZATION,
+          id,
+          patch.originalLanguage,
+        );
+      }
+      const organization = await repository.findOne({
+        where: { id },
+        lock: { mode: "pessimistic_write" },
+      });
       if (!organization) {
         throw new NotFoundError(`Organization (id:${id}) not found.`);
       }
 
       const columns: OrganizationColumns = {};
+      const aboutColumns =
+        patch.about !== undefined
+          ? await patchAbout(organization, patch.about, lang, manager)
+          : null;
+      Object.assign(columns, aboutColumns);
       if (patch.title !== undefined) {
         columns.title = patch.title.trim();
       }
@@ -138,6 +206,19 @@ export async function patchOrganization(
 
       if (Object.keys(columns).length) {
         await repository.update({ id }, columns as Partial<Organization>);
+      }
+      if (aboutColumns) {
+        await enqueue(
+          manager,
+          EntityTableName.ORGANIZATION,
+          {
+            id,
+            originalLanguageId:
+              aboutColumns.originalLanguageId ??
+              organization.originalLanguageId,
+          },
+          { about: aboutColumns.about },
+        );
       }
     });
   } catch (err) {
