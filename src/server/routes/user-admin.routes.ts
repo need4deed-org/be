@@ -50,6 +50,13 @@ export function assertActiveAdminRemains(
   }
 }
 
+const revokeApiKeys = (manager: EntityManager, userIds: number[], at: Date) =>
+  manager.update(
+    ApiKey,
+    { userId: In(userIds), revokedAt: IsNull() },
+    { revokedAt: at },
+  );
+
 const leavingAdminIds = (users: User[]) =>
   users
     .filter((user) => user.role === UserRole.ADMIN && user.isActive)
@@ -140,11 +147,7 @@ export async function eraseUserByAdmin(
   for (const loginId of [...loginIds, ...volunteerLoginIds]) {
     await revokeUserRefreshSessions(manager, loginId);
   }
-  await manager.update(
-    ApiKey,
-    { userId: In([...loginIds, ...volunteerLoginIds]), revokedAt: IsNull() },
-    { revokedAt: now },
-  );
+  await revokeApiKeys(manager, [...loginIds, ...volunteerLoginIds], now);
   const eraseSummary = personId
     ? await erasePersonPii(manager, personId)
     : undefined;
@@ -198,6 +201,7 @@ export default async function userAdminRoutes(
           { isActive: false, deactivatedAt: user.deactivatedAt },
         );
         await revokeUserRefreshSessions(manager, id);
+        await revokeApiKeys(manager, [id], user.deactivatedAt);
         return user;
       });
 

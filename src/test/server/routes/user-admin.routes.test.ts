@@ -122,6 +122,29 @@ describe("admin account actions", () => {
     expect(await openSessions(target)).toBe(0);
   });
 
+  it("revokes the account's API keys on deactivate", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    const apiKey = await fastify.db.apiKeyRepository.save(
+      new ApiKey({
+        label: `admin-actions-${randomNumericSuffix()}`,
+        keyHash: `hash-${randomNumericSuffix()}`,
+        userId: target.id,
+      }),
+    );
+
+    try {
+      await send("POST", `/user/${target.id}/deactivate`);
+      await send("POST", `/user/${target.id}/reactivate`);
+
+      const key = await fastify.db.apiKeyRepository.findOneByOrFail({
+        id: apiKey.id,
+      });
+      expect(key.revokedAt).not.toBeNull();
+    } finally {
+      await fastify.db.apiKeyRepository.delete({ id: apiKey.id });
+    }
+  });
+
   it("refuses an action on your own account", async () => {
     const response = await send("POST", `/user/${admin.id}/deactivate`);
     expect(response.statusCode).toBe(400);
