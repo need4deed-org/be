@@ -41,8 +41,8 @@ export default class EventN4D {
   @Column({ type: "varchar", length: 256, nullable: true })
   locationLink?: string;
 
-  @Column({ type: "varchar", length: 256 })
-  rsvpLink: string;
+  @Column({ type: "varchar", length: 256, nullable: true })
+  rsvpLink?: string | null;
 
   @Column({ type: "varchar", length: 256, nullable: true })
   followupLink?: string;
