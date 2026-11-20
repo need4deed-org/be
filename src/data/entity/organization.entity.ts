@@ -49,6 +49,11 @@ export default class Organization {
   @IsString()
   website?: string;
 
+  @Column({ type: "text", nullable: true })
+  @IsOptional()
+  @IsString()
+  about?: string | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 

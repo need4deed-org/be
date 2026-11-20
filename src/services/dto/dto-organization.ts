@@ -55,7 +55,7 @@ export function dtoOrganizationGet(
     title: organization.title,
     website: organization.website ?? null,
     address: dtoOrganizationAddress(organization.address),
-    about: null,
+    about: organization.about ?? null,
     email: organization.email ?? null,
     phone: organization.phone ?? null,
     services,

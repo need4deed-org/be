@@ -299,6 +299,23 @@ describe("organization.routes", () => {
       expect(res.json().data).toMatchObject({ agents: [], services: [] });
     });
 
+    it("returns the Träger's about text", async () => {
+      const repository = dataSource.getRepository(Organization);
+      const organization = await repository.save(
+        new Organization({
+          title: `About Test Org ${suffix}`,
+          about: "Wir betreiben Unterkünfte.",
+        }),
+      );
+      try {
+        const res = await get(organization.id, coordinatorCookie);
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.about).toBe("Wir betreiben Unterkünfte.");
+      } finally {
+        await repository.delete(organization.id);
+      }
+    });
+
     it("loads the Einrichtungen and services without a Cartesian join", async () => {
       const queries = await captureSql(async () => {
         expect((await get(orgA.id, coordinatorCookie)).statusCode).toBe(200);
@@ -480,6 +497,7 @@ describe("organization.routes", () => {
       expect(await reload()).toMatchObject({
         email: "office@example.org",
         phone: "030 1234567",
+        about: null,
       });
     });
 
