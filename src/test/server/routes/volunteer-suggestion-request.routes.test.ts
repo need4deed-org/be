@@ -267,7 +267,10 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
         requesterAgent: agents.requester.title,
         volunteerId: volunteers.owned.id,
         volunteerName: `Vera owned${suffix}`,
-        opportunityTitle: opportunities.open.title,
+        opportunity: expect.objectContaining({
+          id: opportunities.open.id,
+          title: opportunities.open.title,
+        }),
       }),
     );
     expect(fastify.notify.tagged).toHaveBeenCalledWith(
