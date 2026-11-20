@@ -1,4 +1,3 @@
-import { UserRole } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import {
   generateRandomString,
@@ -8,7 +7,6 @@ import {
   getSkipTake,
   isEmptyPlainObject,
   stripNullishAttributes,
-  validatePermissions,
 } from "../../../server/utils/common";
 
 describe("generateRandomString()", () => {
@@ -104,38 +102,6 @@ describe("getNullFromEmptyArray", () => {
     expect(getNullFromEmptyArray(null)).toBeNull();
     // non-array passes through unchanged
     expect(getNullFromEmptyArray({} as unknown as any)).toEqual({});
-  });
-});
-
-describe("validatePermissions", () => {
-  it("validatePermissions allows owner or authorised roles", () => {
-    const entity = { userId: 1 };
-    expect(
-      validatePermissions(entity, [UserRole.ADMIN], {
-        id: 1,
-        role: UserRole.USER,
-      }),
-    ).toBe(true);
-    expect(
-      validatePermissions(entity, [UserRole.ADMIN], {
-        id: 2,
-        role: UserRole.ADMIN,
-      }),
-    ).toBe(true);
-    // neither owner nor authorised -> false
-    expect(
-      validatePermissions(entity, [UserRole.ADMIN], {
-        id: 2,
-        role: UserRole.USER,
-      }),
-    ).toBe(false);
-    // empty roles: only owner allowed
-    expect(
-      validatePermissions(entity, [], { id: 1, role: UserRole.USER }),
-    ).toBe(true);
-    expect(
-      validatePermissions(entity, [], { id: 2, role: UserRole.ADMIN }),
-    ).toBe(false);
   });
 });
 

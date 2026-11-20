@@ -227,6 +227,9 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
+      if (!isPostManagerRole(request.authUser?.role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
       const personId = requireLinkedPersonId(request.authUser?.personId);
 
       const {

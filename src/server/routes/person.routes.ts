@@ -73,15 +73,7 @@ export default async function personRoutes(
             .send({ message: "Invalid person ID provided." });
         }
 
-        const user = await fastify.db.userRepository.findOne({
-          where: { id: request.user.id },
-        });
-
-        if (!user) {
-          throw new Error(
-            `Error fetching person ${parsedPersonId}: user ${request.user.id} not found`,
-          );
-        }
+        const user = request.authUser!;
 
         if (user.role !== UserRole.ADMIN && user.personId !== parsedPersonId) {
           return reply

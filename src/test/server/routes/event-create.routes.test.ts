@@ -195,6 +195,31 @@ describe("POST /event", () => {
     expect(translations).toHaveLength(2);
   });
 
+  it("creates an event without a registration link, so the in-house form is used", async () => {
+    const { linkRSVP: _linkRSVP, ...withoutLink } = baseBody;
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        ...withoutLink,
+        translations: [
+          {
+            language: "de",
+            title: "Workshop",
+            menuTitle: "Workshop",
+            description: "Wir lernen zusammen.",
+            shortDescription: "Wir lernen.",
+          },
+        ],
+      },
+    });
+
+    expect(res.statusCode, res.body).toBe(201);
+    createdEventIds.push(res.json().data.id);
+    expect(res.json().data.linkRSVP).toBeNull();
+  });
+
   it("rejects a non-coordinator", async () => {
     const res = await fastify.inject({
       method: "POST",

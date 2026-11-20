@@ -21,6 +21,7 @@ import { scanRegularUpdate } from "../../../services/jobs/scan-regular-update";
 import { scanStalePending } from "../../../services/jobs/scan-stale-pending";
 import { sendEmailRegularUpdate } from "../../../services/notify/events/email-regular-update";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { HOUR } from "../../time";
 
 // A fixed run, so the window doesn't depend on today: the run on Oct 3
@@ -80,9 +81,7 @@ describe("2-month scans", () => {
       fastify.cronNotify[name] = vi.fn().mockResolvedValue(undefined);
     }
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = async (type: DealType) => {
       const saved = await fastify.db.dealRepository.save(
         new Deal({ type, postcodeId: postcode.id }),

@@ -7,6 +7,54 @@ const importPlugin = require("eslint-plugin-import");
 const unusedImports = require("eslint-plugin-unused-imports");
 const globals = require("globals");
 
+// unbound-method misses pino: its log methods are typed as properties
+const unboundLoggerRules = [
+  {
+    selector:
+      ":matches(CallExpression, NewExpression) > MemberExpression.arguments[property.name=/^(trace|debug|info|warn|error|fatal)$/]:matches([object.name=/^(log|logger)$|Log(ger)?$/], [object.property.name=/^(log|logger)$|Log(ger)?$/])",
+    message:
+      "Pass a bound logger call, e.g. `(err) => logger.error(err)`: an unbound pino method throws when called.",
+  },
+  {
+    selector:
+      ":matches(CallExpression, NewExpression) > ChainExpression.arguments > MemberExpression.expression[property.name=/^(trace|debug|info|warn|error|fatal)$/]:matches([object.name=/^(log|logger)$|Log(ger)?$/], [object.property.name=/^(log|logger)$|Log(ger)?$/])",
+    message:
+      "Pass a bound logger call, e.g. `(err) => logger.error(err)`: an unbound pino method throws when called.",
+  },
+];
+
+const requestUserMessage =
+  "Use request.authUser (loaded from the DB, set for JWT and API-key auth); request.user is the raw JWT payload and is unset for API-key callers.";
+
+const requestUserRules = [
+  {
+    selector:
+      "MemberExpression[object.name=/^req(uest)?$/][property.name='user'], MemberExpression[object.name=/^req(uest)?$/][computed=true][property.value='user']",
+    message: requestUserMessage,
+  },
+  {
+    selector:
+      "VariableDeclarator[init.name=/^req(uest)?$/] > ObjectPattern > Property[key.name='user']",
+    message: requestUserMessage,
+  },
+];
+
+const anyRowMessage =
+  "Use firstSeeded(repository) from src/test/seeded.ts: an empty lookup can return a row another parallel test file just inserted.";
+
+const anyRowLookupRules = [
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(findOne|findOneOrFail)$/] > ObjectExpression > Property[key.name='where'] > ObjectExpression.value[properties.length=0]",
+    message: anyRowMessage,
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name=/^findOneBy(OrFail)?$/] > ObjectExpression.arguments[properties.length=0]",
+    message: anyRowMessage,
+  },
+];
+
 module.exports = [
   { ignores: ["dist", "node_modules", "dev/**", "**/dev.*.ts"] },
   js.configs.recommended,
@@ -72,21 +120,27 @@ module.exports = [
       ],
 
       "sort-keys": "off",
-      // unbound-method misses pino: its log methods are typed as properties
       "no-restricted-syntax": [
         "error",
-        {
-          selector:
-            ":matches(CallExpression, NewExpression) > MemberExpression.arguments[property.name=/^(trace|debug|info|warn|error|fatal)$/]:matches([object.name=/^(log|logger)$|Log(ger)?$/], [object.property.name=/^(log|logger)$|Log(ger)?$/])",
-          message:
-            "Pass a bound logger call, e.g. `(err) => logger.error(err)`: an unbound pino method throws when called.",
-        },
-        {
-          selector:
-            ":matches(CallExpression, NewExpression) > ChainExpression.arguments > MemberExpression.expression[property.name=/^(trace|debug|info|warn|error|fatal)$/]:matches([object.name=/^(log|logger)$|Log(ger)?$/], [object.property.name=/^(log|logger)$|Log(ger)?$/])",
-          message:
-            "Pass a bound logger call, e.g. `(err) => logger.error(err)`: an unbound pino method throws when called.",
-        },
+        ...unboundLoggerRules,
+        ...requestUserRules,
+      ],
+    },
+  },
+  {
+    files: ["src/server/plugins/jwt.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...unboundLoggerRules],
+    },
+  },
+  {
+    files: ["src/test/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...unboundLoggerRules,
+        ...requestUserRules,
+        ...anyRowLookupRules,
       ],
     },
   },

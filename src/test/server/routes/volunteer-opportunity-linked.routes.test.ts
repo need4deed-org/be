@@ -18,6 +18,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -51,9 +52,7 @@ describe("DELETE /volunteer/:id/opportunity-linked/:m2mId", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),

@@ -139,7 +139,7 @@ yarn test:db:down   # stop it and discard the data
 
 `yarn test:db:seed` seeds only from files checked into the repo — reference data from `public/data/*.json`, sample agents/opportunities/volunteers/events from `src/data/seeds/fixtures/*.json` — so reference-table ids (languages, skills, categories, …) are identical on every machine and in CI. Still, don't hardcode ids in tests; look rows up by a stable key (`isoCode`, `title`). Re-running `yarn test:db` against the same `db-test` works; `down` + `up` + `seed` gets you back to a pristine state. Set `DB_TEST_PORT` if 5433 is taken.
 
-The pre-push hook runs exactly this flow (`test:db:up` → `test:db:seed` → `test:db`) when Docker is available, leaving `db-test` running for the next push; without Docker it falls back to plain `yarn test` against the dev DB.
+Before pushing, run the tests your change touches: `yarn test:db <files>`. The pre-push hook only runs `yarn typecheck`; the full suite runs in CI's merge queue, once per merge into `develop`.
 
 ### Against the dev DB
 

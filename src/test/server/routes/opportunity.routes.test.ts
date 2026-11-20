@@ -49,6 +49,7 @@ import { parseOpportunityLegacy } from "../../../services/dto/parser-opportunity
 import { sourceHashOf } from "../../../services/translation/queue";
 import { formatDate, formatTime } from "../../../services/utils";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -85,9 +86,7 @@ describe("PATCH /opportunity/:id agent status update", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     ownAgent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (own) ${suffix}` }),
@@ -591,9 +590,7 @@ describe("PATCH /opportunity/:id cascades Agent.volunteerSearch (be#862)", () =>
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (search-cascade) ${suffix}` }),
@@ -787,9 +784,7 @@ describe("DELETE /opportunity/:id", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (delete) ${suffix}` }),
@@ -841,9 +836,7 @@ describe("DELETE /opportunity/:id", () => {
       { statusMatch: VolunteerStateMatchType.MATCHED },
     );
 
-    const language = await fastify.db.languageRepository.findOneOrFail({
-      where: {},
-    });
+    const language = await firstSeeded(fastify.db.languageRepository);
 
     agentPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "Agent" }),
@@ -1015,9 +1008,7 @@ describe("PATCH /opportunity/:id onetimer resolution", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (onetimer-resolve) ${suffix}` }),
@@ -1142,9 +1133,7 @@ describe("PATCH /opportunity/:id clears stale accompanying PII on type change (b
 
   beforeEach(async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (clear-pii) ${suffix}` }),
@@ -1303,9 +1292,7 @@ describe("GET /opportunity/:id", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (get-by-id) ${suffix}` }),
@@ -1420,9 +1407,7 @@ describe("GET /opportunity sortBy=start-date", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (sort-start-date) ${suffix}` }),
@@ -1526,7 +1511,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("orders soonest-first (old-new) with no-date opportunities last", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1540,7 +1525,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("orders latest-first (new-old) with no-date opportunities still last", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=new-old&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=new-old&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1554,7 +1539,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("exposes appointmentDate/appointmentTime derived from onetimer, null when absent", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1605,9 +1590,7 @@ describe("GET /opportunity appointment date-range filters", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (appointment-filters) ${suffix}` }),
@@ -1729,7 +1712,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("returns only opportunities with an onetimer inside the date range", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1743,7 +1726,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("also excludes accompanying-type opportunities when excludeAccompanying=true", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1755,7 +1738,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("hasAppointmentDate=true alone excludes only the no-date opportunity", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?hasAppointmentDate=true&limit=120",
+      url: `/opportunity?hasAppointmentDate=true&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1784,7 +1767,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("still applies the date range + excludeAccompanying correctly when combined with sortBy=start-date", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -2265,9 +2248,7 @@ describe("GET /opportunity RAC masking + myMatchStatus for volunteers (be#1039)"
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     agentAddress = await getRepository(dataSource, Address).save(
       new Address({
         street: AGENT_STREET,
@@ -2597,9 +2578,7 @@ describe("GET /opportunity/:id accompanying description visibility (be#1092)", (
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test RAC (be#1092) ${suffix}` }),
     );
@@ -2756,9 +2735,7 @@ describe("accompanying description storage (be#1092)", () => {
 
   // PATCH requires a deal on the opportunity.
   const save = async (fields: Partial<Opportunity>) => {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );

@@ -31,6 +31,7 @@ import {
   ReplyData,
   ReplyDataCount,
   ReplyMessage,
+  RoutePrefix,
 } from "../types";
 import {
   applyEventDateRange,
@@ -40,11 +41,16 @@ import {
   matchesEventSearch,
   updateEvent,
 } from "../utils";
+import eventN4DRegistrationListRoutes from "./event-n4d-registration-list.routes";
 
 export default async function eventRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  await fastify.register(eventN4DRegistrationListRoutes, {
+    prefix: `/:id${RoutePrefix.REGISTRATIONS}`,
+  });
+
   fastify.get<{
     Querystring: QuerystringEventGetList;
     Reply: ReplyDataCount<ApiEventN4DGetList[]>;

@@ -200,7 +200,7 @@ function getAgentDistrictWhere(
 function getVolunteerDistrictWhere(
   baseWhere: FindOptionsWhere<Volunteer>,
   districtId: number,
-): FindOptionsWhere<Volunteer> | FindOptionsWhere<Volunteer>[] {
+): FindOptionsWhere<Volunteer> {
   const districtWhere = {
     person: {
       address: {
@@ -208,16 +208,6 @@ function getVolunteerDistrictWhere(
       },
     },
   };
-  if (Array.isArray(baseWhere.person)) {
-    return baseWhere.person.map((personWhere) => {
-      const where: FindOptionsWhere<Volunteer> = {
-        ...baseWhere,
-        person: personWhere,
-      };
-      mergeIntoWhere(where, districtWhere);
-      return where;
-    });
-  }
   const where: FindOptionsWhere<Volunteer> = { ...baseWhere };
   mergeIntoWhere(where, districtWhere);
   return where;
@@ -641,6 +631,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
         undefined,
         undefined,
         availabilityDealIds,
+        isStaffRole(request.authUser?.role),
       );
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(
@@ -715,6 +706,7 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
         undefined,
         undefined,
         availabilityDealIds,
+        isStaffRole(request.authUser?.role),
       );
       if (request.authUser?.role === UserRole.AGENT) {
         const agentIds = await getCallerAgentIds(
