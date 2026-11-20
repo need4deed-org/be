@@ -35,6 +35,7 @@ import statisticsRoutes from "./routes/statistics.routes";
 import translationRoutes from "./routes/translation.routes";
 import trustedDomainRoutes from "./routes/trusted-domain.routes";
 import userRoutes from "./routes/user";
+import userAdminRoutes from "./routes/user-admin.routes";
 import volunteerRoutes from "./routes/volunteer/volunteer.routes";
 import workerRoutes from "./routes/worker.routes";
 import { emailNoteSchema } from "./schema/email-note.schema";
@@ -191,6 +192,7 @@ export async function createServer({
   });
   await fastifyInstance.register(authRoutes, { prefix: RoutePrefix.AUTH });
   await fastifyInstance.register(userRoutes, { prefix: RoutePrefix.USER });
+  await fastifyInstance.register(userAdminRoutes, { prefix: RoutePrefix.USER });
   await fastifyInstance.register(personRoutes, { prefix: RoutePrefix.PERSON });
   await fastifyInstance.register(postRoutes, { prefix: RoutePrefix.POST });
   await fastifyInstance.register(volunteerRoutes, {

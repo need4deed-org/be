@@ -360,7 +360,7 @@ async function authRoutes(
       const user = await fastify.db.userRepository.findOne({
         where: { id: payload.id },
       });
-      if (!user) {
+      if (!user || user.email !== payload.email || user.deactivatedAt) {
         return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 

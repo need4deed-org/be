@@ -1,4 +1,11 @@
+import { AdminUserActionErrorCode } from "need4deed-sdk";
 import { BaseError } from "./base";
+
+export class AdminActionError extends BaseError {
+  constructor(code: AdminUserActionErrorCode, message: string) {
+    super(message, 400, true, { code });
+  }
+}
 
 export class BadRequestError extends BaseError {
   constructor(message = "Bad Request") {

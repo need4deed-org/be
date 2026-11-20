@@ -103,6 +103,11 @@ export function buildEraseSummaryMessage(
     : base;
 }
 
+const ERASED_EMAIL_DOMAIN = "@erased.need4deed.org";
+
+export const erasedEmailFor = (userId: number) =>
+  `deleted-user-${userId}${ERASED_EMAIL_DOMAIN}`;
+
 export async function erasePersonPii(
   manager: EntityManager,
   personId: number,
@@ -126,7 +131,7 @@ export async function erasePersonPii(
         {
           isActive: false,
           deactivatedAt: new Date(),
-          email: `deleted-user-${user.id}@erased.need4deed.org`,
+          email: erasedEmailFor(user.id),
         },
       ),
     ),
