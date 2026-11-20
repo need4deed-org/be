@@ -431,11 +431,12 @@ export default async function opportunityRoutes(
 
       const districtIdNeedingCentroid =
         getOpportunityDistrictIdNeedingCentroid(opportunityComments);
-      const districtCentroid = districtIdNeedingCentroid
-        ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
-            districtIdNeedingCentroid,
-          )
-        : undefined;
+      const districtCentroid =
+        districtIdNeedingCentroid !== undefined
+          ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
+              districtIdNeedingCentroid,
+            )
+          : undefined;
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {

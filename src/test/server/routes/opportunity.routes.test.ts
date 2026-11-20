@@ -2235,6 +2235,19 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
     expect(found.lon).toBe(DISTRICT_LON);
   });
 
+  it("gives a PAST opportunity the masked centroid pin on the detail route too (be#1283)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${oppPast.id}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(data.lat).toBe(DISTRICT_LAT);
+    expect(data.lon).toBe(DISTRICT_LON);
+  });
+
   it("gives a PAST opportunity the same masked centroid pin, never the agent's own coordinates (be#1283)", async () => {
     const res = await fastify.inject({
       method: "GET",

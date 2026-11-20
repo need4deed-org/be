@@ -438,11 +438,9 @@ describe("dtoOpportunityGetList", () => {
   });
 
   describe("map-pin lat/lon (be#662, any status since be#1283)", () => {
-    it.each([
-      OpportunityStatusType.ACTIVE,
-      OpportunityStatusType.INACTIVE,
-      OpportunityStatusType.PAST,
-    ])(
+    const ALL_STATUSES = Object.values(OpportunityStatusType);
+
+    it.each(ALL_STATUSES)(
       "pins a %s opportunity at the agent's geocoded address (be#1283)",
       (status) => {
         const opportunity = {
@@ -460,35 +458,25 @@ describe("dtoOpportunityGetList", () => {
       },
     );
 
-    it("falls back to the district centroid for a past opportunity with no agent address (be#1283)", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        status: OpportunityStatusType.PAST,
-        agent: { address: undefined },
-      };
-      expect(getOpportunityDistrictIdNeedingCentroid(opportunity as any)).toBe(
-        5,
-      );
-      const result = dtoOpportunityGetList(opportunity as any, {
-        latitude: 52.45,
-        longitude: 13.35,
-      });
-      expect(result.lat).toBe(52.45);
-      expect(result.lon).toBe(13.35);
-    });
-
-    it("falls back to the handler-supplied district centroid when there is no agent address", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        agent: { address: undefined },
-      };
-      const result = dtoOpportunityGetList(opportunity as any, {
-        latitude: 52.5,
-        longitude: 13.4,
-      });
-      expect(result.lat).toBe(52.5);
-      expect(result.lon).toBe(13.4);
-    });
+    it.each(ALL_STATUSES)(
+      "falls back to the handler-supplied district centroid for a %s opportunity with no agent address",
+      (status) => {
+        const opportunity = {
+          ...baseOpportunity,
+          status,
+          agent: { address: undefined },
+        };
+        expect(
+          getOpportunityDistrictIdNeedingCentroid(opportunity as any),
+        ).toBe(5);
+        const result = dtoOpportunityGetList(opportunity as any, {
+          latitude: 52.45,
+          longitude: 13.35,
+        });
+        expect(result.lat).toBe(52.45);
+        expect(result.lon).toBe(13.35);
+      },
+    );
 
     it("returns null lat/lon when neither the agent nor the supplied centroid has coordinates", () => {
       const opportunity = {
