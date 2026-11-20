@@ -218,7 +218,8 @@ export default async function agentRegisterRoutes(
           });
           fastify.notify.arrival(
             getMembershipRequestNotificationText(
-              agent?.title ?? `#${result.agentId}`,
+              agent?.title ?? "",
+              result.agentId,
             ),
           );
         } catch (err) {

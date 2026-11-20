@@ -115,6 +115,11 @@ export const registerAgentConflictSchema = {
   anyOf: [
     {
       type: "object",
+      required: ["message", "conflict"],
+      properties: { ...conflictBase, conflict: { const: "title" } },
+    },
+    {
+      type: "object",
       required: ["message", "conflict", "agentId"],
       properties: {
         ...conflictBase,

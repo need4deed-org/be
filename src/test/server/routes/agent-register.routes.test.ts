@@ -814,7 +814,7 @@ describe("/agent/register", () => {
         AgentMembershipStatus.PENDING,
       );
       expect(arrival).toHaveBeenCalledWith(
-        expect.stringContaining(agent.title),
+        expect.stringContaining(`"${agent.title}" (id:${agent.id})`),
       );
       const reloaded = await fastify.db.agentRepository.findOneByOrFail({
         id: agent.id,

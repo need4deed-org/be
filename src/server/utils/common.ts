@@ -124,8 +124,9 @@ export function getAgentOpportunityEditNotificationText(
 
 export function getMembershipRequestNotificationText(
   agentTitle: string,
+  agentId: number,
 ): string {
-  return `New NGO membership request for "${agentTitle}" is waiting for approval at ${formatBerlinTimestamp()}`;
+  return `New NGO membership request for "${agentTitle}" (id:${agentId}) is waiting for approval at ${formatBerlinTimestamp()}`;
 }
 
 export type Env = Record<string, string | undefined>;
