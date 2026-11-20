@@ -34,6 +34,10 @@ vi.mock("../../../../data/utils/get-district", () => ({
     getDistrictFromPostcodeMock(...args),
 }));
 
+vi.mock("../../../../server/utils/data/link-agent-organization", () => ({
+  linkAgentToDomainOrganizationSafely: vi.fn(),
+}));
+
 const isEmailDomainTrustedMock = vi.fn();
 vi.mock("../../../../server/utils/data/is-trusted-domain", () => ({
   isEmailDomainTrusted: (...args: unknown[]) =>

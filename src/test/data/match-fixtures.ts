@@ -6,13 +6,14 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Person from "../../data/entity/person.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
+import { firstSeeded } from "../seeded";
 
 // Minimal volunteer/opportunity rows for status_match tests (be#1106).
 export async function createVolunteer(
   manager: EntityManager,
   overrides: Partial<Volunteer> = {},
 ) {
-  const postcode = await manager.findOneOrFail(Postcode, { where: {} });
+  const postcode = await firstSeeded(manager.getRepository(Postcode));
   const deal = await manager.save(
     new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
   );

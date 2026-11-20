@@ -22,6 +22,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -96,12 +97,8 @@ describe("GET /opportunity volunteerNames", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
-    const district = await fastify.db.districtRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    const district = await firstSeeded(fastify.db.districtRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({

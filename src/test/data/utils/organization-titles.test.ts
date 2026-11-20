@@ -20,7 +20,7 @@ describe("built-in organization title map", () => {
     const unseeded = Object.keys(BUILTIN_ORGANIZATION_TITLES).filter(
       (d) => !ORGANIZATION_DOMAINS.includes(d),
     );
-    expect(unseeded).toEqual(["www.berlin.de"]);
+    expect(unseeded).toEqual(["berlin.de", "www.berlin.de"]);
   });
 
   it("has no domain-shaped titles", () => {

@@ -4,7 +4,7 @@ import {
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { In, QueryRunner } from "typeorm";
+import { EntityManager, In, QueryRunner } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../../data/data-source";
 import FieldTranslation from "../../../../data/entity/field_translation.entity";
@@ -16,6 +16,29 @@ import { enqueue } from "../../../../services/translation/queue";
 import { randomNumericSuffix } from "../../../random";
 
 const ALL = 1_000_000;
+
+const ownOpportunityIds = vi.hoisted(() => [] as number[]);
+
+vi.mock(
+  "../../../../server/utils/data/untranslated-opportunity-query",
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import("../../../../server/utils/data/untranslated-opportunity-query")
+      >();
+    return {
+      ...original,
+      buildUntranslatedOpportunityQuery: (manager: EntityManager) => {
+        if (!ownOpportunityIds.length) {
+          throw new Error("no opportunities to scope the backfill to");
+        }
+        return original
+          .buildUntranslatedOpportunityQuery(manager)
+          .andWhere("o.id IN (:...ownOpportunityIds)", { ownOpportunityIds });
+      },
+    };
+  },
+);
 
 describe("queueUntranslatedOpportunities", () => {
   const suffix = randomNumericSuffix();
@@ -64,7 +87,10 @@ describe("queueUntranslatedOpportunities", () => {
             ...fields,
           }),
         )
-        .then((saved) => (opportunity[key] = saved));
+        .then((saved) => {
+          ownOpportunityIds.push(saved.id);
+          opportunity[key] = saved;
+        });
 
     await save("regular", { info: "Wir suchen Freiwillige" });
     await save("english", {
@@ -125,7 +151,7 @@ describe("queueUntranslatedOpportunities", () => {
   });
 
   it("leaves its own rows unchanged on a second run, including empty sources", async () => {
-    expect(firstRun).toBeGreaterThanOrEqual(3);
+    expect(firstRun).toBe(3);
     expect(await fieldsOf(opportunity.nothing.id)).toEqual([]);
     expect(secondRows).toEqual(firstRows);
     for (const { id } of Object.values(opportunity)) {
@@ -150,6 +176,7 @@ describe("queueUntranslatedOpportunities", () => {
         status: OpportunityStatusType.SEARCHING,
       }),
     );
+    ownOpportunityIds.push(inactive.id, searching.id);
 
     expect(await queueUntranslatedOpportunities(queryRunner.manager, 1)).toBe(
       1,

@@ -13,6 +13,7 @@ import {
   runDedupe,
 } from "../../../data/scripts/dedupe-shared-address";
 import { DealType } from "../../../data/types";
+import { firstSeeded } from "../../seeded";
 
 describe("dedupe-shared-address parseArgs", () => {
   it("defaults to a dry run with no address filter", () => {
@@ -73,9 +74,7 @@ describe("runDedupe (be#1028)", () => {
       await dataSource.initialize();
     }
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    postcode = await dataSource
-      .getRepository(Postcode)
-      .findOneOrFail({ where: {} });
+    postcode = await firstSeeded(dataSource.getRepository(Postcode));
 
     // Group A: blank, shared by 3 — nobody is a confident keeper, but
     // there's nothing real to lose either.

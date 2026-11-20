@@ -1,10 +1,5 @@
 import { FastifyInstance } from "fastify";
-import {
-  EntityTableName,
-  Lang,
-  OpportunityStatusType,
-  OpportunityType,
-} from "need4deed-sdk";
+import { EntityTableName, Lang, OpportunityType } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
@@ -13,6 +8,10 @@ import { enqueue } from "../../../services/translation/queue";
 import { translatedEntities } from "../../../services/translation/registry";
 import { writeHumanTranslations } from "../../../services/translation/write";
 import { getLanguageCode } from "../common";
+import {
+  buildUntranslatedOpportunityQuery,
+  TRANSLATED_INFO_TYPES,
+} from "./untranslated-opportunity-query";
 
 const OPPORTUNITY_FIELDS = [
   ...translatedEntities[EntityTableName.OPPORTUNITY].fields,
@@ -44,11 +43,6 @@ export async function translateOpportunities(
     lang,
   );
 }
-
-const TRANSLATED_INFO_TYPES: readonly OpportunityType[] = [
-  OpportunityType.REGULAR,
-  OpportunityType.EVENTS,
-];
 
 export async function languageIdOf(
   manager: EntityManager,
@@ -127,19 +121,7 @@ export async function queueUntranslatedOpportunities(
   manager: EntityManager,
   limit = BACKFILL_LIMIT,
 ): Promise<number> {
-  const opportunities = await manager
-    .createQueryBuilder(Opportunity, "o")
-    .select(["o.id", "o.title", "o.info", "o.type", "o.originalLanguageId"])
-    .where(
-      "NOT EXISTS (SELECT 1 FROM field_translation ft WHERE ft.opportunity_id = o.id)",
-    )
-    .andWhere(
-      "(btrim(o.title) <> '' OR (o.type IN (:...types) AND btrim(coalesce(o.info, '')) <> ''))",
-      { types: TRANSLATED_INFO_TYPES },
-    )
-    .orderBy("o.status = :searching", "DESC")
-    .addOrderBy("o.id")
-    .setParameter("searching", OpportunityStatusType.SEARCHING)
+  const opportunities = await buildUntranslatedOpportunityQuery(manager)
     .limit(limit)
     .getMany();
   for (const opportunity of opportunities) {

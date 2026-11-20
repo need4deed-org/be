@@ -297,6 +297,21 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("403s when a volunteer tries to create a post", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { text: "Post from a volunteer" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toMatchObject({ message: "Permission denied." });
+    expect(
+      await fastify.db.postRepository.countBy({ authorId: volunteerPerson.id }),
+    ).toBe(0);
+  });
+
   it("403s when a volunteer tries to reply", async () => {
     const postRes = await fastify.inject({
       method: "POST",

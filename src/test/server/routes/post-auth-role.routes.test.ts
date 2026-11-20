@@ -218,6 +218,16 @@ describe("post routes authorize on the DB role, not the JWT claim", () => {
 
   const routeCases: RouteCase[] = [
     {
+      name: "POST /post",
+      request: () => ({
+        method: "POST",
+        url: "/post",
+        payload: { text: "Post by a re-roled user" },
+      }),
+      expectAllowed: status(201),
+      expectDenied: permissionDenied,
+    },
+    {
       name: "PATCH /post/:id",
       request: ({ postId }) => ({
         method: "PATCH",
