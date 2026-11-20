@@ -26,6 +26,7 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { queueOpportunityTranslation } from "../../../server/utils/data/translate-opportunities";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "Length-Limits-1!";
 
@@ -122,10 +123,7 @@ describe("opportunity title and description length limits", () => {
         await dataSource.manager.findOneByOrFail(Language, { isoCode: lang })
       ).id;
     }
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     postcodeId = postcode.id;
     postcodeValue = postcode.value;
     address = await dataSource.manager.save(new Address({ postcodeId }));

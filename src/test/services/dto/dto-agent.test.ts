@@ -271,6 +271,7 @@ describe("dtoAgentGetList", () => {
       district: { title: "Mitte" },
       representative: { person: { email: "contact@helping-hands.org" } },
       opportunity: [{} as any, {} as any],
+      organization: { id: 7, title: "Träger e.V." },
     } as Agent & { activeVolunteers: number; numOpportunities: number };
 
     const result = dtoAgentGetList(fullAgent);
@@ -291,6 +292,7 @@ describe("dtoAgentGetList", () => {
       lat: null,
       lon: null,
       postcode: "10115",
+      organization: { id: 7, title: "Träger e.V." },
     });
   });
 

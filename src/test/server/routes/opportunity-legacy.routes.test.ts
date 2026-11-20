@@ -19,6 +19,7 @@ import { DealType } from "../../../data/types";
 import { getRepository } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 // be#780: GET /opportunity/legacy is public/unauthenticated and unconditionally
 // serialized whatever "accompanying" row it found linked to an opportunity,
@@ -39,9 +40,7 @@ describe("GET /opportunity/legacy", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (legacy-pii) ${suffix}` }),
@@ -113,9 +112,7 @@ describe("GET /opportunity/legacy hides accompanying details", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (legacy-accompanying) ${suffix}` }),
     );
@@ -323,9 +320,7 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     dealDistrictEntity = await districtRepository.save(
       new District({ title: `Deal District (legacy-1341) ${suffix}` }),
     );
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );

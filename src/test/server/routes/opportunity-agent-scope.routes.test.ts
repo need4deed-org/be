@@ -24,6 +24,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 const OWN_AGENT_OPPORTUNITY_COUNT = 3;
@@ -73,9 +74,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    ({ id: postcodeId } = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    }));
+    ({ id: postcodeId } = await firstSeeded(fastify.db.postcodeRepository));
     const districts: { id: number }[] =
       await fastify.db.agentRepository.manager.query(
         `SELECT id FROM district ORDER BY id LIMIT 2`,

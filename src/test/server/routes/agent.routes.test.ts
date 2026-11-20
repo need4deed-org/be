@@ -15,6 +15,7 @@ import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -299,9 +300,7 @@ describe("PATCH /agent/:id organization details", () => {
   // end-to-end from the PATCH contract and so silently failed to save.
   it("saves organizationId — the operator (Träger) field (be#843)", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const addressRepository = dataSource.getRepository(Address);
     const organizationRepository = dataSource.getRepository(Organization);
 

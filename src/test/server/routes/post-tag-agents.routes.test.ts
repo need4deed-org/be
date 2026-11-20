@@ -186,8 +186,8 @@ describe("tagging NGOs in posts (fe#1053)", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("ignores a bare token in the text instead of failing (volunteer)", async () => {
-    const res = await request("POST", "/post", "volunteer", {
+  it("ignores a bare token in the text instead of failing", async () => {
+    const res = await request("POST", "/post", "coordinator", {
       text: `Pasted <@agent:${agents.nearby.id}>`,
     });
     expect(res.statusCode).toBe(201);

@@ -7,6 +7,7 @@ import { DealType } from "../../../../data/types";
 import { createServer } from "../../../../server";
 import { updateBackfilledColumn } from "../../../../server/utils/data/update-backfilled-column";
 import { randomNumericSuffix } from "../../../random";
+import { firstSeeded } from "../../../seeded";
 
 describe("updateBackfilledColumn", () => {
   let fastify: FastifyInstance;
@@ -37,9 +38,7 @@ describe("updateBackfilledColumn", () => {
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
-    ({ id: postcodeId } = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    }));
+    ({ id: postcodeId } = await firstSeeded(fastify.db.postcodeRepository));
     [{ id: districtId }] = await fastify.db.agentRepository.manager.query(
       `SELECT id FROM district ORDER BY id LIMIT 1`,
     );

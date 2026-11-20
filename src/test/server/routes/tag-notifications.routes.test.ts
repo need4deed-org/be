@@ -191,9 +191,11 @@ describe("tag notifications (be#1075)", () => {
       await waitForEmailTo("Cleo");
       expect(recipients()).toEqual([emails.Cleo]);
       expect(tagged).toHaveBeenCalledTimes(1);
-      expect(tagged.mock.calls[0][0].taggedNames).toEqual([
-        `Cleo Tag${suffix}`,
-      ]);
+      expect(tagged.mock.calls[0][0]).toMatchObject({
+        authorName: `Cora Tag${suffix}`,
+        taggedNames: [`Cleo Tag${suffix}`],
+      });
+      expect(emailTagged.mock.calls[0][0].authorName).toBe(`Cora Tag${suffix}`);
     });
 
     it("PATCH without taggedPersonIds notifies nobody", async () => {

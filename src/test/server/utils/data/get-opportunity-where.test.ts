@@ -42,25 +42,43 @@ describe("getOpportunityWhere", () => {
   });
 
   describe("search (be#972)", () => {
-    it("ORs filter.search across title and info, carrying other filters onto both", () => {
-      expect(
-        getOpportunityWhere({
-          status: ["opp-active"],
-          search: "tutoring",
-        } as never),
-      ).toEqual([
+    it("ORs filter.search across title, info and profile fields, carrying other filters onto each", () => {
+      const where = getOpportunityWhere({
+        status: ["opp-active"],
+        search: "tutoring",
+      } as never) as FindOptionsWhere<Opportunity>[];
+      expect(where.slice(0, 2)).toEqual([
         { status: In(["opp-active"]), title: ILike("%tutoring%") },
         { status: In(["opp-active"]), info: ILike("%tutoring%") },
       ]);
+      expect(where).toHaveLength(3);
+      expect(where[2].status).toEqual(In(["opp-active"]));
+      const profile = where[2].id as unknown as {
+        _type: string;
+        _getSql: (alias: string) => string;
+      };
+      expect(profile._type).toBe("raw");
+      for (const part of ["a.title", "JOIN skill o", "JOIN language o"]) {
+        expect(profile._getSql("Opportunity.id")).toContain(part);
+      }
     });
 
     // A literal "%" or "_" in a search term must match as text, not act as a
     // SQL wildcard/single-char-match.
     it("escapes LIKE metacharacters in filter.search", () => {
-      expect(getOpportunityWhere({ search: "50%_off" } as never)).toEqual([
+      const where = getOpportunityWhere({
+        search: "50%_off",
+      } as never) as FindOptionsWhere<Opportunity>[];
+      expect(where.slice(0, 2)).toEqual([
         { title: ILike("%50\\%\\_off%") },
         { info: ILike("%50\\%\\_off%") },
       ]);
+      const profile = where[2].id as unknown as {
+        _objectLiteralParameters: Record<string, unknown>;
+      };
+      expect(profile._objectLiteralParameters.searchPattern).toBe(
+        "%50\\%\\_off%",
+      );
     });
 
     it("adds a displayed-translation branch when a search language is given", () => {
@@ -69,7 +87,7 @@ describe("getOpportunityWhere", () => {
         undefined,
         4,
       ) as FindOptionsWhere<Opportunity>[];
-      expect(where).toHaveLength(3);
+      expect(where).toHaveLength(4);
       expect(where[2].status).toEqual(In(["opp-active"]));
       const raw = where[2].id as unknown as {
         _type: string;
@@ -84,9 +102,12 @@ describe("getOpportunityWhere", () => {
     });
 
     it("crosses the search branches with the district branches", () => {
-      expect(
-        getOpportunityWhere({ search: "x", district: "2" } as never),
-      ).toEqual([
+      const where = getOpportunityWhere({
+        search: "x",
+        district: "2",
+      } as never) as FindOptionsWhere<Opportunity>[];
+      expect(where).toHaveLength(6);
+      expect(where.slice(0, 4)).toEqual([
         { title: ILike("%x%"), districtId: "2" },
         {
           title: ILike("%x%"),

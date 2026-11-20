@@ -22,6 +22,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -94,9 +95,7 @@ describe("filter[availability] on GET /volunteer and GET /opportunity", () => {
     });
 
   async function dealWith(type: DealType, slot?: Partial<Timeslot>) {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type, postcodeId: postcode.id }),
     );

@@ -65,7 +65,7 @@ export default function agentCommunicationRoutes(
       const communicationRepository = fastify.db.communicationRepository;
       const communication = await communicationRepository.save({
         ...request.body,
-        userId: request.user.id,
+        userId: request.authUser!.id,
         agentId,
       });
 

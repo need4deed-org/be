@@ -4,6 +4,7 @@ import {
   UserRole,
   VolunteerStateAppreciationType,
 } from "need4deed-sdk";
+import { In } from "typeorm";
 import {
   afterAll,
   afterEach,
@@ -13,15 +14,17 @@ import {
   expect,
   it,
 } from "vitest";
-import { accessCookieName } from "../../../config/constants";
+import { accessCookieName, apiKeyHeaderName } from "../../../config/constants";
+import ApiKey from "../../../data/entity/api-key.entity";
 import Deal from "../../../data/entity/deal.entity";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import Appreciation from "../../../data/entity/volunteer/appreciation.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
-import { hashPassword } from "../../../data/utils";
+import { hashPassword, sha256Hex } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -52,9 +55,7 @@ describe("PATCH /appreciation/:id status reconciliation (be#909)", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
@@ -155,4 +156,181 @@ describe("PATCH /appreciation/:id status reconciliation (be#909)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().data.status).toBe(AppreciationStatusType.PENDING);
   });
+});
+
+describe("PATCH/DELETE /appreciation/:id authorize on the DB user", () => {
+  let fastify: FastifyInstance;
+  const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const personIds: number[] = [];
+  let deal: Deal;
+  let volunteer: Volunteer;
+  let promotedCookie: string;
+  let demotedCookie: string;
+  let apiKeyUser: User;
+  const rawApiKey = `n4d_appreciation-${suffix}`;
+
+  async function createUser(label: string, role: UserRole): Promise<User> {
+    const person = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: label }),
+    );
+    personIds.push(person.id);
+    return fastify.db.userRepository.save(
+      new User({
+        email: `${label}-appreciation-auth-${suffix}@test.need4deed.org`,
+        password: await hashPassword(PASSWORD),
+        role,
+        isActive: true,
+        personId: person.id,
+      }),
+    );
+  }
+
+  async function staleCookie(
+    label: string,
+    tokenRole: UserRole,
+    dbRole: UserRole,
+  ): Promise<string> {
+    const user = await createUser(label, tokenRole);
+    const login = await fastify.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: user.email, password: PASSWORD },
+    });
+    await fastify.db.userRepository.update(user.id, { role: dbRole });
+    return getCookie(login.cookies, accessCookieName);
+  }
+
+  const createAppreciation = () =>
+    fastify.db.appreciationRepository.save(
+      new Appreciation({
+        title: VolunteerStateAppreciationType.T_SHIRT,
+        status: AppreciationStatusType.PENDING,
+        volunteerId: volunteer.id,
+      }),
+    );
+
+  const callers = [
+    {
+      name: "a token whose role was promoted in the DB",
+      auth: () => ({ cookies: { [accessCookieName]: promotedCookie } }),
+    },
+    {
+      name: "an API key",
+      auth: () => ({ headers: { [apiKeyHeaderName]: rawApiKey } }),
+    },
+  ];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    const volunteerPerson = await fastify.db.personRepository.save(
+      new Person({ firstName: "Test", lastName: "Volunteer" }),
+    );
+    personIds.push(volunteerPerson.id);
+    volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ dealId: deal.id, personId: volunteerPerson.id }),
+    );
+
+    promotedCookie = await staleCookie(
+      "promoted",
+      UserRole.VOLUNTEER,
+      UserRole.COORDINATOR,
+    );
+    demotedCookie = await staleCookie(
+      "demoted",
+      UserRole.COORDINATOR,
+      UserRole.VOLUNTEER,
+    );
+
+    apiKeyUser = await createUser("api-key", UserRole.COORDINATOR);
+    await fastify.db.apiKeyRepository.save(
+      new ApiKey({
+        label: `appreciation-auth-${suffix}`,
+        keyHash: sha256Hex(rawApiKey),
+        userId: apiKeyUser.id,
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    if (!fastify) {
+      return;
+    }
+    if (volunteer) {
+      await fastify.db.appreciationRepository.delete({
+        volunteerId: volunteer.id,
+      });
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+    }
+    if (apiKeyUser) {
+      await fastify.db.apiKeyRepository.delete({ userId: apiKeyUser.id });
+    }
+    if (deal) {
+      await fastify.db.dealRepository.delete({ id: deal.id });
+    }
+    if (personIds.length) {
+      await fastify.db.userRepository.delete({ personId: In(personIds) });
+      await fastify.db.personRepository.delete(personIds);
+    }
+    await fastify.close();
+  });
+
+  describe.each(callers)("with $name", ({ auth }) => {
+    it("updates the appreciation", async () => {
+      const appreciation = await createAppreciation();
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/appreciation/${appreciation.id}`,
+        ...auth(),
+        payload: { status: AppreciationStatusType.POST },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().data.status).toBe(AppreciationStatusType.POST);
+    });
+
+    it("deletes the appreciation", async () => {
+      const appreciation = await createAppreciation();
+      const res = await fastify.inject({
+        method: "DELETE",
+        url: `/appreciation/${appreciation.id}`,
+        ...auth(),
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(
+        await fastify.db.appreciationRepository.findOneBy({
+          id: appreciation.id,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  it.each(["PATCH", "DELETE"] as const)(
+    "denies %s to a token whose role was demoted in the DB",
+    async (method) => {
+      const appreciation = await createAppreciation();
+      const res = await fastify.inject({
+        method,
+        url: `/appreciation/${appreciation.id}`,
+        cookies: { [accessCookieName]: demotedCookie },
+        payload:
+          method === "PATCH"
+            ? { status: AppreciationStatusType.POST }
+            : undefined,
+      });
+
+      expect(res.statusCode).toBe(403);
+      expect(
+        await fastify.db.appreciationRepository.findOneByOrFail({
+          id: appreciation.id,
+        }),
+      ).toMatchObject({ status: AppreciationStatusType.PENDING });
+    },
+  );
 });
