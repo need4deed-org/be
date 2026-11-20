@@ -44,7 +44,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { languageIdOf } from "../../../server/utils/data/translate-opportunities";
+import { languageIdOf } from "../../../server/utils/data/request-language";
 import { parseOpportunityLegacy } from "../../../services/dto/parser-opportunity-legacy";
 import { sourceHashOf } from "../../../services/translation/queue";
 import { formatDate, formatTime } from "../../../services/utils";

@@ -11,7 +11,7 @@ import {
 import { maskForCaller } from "../pii/pre-serialization";
 import { addAgentTypeServiceTranslations } from "./add-agent-type-service-translations";
 import { isStaffRole } from "./is-staff-role";
-import { requestLanguage } from "./translate-opportunities";
+import { requestLanguage } from "./request-language";
 
 export async function getOrganizationProfile(
   request: FastifyRequest,

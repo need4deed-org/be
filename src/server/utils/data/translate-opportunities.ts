@@ -3,11 +3,9 @@ import { EntityTableName, Lang, OpportunityType } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
-import { languageIds } from "../../../services/translation/languages";
 import { enqueue } from "../../../services/translation/queue";
 import { translatedEntities } from "../../../services/translation/registry";
 import { writeHumanTranslations } from "../../../services/translation/write";
-import { getLanguageCode } from "../common";
 import {
   buildUntranslatedOpportunityQuery,
   TRANSLATED_INFO_TYPES,
@@ -16,16 +14,6 @@ import {
 const OPPORTUNITY_FIELDS = [
   ...translatedEntities[EntityTableName.OPPORTUNITY].fields,
 ];
-
-export function editLanguage(query: unknown): Lang | null {
-  return getLanguageCode(
-    (query as { language?: unknown } | undefined)?.language as string,
-  );
-}
-
-export function requestLanguage(queryOrBody: unknown): Lang {
-  return editLanguage(queryOrBody) ?? Lang.DE;
-}
 
 export async function translateOpportunities(
   fastify: FastifyInstance,
@@ -42,13 +30,6 @@ export async function translateOpportunities(
     OPPORTUNITY_FIELDS,
     lang,
   );
-}
-
-export async function languageIdOf(
-  manager: EntityManager,
-  lang: Lang,
-): Promise<number> {
-  return (await languageIds(manager)).idOf[lang];
 }
 
 export function translatedOpportunityFields(

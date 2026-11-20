@@ -18,7 +18,7 @@ import {
 import { writeHumanTranslations } from "../../../services/translation/write";
 import { assertMaxTextLength } from "../../../services/utils";
 import { resolveAddressPostcode } from "./for-routes";
-import { languageIdOf } from "./translate-opportunities";
+import { languageIdOf } from "./request-language";
 
 type OrganizationColumns = Partial<
   Record<"title" | "about" | "website" | "email" | "phone", string | null> & {
@@ -122,10 +122,12 @@ async function patchAbout(
   organization: Organization,
   about: string | null,
   lang: Lang | null,
+  hasExplicitLanguage: boolean,
   manager: EntityManager,
 ): Promise<Pick<OrganizationColumns, "about" | "originalLanguageId"> | null> {
   const text = about?.trim() || null;
-  if (organization.about?.trim() && lang) {
+  const source = organization.about?.trim();
+  if (source && lang) {
     const written = await writeHumanTranslations(
       manager,
       EntityTableName.ORGANIZATION,
@@ -138,12 +140,16 @@ async function patchAbout(
     }
   }
   assertMaxTextLength(
-    "description",
+    "Träger about text",
     text,
     [organization.about],
     ORGANIZATION_ABOUT_MAX_LENGTH,
   );
-  if (!text || organization.originalLanguageId) {
+  const detects =
+    text &&
+    !hasExplicitLanguage &&
+    (!source || !organization.originalLanguageId);
+  if (!detects) {
     return { about: text };
   }
   return {
@@ -163,6 +169,13 @@ export async function patchOrganization(
   try {
     await dataSource.manager.transaction(async (manager) => {
       const repository = manager.getRepository(Organization);
+      let organization = await repository.findOne({
+        where: { id },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!organization) {
+        throw new NotFoundError(`Organization (id:${id}) not found.`);
+      }
       if (patch.originalLanguage) {
         await setOriginalLanguage(
           manager,
@@ -170,19 +183,19 @@ export async function patchOrganization(
           id,
           patch.originalLanguage,
         );
-      }
-      const organization = await repository.findOne({
-        where: { id },
-        lock: { mode: "pessimistic_write" },
-      });
-      if (!organization) {
-        throw new NotFoundError(`Organization (id:${id}) not found.`);
+        organization = await repository.findOneByOrFail({ id });
       }
 
       const columns: OrganizationColumns = {};
       const aboutColumns =
         patch.about !== undefined
-          ? await patchAbout(organization, patch.about, lang, manager)
+          ? await patchAbout(
+              organization,
+              patch.about,
+              lang,
+              Boolean(patch.originalLanguage),
+              manager,
+            )
           : null;
       Object.assign(columns, aboutColumns);
       if (patch.title !== undefined) {
@@ -222,7 +235,11 @@ export async function patchOrganization(
       }
     });
   } catch (err) {
-    if (isUniqueViolation(err) && patch.title !== undefined) {
+    if (
+      isUniqueViolation(err) &&
+      (err as { table?: string }).table === "organization" &&
+      patch.title !== undefined
+    ) {
       throw new ConflictError(`Organization title "${patch.title}" is taken.`);
     }
     throw err;

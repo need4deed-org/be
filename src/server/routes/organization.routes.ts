@@ -12,7 +12,7 @@ import { getOrganizationProfile } from "../utils/data/get-organization-profile";
 import { isStaffRole } from "../utils/data/is-staff-role";
 import { listOrganizations } from "../utils/data/list-organizations";
 import { patchOrganization } from "../utils/data/patch-organization";
-import { editLanguage } from "../utils/data/translate-opportunities";
+import { editLanguage } from "../utils/data/request-language";
 
 export default async function organizationRoutes(
   fastify: FastifyInstance,

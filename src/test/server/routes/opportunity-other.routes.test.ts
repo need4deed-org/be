@@ -23,7 +23,7 @@ import User from "../../../data/entity/user.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { languageIdOf } from "../../../server/utils/data/translate-opportunities";
+import { languageIdOf } from "../../../server/utils/data/request-language";
 import { sourceHashOf } from "../../../services/translation/queue";
 import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";

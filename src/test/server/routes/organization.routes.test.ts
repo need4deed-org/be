@@ -755,6 +755,30 @@ describe("organization.routes", () => {
       expect((await reloadOrg(organization.id)).about).toBeNull();
     });
 
+    it("detects the language again once about was cleared", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      await patchAbout(organization.id, { about: null });
+      await patchAbout(organization.id, { about: ENGLISH_ABOUT });
+      expect(await reloadOrg(organization.id)).toMatchObject({
+        about: ENGLISH_ABOUT,
+        originalLanguageId: await languageIdOf(Lang.EN),
+      });
+      const rows = await rowsOf(organization.id);
+      expect(rows.map((row) => row.language.isoCode)).toEqual([Lang.DE]);
+    });
+
+    it("keeps an explicit originalLanguage sent with about", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, {
+        about: GERMAN_ABOUT,
+        originalLanguage: Lang.EN,
+      });
+      expect((await reloadOrg(organization.id)).originalLanguageId).toBe(
+        await languageIdOf(Lang.EN),
+      );
+    });
+
     it("can't clear about in a language other than the original", async () => {
       const organization = await newOrganization();
       await patchAbout(organization.id, { about: GERMAN_ABOUT });
