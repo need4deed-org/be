@@ -1892,6 +1892,19 @@ describe("GET /opportunity map-pin lat/lon (be#662, any status since be#1283)", 
       expect(typeof found.lon).toBe("number");
     },
   );
+
+  it("pins an ACTIVE opportunity on the detail route too (be#1283)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity/${oppActive.id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { data } = res.json();
+    expect(data.lat).toBe(LAT);
+    expect(data.lon).toBe(LON);
+  });
 });
 
 describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {

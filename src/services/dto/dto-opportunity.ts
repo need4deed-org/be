@@ -34,9 +34,9 @@ interface MapPinResolution {
   neededDistrictId?: number;
 }
 
-// Every opportunity the list returns gets a pin, whatever its status: the
-// list's status filter decides what the map shows, so pins match the counter
-// (be#1283).
+// Pins don't depend on status (be#1283): the list's status filter decides what
+// the map shows. An opportunity still gets no pin when neither its own/agent
+// postcode nor its district has coordinates.
 function resolveMapPin(opportunity: Opportunity): MapPinResolution {
   const coordinates = getCoordinates(
     getOwnLocationPostcode(opportunity) ?? opportunity.agent?.address?.postcode,
