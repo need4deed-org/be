@@ -26,6 +26,7 @@ import { createServer } from "../../../server";
 import { languageIdOf } from "../../../server/utils/data/translate-opportunities";
 import { sourceHashOf } from "../../../services/translation/queue";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -64,9 +65,7 @@ describe("GET /opportunity/other (fe#1052)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const [district]: { id: number }[] =
       await fastify.db.agentRepository.manager.query(
         `SELECT id FROM district ORDER BY id LIMIT 1`,

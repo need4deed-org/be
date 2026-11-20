@@ -4,7 +4,10 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import logger from "../../logger";
 import { resolve } from "../translation/resolve";
 
-type TitleSource = Pick<Opportunity, "id" | "title" | "originalLanguageId">;
+export type TitleSource = Pick<
+  Opportunity,
+  "id" | "title" | "originalLanguageId"
+>;
 
 // Resolves onto a copy so the shared entity keeps its original title for the other language.
 export async function opportunityTitleIn(

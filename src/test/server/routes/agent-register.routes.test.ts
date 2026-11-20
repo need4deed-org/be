@@ -17,6 +17,7 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { lockRegistration } from "../../../server/utils/data/write-agent-registration";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 describe("/agent/register", () => {
   let fastify: FastifyInstance;
@@ -531,9 +532,7 @@ describe("/agent/register", () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const organization = await fastify.db.organizationRepository.findOneOrFail({
-      where: {},
-    });
+    const organization = await firstSeeded(fastify.db.organizationRepository);
     expect(res.json().data).toContainEqual(
       expect.objectContaining({
         id: organization.id,
@@ -551,9 +550,7 @@ describe("/agent/register", () => {
   });
 
   it("stores the chosen operator (Träger) on the new agent", async () => {
-    const organization = await fastify.db.organizationRepository.findOneOrFail({
-      where: {},
-    });
+    const organization = await firstSeeded(fastify.db.organizationRepository);
     const { token } = await makeRegistrant("test.need4deed.org");
 
     const res = await fastify.inject({

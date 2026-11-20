@@ -19,7 +19,7 @@ import { commentSerializer } from "./dto-comment";
 import { dtoSerializePerson } from "./dto-person";
 import { getAvailability, getCoordinates, getLanguages } from "./utils";
 
-function dtoOptionTitle(
+export function dtoOptionTitle(
   id: number | undefined,
   ref?: { title?: string; translations?: OptionTitle },
 ): OptionById {
@@ -82,6 +82,9 @@ export function dtoAgentGetList(
     statusEngagement: agent.engagementStatus,
     ...getAgentCoordinates(agent, districtCentroid),
     postcode: agent.address?.postcode?.value ?? null,
+    organization: agent.organization
+      ? { id: agent.organization.id, title: agent.organization.title }
+      : null,
   };
 }
 

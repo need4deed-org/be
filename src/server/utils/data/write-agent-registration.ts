@@ -24,6 +24,7 @@ import { isFreeEmailDomain } from "./free-email-domains";
 import { getAgentByAddress } from "./get-agent-by-postcode";
 import { isAgentDomainAllowed } from "./is-agent-domain-allowed";
 import { isEmailDomainTrusted } from "./is-trusted-domain";
+import { linkAgentToDomainOrganizationSafely } from "./link-agent-organization";
 
 export interface RegisterAgentResult {
   agentId: number;
@@ -259,6 +260,7 @@ export async function createAgentForPerson(
   } catch (err) {
     throw await toRegisterAgentError(err, input);
   }
+  await linkAgentToDomainOrganizationSafely(dataSource.manager, result.agentId);
 
   return result;
 }
@@ -380,6 +382,9 @@ export async function joinAgent(
       await claimAgent(agentId, manager);
     }
   });
+  if (status === AgentMembershipStatus.ACTIVE) {
+    await linkAgentToDomainOrganizationSafely(dataSource.manager, agentId);
+  }
 
   return { agentId, membershipStatus: status };
 }

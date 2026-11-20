@@ -36,6 +36,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 const RARE_LANGUAGES = ["uk", "ar", "fa"];
@@ -246,12 +247,7 @@ describe("recommended matches (be#1184)", () => {
       id: singleDistrictPostcode.postcodeId,
       value: singleDistrictPostcode.value,
     };
-    postcodeId = (
-      await fastify.db.postcodeRepository.findOneOrFail({
-        where: {},
-        order: { id: "ASC" },
-      })
-    ).id;
+    postcodeId = (await firstSeeded(fastify.db.postcodeRepository)).id;
     if (postcodeId !== appointmentPostcode.id) {
       const commuteRepository = getRepository(dataSource, PostcodeCommute);
       const pair = {

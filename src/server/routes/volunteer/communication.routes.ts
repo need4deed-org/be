@@ -79,7 +79,7 @@ export default function volunteerCommunicationRoutes(
 
       const communication = await fastify.db.communicationRepository.save({
         ...request.body,
-        userId: request.user.id,
+        userId: request.authUser!.id,
         volunteerId,
       });
 

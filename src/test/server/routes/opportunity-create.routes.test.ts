@@ -23,6 +23,7 @@ import Skill from "../../../data/entity/profile/skill.entity";
 import User from "../../../data/entity/user.entity";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
 import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
@@ -150,10 +151,7 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -291,10 +289,7 @@ describe("POST /opportunity resolves district from the agent at creation", () =>
     );
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -395,10 +390,7 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     postcodeValue = postcode.value;
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -573,10 +565,7 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -825,10 +814,7 @@ describe("POST /opportunity cascades a new agent to SEARCHING (be#862)", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -976,10 +962,7 @@ describe("POST /opportunity saves an own address (be#1291)", () => {
     agentDistrict = await getRepository(dataSource, District).save(
       new District({ title: `Own Address Agent District ${suffix}` }),
     );
-    const agentPostcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const agentPostcode = await firstSeeded(fastify.db.postcodeRepository);
     const agentAddress = await getRepository(dataSource, Address).save(
       new Address({ postcodeId: agentPostcode.id }),
     );

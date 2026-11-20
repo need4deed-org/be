@@ -25,6 +25,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
@@ -52,10 +53,7 @@ describe("endpoints loading several to-many lists", () => {
       new Agent({ title: `Relation load agent ${suffix}` }),
     );
     cleanup.push(() => db.agentRepository.delete(agent.id));
-    const postcode = await db.postcodeRepository.findOneOrFail({
-      where: {},
-      order: { id: "ASC" },
-    });
+    const postcode = await firstSeeded(db.postcodeRepository);
     const [opportunityDeal, volunteerDeal] = await db.dealRepository.save([
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
