@@ -52,7 +52,7 @@ export default class Organization {
   @Column({ type: "text", nullable: true })
   @IsOptional()
   @IsString()
-  about?: string;
+  about?: string | null;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

@@ -301,13 +301,18 @@ describe("organization.routes", () => {
 
     it("returns the Träger's about text", async () => {
       const repository = dataSource.getRepository(Organization);
-      await repository.update(orgB.id, { about: "Wir betreiben Unterkünfte." });
+      const organization = await repository.save(
+        new Organization({
+          title: `About Test Org ${suffix}`,
+          about: "Wir betreiben Unterkünfte.",
+        }),
+      );
       try {
-        const res = await get(orgB.id, coordinatorCookie);
+        const res = await get(organization.id, coordinatorCookie);
         expect(res.statusCode).toBe(200);
         expect(res.json().data.about).toBe("Wir betreiben Unterkünfte.");
       } finally {
-        await repository.update(orgB.id, { about: null as unknown as string });
+        await repository.delete(organization.id);
       }
     });
 
@@ -492,6 +497,7 @@ describe("organization.routes", () => {
       expect(await reload()).toMatchObject({
         email: "office@example.org",
         phone: "030 1234567",
+        about: null,
       });
     });
 
