@@ -6,7 +6,6 @@ import {
   EntityTableName,
   Lang,
   OpportunityType,
-  OpportunityVolunteerStatusType,
   OptionTitle,
   ProfileVolunteeringType,
   STATISTICS_TOTAL_KEY,
@@ -19,6 +18,7 @@ import { BadRequestError, berlinTimeZone } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
+import { MATCHED_VOLUNTEER_STATUSES } from "./no-match-found";
 
 const MAX_PERIODS = 1000;
 
@@ -61,13 +61,9 @@ interface MetricSource {
 
 const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
 
-const MATCHED_STATUSES_SQL = `(${[
-  OpportunityVolunteerStatusType.MATCHED,
-  OpportunityVolunteerStatusType.ACTIVE,
-  OpportunityVolunteerStatusType.PAST,
-]
-  .map((status) => `'${status}'`)
-  .join(", ")})`;
+const MATCHED_STATUSES_SQL = `(${MATCHED_VOLUNTEER_STATUSES.map(
+  (status) => `'${status}'`,
+).join(", ")})`;
 
 const OPPORTUNITY_KEYS: MetricSource["keys"] = {
   [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
@@ -121,8 +117,7 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     },
   },
   [StatisticsMetric.MATCHED_VOLUNTEERS]: {
-    from: "opportunity_volunteer r",
-    counted: `(
+    from: `(
       SELECT ov.volunteer_id AS id, ov.opportunity_id, ov.status, ov.created_at
       FROM opportunity_volunteer ov
     ) r`,
@@ -138,7 +133,8 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
   },
   [StatisticsMetric.MATCHED_OPPORTUNITIES]: {
     from: `(
-      SELECT o.*, min(ov.created_at) AS matched_at
+      SELECT o.id, o.type, o.agent_id, o.district_id, o.address_id,
+        min(ov.created_at) AS matched_at
       FROM opportunity o
       JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
       WHERE ov.status IN ${MATCHED_STATUSES_SQL}

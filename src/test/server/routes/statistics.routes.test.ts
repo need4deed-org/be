@@ -235,7 +235,7 @@ describe("GET /statistics/:metric", () => {
     await createOpportunity(OpportunityType.REGULAR, "1986-02-01T12:00:00Z");
     const { MATCHED, ACTIVE, PAST, PENDING } = OpportunityVolunteerStatusType;
     await createMatch(regular, first, MATCHED, "1986-02-10T12:00:00Z");
-    await createMatch(regular, second, PENDING, "1986-02-11T12:00:00Z");
+    await createMatch(regular, second, PENDING, "1986-01-25T12:00:00Z");
     await createMatch(event, second, ACTIVE, "1986-02-15T12:00:00Z");
     await createMatch(event, first, PAST, "1986-03-01T12:00:00Z");
     await createMatch(pendingOnly, second, PENDING, "1986-01-20T12:00:00Z");
@@ -435,6 +435,14 @@ describe("GET /statistics/:metric", () => {
       },
       { counts: {}, total: 0 },
     ]);
+  });
+
+  it("groups matched opportunities by district", async () => {
+    const data = await getData(
+      "/statistics/matched-opportunities?granularity=month&from=1986-02-01&to=1986-03-01&groupBy=district",
+    );
+
+    expect(data.periods[0].total).toBe(2);
   });
 
   it("counts opportunities never matched, pending ones included", async () => {
