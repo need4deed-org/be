@@ -3,52 +3,48 @@ import {
   EntityTableName,
   MyActivityEntityType,
   MyActivityKind,
-  VolunteerAuditLogType,
 } from "need4deed-sdk";
 import { dataSource } from "../../../data/data-source";
-
-type ActivityRow = {
-  kind: MyActivityKind;
-  id: number;
-  occurredAt: Date;
-  entityType: MyActivityEntityType;
-  entityId: number;
-  text: string;
-  changeType: VolunteerAuditLogType | null;
-};
+import {
+  dtoMyActivityItem,
+  MyActivityRow,
+  myActivityTitleKey,
+} from "../../../services/dto/dto-my-activity";
 
 type TitleRow = { entityType: MyActivityEntityType; id: number; title: string };
-
-const ENTITY_TYPES: MyActivityEntityType[] = [
-  EntityTableName.AGENT,
-  EntityTableName.OPPORTUNITY,
-  EntityTableName.VOLUNTEER,
-];
 
 async function getActivityRows(
   userId: number,
   limit: number,
-): Promise<ActivityRow[]> {
+): Promise<MyActivityRow[]> {
   return dataSource.query(
     `SELECT * FROM (
-       SELECT '${MyActivityKind.COMMENT}' AS kind, c.id, c.created_at AS "occurredAt",
+       SELECT '${MyActivityKind.COMMENT}' AS kind, c.id, c.updated_at AS "occurredAt",
          c.entity_type::text AS "entityType", c.entity_id AS "entityId", c.text,
          NULL AS "changeType"
        FROM comment c
-       WHERE c.user_id = $1 AND c.entity_type::text = ANY($3)
+       WHERE c.user_id = $1
+         AND (
+           (c.entity_type::text = '${EntityTableName.AGENT}'
+             AND EXISTS (SELECT 1 FROM agent a WHERE a.id = c.entity_id))
+           OR (c.entity_type::text = '${EntityTableName.OPPORTUNITY}'
+             AND EXISTS (SELECT 1 FROM opportunity o WHERE o.id = c.entity_id))
+           OR (c.entity_type::text = '${EntityTableName.VOLUNTEER}'
+             AND EXISTS (SELECT 1 FROM volunteer v WHERE v.id = c.entity_id))
+         )
        UNION ALL
        SELECT '${MyActivityKind.CHANGE}', l.id, l.occurred_at,
          '${EntityTableName.VOLUNTEER}', l.volunteer_id, l.detail, l.type
        FROM volunteer_audit_log l
        WHERE l.actor_user_id = $1
      ) activity
-     ORDER BY "occurredAt" DESC, id DESC
+     ORDER BY "occurredAt" DESC, kind, id DESC
      LIMIT $2`,
-    [userId, limit, ENTITY_TYPES],
+    [userId, limit],
   );
 }
 
-async function getTitles(rows: ActivityRow[]): Promise<Map<string, string>> {
+async function getTitles(rows: MyActivityRow[]): Promise<Map<string, string>> {
   const idsOf = (type: MyActivityEntityType) =>
     rows.filter((row) => row.entityType === type).map((row) => row.entityId);
 
@@ -70,7 +66,10 @@ async function getTitles(rows: ActivityRow[]): Promise<Map<string, string>> {
     ],
   );
   return new Map(
-    titles.map(({ entityType, id, title }) => [`${entityType}-${id}`, title]),
+    titles.map(({ entityType, id, title }) => [
+      myActivityTitleKey(entityType, id),
+      title,
+    ]),
   );
 }
 
@@ -80,16 +79,5 @@ export async function getMyActivity(
 ): Promise<ApiMyActivityItem[]> {
   const rows = await getActivityRows(userId, limit);
   const titles = await getTitles(rows);
-
-  return rows.map((row) => ({
-    id: `${row.kind}-${row.id}`,
-    kind: row.kind,
-    occurredAt: row.occurredAt,
-    entityType: row.entityType,
-    entityId: row.entityId,
-    entityTitle:
-      titles.get(`${row.entityType}-${row.entityId}`) || `#${row.entityId}`,
-    text: row.text,
-    ...(row.changeType ? { changeType: row.changeType } : {}),
-  }));
+  return rows.map((row) => dtoMyActivityItem(row, titles));
 }

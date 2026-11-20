@@ -22,6 +22,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -85,6 +86,7 @@ describe("GET /user/me/activity", () => {
         languageId: language.id,
         userId: user.id,
         createdAt: new Date(createdAt),
+        updatedAt: new Date(createdAt),
       }),
     );
   }
@@ -116,9 +118,7 @@ describe("GET /user/me/activity", () => {
       new Person({ firstName: "Mira", lastName: `Feed-${suffix}` }),
     );
     created.persons.push(volunteerPerson.id);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
@@ -217,8 +217,33 @@ describe("GET /user/me/activity", () => {
     expect(activity[1]).not.toHaveProperty("changeType");
   });
 
-  it("honours the limit", async () => {
-    expect(await getActivity(coordinatorCookie, "?limit=1")).toHaveLength(1);
+  it("honours the limit, keeping the newest", async () => {
+    const activity = await getActivity(coordinatorCookie, "?limit=1");
+    expect(activity).toHaveLength(1);
+    expect(activity[0].kind).toBe(MyActivityKind.CHANGE);
+  });
+
+  it("leaves out comments on an NGO that was deleted", async () => {
+    const goneAgent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Gone NGO ${suffix}` }),
+    );
+    await addComment(
+      coordinator,
+      EntityTableName.AGENT,
+      goneAgent.id,
+      "On a deleted NGO",
+      "2026-11-20T09:00:00Z",
+    );
+    await fastify.db.agentRepository.delete({ id: goneAgent.id });
+
+    const activity = await getActivity();
+
+    expect(activity.map(({ text }) => text)).not.toContain("On a deleted NGO");
+  });
+
+  it("is open to admins", async () => {
+    const { cookie } = await createLogin(UserRole.ADMIN);
+    expect(await getActivity(cookie)).toEqual([]);
   });
 
   it("is for staff only", async () => {
