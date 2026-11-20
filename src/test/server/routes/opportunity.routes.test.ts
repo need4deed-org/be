@@ -1885,7 +1885,7 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
     expect(typeof found.lon).toBe("number");
   });
 
-  it("nulls lat/lon for a status outside NEW/SEARCHING, even with a geocoded agent", async () => {
+  it("pins an ACTIVE opportunity too, so the map matches the list (be#1283)", async () => {
     const res = await fastify.inject({
       method: "GET",
       url: `/opportunity?filter[search]=${encodeURIComponent(oppActive.title)}`,
@@ -1896,8 +1896,8 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
     const body = res.json();
     const found = body.data.find((o: { id: number }) => o.id === oppActive.id);
     expect(found).toBeDefined();
-    expect(found.lat).toBeNull();
-    expect(found.lon).toBeNull();
+    expect(found.lat).toBe(LAT);
+    expect(found.lon).toBe(LON);
   });
 });
 

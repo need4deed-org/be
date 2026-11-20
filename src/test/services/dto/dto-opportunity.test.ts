@@ -437,19 +437,29 @@ describe("dtoOpportunityGetList", () => {
   });
 
   describe("map-pin lat/lon (be#662)", () => {
-    it("returns null lat/lon for a status outside NEW/SEARCHING, even with a geocoded agent", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        status: "opp-active",
-        agent: {
-          address: {
-            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+    it.each(["opp-matched", "opp-active", "opp-inactive", "opp-past"])(
+      "pins a %s opportunity too: the list's status filter decides what the map shows (be#1283)",
+      (status) => {
+        const opportunity = {
+          ...baseOpportunity,
+          status,
+          agent: {
+            address: {
+              postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+            },
           },
-        },
-      };
-      const result = dtoOpportunityGetList(opportunity as any);
-      expect(result.lat).toBeNull();
-      expect(result.lon).toBeNull();
+        };
+        const result = dtoOpportunityGetList(opportunity as any);
+        expect(result.lat).toBe(52.5);
+        expect(result.lon).toBe(13.4);
+      },
+    );
+
+    it("falls back to the district centroid for a non-NEW/SEARCHING opportunity with no agent address (be#1283)", () => {
+      const opportunity = { ...baseOpportunity, status: "opp-past" };
+      expect(getOpportunityDistrictIdNeedingCentroid(opportunity as any)).toBe(
+        5,
+      );
     });
 
     it("uses the agent's geocoded address when the opportunity is NEW", () => {

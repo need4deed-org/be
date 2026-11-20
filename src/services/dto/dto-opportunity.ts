@@ -5,7 +5,6 @@ import {
   ApiOpportunityGetList,
   ApiVolunteerOpportunityGetList,
   Lang,
-  OpportunityStatusType,
   OpportunityType,
   OpportunityVolunteerStatusType,
 } from "need4deed-sdk";
@@ -35,14 +34,10 @@ interface MapPinResolution {
   neededDistrictId?: number;
 }
 
+// Every opportunity the list returns gets a pin, whatever its status: the
+// list's status filter decides what the map shows, so pins match the counter
+// (be#1283).
 function resolveMapPin(opportunity: Opportunity): MapPinResolution {
-  if (
-    opportunity.status !== OpportunityStatusType.NEW &&
-    opportunity.status !== OpportunityStatusType.SEARCHING
-  ) {
-    return { lat: null, lon: null };
-  }
-
   const coordinates = getCoordinates(
     getOwnLocationPostcode(opportunity) ?? opportunity.agent?.address?.postcode,
   );
