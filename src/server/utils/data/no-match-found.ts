@@ -13,7 +13,7 @@ import { ONETIMER_ENGAGED_VOLUNTEER_STATUSES } from "./onetimer-statuses";
 
 export const NO_MATCH_FOUND_WORKING_DAYS = 4;
 
-const MATCHED_VOLUNTEER_STATUSES = [
+export const MATCHED_VOLUNTEER_STATUSES = [
   ...ONETIMER_ENGAGED_VOLUNTEER_STATUSES,
   OpportunityVolunteerStatusType.PAST,
 ];
