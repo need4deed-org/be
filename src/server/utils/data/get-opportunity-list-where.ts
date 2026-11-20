@@ -13,7 +13,7 @@ import {
   OpportunityAppointmentFilter,
 } from "./get-opportunity-where";
 import { andIntoWhere } from "./merge-into-where";
-import { languageIdOf } from "./translate-opportunities";
+import { languageIdOf } from "./request-language";
 
 export async function getOpportunityListWhere(
   filter: QuerystringOpportunityFiltering["filter"],

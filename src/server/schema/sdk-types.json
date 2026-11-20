@@ -1916,6 +1916,8 @@
       "type": "object",
       "properties": {
         "title": { "type": "string", "pattern": "\\S" },
+        "about": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "originalLanguage": { "$ref": "Lang#" },
         "website": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "email": {
           "anyOf": [
@@ -1985,7 +1987,8 @@
         "agents": {
           "type": "array",
           "items": { "$ref": "ApiAgentTagCandidate#" }
-        }
+        },
+        "originalLanguage": { "$ref": "Lang#" }
       },
       "required": [
         "id",

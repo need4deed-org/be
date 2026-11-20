@@ -38,10 +38,8 @@ import {
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 
 function parseContactPerson(formData: OpportunityLegacyFormData): Person {
   const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);

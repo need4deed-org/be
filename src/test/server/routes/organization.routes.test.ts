@@ -1,14 +1,24 @@
 import { FastifyInstance } from "fastify";
-import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
+import {
+  AgentMembershipStatus,
+  AgentRoleType,
+  Lang,
+  ORGANIZATION_ABOUT_MAX_LENGTH,
+  TranslationOrigin,
+  TranslationStatus,
+  UserRole,
+} from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import FieldTranslation from "../../../data/entity/field_translation.entity";
 import Address from "../../../data/entity/location/address.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import AgentService from "../../../data/entity/m2m/agent-service";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Organization from "../../../data/entity/organization.entity";
 import Person from "../../../data/entity/person.entity";
+import Language from "../../../data/entity/profile/language.entity";
 import Service from "../../../data/entity/profile/service.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
@@ -491,13 +501,11 @@ describe("organization.routes", () => {
         email: "office@example.org",
         phone: "030 1234567",
         serviceIds: [1],
-        about: "ignored",
       });
       expect(res.statusCode).toBe(204);
       expect(await reload()).toMatchObject({
         email: "office@example.org",
         phone: "030 1234567",
-        about: null,
       });
     });
 
@@ -627,6 +635,182 @@ describe("organization.routes", () => {
         .getRepository(Organization)
         .findOneByOrFail({ id: orgA.id });
       expect(updated.website).toBe("https://updated.example.org");
+    });
+  });
+  describe("about and its machine translation", () => {
+    const GERMAN_ABOUT =
+      "Wir betreiben Unterkünfte für geflüchtete Menschen in Berlin und suchen Freiwillige, die bei der Hausaufgabenhilfe und beim Deutschlernen helfen.";
+    const ENGLISH_ABOUT =
+      "We run shelters for refugees in Berlin and are looking for volunteers who help with homework and with learning German every week.";
+    const created: number[] = [];
+    const languageIdOf = async (isoCode: Lang) =>
+      (await dataSource.getRepository(Language).findOneByOrFail({ isoCode }))
+        .id;
+
+    async function newOrganization(): Promise<Organization> {
+      const organization = await dataSource.getRepository(Organization).save(
+        new Organization({
+          title: `About Org ${suffix}-${created.length}`,
+        }),
+      );
+      created.push(organization.id);
+      return organization;
+    }
+    const patchAbout = (id: number, payload: object, language?: Lang) =>
+      fastify.inject({
+        method: "PATCH",
+        url: `/organization/${id}${language ? `?language=${language}` : ""}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload,
+      });
+    const getAbout = (id: number, language: Lang) =>
+      fastify.inject({
+        method: "GET",
+        url: `/organization/${id}?language=${language}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+    const reloadOrg = (id: number) =>
+      dataSource.getRepository(Organization).findOneByOrFail({ id });
+    const rowsOf = (organizationId: number) =>
+      dataSource.manager.find(FieldTranslation, {
+        where: { organizationId },
+        relations: ["language"],
+      });
+
+    afterAll(async () => {
+      if (created.length) {
+        await dataSource.getRepository(Organization).delete(created);
+      }
+    });
+
+    it("saves about, detects its language and queues the other one", async () => {
+      const organization = await newOrganization();
+      expect(
+        (await patchAbout(organization.id, { about: ` ${GERMAN_ABOUT} ` }))
+          .statusCode,
+      ).toBe(204);
+      expect(await reloadOrg(organization.id)).toMatchObject({
+        about: GERMAN_ABOUT,
+        originalLanguageId: await languageIdOf(Lang.DE),
+      });
+      const rows = await rowsOf(organization.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        fieldName: "about",
+        origin: TranslationOrigin.MACHINE,
+        status: TranslationStatus.PENDING,
+      });
+      expect(rows[0].language.isoCode).toBe(Lang.EN);
+    });
+
+    it("detects an English about as English", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: ENGLISH_ABOUT }, Lang.DE);
+      expect((await reloadOrg(organization.id)).originalLanguageId).toBe(
+        await languageIdOf(Lang.EN),
+      );
+      const res = await getAbout(organization.id, Lang.EN);
+      expect(res.json().data).toMatchObject({
+        about: ENGLISH_ABOUT,
+        originalLanguage: Lang.EN,
+      });
+    });
+
+    it("stores an edit in another language as a translation and serves it", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      expect(
+        (await patchAbout(organization.id, { about: ENGLISH_ABOUT }, Lang.EN))
+          .statusCode,
+      ).toBe(204);
+      expect((await reloadOrg(organization.id)).about).toBe(GERMAN_ABOUT);
+      const [row] = await rowsOf(organization.id);
+      expect(row).toMatchObject({
+        origin: TranslationOrigin.HUMAN,
+        status: TranslationStatus.DONE,
+        translation: ENGLISH_ABOUT,
+      });
+
+      expect(
+        (await getAbout(organization.id, Lang.EN)).json().data,
+      ).toMatchObject({ about: ENGLISH_ABOUT, originalLanguage: Lang.DE });
+      expect((await getAbout(organization.id, Lang.DE)).json().data.about).toBe(
+        GERMAN_ABOUT,
+      );
+    });
+
+    it("clears about with null or an empty string and drops its translations", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      expect(
+        (await patchAbout(organization.id, { about: null })).statusCode,
+      ).toBe(204);
+      expect((await reloadOrg(organization.id)).about).toBeNull();
+      expect(await rowsOf(organization.id)).toHaveLength(0);
+
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      expect(
+        (await patchAbout(organization.id, { about: "" })).statusCode,
+      ).toBe(204);
+      expect((await reloadOrg(organization.id)).about).toBeNull();
+    });
+
+    it("detects the language again once about was cleared", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      await patchAbout(organization.id, { about: null });
+      await patchAbout(organization.id, { about: ENGLISH_ABOUT });
+      expect(await reloadOrg(organization.id)).toMatchObject({
+        about: ENGLISH_ABOUT,
+        originalLanguageId: await languageIdOf(Lang.EN),
+      });
+      const rows = await rowsOf(organization.id);
+      expect(rows.map((row) => row.language.isoCode)).toEqual([Lang.DE]);
+    });
+
+    it("keeps an explicit originalLanguage sent with about", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, {
+        about: GERMAN_ABOUT,
+        originalLanguage: Lang.EN,
+      });
+      expect((await reloadOrg(organization.id)).originalLanguageId).toBe(
+        await languageIdOf(Lang.EN),
+      );
+    });
+
+    it("can't clear about in a language other than the original", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      expect(
+        (await patchAbout(organization.id, { about: null }, Lang.EN))
+          .statusCode,
+      ).toBe(400);
+      expect((await reloadOrg(organization.id)).about).toBe(GERMAN_ABOUT);
+    });
+
+    it("rejects an about longer than the limit", async () => {
+      const organization = await newOrganization();
+      const res = await patchAbout(organization.id, {
+        about: "a".repeat(ORGANIZATION_ABOUT_MAX_LENGTH + 1),
+      });
+      expect(res.statusCode).toBe(400);
+      expect((await reloadOrg(organization.id)).about).toBeNull();
+    });
+
+    it("corrects the original language and requeues the other one", async () => {
+      const organization = await newOrganization();
+      await patchAbout(organization.id, { about: GERMAN_ABOUT });
+      expect(
+        (await patchAbout(organization.id, { originalLanguage: Lang.EN }))
+          .statusCode,
+      ).toBe(204);
+      expect((await reloadOrg(organization.id)).originalLanguageId).toBe(
+        await languageIdOf(Lang.EN),
+      );
+      const rows = await rowsOf(organization.id);
+      expect(rows.map((row) => row.language.isoCode)).toEqual([Lang.DE]);
+      expect(rows[0].status).toBe(TranslationStatus.PENDING);
     });
   });
 });
