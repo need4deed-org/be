@@ -299,6 +299,18 @@ describe("organization.routes", () => {
       expect(res.json().data).toMatchObject({ agents: [], services: [] });
     });
 
+    it("returns the Träger's about text", async () => {
+      const repository = dataSource.getRepository(Organization);
+      await repository.update(orgB.id, { about: "Wir betreiben Unterkünfte." });
+      try {
+        const res = await get(orgB.id, coordinatorCookie);
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.about).toBe("Wir betreiben Unterkünfte.");
+      } finally {
+        await repository.update(orgB.id, { about: null as unknown as string });
+      }
+    });
+
     it("loads the Einrichtungen and services without a Cartesian join", async () => {
       const queries = await captureSql(async () => {
         expect((await get(orgA.id, coordinatorCookie)).statusCode).toBe(200);
