@@ -1,5 +1,6 @@
 import {
   EntityTableName,
+  MyActivityEntityType,
   MyActivityKind,
   VolunteerAuditLogType,
 } from "need4deed-sdk";
@@ -12,7 +13,7 @@ export const MY_ACTIVITY_ENTITY_TYPES = [
   EntityTableName.AGENT,
   EntityTableName.OPPORTUNITY,
   EntityTableName.VOLUNTEER,
-] as const;
+] as const satisfies readonly MyActivityEntityType[];
 
 const myActivityItemSchema = {
   type: "object",

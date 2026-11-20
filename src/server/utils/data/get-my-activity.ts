@@ -45,12 +45,15 @@ async function getActivityRows(
 }
 
 async function getTitles(rows: MyActivityRow[]): Promise<Map<string, string>> {
+  if (!rows.length) {
+    return new Map();
+  }
   const idsOf = (type: MyActivityEntityType) =>
     rows.filter((row) => row.entityType === type).map((row) => row.entityId);
 
   const titles: TitleRow[] = await dataSource.query(
     `SELECT '${EntityTableName.VOLUNTEER}' AS "entityType", v.id,
-       CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.last_name, '')) AS title
+       CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.middle_name, ''), NULLIF(p.last_name, '')) AS title
      FROM volunteer v JOIN person p ON p.id = v.person_id
      WHERE v.id = ANY($1)
      UNION ALL

@@ -115,7 +115,11 @@ describe("GET /user/me/activity", () => {
     ({ cookie: volunteerCookie } = await createLogin(UserRole.VOLUNTEER));
 
     const volunteerPerson = await fastify.db.personRepository.save(
-      new Person({ firstName: "Mira", lastName: `Feed-${suffix}` }),
+      new Person({
+        firstName: "Mira",
+        middleName: "Lea",
+        lastName: `Feed-${suffix}`,
+      }),
     );
     created.persons.push(volunteerPerson.id);
     const postcode = await firstSeeded(fastify.db.postcodeRepository);
@@ -195,7 +199,7 @@ describe("GET /user/me/activity", () => {
       {
         kind: MyActivityKind.CHANGE,
         entityType: EntityTableName.VOLUNTEER,
-        entityTitle: `Mira Feed-${suffix}`,
+        entityTitle: `Mira Lea Feed-${suffix}`,
         text: "Availability changed.",
       },
       {
@@ -239,6 +243,25 @@ describe("GET /user/me/activity", () => {
     const activity = await getActivity();
 
     expect(activity.map(({ text }) => text)).not.toContain("On a deleted NGO");
+  });
+
+  it("names the volunteer on the caller's own volunteer comment", async () => {
+    await addComment(
+      coordinator,
+      EntityTableName.VOLUNTEER,
+      volunteer.id,
+      "Mine on a volunteer",
+      "2026-11-21T09:00:00Z",
+    );
+
+    const [newest] = await getActivity();
+
+    expect(newest).toMatchObject({
+      kind: MyActivityKind.COMMENT,
+      entityType: EntityTableName.VOLUNTEER,
+      entityTitle: `Mira Lea Feed-${suffix}`,
+      text: "Mine on a volunteer",
+    });
   });
 
   it("is open to admins", async () => {
