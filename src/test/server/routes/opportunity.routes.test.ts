@@ -1511,7 +1511,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("orders soonest-first (old-new) with no-date opportunities last", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1525,7 +1525,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("orders latest-first (new-old) with no-date opportunities still last", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=new-old&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=new-old&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1539,7 +1539,7 @@ describe("GET /opportunity sortBy=start-date", () => {
   it("exposes appointmentDate/appointmentTime derived from onetimer, null when absent", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1712,7 +1712,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("returns only opportunities with an onetimer inside the date range", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1726,7 +1726,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("also excludes accompanying-type opportunities when excludeAccompanying=true", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1738,7 +1738,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("hasAppointmentDate=true alone excludes only the no-date opportunity", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?hasAppointmentDate=true&limit=120",
+      url: `/opportunity?hasAppointmentDate=true&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
@@ -1767,7 +1767,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   it("still applies the date range + excludeAccompanying correctly when combined with sortBy=start-date", async () => {
     const res = await fastify.inject({
       method: "GET",
-      url: "/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&sortBy=start-date&sortOrder=old-new&limit=120",
+      url: `/opportunity?appointmentDateFrom=2026-06-01&appointmentDateTo=2026-06-30&excludeAccompanying=true&sortBy=start-date&sortOrder=old-new&limit=120&agentId=${agent.id}`,
       cookies: { [accessCookieName]: coordinatorCookie },
     });
     expect(res.statusCode).toBe(200);
