@@ -98,10 +98,10 @@ export default class Agent {
 
   @ManyToOne(() => District)
   @JoinColumn({ name: "district_id" })
-  district: District;
+  district: District | null;
 
-  @Column({ nullable: true })
-  districtId: number;
+  @Column({ type: "integer", nullable: true })
+  districtId: number | null;
 
   @OneToMany(() => AgentPostcode, (agentPostcode) => agentPostcode.agent)
   agentPostcode: AgentPostcode[];
