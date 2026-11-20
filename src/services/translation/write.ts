@@ -2,6 +2,7 @@ import {
   EntityTableName,
   Lang,
   OPPORTUNITY_TRANSLATION_MAX_LENGTH,
+  ORGANIZATION_ABOUT_MAX_LENGTH,
   TranslatedEntityType,
 } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
@@ -14,7 +15,10 @@ import { resolve } from "./resolve";
 
 const translationMaxLength: Partial<
   Record<TranslatedEntityType, Record<string, number>>
-> = { [EntityTableName.OPPORTUNITY]: OPPORTUNITY_TRANSLATION_MAX_LENGTH };
+> = {
+  [EntityTableName.OPPORTUNITY]: OPPORTUNITY_TRANSLATION_MAX_LENGTH,
+  [EntityTableName.ORGANIZATION]: { about: ORGANIZATION_ABOUT_MAX_LENGTH },
+};
 
 export function assertTranslationLength(
   entityType: TranslatedEntityType,

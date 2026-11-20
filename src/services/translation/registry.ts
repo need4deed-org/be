@@ -6,6 +6,7 @@ import {
 import type FieldTranslation from "../../data/entity/field_translation.entity";
 import LeadFrom from "../../data/entity/lead.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
+import Organization from "../../data/entity/organization.entity";
 import Activity from "../../data/entity/profile/activity.entity";
 import AgentType from "../../data/entity/profile/agent-type.entity";
 import Category from "../../data/entity/profile/category.entity";
@@ -71,6 +72,12 @@ export const translatedEntities = {
     entity: LeadFrom,
     fields: ["title"],
     machine: false,
+  },
+  [EntityTableName.ORGANIZATION]: {
+    fk: "organizationId",
+    entity: Organization,
+    fields: ["about"],
+    machine: true,
   },
 } as const satisfies TranslatedEntities;
 

@@ -9,10 +9,8 @@ import {
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 import { maskFields } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 

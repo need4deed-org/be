@@ -1,7 +1,7 @@
 import { Lang, OpportunityStatusType, OpportunityType } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Opportunity from "../../../../data/entity/opportunity/opportunity.entity";
-import { languageIdOf } from "../../../../server/utils/data/translate-opportunities";
+import { languageIdOf } from "../../../../server/utils/data/request-language";
 import { writeOpportunityLegacy } from "../../../../server/utils/data/write-opportunity-legacy";
 
 const setAgentSearchingMock = vi.fn();
@@ -20,8 +20,14 @@ vi.mock(
   "../../../../server/utils/data/translate-opportunities",
   async (importOriginal) => ({
     ...(await importOriginal<object>()),
-    languageIdOf: vi.fn(async () => 1),
     queueOpportunityTranslation: vi.fn(),
+  }),
+);
+vi.mock(
+  "../../../../server/utils/data/request-language",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    languageIdOf: vi.fn(async () => 1),
   }),
 );
 
