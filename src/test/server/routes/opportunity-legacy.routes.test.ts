@@ -429,9 +429,18 @@ describe("POST /opportunity/legacy skips an inactive agent at the same address",
 
   afterAll(async () => {
     if (createdOpportunityId) {
+      const created = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: createdOpportunityId,
+      });
       await fastify.db.opportunityRepository.delete({
         id: createdOpportunityId,
       });
+      await fastify.db.dealRepository.delete({ id: created.dealId });
+      if (created.contactPersonId) {
+        await fastify.db.personRepository.delete({
+          id: created.contactPersonId,
+        });
+      }
     }
     await fastify.db.agentRepository.delete({
       id: In([inactive.id, active.id]),

@@ -218,7 +218,7 @@ export default async function agentRegisterRoutes(
           });
           fastify.notify.arrival(
             getMembershipRequestNotificationText(
-              agent?.title ?? "",
+              agent?.title ?? "unknown",
               result.agentId,
             ),
           );
