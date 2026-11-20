@@ -4,11 +4,10 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Length,
   MaxLength,
   Min,
 } from "class-validator";
-import { VolunteerType } from "need4deed-sdk";
+import { EVENT_SIGN_UP_ANSWER_MAX_LENGTH, VolunteerType } from "need4deed-sdk";
 import {
   Column,
   CreateDateColumn,
@@ -48,20 +47,20 @@ export default class EventN4DRegistration {
   @IsEmail()
   email: string;
 
-  @Column({ nullable: true })
-  @IsOptional()
-  @Length(7, 20)
-  phone?: string;
-
   @Column({ default: 1 })
   @IsInt()
   @Min(1)
   numberOfPeople: number;
 
-  @Column({ nullable: true })
+  @Column({
+    type: "varchar",
+    length: EVENT_SIGN_UP_ANSWER_MAX_LENGTH,
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
-  languagePreference?: string;
+  @MaxLength(EVENT_SIGN_UP_ANSWER_MAX_LENGTH)
+  signUpAnswer?: string | null;
 
   @Column({ nullable: true })
   @IsOptional()

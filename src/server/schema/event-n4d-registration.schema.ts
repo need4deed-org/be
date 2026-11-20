@@ -1,4 +1,7 @@
-import { OpportunityType } from "need4deed-sdk";
+import {
+  EVENT_SIGN_UP_ANSWER_MAX_LENGTH,
+  OpportunityType,
+} from "need4deed-sdk";
 import { responseSchema } from "./response-schema";
 import { responseErrors } from "./responseErrors";
 
@@ -10,9 +13,11 @@ export const eventN4DRegistrationBodySchema = {
     eventId: { type: "integer", minimum: 1 },
     fullName: { type: "string", minLength: 1 },
     email: { type: "string", minLength: 1, format: "email" },
-    phone: { type: ["string", "null"] },
     numberOfPeople: { type: "integer", minimum: 1, maximum: 1000 },
-    languagePreference: { type: ["string", "null"] },
+    signUpAnswer: {
+      type: ["string", "null"],
+      maxLength: EVENT_SIGN_UP_ANSWER_MAX_LENGTH,
+    },
     message: { type: ["string", "null"], maxLength: 500 },
     isVolunteer: { type: "boolean" },
     volunteerTypes: {
@@ -40,9 +45,8 @@ const eventN4DRegistrationItemSchema = {
     id: { type: "integer" },
     fullName: { type: "string" },
     email: { type: "string" },
-    phone: { type: ["string", "null"] },
     numberOfPeople: { type: "integer" },
-    languagePreference: { type: ["string", "null"] },
+    signUpAnswer: { type: ["string", "null"] },
     message: { type: ["string", "null"] },
     createdAt: { type: "string" },
     isVolunteer: { type: "boolean" },

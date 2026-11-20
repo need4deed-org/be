@@ -33,6 +33,7 @@ describe("sign-ups for need4deed events", () => {
   let inactive: EventN4D;
   let running: EventN4D;
   let external: EventN4D;
+  let asking: EventN4D;
   let volunteer: Volunteer;
   let deal: Deal;
   const suffix = randomNumericSuffix();
@@ -145,6 +146,9 @@ describe("sign-ups for need4deed events", () => {
       undefined,
       { rsvpLink: "https://forms.example/rsvp" },
     );
+    asking = await makeEvent(new Date(Date.now() + 30 * DAY), true, undefined, {
+      signUpQuestion: "Bringst du etwas zum Buffet mit?",
+    });
 
     const person = await fastify.db.personRepository.save(
       new Person({
@@ -226,9 +230,42 @@ describe("sign-ups for need4deed events", () => {
     expect((await signUp({ eventId: external.id })).statusCode).toBe(400);
   });
 
-  it("treats an empty phone as no phone", async () => {
-    const res = await signUp({ eventId: running.id, phone: " " });
+  it("keeps the answer to the event's question", async () => {
+    const email = `asked-${suffix}@test.need4deed.org`;
+    const res = await signUp({
+      eventId: asking.id,
+      email,
+      signUpAnswer: " Kuchen ",
+    });
     expect(res.statusCode, res.body).toBe(201);
+    const saved = await getRepository(
+      dataSource,
+      EventN4DRegistration,
+    ).findOneByOrFail({ eventId: asking.id, email });
+    expect(saved.signUpAnswer).toBe("Kuchen");
+  });
+
+  it("ignores an answer when the event asks nothing", async () => {
+    const email = `unasked-${suffix}@test.need4deed.org`;
+    await signUp({ eventId: running.id, email, signUpAnswer: "Kuchen" });
+    const saved = await getRepository(
+      dataSource,
+      EventN4DRegistration,
+    ).findOneByOrFail({ eventId: running.id, email });
+    expect(saved.signUpAnswer).toBeNull();
+  });
+
+  it("exports the answers under the event's question", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/event/${asking.id}/registrations/export`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const [header, row] = res.body.split("\n");
+    expect(header).toContain("Bringst du etwas zum Buffet mit?");
+    expect(header).not.toContain("Phone");
+    expect(row).toContain("Kuchen");
   });
 
   it("lists sign-ups with the total people for coordinators", async () => {

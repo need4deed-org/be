@@ -74,14 +74,15 @@ export default async function eventN4DRegistrationListRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const registrations = await findRegistrations(id);
+      const event = await fastify.db.eventRepository.findOneByOrFail({ id });
+      const question = event.signUpQuestion;
 
       const rows = [
         [
           "Name",
           "Email",
-          "Phone",
           "People",
-          "Language",
+          ...(question ? [question] : []),
           "Message",
           "Volunteers with refugees",
           "Attended",
@@ -90,9 +91,8 @@ export default async function eventN4DRegistrationListRoutes(
         ...registrations.map((r) => [
           r.fullName,
           r.email,
-          r.phone ?? "",
           String(r.numberOfPeople),
-          r.languagePreference ?? "",
+          ...(question ? [r.signUpAnswer ?? ""] : []),
           r.message ?? "",
           r.isVolunteer ? r.volunteerTypes.join(" ") || "yes" : "no",
           r.attended ? "yes" : "no",

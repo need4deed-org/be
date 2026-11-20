@@ -48,6 +48,7 @@ export function dtoEventN4DGetList(
     description: translation?.description ?? "",
     shortDescription: translation?.shortDescription ?? "",
     linkRSVP: event.rsvpLink ?? null,
+    signUpQuestion: event.signUpQuestion ?? null,
     hostName: event.hostName,
     additionalTitle: translation?.additionalTitle,
     additionalInfo: sanitizeAdditionalInfo(translation?.additionalInfo),
