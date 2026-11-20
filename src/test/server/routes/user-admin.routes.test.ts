@@ -118,6 +118,7 @@ describe("admin account actions", () => {
       id: target.id,
       isActive: false,
     });
+    expect(response.json().data.deactivatedAt).toEqual(expect.any(String));
     expect((await reload(target)).deactivatedAt).not.toBeNull();
     expect(await openSessions(target)).toBe(0);
   });
@@ -166,6 +167,7 @@ describe("admin account actions", () => {
 
     expect(response.statusCode, response.body).toBe(200);
     expect(response.json().data.isActive).toBe(true);
+    expect(response.json().data.deactivatedAt).toBeNull();
     expect((await reload(target)).deactivatedAt).toBeNull();
   });
 

@@ -31,6 +31,7 @@ describe("serializeUserToMeDTO", () => {
       avatarUrl: "https://cdn.example.com/avatar.png",
       isoCode: "de",
       timezone: "Europe/Berlin",
+      deactivatedAt: null,
     });
   });
 
