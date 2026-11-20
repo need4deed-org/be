@@ -436,8 +436,10 @@ describe("dtoOpportunityGetList", () => {
     expect(result.accompanyingDetails.refugeeName).toBe("Real Name");
   });
 
-  describe("map-pin lat/lon (be#662)", () => {
-    it.each(["opp-matched", "opp-active", "opp-inactive", "opp-past"])(
+  // Pins no longer depend on status (be#1283): the NEW/SEARCHING statuses in
+  // the fixtures below are incidental.
+  describe("map-pin lat/lon (be#662, any status since be#1283)", () => {
+    it.each(["opp-active", "opp-inactive", "opp-past"])(
       "pins a %s opportunity too: the list's status filter decides what the map shows (be#1283)",
       (status) => {
         const opportunity = {
@@ -455,14 +457,24 @@ describe("dtoOpportunityGetList", () => {
       },
     );
 
-    it("falls back to the district centroid for a non-NEW/SEARCHING opportunity with no agent address (be#1283)", () => {
-      const opportunity = { ...baseOpportunity, status: "opp-past" };
+    it("falls back to the district centroid for a past opportunity with no agent address (be#1283)", () => {
+      const opportunity = {
+        ...baseOpportunity,
+        status: "opp-past",
+        agent: { address: undefined },
+      };
       expect(getOpportunityDistrictIdNeedingCentroid(opportunity as any)).toBe(
         5,
       );
+      const result = dtoOpportunityGetList(opportunity as any, {
+        latitude: 52.45,
+        longitude: 13.35,
+      });
+      expect(result.lat).toBe(52.45);
+      expect(result.lon).toBe(13.35);
     });
 
-    it("uses the agent's geocoded address when the opportunity is NEW", () => {
+    it("uses the agent's geocoded address", () => {
       const opportunity = {
         ...baseOpportunity,
         status: "opp-new",
@@ -477,7 +489,7 @@ describe("dtoOpportunityGetList", () => {
       expect(result.lon).toBe(13.4);
     });
 
-    it("falls back to the handler-supplied district centroid when the opportunity is SEARCHING with no agent address", () => {
+    it("falls back to the handler-supplied district centroid when there is no agent address", () => {
       const opportunity = {
         ...baseOpportunity,
         status: "opp-searching",

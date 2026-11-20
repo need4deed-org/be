@@ -1777,7 +1777,7 @@ describe("GET /opportunity appointment date-range filters", () => {
   });
 });
 
-describe("GET /opportunity map-pin lat/lon (be#662)", () => {
+describe("GET /opportunity map-pin lat/lon (be#662, any status since be#1283)", () => {
   let fastify: FastifyInstance;
   let agent: Agent;
   let postcode: Postcode;
@@ -1868,37 +1868,30 @@ describe("GET /opportunity map-pin lat/lon (be#662)", () => {
     await fastify.close();
   });
 
-  it("serializes the agent's geocoded coordinates as numeric lat/lon for a NEW opportunity", async () => {
-    const res = await fastify.inject({
-      method: "GET",
-      url: `/opportunity?filter[search]=${encodeURIComponent(oppNew.title)}`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-    expect(res.statusCode).toBe(200);
+  // Pins no longer depend on status (be#1283): a NEW and an ACTIVE
+  // opportunity get the same pin.
+  it.each([
+    ["NEW", () => oppNew],
+    ["ACTIVE", () => oppActive],
+  ])(
+    "serializes the agent's geocoded coordinates as numeric lat/lon for a %s opportunity",
+    async (_status, opportunity) => {
+      const { id, title } = opportunity();
+      const res = await fastify.inject({
+        method: "GET",
+        url: `/opportunity?filter[search]=${encodeURIComponent(title)}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+      });
+      expect(res.statusCode).toBe(200);
 
-    const body = res.json();
-    const found = body.data.find((o: { id: number }) => o.id === oppNew.id);
-    expect(found).toBeDefined();
-    expect(found.lat).toBe(LAT);
-    expect(found.lon).toBe(LON);
-    expect(typeof found.lat).toBe("number");
-    expect(typeof found.lon).toBe("number");
-  });
-
-  it("pins an ACTIVE opportunity too, so the map matches the list (be#1283)", async () => {
-    const res = await fastify.inject({
-      method: "GET",
-      url: `/opportunity?filter[search]=${encodeURIComponent(oppActive.title)}`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-    });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json();
-    const found = body.data.find((o: { id: number }) => o.id === oppActive.id);
-    expect(found).toBeDefined();
-    expect(found.lat).toBe(LAT);
-    expect(found.lon).toBe(LON);
-  });
+      const found = res.json().data.find((o: { id: number }) => o.id === id);
+      expect(found).toBeDefined();
+      expect(found.lat).toBe(LAT);
+      expect(found.lon).toBe(LON);
+      expect(typeof found.lat).toBe("number");
+      expect(typeof found.lon).toBe("number");
+    },
+  );
 });
 
 describe("GET /opportunity map-pin district-centroid fallback (be#662)", () => {
@@ -2051,6 +2044,7 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
   let agent: Agent;
   let deal: Deal;
   let oppNew: Opportunity;
+  let oppPast: Opportunity;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
   let unrelatedPerson: Person;
@@ -2121,6 +2115,15 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
         dealId: deal.id,
       }),
     );
+    oppPast = await fastify.db.opportunityRepository.save(
+      new Opportunity({
+        title: `Test Map Pin Masked Fallback PAST ${suffix}`,
+        type: OpportunityType.REGULAR,
+        status: OpportunityStatusType.PAST,
+        agentId: agent.id,
+        dealId: deal.id,
+      }),
+    );
 
     coordinatorPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Test", lastName: "MaskedFallbackCoordinator" }),
@@ -2173,6 +2176,7 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: unrelatedPerson.id });
     await fastify.db.opportunityRepository.delete({ id: oppNew.id });
+    await fastify.db.opportunityRepository.delete({ id: oppPast.id });
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.agentRepository.delete({ id: agent.id });
     await getRepository(dataSource, Address).delete({ id: agentAddress.id });
@@ -2213,6 +2217,22 @@ describe("GET /opportunity map-pin falls back to district centroid for a masked 
     const found = res
       .json()
       .data.find((o: { id: number }) => o.id === oppNew.id);
+    expect(found).toBeDefined();
+    expect(found.lat).toBe(DISTRICT_LAT);
+    expect(found.lon).toBe(DISTRICT_LON);
+  });
+
+  it("gives a PAST opportunity the same masked centroid pin, never the agent's own coordinates (be#1283)", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/opportunity?filter[search]=${encodeURIComponent(oppPast.title)}`,
+      cookies: { [accessCookieName]: unrelatedUserCookie },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const found = res
+      .json()
+      .data.find((o: { id: number }) => o.id === oppPast.id);
     expect(found).toBeDefined();
     expect(found.lat).toBe(DISTRICT_LAT);
     expect(found.lon).toBe(DISTRICT_LON);
