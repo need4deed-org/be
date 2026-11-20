@@ -360,8 +360,7 @@ async function authRoutes(
       const user = await fastify.db.userRepository.findOne({
         where: { id: payload.id },
       });
-      // The email changes when the account is erased, which voids older links.
-      if (!user || user.email !== payload.email) {
+      if (!user || user.email !== payload.email || user.deactivatedAt) {
         return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 

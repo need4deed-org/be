@@ -1,14 +1,13 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ADMIN_ASSIGNABLE_ROLES,
-  AdminUserActionErrorCode,
   ApiAdminUserActionResponse,
   ApiAdminUserRolePatch,
   isAdminManageableRole,
   UserRole,
 } from "need4deed-sdk";
 import { EntityManager, In, IsNull, Not } from "typeorm";
-import { BadRequestError, BaseError, NotFoundError } from "../../config";
+import { AdminActionError, BadRequestError, NotFoundError } from "../../config";
 import ApiKey from "../../data/entity/api-key.entity";
 import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
@@ -19,25 +18,14 @@ import { idParamSchema, responseSchema } from "../schema";
 import { ParamsId, ReplyData, ReplyMessage } from "../types";
 import {
   buildEraseSummaryMessage,
-  ERASED_EMAIL_DOMAIN,
   erasedEmailFor,
   erasePersonPii,
 } from "../utils/data/erase-person-pii";
 import { revokeUserRefreshSessions } from "../utils/data/refresh-session";
 
-class AdminActionError extends BaseError {
-  constructor(code: AdminUserActionErrorCode, message: string) {
-    super(message, 400, true, { code });
-  }
-}
+const isErased = (user: User) => user.email === erasedEmailFor(user.id);
 
-const isErased = (user: User) => user.email.endsWith(ERASED_EMAIL_DOMAIN);
-
-/**
- * Locks every active admin row in id order. Every transaction that can take an
- * admin out of the active set calls this before locking any other user row, so
- * concurrent admin actions queue up instead of deadlocking.
- */
+// Lock before any other user row, so concurrent admin actions can't deadlock.
 export async function lockActiveAdminIds(
   manager: EntityManager,
 ): Promise<number[]> {
@@ -109,8 +97,6 @@ export async function eraseUserByAdmin(
   const user = await findManageableUser(manager, id, adminId);
   const { personId } = user;
 
-  // Erasing anonymizes the whole Person, so every non-volunteer login of that
-  // Person goes with it (erasePersonPii handles the volunteer logins).
   const logins = [user];
   if (personId) {
     if (await manager.exists(Volunteer, { where: { personId } })) {
@@ -135,6 +121,14 @@ export async function eraseUserByAdmin(
   assertActiveAdminRemains(activeAdminIds, leavingAdminIds(logins));
 
   const loginIds = logins.map((login) => login.id);
+  const volunteerLoginIds = personId
+    ? (
+        await manager.find(User, {
+          select: { id: true },
+          where: { personId, role: UserRole.VOLUNTEER },
+        })
+      ).map(({ id }) => id)
+    : [];
   const now = new Date();
   for (const loginId of loginIds) {
     await manager.update(
@@ -142,18 +136,20 @@ export async function eraseUserByAdmin(
       { id: loginId },
       { isActive: false, deactivatedAt: now, email: erasedEmailFor(loginId) },
     );
+  }
+  for (const loginId of [...loginIds, ...volunteerLoginIds]) {
     await revokeUserRefreshSessions(manager, loginId);
   }
   await manager.update(
     ApiKey,
-    { userId: In(loginIds), revokedAt: IsNull() },
+    { userId: In([...loginIds, ...volunteerLoginIds]), revokedAt: IsNull() },
     { revokedAt: now },
   );
   const eraseSummary = personId
     ? await erasePersonPii(manager, personId)
     : undefined;
   if (eraseSummary && logins.some((login) => login.role === UserRole.AGENT)) {
-    // An NGO login's own agent memberships aren't "other roles" of the person.
+    // An NGO login's own memberships aren't "other roles" of the person.
     eraseSummary.agentRoles = 0;
   }
 

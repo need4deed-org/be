@@ -347,21 +347,29 @@ describe("admin account actions", () => {
     }
   });
 
-  it("voids a reset link sent before the account was deleted", async () => {
-    const target = await createAccount(UserRole.COORDINATOR);
-    const token = fastify.jwt.sign({
-      id: target.id,
-      email: target.email,
-      type: "reset",
-    });
-    await send("DELETE", `/user/${target.id}`);
+  it.each(["DELETE", "POST"] as const)(
+    "voids a reset link sent before the account was deleted/deactivated (%s)",
+    async (method) => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const token = fastify.jwt.sign({
+        id: target.id,
+        email: target.email,
+        type: "reset",
+      });
+      await send(
+        method,
+        method === "DELETE"
+          ? `/user/${target.id}`
+          : `/user/${target.id}/deactivate`,
+      );
 
-    const response = await fastify.inject({
-      method: "POST",
-      url: "/auth/password-reset",
-      payload: { token, newPassword: "newpass123456" },
-    });
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/password-reset",
+        payload: { token, newPassword: "newpass123456" },
+      });
 
-    expect(response.statusCode).toBe(400);
-  });
+      expect(response.statusCode).toBe(400);
+    },
+  );
 });

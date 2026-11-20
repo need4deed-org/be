@@ -103,7 +103,7 @@ export function buildEraseSummaryMessage(
     : base;
 }
 
-export const ERASED_EMAIL_DOMAIN = "@erased.need4deed.org";
+const ERASED_EMAIL_DOMAIN = "@erased.need4deed.org";
 
 export const erasedEmailFor = (userId: number) =>
   `deleted-user-${userId}${ERASED_EMAIL_DOMAIN}`;
