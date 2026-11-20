@@ -22,6 +22,7 @@ import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { berlinDayBoundaries } from "../../../services/jobs/berlin-dates";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { HOUR } from "../../time";
 
 const PASSWORD = "test_password";
@@ -89,9 +90,7 @@ describe("no match found (be#1162)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     for (const [key, { type, date }] of Object.entries(setup) as [
       Key,
       (typeof setup)[Key],
