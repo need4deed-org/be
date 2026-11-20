@@ -65,15 +65,6 @@ export class AgentAlreadyRegisteredError extends BaseError {
   }
 }
 
-export class AgentTitleConflictError extends BaseError {
-  constructor(public readonly agentId?: number) {
-    super("An agent with this title already exists.", 409, true, {
-      conflict: "title",
-      ...(agentId !== undefined ? { agentId } : {}),
-    });
-  }
-}
-
 export async function findRegistrationMembership(
   personId: number,
   {
@@ -257,7 +248,7 @@ export async function createAgentForPerson(
       };
     });
   } catch (err) {
-    throw await toRegisterAgentError(err, input);
+    throw toRegisterAgentError(err, input);
   }
 
   return result;
@@ -276,7 +267,7 @@ export async function createAgent(
       agentId = agent.id;
     });
   } catch (err) {
-    throw await toRegisterAgentError(err, input);
+    throw toRegisterAgentError(err, input);
   }
 
   return { agentId };
@@ -384,35 +375,21 @@ export async function joinAgent(
   return { agentId, membershipStatus: status };
 }
 
-async function toRegisterAgentError(
+function toRegisterAgentError(
   err: unknown,
   input: ApiAgentRegisterNew,
-): Promise<unknown> {
-  switch (classifyRegisterAgentConflict(err)) {
-    case "title": {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      return new AgentTitleConflictError(existing?.id);
-    }
-    case "organization":
-      return new BadRequestError(
-        `Organization (id:${input.organizationId}) not found.`,
-      );
-    default:
-      return err;
-  }
+): unknown {
+  return classifyRegisterAgentConflict(err) === "organization"
+    ? new BadRequestError(`Organization (id:${input.organizationId}) not found.`)
+    : err;
 }
 
 export function classifyRegisterAgentConflict(
   err: unknown,
-): "title" | "organization" | null {
+): "organization" | null {
   const e = err as { code?: string; detail?: string };
   if (!e?.detail) {
     return null;
-  }
-  if (e.code === "23505" && e.detail.includes("title")) {
-    return "title";
   }
   if (e.code === "23503" && e.detail.includes("organization_id")) {
     return "organization";
