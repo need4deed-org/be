@@ -67,7 +67,7 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
         type: input.type,
         pic: input.pic,
         locationLink: input.locationLink,
-        rsvpLink: input.linkRSVP,
+        rsvpLink: input.linkRSVP || null,
         followupLink: input.followUpLink,
         address: input.address,
         hostName: input.hostName,
@@ -125,7 +125,8 @@ export async function updateEvent(
       type: input.type,
       pic: input.pic,
       locationLink: input.locationLink,
-      rsvpLink: input.linkRSVP,
+      rsvpLink:
+        input.linkRSVP === undefined ? undefined : input.linkRSVP || null,
       followupLink: input.followUpLink,
       address: input.address,
       hostName: input.hostName,
