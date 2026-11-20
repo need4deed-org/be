@@ -185,6 +185,7 @@ describe("POST /auth/reset-password", () => {
 
     vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
       id: 999,
+      email: "test@example.com",
     } as any);
     const updateSpy = mockTransaction(fastify);
 

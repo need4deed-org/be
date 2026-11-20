@@ -3,10 +3,14 @@ import { UserRole } from "need4deed-sdk";
 import { IsNull } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
+import ApiKey from "../../../data/entity/api-key.entity";
+import Deal from "../../../data/entity/deal.entity";
 import Person from "../../../data/entity/person.entity";
 import RefreshSession from "../../../data/entity/refresh-session.entity";
 import User from "../../../data/entity/user.entity";
-import { hashPassword } from "../../../data/utils";
+import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
+import { DealType } from "../../../data/types";
+import { getPostcode, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
 
@@ -226,6 +230,138 @@ describe("admin account actions", () => {
     const response = await send("PATCH", `/user/${target.id}/role`, undefined, {
       role: UserRole.VOLUNTEER,
     });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("refuses to deactivate an account that was never verified", async () => {
+    const target = await createAccount(UserRole.AGENT, false);
+    const response = await send("POST", `/user/${target.id}/deactivate`);
+    expect(response.statusCode).toBe(400);
+    expect((await reload(target)).deactivatedAt).toBeNull();
+  });
+
+  it("keeps the first deactivation time when deactivating twice", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    await send("POST", `/user/${target.id}/deactivate`);
+    const { deactivatedAt } = await reload(target);
+
+    const response = await send("POST", `/user/${target.id}/deactivate`);
+
+    expect(response.statusCode, response.body).toBe(200);
+    expect((await reload(target)).deactivatedAt).toEqual(deactivatedAt);
+  });
+
+  it("refuses deactivate, role change and delete on an erased account", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    await send("DELETE", `/user/${target.id}`);
+
+    const responses = [
+      await send("POST", `/user/${target.id}/deactivate`),
+      await send("PATCH", `/user/${target.id}/role`, undefined, {
+        role: UserRole.ADMIN,
+      }),
+      await send("DELETE", `/user/${target.id}`),
+    ];
+
+    for (const response of responses) {
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe("erased");
+    }
+  });
+
+  it("deletes every staff/NGO login of the person and revokes their API keys", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    const sameUser = await fastify.db.userRepository.save(
+      new User({
+        email: `admin-actions-same-person-${randomNumericSuffix()}@test.need4deed.org`,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: target.personId,
+      }),
+    );
+    createdUserIds.push(sameUser.id);
+    const apiKey = await fastify.db.apiKeyRepository.save(
+      new ApiKey({
+        label: `admin-actions-${randomNumericSuffix()}`,
+        keyHash: `hash-${randomNumericSuffix()}`,
+        userId: sameUser.id,
+      }),
+    );
+
+    try {
+      const response = await send("DELETE", `/user/${target.id}`);
+
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json().message).not.toMatch(/agent-membership/);
+      const other = await reload(sameUser);
+      expect(other.isActive).toBe(false);
+      expect(other.email).toMatch(/@erased\.need4deed\.org$/);
+      const key = await fastify.db.apiKeyRepository.findOneByOrFail({
+        id: apiKey.id,
+      });
+      expect(key.revokedAt).not.toBeNull();
+    } finally {
+      await fastify.db.apiKeyRepository.delete({ id: apiKey.id });
+    }
+  });
+
+  it("refuses to delete an account whose person shares your own login", async () => {
+    const target = await fastify.db.userRepository.save(
+      new User({
+        email: `admin-actions-own-person-${randomNumericSuffix()}@test.need4deed.org`,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.AGENT,
+        isActive: true,
+        personId: admin.personId,
+      }),
+    );
+    createdUserIds.push(target.id);
+
+    const response = await send("DELETE", `/user/${target.id}`);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().code).toBe("self");
+    expect((await reload(target)).isActive).toBe(true);
+  });
+
+  it("refuses to delete an account whose person has a volunteer profile", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    const postcode = await getPostcode("10115");
+    const deal = await fastify.db.dealRepository.save(
+      new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
+    );
+    const volunteer = await fastify.db.volunteerRepository.save(
+      new Volunteer({ personId: target.personId!, dealId: deal.id }),
+    );
+
+    try {
+      const response = await send("DELETE", `/user/${target.id}`);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe("not_manageable");
+      expect((await reload(target)).isActive).toBe(true);
+    } finally {
+      await fastify.db.volunteerRepository.delete({ id: volunteer.id });
+      await fastify.db.dealRepository.delete({ id: deal.id });
+    }
+  });
+
+  it("voids a reset link sent before the account was deleted", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    const token = fastify.jwt.sign({
+      id: target.id,
+      email: target.email,
+      type: "reset",
+    });
+    await send("DELETE", `/user/${target.id}`);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/auth/password-reset",
+      payload: { token, newPassword: "newpass123456" },
+    });
+
     expect(response.statusCode).toBe(400);
   });
 });
