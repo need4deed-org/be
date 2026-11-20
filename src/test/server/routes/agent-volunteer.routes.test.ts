@@ -31,6 +31,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
@@ -75,9 +76,7 @@ describe("GET /agent/:id/volunteer-linked", () => {
       new Agent({ title: `Test Agent (no volunteers) ${suffix}` }),
     );
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );

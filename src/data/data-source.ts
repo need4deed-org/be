@@ -8,6 +8,7 @@ import Config from "./entity/config.entity";
 import Deal from "./entity/deal.entity";
 import Document from "./entity/document.entity";
 import EventTranslation from "./entity/event/event_translation.entity";
+import EventN4DRegistration from "./entity/event/event-n4d-registration.entity";
 import EventN4D from "./entity/event/event.entity";
 import FieldTranslation from "./entity/field_translation.entity";
 import LeadFrom from "./entity/lead.entity";
@@ -31,7 +32,6 @@ import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
 import PostBookmark from "./entity/m2m/post-bookmark";
 import PostReaction from "./entity/m2m/post-reaction";
 import NotionRelation from "./entity/notion-relation.entity";
-import OpportunityEventRegistration from "./entity/opportunity-event-registration.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Onetimer from "./entity/opportunity/onetimer.entity";
@@ -106,7 +106,7 @@ export const dataSource = new DataSource({
     NotionRelation,
     Onetimer,
     Opportunity,
-    OpportunityEventRegistration,
+    EventN4DRegistration,
     OpportunityVolunteer,
     Organization,
     Person,

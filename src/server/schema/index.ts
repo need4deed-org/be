@@ -7,7 +7,7 @@ export * from "./param";
 export * from "./person.schema";
 export * from "./querystring";
 export * from "./opportunity-create.schema";
-export * from "./opportunity-event-registration.schema";
+export * from "./event-n4d-registration.schema";
 export * from "./opportunity-volunteer-patch.schema";
 export * from "./response-schema";
 export * from "./responseErrors";

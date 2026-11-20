@@ -26,6 +26,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -67,9 +68,7 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
     );
     vi.spyOn(fastify.notify, "tagged").mockResolvedValue(undefined);
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const sharing: Record<AgentKey, boolean> = {
       requester: true,
       owner: true,
@@ -268,7 +267,10 @@ describe("POST /volunteer/:id/suggestion-request (be#1317)", () => {
         requesterAgent: agents.requester.title,
         volunteerId: volunteers.owned.id,
         volunteerName: `Vera owned${suffix}`,
-        opportunityTitle: opportunities.open.title,
+        opportunity: expect.objectContaining({
+          id: opportunities.open.id,
+          title: opportunities.open.title,
+        }),
       }),
     );
     expect(fastify.notify.tagged).toHaveBeenCalledWith(

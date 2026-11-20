@@ -22,6 +22,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -69,9 +70,7 @@ describe("NGO-owned volunteers (be#1056)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const sharing: Record<AgentKey, boolean> = {
       owner: false,
       sharing: true,

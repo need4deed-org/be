@@ -32,6 +32,7 @@ import { appointmentsDue } from "../../../services/jobs/berlin-dates";
 import { scanAccompanyNotFound } from "../../../services/jobs/scan-accompany-not-found";
 import { SuspendedEmailError } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 import { DAY, HOUR } from "../../time";
 
 const nextWeekday = (date: Date, weekday: number) => {
@@ -107,9 +108,7 @@ describe("scanAccompanyNotFound", () => {
     notify = vi.fn<(opportunity: Opportunity) => Promise<EmailDelivery>>();
     fastify.cronNotify.emailAccompanyNotFound = notify;
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (scan-not-found) ${suffix}` }),
     );
