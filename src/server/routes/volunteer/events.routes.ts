@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ApiVolunteerEventN4DGet, Lang, UserRole } from "need4deed-sdk";
+import { NotFoundError } from "../../../config";
 import { dtoVolunteerEventN4D } from "../../../services";
 import {
   idParamSchema,
@@ -30,6 +31,10 @@ export default async function volunteerEventsRoutes(
     async (request, reply) => {
       const { id } = request.params;
       const language = getLanguageCode(request.query.language) || Lang.DE;
+
+      if (!(await fastify.db.volunteerRepository.existsBy({ id }))) {
+        throw new NotFoundError(`Volunteer (id:${id}) not found.`);
+      }
 
       const registrations =
         await fastify.db.eventN4DRegistrationRepository.find({

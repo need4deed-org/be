@@ -51,17 +51,26 @@ export default async function eventN4DRegistrationRoutes(
       if (!event) {
         throw new NotFoundError(`Event (id:${eventId}) not found.`);
       }
-      if (event.date.getTime() < Date.now()) {
+      if ((event.dateEnd ?? event.date).getTime() < Date.now()) {
         throw new BadRequestError("Event date has already passed.");
+      }
+      if (event.rsvpLink) {
+        throw new BadRequestError(
+          "Event uses its own registration link; sign up there.",
+        );
       }
 
       const registration = new EventN4DRegistration({
         eventId,
         ...answers,
+        phone: answers.phone?.trim() || null,
         isVolunteer,
         volunteerTypes: isVolunteer ? (volunteerTypes ?? []) : [],
         volunteerId: isVolunteer
-          ? await findVolunteerIdByEmail(answers.email)
+          ? await findVolunteerIdByEmail(
+              fastify.db.volunteerRepository,
+              answers.email,
+            )
           : null,
       });
       const errors = await validate(registration);

@@ -30,6 +30,8 @@ describe("sign-ups for need4deed events", () => {
   let upcoming: EventN4D;
   let past: EventN4D;
   let inactive: EventN4D;
+  let running: EventN4D;
+  let external: EventN4D;
   let volunteer: Volunteer;
   let deal: Deal;
   const suffix = randomNumericSuffix();
@@ -64,7 +66,12 @@ describe("sign-ups for need4deed events", () => {
     return cookie.value;
   }
 
-  async function makeEvent(date: Date, isActive = true, title?: string) {
+  async function makeEvent(
+    date: Date,
+    isActive = true,
+    title?: string,
+    extra: Partial<EventN4D> = {},
+  ) {
     const de = await fastify.db.languageRepository.findOneByOrFail({
       isoCode: "de",
     });
@@ -74,8 +81,8 @@ describe("sign-ups for need4deed events", () => {
         date,
         type: EventN4DType.PARTY,
         address: "Elsenstraße 87, Berlin",
-        rsvpLink: "https://forms.example/rsvp",
         languageId: de.id,
+        ...extra,
       }),
     );
     events.push(event.id);
@@ -128,6 +135,15 @@ describe("sign-ups for need4deed events", () => {
     );
     past = await makeEvent(new Date(Date.now() - 30 * DAY));
     inactive = await makeEvent(new Date(Date.now() + 30 * DAY), false);
+    running = await makeEvent(new Date(Date.now() - DAY), true, undefined, {
+      dateEnd: new Date(Date.now() + DAY),
+    });
+    external = await makeEvent(
+      new Date(Date.now() + 30 * DAY),
+      true,
+      undefined,
+      { rsvpLink: "https://forms.example/rsvp" },
+    );
 
     const person = await fastify.db.personRepository.save(
       new Person({
@@ -202,6 +218,20 @@ describe("sign-ups for need4deed events", () => {
     expect((await signUp({ eventId: 999999999 })).statusCode).toBe(404);
   });
 
+  it("takes sign-ups until a multi-day event ends", async () => {
+    const res = await signUp({ eventId: running.id });
+    expect(res.statusCode, res.body).toBe(201);
+  });
+
+  it("sends sign-ups for an event with its own link there", async () => {
+    expect((await signUp({ eventId: external.id })).statusCode).toBe(400);
+  });
+
+  it("treats an empty phone as no phone", async () => {
+    const res = await signUp({ eventId: running.id, phone: " " });
+    expect(res.statusCode, res.body).toBe(201);
+  });
+
   it("lists sign-ups with the total people for coordinators", async () => {
     const res = await listSignUps(upcoming.id);
     expect(res.statusCode, res.body).toBe(200);
@@ -268,6 +298,15 @@ describe("sign-ups for need4deed events", () => {
         attended: true,
       },
     ]);
+  });
+
+  it("answers 404 for an unknown volunteer's events", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/volunteer/999999999/events",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   it("keeps attendance and a volunteer's events from non-staff", async () => {
