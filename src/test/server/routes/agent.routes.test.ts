@@ -487,7 +487,7 @@ describe("PATCH /agent/:id organization details", () => {
     });
 
     describe("moving to a postcode with no district", () => {
-      const unmappedPlz = `7${randomNumericSuffix(4)}`;
+      let unmappedPlz: string;
       let preexistingPostcode = false;
 
       const patchAgent = (payload: Record<string, unknown>) =>
@@ -502,6 +502,13 @@ describe("PATCH /agent/:id organization details", () => {
           .districtId;
 
       beforeAll(async () => {
+        do {
+          unmappedPlz = randomNonReferencePostcode("7");
+        } while (
+          await dataSource
+            .getRepository(DistrictPostcode)
+            .existsBy({ postcode: { value: unmappedPlz } })
+        );
         preexistingPostcode = await dataSource
           .getRepository(Postcode)
           .existsBy({ value: unmappedPlz });
@@ -535,20 +542,6 @@ describe("PATCH /agent/:id organization details", () => {
         const res = await patchAgent({ addressPostcode: unmappedPlz });
         expect(res.statusCode).toBe(204);
         expect(await districtId()).toBeNull();
-      });
-
-      it("keeps a district set elsewhere while the unmapped postcode stays the same", async () => {
-        await fastify.db.agentRepository.update(
-          { id: agent.id },
-          { districtId: districtB.id },
-        );
-
-        const res = await patchAgent({
-          addressStreet: "Teststraße 10",
-          addressPostcode: unmappedPlz,
-        });
-        expect(res.statusCode).toBe(204);
-        expect(await districtId()).toBe(districtB.id);
       });
     });
   });

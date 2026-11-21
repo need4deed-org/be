@@ -32,18 +32,12 @@ export async function syncAgentDistrictFromPostcode(
   agent: Agent,
   postcode?: Voidable<Postcode | number>,
   manager: DataSource | EntityManager = dataSource,
-  { clearWhenUnmapped = false }: { clearWhenUnmapped?: boolean } = {},
 ): Promise<Agent> {
   const district = await getDistrictFromPostcode(
     postcode ?? agent.address?.postcode,
     manager,
   );
-  if (district) {
-    agent.district = district;
-    agent.districtId = district.id;
-  } else if (clearWhenUnmapped) {
-    agent.district = null;
-    agent.districtId = null;
-  }
+  agent.district = district;
+  agent.districtId = district?.id ?? null;
   return agent;
 }
