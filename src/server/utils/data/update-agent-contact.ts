@@ -1,4 +1,5 @@
 import { ApiAgentContactPatch } from "need4deed-sdk";
+import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
@@ -7,7 +8,7 @@ import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import {
   createAddress,
-  isAddressShared,
+  deleteAddressIfUnshared,
   patchOrReplaceAddress,
   resolveAddressPostcode,
 } from "./for-routes";
@@ -21,6 +22,39 @@ const PERSON_FIELDS = [
   "landline",
 ] as const;
 
+async function upsertContactAddress(
+  person: Person,
+  street: string | null | undefined,
+  postcode: string | undefined,
+  manager: EntityManager,
+): Promise<void> {
+  const addressData: Partial<Address> =
+    street === undefined ? {} : { street: street as string };
+  const postcodeData = await resolveAddressPostcode(postcode, manager);
+
+  if (person.addressId) {
+    const patched = await patchOrReplaceAddress(
+      person.id,
+      { id: person.addressId, ...addressData },
+      postcodeData,
+      manager,
+    );
+    if (!patched) {
+      throw new BadRequestError("Address not saved.");
+    }
+    return;
+  }
+
+  const address = await createAddress(addressData, postcodeData, manager);
+  if (!address) {
+    throw new BadRequestError("Address not saved: a postcode is required.");
+  }
+  await getRepository(manager, Person).update(
+    { id: person.id },
+    { addressId: address.id },
+  );
+}
+
 export async function updateAgentContact(
   membership: AgentPerson,
   input: ApiAgentContactPatch,
@@ -32,59 +66,30 @@ export async function updateAgentContact(
     const agentPersonRepository = getRepository(manager, AgentPerson);
     const person = membership.person;
 
-    const clearsStreet = input.addressStreet === null;
-    const clearsPostcode = input.addressPostcode === null;
-    const changesStreet =
-      input.addressStreet !== undefined && !(clearsStreet && !person.addressId);
+    const street =
+      input.addressStreet === undefined
+        ? undefined
+        : input.addressStreet || null;
+    const postcode =
+      input.addressPostcode === undefined
+        ? undefined
+        : input.addressPostcode || null;
 
-    if (clearsPostcode && !clearsStreet) {
+    if (postcode === null && street !== null) {
       throw new BadRequestError(
         "An address needs a postcode; clear addressStreet and addressPostcode together to remove it.",
       );
     }
 
-    if (clearsPostcode) {
+    if (postcode === null) {
       if (person.addressId) {
-        await personRepository.update({ id: personId }, {
-          addressId: null,
-        } as unknown as Partial<Person>);
-        if (!(await isAddressShared(person.addressId, manager))) {
-          await getRepository(manager, Address).delete({
-            id: person.addressId,
-          });
-        }
+        await personRepository.update({ id: personId }, { addressId: null });
+        await deleteAddressIfUnshared(person.addressId, manager);
       }
-    } else if (input.addressPostcode || changesStreet) {
-      const addressData = (
-        changesStreet ? { street: input.addressStreet } : {}
-      ) as Partial<Address>;
-      const postcodeData = await resolveAddressPostcode(
-        input.addressPostcode ?? undefined,
-        manager,
-      );
-
-      if (person.addressId) {
-        const patched = await patchOrReplaceAddress(
-          personId,
-          { id: person.addressId, ...addressData },
-          postcodeData,
-          manager,
-        );
-        if (!patched) {
-          throw new BadRequestError("Address not saved.");
-        }
-      } else {
-        const address = await createAddress(addressData, postcodeData, manager);
-        if (!address) {
-          throw new BadRequestError(
-            "Address not saved: a postcode is required.",
-          );
-        }
-        await personRepository.update(
-          { id: personId },
-          { addressId: address.id },
-        );
-      }
+    } else if (postcode || (street !== undefined && person.addressId)) {
+      await upsertContactAddress(person, street, postcode, manager);
+    } else if (street) {
+      throw new BadRequestError("Address not saved: a postcode is required.");
     }
 
     const personUpdates = Object.fromEntries(

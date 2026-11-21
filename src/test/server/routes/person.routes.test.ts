@@ -276,7 +276,13 @@ describe("PATCH /person/:id representative role", () => {
         method: "PATCH",
         url: `/person/${person.id}`,
         cookies: { [accessCookieName]: adminCookie },
-        payload: { middleName: null, email: null, phone: null, landline: null },
+        payload: {
+          middleName: null,
+          lastName: null,
+          email: null,
+          phone: null,
+          landline: null,
+        },
       });
       expect(res.statusCode).toBe(200);
 
@@ -284,6 +290,7 @@ describe("PATCH /person/:id representative role", () => {
         id: person.id,
       });
       expect(reloaded.middleName).toBeNull();
+      expect(reloaded.lastName).toBeNull();
       expect(reloaded.email).toBeNull();
       expect(reloaded.phone).toBeNull();
       expect(reloaded.landline).toBeNull();

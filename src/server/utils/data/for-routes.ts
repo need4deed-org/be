@@ -471,6 +471,19 @@ export async function isAddressShared(
   return shared;
 }
 
+export async function deleteAddressIfUnshared(
+  addressId: number,
+  manager: EntityManager,
+): Promise<void> {
+  const address = await manager.getRepository(Address).findOne({
+    where: { id: addressId },
+    lock: { mode: "pessimistic_write" },
+  });
+  if (address && !(await isAddressShared(addressId, manager))) {
+    await manager.getRepository(Address).delete({ id: addressId });
+  }
+}
+
 export async function patchOrReplaceAddress(
   personId: number,
   addressData: Partial<Address> & { id: number },
