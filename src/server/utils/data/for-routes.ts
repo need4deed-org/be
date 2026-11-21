@@ -482,12 +482,24 @@ export async function patchOrReplaceAddress(
   addressData: Partial<Address> & { id: number },
   postcodeData: Partial<Postcode>,
   manager: DataSource | EntityManager = dataSource,
-): Promise<boolean> {
+): Promise<number | false> {
+  if (
+    manager instanceof EntityManager &&
+    manager.queryRunner?.isTransactionActive
+  ) {
+    await manager.getRepository(Address).findOne({
+      where: { id: addressData.id },
+      lock: { mode: "pessimistic_write" },
+    });
+  }
+
   const shared = await isAddressShared(addressData.id, manager, {
     exceptPersonId: personId,
   });
   if (!shared) {
-    return patchAddress(addressData, postcodeData, manager);
+    return (await patchAddress(addressData, postcodeData, manager))
+      ? addressData.id
+      : false;
   }
 
   const current = await getRepository(manager, Address).findOneBy({
@@ -497,16 +509,16 @@ export async function patchOrReplaceAddress(
     return false;
   }
 
+  const postcodeId =
+    (await resolvePostcodeId(postcodeData, manager)) ?? current.postcodeId;
   const { id: _addressId, ...patchFields } = addressData;
   const created = await createAddress(
     {
       street: current.street,
-      city: current.city,
+      city: postcodeId === current.postcodeId ? current.city : undefined,
       ...patchFields,
     },
-    postcodeData?.id || postcodeData?.value
-      ? postcodeData
-      : { id: current.postcodeId },
+    { id: postcodeId },
     manager,
   );
   if (!created) {
@@ -517,7 +529,7 @@ export async function patchOrReplaceAddress(
     { id: personId },
     { addressId: created.id },
   );
-  return true;
+  return created.id;
 }
 
 export async function updateAgentLanguages(

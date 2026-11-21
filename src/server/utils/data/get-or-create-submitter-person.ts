@@ -66,6 +66,7 @@ async function syncSubmitterAddress(
       manager,
     );
     if (patched) {
+      person.addressId = patched;
       return;
     }
   }
