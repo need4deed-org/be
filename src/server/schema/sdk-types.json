@@ -499,6 +499,10 @@
         "timezone": {
           "type": "string"
         },
+        "deactivatedAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
         "agentId": {
           "type": "integer",
           "minimum": 1

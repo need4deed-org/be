@@ -21,5 +21,6 @@ export function serializeUserToMeDTO(
     agentId,
     agentMemberships,
     volunteerId,
+    deactivatedAt: user.deactivatedAt ?? null,
   };
 }

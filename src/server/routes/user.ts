@@ -63,6 +63,11 @@ import {
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
+import {
+  assertActiveAdminRemains,
+  eraseUserByAdmin,
+  lockActiveAdminIds,
+} from "../utils/data/admin-account";
 import { deactivateVolunteerProfile } from "../utils/data/deactivate-volunteer-profile";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
@@ -184,25 +189,22 @@ export default async function userRoutes(
     },
     async (request, reply) => {
       const { id } = request.params;
+      const caller = request.authUser!;
 
-      if (request.authUser!.id !== id) {
-        throw new UnauthorizedError("Permission denied");
+      if (caller.id !== id) {
+        if (caller.role !== UserRole.ADMIN) {
+          throw new UnauthorizedError("Permission denied");
+        }
+        const message = await fastify.db.userRepository.manager.transaction(
+          (manager) => eraseUserByAdmin(manager, id, caller.id),
+        );
+        return reply.status(200).send({ message });
       }
 
       await fastify.db.userRepository.manager.transaction(async (manager) => {
         const { role, personId } = request.authUser!;
         if (role === UserRole.ADMIN) {
-          const activeAdmins = await manager.find(User, {
-            select: { id: true },
-            where: { role: UserRole.ADMIN, isActive: true },
-            order: { id: "ASC" },
-            lock: { mode: "for_no_key_update" },
-          });
-          if (!activeAdmins.some((admin) => admin.id !== id)) {
-            throw new BadRequestError(
-              "The last active admin account cannot be deactivated.",
-            );
-          }
+          assertActiveAdminRemains(await lockActiveAdminIds(manager), [id]);
         }
         if (role === UserRole.VOLUNTEER && personId) {
           await deactivateVolunteerProfile(manager, personId, id);
