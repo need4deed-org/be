@@ -218,6 +218,7 @@ describe("POST /event", () => {
     expect(res.statusCode, res.body).toBe(201);
     createdEventIds.push(res.json().data.id);
     expect(res.json().data.linkRSVP).toBeNull();
+    expect(res.json().data.signUpQuestion).toBeNull();
   });
 
   it("rejects a non-coordinator", async () => {

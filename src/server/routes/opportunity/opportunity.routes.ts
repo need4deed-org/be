@@ -127,12 +127,14 @@ import {
   applyVolunteerOpportunityScope,
   assertOwnedVolunteerSeesOpportunity,
 } from "../../utils/data/owned-volunteer-scope";
+import {
+  editLanguage,
+  requestLanguage,
+} from "../../utils/data/request-language";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
-  editLanguage,
   queueOpportunityTranslation,
-  requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
@@ -429,11 +431,12 @@ export default async function opportunityRoutes(
 
       const districtIdNeedingCentroid =
         getOpportunityDistrictIdNeedingCentroid(opportunityComments);
-      const districtCentroid = districtIdNeedingCentroid
-        ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
-            districtIdNeedingCentroid,
-          )
-        : undefined;
+      const districtCentroid =
+        districtIdNeedingCentroid !== undefined
+          ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
+              districtIdNeedingCentroid,
+            )
+          : undefined;
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {

@@ -58,6 +58,7 @@ import {
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
 import { attachPostLists, attachTaggedAgents } from "../utils/data/post-lists";
+import { requestLanguage } from "../utils/data/request-language";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
@@ -66,10 +67,7 @@ import {
   mergePersons,
   resolveTaggedAgentIds,
 } from "../utils/data/tag-agents";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../utils/data/translate-opportunities";
+import { translateOpportunities } from "../utils/data/translate-opportunities";
 import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";

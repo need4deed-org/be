@@ -3,6 +3,7 @@ import {
   ApiOrganizationContact,
   ApiOrganizationGet,
   ApiOrganizationGetList,
+  Lang,
   Service,
 } from "need4deed-sdk";
 import Address from "../../data/entity/location/address.entity";
@@ -55,7 +56,7 @@ export function dtoOrganizationGet(
     title: organization.title,
     website: organization.website ?? null,
     address: dtoOrganizationAddress(organization.address),
-    about: null,
+    about: organization.about ?? null,
     email: organization.email ?? null,
     phone: organization.phone ?? null,
     services,
@@ -63,5 +64,7 @@ export function dtoOrganizationGet(
       ? [dtoOrganizationContact(organization.person)]
       : [],
     agents,
+    originalLanguage:
+      (organization.originalLanguage?.isoCode as Lang | undefined) ?? Lang.DE,
   };
 }

@@ -37,7 +37,7 @@ export default class Agent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column()
   title: string;
 
   @Column({ nullable: true })

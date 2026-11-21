@@ -4,11 +4,12 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
+  AgentEngagementStatusType,
   OpportunityLegacyFormData,
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { In } from "typeorm";
+import { In, Not } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -37,10 +38,8 @@ import {
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 
 function parseContactPerson(formData: OpportunityLegacyFormData): Person {
   const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
@@ -64,6 +63,7 @@ async function findOrCreateAgent(
 
   const agentRepository = getRepository(dataSource, Agent);
   const agents = await agentRepository.find({
+    where: { engagementStatus: Not(AgentEngagementStatusType.INACTIVE) },
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
 

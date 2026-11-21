@@ -25,11 +25,14 @@ describe("translatedEntities", () => {
     }
   });
 
-  it("only sends opportunity text to machine translation", () => {
+  it("only sends opportunity and Träger text to machine translation", () => {
     const machine = Object.entries(translatedEntities)
       .filter(([, { machine }]) => machine)
       .map(([entityType]) => entityType);
-    expect(machine).toEqual([EntityTableName.OPPORTUNITY]);
+    expect(machine).toEqual([
+      EntityTableName.OPPORTUNITY,
+      EntityTableName.ORGANIZATION,
+    ]);
   });
 });
 

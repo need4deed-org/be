@@ -8,6 +8,7 @@ export async function getOpportunityOrphanageAgent() {
 
   const orphanageAgent = await agentRepository.findOne({
     where: { title: titleOrphanageAgent },
+    order: { id: "ASC" },
   });
 
   if (!orphanageAgent) {

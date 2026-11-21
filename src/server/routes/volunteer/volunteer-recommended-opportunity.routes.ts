@@ -34,7 +34,7 @@ import {
   speaksFluentGerman,
   topRanked,
 } from "../../utils/data/recommended-matches";
-import { requestLanguage } from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
 
 export default function volunteerRecommendedOpportunityRoutes(
   fastify: FastifyInstance,

@@ -63,7 +63,9 @@ export default async function eventN4DRegistrationRoutes(
       const registration = new EventN4DRegistration({
         eventId,
         ...answers,
-        phone: answers.phone?.trim() || null,
+        signUpAnswer: event.signUpQuestion
+          ? answers.signUpAnswer?.trim() || null
+          : null,
         isVolunteer,
         volunteerTypes: isVolunteer ? (volunteerTypes ?? []) : [],
         volunteerId: isVolunteer

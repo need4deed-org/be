@@ -19,10 +19,8 @@ import {
   mergeIntoWhere,
   updateBackfilledColumn,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 export default async function volunteerOpportunityRoutes(

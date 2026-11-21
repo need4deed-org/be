@@ -590,7 +590,7 @@ describe("/agent/register", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("409s creating an agent whose title is already taken", async () => {
+  it("creates an agent whose title another agent already has", async () => {
     const existing = await makeAgent();
     const { token } = await makeRegistrant("test.need4deed.org");
 
@@ -600,8 +600,43 @@ describe("/agent/register", () => {
       payload: { agent: { title: existing.title } },
     });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.json().conflict).toBe("title");
+    expect(res.statusCode, res.body).toBe(201);
+    createdAgentIds.push(res.json().data.agentId);
+    expect(res.json().data.agentId).not.toBe(existing.id);
+  });
+
+  it("creates an agent at an inactive agent's address without asking to confirm", async () => {
+    const address = {
+      addressStreet: `Alte Str ${randomNumericSuffix()}`,
+      addressPostcode: "10115",
+    };
+    const register = async (title: string) => {
+      const { token } = await makeRegistrant("test.need4deed.org");
+      const res = await fastify.inject({
+        method: "POST",
+        url: `/agent/register?token=${token}`,
+        payload: { agent: { title, ...address } },
+      });
+      expect(res.statusCode, res.body).toBe(201);
+      const agentId: number = res.json().data.agentId;
+      createdAgentIds.push(agentId);
+      const agent = await fastify.db.agentRepository.findOneByOrFail({
+        id: agentId,
+      });
+      if (agent.addressId) {
+        createdAddressIds.push(agent.addressId);
+      }
+      return agentId;
+    };
+
+    const formerId = await register(`Former NGO ${randomNumericSuffix()}`);
+    await fastify.db.agentRepository.update(
+      { id: formerId },
+      { engagementStatus: AgentEngagementStatusType.INACTIVE },
+    );
+
+    const newId = await register(`New NGO ${randomNumericSuffix()}`);
+    expect(newId).not.toBe(formerId);
   });
 
   it("409s creating an agent at an existing agent's address unless confirmSharedAddress is set", async () => {
@@ -728,10 +763,7 @@ describe("/agent/register", () => {
       }
     });
 
-    it.each([
-      ["INACTIVE", { engagementStatus: AgentEngagementStatusType.INACTIVE }],
-      ["unclaimed", { unclaimed: true }],
-    ])(
+    it.each([["unclaimed", { unclaimed: true }]])(
       "never for a %s agent, even on a member's domain",
       async (_label, patch: Partial<Agent>) => {
         const domain = `conflict-${randomNumericSuffix()}.example.org`;
@@ -782,7 +814,7 @@ describe("/agent/register", () => {
         AgentMembershipStatus.PENDING,
       );
       expect(arrival).toHaveBeenCalledWith(
-        expect.stringContaining(agent.title),
+        expect.stringContaining(`"${agent.title}" (id:${agent.id})`),
       );
       const reloaded = await fastify.db.agentRepository.findOneByOrFail({
         id: agent.id,
