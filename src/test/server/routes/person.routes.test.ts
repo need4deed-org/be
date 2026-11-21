@@ -14,6 +14,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
@@ -266,7 +267,7 @@ describe("PATCH /person/:id representative role", () => {
         firstName: "Clear",
         lastName: "Fields",
         middleName: "Middle",
-        email: "clear-fields@test.need4deed.org",
+        email: `clear-fields-${randomNumericSuffix()}@test.need4deed.org`,
         phone: "+4915100000002",
         landline: "+49301234568",
       }),

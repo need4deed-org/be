@@ -64,13 +64,16 @@ export async function updateAgentContact(
   await dataSource.manager.transaction(async (manager) => {
     const personRepository = getRepository(manager, Person);
     const agentPersonRepository = getRepository(manager, AgentPerson);
-    const person = membership.person;
+    const person = await personRepository.findOneOrFail({
+      where: { id: personId },
+      lock: { mode: "pessimistic_write" },
+    });
 
     const street = input.addressStreet === "" ? undefined : input.addressStreet;
     const postcode =
       input.addressPostcode === "" ? undefined : input.addressPostcode;
 
-    if (postcode === null && street !== null) {
+    if (postcode === null && street !== null && person.addressId) {
       throw new BadRequestError(
         "An address needs a postcode; clear addressStreet and addressPostcode together to remove it.",
       );

@@ -199,6 +199,21 @@ describe("PATCH /agent/:id/contact/:membershipId null clears", () => {
     ).toBeNull();
   });
 
+  it("treats clearing the postcode of a contact without an address as a no-op", async () => {
+    const { membershipId, personId } = await createContact();
+    const res = await patch(membershipId, {
+      addressPostcode: null,
+      phone: "+4915100000004",
+    });
+    expect(res.statusCode).toBe(200);
+
+    const person = await fastify.db.personRepository.findOneByOrFail({
+      id: personId,
+    });
+    expect(person.addressId).toBeNull();
+    expect(person.phone).toBe("+4915100000004");
+  });
+
   it("treats clearing the street of a contact without an address as a no-op", async () => {
     const { membershipId, personId } = await createContact();
     const res = await patch(membershipId, { addressStreet: null });
