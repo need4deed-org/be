@@ -48,7 +48,7 @@ export default async function communicationRoutes(
         });
       }
 
-      assertCommunicationAuthor(communication, request.user, "update");
+      assertCommunicationAuthor(communication, request.authUser!, "update");
 
       const updatedCommunication = await communicationRepository.save({
         ...communication,
@@ -92,7 +92,7 @@ export default async function communicationRoutes(
         });
       }
 
-      assertCommunicationAuthor(communication, request.user, "delete");
+      assertCommunicationAuthor(communication, request.authUser!, "delete");
 
       await communicationRepository.remove(communication);
 

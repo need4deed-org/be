@@ -401,8 +401,9 @@ export async function getOrCreateAgent(
   const agentRepository = getRepository(dataSource, Agent);
 
   if (!agentData) {
-    const orphanage = await agentRepository.findOneBy({
-      title: titleOrphanageAgent,
+    const orphanage = await agentRepository.findOne({
+      where: { title: titleOrphanageAgent },
+      order: { id: "ASC" },
     });
     if (!orphanage) {
       throw new Error("Agent data is empty.");
@@ -412,6 +413,7 @@ export async function getOrCreateAgent(
 
   const agent = await agentRepository.findOne({
     where: { title: agentData.title },
+    order: { id: "ASC" },
   });
 
   if (agent) {

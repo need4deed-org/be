@@ -9,6 +9,10 @@ import {
 import type { EmailTransport } from "../../../services/notify/types";
 import { validateEmailMessage } from "../../../services/notify/validate-email-message";
 
+vi.mock("../../../services/notify/opportunity-title", () => ({
+  opportunityTitleIn: async ({ title }: { title: string }) => title,
+}));
+
 vi.mock("../../../data/utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../data/utils")>();
   return { ...actual, fetchJsonFromUrl: vi.fn() };
@@ -32,7 +36,7 @@ function input(
     requesterAgent: "Haus Linde",
     volunteerId: 7,
     volunteerName: "Vera",
-    opportunityTitle: "German tutoring",
+    opportunity: { id: 1, title: "German tutoring" },
     ...over,
   };
 }
@@ -76,7 +80,7 @@ describe("sendEmailSuggestionRequest", () => {
       input({
         recipient: { email: "olga@example.com", language: "en" },
         requesterName: undefined,
-        opportunityTitle: "{{ link }}",
+        opportunity: { id: 1, title: "{{ link }}" },
       }),
     );
 

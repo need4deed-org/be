@@ -23,6 +23,10 @@ import { sendEmailNewRegular } from "../../../services/notify/events/email-new-r
 import { sendEmailSuggestion } from "../../../services/notify/events/email-suggestion";
 import { sendEmailSuggestionAccompanying } from "../../../services/notify/events/email-suggestion-accompanying";
 import {
+  resetSuggestionRequestTemplateCache,
+  sendEmailSuggestionRequest,
+} from "../../../services/notify/events/email-suggestion-request";
+import {
   localizedOpportunityTitle,
   opportunityTitleIn,
 } from "../../../services/notify/opportunity-title";
@@ -239,5 +243,32 @@ describe("opportunity title in emails", () => {
       expect(text).toContain("“Kinderbetreuung DE”");
       expect(text).not.toContain(opportunity.title);
     });
+  });
+
+  describe("suggestion request to an NGO member", () => {
+    it.each([
+      ["de", "„Kinderbetreuung DE“"],
+      ["en", undefined],
+    ])(
+      "shows the title in the recipient's language (%s)",
+      async (language, expected) => {
+        resetSuggestionRequestTemplateCache();
+        const opportunity = await opportunityWith(Lang.EN, {
+          status: TranslationStatus.DONE,
+          text: "Kinderbetreuung DE",
+        });
+
+        await sendEmailSuggestionRequest(email, {
+          recipient: { email: "olga@example.com", language },
+          requesterAgent: "Haus Linde",
+          volunteerId: 7,
+          volunteerName: "Vera",
+          opportunity,
+        });
+
+        const { text } = send.mock.calls[0][0];
+        expect(text).toContain(expected ?? `"${opportunity.title}"`);
+      },
+    );
   });
 });

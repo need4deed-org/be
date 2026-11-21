@@ -57,6 +57,8 @@ import {
 } from "../utils/data/get-post-where";
 import { isPostManagerRole } from "../utils/data/is-post-manager-role";
 import { notifyTaggedByEmail } from "../utils/data/notify-tagged-by-email";
+import { attachPostLists, attachTaggedAgents } from "../utils/data/post-lists";
+import { requestLanguage } from "../utils/data/request-language";
 import { requireEngagementPersonId } from "../utils/data/require-engagement-person-id";
 import { requireLinkedPersonId } from "../utils/data/require-linked-person-id";
 import {
@@ -65,11 +67,7 @@ import {
   mergePersons,
   resolveTaggedAgentIds,
 } from "../utils/data/tag-agents";
-import { attachTaggedAgents } from "../utils/data/tagged-agents";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../utils/data/translate-opportunities";
+import { translateOpportunities } from "../utils/data/translate-opportunities";
 import { upsertPostBookmark } from "../utils/data/upsert-post-bookmark";
 import { upsertPostReaction } from "../utils/data/upsert-post-reaction";
 import { validateRelationIds } from "../utils/data/validate-relation-ids";
@@ -167,7 +165,6 @@ export default async function postRoutes(
         const idsQb = buildMatchingPostIdsQuery(fastify, filter)
           .select("post.id", "id")
           .addSelect("COUNT(*) OVER()", "totalCount")
-          .groupBy("post.id")
           .orderBy("post.createdAt", "DESC")
           .addOrderBy("post.id", "DESC")
           .offset(skip)
@@ -183,7 +180,7 @@ export default async function postRoutes(
           : Number(
               (
                 await buildMatchingPostIdsQuery(fastify, filter)
-                  .select("COUNT(DISTINCT post.id)", "count")
+                  .select("COUNT(*)", "count")
                   .getRawOne<{ count: string }>()
               )?.count ?? 0,
             );
@@ -201,9 +198,9 @@ export default async function postRoutes(
       }
 
       await Promise.all([
+        attachPostLists(fastify, orderedPosts),
         attachReactionData(fastify, orderedPosts, request.authUser?.personId),
         attachBookmarkData(fastify, orderedPosts, request.authUser?.personId),
-        attachTaggedAgents(fastify, orderedPosts),
       ]);
       await translateLinkedOpportunities(fastify, orderedPosts, request.query);
       return reply.status(200).send({
@@ -228,6 +225,9 @@ export default async function postRoutes(
       onRequest: [fastify.authenticate()],
     },
     async (request, reply) => {
+      if (!isPostManagerRole(request.authUser?.role)) {
+        throw new UnauthorizedError("Permission denied.");
+      }
       const personId = requireLinkedPersonId(request.authUser?.personId);
 
       const {
@@ -275,6 +275,7 @@ export default async function postRoutes(
 
       const full = await fastify.db.postRepository.findOne({
         where: { id: saved.id },
+        relationLoadStrategy: "query",
         relations: ["author", "taggedPersons", "linkedOpportunities"],
       });
 
@@ -326,6 +327,7 @@ export default async function postRoutes(
 
       const post = await fastify.db.postRepository.findOne({
         where: getRootPostWhere(id),
+        relationLoadStrategy: "query",
         relations: [
           "author",
           "taggedPersons",

@@ -1,6 +1,9 @@
 import { ApiPostGet } from "need4deed-sdk";
 import Post from "../../data/entity/post.entity";
 
+const byId = <T extends { id: number }>(items: T[] | undefined): T[] =>
+  [...(items ?? [])].sort((a, b) => a.id - b.id);
+
 export function dtoPost(post: Post): ApiPostGet {
   return {
     id: post.id,
@@ -11,16 +14,16 @@ export function dtoPost(post: Post): ApiPostGet {
       avatarUrl: post.author.avatarUrl,
     },
     agentId: post.agentId,
-    taggedPersons: (post.taggedPersons ?? []).map((p) => ({
+    taggedPersons: byId(post.taggedPersons).map((p) => ({
       id: p.id,
       fullName: p.name,
       avatarUrl: p.avatarUrl,
     })),
-    taggedAgents: (post.taggedAgents ?? []).map((agent) => ({
+    taggedAgents: byId(post.taggedAgents).map((agent) => ({
       id: agent.id,
       title: agent.title,
     })),
-    linkedOpportunities: (post.linkedOpportunities ?? []).map((o) => ({
+    linkedOpportunities: byId(post.linkedOpportunities).map((o) => ({
       id: o.id,
       title: o.title,
     })),

@@ -406,6 +406,9 @@ describe("maskPii", () => {
         const opp = hiddenAppointment(status);
         maskPii(opp, ctx({ role: UserRole.VOLUNTEER, opportunityIds: [] }));
         expect(opp.accompanying!.postcode!.value).toBeNull();
+        // Map pins come from these coordinates for any status (be#1283).
+        expect(opp.accompanying!.postcode!.latitude).toBeNull();
+        expect(opp.accompanying!.postcode!.longitude).toBeNull();
       },
     );
 

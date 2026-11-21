@@ -15,8 +15,8 @@ import {
   impliesAgentSearching,
   setAgentSearching,
 } from "./for-routes";
+import { languageIdOf } from "./request-language";
 import {
-  languageIdOf,
   queueOpportunityTranslation,
   translatedOpportunityFields,
 } from "./translate-opportunities";

@@ -28,6 +28,8 @@ import {
   hashPassword,
 } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { firstSeeded } from "../../seeded";
+import { captureSql, maxToManyJoins } from "../../sql-capture";
 
 const PASSWORD = "test_password";
 
@@ -154,9 +156,7 @@ describe("POST /opportunity resolves activities/skills/languages by id", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -294,9 +294,7 @@ describe("POST /opportunity resolves district from the agent at creation", () =>
     );
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -397,9 +395,7 @@ describe("POST /opportunity persists onetimer on creation (be#844)", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     postcodeValue = postcode.value;
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
@@ -574,9 +570,7 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -810,7 +804,7 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
     }
   });
 
-  it("emails an active agent member, not the staff submitter, when the representative has no email (be#1368)", async () => {
+  it("emails an active agent member, not the staff submitter, when the representative has no email", async () => {
     const personRepository = fastify.db.personRepository;
     const coordinatorEmail = `coordinator-person-${suffix}@test.need4deed.org`;
     await personRepository.update(
@@ -868,6 +862,41 @@ describe("POST /opportunity freezes contact_person_id at creation (be#833)", () 
       );
     }
   });
+
+  it("loads the new-opportunity email's people without joining two of their lists in one query", async () => {
+    const newRegular = vi
+      .spyOn(fastify.notify, "emailNewRegular")
+      .mockResolvedValue(undefined);
+    try {
+      let res!: Awaited<ReturnType<typeof fastify.inject>>;
+      const queries = await captureSql(async () => {
+        res = await fastify.inject({
+          method: "POST",
+          url: "/opportunity/",
+          cookies: { [accessCookieName]: memberCookie },
+          payload: {
+            title: `Test Opportunity (email relations) ${suffix}`,
+            opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+            volunteers_number: 1,
+            category: "",
+            category_id: "",
+            language: "en",
+            agent_id: agent.id,
+          },
+        });
+        await vi.waitFor(() => expect(newRegular).toHaveBeenCalledOnce());
+      });
+
+      expect(res.statusCode).toBe(201);
+      createdOpportunityIds.push(res.json().data.id);
+      const [opportunity] = newRegular.mock.calls[0];
+      expect(opportunity.submittedByPerson?.users).toHaveLength(1);
+      expect(opportunity.agent?.agentPerson).toHaveLength(2);
+      expect(maxToManyJoins(queries)).toBeLessThanOrEqual(1);
+    } finally {
+      newRegular.mockRestore();
+    }
+  });
 });
 
 // Regression test for be#862: a newly-created opportunity always starts in a
@@ -889,9 +918,7 @@ describe("POST /opportunity cascades a new agent to SEARCHING (be#862)", () => {
     await fastify.ready();
 
     const addressRepository = getRepository(dataSource, Address);
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const address = await addressRepository.save(
       new Address({ postcodeId: postcode.id }),
     );
@@ -1039,9 +1066,7 @@ describe("POST /opportunity saves an own address (be#1291)", () => {
     agentDistrict = await getRepository(dataSource, District).save(
       new District({ title: `Own Address Agent District ${suffix}` }),
     );
-    const agentPostcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const agentPostcode = await firstSeeded(fastify.db.postcodeRepository);
     const agentAddress = await getRepository(dataSource, Address).save(
       new Address({ postcodeId: agentPostcode.id }),
     );

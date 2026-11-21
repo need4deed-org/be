@@ -1,3 +1,4 @@
+import { OpportunityStatusType } from "need4deed-sdk";
 import { describe, expect, it } from "vitest";
 import {
   dtoOpportunityGet,
@@ -436,55 +437,50 @@ describe("dtoOpportunityGetList", () => {
     expect(result.accompanyingDetails.refugeeName).toBe("Real Name");
   });
 
-  describe("map-pin lat/lon (be#662)", () => {
-    it("returns null lat/lon for a status outside NEW/SEARCHING, even with a geocoded agent", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        status: "opp-active",
-        agent: {
-          address: {
-            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
-          },
-        },
-      };
-      const result = dtoOpportunityGetList(opportunity as any);
-      expect(result.lat).toBeNull();
-      expect(result.lon).toBeNull();
-    });
+  describe("map-pin lat/lon (be#662, any status since be#1283)", () => {
+    const ALL_STATUSES = Object.values(OpportunityStatusType);
 
-    it("uses the agent's geocoded address when the opportunity is NEW", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        status: "opp-new",
-        agent: {
-          address: {
-            postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+    it.each(ALL_STATUSES)(
+      "pins a %s opportunity at the agent's geocoded address (be#1283)",
+      (status) => {
+        const opportunity = {
+          ...baseOpportunity,
+          status,
+          agent: {
+            address: {
+              postcode: { value: "10115", latitude: 52.5, longitude: 13.4 },
+            },
           },
-        },
-      };
-      const result = dtoOpportunityGetList(opportunity as any);
-      expect(result.lat).toBe(52.5);
-      expect(result.lon).toBe(13.4);
-    });
+        };
+        const result = dtoOpportunityGetList(opportunity as any);
+        expect(result.lat).toBe(52.5);
+        expect(result.lon).toBe(13.4);
+      },
+    );
 
-    it("falls back to the handler-supplied district centroid when the opportunity is SEARCHING with no agent address", () => {
-      const opportunity = {
-        ...baseOpportunity,
-        status: "opp-searching",
-        agent: { address: undefined },
-      };
-      const result = dtoOpportunityGetList(opportunity as any, {
-        latitude: 52.5,
-        longitude: 13.4,
-      });
-      expect(result.lat).toBe(52.5);
-      expect(result.lon).toBe(13.4);
-    });
+    it.each(ALL_STATUSES)(
+      "falls back to the handler-supplied district centroid for a %s opportunity with no agent address",
+      (status) => {
+        const opportunity = {
+          ...baseOpportunity,
+          status,
+          agent: { address: undefined },
+        };
+        expect(
+          getOpportunityDistrictIdNeedingCentroid(opportunity as any),
+        ).toBe(5);
+        const result = dtoOpportunityGetList(opportunity as any, {
+          latitude: 52.45,
+          longitude: 13.35,
+        });
+        expect(result.lat).toBe(52.45);
+        expect(result.lon).toBe(13.35);
+      },
+    );
 
     it("returns null lat/lon when neither the agent nor the supplied centroid has coordinates", () => {
       const opportunity = {
         ...baseOpportunity,
-        status: "opp-new",
         agent: { address: undefined },
       };
       const result = dtoOpportunityGetList(opportunity as any, {

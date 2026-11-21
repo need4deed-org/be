@@ -11,10 +11,8 @@ import { dtoOpportunityOtherGetList } from "../../../services/dto/dto-opportunit
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { getSearchBranches } from "./get-opportunity-where";
 import { escapeLikePattern } from "./person-name-ilike";
-import {
-  languageIdOf,
-  translateOpportunities,
-} from "./translate-opportunities";
+import { languageIdOf } from "./request-language";
+import { translateOpportunities } from "./translate-opportunities";
 
 const OPEN_STATUSES = [
   OpportunityStatusType.NEW,

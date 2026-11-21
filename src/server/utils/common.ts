@@ -1,5 +1,5 @@
 import * as crypto from "node:crypto";
-import { Lang, UserRole } from "need4deed-sdk";
+import { Lang } from "need4deed-sdk";
 import { berlinDateTimeFormat, defaultPageSize } from "../../config";
 
 export function generateRandomString(length) {
@@ -72,14 +72,6 @@ export function getNullFromEmptyArray<T>(arr: T[] | null): T[] | null {
   return null;
 }
 
-export function validatePermissions<E extends { userId: number }>(
-  entity: E,
-  roles: readonly UserRole[],
-  user: { id: number; role: UserRole },
-) {
-  return entity.userId === user.id || roles?.includes(user.role);
-}
-
 export function getRef(reference: string) {
   return { $ref: reference };
 }
@@ -132,8 +124,9 @@ export function getAgentOpportunityEditNotificationText(
 
 export function getMembershipRequestNotificationText(
   agentTitle: string,
+  agentId: number,
 ): string {
-  return `New NGO membership request for "${agentTitle}" is waiting for approval at ${formatBerlinTimestamp()}`;
+  return `New NGO membership request for "${agentTitle}" (id:${agentId}) is waiting for approval at ${formatBerlinTimestamp()}`;
 }
 
 export type Env = Record<string, string | undefined>;

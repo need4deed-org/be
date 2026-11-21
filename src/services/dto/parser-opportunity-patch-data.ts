@@ -1,14 +1,40 @@
-import { ApiOpportunityPatch, LangPurpose } from "need4deed-sdk";
+import {
+  ApiOpportunityPatch,
+  LangPurpose,
+  OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+  OPPORTUNITY_TITLE_MAX_LENGTH,
+} from "need4deed-sdk";
 import { In, Repository } from "typeorm";
 import { BadRequestError } from "../../config";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
+import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Language from "../../data/entity/profile/language.entity";
 import { DataId } from "../../server/types";
 import { getEmptyPropsNull } from "../../server/utils/common";
-import { getDateObj } from "../utils";
+import { assertMaxTextLength, getDateObj } from "../utils";
 
 type LanguagePatchItem = { id: number | string; purpose: LangPurpose };
+
+export function assertOpportunityTextLengths(
+  patch: Partial<Opportunity>,
+  current: Opportunity,
+) {
+  assertMaxTextLength(
+    "title",
+    patch.title,
+    [current.title],
+    OPPORTUNITY_TITLE_MAX_LENGTH,
+  );
+  for (const description of [patch.info, patch.infoConfidential]) {
+    assertMaxTextLength(
+      "description",
+      description,
+      [current.info, current.infoConfidential],
+      OPPORTUNITY_DESCRIPTION_MAX_LENGTH,
+    );
+  }
+}
 
 export async function assertValidMainCommunicationLanguages(
   languagesMain: { id: number | string }[] | undefined,

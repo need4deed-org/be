@@ -297,6 +297,21 @@ describe("POST /post", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("403s when a volunteer tries to create a post", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/post",
+      cookies: { [accessCookieName]: volunteerCookie },
+      payload: { text: "Post from a volunteer" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toMatchObject({ message: "Permission denied." });
+    expect(
+      await fastify.db.postRepository.countBy({ authorId: volunteerPerson.id }),
+    ).toBe(0);
+  });
+
   it("403s when a volunteer tries to reply", async () => {
     const postRes = await fastify.inject({
       method: "POST",
@@ -991,9 +1006,6 @@ describe("POST /post", () => {
   });
 
   it("lists a post with multiple tagged persons and opportunities exactly once (no search)", async () => {
-    // Regression test for the plain (non-search) listing path: buildPostQuery's
-    // leftJoinAndSelect + getManyAndCount must collapse the to-many-relation
-    // fan-out on its own (no search param, so no manual GROUP BY applies here).
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
     const agent = await fastify.db.agentRepository.save(

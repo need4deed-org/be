@@ -1664,6 +1664,14 @@
         },
         "statusEngagement": {
           "$ref": "AgentEngagementStatusType#"
+        },
+        "organization": {
+          "type": ["object", "null"],
+          "properties": {
+            "id": { "type": "integer", "minimum": 1 },
+            "title": { "type": "string" }
+          },
+          "required": ["id", "title"]
         }
       }
     },
@@ -1684,7 +1692,8 @@
         "lat",
         "lon",
         "postcode",
-        "statusEngagement"
+        "statusEngagement",
+        "organization"
       ]
     },
     "AgentProps": {
@@ -1826,6 +1835,7 @@
         "lon",
         "createdAt",
         "statusEngagement",
+        "organization",
         "agentDetails",
         "comments",
         "languages"
@@ -1905,19 +1915,93 @@
       "$id": "ApiOrganizationPatch",
       "type": "object",
       "properties": {
-        "title": {
-          "type": "string"
-        },
+        "title": { "type": "string", "pattern": "\\S" },
+        "about": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "originalLanguage": { "$ref": "Lang#" },
+        "website": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "email": {
-          "type": "string"
+          "anyOf": [
+            { "const": null },
+            { "const": "" },
+            { "type": "string", "format": "email" }
+          ]
         },
         "phone": {
-          "type": "string"
+          "anyOf": [
+            { "const": null },
+            { "const": "" },
+            { "type": "string", "minLength": 7, "maxLength": 20 }
+          ]
         },
-        "website": {
-          "type": "string"
+        "addressStreet": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "addressPostcode": {
+          "anyOf": [{ "const": null }, { "type": "string" }]
         }
-      }
+      },
+      "additionalProperties": false
+    },
+    "ApiOrganizationContact": {
+      "$id": "ApiOrganizationContact",
+      "type": "object",
+      "properties": {
+        "personId": { "type": "integer", "minimum": 1 },
+        "firstName": { "type": "string" },
+        "lastName": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] }
+      },
+      "required": ["personId", "firstName", "lastName", "email", "phone"]
+    },
+    "ApiOrganizationGet": {
+      "$id": "ApiOrganizationGet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "website": { "type": ["string", "null"] },
+        "address": {
+          "type": ["object", "null"],
+          "properties": {
+            "id": { "type": "integer" },
+            "street": { "type": ["string", "null"] },
+            "city": { "type": ["string", "null"] },
+            "postcode": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "code": { "type": "string" },
+                "latitude": { "type": ["number", "null"] },
+                "longitude": { "type": ["number", "null"] }
+              }
+            }
+          }
+        },
+        "about": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "services": { "type": "array", "items": { "$ref": "OptionById#" } },
+        "contacts": {
+          "type": "array",
+          "items": { "$ref": "ApiOrganizationContact#" }
+        },
+        "agents": {
+          "type": "array",
+          "items": { "$ref": "ApiAgentTagCandidate#" }
+        },
+        "originalLanguage": { "$ref": "Lang#" }
+      },
+      "required": [
+        "id",
+        "title",
+        "website",
+        "address",
+        "about",
+        "email",
+        "phone",
+        "services",
+        "contacts",
+        "agents"
+      ]
     },
     "ApiOrganizationGetList": {
       "$id": "ApiOrganizationGetList",

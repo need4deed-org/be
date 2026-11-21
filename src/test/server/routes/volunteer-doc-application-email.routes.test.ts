@@ -24,6 +24,7 @@ import {
   SuspendedEmailError,
 } from "../../../services/notify";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -71,9 +72,7 @@ describe("POST /volunteer/:id/doc/application-email", () => {
   }
 
   async function makeVolunteer(person: Person) {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );

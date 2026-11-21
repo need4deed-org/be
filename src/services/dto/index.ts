@@ -5,7 +5,7 @@ export * from "./dto-comment";
 export * from "./dto-communication";
 export * from "./dto-event";
 export * from "./dto-opportunity";
-export * from "./dto-opportunity-event-registration";
+export * from "./dto-event-n4d-registration";
 export * from "./dto-opportunity-volunteer";
 export * from "./dto-organization";
 export * from "./dto-person";
