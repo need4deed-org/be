@@ -7,6 +7,8 @@ export const agentContactMembershipParamSchema = {
   required: ["id", "membershipId"],
 };
 
+const nullableString = { anyOf: [{ const: null }, { type: "string" }] };
+
 export const agentContactPostBodySchema = {
   type: "object",
   required: ["firstName", "lastName", "role"],
@@ -29,14 +31,14 @@ export const agentContactPatchBodySchema = {
   additionalProperties: false,
   properties: {
     firstName: { type: "string", minLength: 1 },
-    middleName: { type: "string" },
+    middleName: nullableString,
     lastName: { type: "string", minLength: 1 },
     role: { $ref: "AgentRoleType#" },
-    email: { type: "string" },
-    phone: { type: "string" },
-    landline: { type: "string" },
-    addressStreet: { type: "string" },
-    addressPostcode: { type: "string" },
+    email: nullableString,
+    phone: nullableString,
+    landline: nullableString,
+    addressStreet: nullableString,
+    addressPostcode: nullableString,
   },
 };
 

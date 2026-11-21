@@ -455,6 +455,36 @@ export async function isAddressExclusivelyOwned(
   return otherOwners === 0;
 }
 
+export async function isAddressShared(
+  addressId: number,
+  manager: DataSource | EntityManager = dataSource,
+  { exceptOrganizationId }: { exceptOrganizationId?: number } = {},
+): Promise<boolean> {
+  const [{ shared }]: { shared: boolean }[] = await manager.query(
+    `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
+       AS "shared"`,
+    [addressId, exceptOrganizationId ?? 0],
+  );
+  return shared;
+}
+
+export async function deleteAddressIfUnshared(
+  addressId: number,
+  manager: EntityManager,
+): Promise<void> {
+  const repository = getRepository(manager, Address);
+  const address = await repository.findOne({
+    where: { id: addressId },
+    lock: { mode: "pessimistic_write" },
+  });
+  if (address && !(await isAddressShared(addressId, manager))) {
+    await repository.delete({ id: addressId });
+  }
+}
+
 export async function patchOrReplaceAddress(
   personId: number,
   addressData: Partial<Address> & { id: number },

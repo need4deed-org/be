@@ -14,6 +14,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
@@ -259,5 +260,53 @@ describe("PATCH /person/:id representative role", () => {
     } finally {
       await fastify.db.personRepository.delete({ id: person.id });
     }
+  });
+  it("stores NULL for cleared nullable person fields", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Clear",
+        lastName: "Fields",
+        middleName: "Middle",
+        email: `clear-fields-${randomNumericSuffix()}@test.need4deed.org`,
+        phone: "+4915100000002",
+        landline: "+49301234568",
+      }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/person/${person.id}`,
+        cookies: { [accessCookieName]: adminCookie },
+        payload: {
+          middleName: null,
+          email: null,
+          phone: null,
+          landline: null,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const reloaded = await fastify.db.personRepository.findOneByOrFail({
+        id: person.id,
+      });
+      expect(reloaded.middleName).toBeNull();
+      expect(reloaded.email).toBeNull();
+      expect(reloaded.phone).toBeNull();
+      expect(reloaded.landline).toBeNull();
+      expect(reloaded.firstName).toBe("Clear");
+      expect(reloaded.lastName).toBe("Fields");
+    } finally {
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+  });
+
+  it("rejects null on firstName", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/person/${editorPerson.id}`,
+      cookies: { [accessCookieName]: editorCookie },
+      payload: { firstName: null },
+    });
+    expect(res.statusCode).toBe(400);
   });
 });
