@@ -294,7 +294,7 @@
       "properties": {
         "avatarUrl": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "firstName": { "type": "string", "minLength": 1 },
-        "lastName": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "lastName": { "type": "string" },
         "middleName": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "email": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "phone": { "anyOf": [{ "const": null }, { "type": "string" }] },

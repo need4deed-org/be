@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AgentRoleType, UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -80,10 +81,18 @@ describe("PATCH /agent/:id/contact/:membershipId null clears", () => {
   });
 
   afterAll(async () => {
+    const addressIds = (
+      await fastify.db.personRepository.findBy({ id: In(createdPersonIds) })
+    )
+      .map(({ addressId }) => addressId)
+      .filter((id): id is number => id !== null);
     await fastify.db.agentPersonRepository.delete({ agentId });
     await fastify.db.agentRepository.delete({ id: agentId });
     for (const id of createdPersonIds) {
       await fastify.db.personRepository.delete({ id });
+    }
+    if (addressIds.length) {
+      await getRepository(dataSource, Address).delete({ id: In(addressIds) });
     }
     await fastify.db.userRepository.delete({ email: coordinatorEmail });
     await fastify.close();
@@ -141,20 +150,20 @@ describe("PATCH /agent/:id/contact/:membershipId null clears", () => {
     expect(person.address.street).toBeNull();
   });
 
-  it("treats an empty street like null", async () => {
-    const { membershipId, personId } = await createContact({
-      addressStreet: "Teststraße 4",
-      addressPostcode: postcode,
+  it("ignores empty address strings, as before", async () => {
+    const { membershipId, personId } = await createContact();
+    const res = await patch(membershipId, {
+      addressStreet: "",
+      addressPostcode: "",
+      phone: "+4915100000003",
     });
-
-    const res = await patch(membershipId, { addressStreet: "" });
     expect(res.statusCode).toBe(200);
 
-    const person = await fastify.db.personRepository.findOneOrFail({
-      where: { id: personId },
-      relations: ["address"],
+    const person = await fastify.db.personRepository.findOneByOrFail({
+      id: personId,
     });
-    expect(person.address.street).toBeNull();
+    expect(person.addressId).toBeNull();
+    expect(person.phone).toBe("+4915100000003");
   });
 
   it("refuses to clear the postcode alone", async () => {

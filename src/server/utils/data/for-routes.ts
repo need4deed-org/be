@@ -458,7 +458,7 @@ export async function isAddressExclusivelyOwned(
 export async function isAddressShared(
   addressId: number,
   manager: DataSource | EntityManager = dataSource,
-  exceptOrganizationId = 0,
+  { exceptOrganizationId }: { exceptOrganizationId?: number } = {},
 ): Promise<boolean> {
   const [{ shared }]: { shared: boolean }[] = await manager.query(
     `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
@@ -466,7 +466,7 @@ export async function isAddressShared(
          OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
          OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
        AS "shared"`,
-    [addressId, exceptOrganizationId],
+    [addressId, exceptOrganizationId ?? 0],
   );
   return shared;
 }
@@ -475,12 +475,13 @@ export async function deleteAddressIfUnshared(
   addressId: number,
   manager: EntityManager,
 ): Promise<void> {
-  const address = await manager.getRepository(Address).findOne({
+  const repository = getRepository(manager, Address);
+  const address = await repository.findOne({
     where: { id: addressId },
     lock: { mode: "pessimistic_write" },
   });
   if (address && !(await isAddressShared(addressId, manager))) {
-    await manager.getRepository(Address).delete({ id: addressId });
+    await repository.delete({ id: addressId });
   }
 }
 

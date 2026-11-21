@@ -49,7 +49,9 @@ async function resolveAddressId(
   ) {
     if (
       current &&
-      !(await isAddressShared(current.id, manager, organization.id))
+      !(await isAddressShared(current.id, manager, {
+        exceptOrganizationId: organization.id,
+      }))
     ) {
       await manager
         .getRepository(Organization)
@@ -83,7 +85,9 @@ async function resolveAddressId(
 
   if (
     current &&
-    !(await isAddressShared(current.id, manager, organization.id))
+    !(await isAddressShared(current.id, manager, {
+      exceptOrganizationId: organization.id,
+    }))
   ) {
     await repository.update({ id: current.id }, {
       street,

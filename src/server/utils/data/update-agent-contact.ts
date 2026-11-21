@@ -66,14 +66,9 @@ export async function updateAgentContact(
     const agentPersonRepository = getRepository(manager, AgentPerson);
     const person = membership.person;
 
-    const street =
-      input.addressStreet === undefined
-        ? undefined
-        : input.addressStreet || null;
+    const street = input.addressStreet === "" ? undefined : input.addressStreet;
     const postcode =
-      input.addressPostcode === undefined
-        ? undefined
-        : input.addressPostcode || null;
+      input.addressPostcode === "" ? undefined : input.addressPostcode;
 
     if (postcode === null && street !== null) {
       throw new BadRequestError(
@@ -81,15 +76,13 @@ export async function updateAgentContact(
       );
     }
 
-    if (postcode === null) {
-      if (person.addressId) {
-        await personRepository.update({ id: personId }, { addressId: null });
-        await deleteAddressIfUnshared(person.addressId, manager);
+    const clearsAddress = postcode === null && Boolean(person.addressId);
+    if (postcode !== null) {
+      if (postcode || (street !== undefined && person.addressId)) {
+        await upsertContactAddress(person, street, postcode, manager);
+      } else if (street) {
+        throw new BadRequestError("Address not saved: a postcode is required.");
       }
-    } else if (postcode || (street !== undefined && person.addressId)) {
-      await upsertContactAddress(person, street, postcode, manager);
-    } else if (street) {
-      throw new BadRequestError("Address not saved: a postcode is required.");
     }
 
     const personUpdates = Object.fromEntries(
@@ -97,9 +90,15 @@ export async function updateAgentContact(
         (field) => [field, input[field]],
       ),
     ) as Partial<Person>;
+    if (clearsAddress) {
+      personUpdates.addressId = null;
+    }
 
     if (Object.keys(personUpdates).length > 0) {
       await personRepository.update({ id: personId }, personUpdates);
+    }
+    if (clearsAddress) {
+      await deleteAddressIfUnshared(person.addressId!, manager);
     }
 
     if (input.role !== undefined) {

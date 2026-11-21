@@ -278,7 +278,6 @@ describe("PATCH /person/:id representative role", () => {
         cookies: { [accessCookieName]: adminCookie },
         payload: {
           middleName: null,
-          lastName: null,
           email: null,
           phone: null,
           landline: null,
@@ -290,11 +289,11 @@ describe("PATCH /person/:id representative role", () => {
         id: person.id,
       });
       expect(reloaded.middleName).toBeNull();
-      expect(reloaded.lastName).toBeNull();
       expect(reloaded.email).toBeNull();
       expect(reloaded.phone).toBeNull();
       expect(reloaded.landline).toBeNull();
       expect(reloaded.firstName).toBe("Clear");
+      expect(reloaded.lastName).toBe("Fields");
     } finally {
       await fastify.db.personRepository.delete({ id: person.id });
     }
