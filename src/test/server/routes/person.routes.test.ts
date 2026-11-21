@@ -260,4 +260,46 @@ describe("PATCH /person/:id representative role", () => {
       await fastify.db.personRepository.delete({ id: person.id });
     }
   });
+  it("stores NULL for cleared nullable person fields", async () => {
+    const person = await fastify.db.personRepository.save(
+      new Person({
+        firstName: "Clear",
+        lastName: "Fields",
+        middleName: "Middle",
+        email: "clear-fields@test.need4deed.org",
+        phone: "+4915100000002",
+        landline: "+49301234568",
+      }),
+    );
+    try {
+      const res = await fastify.inject({
+        method: "PATCH",
+        url: `/person/${person.id}`,
+        cookies: { [accessCookieName]: adminCookie },
+        payload: { middleName: null, email: null, phone: null, landline: null },
+      });
+      expect(res.statusCode).toBe(200);
+
+      const reloaded = await fastify.db.personRepository.findOneByOrFail({
+        id: person.id,
+      });
+      expect(reloaded.middleName).toBeNull();
+      expect(reloaded.email).toBeNull();
+      expect(reloaded.phone).toBeNull();
+      expect(reloaded.landline).toBeNull();
+      expect(reloaded.firstName).toBe("Clear");
+    } finally {
+      await fastify.db.personRepository.delete({ id: person.id });
+    }
+  });
+
+  it("rejects null on firstName", async () => {
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/person/${editorPerson.id}`,
+      cookies: { [accessCookieName]: editorCookie },
+      payload: { firstName: null },
+    });
+    expect(res.statusCode).toBe(400);
+  });
 });

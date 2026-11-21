@@ -1,14 +1,25 @@
 import { ApiAgentContactPatch } from "need4deed-sdk";
 import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
+import Address from "../../../data/entity/location/address.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
 import {
   createAddress,
+  isAddressShared,
   patchOrReplaceAddress,
   resolveAddressPostcode,
 } from "./for-routes";
+
+const PERSON_FIELDS = [
+  "firstName",
+  "middleName",
+  "lastName",
+  "email",
+  "phone",
+  "landline",
+] as const;
 
 export async function updateAgentContact(
   membership: AgentPerson,
@@ -21,12 +32,34 @@ export async function updateAgentContact(
     const agentPersonRepository = getRepository(manager, AgentPerson);
     const person = membership.person;
 
-    if (input.addressStreet || input.addressPostcode) {
-      const addressData = input.addressStreet
-        ? { street: input.addressStreet }
-        : {};
+    const clearsStreet = input.addressStreet === null;
+    const clearsPostcode = input.addressPostcode === null;
+    const changesStreet =
+      input.addressStreet !== undefined && !(clearsStreet && !person.addressId);
+
+    if (clearsPostcode && !clearsStreet) {
+      throw new BadRequestError(
+        "An address needs a postcode; clear addressStreet and addressPostcode together to remove it.",
+      );
+    }
+
+    if (clearsPostcode) {
+      if (person.addressId) {
+        await personRepository.update({ id: personId }, {
+          addressId: null,
+        } as unknown as Partial<Person>);
+        if (!(await isAddressShared(person.addressId, manager))) {
+          await getRepository(manager, Address).delete({
+            id: person.addressId,
+          });
+        }
+      }
+    } else if (input.addressPostcode || changesStreet) {
+      const addressData = (
+        changesStreet ? { street: input.addressStreet } : {}
+      ) as Partial<Address>;
       const postcodeData = await resolveAddressPostcode(
-        input.addressPostcode,
+        input.addressPostcode ?? undefined,
         manager,
       );
 
@@ -54,25 +87,11 @@ export async function updateAgentContact(
       }
     }
 
-    const personUpdates: Partial<Person> = {};
-    if (input.firstName !== undefined) {
-      personUpdates.firstName = input.firstName;
-    }
-    if (input.middleName !== undefined) {
-      personUpdates.middleName = input.middleName;
-    }
-    if (input.lastName !== undefined) {
-      personUpdates.lastName = input.lastName;
-    }
-    if (input.email !== undefined) {
-      personUpdates.email = input.email;
-    }
-    if (input.phone !== undefined) {
-      personUpdates.phone = input.phone;
-    }
-    if (input.landline !== undefined) {
-      personUpdates.landline = input.landline;
-    }
+    const personUpdates = Object.fromEntries(
+      PERSON_FIELDS.filter((field) => input[field] !== undefined).map(
+        (field) => [field, input[field]],
+      ),
+    ) as Partial<Person>;
 
     if (Object.keys(personUpdates).length > 0) {
       await personRepository.update({ id: personId }, personUpdates);

@@ -455,6 +455,22 @@ export async function isAddressExclusivelyOwned(
   return otherOwners === 0;
 }
 
+export async function isAddressShared(
+  addressId: number,
+  manager: DataSource | EntityManager = dataSource,
+  exceptOrganizationId = 0,
+): Promise<boolean> {
+  const [{ shared }]: { shared: boolean }[] = await manager.query(
+    `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
+       AS "shared"`,
+    [addressId, exceptOrganizationId],
+  );
+  return shared;
+}
+
 export async function patchOrReplaceAddress(
   personId: number,
   addressData: Partial<Address> & { id: number },

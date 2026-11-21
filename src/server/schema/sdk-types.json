@@ -290,14 +290,28 @@
     },
     "ApiPersonPatch": {
       "$id": "ApiPersonPatch",
-      "$ref": "ApiPerson#"
+      "type": "object",
+      "properties": {
+        "avatarUrl": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "firstName": { "type": "string", "minLength": 1 },
+        "lastName": { "type": "string" },
+        "middleName": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "email": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "phone": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "landline": { "anyOf": [{ "const": null }, { "type": "string" }] },
+        "address": { "$ref": "Address#" },
+        "preferredComm": {
+          "type": "array",
+          "items": { "$ref": "PreferredCommunicationType#" }
+        }
+      }
     },
     "ApiRepresentativePatch": {
       "$id": "ApiRepresentativePatch",
       "type": "object",
       "allOf": [
         {
-          "$ref": "ApiPerson#"
+          "$ref": "ApiPersonPatch#"
         },
         {
           "type": "object",

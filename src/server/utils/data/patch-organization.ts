@@ -17,7 +17,7 @@ import {
 } from "../../../services/translation/queue";
 import { writeHumanTranslations } from "../../../services/translation/write";
 import { assertMaxTextLength } from "../../../services/utils";
-import { resolveAddressPostcode } from "./for-routes";
+import { isAddressShared, resolveAddressPostcode } from "./for-routes";
 import { languageIdOf } from "./request-language";
 
 type OrganizationColumns = Partial<
@@ -28,22 +28,6 @@ type OrganizationColumns = Partial<
 >;
 
 const NULLABLE_COLUMNS = ["website", "email", "phone"] as const;
-
-async function isAddressShared(
-  addressId: number,
-  organizationId: number,
-  manager: EntityManager,
-): Promise<boolean> {
-  const [{ shared }]: { shared: boolean }[] = await manager.query(
-    `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
-         OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1)
-         OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
-         OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
-       AS "shared"`,
-    [addressId, organizationId],
-  );
-  return shared;
-}
 
 async function resolveAddressId(
   organization: Organization,
@@ -65,7 +49,7 @@ async function resolveAddressId(
   ) {
     if (
       current &&
-      !(await isAddressShared(current.id, organization.id, manager))
+      !(await isAddressShared(current.id, manager, organization.id))
     ) {
       await manager
         .getRepository(Organization)
@@ -99,7 +83,7 @@ async function resolveAddressId(
 
   if (
     current &&
-    !(await isAddressShared(current.id, organization.id, manager))
+    !(await isAddressShared(current.id, manager, organization.id))
   ) {
     await repository.update({ id: current.id }, {
       street,
