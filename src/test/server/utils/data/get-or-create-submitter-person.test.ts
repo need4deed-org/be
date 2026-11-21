@@ -16,7 +16,7 @@ const personSave = vi.fn();
 const personUpdate = vi.fn((..._args: any[]) =>
   Promise.resolve({ affected: 1 }),
 );
-const personCount = vi.fn();
+const addressSharedQuery = vi.fn();
 const agentFind = vi.fn();
 const agentPersonFind = vi.fn();
 const agentPersonSave = vi.fn();
@@ -29,6 +29,7 @@ const addressFindOneBy = vi.fn();
 const postcodeFindOneBy = vi.fn();
 
 const fakeManager: any = {
+  query: addressSharedQuery,
   getRepository: (entity: any) => {
     switch (entity) {
       case Person:
@@ -36,7 +37,6 @@ const fakeManager: any = {
           findOne: personFind,
           save: personSave,
           update: personUpdate,
-          count: personCount,
         };
       case AgentPerson:
         return { findOne: agentPersonFind, save: agentPersonSave };
@@ -357,7 +357,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(0); // no other Person shares it
+      addressSharedQuery.mockResolvedValueOnce([{ shared: false }]);
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -385,7 +385,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 500,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(0); // no other Person shares it
+      addressSharedQuery.mockResolvedValueOnce([{ shared: false }]);
       postcodeFindOneBy.mockResolvedValueOnce(null); // rac_plz not found
       agentPersonFind.mockResolvedValueOnce({
         id: 100,
@@ -415,7 +415,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 1,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(528); // shared by many other Person rows
+      addressSharedQuery.mockResolvedValueOnce([{ shared: true }]);
       addressFindOneBy.mockResolvedValueOnce({ id: 1, title: "Dummy" });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 888 });
@@ -447,7 +447,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 2,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(308); // shared with other Persons, untitled
+      addressSharedQuery.mockResolvedValueOnce([{ shared: true }]);
       addressFindOneBy.mockResolvedValueOnce({ id: 2, title: null });
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 889 });
@@ -480,7 +480,7 @@ describe("getOrCreateSubmitterPerson", () => {
         addressId: 999,
       });
       personSave.mockImplementation(async (p: any) => p);
-      personCount.mockResolvedValueOnce(0); // dangling id, nobody references it
+      addressSharedQuery.mockResolvedValueOnce([{ shared: false }]);
       addressUpdate.mockResolvedValueOnce({ affected: 0 }); // row doesn't exist
       postcodeFindOneBy.mockResolvedValueOnce({ id: 9, value: "12345" });
       addressSave.mockResolvedValueOnce({ id: 890 });

@@ -444,29 +444,21 @@ export async function createAddress(
   return await addressRepository.save(address);
 }
 
-export async function isAddressExclusivelyOwned(
-  personId: number,
-  addressId: number,
-  manager: DataSource | EntityManager = dataSource,
-): Promise<boolean> {
-  const otherOwners = await getRepository(manager, Person).count({
-    where: { addressId, id: Not(personId) },
-  });
-  return otherOwners === 0;
-}
-
 export async function isAddressShared(
   addressId: number,
   manager: DataSource | EntityManager = dataSource,
-  { exceptOrganizationId }: { exceptOrganizationId?: number } = {},
+  {
+    exceptOrganizationId,
+    exceptPersonId,
+  }: { exceptOrganizationId?: number; exceptPersonId?: number } = {},
 ): Promise<boolean> {
   const [{ shared }]: { shared: boolean }[] = await manager.query(
     `SELECT EXISTS (SELECT 1 FROM "agent" WHERE "address_id" = $1)
-         OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1)
+         OR EXISTS (SELECT 1 FROM "person" WHERE "address_id" = $1 AND "id" <> $3)
          OR EXISTS (SELECT 1 FROM "opportunity" WHERE "address_id" = $1)
          OR EXISTS (SELECT 1 FROM "organization" WHERE "address_id" = $1 AND "id" <> $2)
        AS "shared"`,
-    [addressId, exceptOrganizationId ?? 0],
+    [addressId, exceptOrganizationId ?? 0, exceptPersonId ?? 0],
   );
   return shared;
 }
@@ -491,12 +483,10 @@ export async function patchOrReplaceAddress(
   postcodeData: Partial<Postcode>,
   manager: DataSource | EntityManager = dataSource,
 ): Promise<boolean> {
-  const exclusivelyOwned = await isAddressExclusivelyOwned(
-    personId,
-    addressData.id,
-    manager,
-  );
-  if (exclusivelyOwned) {
+  const shared = await isAddressShared(addressData.id, manager, {
+    exceptPersonId: personId,
+  });
+  if (!shared) {
     return patchAddress(addressData, postcodeData, manager);
   }
 
