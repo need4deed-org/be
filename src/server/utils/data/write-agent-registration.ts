@@ -385,9 +385,7 @@ function toRegisterAgentError(
   input: ApiAgentRegisterNew,
 ): unknown {
   return classifyRegisterAgentConflict(err) === "organization"
-    ? new BadRequestError(
-        `Organization (id:${input.organizationId}) not found.`,
-      )
+    ? new BadRequestError(`Organization (id:${input.organizationId}) not found.`)
     : err;
 }
 
