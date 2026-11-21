@@ -63,6 +63,11 @@ import {
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
+import {
+  assertActiveAdminRemains,
+  eraseUserByAdmin,
+  lockActiveAdminIds,
+} from "../utils/data/admin-account";
 import { deactivateVolunteerProfile } from "../utils/data/deactivate-volunteer-profile";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
 import { pickRepresentativeMembership } from "../utils/data/get-agent-person-representative";
@@ -71,11 +76,6 @@ import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
 import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-token";
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
 import { signLink } from "../utils/data/sign-link";
-import {
-  assertActiveAdminRemains,
-  eraseUserByAdmin,
-  lockActiveAdminIds,
-} from "./user-admin.routes";
 
 export default async function userRoutes(
   fastify: FastifyInstance,

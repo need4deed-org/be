@@ -1,10 +1,12 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
 import { IsNull } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import ApiKey from "../../../data/entity/api-key.entity";
 import Deal from "../../../data/entity/deal.entity";
+import AgentPerson from "../../../data/entity/m2m/agent-person";
+import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import RefreshSession from "../../../data/entity/refresh-session.entity";
 import User from "../../../data/entity/user.entity";
@@ -222,9 +224,22 @@ describe("admin account actions", () => {
   });
 
   it("refuses a password reset for a deactivated account", async () => {
+    const target = await createAccount(UserRole.COORDINATOR);
+    await send("POST", `/user/${target.id}/deactivate`);
+
+    const response = await send("POST", `/user/${target.id}/password-reset`);
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().message).toBe("Reactivate the account first.");
+  });
+
+  it("refuses a password reset for an account that was never verified", async () => {
     const target = await createAccount(UserRole.COORDINATOR, false);
     const response = await send("POST", `/user/${target.id}/password-reset`);
     expect(response.statusCode).toBe(400);
+    expect(response.json().message).toBe(
+      "This account hasn't been verified yet.",
+    );
   });
 
   it("switches a coordinator to admin and ends their sessions", async () => {
@@ -328,6 +343,30 @@ describe("admin account actions", () => {
       expect(key.revokedAt).not.toBeNull();
     } finally {
       await fastify.db.apiKeyRepository.delete({ id: apiKey.id });
+    }
+  });
+
+  it("tells the admin about the NGO memberships of a deleted NGO account", async () => {
+    const target = await createAccount(UserRole.AGENT);
+    const agent = await fastify.db.agentRepository.save(
+      new Agent({ title: `Admin Actions NGO ${randomNumericSuffix()}` }),
+    );
+    await fastify.db.agentPersonRepository.save(
+      new AgentPerson({
+        agentId: agent.id,
+        personId: target.personId!,
+        status: AgentMembershipStatus.ACTIVE,
+      }),
+    );
+
+    try {
+      const response = await send("DELETE", `/user/${target.id}`);
+
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json().message).toMatch(/1 agent-membership record/);
+    } finally {
+      await fastify.db.agentPersonRepository.delete({ agentId: agent.id });
+      await fastify.db.agentRepository.delete({ id: agent.id });
     }
   });
 
