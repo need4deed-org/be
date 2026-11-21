@@ -37,9 +37,7 @@ export async function syncAgentDistrictFromPostcode(
     postcode ?? agent.address?.postcode,
     manager,
   );
-  if (district) {
-    agent.district = district;
-    agent.districtId = district.id;
-  }
+  agent.district = district;
+  agent.districtId = district?.id ?? null;
   return agent;
 }

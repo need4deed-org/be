@@ -13,9 +13,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../../config";
-import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
-import { getRepository } from "../../../data/utils";
 import { getDistrictCentroids } from "../../../data/utils/get-district";
 import logger from "../../../logger";
 import {
@@ -349,12 +347,13 @@ export default async function agentRoutes(
         request.body;
 
       await agentRepository.manager.transaction(async (manager) => {
+        const postcodeData = await resolveAddressPostcode(
+          addressPostcode,
+          manager,
+        );
+
         if (addressStreet || addressPostcode) {
           const addressData = addressStreet ? { street: addressStreet } : {};
-          const postcodeData = await resolveAddressPostcode(
-            addressPostcode,
-            manager,
-          );
 
           if (agent.addressId) {
             const success = await patchAddress(
@@ -384,17 +383,8 @@ export default async function agentRoutes(
 
         Object.assign(agent, parseAgentPatch(request.body));
 
-        if (agent.addressId) {
-          const addressRepository = getRepository(manager, Address);
-          const address = await addressRepository.findOne({
-            where: { id: agent.addressId },
-            relations: ["postcode"],
-          });
-          await syncAgentDistrictFromPostcode(
-            agent,
-            address?.postcode,
-            manager,
-          );
+        if (postcodeData.id) {
+          await syncAgentDistrictFromPostcode(agent, postcodeData.id, manager);
         }
 
         await manager.getRepository(Agent).save(agent);

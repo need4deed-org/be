@@ -189,7 +189,7 @@ describe("createAgentForPerson", () => {
     expect(agentSave.mock.calls[0][0].districtId).toBeUndefined();
   });
 
-  it("leaves districtId unset when the postcode maps to no district", async () => {
+  it("saves no districtId when the postcode maps to no district", async () => {
     createAddressMock.mockResolvedValueOnce({ id: 99, postcodeId: 3 });
 
     await createAgentForPerson(11, {
@@ -199,7 +199,7 @@ describe("createAgentForPerson", () => {
       districtId: 1,
     } as ApiAgentRegisterNew);
 
-    expect(agentSave.mock.calls[0][0].districtId).toBeUndefined();
+    expect(agentSave.mock.calls[0][0].districtId).toBeNull();
   });
 
   it("throws AgentAddressConflictError (no create) when street+postcode match an existing agent", async () => {

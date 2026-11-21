@@ -89,7 +89,7 @@ describe("syncAgentDistrictFromPostcode", () => {
     );
   });
 
-  it("leaves district/districtId untouched when no district resolves for the postcode", async () => {
+  it("clears district/districtId when no district resolves for the postcode", async () => {
     mockedGetDistrictFromPostcode.mockResolvedValue(null);
 
     const agent = makeAgent({ districtId: 1, district: makeDistrict() as any });
@@ -97,7 +97,8 @@ describe("syncAgentDistrictFromPostcode", () => {
       id: 99,
     } as any);
 
-    expect(result.districtId).toBe(1);
+    expect(result.districtId).toBeNull();
+    expect(result.district).toBeNull();
   });
 });
 
