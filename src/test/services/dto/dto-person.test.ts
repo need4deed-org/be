@@ -110,9 +110,9 @@ describe("dtoSerializePerson", () => {
         city: "London",
         postcode: {
           id: "pc-789",
-          value: "SW1A 1AA",
-          latitude: 51.5,
-          longitude: -0.1,
+          value: "10115",
+          latitude: 52.5,
+          longitude: 13.4,
         },
       },
     } as unknown as Person;
@@ -129,9 +129,9 @@ describe("dtoSerializePerson", () => {
         city: "London",
         postcode: {
           id: "pc-789",
-          code: "SW1A 1AA", // Mapping value -> code
-          latitude: 51.5,
-          longitude: -0.1,
+          code: "10115",
+          latitude: 52.5,
+          longitude: 13.4,
         },
       },
     });

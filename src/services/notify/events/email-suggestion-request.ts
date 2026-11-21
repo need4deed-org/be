@@ -15,6 +15,7 @@ import {
   type LocalizedValue,
   type Manifest,
 } from "../email-template";
+import { opportunityTitleIn, type TitleSource } from "../opportunity-title";
 import type { EmailTransport } from "../types";
 import { buildTaggedLink, neutralizeBraces } from "./email-tagged";
 
@@ -30,7 +31,7 @@ export interface EmailSuggestionRequestInput {
   requesterAgent: string;
   volunteerId: number;
   volunteerName: string;
-  opportunityTitle: string;
+  opportunity: TitleSource;
 }
 
 const resolveLabel = (
@@ -46,13 +47,15 @@ export async function sendEmailSuggestionRequest(
     requesterAgent,
     volunteerId,
     volunteerName,
-    opportunityTitle,
+    opportunity,
   }: EmailSuggestionRequestInput,
 ): Promise<void> {
   if (!recipient.email) {
     throw new Error("sendEmailSuggestionRequest: missing recipient email");
   }
 
+  const locale = resolveLocale(recipient.language);
+  const title = await opportunityTitleIn(opportunity, locale);
   const manifest = await loader.load();
   const {
     subject,
@@ -70,14 +73,14 @@ export async function sendEmailSuggestionRequest(
         : resolveLabel(manifest, "someone"),
       requesterAgent: neutralizeBraces(requesterAgent),
       volunteerName: neutralizeBraces(volunteerName),
-      opportunityTitle: neutralizeBraces(opportunityTitle),
+      opportunityTitle: neutralizeBraces(title),
       link: buildTaggedLink({
         kind: "comment",
         entityType: EntityTableName.VOLUNTEER,
         entityId: volunteerId,
       }),
     },
-    resolveLocale(recipient.language),
+    locale,
     { escapeHtmlValues: true },
   );
 

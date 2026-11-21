@@ -57,6 +57,7 @@ async function sendSuggestionEmail(
   logger.debug(`emailSuggestion side-effect triggered (ov ${id})`);
   const ov = await opportunityVolunteerRepository.findOne({
     where: { id },
+    relationLoadStrategy: "query",
     relations: [
       "volunteer.person",
       "volunteer.person.users",
@@ -184,6 +185,7 @@ async function sendMatchedEmails(
       "opportunity.onetimer",
       "opportunity.district",
     ],
+    relationLoadStrategy: "query",
   });
   if (!ov) {
     return "no-match";

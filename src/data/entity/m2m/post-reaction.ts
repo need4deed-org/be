@@ -39,6 +39,6 @@ export default class PostReaction {
   @Column({ type: "text" })
   emoji: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

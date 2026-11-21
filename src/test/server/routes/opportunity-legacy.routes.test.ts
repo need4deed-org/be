@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import {
+  AgentEngagementStatusType,
   OpportunityLegacyType,
   OpportunityStatusType,
   OpportunityType,
@@ -8,6 +9,7 @@ import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
 import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
@@ -19,6 +21,7 @@ import { DealType } from "../../../data/types";
 import { getRepository } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 // be#780: GET /opportunity/legacy is public/unauthenticated and unconditionally
 // serialized whatever "accompanying" row it found linked to an opportunity,
@@ -39,9 +42,7 @@ describe("GET /opportunity/legacy", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (legacy-pii) ${suffix}` }),
@@ -113,9 +114,7 @@ describe("GET /opportunity/legacy hides accompanying details", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     agent = await fastify.db.agentRepository.save(
       new Agent({ title: `Test Agent (legacy-accompanying) ${suffix}` }),
     );
@@ -323,9 +322,7 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     dealDistrictEntity = await districtRepository.save(
       new District({ title: `Deal District (legacy-1341) ${suffix}` }),
     );
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );
@@ -391,5 +388,99 @@ describe("GET /opportunity/legacy fills berlin_locations from the own district",
     expect((await getEntry(legacy.id)).berlin_locations).toEqual([
       dealDistrictEntity.title,
     ]);
+  });
+});
+
+describe("POST /opportunity/legacy skips an inactive agent at the same address", () => {
+  let fastify: FastifyInstance;
+  const suffix = randomNumericSuffix();
+  const street = `Inaktivstrasse-${suffix} 5`;
+  let inactive: Agent;
+  let active: Agent;
+  let addressIds: number[] = [];
+  let createdOpportunityId: number | undefined;
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    const addressRepository = getRepository(dataSource, Address);
+    const [inactiveAddress, activeAddress] = await addressRepository.save([
+      new Address({ street, postcodeId: postcode.id }),
+      new Address({ street, postcodeId: postcode.id }),
+    ]);
+    addressIds = [inactiveAddress.id, activeAddress.id];
+    inactive = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Legacy Inactive ${suffix}`,
+        addressId: inactiveAddress.id,
+        engagementStatus: AgentEngagementStatusType.INACTIVE,
+      }),
+    );
+    active = await fastify.db.agentRepository.save(
+      new Agent({
+        title: `Legacy Active ${suffix}`,
+        addressId: activeAddress.id,
+        engagementStatus: AgentEngagementStatusType.ACTIVE,
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    if (createdOpportunityId) {
+      const created = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: createdOpportunityId,
+      });
+      await fastify.db.opportunityRepository.delete({
+        id: createdOpportunityId,
+      });
+      await fastify.db.dealRepository.delete({ id: created.dealId });
+      if (created.contactPersonId) {
+        await fastify.db.personRepository.delete({
+          id: created.contactPersonId,
+        });
+      }
+    }
+    await fastify.db.agentRepository.delete({
+      id: In([inactive.id, active.id]),
+    });
+    await getRepository(dataSource, Address).delete({ id: In(addressIds) });
+    await fastify.close();
+  });
+
+  it("files the opportunity under the active agent", async () => {
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    const arrival = vi
+      .spyOn(fastify.notify, "arrival")
+      .mockResolvedValue(undefined);
+    try {
+      const res = await fastify.inject({
+        method: "POST",
+        url: "/opportunity/legacy",
+        payload: {
+          title: `Test Opportunity (legacy-inactive) ${suffix}`,
+          opportunity_type: OpportunityLegacyType.VOLUNTEERING,
+          volunteers_number: 1,
+          category: "",
+          category_id: "",
+          language: "en",
+          languages: [],
+          activities: [],
+          skills: [],
+          rac_address: street,
+          rac_plz: postcode.value,
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      createdOpportunityId = res.json().data.id;
+      const saved = await fastify.db.opportunityRepository.findOneByOrFail({
+        id: createdOpportunityId,
+      });
+      expect(saved.agentId).toBe(active.id);
+    } finally {
+      arrival.mockRestore();
+    }
   });
 });

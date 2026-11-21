@@ -4,11 +4,12 @@ import {
   FastifyPluginOptions,
 } from "fastify";
 import {
+  AgentEngagementStatusType,
   OpportunityLegacyFormData,
   OpportunityStatusType,
   OpportunityType,
 } from "need4deed-sdk";
-import { In } from "typeorm";
+import { In, Not } from "typeorm";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Agent from "../../../data/entity/opportunity/agent.entity";
@@ -25,6 +26,7 @@ import {
   parseOpportunityLegacy,
 } from "../../../services";
 import { dealParserOpportunity } from "../../../services/dto/parser-deal-opportunity";
+import { opportunityLegacyBodySchema } from "../../schema";
 import {
   assertAppointmentNotTooSoon,
   getAgentByAddress,
@@ -36,10 +38,8 @@ import {
   writeOpportunityContactComment,
   writeOpportunityLegacy,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 
 function parseContactPerson(formData: OpportunityLegacyFormData): Person {
   const parts = (formData.rac_full_name ?? "").trim().split(/\s+/);
@@ -63,6 +63,7 @@ async function findOrCreateAgent(
 
   const agentRepository = getRepository(dataSource, Agent);
   const agents = await agentRepository.find({
+    where: { engagementStatus: Not(AgentEngagementStatusType.INACTIVE) },
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
 
@@ -105,7 +106,10 @@ export default async function opportunityLegacyRoutes(
 ) {
   fastify.post<{ Body: OpportunityLegacyFormData }>(
     "/",
-    { config: { public: true } as FastifyContextConfig },
+    {
+      config: { public: true } as FastifyContextConfig,
+      schema: { body: opportunityLegacyBodySchema },
+    },
     async (request, reply) => {
       const opportunity = await parseFormData(
         request.body,
@@ -367,6 +371,8 @@ export default async function opportunityLegacyRoutes(
           ]),
         },
         take: 300,
+        order: { id: "ASC" },
+        relationLoadStrategy: "query",
         relations: [
           "deal.dealLanguage.language",
           "deal.dealActivity.activity",

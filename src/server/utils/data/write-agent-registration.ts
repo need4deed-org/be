@@ -6,7 +6,7 @@ import {
   ApiAgentAlreadyRegisteredConflict,
   ApiAgentRegisterNew,
 } from "need4deed-sdk";
-import { DataSource, EntityManager, In } from "typeorm";
+import { DataSource, EntityManager, In, Not } from "typeorm";
 import { BadRequestError, BaseError, NotFoundError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -24,6 +24,7 @@ import { isFreeEmailDomain } from "./free-email-domains";
 import { getAgentByAddress } from "./get-agent-by-postcode";
 import { isAgentDomainAllowed } from "./is-agent-domain-allowed";
 import { isEmailDomainTrusted } from "./is-trusted-domain";
+import { linkAgentToDomainOrganizationSafely } from "./link-agent-organization";
 
 export interface RegisterAgentResult {
   agentId: number;
@@ -62,15 +63,6 @@ export class AgentAlreadyRegisteredError extends BaseError {
       true,
       { ...details },
     );
-  }
-}
-
-export class AgentTitleConflictError extends BaseError {
-  constructor(public readonly agentId?: number) {
-    super("An agent with this title already exists.", 409, true, {
-      conflict: "title",
-      ...(agentId !== undefined ? { agentId } : {}),
-    });
   }
 }
 
@@ -149,6 +141,7 @@ async function assertNoAddressConflict(
     return;
   }
   const agents = await manager.getRepository(Agent).find({
+    where: { engagementStatus: Not(AgentEngagementStatusType.INACTIVE) },
     relations: ["address.postcode", "agentPostcode.postcode"],
   });
   const match = getAgentByAddress(
@@ -256,8 +249,9 @@ export async function createAgentForPerson(
       };
     });
   } catch (err) {
-    throw await toRegisterAgentError(err, input);
+    throw toRegisterAgentError(err, input);
   }
+  await linkAgentToDomainOrganizationSafely(dataSource.manager, result.agentId);
 
   return result;
 }
@@ -275,7 +269,7 @@ export async function createAgent(
       agentId = agent.id;
     });
   } catch (err) {
-    throw await toRegisterAgentError(err, input);
+    throw toRegisterAgentError(err, input);
   }
 
   return { agentId };
@@ -379,39 +373,28 @@ export async function joinAgent(
       await claimAgent(agentId, manager);
     }
   });
+  if (status === AgentMembershipStatus.ACTIVE) {
+    await linkAgentToDomainOrganizationSafely(dataSource.manager, agentId);
+  }
 
   return { agentId, membershipStatus: status };
 }
 
-async function toRegisterAgentError(
+function toRegisterAgentError(
   err: unknown,
   input: ApiAgentRegisterNew,
-): Promise<unknown> {
-  switch (classifyRegisterAgentConflict(err)) {
-    case "title": {
-      const existing = await dataSource
-        .getRepository(Agent)
-        .findOne({ where: { title: input.title } });
-      return new AgentTitleConflictError(existing?.id);
-    }
-    case "organization":
-      return new BadRequestError(
-        `Organization (id:${input.organizationId}) not found.`,
-      );
-    default:
-      return err;
-  }
+): unknown {
+  return classifyRegisterAgentConflict(err) === "organization"
+    ? new BadRequestError(`Organization (id:${input.organizationId}) not found.`)
+    : err;
 }
 
 export function classifyRegisterAgentConflict(
   err: unknown,
-): "title" | "organization" | null {
+): "organization" | null {
   const e = err as { code?: string; detail?: string };
   if (!e?.detail) {
     return null;
-  }
-  if (e.code === "23505" && e.detail.includes("title")) {
-    return "title";
   }
   if (e.code === "23503" && e.detail.includes("organization_id")) {
     return "organization";

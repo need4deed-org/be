@@ -18,6 +18,7 @@ import {
 } from "typeorm";
 import LeadFrom from "./lead.entity";
 import Opportunity from "./opportunity/opportunity.entity";
+import Organization from "./organization.entity";
 import Activity from "./profile/activity.entity";
 import AgentType from "./profile/agent-type.entity";
 import Category from "./profile/category.entity";
@@ -28,7 +29,7 @@ import Skill from "./profile/skill.entity";
 @Entity()
 @Check(
   "CHK_field_translation_one_target",
-  `num_nonnulls("opportunity_id", "translated_language_id", "category_id", "activity_id", "skill_id", "agent_type_id", "service_id", "lead_from_id") = 1`,
+  `num_nonnulls("opportunity_id", "translated_language_id", "category_id", "activity_id", "skill_id", "agent_type_id", "service_id", "lead_from_id", "organization_id") = 1`,
 )
 @Index(
   "UQ_field_translation_opportunity",
@@ -68,6 +69,11 @@ import Skill from "./profile/skill.entity";
   "UQ_field_translation_lead_from",
   ["leadFromId", "fieldName", "languageId"],
   { unique: true, where: `"lead_from_id" IS NOT NULL` },
+)
+@Index(
+  "UQ_field_translation_organization",
+  ["organizationId", "fieldName", "languageId"],
+  { unique: true, where: `"organization_id" IS NOT NULL` },
 )
 @Index("IDX_field_translation_reference_text", ["translation"], {
   where: `"origin" = 'reference'`,
@@ -128,7 +134,7 @@ export default class FieldTranslation {
   @Column({ type: "varchar", nullable: true })
   model: string | null;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Opportunity, { nullable: true, onDelete: "CASCADE" })
@@ -178,4 +184,10 @@ export default class FieldTranslation {
   leadFrom?: LeadFrom;
   @Column({ nullable: true })
   leadFromId?: number;
+
+  @ManyToOne(() => Organization, { nullable: true, onDelete: "CASCADE" })
+  @JoinColumn({ name: "organization_id" })
+  organization?: Organization;
+  @Column({ nullable: true })
+  organizationId?: number;
 }

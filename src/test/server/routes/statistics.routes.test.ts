@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import {
   ApiStatisticsGet,
   OpportunityType,
+  OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
   STATISTICS_UNKNOWN_KEY,
   UserRole,
@@ -12,6 +13,7 @@ import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import LeadFrom from "../../../data/entity/lead.entity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
+import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import Person from "../../../data/entity/person.entity";
@@ -24,6 +26,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -31,7 +34,7 @@ const PASSWORD = "test_password";
 async function backdate(table: string, id: number, instant: string) {
   const column = table === "statistics_event" ? "occurred_at" : "created_at";
   await dataSource.query(
-    `UPDATE ${table} SET ${column} = $1::timestamptz AT TIME ZONE current_setting('TimeZone') WHERE id = $2`,
+    `UPDATE ${table} SET ${column} = $1::timestamptz WHERE id = $2`,
     [instant, id],
   );
 }
@@ -88,9 +91,7 @@ describe("GET /statistics/:metric", () => {
     districtIds: string[],
     email?: string,
   ) {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );
@@ -115,6 +116,32 @@ describe("GET /statistics/:metric", () => {
     );
     createdIds.volunteers.push(volunteer.id);
     await backdate("volunteer", volunteer.id, instant);
+    return volunteer;
+  }
+
+  async function createOpportunity(type: OpportunityType, instant: string) {
+    const opportunity = await fastify.db.opportunityRepository.save(
+      new Opportunity({ title: `Stats ${randomNumericSuffix()}`, type }),
+    );
+    createdIds.opportunities.push(opportunity.id);
+    await backdate("opportunity", opportunity.id, instant);
+    return opportunity;
+  }
+
+  async function createMatch(
+    opportunity: Opportunity,
+    volunteer: Volunteer,
+    status: OpportunityVolunteerStatusType,
+    instant: string,
+  ) {
+    const match = await dataSource.getRepository(OpportunityVolunteer).save(
+      new OpportunityVolunteer({
+        opportunityId: opportunity.id,
+        volunteerId: volunteer.id,
+        status,
+      }),
+    );
+    await backdate("opportunity_volunteer", match.id, instant);
   }
 
   async function get(url: string, cookie = coordinatorCookie) {
@@ -188,6 +215,29 @@ describe("GET /statistics/:metric", () => {
     );
     createdIds.opportunities.push(agentOpportunity.id);
     await backdate("opportunity", agentOpportunity.id, "1985-05-06T10:00:00Z");
+
+    // Match fixtures live in 1986, away from the 1985 request counts.
+    const first = await createVolunteer("1986-01-01T12:00:00Z", null, []);
+    const second = await createVolunteer("1986-01-01T12:00:00Z", null, []);
+    const regular = await createOpportunity(
+      OpportunityType.REGULAR,
+      "1986-01-05T12:00:00Z",
+    );
+    const event = await createOpportunity(
+      OpportunityType.EVENTS,
+      "1986-01-06T12:00:00Z",
+    );
+    const pendingOnly = await createOpportunity(
+      OpportunityType.ACCOMPANYING,
+      "1986-01-07T12:00:00Z",
+    );
+    await createOpportunity(OpportunityType.REGULAR, "1986-02-01T12:00:00Z");
+    const { MATCHED, ACTIVE, PAST, PENDING } = OpportunityVolunteerStatusType;
+    await createMatch(regular, first, MATCHED, "1986-02-10T12:00:00Z");
+    await createMatch(regular, second, PENDING, "1986-01-25T12:00:00Z");
+    await createMatch(event, second, ACTIVE, "1986-02-15T12:00:00Z");
+    await createMatch(event, first, PAST, "1986-03-01T12:00:00Z");
+    await createMatch(pendingOnly, second, PENDING, "1986-01-20T12:00:00Z");
 
     lead = await dataSource
       .getRepository(LeadFrom)
@@ -343,6 +393,69 @@ describe("GET /statistics/:metric", () => {
 
     expect(data.periods[0]).toMatchObject({ counts: { total: 2 }, total: 2 });
     expect(data.totalsBeforeTracking).toBeUndefined();
+  });
+
+  it("counts matched volunteers per month, by opportunity type", async () => {
+    const data = await getData(
+      "/statistics/matched-volunteers?granularity=month&from=1986-01-01&to=1986-04-01&groupBy=opportunity-type",
+    );
+
+    expect(
+      data.periods.map(({ counts, total }) => ({ counts, total })),
+    ).toEqual([
+      { counts: {}, total: 0 },
+      {
+        counts: {
+          [OpportunityType.REGULAR]: 1,
+          [OpportunityType.EVENTS]: 1,
+        },
+        total: 2,
+      },
+      { counts: { [OpportunityType.EVENTS]: 1 }, total: 1 },
+    ]);
+    expect(data.allowedGroupBy).toEqual(["none", "opportunity-type"]);
+  });
+
+  it("counts a matched opportunity once, in the month of its first match", async () => {
+    const data = await getData(
+      "/statistics/matched-opportunities?granularity=month&from=1986-01-01&to=1986-04-01&groupBy=opportunity-type",
+    );
+
+    expect(
+      data.periods.map(({ counts, total }) => ({ counts, total })),
+    ).toEqual([
+      { counts: {}, total: 0 },
+      {
+        counts: {
+          [OpportunityType.REGULAR]: 1,
+          [OpportunityType.EVENTS]: 1,
+        },
+        total: 2,
+      },
+      { counts: {}, total: 0 },
+    ]);
+  });
+
+  it("groups matched opportunities by district", async () => {
+    const data = await getData(
+      "/statistics/matched-opportunities?granularity=month&from=1986-02-01&to=1986-03-01&groupBy=district",
+    );
+
+    expect(data.periods[0].total).toBe(2);
+  });
+
+  it("counts opportunities never matched, pending ones included", async () => {
+    const data = await getData(
+      "/statistics/unmatched-opportunities?granularity=year&from=1986-01-01&to=1987-01-01&groupBy=opportunity-type",
+    );
+
+    expect(data.periods[0]).toMatchObject({
+      counts: {
+        [OpportunityType.ACCOMPANYING]: 1,
+        [OpportunityType.REGULAR]: 1,
+      },
+      total: 2,
+    });
   });
 
   it("rejects a groupBy the metric does not support", async () => {

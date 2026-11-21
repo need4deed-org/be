@@ -5,7 +5,11 @@ import Postcode from "../../../../data/entity/location/postcode.entity";
 import AgentPerson from "../../../../data/entity/m2m/agent-person";
 import Person from "../../../../data/entity/person.entity";
 import { updateAgentContact } from "../../../../server/utils/data/update-agent-contact";
-import { randomNumericSuffix } from "../../../random";
+import {
+  randomNonReferencePostcode,
+  randomNumericSuffix,
+} from "../../../random";
+import { firstSeeded } from "../../../seeded";
 
 // be#1026: PATCH /agent/:id/contact/:membershipId (updateAgentContact) used
 // to patch a caller-supplied Address id in place with no check for whether
@@ -23,7 +27,7 @@ describe("updateAgentContact address handling (be#1026)", () => {
 
   it("re-points the contact to a fresh Address instead of patching one shared with another Person", async () => {
     const postcodeRepository = dataSource.getRepository(Postcode);
-    const postcode = await postcodeRepository.findOneOrFail({ where: {} });
+    const postcode = await firstSeeded(postcodeRepository);
 
     const addressRepository = dataSource.getRepository(Address);
     const shared = await addressRepository.save(
@@ -79,7 +83,7 @@ describe("updateAgentContact address handling (be#1026)", () => {
 });
 
 describe("updateAgentContact postcode resolution", () => {
-  const plz = `6${randomNumericSuffix(4)}`;
+  const plz = randomNonReferencePostcode("6");
   let preexistingPostcode = false;
   let person: Person;
 

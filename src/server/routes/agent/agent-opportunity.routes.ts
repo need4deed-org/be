@@ -9,10 +9,8 @@ import {
   maskVolunteerIdentities,
   shouldMaskInactiveAgentData,
 } from "../../utils";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { requestLanguage } from "../../utils/data/request-language";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 import { maskFields } from "../../utils/pii/mask";
 import { makePiiSerialization } from "../../utils/pii/pre-serialization";
 
@@ -44,7 +42,11 @@ export default async function agentOpportunityRoutes(
         "opportunity.deal.dealTimeslot.timeslot",
         "opportunity.district",
       ];
-      const agent = await agentRepository.findOne({ where: { id }, relations });
+      const agent = await agentRepository.findOne({
+        where: { id },
+        relations,
+        relationLoadStrategy: "query",
+      });
 
       if (!agent) {
         throw new NotFoundError(`Agent (id:${id}) not found.`);

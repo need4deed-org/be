@@ -1,9 +1,6 @@
 import { DataSource } from "typeorm";
-import { seedPLZFile } from "../../../config/constants";
-import logger from "../../../logger";
-import Postcode from "../../entity/location/postcode.entity";
-import { fetchJsonFromUrl, getRepository } from "../../utils";
-import { getCount } from "../utils";
+import { seedAllPLZFile, seedPLZFile } from "../../../config/constants";
+import { fetchJsonFromUrl } from "../../utils";
 
 interface PLZJSON {
   plz: string;
@@ -11,32 +8,50 @@ interface PLZJSON {
   longitude: number;
 }
 
+const placeholderPostcode = "12345";
+const missingCoordinates =
+  "postcode.latitude IS NULL AND postcode.longitude IS NULL";
+
 export async function seedPostcode(dataSource: DataSource): Promise<void> {
   if (!dataSource) {
     throw new Error("DataSource is not initialized.");
   }
 
-  const postcodeRepository = getRepository(dataSource, Postcode);
-
-  const count = await getCount(postcodeRepository);
-  if (count !== 0) {
-    logger.info("Skipping seeding postcodes.");
-    return;
+  const rowsByPLZ = new Map<string, PLZJSON>();
+  for (const file of [seedAllPLZFile, seedPLZFile]) {
+    for (const row of (await fetchJsonFromUrl(file)) as PLZJSON[]) {
+      rowsByPLZ.set(row.plz, row);
+    }
   }
-
-  const plzs = (await fetchJsonFromUrl(seedPLZFile)) as PLZJSON[];
-
-  const postcodesByValue = new Map<string, Postcode>([
-    ["12345", new Postcode({ value: "12345" })],
-  ]);
-  for (const { plz: value, latitude, longitude } of plzs) {
-    postcodesByValue.set(value, new Postcode({ value, latitude, longitude }));
-  }
-  const postcodesForInsert = [...postcodesByValue.values()];
+  const rows = [...rowsByPLZ.values()];
 
   try {
-    await postcodeRepository.insert(postcodesForInsert);
+    await dataSource.transaction(async (manager) => {
+      await manager.query(
+        `
+        INSERT INTO postcode (value, latitude, longitude, is_reference)
+        SELECT value, latitude, longitude, true
+          FROM unnest($1::varchar[], $2::numeric[], $3::numeric[])
+               AS t(value, latitude, longitude)
+        ON CONFLICT (value) DO UPDATE
+           SET is_reference = true,
+               latitude = CASE WHEN ${missingCoordinates}
+                          THEN EXCLUDED.latitude ELSE postcode.latitude END,
+               longitude = CASE WHEN ${missingCoordinates}
+                           THEN EXCLUDED.longitude ELSE postcode.longitude END
+        `,
+        [
+          rows.map(({ plz }) => plz),
+          rows.map(({ latitude }) => latitude),
+          rows.map(({ longitude }) => longitude),
+        ],
+      );
+      await manager.query(
+        `INSERT INTO postcode (value) VALUES ($1) ON CONFLICT (value) DO NOTHING`,
+        [placeholderPostcode],
+      );
+    });
   } catch (error) {
-    throw new Error(`Error inserting postcodes: ${error.message}`);
+    throw new Error(`Error seeding postcodes: ${error.message}`);
   }
 }

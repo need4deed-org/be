@@ -18,11 +18,9 @@ import {
   responseSchema,
 } from "../../schema";
 import { commuteFor, loadCommuteRangesForCaller } from "../../utils";
+import { requestLanguage } from "../../utils/data/request-language";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
-import {
-  requestLanguage,
-  translateOpportunities,
-} from "../../utils/data/translate-opportunities";
+import { translateOpportunities } from "../../utils/data/translate-opportunities";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
 
 const msg400 = "URL param must ba a positive number";

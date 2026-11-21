@@ -147,8 +147,7 @@ export default async function volunteerDocRoutes(
             volunteerId: id,
             communicationType: CommunicationType.CGC_APPLICATION_EMAIL,
             date: Raw(
-              (alias) =>
-                `${alias} > LOCALTIMESTAMP - make_interval(secs => :secs)`,
+              (alias) => `${alias} > now() - make_interval(secs => :secs)`,
               { secs: cgcApplicationResendGuardMs / 1000 },
             ),
           });

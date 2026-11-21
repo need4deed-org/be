@@ -1,8 +1,10 @@
 import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { dataSource } from "../../../data/data-source";
+import District from "../../../data/entity/location/district.entity";
 import PostcodeCommute from "../../../data/entity/location/postcode-commute.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
+import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import {
   fetchVbbJourneys,
   journeysUrl,
@@ -13,7 +15,7 @@ import {
   shortestJourneyMinutes,
   VbbJourneysResponse,
 } from "../../../data/scripts/fill-postcode-commute";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
 
 const journey = (departure: string | null, arrival: string | null) => ({
   legs: [
@@ -215,11 +217,14 @@ describe("fetchVbbJourneys", () => {
 });
 
 describe("runFill", () => {
+  let district: District;
   let postcodes: Postcode[];
   let withoutCoordinates: Postcode;
+  let outsideCommuteArea: Postcode;
   const values = () => [
     ...postcodes.map((postcode) => postcode.value),
     withoutCoordinates.value,
+    outsideCommuteArea.value,
   ];
   const deps = (
     fetchJourneys: (url: string) => Promise<VbbJourneysResponse>,
@@ -257,7 +262,7 @@ describe("runFill", () => {
       [0, 1, 2].map(
         (i) =>
           new Postcode({
-            value: `9${randomNumericSuffix(4)}`,
+            value: randomNonReferencePostcode("9"),
             latitude: 52.5 + i / 100,
             longitude: 13.4,
           }),
@@ -265,13 +270,38 @@ describe("runFill", () => {
     );
     withoutCoordinates = await dataSource
       .getRepository(Postcode)
-      .save(new Postcode({ value: `9${randomNumericSuffix(4)}` }));
+      .save(new Postcode({ value: randomNonReferencePostcode("9") }));
+    outsideCommuteArea = await dataSource.getRepository(Postcode).save(
+      new Postcode({
+        value: randomNonReferencePostcode("9"),
+        latitude: 48.1,
+        longitude: 11.6,
+      }),
+    );
+    district = await dataSource.getRepository(District).save(
+      new District({
+        title: `Commute Fill District ${randomNumericSuffix()}`,
+      }),
+    );
+    await dataSource
+      .getRepository(DistrictPostcode)
+      .save(
+        [...postcodes, withoutCoordinates].map(
+          ({ id }) =>
+            new DistrictPostcode({ postcodeId: id, districtId: district.id }),
+        ),
+      );
   });
 
   afterAll(async () => {
     await dataSource.getRepository(Postcode).delete({
-      id: In([...postcodes, withoutCoordinates].map(({ id }) => id)),
+      id: In(
+        [...postcodes, withoutCoordinates, outsideCommuteArea].map(
+          ({ id }) => id,
+        ),
+      ),
     });
+    await dataSource.getRepository(District).delete({ id: district.id });
   });
 
   it("reports the pending pairs of postcodes with coordinates on a dry run, without fetching", async () => {
@@ -283,6 +313,19 @@ describe("runFill", () => {
     );
     expect(report.pending).toBe(6);
     expect(fetchJourneys).not.toHaveBeenCalled();
+  });
+
+  it("pairs a PLZs.json postcode without a district but not one outside the commute area", async () => {
+    const report = await runFill(
+      dataSource,
+      {
+        refresh: false,
+        dryRun: true,
+        postcodes: [postcodes[0].value, "15537", outsideCommuteArea.value],
+      },
+      deps(vi.fn()),
+    );
+    expect(report.pending).toBe(2);
   });
 
   it("saves the minutes of every ordered pair", async () => {
@@ -299,6 +342,9 @@ describe("runFill", () => {
     });
     const rows = await commuteRows();
     expect(rows).toHaveLength(6);
+    expect(rows.some((row) => row.toPostcodeId === outsideCommuteArea.id)).toBe(
+      false,
+    );
     expect(
       rows.find(
         (row) =>

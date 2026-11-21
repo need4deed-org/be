@@ -1,7 +1,10 @@
 import districtGeometry from "../../../../public/data/district-geometry.json";
-import berlinDistricts from "../../../../public/data/districts-berlin.json";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
+import {
+  berlinDistrictPLZs,
+  getCommuteAreaCoordinates,
+} from "../../../data/utils/commute-area";
 import { firstDistrictPostcode } from "../../../data/utils/get-district";
 
 type PostcodeWithDistricts = Postcode & {
@@ -21,8 +24,6 @@ type Coordinate = [number, number];
 type LinearRing = Coordinate[];
 type PolygonCoordinates = LinearRing[];
 type MultiPolygonCoordinates = PolygonCoordinates[];
-
-const berlinPostcodes = new Set(berlinDistricts.flatMap(({ plzs }) => plzs));
 
 function isPointInRing(
   longitude: number,
@@ -101,13 +102,12 @@ export function getDistrictLocationBucket({
     return { bucket: "remote" };
   }
 
+  const { latitude, longitude } = getCommuteAreaCoordinates(postcode);
   if (
-    berlinPostcodes.has(postcode.value) ||
-    (postcode.latitude !== null &&
-      postcode.latitude !== undefined &&
-      postcode.longitude !== null &&
-      postcode.longitude !== undefined &&
-      isWithinBerlin(postcode.longitude, postcode.latitude))
+    berlinDistrictPLZs.has(postcode.value) ||
+    (latitude !== null &&
+      longitude !== null &&
+      isWithinBerlin(longitude, latitude))
   ) {
     return { bucket: "unassignedBerlin" };
   }

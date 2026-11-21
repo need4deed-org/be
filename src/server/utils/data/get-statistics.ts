@@ -18,6 +18,7 @@ import { BadRequestError, berlinTimeZone } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
+import { MATCHED_VOLUNTEER_STATUSES } from "./no-match-found";
 
 const MAX_PERIODS = 1000;
 
@@ -60,6 +61,23 @@ interface MetricSource {
 
 const TOTAL_KEY_SQL = { key: `'${STATISTICS_TOTAL_KEY}'` };
 
+const MATCHED_STATUSES_SQL = `(${MATCHED_VOLUNTEER_STATUSES.map(
+  (status) => `'${status}'`,
+).join(", ")})`;
+
+const OPPORTUNITY_KEYS: MetricSource["keys"] = {
+  [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+  [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
+  [StatisticsGroupBy.DISTRICT]: {
+    join: `LEFT JOIN agent a ON a.id = r.agent_id
+           LEFT JOIN district d ON d.id = COALESCE(
+             r.district_id,
+             CASE WHEN r.address_id IS NULL THEN a.district_id END
+           )`,
+    key: "d.id::text",
+  },
+};
+
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
     from: "volunteer r",
@@ -84,18 +102,7 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.REQUESTS]: {
     from: "opportunity r",
     at: "r.created_at",
-    keys: {
-      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
-      [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.type::text" },
-      [StatisticsGroupBy.DISTRICT]: {
-        join: `LEFT JOIN agent a ON a.id = r.agent_id
-               LEFT JOIN district d ON d.id = COALESCE(
-                 r.district_id,
-                 CASE WHEN r.address_id IS NULL THEN a.district_id END
-               )`,
-        key: "d.id::text",
-      },
-    },
+    keys: OPPORTUNITY_KEYS,
   },
   [StatisticsMetric.LEAD_FROM]: {
     from: "statistics_event r",
@@ -109,13 +116,47 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
       },
     },
   },
+  [StatisticsMetric.MATCHED_VOLUNTEERS]: {
+    from: `(
+      SELECT ov.volunteer_id AS id, ov.opportunity_id, ov.status, ov.created_at
+      FROM opportunity_volunteer ov
+    ) r`,
+    at: "r.created_at",
+    filter: `r.status IN ${MATCHED_STATUSES_SQL}`,
+    keys: {
+      [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+      [StatisticsGroupBy.OPPORTUNITY_TYPE]: {
+        join: "JOIN opportunity o ON o.id = r.opportunity_id",
+        key: "o.type::text",
+      },
+    },
+  },
+  [StatisticsMetric.MATCHED_OPPORTUNITIES]: {
+    from: `(
+      SELECT o.id, o.type, o.agent_id, o.district_id, o.address_id,
+        min(ov.created_at) AS matched_at
+      FROM opportunity o
+      JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
+      WHERE ov.status IN ${MATCHED_STATUSES_SQL}
+      GROUP BY o.id
+    ) r`,
+    at: "r.matched_at",
+    keys: OPPORTUNITY_KEYS,
+  },
+  [StatisticsMetric.UNMATCHED_OPPORTUNITIES]: {
+    from: "opportunity r",
+    at: "r.created_at",
+    filter: `NOT EXISTS (
+      SELECT 1 FROM opportunity_volunteer ov
+      WHERE ov.opportunity_id = r.id AND ov.status IN ${MATCHED_STATUSES_SQL}
+    )`,
+    keys: OPPORTUNITY_KEYS,
+  },
 };
 
-// Columns are `timestamp` filled by the database's now(), i.e. session time zone wall time.
-const toLocal = (column: string) =>
-  `((${column}) AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${berlinTimeZone}'`;
-const fromLocal = (local: string) =>
-  `((${local}) AT TIME ZONE '${berlinTimeZone}') AT TIME ZONE current_setting('TimeZone')`;
+// timestamptz → Berlin wall time, and Berlin wall time (timestamp) → timestamptz
+const atBerlin = (value: string) =>
+  `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
 
 async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   const fk = getTranslationFkColumn(EntityTableName.LEAD);
@@ -214,7 +255,7 @@ export async function getStatistics(
            date_trunc($1, COALESCE(
              $2::timestamp,
              LEAST(
-               (SELECT ${toLocal(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
+               (SELECT ${atBerlin(`min(${source.at})`)} FROM ${source.from} WHERE TRUE ${filter}),
                $3::timestamp - interval '1 microsecond'
              ),
              ${nowLocal}
@@ -248,10 +289,10 @@ export async function getStatistics(
     }[]
   > = dataSource.query(
     `WITH src AS (
-       SELECT r.id AS record_id, ${toLocal(source.at)} AS local_at, ${groupKey.key} AS key
+       SELECT r.id AS record_id, ${atBerlin(source.at)} AS local_at, ${groupKey.key} AS key
        FROM ${source.counted ?? source.from} ${groupKey.join ?? ""}
-       WHERE ${source.at} >= ${fromLocal("$2::timestamp")}
-         AND ${source.at} < ${fromLocal("$3::timestamp")} ${filter} ${exclude}
+       WHERE ${source.at} >= ${atBerlin("$2::timestamp")}
+         AND ${source.at} < ${atBerlin("$3::timestamp")} ${filter} ${exclude}
      ),
      counts AS (
        SELECT date_trunc($1, local_at) AS bucket,

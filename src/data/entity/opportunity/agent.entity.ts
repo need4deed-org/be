@@ -37,7 +37,7 @@ export default class Agent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column()
   title: string;
 
   @Column({ nullable: true })
@@ -76,10 +76,10 @@ export default class Agent {
   })
   engagementStatus: AgentEngagementStatusType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Organization)

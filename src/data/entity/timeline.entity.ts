@@ -42,7 +42,7 @@ export default class Timeline {
   @IsEnum(TimedTextType)
   contentType: TimedTextType;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
   timestamp: Date;
 
   @Column({ type: "text" })

@@ -18,6 +18,6 @@ export default class TrustedDomain {
   @IsString()
   domain: string;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
 }

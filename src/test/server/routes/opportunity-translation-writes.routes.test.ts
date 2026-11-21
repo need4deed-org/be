@@ -29,6 +29,7 @@ import { createServer } from "../../../server";
 import { queueOpportunityTranslation } from "../../../server/utils/data/translate-opportunities";
 import { sourceHashOf } from "../../../services/translation/queue";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "Translation-Writes-1!";
 
@@ -58,9 +59,7 @@ describe("opportunity writes queue translations", () => {
 
   // A regular opportunity with a deal (PATCH needs one).
   async function saved(fields: Partial<Opportunity>): Promise<Opportunity> {
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
     );
@@ -146,15 +145,11 @@ describe("opportunity writes queue translations", () => {
         await dataSource.manager.findOneByOrFail(Language, { isoCode: lang })
       ).id;
     }
-    postcodeValue = (
-      await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
-    ).value;
+    postcodeValue = (await firstSeeded(fastify.db.postcodeRepository)).value;
     // POST /opportunity needs the NGO's address to have a postcode.
     address = await dataSource.manager.save(
       new Address({
-        postcodeId: (
-          await fastify.db.postcodeRepository.findOneOrFail({ where: {} })
-        ).id,
+        postcodeId: (await firstSeeded(fastify.db.postcodeRepository)).id,
       }),
     );
     agent = await fastify.db.agentRepository.save(

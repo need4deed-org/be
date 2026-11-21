@@ -46,6 +46,7 @@ export default function agentVolunteerRoutes(
         where: {
           opportunity: { agentId: id },
         },
+        relationLoadStrategy: "query",
         relations: [
           "volunteer.person",
           "volunteer.deal.dealActivity.activity",

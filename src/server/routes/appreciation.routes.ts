@@ -4,9 +4,8 @@ import {
   AppreciationStatusType,
   UserRole,
 } from "need4deed-sdk";
-import { NotFoundError, UnauthorizedError } from "../../config/error/fastify";
+import { NotFoundError } from "../../config/error/fastify";
 import { idParamSchema } from "../schema";
-import { STAFF_ROLES, validatePermissions } from "../utils";
 
 export default async function appreciationRoutes(
   fastify: FastifyInstance,
@@ -48,12 +47,6 @@ export default async function appreciationRoutes(
 
       if (!appreciation) {
         throw new NotFoundError(`Appreciation with id:${id} not found.`);
-      }
-
-      if (!validatePermissions(appreciation, STAFF_ROLES, request.user)) {
-        throw new UnauthorizedError(
-          `Permission denied, appreciation with id:${id} not updated.`,
-        );
       }
 
       const patch = { ...request.body };
@@ -108,12 +101,6 @@ export default async function appreciationRoutes(
 
       if (!appreciation) {
         throw new NotFoundError(`Appreciation with id:${id} not found.`);
-      }
-
-      if (!validatePermissions(appreciation, STAFF_ROLES, request.user)) {
-        throw new UnauthorizedError(
-          `Permission denied, appreciation with id:${id} not deleted.`,
-        );
       }
 
       await appreciationRepository.remove(appreciation);

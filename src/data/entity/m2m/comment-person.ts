@@ -40,6 +40,6 @@ export default class CommentPerson {
   @Column()
   personId: number;
 
-  @Column({ type: "timestamp", nullable: true, default: null })
+  @Column({ type: "timestamptz", nullable: true, default: null })
   readAt: Date | null;
 }

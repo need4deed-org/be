@@ -264,6 +264,27 @@ describe("PATCH /event/:id", () => {
     expect(en).toBeDefined();
   });
 
+  it("sets the sign-up question, and clears it with an empty one", async () => {
+    const id = await createTestEvent();
+    const patch = (signUpQuestion: string | null) =>
+      fastify.inject({
+        method: "PATCH",
+        url: `/event/${id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { signUpQuestion },
+      });
+
+    expect((await patch(" Bringst du etwas mit? ")).statusCode).toBe(204);
+    expect(
+      (await fastify.db.eventRepository.findOneByOrFail({ id })).signUpQuestion,
+    ).toBe("Bringst du etwas mit?");
+
+    expect((await patch("  ")).statusCode).toBe(204);
+    expect(
+      (await fastify.db.eventRepository.findOneByOrFail({ id })).signUpQuestion,
+    ).toBeNull();
+  });
+
   it("clears a nullable field via explicit null", async () => {
     const id = await createTestEvent();
     await fastify.inject({

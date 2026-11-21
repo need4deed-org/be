@@ -1,6 +1,5 @@
 import { FastifyInstance } from "fastify";
 import { AgentMembershipStatus, AgentRoleType, UserRole } from "need4deed-sdk";
-import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -15,7 +14,8 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { randomNumericSuffix } from "../../random";
+import { randomNonReferencePostcode, randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -300,9 +300,7 @@ describe("PATCH /agent/:id organization details", () => {
   // end-to-end from the PATCH contract and so silently failed to save.
   it("saves organizationId — the operator (Träger) field (be#843)", async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     const addressRepository = dataSource.getRepository(Address);
     const organizationRepository = dataSource.getRepository(Organization);
 
@@ -556,7 +554,7 @@ describe("PATCH /agent/:id organization details", () => {
   });
 
   describe("address postcode resolution", () => {
-    const plz = `5${randomNumericSuffix(4)}`;
+    const plz = randomNonReferencePostcode("5");
     let preexistingPostcode = false;
 
     async function agentAddress(): Promise<Address | null> {
@@ -814,7 +812,7 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
     createdAgentIds.push(res.json().data.agentId);
   });
 
-  it("409s on a duplicate title", async () => {
+  it("creates a second agent with the same title", async () => {
     const title = `Duplicate Agent ${suffix}`;
     const first = await fastify.inject({
       method: "POST",
@@ -831,8 +829,9 @@ describe("POST /agent — coordinator-created agent (fe#911)", () => {
       cookies: { access: coordinatorCookie },
       payload: { title },
     });
-    expect(second.statusCode).toBe(409);
-    expect(second.json()).toMatchObject({ conflict: "title" });
+    expect(second.statusCode).toBe(201);
+    createdAgentIds.push(second.json().data.agentId);
+    expect(second.json().data.agentId).not.toBe(first.json().data.agentId);
   });
 });
 
@@ -851,10 +850,8 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const numericSuffix = randomNumericSuffix();
   const TITLE_PREFIX = `Test Agent map-pin ${suffix}`;
-  // Deliberately different from the district centroid so the two outcomes
-  // are unambiguous.
-  const AGENT_LAT = 52.52;
-  const AGENT_LON = 13.405;
+  let AGENT_LAT: number;
+  let AGENT_LON: number;
   const DISTRICT_LAT = 52.4;
   const DISTRICT_LON = 13.3;
 
@@ -878,13 +875,11 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
         districtId: district.id,
       }),
     );
-    agentPostcode = await dataSource.getRepository(Postcode).save(
-      new Postcode({
-        value: `2${numericSuffix}`,
-        latitude: AGENT_LAT,
-        longitude: AGENT_LON,
-      }),
-    );
+    agentPostcode = await dataSource
+      .getRepository(Postcode)
+      .findOneByOrFail({ value: "10115" });
+    AGENT_LAT = agentPostcode.latitude as number;
+    AGENT_LON = agentPostcode.longitude as number;
     agentAddress = await dataSource
       .getRepository(Address)
       .save(new Address({ postcodeId: agentPostcode.id }));
@@ -945,7 +940,7 @@ describe("GET /agent map-pin lat/lon (be#1083)", () => {
     await dataSource.getRepository(District).delete({ id: district.id });
     await dataSource
       .getRepository(Postcode)
-      .delete({ id: In([agentPostcode.id, districtPostcode.id]) });
+      .delete({ id: districtPostcode.id });
     await fastify.close();
   });
 

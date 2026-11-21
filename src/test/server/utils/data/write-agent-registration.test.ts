@@ -14,7 +14,6 @@ import Person from "../../../../data/entity/person.entity";
 import {
   AgentAddressConflictError,
   AgentAlreadyRegisteredError,
-  AgentTitleConflictError,
   classifyRegisterAgentConflict,
   createAgent,
   createAgentForPerson,
@@ -32,6 +31,10 @@ const getDistrictFromPostcodeMock = vi.fn();
 vi.mock("../../../../data/utils/get-district", () => ({
   getDistrictFromPostcode: (...args: unknown[]) =>
     getDistrictFromPostcodeMock(...args),
+}));
+
+vi.mock("../../../../server/utils/data/link-agent-organization", () => ({
+  linkAgentToDomainOrganizationSafely: vi.fn(),
 }));
 
 const isEmailDomainTrustedMock = vi.fn();
@@ -324,21 +327,6 @@ describe("createAgentForPerson", () => {
     expect(agentRepoFind).not.toHaveBeenCalled();
     expect(agentSave).not.toHaveBeenCalled();
   });
-
-  it("throws AgentTitleConflictError with the existing agent's id on a unique-title violation", async () => {
-    agentSave.mockRejectedValueOnce({
-      code: "23505",
-      detail: "Key (title)=(Centre HERO) already exists.",
-    });
-    agentRepoFindOne.mockResolvedValueOnce({ id: 55 });
-
-    const err = await createAgentForPerson(11, { title: "Centre HERO" }).catch(
-      (e) => e,
-    );
-
-    expect(err).toBeInstanceOf(AgentTitleConflictError);
-    expect(err.agentId).toBe(55);
-  });
 });
 
 // fe#911: coordinator/admin creates a bare Agent with no linked Person — same
@@ -358,19 +346,6 @@ describe("createAgent", () => {
     expect(agentPersonSave).not.toHaveBeenCalled();
     expect(personUpdate).not.toHaveBeenCalled();
     expect(result).toEqual({ agentId: 33 });
-  });
-
-  it("throws AgentTitleConflictError with the existing agent's id on a unique-title violation", async () => {
-    agentSave.mockRejectedValueOnce({
-      code: "23505",
-      detail: "Key (title)=(Bare Agent HERO) already exists.",
-    });
-    agentRepoFindOne.mockResolvedValueOnce({ id: 55 });
-
-    const err = await createAgent({ title: "Bare Agent HERO" }).catch((e) => e);
-
-    expect(err).toBeInstanceOf(AgentTitleConflictError);
-    expect(err.agentId).toBe(55);
   });
 
   it("creates Address and propagates addressId when street+postcode given", async () => {
@@ -663,15 +638,6 @@ describe("joinAgent", () => {
 });
 
 describe("classifyRegisterAgentConflict", () => {
-  it("returns 'title' for a 23505 violation on the title column", () => {
-    expect(
-      classifyRegisterAgentConflict({
-        code: "23505",
-        detail: "Key (title)=(Centre HERO) already exists.",
-      }),
-    ).toBe("title");
-  });
-
   it("returns 'organization' for a 23503 violation on organization_id", () => {
     expect(
       classifyRegisterAgentConflict({
@@ -690,11 +656,11 @@ describe("classifyRegisterAgentConflict", () => {
     expect(classifyRegisterAgentConflict(null)).toBeNull();
   });
 
-  it("returns null for 23505 on an unknown column", () => {
+  it("returns null for any 23505 unique violation", () => {
     expect(
       classifyRegisterAgentConflict({
         code: "23505",
-        detail: "Key (something_else)=(...) already exists.",
+        detail: "Key (title)=(Centre HERO) already exists.",
       }),
     ).toBeNull();
   });

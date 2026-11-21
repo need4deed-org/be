@@ -34,10 +34,10 @@ export default class OpportunityVolunteer {
   @IsEnum(OpportunityVolunteerStatusType)
   status: OpportunityVolunteerStatusType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(

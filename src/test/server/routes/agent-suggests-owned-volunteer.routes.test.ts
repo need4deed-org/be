@@ -23,6 +23,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -117,9 +118,7 @@ describe("NGO suggests its own volunteers (be#1316)", () => {
     await fastify.ready();
     vi.spyOn(fastify.notify, "emailSuggestion").mockResolvedValue(undefined);
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
 
     for (const [key, { sharesVolunteers, inactive }] of Object.entries(
       AGENTS,

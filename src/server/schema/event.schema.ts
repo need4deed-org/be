@@ -1,4 +1,4 @@
-import { EventN4DType } from "need4deed-sdk";
+import { EVENT_SIGN_UP_QUESTION_MAX_LENGTH, EventN4DType } from "need4deed-sdk";
 import { getRef } from "../utils";
 import { responseErrors } from "./responseErrors";
 
@@ -18,7 +18,8 @@ export const eventItemSchema = {
     locationComment: { type: ["string", "null"] },
     description: { type: "string" },
     shortDescription: { type: "string" },
-    linkRSVP: { type: "string" },
+    linkRSVP: { type: ["string", "null"] },
+    signUpQuestion: { type: ["string", "null"] },
     hostName: { type: ["string", "null"] },
     additionalTitle: { type: ["string", "null"] },
     additionalInfo: {
@@ -36,7 +37,6 @@ export const eventItemSchema = {
     "address",
     "description",
     "shortDescription",
-    "linkRSVP",
   ],
   additionalProperties: false,
 };
@@ -114,7 +114,11 @@ export const eventCreateBodySchema = {
     type: { type: "string", enum: Object.values(EventN4DType) },
     pic: { type: "string" },
     locationLink: { type: "string" },
-    linkRSVP: { type: "string" },
+    linkRSVP: { type: ["string", "null"] },
+    signUpQuestion: {
+      type: ["string", "null"],
+      maxLength: EVENT_SIGN_UP_QUESTION_MAX_LENGTH,
+    },
     followUpLink: { type: "string" },
     address: { type: "string", minLength: 1 },
     hostName: { type: "string" },
@@ -125,7 +129,7 @@ export const eventCreateBodySchema = {
       minItems: 1,
     },
   },
-  required: ["date", "type", "linkRSVP", "address", "translations"],
+  required: ["date", "type", "address", "translations"],
   additionalProperties: false,
 };
 
@@ -150,7 +154,11 @@ export const eventPatchBodySchema = {
     type: { type: "string", enum: Object.values(EventN4DType) },
     pic: { type: ["string", "null"] },
     locationLink: { type: ["string", "null"] },
-    linkRSVP: { type: "string" },
+    linkRSVP: { type: ["string", "null"] },
+    signUpQuestion: {
+      type: ["string", "null"],
+      maxLength: EVENT_SIGN_UP_QUESTION_MAX_LENGTH,
+    },
     followUpLink: { type: ["string", "null"] },
     address: { type: "string", minLength: 1 },
     hostName: { type: ["string", "null"] },

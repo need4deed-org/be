@@ -1,5 +1,5 @@
 import { IsEnum } from "class-validator";
-import { EventN4DType } from "need4deed-sdk";
+import { EVENT_SIGN_UP_QUESTION_MAX_LENGTH, EventN4DType } from "need4deed-sdk";
 import {
   Column,
   Entity,
@@ -41,8 +41,15 @@ export default class EventN4D {
   @Column({ type: "varchar", length: 256, nullable: true })
   locationLink?: string;
 
-  @Column({ type: "varchar", length: 256 })
-  rsvpLink: string;
+  @Column({ type: "varchar", length: 256, nullable: true })
+  rsvpLink?: string | null;
+
+  @Column({
+    type: "varchar",
+    length: EVENT_SIGN_UP_QUESTION_MAX_LENGTH,
+    nullable: true,
+  })
+  signUpQuestion?: string | null;
 
   @Column({ type: "varchar", length: 256, nullable: true })
   followupLink?: string;

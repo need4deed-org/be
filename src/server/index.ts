@@ -20,16 +20,18 @@ import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import districtGeometryRoutes from "./routes/district-geometry.routes";
+import eventN4DRegistrationRoutes from "./routes/event-n4d-registration.routes";
 import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
 import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
-import opportunityEventRegistrationRoutes from "./routes/opportunity-event-registration.routes";
+import myActivityRoutes from "./routes/my-activity.routes";
 import opportunityRoutes from "./routes/opportunity/opportunity.routes";
 import optionRoutes from "./routes/option";
 import organizationRoutes from "./routes/organization.routes";
 import personRoutes from "./routes/person.routes";
 import postRoutes from "./routes/post.routes";
+import postcodeRoutes from "./routes/postcode.routes";
 import statisticsRoutes from "./routes/statistics.routes";
 import translationRoutes from "./routes/translation.routes";
 import trustedDomainRoutes from "./routes/trusted-domain.routes";
@@ -190,6 +192,9 @@ export async function createServer({
   });
   await fastifyInstance.register(authRoutes, { prefix: RoutePrefix.AUTH });
   await fastifyInstance.register(userRoutes, { prefix: RoutePrefix.USER });
+  await fastifyInstance.register(myActivityRoutes, {
+    prefix: RoutePrefix.USER,
+  });
   await fastifyInstance.register(personRoutes, { prefix: RoutePrefix.PERSON });
   await fastifyInstance.register(postRoutes, { prefix: RoutePrefix.POST });
   await fastifyInstance.register(volunteerRoutes, {
@@ -234,11 +239,14 @@ export async function createServer({
   await fastifyInstance.register(trustedDomainRoutes, {
     prefix: RoutePrefix.TRUSTED_DOMAIN,
   });
-  await fastifyInstance.register(opportunityEventRegistrationRoutes, {
+  await fastifyInstance.register(eventN4DRegistrationRoutes, {
     prefix: RoutePrefix.EVENT_REGISTRATION,
   });
   await fastifyInstance.register(districtGeometryRoutes, {
     prefix: RoutePrefix.DISTRICT_GEOMETRY,
+  });
+  await fastifyInstance.register(postcodeRoutes, {
+    prefix: RoutePrefix.POSTCODE,
   });
 
   await fastifyInstance.ready();

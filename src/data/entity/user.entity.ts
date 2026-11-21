@@ -46,7 +46,7 @@ export default class User {
   @IsBoolean()
   isActive: boolean;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   @IsOptional()
   deactivatedAt: Date | null;
 
@@ -72,9 +72,9 @@ export default class User {
   @Column({ nullable: true })
   personId: number;
 
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
   createdAt: Date;
-  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
   updatedAt: Date;
 
   @OneToMany(() => Communication, (communication) => communication.user)

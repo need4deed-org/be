@@ -34,6 +34,7 @@ import { DealType } from "../../../data/types";
 import { getRepository, hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -68,12 +69,8 @@ describe("DELETE /volunteer/:id", () => {
     await fastify.ready();
 
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
-    const language = await fastify.db.languageRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    const language = await firstSeeded(fastify.db.languageRepository);
 
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
@@ -265,21 +262,17 @@ describe("GET /volunteer", () => {
   const lastName = `MapPin-${suffix}`;
   const numericSuffix = randomNumericSuffix();
   const phone = `+49 30 ${numericSuffix}`;
-  const LAT = 52.52;
-  const LON = 13.405;
+  let LAT: number;
+  let LON: number;
 
   beforeAll(async () => {
     fastify = await createServer();
     await fastify.ready();
 
     const postcodeRepository = getRepository(dataSource, Postcode);
-    postcode = await postcodeRepository.save(
-      new Postcode({
-        value: `1${numericSuffix}`,
-        latitude: LAT,
-        longitude: LON,
-      }),
-    );
+    postcode = await postcodeRepository.findOneByOrFail({ value: "10115" });
+    LAT = postcode.latitude as number;
+    LON = postcode.longitude as number;
 
     const addressRepository = getRepository(dataSource, Address);
     address = await addressRepository.save(
@@ -370,7 +363,6 @@ describe("GET /volunteer", () => {
     await fastify.db.dealRepository.delete({ id: deal.id });
     await fastify.db.personRepository.delete({ id: volunteerPerson.id });
     await getRepository(dataSource, Address).delete({ id: address.id });
-    await getRepository(dataSource, Postcode).delete({ id: postcode.id });
     await fastify.close();
   });
 
@@ -641,9 +633,7 @@ describe("DELETE /volunteer/:id erases the underlying Person (be#727)", () => {
       }),
     );
 
-    const language = await fastify.db.languageRepository.findOneOrFail({
-      where: {},
-    });
+    const language = await firstSeeded(fastify.db.languageRepository);
     // Attached to the Agent, not this Volunteer — a comment scoped to the
     // volunteer profile being deleted is cleaned up by the route's own
     // pre-existing logic before erasePersonPii ever runs, which would
@@ -827,9 +817,7 @@ describe("DELETE /volunteer/:id with no linked Person (be#727)", () => {
     fastify = await createServer();
     await fastify.ready();
 
-    const postcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: {},
-    });
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
     deal = await fastify.db.dealRepository.save(
       new Deal({ type: DealType.VOLUNTEER, postcodeId: postcode.id }),
     );

@@ -30,6 +30,7 @@ import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
 import { randomNumericSuffix } from "../../random";
+import { firstSeeded } from "../../seeded";
 
 const PASSWORD = "test_password";
 
@@ -67,8 +68,7 @@ describe("#new-volunteers-opportunities notice on profile edits by volunteers an
     fastify = await createServer();
     await fastify.ready();
 
-    const { id: postcodeId } =
-      await fastify.db.postcodeRepository.findOneOrFail({ where: {} });
+    const { id: postcodeId } = await firstSeeded(fastify.db.postcodeRepository);
     const password = await hashPassword(PASSWORD);
 
     const volunteerDeal = await fastify.db.dealRepository.save(

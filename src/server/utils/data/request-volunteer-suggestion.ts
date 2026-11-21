@@ -60,6 +60,7 @@ export async function requestVolunteerSuggestion(
       select: {
         id: true,
         title: true,
+        originalLanguageId: true,
         status: true,
         agentId: true,
         agent: { id: true, title: true, engagementStatus: true },
@@ -187,7 +188,7 @@ export async function requestVolunteerSuggestion(
         requesterAgent,
         volunteerId,
         volunteerName,
-        opportunityTitle: opportunity.title,
+        opportunity,
       }),
     ),
   ).then((results) => {

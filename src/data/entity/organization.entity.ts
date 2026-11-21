@@ -16,6 +16,7 @@ import {
 } from "typeorm";
 import Address from "./location/address.entity";
 import Person from "./person.entity";
+import Language from "./profile/language.entity";
 
 @Entity()
 export default class Organization {
@@ -49,10 +50,15 @@ export default class Organization {
   @IsString()
   website?: string;
 
-  @CreateDateColumn()
+  @Column({ type: "text", nullable: true })
+  @IsOptional()
+  @IsString()
+  about?: string | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @ManyToOne(() => Address, (address) => address.organization, {
@@ -72,4 +78,10 @@ export default class Organization {
 
   @Column({ nullable: true })
   personId?: number;
+
+  @ManyToOne(() => Language, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "original_language_id" })
+  originalLanguage?: Language;
+  @Column({ nullable: true })
+  originalLanguageId?: number;
 }

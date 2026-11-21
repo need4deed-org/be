@@ -57,7 +57,10 @@ import {
   newOpportunityAddress,
   parseOpportunityAddress,
 } from "../../../services/dto/parser-opportunity-address";
-import { assertValidMainCommunicationLanguages } from "../../../services/dto/parser-opportunity-patch-data";
+import {
+  assertOpportunityTextLengths,
+  assertValidMainCommunicationLanguages,
+} from "../../../services/dto/parser-opportunity-patch-data";
 import { getDateObj } from "../../../services/utils";
 import {
   idParamSchema,
@@ -98,6 +101,7 @@ import {
   getSkipTake,
   impliesAgentSearching,
   isActiveAgentMember,
+  isStaffRole,
   mergeIntoWhere,
   patchEntity,
   setAgentSearching,
@@ -123,12 +127,14 @@ import {
   applyVolunteerOpportunityScope,
   assertOwnedVolunteerSeesOpportunity,
 } from "../../utils/data/owned-volunteer-scope";
+import {
+  editLanguage,
+  requestLanguage,
+} from "../../utils/data/request-language";
 import { syncEngagementForMatchChange } from "../../utils/data/sync-volunteer-engagement";
 import {
   divertTranslatedEdits,
-  editLanguage,
   queueOpportunityTranslation,
-  requestLanguage,
   translateOpportunities,
 } from "../../utils/data/translate-opportunities";
 import { canSeeOpportunityDescription } from "../../utils/pii/accompanying-description";
@@ -139,7 +145,6 @@ import {
 } from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
-import opportunityEventRegistrationRoutes from "./opportunity-event-registration.routes";
 import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 
@@ -152,6 +157,7 @@ async function sendNewOpportunityEmail(
 ): Promise<void> {
   const opp = await fastify.db.opportunityRepository.findOne({
     where: { id },
+    relationLoadStrategy: "query",
     relations,
   });
   if (!opp) {
@@ -285,10 +291,6 @@ export default async function opportunityRoutes(
     prefix: `:id${RoutePrefix.VOLUNTEER_LINKED}`,
   });
 
-  await fastify.register(opportunityEventRegistrationRoutes, {
-    prefix: `:id${RoutePrefix.REGISTRATIONS}`,
-  });
-
   await fastify.register(opportunityRecommendedVolunteerRoutes, {
     prefix: `:id${RoutePrefix.RECOMMENDED_VOLUNTEERS}`,
   });
@@ -368,6 +370,7 @@ export default async function opportunityRoutes(
       const opportunity = await opportunityRepository.findOne({
         where: { id },
         relations,
+        relationLoadStrategy: "query",
       });
 
       if (!opportunity) {
@@ -428,11 +431,12 @@ export default async function opportunityRoutes(
 
       const districtIdNeedingCentroid =
         getOpportunityDistrictIdNeedingCentroid(opportunityComments);
-      const districtCentroid = districtIdNeedingCentroid
-        ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
-            districtIdNeedingCentroid,
-          )
-        : undefined;
+      const districtCentroid =
+        districtIdNeedingCentroid !== undefined
+          ? (await getDistrictCentroids([districtIdNeedingCentroid])).get(
+              districtIdNeedingCentroid,
+            )
+          : undefined;
 
       const myMatchStatus = await getCallerMatchStatus(request, id);
       const data = {
@@ -498,6 +502,7 @@ export default async function opportunityRoutes(
         request.query.filter,
         requestLanguage(request.query),
         request.query,
+        isStaffRole(request.authUser?.role),
       );
       if (agentIds) {
         mergeIntoWhere(where, { agentId: In(agentIds) });
@@ -931,6 +936,7 @@ export default async function opportunityRoutes(
                 effectiveType,
                 editLanguage(request.query),
               );
+              assertOpportunityTextLengths(opportunityObj, opportunity);
               const success = await patchEntity(
                 Opportunity,
                 opportunityObj,

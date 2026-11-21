@@ -1,11 +1,15 @@
 import "reflect-metadata";
 import { berlinToday, isWorkingDay } from "need4deed-sdk";
-import { DataSource, In, IsNull, Not } from "typeorm";
+import { DataSource, In } from "typeorm";
 import logger from "../../logger";
 import { berlinDayBoundaries } from "../../services/jobs/berlin-dates";
 import { dataSource } from "../data-source";
 import PostcodeCommute from "../entity/location/postcode-commute.entity";
 import Postcode from "../entity/location/postcode.entity";
+import {
+  getCommuteAreaListedPLZs,
+  inCommuteAreaSql,
+} from "../utils/commute-area";
 
 const VBB_JOURNEYS_URL = "https://v6.vbb.transport.rest/journeys";
 const TUESDAY = 2;
@@ -184,16 +188,24 @@ async function findPoints(
   ds: DataSource,
   postcodes?: string[],
 ): Promise<CommutePoint[]> {
-  const rows = await ds.getRepository(Postcode).find({
-    select: { id: true, value: true, latitude: true, longitude: true },
-    where: {
-      latitude: Not(IsNull()),
-      longitude: Not(IsNull()),
-      ...(postcodes ? { value: In(postcodes) } : {}),
-    },
-    order: { id: "ASC" },
-  });
-  return rows as CommutePoint[];
+  const query = ds
+    .getRepository(Postcode)
+    .createQueryBuilder("postcode")
+    .select([
+      "postcode.id",
+      "postcode.value",
+      "postcode.latitude",
+      "postcode.longitude",
+    ])
+    .where("postcode.latitude IS NOT NULL AND postcode.longitude IS NOT NULL")
+    .andWhere(inCommuteAreaSql("postcode", ":listedPLZs"), {
+      listedPLZs: getCommuteAreaListedPLZs(),
+    })
+    .orderBy("postcode.id", "ASC");
+  if (postcodes) {
+    query.andWhere("postcode.value IN (:...postcodes)", { postcodes });
+  }
+  return (await query.getMany()) as CommutePoint[];
 }
 
 async function findExistingPairs(
