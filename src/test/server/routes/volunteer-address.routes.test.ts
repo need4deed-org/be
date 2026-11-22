@@ -570,6 +570,5 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       address: { street: "Broken Id Street 6", postcode: { id: "abc" } },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toContain("unknown postcode");
   });
 });

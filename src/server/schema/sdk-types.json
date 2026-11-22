@@ -76,7 +76,7 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "integer"
         },
         "street": {
           "type": "string"
@@ -106,7 +106,7 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "integer"
         },
         "code": {
           "type": "string"

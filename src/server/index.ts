@@ -50,6 +50,7 @@ import volunteerApiOpportunitySchema from "./schema/volunteer-api-opportunity.js
 import volunteerApiSchema from "./schema/volunteer-api.json";
 import { RoutePrefix } from "./types";
 import { getErrorReply } from "./utils/error-reply";
+import { buildValidator } from "./validator-compiler";
 
 const decodeTrustProxyEnv = (
   value: string | undefined,
@@ -92,6 +93,7 @@ export async function createServer({
         strict: false,
       },
     },
+    schemaController: { compilersFactory: { buildValidator } },
   });
 
   await fastifyInstance.addSchema({
