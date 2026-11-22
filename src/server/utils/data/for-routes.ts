@@ -17,7 +17,6 @@ import {
 } from "need4deed-sdk";
 import {
   DataSource,
-  DeepPartial,
   EntityManager,
   FindOptionsWhere,
   In,
@@ -862,19 +861,6 @@ export async function getVolunteerDocuments(
 
 export function normalizeStringArrayInput(input: string | string[]) {
   return Array.isArray(input) ? In(input) : input;
-}
-
-export async function updatePerson(
-  person: DeepPartial<Person>,
-): Promise<Person> {
-  const personRepository = getRepository(dataSource, Person);
-
-  await personRepository.save(person);
-
-  return (await personRepository.findOne({
-    where: { id: person.id! },
-    relations: ["address.postcode"],
-  })) as Person;
 }
 
 export async function setTranslationType(

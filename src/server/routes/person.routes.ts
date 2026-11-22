@@ -6,14 +6,16 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../config";
+import { dataSource } from "../../data/data-source";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
+import { getRepository } from "../../data/utils";
 import logger from "../../logger";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
 import { idParamSchema, responseSchema } from "../schema";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { ParamsId, ReplyData } from "../types";
-import { updatePerson } from "../utils";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
 import { updatePersonAddress } from "../utils/data/update-person-address";
 
@@ -150,23 +152,39 @@ export default async function personRoutes(
         }
       }
 
-      if (address) {
-        await updatePersonAddress(person.id, address);
+      const changesAddress = Boolean(
+        address &&
+          (address.street !== undefined ||
+            address.city !== undefined ||
+            address.postcode),
+      );
+      const changesPerson = Object.keys(personFields).length > 0;
+
+      if (changesAddress || changesPerson || membership) {
+        await dataSource.transaction(async (manager) => {
+          if (changesAddress && address) {
+            await updatePersonAddress(person.id, address, manager);
+          }
+          if (changesPerson) {
+            await getRepository(manager, Person).save({
+              id: person.id,
+              ...dtoParsePerson(personFields),
+            });
+          }
+          if (membership && role !== undefined) {
+            membership.role = role;
+            await getRepository(manager, AgentPerson).save(membership);
+          }
+        });
       }
 
-      const updatedPerson = Object.keys(personFields).length
-        ? await updatePerson({ id: person.id, ...dtoParsePerson(personFields) })
-        : address
+      const updatedPerson =
+        changesAddress || changesPerson
           ? await fastify.db.personRepository.findOneOrFail({
               where: { id: person.id },
               relations: ["address.postcode"],
             })
           : person;
-
-      if (membership && role !== undefined) {
-        membership.role = role;
-        await fastify.db.agentPersonRepository.save(membership);
-      }
 
       const data = dtoSerializePerson(updatedPerson);
 

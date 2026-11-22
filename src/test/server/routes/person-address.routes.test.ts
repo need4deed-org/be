@@ -214,4 +214,42 @@ describe("PATCH /person/:id address", () => {
       "Kept Street 6",
     );
   });
+  it("saves an address and person fields in one request", async () => {
+    const address = await addresses().save(
+      new Address({ street: "Mixed Street 7", postcodeId }),
+    );
+    const person = await makePerson(address.id);
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/person/${person.id}`,
+      cookies: { [accessCookieName]: adminCookie },
+      payload: { firstName: "Mixed", address: { city: "Berlin" } },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.firstName).toBe("Mixed");
+
+    const reloaded = await fastify.db.personRepository.findOneOrFail({
+      where: { id: person.id },
+      relations: ["address"],
+    });
+    expect(reloaded.firstName).toBe("Mixed");
+    expect(reloaded.address.city).toBe("Berlin");
+    expect(reloaded.address.street).toBe("Mixed Street 7");
+  });
+
+  it("keeps person fields unsaved when the address is rejected", async () => {
+    const person = await makePerson();
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/person/${person.id}`,
+      cookies: { [accessCookieName]: adminCookie },
+      payload: { firstName: "Rejected", address: { street: "No Postcode 8" } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(
+      (await fastify.db.personRepository.findOneByOrFail({ id: person.id }))
+        .firstName,
+    ).toBe("Address");
+  });
 });

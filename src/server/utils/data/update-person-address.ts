@@ -1,7 +1,6 @@
 import { ApiPersonPatch } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../../config";
-import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Person from "../../../data/entity/person.entity";
@@ -33,45 +32,44 @@ async function resolvePostcode(
 export async function updatePersonAddress(
   personId: number,
   address: PersonAddressPatch,
+  manager: EntityManager,
 ): Promise<void> {
   const fields: Partial<Address> = {
     ...(address.street !== undefined && { street: address.street || null }),
     ...(address.city !== undefined && { city: address.city || null }),
   };
 
-  await dataSource.transaction(async (manager) => {
-    const postcodeData = await resolvePostcode(address.postcode, manager);
-    const person = await getRepository(manager, Person).findOneOrFail({
-      where: { id: personId },
-      lock: { mode: "pessimistic_write" },
-    });
-
-    if (person.addressId) {
-      if (!Object.keys(fields).length && !postcodeData.id) {
-        return;
-      }
-      const addressId = await patchOrReplaceAddress(
-        person.id,
-        { id: person.addressId, ...fields },
-        postcodeData,
-        manager,
-      );
-      if (!addressId) {
-        throw new BadRequestError("Address not saved.");
-      }
-      return;
-    }
-
-    if (!fields.street && !fields.city && !postcodeData.id) {
-      return;
-    }
-    const created = await createAddress(fields, postcodeData, manager);
-    if (!created) {
-      throw new BadRequestError("Address not saved: a postcode is required.");
-    }
-    await getRepository(manager, Person).update(
-      { id: person.id },
-      { addressId: created.id },
-    );
+  const postcodeData = await resolvePostcode(address.postcode, manager);
+  const person = await getRepository(manager, Person).findOneOrFail({
+    where: { id: personId },
+    lock: { mode: "pessimistic_write" },
   });
+
+  if (person.addressId) {
+    if (!Object.keys(fields).length && !postcodeData.id) {
+      return;
+    }
+    const addressId = await patchOrReplaceAddress(
+      person.id,
+      { id: person.addressId, ...fields },
+      postcodeData,
+      manager,
+    );
+    if (!addressId) {
+      throw new BadRequestError("Address not saved.");
+    }
+    return;
+  }
+
+  if (!fields.street && !fields.city && !postcodeData.id) {
+    return;
+  }
+  const created = await createAddress(fields, postcodeData, manager);
+  if (!created) {
+    throw new BadRequestError("Address not saved: a postcode is required.");
+  }
+  await getRepository(manager, Person).update(
+    { id: person.id },
+    { addressId: created.id },
+  );
 }
