@@ -50,10 +50,7 @@ export async function writeVolunteerLegacy(
           `Failed to reuse Address ${addressReuse.addressId} for Person ${volunteer.person.id}.`,
         );
       }
-      const refreshedPerson = await personRepository.findOneByOrFail({
-        id: volunteer.person.id,
-      });
-      volunteer.person.addressId = refreshedPerson.addressId;
+      volunteer.person.addressId = patched;
     } else {
       await addressRepository.save(volunteer.person.address);
     }

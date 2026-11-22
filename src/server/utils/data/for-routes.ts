@@ -509,16 +509,16 @@ export async function patchOrReplaceAddress(
     return false;
   }
 
-  const postcodeId =
-    (await resolvePostcodeId(postcodeData, manager)) ?? current.postcodeId;
   const { id: _addressId, ...patchFields } = addressData;
   const created = await createAddress(
     {
       street: current.street,
-      city: postcodeId === current.postcodeId ? current.city : undefined,
+      city: current.city,
       ...patchFields,
     },
-    { id: postcodeId },
+    postcodeData?.id || postcodeData?.value
+      ? postcodeData
+      : { id: current.postcodeId },
     manager,
   );
   if (!created) {

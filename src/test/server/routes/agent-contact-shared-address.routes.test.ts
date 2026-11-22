@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { AgentRoleType, UserRole } from "need4deed-sdk";
-import { In, Not } from "typeorm";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
@@ -23,7 +23,6 @@ describe("PATCH /agent/:id/contact/:membershipId on an address shared with the a
   let coordinatorCookie: string;
   let agentId: number;
   let sharedAddressId: number;
-  let sharedPostcodeId: number;
   let contactPersonId: number;
   let membershipId: number;
 
@@ -57,7 +56,6 @@ describe("PATCH /agent/:id/contact/:membershipId on an address shared with the a
       }),
     );
     sharedAddressId = address.id;
-    sharedPostcodeId = postcode.id;
 
     const agent = await fastify.db.agentRepository.save(
       new Agent({
@@ -123,33 +121,5 @@ describe("PATCH /agent/:id/contact/:membershipId on an address shared with the a
     expect(person.address.street).toBe("Contact Street 2");
     expect(person.address.postcodeId).toBe(agentAddress.postcodeId);
     expect(person.address.city).toBe("Berlin");
-  });
-  it("drops the copied city when the postcode changes", async () => {
-    const ownCopy = await fastify.db.personRepository.findOneByOrFail({
-      id: contactPersonId,
-    });
-    await fastify.db.personRepository.update(
-      { id: contactPersonId },
-      { addressId: sharedAddressId },
-    );
-    await getRepository(dataSource, Address).delete({ id: ownCopy.addressId! });
-    const otherPostcode = await fastify.db.postcodeRepository.findOneOrFail({
-      where: { id: Not(sharedPostcodeId) },
-      order: { id: "ASC" },
-    });
-    const res = await fastify.inject({
-      method: "PATCH",
-      url: `/agent/${agentId}/contact/${membershipId}`,
-      cookies: { [accessCookieName]: coordinatorCookie },
-      payload: { addressPostcode: otherPostcode.value },
-    });
-    expect(res.statusCode).toBe(200);
-
-    const person = await fastify.db.personRepository.findOneOrFail({
-      where: { id: contactPersonId },
-      relations: ["address"],
-    });
-    expect(person.address.postcodeId).toBe(otherPostcode.id);
-    expect(person.address.city).toBeNull();
   });
 });
