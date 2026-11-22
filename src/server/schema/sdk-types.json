@@ -301,7 +301,16 @@
         "email": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "phone": { "anyOf": [{ "const": null }, { "type": "string" }] },
         "landline": { "anyOf": [{ "const": null }, { "type": "string" }] },
-        "address": { "$ref": "Address#" },
+        "address": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "maximum": 2147483647 },
+            "street": { "type": ["string", "null"] },
+            "city": { "type": ["string", "null"] },
+            "postcode": { "$ref": "Postcode#" }
+          },
+          "additionalProperties": false
+        },
         "preferredComm": {
           "type": "array",
           "items": { "$ref": "PreferredCommunicationType#" }

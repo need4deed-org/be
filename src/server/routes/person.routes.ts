@@ -9,13 +9,13 @@ import {
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
 import logger from "../../logger";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
-import { deepMerge } from "../../services/utils";
 import { idParamSchema, responseSchema } from "../schema";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { ParamsId, ReplyData } from "../types";
 import { updatePerson } from "../utils";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import { updatePersonAddress } from "../utils/data/update-person-address";
 
 export default async function personRoutes(
   fastify: FastifyInstance,
@@ -133,25 +133,24 @@ export default async function personRoutes(
         throw new NotFoundError(`Person with id ${personId} not found.`);
       }
 
-      const hasPersonFieldUpdates = Object.keys(request.body).some(
-        (key) => key !== "role" && key !== "agentId",
-      );
+      const {
+        address,
+        role: _role,
+        agentId: _agentId,
+        ...personFields
+      } = request.body;
 
-      const updatedPerson = hasPersonFieldUpdates
-        ? await updatePerson(
-            deepMerge(
-              {
-                id: person.id,
-                addressId: person.addressId,
-                ...(request.body.address &&
-                  person.address && {
-                    address: { postcodeId: person.address.postcodeId },
-                  }),
-              },
-              dtoParsePerson(request.body),
-            ),
-          )
-        : person;
+      if (address) {
+        await updatePersonAddress(person, address);
+      }
+
+      const updatedPerson =
+        Object.keys(personFields).length || address
+          ? await updatePerson({
+              id: person.id,
+              ...dtoParsePerson(personFields),
+            })
+          : person;
 
       if (request.body.role !== undefined) {
         if (!request.body.agentId) {
