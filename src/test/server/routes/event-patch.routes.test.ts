@@ -184,6 +184,41 @@ describe("PATCH /event/:id", () => {
     expect(translations[0].title).toBe("Sommerfest (aktualisiert)");
   });
 
+  it("accepts null optional translation fields as read back from GET", async () => {
+    const id = await createTestEvent();
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/event/${id}`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        translations: [
+          {
+            language: "de",
+            title: "Sommerfest",
+            menuTitle: "Sommerfest",
+            description: "Wir feiern zusammen.",
+            shortDescription: "Wir feiern.",
+            subTitle: null,
+            time: null,
+            locationComment: null,
+            additionalTitle: null,
+            outro: null,
+            followUpText: null,
+          },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(204);
+    const [translation] = await getRepository(
+      dataSource,
+      EventTranslation,
+    ).find({ where: { eventn4dId: id } });
+    expect(translation.subtitle).toBeNull();
+    expect(translation.locationComment).toBeNull();
+  });
+
   it("clears an omitted optional translation field instead of leaving it stale", async () => {
     const id = await createTestEvent();
 

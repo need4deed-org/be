@@ -76,7 +76,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "integer",
+          "maximum": 2147483647
         },
         "street": {
           "type": "string"
@@ -106,7 +107,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "integer",
+          "maximum": 2147483647
         },
         "code": {
           "type": "string"

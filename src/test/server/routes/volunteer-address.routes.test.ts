@@ -562,6 +562,17 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     expect(await dealPostcodeId()).toBe(stored.id);
   });
 
+  it("400s for an unknown numeric postcode id", async () => {
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      address: { street: "Unknown Id Street 7", postcode: { id: 999999999 } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain("unknown postcode");
+  });
+
   it("400s for a non-numeric postcode id instead of failing in the database", async () => {
     const res = await patch({
       id: person.id,
@@ -570,6 +581,5 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
       address: { street: "Broken Id Street 6", postcode: { id: "abc" } },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().message).toContain("unknown postcode");
   });
 });
