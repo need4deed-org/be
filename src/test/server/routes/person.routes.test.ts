@@ -285,6 +285,12 @@ describe("PATCH /person/:id representative role", () => {
         },
       });
       expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      expect(data.middleName).toBeNull();
+      expect(data.email).toBeNull();
+      expect(data.phone).toBeNull();
+      expect(data.landline).toBeNull();
+      expect(data.lastName).toBe("Fields");
 
       const reloaded = await fastify.db.personRepository.findOneByOrFail({
         id: person.id,

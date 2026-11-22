@@ -254,25 +254,25 @@
           "minimum": 1
         },
         "avatarUrl": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "firstName": {
           "type": "string"
         },
         "lastName": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "middleName": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "email": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "phone": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "landline": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "address": {
           "$ref": "Address#"
