@@ -869,38 +869,12 @@ export async function updatePerson(
 ): Promise<Person> {
   const personRepository = getRepository(dataSource, Person);
 
-  if (Object.keys(person.address || {}).length > 1) {
-    await updateAddress(person.address);
-  }
-
   await personRepository.save(person);
 
   return (await personRepository.findOne({
     where: { id: person.id! },
     relations: ["address.postcode"],
   })) as Person;
-}
-
-export async function updateAddress(
-  address: DeepPartial<Address>,
-): Promise<Address> {
-  const addressRepository = getRepository(dataSource, Address);
-
-  if (address?.postcode?.value) {
-    const postcodeRepository = getRepository(dataSource, Postcode);
-    const postcode = await postcodeRepository.findOneBy({
-      value: address.postcode.value,
-    });
-    if (postcode) {
-      address.postcodeId = postcode.id;
-    }
-  }
-
-  await addressRepository.save(address);
-  return (await addressRepository.findOne({
-    where: { id: address.id! },
-    relations: ["postcode"],
-  })) as Address;
 }
 
 export async function setTranslationType(

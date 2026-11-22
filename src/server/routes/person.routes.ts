@@ -133,44 +133,38 @@ export default async function personRoutes(
         throw new NotFoundError(`Person with id ${personId} not found.`);
       }
 
-      const {
-        address,
-        role: _role,
-        agentId: _agentId,
-        ...personFields
-      } = request.body;
+      const { address, role, agentId, ...personFields } = request.body;
 
-      if (address) {
-        await updatePersonAddress(person, address);
-      }
-
-      const updatedPerson =
-        Object.keys(personFields).length || address
-          ? await updatePerson({
-              id: person.id,
-              ...dtoParsePerson(personFields),
-            })
-          : person;
-
-      if (request.body.role !== undefined) {
-        if (!request.body.agentId) {
+      let membership = null;
+      if (role !== undefined) {
+        if (!agentId) {
           throw new BadRequestError(
             "agentId is required to update a representative's role.",
           );
         }
-
-        const membership = await getAgentPersonRepresentative(
-          personId,
-          request.body.agentId,
-        );
-
+        membership = await getAgentPersonRepresentative(personId, agentId);
         if (!membership) {
           throw new NotFoundError(
-            `No active agent membership found for person ${personId} at agent ${request.body.agentId}.`,
+            `No active agent membership found for person ${personId} at agent ${agentId}.`,
           );
         }
+      }
 
-        membership.role = request.body.role;
+      if (address) {
+        await updatePersonAddress(person.id, address);
+      }
+
+      const updatedPerson = Object.keys(personFields).length
+        ? await updatePerson({ id: person.id, ...dtoParsePerson(personFields) })
+        : address
+          ? await fastify.db.personRepository.findOneOrFail({
+              where: { id: person.id },
+              relations: ["address.postcode"],
+            })
+          : person;
+
+      if (membership && role !== undefined) {
+        membership.role = role;
         await fastify.db.agentPersonRepository.save(membership);
       }
 

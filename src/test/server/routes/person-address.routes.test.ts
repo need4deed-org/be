@@ -167,4 +167,51 @@ describe("PATCH /person/:id address", () => {
     });
     expect(reloaded.addressId).toBeNull();
   });
+  it("400s creating an address without a postcode", async () => {
+    const person = await makePerson();
+    const res = await patch(person.id, { street: "No Postcode 3" });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("400s for an unknown postcode id or code", async () => {
+    const person = await makePerson();
+    expect(
+      (
+        await patch(person.id, {
+          street: "Unknown 4",
+          postcode: { id: 2147483000 },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await patch(person.id, {
+          street: "Unknown 5",
+          postcode: { code: "99999X" },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await fastify.db.personRepository.findOneByOrFail({ id: person.id }))
+        .addressId,
+    ).toBeNull();
+  });
+
+  it("leaves the address alone when the role update is rejected", async () => {
+    const address = await addresses().save(
+      new Address({ street: "Kept Street 6", postcodeId }),
+    );
+    const person = await makePerson(address.id);
+
+    const res = await fastify.inject({
+      method: "PATCH",
+      url: `/person/${person.id}`,
+      cookies: { [accessCookieName]: adminCookie },
+      payload: { address: { street: null }, role: "volunteer-coordinator" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect((await addresses().findOneByOrFail({ id: address.id })).street).toBe(
+      "Kept Street 6",
+    );
+  });
 });

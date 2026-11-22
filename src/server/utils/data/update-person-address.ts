@@ -1,33 +1,55 @@
 import { ApiPersonPatch } from "need4deed-sdk";
+import { EntityManager } from "typeorm";
 import { BadRequestError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Person from "../../../data/entity/person.entity";
 import { getRepository } from "../../../data/utils";
-import { createAddress, patchOrReplaceAddress } from "./for-routes";
+import {
+  createAddress,
+  patchOrReplaceAddress,
+  resolveAddressPostcode,
+} from "./for-routes";
+
+type PersonAddressPatch = NonNullable<ApiPersonPatch["address"]>;
+
+async function resolvePostcode(
+  postcode: PersonAddressPatch["postcode"],
+  manager: EntityManager,
+): Promise<Partial<Postcode>> {
+  if (postcode?.id) {
+    const known = await getRepository(manager, Postcode).existsBy({
+      id: postcode.id,
+    });
+    if (!known) {
+      throw new BadRequestError("Address not saved: unknown postcode.");
+    }
+    return { id: postcode.id };
+  }
+  return resolveAddressPostcode(postcode?.code, manager);
+}
 
 export async function updatePersonAddress(
-  person: Person,
-  address: NonNullable<ApiPersonPatch["address"]>,
+  personId: number,
+  address: PersonAddressPatch,
 ): Promise<void> {
   const fields: Partial<Address> = {
     ...(address.street !== undefined && { street: address.street || null }),
     ...(address.city !== undefined && { city: address.city || null }),
   };
-  const postcodeData: Partial<Postcode> = address.postcode?.id
-    ? { id: address.postcode.id }
-    : address.postcode?.code
-      ? { value: address.postcode.code }
-      : {};
-  const sendsPostcode = Boolean(postcodeData.id || postcodeData.value);
-
-  if (!Object.keys(fields).length && !sendsPostcode) {
-    return;
-  }
 
   await dataSource.transaction(async (manager) => {
+    const postcodeData = await resolvePostcode(address.postcode, manager);
+    const person = await getRepository(manager, Person).findOneOrFail({
+      where: { id: personId },
+      lock: { mode: "pessimistic_write" },
+    });
+
     if (person.addressId) {
+      if (!Object.keys(fields).length && !postcodeData.id) {
+        return;
+      }
       const addressId = await patchOrReplaceAddress(
         person.id,
         { id: person.addressId, ...fields },
@@ -40,7 +62,7 @@ export async function updatePersonAddress(
       return;
     }
 
-    if (!fields.street && !fields.city && !sendsPostcode) {
+    if (!fields.street && !fields.city && !postcodeData.id) {
       return;
     }
     const created = await createAddress(fields, postcodeData, manager);
