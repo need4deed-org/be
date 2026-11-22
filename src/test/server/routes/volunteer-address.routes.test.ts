@@ -582,4 +582,44 @@ describe("PATCH /volunteer/:id for a volunteer without an address", () => {
     });
     expect(res.statusCode).toBe(400);
   });
+  it("stores null and empty person fields as NULL, applies landline, and returns null", async () => {
+    const set = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      landline: "+49301112233",
+    });
+    expect(set.statusCode).toBe(200);
+    expect(
+      (await fastify.db.personRepository.findOneByOrFail({ id: person.id }))
+        .landline,
+    ).toBe("+49301112233");
+
+    const res = await patch({
+      id: person.id,
+      firstName: person.firstName,
+      email: person.email,
+      middleName: "",
+      phone: null,
+      landline: null,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const refreshed = await fastify.db.personRepository.findOneByOrFail({
+      id: person.id,
+    });
+    expect(refreshed.middleName).toBeNull();
+    expect(refreshed.phone).toBeNull();
+    expect(refreshed.landline).toBeNull();
+    expect(refreshed.email).toBe(person.email);
+
+    const get = await fastify.inject({
+      method: "GET",
+      url: `/volunteer/${volunteer.id}?language=en`,
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    expect(get.statusCode).toBe(200);
+    expect(get.json().data.person.phone).toBeNull();
+    expect(get.json().data.person.landline).toBeNull();
+  });
 });
