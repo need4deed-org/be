@@ -27,15 +27,15 @@ export default class Address {
   @Length(100)
   title: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsString()
   @Length(200)
-  street: string;
+  street: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsString()
   @Length(100)
-  city: string;
+  city: string | null;
 
   @ManyToOne(() => Postcode, (postcode) => postcode.address, {
     onDelete: "CASCADE",

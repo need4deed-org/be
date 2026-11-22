@@ -89,11 +89,14 @@ async function resolveAddressId(
       exceptOrganizationId: organization.id,
     }))
   ) {
-    await repository.update({ id: current.id }, {
-      street,
-      city,
-      postcodeId,
-    } as Partial<Address>);
+    await repository.update(
+      { id: current.id },
+      {
+        street,
+        city,
+        postcodeId,
+      },
+    );
     return current.id;
   }
   const created = await repository.save(
@@ -101,7 +104,7 @@ async function resolveAddressId(
       street,
       city,
       postcodeId,
-    } as Partial<Address>),
+    }),
   );
   return created.id;
 }
