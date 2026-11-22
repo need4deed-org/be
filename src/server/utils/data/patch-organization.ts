@@ -55,9 +55,7 @@ async function resolveAddressId(
     ) {
       await manager
         .getRepository(Organization)
-        .update({ id: organization.id }, {
-          addressId: null,
-        } as unknown as Partial<Organization>);
+        .update({ id: organization.id }, { addressId: null });
       await repository.delete({ id: current.id });
     }
     return null;

@@ -67,8 +67,8 @@ export default class Organization {
   @JoinColumn({ name: "address_id" })
   address?: Address;
 
-  @Column({ nullable: true })
-  addressId?: number;
+  @Column({ type: "integer", nullable: true })
+  addressId?: number | null;
 
   @ManyToOne(() => Person, (person) => person.organization, {
     onDelete: "CASCADE",
