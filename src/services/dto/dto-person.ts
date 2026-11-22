@@ -3,7 +3,9 @@ import { DeepPartial } from "typeorm";
 import Person from "../../data/entity/person.entity";
 import { getCoordinates } from "./utils";
 
-export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
+export function dtoParsePerson(
+  apiPerson: Omit<ApiPersonPatch, "address">,
+): DeepPartial<Person> {
   return {
     firstName: apiPerson.firstName,
     middleName: apiPerson.middleName,
@@ -17,22 +19,6 @@ export function dtoParsePerson(apiPerson: ApiPersonPatch): DeepPartial<Person> {
         ? apiPerson.preferredComm
         : [apiPerson.preferredComm].filter(Boolean),
     }),
-    ...(apiPerson.address
-      ? {
-          address: {
-            street: apiPerson.address.street,
-            city: apiPerson.address.city,
-            ...(apiPerson.address.postcode
-              ? {
-                  postcode: {
-                    id: apiPerson.address.postcode?.id,
-                    value: apiPerson.address.postcode?.code,
-                  },
-                }
-              : {}),
-          },
-        }
-      : {}),
   };
 }
 

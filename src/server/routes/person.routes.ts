@@ -6,16 +6,18 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../../config";
+import { dataSource } from "../../data/data-source";
+import AgentPerson from "../../data/entity/m2m/agent-person";
 import Person, { PersonCreateType } from "../../data/entity/person.entity";
+import { getRepository } from "../../data/utils";
 import logger from "../../logger";
 import { dtoParsePerson, dtoSerializePerson } from "../../services";
-import { deepMerge } from "../../services/utils";
 import { idParamSchema, responseSchema } from "../schema";
 import { newPersonSchema, personResponseSchema } from "../schema/person.schema";
 import { responseErrors } from "../schema/responseErrors";
 import { ParamsId, ReplyData } from "../types";
-import { updatePerson } from "../utils";
 import { getAgentPersonRepresentative } from "../utils/data/get-agent-person-representative";
+import { updatePersonAddress } from "../utils/data/update-person-address";
 
 export default async function personRoutes(
   fastify: FastifyInstance,
@@ -133,47 +135,56 @@ export default async function personRoutes(
         throw new NotFoundError(`Person with id ${personId} not found.`);
       }
 
-      const hasPersonFieldUpdates = Object.keys(request.body).some(
-        (key) => key !== "role" && key !== "agentId",
-      );
+      const { address, role, agentId, ...personFields } = request.body;
 
-      const updatedPerson = hasPersonFieldUpdates
-        ? await updatePerson(
-            deepMerge(
-              {
-                id: person.id,
-                addressId: person.addressId,
-                ...(request.body.address &&
-                  person.address && {
-                    address: { postcodeId: person.address.postcodeId },
-                  }),
-              },
-              dtoParsePerson(request.body),
-            ),
-          )
-        : person;
-
-      if (request.body.role !== undefined) {
-        if (!request.body.agentId) {
+      let membership = null;
+      if (role !== undefined) {
+        if (!agentId) {
           throw new BadRequestError(
             "agentId is required to update a representative's role.",
           );
         }
-
-        const membership = await getAgentPersonRepresentative(
-          personId,
-          request.body.agentId,
-        );
-
+        membership = await getAgentPersonRepresentative(personId, agentId);
         if (!membership) {
           throw new NotFoundError(
-            `No active agent membership found for person ${personId} at agent ${request.body.agentId}.`,
+            `No active agent membership found for person ${personId} at agent ${agentId}.`,
           );
         }
-
-        membership.role = request.body.role;
-        await fastify.db.agentPersonRepository.save(membership);
       }
+
+      const changesAddress = Boolean(
+        address &&
+          (address.street !== undefined ||
+            address.city !== undefined ||
+            address.postcode),
+      );
+      const changesPerson = Object.keys(personFields).length > 0;
+
+      if (changesAddress || changesPerson || membership) {
+        await dataSource.transaction(async (manager) => {
+          if (changesAddress && address) {
+            await updatePersonAddress(person.id, address, manager);
+          }
+          if (changesPerson) {
+            await getRepository(manager, Person).save({
+              id: person.id,
+              ...dtoParsePerson(personFields),
+            });
+          }
+          if (membership && role !== undefined) {
+            membership.role = role;
+            await getRepository(manager, AgentPerson).save(membership);
+          }
+        });
+      }
+
+      const updatedPerson =
+        changesAddress || changesPerson
+          ? await fastify.db.personRepository.findOneOrFail({
+              where: { id: person.id },
+              relations: ["address.postcode"],
+            })
+          : person;
 
       const data = dtoSerializePerson(updatedPerson);
 

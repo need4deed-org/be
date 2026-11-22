@@ -36,66 +36,6 @@ describe("dtoParsePerson", () => {
 
     expect(result.preferredCommunicationType).toEqual(["Phone"]);
   });
-
-  it("should map address without postcode correctly", () => {
-    const apiPerson = {
-      firstName: "John",
-      address: {
-        street: "123 Main St",
-        city: "Tech City",
-      },
-    };
-
-    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
-
-    expect(result.address).toEqual({
-      street: "123 Main St",
-      city: "Tech City",
-    });
-    expect(result.address).not.toHaveProperty("postcode");
-  });
-
-  it("should map the full object including nested postcode", () => {
-    const apiPerson = {
-      firstName: "Alice",
-      address: {
-        street: "456 Oak Ave",
-        city: "Berlin",
-        postcode: {
-          id: "pc_123",
-          code: "10115",
-        },
-      },
-    };
-
-    const result = dtoParsePerson(apiPerson as unknown as ApiPersonPatch);
-
-    expect(result.address?.postcode).toEqual({
-      id: "pc_123",
-      value: "10115",
-    });
-  });
-
-  it("should not include an address key if apiPerson.address is undefined", () => {
-    const apiPerson = { firstName: "Bob" };
-    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
-
-    expect(result).not.toHaveProperty("address");
-  });
-
-  it("should handle partial address fields", () => {
-    const apiPerson = {
-      address: {
-        street: "Lone Street",
-      },
-    };
-
-    const result = dtoParsePerson(apiPerson as ApiPersonPatch);
-
-    expect(result.address).toBeDefined();
-    expect(result.address?.street).toBe("Lone Street");
-    expect(result.address?.city).toBeUndefined();
-  });
 });
 
 describe("dtoSerializePerson", () => {
