@@ -84,4 +84,12 @@ describe("request bodies are validated without type coercion", () => {
     });
     expect(res.statusCode).toBe(200);
   });
+  it("still coerces querystring values", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/volunteer?page=1&limit=5",
+      cookies: { [accessCookieName]: adminCookie },
+    });
+    expect(res.statusCode).toBe(200);
+  });
 });
