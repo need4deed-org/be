@@ -1,4 +1,4 @@
-import { IsString, Length } from "class-validator";
+import { IsOptional, IsString, MaxLength } from "class-validator";
 import {
   Column,
   Entity,
@@ -22,20 +22,23 @@ export default class Address {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ nullable: true, unique: true })
+  @Column({ type: "varchar", nullable: true, unique: true })
+  @IsOptional()
   @IsString()
-  @Length(100)
-  title: string;
+  @MaxLength(100)
+  title: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
+  @IsOptional()
   @IsString()
-  @Length(200)
-  street: string;
+  @MaxLength(200)
+  street: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
+  @IsOptional()
   @IsString()
-  @Length(100)
-  city: string;
+  @MaxLength(100)
+  city: string | null;
 
   @ManyToOne(() => Postcode, (postcode) => postcode.address, {
     onDelete: "CASCADE",

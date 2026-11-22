@@ -28,8 +28,7 @@ async function upsertContactAddress(
   postcode: string | undefined,
   manager: EntityManager,
 ): Promise<void> {
-  const addressData: Partial<Address> =
-    street === undefined ? {} : { street: street as string };
+  const addressData: Partial<Address> = street === undefined ? {} : { street };
   const postcodeData = await resolveAddressPostcode(postcode, manager);
 
   if (person.addressId) {

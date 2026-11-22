@@ -38,37 +38,37 @@ export default class Person {
   @IsString()
   firstName: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsString()
-  middleName?: string;
+  middleName?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsString()
-  lastName?: string;
+  lastName?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsEmail()
-  email?: string;
+  email?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsString()
   @Length(7, 20)
-  phone?: string;
+  phone?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsString()
   @Length(7, 20)
-  landline?: string;
+  landline?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: "varchar", nullable: true })
   @IsOptional()
   @IsString()
-  avatarUrl?: string;
+  avatarUrl?: string | null;
 
   @Column({
     type: "text",
