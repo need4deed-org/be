@@ -9,6 +9,14 @@ import {
   stripNullishAttributes,
 } from "../common";
 
+const NULLABLE_PERSON_COLUMNS = [
+  "lastName",
+  "middleName",
+  "email",
+  "phone",
+  "landline",
+] as const;
+
 export function getVolunteerPatchData(
   body: VolunteerPatchBodyData,
   nullable?: Array<keyof VolunteerPatchBodyData>,
@@ -48,17 +56,17 @@ export function getVolunteerPatchData(
     ),
     ...statusDates,
   };
-  const personData: Partial<Person> = stripNullishAttributes(
-    {
-      id: body.person?.id,
-      firstName: body.person?.firstName,
-      lastName: body.person?.lastName,
-      middleName: body.person?.middleName,
-      email: body.person?.email,
-      phone: body.person?.phone,
-    },
-    nullable,
-  );
+  const personData: Partial<Person> = {
+    ...stripNullishAttributes(
+      { id: body.person?.id, firstName: body.person?.firstName },
+      nullable,
+    ),
+    ...Object.fromEntries(
+      NULLABLE_PERSON_COLUMNS.filter(
+        (column) => body.person?.[column] !== undefined,
+      ).map((column) => [column, body.person?.[column] || null]),
+    ),
+  };
   const comments = body.comments;
   const addressData: Partial<Address> = stripNullishAttributes(
     {
