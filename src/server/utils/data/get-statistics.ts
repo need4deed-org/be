@@ -19,7 +19,11 @@ import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
 import { MATCHED_VOLUNTEER_STATUSES } from "./no-match-found";
-import { atBerlin, SNAPSHOT_KEY_SEPARATOR } from "./record-statistics-events";
+import {
+  atBerlin,
+  SNAPSHOT_KEY_SEPARATOR,
+  SNAPSHOT_MARKER_KEY,
+} from "./record-statistics-events";
 
 const MAX_PERIODS = 1000;
 
@@ -98,7 +102,7 @@ const volunteerSnapshots = (metric: StatisticsMetric): MetricSource => ({
     SELECT se.value_key AS id, se.occurred_at, se.district_id,
       NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type
     FROM statistics_event se
-    WHERE se.metric = '${metric}'
+    WHERE se.metric = '${metric}' AND se.value_key <> '${SNAPSHOT_MARKER_KEY}'
   ) r`,
   at: "r.occurred_at",
   filter: `r.occurred_at = ${atBerlin(`LEAST(

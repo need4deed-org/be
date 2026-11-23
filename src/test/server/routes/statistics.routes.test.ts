@@ -26,6 +26,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { SNAPSHOT_MARKER_KEY } from "../../../server/utils/data/record-statistics-events";
 import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";
 
@@ -298,6 +299,11 @@ describe("GET /statistics/:metric", () => {
       ACTIVE_VOLUNTEERS,
       `${ACCOMPANYING}#1`,
       "1987-03-31T21:59:59.999Z",
+    );
+    await createEvent(
+      ACTIVE_VOLUNTEERS,
+      SNAPSHOT_MARKER_KEY,
+      "1987-06-30T21:59:59.999Z",
     );
   });
 
