@@ -19,6 +19,7 @@ import StatisticsEvent from "../../../data/entity/statistics-event.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import {
+  EMPTY_SNAPSHOT_MARKER_KEY,
   recordOpportunityStatusEvents,
   recordVolunteerSnapshots,
 } from "../../../server/utils/data/record-statistics-events";
@@ -27,6 +28,10 @@ import { firstSeeded } from "../../seeded";
 
 const { PAST_OPPORTUNITIES, VALIDATED_OPPORTUNITIES } = StatisticsMetric;
 const { ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS } = StatisticsMetric;
+const SKIPPED = {
+  [ACTIVE_VOLUNTEERS]: "skipped",
+  [AVAILABLE_VOLUNTEERS]: "skipped",
+};
 
 describe("recordOpportunityStatusEvents", () => {
   let district: District;
@@ -136,8 +141,10 @@ describe("recordVolunteerSnapshots", () => {
   const year = 1950 + Math.floor(Math.random() * 30);
   const monthStart = new Date(`${year}-03-01T00:00:00+01:00`);
   const previousMonthStart = new Date(`${year}-02-01T00:00:00+01:00`);
-  const berlinMorning = (day: number) =>
-    new Date(`${year}-03-0${day}T06:00:00+01:00`);
+  const berlinMorning = (day: number, month = "03") =>
+    new Date(`${year}-${month}-0${day}T06:00:00+01:00`);
+  const aprilStart = new Date(`${year}-04-01T00:00:00+01:00`);
+  const mayStart = new Date(`${year}-05-01T00:00:00+01:00`);
   const createdIds = {
     districts: [] as number[],
     deals: [] as number[],
@@ -221,11 +228,7 @@ describe("recordVolunteerSnapshots", () => {
     await dataSource.query(
       `DELETE FROM statistics_event
        WHERE metric = ANY($1) AND occurred_at >= $2 AND occurred_at < $3`,
-      [
-        [ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS],
-        previousMonthStart,
-        monthStart,
-      ],
+      [[ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS], previousMonthStart, mayStart],
     );
     const remove = (table: string, ids: number[]) =>
       dataSource.query(`DELETE FROM "${table}" WHERE id = ANY($1)`, [ids]);
@@ -236,12 +239,13 @@ describe("recordVolunteerSnapshots", () => {
   });
 
   it("skips the snapshot after the catch-up days", async () => {
-    await recordVolunteerSnapshots(
+    const recorded = await recordVolunteerSnapshots(
       dataSource.manager,
       berlinMorning(4),
       createdIds.volunteers,
     );
 
+    expect(recorded).toEqual(SKIPPED);
     expect(await mine(ACTIVE_VOLUNTEERS)).toEqual([]);
   });
 
@@ -251,11 +255,12 @@ describe("recordVolunteerSnapshots", () => {
       berlinMorning(1),
       createdIds.volunteers,
     );
-    await recordVolunteerSnapshots(
+    const repeat = await recordVolunteerSnapshots(
       dataSource.manager,
       berlinMorning(2),
       createdIds.volunteers,
     );
+    expect(repeat).toEqual(SKIPPED);
 
     const rows = await mine(ACTIVE_VOLUNTEERS);
     expect(
@@ -281,5 +286,30 @@ describe("recordVolunteerSnapshots", () => {
       ].sort(),
     );
     expect(await mine(AVAILABLE_VOLUNTEERS)).toHaveLength(1);
+  });
+
+  it("keeps an empty month-end snapshot from a later catch-up", async () => {
+    const empty = await recordVolunteerSnapshots(
+      dataSource.manager,
+      berlinMorning(1, "05"),
+      [],
+    );
+    const catchUp = await recordVolunteerSnapshots(
+      dataSource.manager,
+      berlinMorning(2, "05"),
+      createdIds.volunteers,
+    );
+
+    expect(empty).toEqual({
+      [ACTIVE_VOLUNTEERS]: 0,
+      [AVAILABLE_VOLUNTEERS]: 0,
+    });
+    expect(catchUp).toEqual(SKIPPED);
+    const april: { valueKey: string }[] = await dataSource.query(
+      `SELECT value_key AS "valueKey" FROM statistics_event
+       WHERE metric = $1 AND occurred_at >= $2 AND occurred_at < $3`,
+      [ACTIVE_VOLUNTEERS, aprilStart, mayStart],
+    );
+    expect(april).toEqual([{ valueKey: EMPTY_SNAPSHOT_MARKER_KEY }]);
   });
 });

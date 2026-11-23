@@ -26,6 +26,7 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
+import { EMPTY_SNAPSHOT_MARKER_KEY } from "../../../server/utils/data/record-statistics-events";
 import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";
 
@@ -299,6 +300,11 @@ describe("GET /statistics/:metric", () => {
       `${ACCOMPANYING}#1`,
       "1987-03-31T21:59:59.999Z",
     );
+    await createEvent(
+      ACTIVE_VOLUNTEERS,
+      EMPTY_SNAPSHOT_MARKER_KEY,
+      "1987-06-30T21:59:59.999Z",
+    );
   });
 
   afterAll(async () => {
@@ -563,9 +569,9 @@ describe("GET /statistics/:metric", () => {
     ]);
   });
 
-  it("shows a quarter's own month-end snapshot, none when it is missing", async () => {
+  it("shows a quarter's own month-end snapshot, 0 when empty or missing", async () => {
     const data = await getData(
-      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-07-01&groupBy=volunteer-type",
+      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-10-01&groupBy=volunteer-type",
     );
 
     expect(
@@ -581,6 +587,7 @@ describe("GET /statistics/:metric", () => {
         total: 1,
       },
       { period: "1987-Q2", counts: {}, total: 0 },
+      { period: "1987-Q3", counts: {}, total: 0 },
     ]);
   });
 

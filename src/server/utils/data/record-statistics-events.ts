@@ -43,6 +43,8 @@ export const SNAPSHOT_CATCH_UP_DAYS = 3;
 
 export const SNAPSHOT_KEY_SEPARATOR = "#";
 
+export const EMPTY_SNAPSHOT_MARKER_KEY = "";
+
 export const atBerlin = (value: string) =>
   `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
 
@@ -80,8 +82,8 @@ export async function recordVolunteerSnapshots(
   manager: EntityManager,
   at: Date = new Date(),
   volunteerIds?: number[],
-): Promise<Record<string, number>> {
-  const recorded: Record<string, number> = {};
+): Promise<Record<string, number | "skipped">> {
+  const recorded: Record<string, number | "skipped"> = {};
   for (const { metric, status } of VOLUNTEER_SNAPSHOT_METRICS) {
     const rows: { valueKey: string }[] = await manager.query(
       `WITH bounds AS (
@@ -103,12 +105,18 @@ export async function recordVolunteerSnapshots(
            || row_number() OVER (ORDER BY random()) AS value_key
          FROM in_status
          WHERE registration = 1
+       ),
+       entries AS (
+         SELECT deal_id, value_key FROM snapshot
+         UNION ALL
+         SELECT NULL::int, '${EMPTY_SNAPSHOT_MARKER_KEY}'
+         WHERE NOT EXISTS (SELECT 1 FROM snapshot)
        )
        INSERT INTO statistics_event (metric, occurred_at, value_key, district_id)
        SELECT $1::varchar, ${atBerlin("b.month_start")} - interval '1 millisecond',
          s.value_key, dd.district_id
        FROM bounds b
-       CROSS JOIN snapshot s
+       CROSS JOIN entries s
        LEFT JOIN deal_district dd ON dd.deal_id = s.deal_id
        WHERE b.day <= ${SNAPSHOT_CATCH_UP_DAYS}
          AND NOT EXISTS (
@@ -120,7 +128,13 @@ export async function recordVolunteerSnapshots(
        RETURNING value_key AS "valueKey"`,
       [metric, at, status, volunteerIds ?? null],
     );
-    recorded[metric] = new Set(rows.map(({ valueKey }) => valueKey)).size;
+    recorded[metric] = rows.length
+      ? new Set(
+          rows
+            .map(({ valueKey }) => valueKey)
+            .filter((valueKey) => valueKey !== EMPTY_SNAPSHOT_MARKER_KEY),
+        ).size
+      : "skipped";
   }
   return recorded;
 }
