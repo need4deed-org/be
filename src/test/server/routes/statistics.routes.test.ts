@@ -569,9 +569,9 @@ describe("GET /statistics/:metric", () => {
     ]);
   });
 
-  it("shows a quarter's own month-end snapshot, none when it is missing", async () => {
+  it("shows a quarter's own month-end snapshot, 0 when empty or missing", async () => {
     const data = await getData(
-      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-07-01&groupBy=volunteer-type",
+      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-10-01&groupBy=volunteer-type",
     );
 
     expect(
@@ -587,6 +587,7 @@ describe("GET /statistics/:metric", () => {
         total: 1,
       },
       { period: "1987-Q2", counts: {}, total: 0 },
+      { period: "1987-Q3", counts: {}, total: 0 },
     ]);
   });
 

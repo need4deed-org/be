@@ -299,8 +299,8 @@ describe("recordVolunteerSnapshots", () => {
       [AVAILABLE_VOLUNTEERS]: 0,
     });
     expect(catchUp).toEqual({
-      [ACTIVE_VOLUNTEERS]: 0,
-      [AVAILABLE_VOLUNTEERS]: 0,
+      [ACTIVE_VOLUNTEERS]: "skipped",
+      [AVAILABLE_VOLUNTEERS]: "skipped",
     });
     const april: { valueKey: string }[] = await dataSource.query(
       `SELECT value_key AS "valueKey" FROM statistics_event

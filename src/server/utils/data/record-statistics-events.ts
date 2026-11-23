@@ -83,8 +83,8 @@ export async function recordVolunteerSnapshots(
   manager: EntityManager,
   at: Date = new Date(),
   volunteerIds?: number[],
-): Promise<Record<string, number>> {
-  const recorded: Record<string, number> = {};
+): Promise<Record<string, number | "skipped">> {
+  const recorded: Record<string, number | "skipped"> = {};
   for (const { metric, status } of VOLUNTEER_SNAPSHOT_METRICS) {
     const rows: { valueKey: string }[] = await manager.query(
       `WITH bounds AS (
@@ -111,6 +111,7 @@ export async function recordVolunteerSnapshots(
          SELECT deal_id, value_key FROM snapshot
          UNION ALL
          SELECT NULL::int, '${SNAPSHOT_MARKER_KEY}'
+         WHERE NOT EXISTS (SELECT 1 FROM snapshot)
        )
        INSERT INTO statistics_event (metric, occurred_at, value_key, district_id)
        SELECT $1::varchar, ${atBerlin("b.month_start")} - interval '1 millisecond',
@@ -128,11 +129,13 @@ export async function recordVolunteerSnapshots(
        RETURNING value_key AS "valueKey"`,
       [metric, at, status, volunteerIds ?? null],
     );
-    recorded[metric] = new Set(
-      rows
-        .map(({ valueKey }) => valueKey)
-        .filter((valueKey) => valueKey !== SNAPSHOT_MARKER_KEY),
-    ).size;
+    recorded[metric] = rows.length
+      ? new Set(
+          rows
+            .map(({ valueKey }) => valueKey)
+            .filter((valueKey) => valueKey !== SNAPSHOT_MARKER_KEY),
+        ).size
+      : "skipped";
   }
   return recorded;
 }
