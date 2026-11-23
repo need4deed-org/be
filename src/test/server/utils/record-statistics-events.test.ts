@@ -19,15 +19,19 @@ import StatisticsEvent from "../../../data/entity/statistics-event.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../../data/types";
 import {
+  EMPTY_SNAPSHOT_MARKER_KEY,
   recordOpportunityStatusEvents,
   recordVolunteerSnapshots,
-  SNAPSHOT_MARKER_KEY,
 } from "../../../server/utils/data/record-statistics-events";
 import { randomNumericSuffix } from "../../random";
 import { firstSeeded } from "../../seeded";
 
 const { PAST_OPPORTUNITIES, VALIDATED_OPPORTUNITIES } = StatisticsMetric;
 const { ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS } = StatisticsMetric;
+const SKIPPED = {
+  [ACTIVE_VOLUNTEERS]: "skipped",
+  [AVAILABLE_VOLUNTEERS]: "skipped",
+};
 
 describe("recordOpportunityStatusEvents", () => {
   let district: District;
@@ -235,12 +239,13 @@ describe("recordVolunteerSnapshots", () => {
   });
 
   it("skips the snapshot after the catch-up days", async () => {
-    await recordVolunteerSnapshots(
+    const recorded = await recordVolunteerSnapshots(
       dataSource.manager,
       berlinMorning(4),
       createdIds.volunteers,
     );
 
+    expect(recorded).toEqual(SKIPPED);
     expect(await mine(ACTIVE_VOLUNTEERS)).toEqual([]);
   });
 
@@ -250,11 +255,12 @@ describe("recordVolunteerSnapshots", () => {
       berlinMorning(1),
       createdIds.volunteers,
     );
-    await recordVolunteerSnapshots(
+    const repeat = await recordVolunteerSnapshots(
       dataSource.manager,
       berlinMorning(2),
       createdIds.volunteers,
     );
+    expect(repeat).toEqual(SKIPPED);
 
     const rows = await mine(ACTIVE_VOLUNTEERS);
     expect(
@@ -298,15 +304,12 @@ describe("recordVolunteerSnapshots", () => {
       [ACTIVE_VOLUNTEERS]: 0,
       [AVAILABLE_VOLUNTEERS]: 0,
     });
-    expect(catchUp).toEqual({
-      [ACTIVE_VOLUNTEERS]: "skipped",
-      [AVAILABLE_VOLUNTEERS]: "skipped",
-    });
+    expect(catchUp).toEqual(SKIPPED);
     const april: { valueKey: string }[] = await dataSource.query(
       `SELECT value_key AS "valueKey" FROM statistics_event
        WHERE metric = $1 AND occurred_at >= $2 AND occurred_at < $3`,
       [ACTIVE_VOLUNTEERS, aprilStart, mayStart],
     );
-    expect(april).toEqual([{ valueKey: SNAPSHOT_MARKER_KEY }]);
+    expect(april).toEqual([{ valueKey: EMPTY_SNAPSHOT_MARKER_KEY }]);
   });
 });

@@ -43,8 +43,7 @@ export const SNAPSHOT_CATCH_UP_DAYS = 3;
 
 export const SNAPSHOT_KEY_SEPARATOR = "#";
 
-// Marks a month as snapshotted even when no volunteer had the status.
-export const SNAPSHOT_MARKER_KEY = "";
+export const EMPTY_SNAPSHOT_MARKER_KEY = "";
 
 export const atBerlin = (value: string) =>
   `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
@@ -110,7 +109,7 @@ export async function recordVolunteerSnapshots(
        entries AS (
          SELECT deal_id, value_key FROM snapshot
          UNION ALL
-         SELECT NULL::int, '${SNAPSHOT_MARKER_KEY}'
+         SELECT NULL::int, '${EMPTY_SNAPSHOT_MARKER_KEY}'
          WHERE NOT EXISTS (SELECT 1 FROM snapshot)
        )
        INSERT INTO statistics_event (metric, occurred_at, value_key, district_id)
@@ -133,7 +132,7 @@ export async function recordVolunteerSnapshots(
       ? new Set(
           rows
             .map(({ valueKey }) => valueKey)
-            .filter((valueKey) => valueKey !== SNAPSHOT_MARKER_KEY),
+            .filter((valueKey) => valueKey !== EMPTY_SNAPSHOT_MARKER_KEY),
         ).size
       : "skipped";
   }
