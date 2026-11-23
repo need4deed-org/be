@@ -140,6 +140,7 @@ describe("POST /event", () => {
     createdEventIds.push(data.id);
     expect(data.title).toBe("Sommerfest");
     expect(data.active).toBe(false);
+    expect(data.listed).toBe(true);
     // Fields ApiEventN4DGetList doesn't carry, only ApiEventN4DGet does —
     // must round-trip through the create response.
     expect(data.hostName).toBe("Du für Berlin");
@@ -219,6 +220,32 @@ describe("POST /event", () => {
     createdEventIds.push(res.json().data.id);
     expect(res.json().data.linkRSVP).toBeNull();
     expect(res.json().data.signUpQuestion).toBeNull();
+  });
+
+  it("creates an unlisted event when listed is false", async () => {
+    const res = await fastify.inject({
+      method: "POST",
+      url: "/event",
+      cookies: { [accessCookieName]: coordinatorCookie },
+      payload: {
+        ...baseBody,
+        listed: false,
+        translations: [
+          {
+            language: "de",
+            title: "Internes Event",
+            menuTitle: "Internes Event",
+            description: "Nur mit Link.",
+            shortDescription: "Nur mit Link.",
+          },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const { data } = res.json();
+    createdEventIds.push(data.id);
+    expect(data.listed).toBe(false);
   });
 
   it("rejects a non-coordinator", async () => {

@@ -320,6 +320,27 @@ describe("PATCH /event/:id", () => {
     ).toBeNull();
   });
 
+  it("unlists and relists an event", async () => {
+    const id = await createTestEvent();
+    const patch = (listed: boolean) =>
+      fastify.inject({
+        method: "PATCH",
+        url: `/event/${id}`,
+        cookies: { [accessCookieName]: coordinatorCookie },
+        payload: { listed },
+      });
+
+    expect((await patch(false)).statusCode).toBe(204);
+    expect(
+      (await fastify.db.eventRepository.findOneByOrFail({ id })).isListed,
+    ).toBe(false);
+
+    expect((await patch(true)).statusCode).toBe(204);
+    expect(
+      (await fastify.db.eventRepository.findOneByOrFail({ id })).isListed,
+    ).toBe(true);
+  });
+
   it("clears a nullable field via explicit null", async () => {
     const id = await createTestEvent();
     await fastify.inject({

@@ -77,6 +77,7 @@ export default async function eventRoutes(
         .orderBy("event.date", "ASC");
       if (!isPrivileged) {
         qb.andWhere("event.isActive = :isActive", { isActive: true });
+        qb.andWhere("event.isListed = :isListed", { isListed: true });
       }
       const events = await applyEventDateRange(qb, request.query).getMany();
 
