@@ -67,7 +67,6 @@ describe("createFatalHandler", () => {
         err: expect.objectContaining({
           message: expect.stringContaining("503"),
         }),
-        reason,
       },
       "unhandledRejection, exiting",
     );
@@ -167,6 +166,10 @@ describe("fatalAlertText code fence", () => {
 });
 
 describe("toError", () => {
+  it("caps a large non-Error reason", () => {
+    expect(toError({ body: "x".repeat(5_000) }).message).toHaveLength(500);
+  });
+
   it("wraps a non-Error reason", () => {
     expect(toError("nope").message).toBe("'nope'");
     expect(toError({ a: 1 }).message).toBe("{ a: 1 }");

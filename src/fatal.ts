@@ -5,6 +5,7 @@ import { isDryRun, slackWebhookUrls } from "./server/plugins/notify";
 import { SlackWebhookTransport } from "./services/notify/transports/slack-webhook";
 
 const STACK_LINES = 12;
+const REASON_CHARS = 500;
 const EXIT_CODE = 1;
 
 export interface FatalDeps {
@@ -23,7 +24,9 @@ export function toError(reason: unknown): Error {
   if (reason instanceof Error) {
     return reason;
   }
-  const error = new Error(inspect(reason, { depth: 3, breakLength: Infinity }));
+  const error = new Error(
+    inspect(reason, { depth: 2, breakLength: Infinity }).slice(0, REASON_CHARS),
+  );
   error.stack = `${error.name}: ${error.message}`;
   return error;
 }
@@ -53,8 +56,7 @@ export function createFatalHandler(deps: FatalDeps): FatalHandler {
 
   const onFatal = (kind: string, reason: unknown) => {
     const error = toError(reason);
-    const logged =
-      reason instanceof Error ? { err: error } : { err: error, reason };
+    const logged = { err: error };
     if (exiting) {
       deps.logger.fatal(logged, `${kind} while exiting`);
       return;

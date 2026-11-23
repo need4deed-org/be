@@ -22,7 +22,8 @@ export async function start() {
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) {
-      logger.info(`Received ${signal} again, already shutting down`);
+      logger.info(`Received ${signal} again, exiting now`);
+      logger.flush(() => process.exit(1));
       return;
     }
     shuttingDown = true;
@@ -53,7 +54,7 @@ export async function start() {
     logger.info("Server started.");
   } catch (err) {
     if (shuttingDown) {
-      logger.info({ err }, "Startup stopped by shutdown");
+      logger.error({ err }, "Startup ended during shutdown");
       return;
     }
     fatal.onFatal("startup failed", err);
