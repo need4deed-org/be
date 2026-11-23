@@ -14,6 +14,7 @@ export const LEAD_FROM_METRIC = "lead-from";
 // Anonymous on purpose: no person or volunteer id.
 @Entity()
 @Index(["metric", "occurredAt"])
+@Index(["metric", "valueKey"])
 export default class StatisticsEvent {
   constructor(event?: Partial<StatisticsEvent>) {
     if (event) {
