@@ -19,7 +19,7 @@ import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
 import { MATCHED_VOLUNTEER_STATUSES } from "./no-match-found";
-import { SNAPSHOT_KEY_SEPARATOR } from "./record-statistics-events";
+import { atBerlin, SNAPSHOT_KEY_SEPARATOR } from "./record-statistics-events";
 
 const MAX_PERIODS = 1000;
 
@@ -79,10 +79,6 @@ const OPPORTUNITY_KEYS: MetricSource["keys"] = {
   },
 };
 
-// timestamptz → Berlin wall time, and Berlin wall time (timestamp) → timestamptz
-const atBerlin = (value: string) =>
-  `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
-
 const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
   from: "statistics_event r",
   at: "r.occurred_at",
@@ -94,19 +90,18 @@ const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
   },
 });
 
-// A coarser period shows its latest month-end snapshot.
 const volunteerSnapshots = (metric: StatisticsMetric): MetricSource => ({
   from: `(
-    SELECT se.value_key AS id, se.metric, se.occurred_at, se.district_id,
-      NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type
+    SELECT se.value_key AS id, se.occurred_at, se.district_id,
+      NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type,
+      max(se.occurred_at) OVER (
+        PARTITION BY date_trunc($1, ${atBerlin("se.occurred_at")})
+      ) AS latest_at
     FROM statistics_event se
+    WHERE se.metric = '${metric}'
   ) r`,
   at: "r.occurred_at",
-  filter: `r.metric = '${metric}' AND r.occurred_at = (
-    SELECT max(latest.occurred_at) FROM statistics_event latest
-    WHERE latest.metric = r.metric
-      AND date_trunc($1, ${atBerlin("latest.occurred_at")}) = date_trunc($1, ${atBerlin("r.occurred_at")})
-  )`,
+  filter: "r.occurred_at = r.latest_at",
   keys: {
     [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
     [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.volunteer_type" },

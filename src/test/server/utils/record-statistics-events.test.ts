@@ -227,6 +227,7 @@ describe("recordVolunteerSnapshots", () => {
     await recordVolunteerSnapshots(
       dataSource.manager,
       new Date("1988-03-04T05:00:00Z"),
+      createdIds.volunteers,
     );
 
     expect(await mine(ACTIVE_VOLUNTEERS)).toEqual([]);
@@ -236,10 +237,12 @@ describe("recordVolunteerSnapshots", () => {
     await recordVolunteerSnapshots(
       dataSource.manager,
       new Date("1988-03-01T05:00:00Z"),
+      createdIds.volunteers,
     );
     await recordVolunteerSnapshots(
       dataSource.manager,
       new Date("1988-03-02T05:00:00Z"),
+      createdIds.volunteers,
     );
 
     const rows = await mine(ACTIVE_VOLUNTEERS);

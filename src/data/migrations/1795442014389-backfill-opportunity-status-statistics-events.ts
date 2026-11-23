@@ -39,10 +39,6 @@ export class BackfillOpportunityStatusStatisticsEvents1795442014389
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DELETE FROM statistics_event WHERE metric = ANY($1)`,
-      [BACKFILLS.map(({ metric }) => metric)],
-    );
-  }
+  // Irreversible: the daily job's events can't be told apart from the backfill's.
+  public async down(): Promise<void> {}
 }

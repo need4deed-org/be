@@ -5,14 +5,20 @@ import {
   recordVolunteerSnapshots,
 } from "../../server/utils/data/record-statistics-events";
 
-export async function recordStatisticsEvents(
+export async function recordStatisticsSnapshots(
   fastify: FastifyInstance,
 ): Promise<void> {
-  const manager = fastify.db.opportunityRepository.manager;
-  const opportunities = await recordOpportunityStatusEvents(manager);
-  const volunteers = await recordVolunteerSnapshots(manager);
-  logger.info(
-    { ...opportunities, ...volunteers },
-    "scheduler: recorded statistics events",
+  const recorded = await recordVolunteerSnapshots(
+    fastify.db.volunteerRepository.manager,
   );
+  logger.info(recorded, "scheduler: recorded volunteer statistics snapshots");
+}
+
+export async function recordStatisticsStatusEvents(
+  fastify: FastifyInstance,
+): Promise<void> {
+  const recorded = await recordOpportunityStatusEvents(
+    fastify.db.opportunityRepository.manager,
+  );
+  logger.info(recorded, "scheduler: recorded opportunity statistics events");
 }

@@ -43,7 +43,8 @@ export const SNAPSHOT_CATCH_UP_DAYS = 3;
 
 export const SNAPSHOT_KEY_SEPARATOR = "#";
 
-const berlin = (value: string) => `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
+export const atBerlin = (value: string) =>
+  `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
 
 export async function recordOpportunityStatusEvents(
   manager: EntityManager,
@@ -55,7 +56,7 @@ export async function recordOpportunityStatusEvents(
     const rows: unknown[] = await manager.query(
       `INSERT INTO statistics_event
          (metric, occurred_at, value_key, district_id, opportunity_type)
-       SELECT $1::varchar, $2::timestamptz, o.id::text,
+       SELECT $1::varchar, LEAST(o.updated_at, $2::timestamptz), o.id::text,
          COALESCE(o.district_id, CASE WHEN o.address_id IS NULL THEN a.district_id END),
          o.type::text
        FROM opportunity o
@@ -74,27 +75,28 @@ export async function recordOpportunityStatusEvents(
   return recorded;
 }
 
-// Anonymous on purpose: value_key is "<volunteer type>#<n>", n a random-order
-// number within one snapshot.
+// Anonymous on purpose: no volunteer id, only a random number within the snapshot.
 export async function recordVolunteerSnapshots(
   manager: EntityManager,
   at: Date = new Date(),
+  volunteerIds?: number[],
 ): Promise<Record<string, number>> {
   const recorded: Record<string, number> = {};
   for (const { metric, status } of VOLUNTEER_SNAPSHOT_METRICS) {
     const rows: unknown[] = await manager.query(
       `WITH bounds AS (
-         SELECT date_trunc('month', ${berlin("$2::timestamptz")}) AS month_start,
-           extract(day FROM ${berlin("$2::timestamptz")}) AS day
+         SELECT date_trunc('month', ${atBerlin("$2::timestamptz")}) AS month_start,
+           extract(day FROM ${atBerlin("$2::timestamptz")}) AS day
        ),
        snapshot AS (
          SELECT v.deal_id, COALESCE(v.status_type::text, '') || '${SNAPSHOT_KEY_SEPARATOR}'
            || row_number() OVER (ORDER BY random()) AS value_key
          FROM volunteer v
          WHERE v.status_engagement::text = $3
+           AND ($4::int[] IS NULL OR v.id = ANY($4))
        )
        INSERT INTO statistics_event (metric, occurred_at, value_key, district_id)
-       SELECT $1::varchar, ${berlin("b.month_start")} - interval '1 millisecond',
+       SELECT $1::varchar, ${atBerlin("b.month_start")} - interval '1 millisecond',
          s.value_key, dd.district_id
        FROM bounds b
        CROSS JOIN snapshot s
@@ -103,11 +105,11 @@ export async function recordVolunteerSnapshots(
          AND NOT EXISTS (
            SELECT 1 FROM statistics_event se
            WHERE se.metric = $1
-             AND se.occurred_at >= ${berlin("b.month_start - interval '1 month'")}
-             AND se.occurred_at < ${berlin("b.month_start")}
+             AND se.occurred_at >= ${atBerlin("b.month_start - interval '1 month'")}
+             AND se.occurred_at < ${atBerlin("b.month_start")}
          )
        RETURNING id`,
-      [metric, at, status],
+      [metric, at, status, volunteerIds ?? null],
     );
     recorded[metric] = rows.length;
   }
