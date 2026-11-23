@@ -1,4 +1,5 @@
 import { hostname } from "node:os";
+import { inspect } from "node:util";
 import type { Logger } from "pino";
 import { isDryRun, slackWebhookUrls } from "./server/plugins/notify";
 import { SlackWebhookTransport } from "./services/notify/transports/slack-webhook";
@@ -13,16 +14,28 @@ export interface FatalDeps {
   timeoutMs: number;
 }
 
-export function toError(reason: unknown): Error {
-  return reason instanceof Error ? reason : new Error(String(reason));
+export interface FatalHandler {
+  onFatal: (kind: string, reason: unknown) => void;
+  isExiting: () => boolean;
 }
+
+export function toError(reason: unknown): Error {
+  if (reason instanceof Error) {
+    return reason;
+  }
+  const error = new Error(inspect(reason, { depth: 3, breakLength: Infinity }));
+  error.stack = `${error.name}: ${error.message}`;
+  return error;
+}
+
+const unfence = (text: string) => text.replaceAll("```", "'''");
 
 export function fatalAlertText(kind: string, error: Error): string {
   const stack = (error.stack ?? `${error.name}: ${error.message}`)
     .split("\n")
     .slice(0, STACK_LINES)
     .join("\n");
-  return `be on ${hostname()} is exiting (${kind}): ${error.message}\n\`\`\`${stack}\`\`\``;
+  return `be on ${hostname()} is exiting (${kind}): ${unfence(error.message)}\n\`\`\`${unfence(stack)}\`\`\``;
 }
 
 export async function alertOpsSlack(text: string): Promise<void> {
@@ -35,19 +48,19 @@ export async function alertOpsSlack(text: string): Promise<void> {
   });
 }
 
-export function createFatalHandler(
-  deps: FatalDeps,
-): (kind: string, reason: unknown) => void {
+export function createFatalHandler(deps: FatalDeps): FatalHandler {
   let exiting = false;
 
-  return (kind, reason) => {
+  const onFatal = (kind: string, reason: unknown) => {
     const error = toError(reason);
+    const logged =
+      reason instanceof Error ? { err: error } : { err: error, reason };
     if (exiting) {
-      deps.logger.fatal({ err: error }, `${kind} while exiting`);
+      deps.logger.fatal(logged, `${kind} while exiting`);
       return;
     }
     exiting = true;
-    deps.logger.fatal({ err: error }, `${kind}, exiting`);
+    deps.logger.fatal(logged, `${kind}, exiting`);
 
     const forceExit = setTimeout(() => deps.exit(EXIT_CODE), deps.timeoutMs);
     deps
@@ -65,10 +78,12 @@ export function createFatalHandler(
         });
       });
   };
+
+  return { onFatal, isExiting: () => exiting };
 }
 
 export function installFatalHandlers(
-  onFatal: (kind: string, reason: unknown) => void,
+  onFatal: FatalHandler["onFatal"],
   target: Pick<typeof process, "on"> = process,
 ): void {
   target.on("uncaughtException", (err) => onFatal("uncaughtException", err));

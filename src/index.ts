@@ -8,7 +8,7 @@ import {
 import logger from "./logger";
 import { createServer } from "./server";
 
-const onFatal = createFatalHandler({
+const fatal = createFatalHandler({
   logger,
   exit: (code) => process.exit(code),
   alertOps: alertOpsSlack,
@@ -16,10 +16,16 @@ const onFatal = createFatalHandler({
 });
 
 export async function start() {
-  installFatalHandlers(onFatal);
+  installFatalHandlers(fatal.onFatal);
 
   let server: FastifyInstance | undefined;
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) {
+      logger.info(`Received ${signal} again, already shutting down`);
+      return;
+    }
+    shuttingDown = true;
     logger.info(
       `Received ${signal}, shutting down${server ? "" : " during startup"}...`,
     );
@@ -29,12 +35,16 @@ export async function start() {
     } catch (err) {
       logger.error(err);
     } finally {
-      clearTimeout(forceExit);
-      logger.flush(() => process.exit(0));
+      logger.flush(() => {
+        clearTimeout(forceExit);
+        if (!fatal.isExiting()) {
+          process.exit(0);
+        }
+      });
     }
   };
-  process.once("SIGTERM", () => shutdown("SIGTERM"));
-  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   try {
     server = await createServer();
@@ -42,7 +52,11 @@ export async function start() {
     await server.listen({ port, host: "0.0.0.0" });
     logger.info("Server started.");
   } catch (err) {
-    onFatal("startup failed", err);
+    if (shuttingDown) {
+      logger.info({ err }, "Startup stopped by shutdown");
+      return;
+    }
+    fatal.onFatal("startup failed", err);
   }
 }
 

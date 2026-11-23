@@ -34,7 +34,7 @@ describe("createFatalHandler", () => {
     const deps = fakeDeps(async () => undefined);
     const error = new Error("boom");
 
-    createFatalHandler(deps as unknown as FatalDeps)(
+    createFatalHandler(deps as unknown as FatalDeps).onFatal(
       "uncaughtException",
       error,
     );
@@ -52,12 +52,36 @@ describe("createFatalHandler", () => {
     expect(deps.exit).toHaveBeenCalledWith(1);
   });
 
+  it("keeps a non-Error reason in the log and the alert", async () => {
+    const deps = fakeDeps(async () => undefined);
+    const reason = { status: 503, body: "upstream down" };
+
+    createFatalHandler(deps as unknown as FatalDeps).onFatal(
+      "unhandledRejection",
+      reason,
+    );
+    await vi.runAllTimersAsync();
+
+    expect(deps.logFatal).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: expect.stringContaining("503"),
+        }),
+        reason,
+      },
+      "unhandledRejection, exiting",
+    );
+    expect(deps.alertOps).toHaveBeenCalledWith(
+      expect.stringContaining("body: 'upstream down'"),
+    );
+  });
+
   it("still exits when the ops alert fails", async () => {
     const deps = fakeDeps(async () => {
       throw new Error("slack down");
     });
 
-    createFatalHandler(deps as unknown as FatalDeps)(
+    createFatalHandler(deps as unknown as FatalDeps).onFatal(
       "unhandledRejection",
       "rejected",
     );
@@ -73,7 +97,7 @@ describe("createFatalHandler", () => {
   it("exits after the timeout when the alert hangs", async () => {
     const deps = fakeDeps(() => new Promise<void>(() => undefined));
 
-    createFatalHandler(deps as unknown as FatalDeps)(
+    createFatalHandler(deps as unknown as FatalDeps).onFatal(
       "uncaughtException",
       new Error("boom"),
     );
@@ -86,11 +110,13 @@ describe("createFatalHandler", () => {
 
   it("only logs a second fatal error while exiting", async () => {
     const deps = fakeDeps(() => new Promise<void>(() => undefined));
-    const onFatal = createFatalHandler(deps as unknown as FatalDeps);
+    const fatal = createFatalHandler(deps as unknown as FatalDeps);
+    expect(fatal.isExiting()).toBe(false);
 
-    onFatal("uncaughtException", new Error("first"));
-    onFatal("unhandledRejection", new Error("second"));
+    fatal.onFatal("uncaughtException", new Error("first"));
+    fatal.onFatal("unhandledRejection", new Error("second"));
 
+    expect(fatal.isExiting()).toBe(true);
     expect(deps.alertOps).toHaveBeenCalledTimes(1);
     expect(deps.logFatal).toHaveBeenLastCalledWith(
       { err: expect.objectContaining({ message: "second" }) },
@@ -130,9 +156,20 @@ describe("fatalAlertText", () => {
   });
 });
 
+describe("fatalAlertText code fence", () => {
+  it("keeps a backtick fence in the error from closing the alert's", () => {
+    const error = new Error("bad ```input```");
+
+    const text = fatalAlertText("uncaughtException", error);
+
+    expect(text.match(/```/g)).toHaveLength(2);
+  });
+});
+
 describe("toError", () => {
   it("wraps a non-Error reason", () => {
-    expect(toError("nope")).toEqual(new Error("nope"));
+    expect(toError("nope").message).toBe("'nope'");
+    expect(toError({ a: 1 }).message).toBe("{ a: 1 }");
     const error = new Error("kept");
     expect(toError(error)).toBe(error);
   });
