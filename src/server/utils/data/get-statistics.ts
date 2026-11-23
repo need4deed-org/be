@@ -19,6 +19,7 @@ import { dataSource } from "../../../data/data-source";
 import { LEAD_FROM_METRIC } from "../../../data/entity/statistics-event.entity";
 import { getTranslationFkColumn } from "../../../services/translation/registry";
 import { MATCHED_VOLUNTEER_STATUSES } from "./no-match-found";
+import { atBerlin, SNAPSHOT_KEY_SEPARATOR } from "./record-statistics-events";
 
 const MAX_PERIODS = 1000;
 
@@ -78,6 +79,45 @@ const OPPORTUNITY_KEYS: MetricSource["keys"] = {
   },
 };
 
+const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
+  from: `(
+    SELECT se.value_key AS id, se.occurred_at, se.district_id, se.opportunity_type
+    FROM statistics_event se
+    WHERE se.metric = '${metric}'
+  ) r`,
+  at: "r.occurred_at",
+  keys: {
+    [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+    [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.opportunity_type" },
+    [StatisticsGroupBy.DISTRICT]: { key: "r.district_id::text" },
+  },
+});
+
+const volunteerSnapshots = (metric: StatisticsMetric): MetricSource => ({
+  from: `(
+    SELECT se.value_key AS id, se.occurred_at, se.district_id,
+      NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type
+    FROM statistics_event se
+    WHERE se.metric = '${metric}'
+  ) r`,
+  at: "r.occurred_at",
+  filter: `r.occurred_at = ${atBerlin(`LEAST(
+    date_trunc($1, ${atBerlin("r.occurred_at")}) + $4::interval,
+    date_trunc('month', ${atBerlin("now()")})
+  )`)} - interval '1 millisecond'`,
+  keys: {
+    [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
+    [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.volunteer_type" },
+    [StatisticsGroupBy.DISTRICT]: { key: "r.district_id::text" },
+  },
+});
+
+const REQUESTS_SOURCE: MetricSource = {
+  from: "opportunity r",
+  at: "r.created_at",
+  keys: OPPORTUNITY_KEYS,
+};
+
 const METRICS: Record<StatisticsMetric, MetricSource> = {
   [StatisticsMetric.NEW_VOLUNTEERS]: {
     from: "volunteer r",
@@ -99,11 +139,20 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
       },
     },
   },
-  [StatisticsMetric.REQUESTS]: {
-    from: "opportunity r",
-    at: "r.created_at",
-    keys: OPPORTUNITY_KEYS,
-  },
+  [StatisticsMetric.REQUESTS]: REQUESTS_SOURCE,
+  [StatisticsMetric.NEW_OPPORTUNITIES]: REQUESTS_SOURCE,
+  [StatisticsMetric.PAST_OPPORTUNITIES]: opportunityStatusEvents(
+    StatisticsMetric.PAST_OPPORTUNITIES,
+  ),
+  [StatisticsMetric.VALIDATED_OPPORTUNITIES]: opportunityStatusEvents(
+    StatisticsMetric.VALIDATED_OPPORTUNITIES,
+  ),
+  [StatisticsMetric.ACTIVE_VOLUNTEERS]: volunteerSnapshots(
+    StatisticsMetric.ACTIVE_VOLUNTEERS,
+  ),
+  [StatisticsMetric.AVAILABLE_VOLUNTEERS]: volunteerSnapshots(
+    StatisticsMetric.AVAILABLE_VOLUNTEERS,
+  ),
   [StatisticsMetric.LEAD_FROM]: {
     from: "statistics_event r",
     at: "r.occurred_at",
@@ -153,10 +202,6 @@ const METRICS: Record<StatisticsMetric, MetricSource> = {
     keys: OPPORTUNITY_KEYS,
   },
 };
-
-// timestamptz → Berlin wall time, and Berlin wall time (timestamp) → timestamptz
-const atBerlin = (value: string) =>
-  `(${value}) AT TIME ZONE '${berlinTimeZone}'`;
 
 async function getLeadFromGroups(): Promise<ApiStatisticsGroup[]> {
   const fk = getTranslationFkColumn(EntityTableName.LEAD);

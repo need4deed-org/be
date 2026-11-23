@@ -5,6 +5,7 @@ import {
   OpportunityVolunteerStatusType,
   ProfileVolunteeringType,
   STATISTICS_UNKNOWN_KEY,
+  StatisticsMetric,
   UserRole,
 } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -144,6 +145,19 @@ describe("GET /statistics/:metric", () => {
     await backdate("opportunity_volunteer", match.id, instant);
   }
 
+  async function createEvent(
+    metric: string,
+    valueKey: string,
+    instant: string,
+    fields: Partial<StatisticsEvent> = {},
+  ) {
+    const event = await dataSource
+      .getRepository(StatisticsEvent)
+      .save(new StatisticsEvent({ metric, valueKey, ...fields }));
+    createdIds.events.push(event.id);
+    await backdate("statistics_event", event.id, instant);
+  }
+
   async function get(url: string, cookie = coordinatorCookie) {
     return fastify.inject({
       method: "GET",
@@ -254,6 +268,37 @@ describe("GET /statistics/:metric", () => {
       createdIds.events.push(event.id);
       await backdate("statistics_event", event.id, instant);
     }
+  });
+
+  beforeAll(async () => {
+    const { PAST_OPPORTUNITIES, ACTIVE_VOLUNTEERS } = StatisticsMetric;
+    const { REGULAR, ACCOMPANYING } = ProfileVolunteeringType;
+    await createEvent(PAST_OPPORTUNITIES, "-1", "1987-01-10T12:00:00Z", {
+      opportunityType: OpportunityType.REGULAR,
+      districtId: Number(mitteId),
+    });
+    await createEvent(PAST_OPPORTUNITIES, "-2", "1987-02-10T12:00:00Z", {
+      opportunityType: OpportunityType.EVENTS,
+    });
+    const januaryEnd = "1987-01-31T22:59:59.999Z";
+    await createEvent(ACTIVE_VOLUNTEERS, `${REGULAR}#1`, januaryEnd, {
+      districtId: Number(mitteId),
+    });
+    await createEvent(ACTIVE_VOLUNTEERS, `${REGULAR}#1`, januaryEnd, {
+      districtId: Number(pankowId),
+    });
+    await createEvent(ACTIVE_VOLUNTEERS, `${ACCOMPANYING}#2`, januaryEnd);
+    await createEvent(
+      ACTIVE_VOLUNTEERS,
+      `${REGULAR}#1`,
+      "1987-02-28T22:59:59.999Z",
+      { districtId: Number(mitteId) },
+    );
+    await createEvent(
+      ACTIVE_VOLUNTEERS,
+      `${ACCOMPANYING}#1`,
+      "1987-03-31T21:59:59.999Z",
+    );
   });
 
   afterAll(async () => {
@@ -456,6 +501,87 @@ describe("GET /statistics/:metric", () => {
       },
       total: 2,
     });
+  });
+
+  it("counts new opportunities like requests", async () => {
+    const url =
+      "granularity=year&from=1985-01-01&to=1986-01-01&groupBy=district";
+    const opportunities = await getData(`/statistics/new-opportunities?${url}`);
+    const requests = await getData(`/statistics/requests?${url}`);
+
+    expect(opportunities.periods).toEqual(requests.periods);
+  });
+
+  it("counts past opportunities by type and by district", async () => {
+    const query = "granularity=month&from=1987-01-01&to=1987-03-01";
+    const byType = await getData(
+      `/statistics/past-opportunities?${query}&groupBy=opportunity-type`,
+    );
+    const byDistrict = await getData(
+      `/statistics/past-opportunities?${query}&groupBy=district`,
+    );
+
+    expect(byType.periods.map(({ counts }) => counts)).toEqual([
+      { [OpportunityType.REGULAR]: 1 },
+      { [OpportunityType.EVENTS]: 1 },
+    ]);
+    expect(byDistrict.periods.map(({ counts }) => counts)).toEqual([
+      { [mitteId]: 1 },
+      { [STATISTICS_UNKNOWN_KEY]: 1 },
+    ]);
+    expect(byType.allowedGroupBy).toEqual([
+      "none",
+      "opportunity-type",
+      "district",
+    ]);
+  });
+
+  it("counts a month-end snapshot volunteer once across districts", async () => {
+    const query = "granularity=month&from=1987-01-01&to=1987-03-01";
+    const byDistrict = await getData(
+      `/statistics/active-volunteers?${query}&groupBy=district`,
+    );
+    const byType = await getData(
+      `/statistics/active-volunteers?${query}&groupBy=volunteer-type`,
+    );
+
+    expect(byDistrict.periods[0]).toMatchObject({
+      counts: { [mitteId]: 1, [pankowId]: 1, [STATISTICS_UNKNOWN_KEY]: 1 },
+      total: 2,
+    });
+    expect(
+      byType.periods.map(({ counts, total }) => ({ counts, total })),
+    ).toEqual([
+      {
+        counts: {
+          [ProfileVolunteeringType.REGULAR]: 1,
+          [ProfileVolunteeringType.ACCOMPANYING]: 1,
+        },
+        total: 2,
+      },
+      { counts: { [ProfileVolunteeringType.REGULAR]: 1 }, total: 1 },
+    ]);
+  });
+
+  it("shows a quarter's own month-end snapshot, none when it is missing", async () => {
+    const data = await getData(
+      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-07-01&groupBy=volunteer-type",
+    );
+
+    expect(
+      data.periods.map(({ period, counts, total }) => ({
+        period,
+        counts,
+        total,
+      })),
+    ).toEqual([
+      {
+        period: "1987-Q1",
+        counts: { [ProfileVolunteeringType.ACCOMPANYING]: 1 },
+        total: 1,
+      },
+      { period: "1987-Q2", counts: {}, total: 0 },
+    ]);
   });
 
   it("rejects a groupBy the metric does not support", async () => {

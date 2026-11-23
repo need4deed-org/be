@@ -6,6 +6,10 @@ import { berlinTimeZone } from "../../config";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
 import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
+import {
+  recordStatisticsSnapshots,
+  recordStatisticsStatusEvents,
+} from "../../services/jobs/record-statistics-events";
 import { releaseLapsedOnetimerEngagement } from "../../services/jobs/release-lapsed-onetimer-engagement";
 import { scanAccompanyNotFound } from "../../services/jobs/scan-accompany-not-found";
 import { scanExpiredOnetimers } from "../../services/jobs/scan-expired-onetimers";
@@ -32,6 +36,14 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
           () =>
             runNamedCronJobs(
               [
+                {
+                  name: "recordStatisticsSnapshots",
+                  run: () => recordStatisticsSnapshots(fastify),
+                },
+                {
+                  name: "recordStatisticsStatusEvents",
+                  run: () => recordStatisticsStatusEvents(fastify),
+                },
                 {
                   name: "activateDueOnetimers",
                   run: () => activateDueOnetimers(fastify),
@@ -93,12 +105,19 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
         }
         await runWithAdvisoryLock(
           () =>
-            runNamedCronJobs([
-              {
-                name: "scanAccompanyNotFound",
-                run: () => scanAccompanyNotFound(fastify),
-              },
-            ]),
+            runNamedCronJobs(
+              [
+                {
+                  name: "recordStatisticsStatusEvents",
+                  run: () => recordStatisticsStatusEvents(fastify),
+                },
+                {
+                  name: "scanAccompanyNotFound",
+                  run: () => scanAccompanyNotFound(fastify),
+                },
+              ],
+              { sequential: true },
+            ),
           ACCOMPANY_NOT_FOUND_LOCK_ID,
         );
       } catch (err) {
