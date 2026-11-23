@@ -133,7 +133,11 @@ describe("recordOpportunityStatusEvents", () => {
 });
 
 describe("recordVolunteerSnapshots", () => {
-  const monthStart = new Date("1988-02-29T23:00:00Z");
+  const year = 1950 + Math.floor(Math.random() * 30);
+  const monthStart = new Date(`${year}-03-01T00:00:00+01:00`);
+  const previousMonthStart = new Date(`${year}-02-01T00:00:00+01:00`);
+  const berlinMorning = (day: number) =>
+    new Date(`${year}-03-0${day}T06:00:00+01:00`);
   const createdIds = {
     districts: [] as number[],
     deals: [] as number[],
@@ -150,8 +154,8 @@ describe("recordVolunteerSnapshots", () => {
     dataSource.query(
       `SELECT value_key AS "valueKey", district_id AS "districtId", occurred_at AS "occurredAt"
        FROM statistics_event
-       WHERE metric = $1 AND occurred_at >= '1988-01-31T23:00:00Z' AND occurred_at < $2`,
-      [metric, monthStart],
+       WHERE metric = $1 AND occurred_at >= $2 AND occurred_at < $3`,
+      [metric, previousMonthStart, monthStart],
     );
 
   const mine = async (metric: StatisticsMetric) =>
@@ -216,8 +220,12 @@ describe("recordVolunteerSnapshots", () => {
   afterAll(async () => {
     await dataSource.query(
       `DELETE FROM statistics_event
-       WHERE metric = ANY($1) AND occurred_at >= '1988-01-31T23:00:00Z' AND occurred_at < $2`,
-      [[ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS], monthStart],
+       WHERE metric = ANY($1) AND occurred_at >= $2 AND occurred_at < $3`,
+      [
+        [ACTIVE_VOLUNTEERS, AVAILABLE_VOLUNTEERS],
+        previousMonthStart,
+        monthStart,
+      ],
     );
     const remove = (table: string, ids: number[]) =>
       dataSource.query(`DELETE FROM "${table}" WHERE id = ANY($1)`, [ids]);
@@ -230,7 +238,7 @@ describe("recordVolunteerSnapshots", () => {
   it("skips the snapshot after the catch-up days", async () => {
     await recordVolunteerSnapshots(
       dataSource.manager,
-      new Date("1988-03-04T05:00:00Z"),
+      berlinMorning(4),
       createdIds.volunteers,
     );
 
@@ -240,12 +248,12 @@ describe("recordVolunteerSnapshots", () => {
   it("writes the previous month-end snapshot once, one row per district, without repeat registrations", async () => {
     await recordVolunteerSnapshots(
       dataSource.manager,
-      new Date("1988-03-01T05:00:00Z"),
+      berlinMorning(1),
       createdIds.volunteers,
     );
     await recordVolunteerSnapshots(
       dataSource.manager,
-      new Date("1988-03-02T05:00:00Z"),
+      berlinMorning(2),
       createdIds.volunteers,
     );
 

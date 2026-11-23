@@ -80,9 +80,12 @@ const OPPORTUNITY_KEYS: MetricSource["keys"] = {
 };
 
 const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
-  from: "statistics_event r",
+  from: `(
+    SELECT se.value_key AS id, se.occurred_at, se.district_id, se.opportunity_type
+    FROM statistics_event se
+    WHERE se.metric = '${metric}'
+  ) r`,
   at: "r.occurred_at",
-  filter: `r.metric = '${metric}'`,
   keys: {
     [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
     [StatisticsGroupBy.OPPORTUNITY_TYPE]: { key: "r.opportunity_type" },
