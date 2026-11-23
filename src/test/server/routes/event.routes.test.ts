@@ -33,6 +33,7 @@ describe("GET /event", () => {
   let inactiveEvent: EventN4D;
   let untranslatedEvent: EventN4D;
   let ongoingEvent: EventN4D;
+  let unlistedEvent: EventN4D;
   let suffix: string;
   let coordinatorPerson: Person;
   let coordinatorCookie: string;
@@ -103,6 +104,27 @@ describe("GET /event", () => {
         menuTitle: "Altes Event",
         description: "Vorbei.",
         shortDescription: "Vorbei.",
+      }),
+    );
+
+    unlistedEvent = await fastify.db.eventRepository.save(
+      new EventN4D({
+        isActive: true,
+        isListed: false,
+        date: new Date("2026-09-15T13:00:00Z"),
+        type: EventN4DType.WORKSHOP,
+        address: "Elsenstraße 87, Berlin",
+        languageId: de.id,
+      }),
+    );
+    await eventTranslationRepository.save(
+      new EventTranslation({
+        eventn4dId: unlistedEvent.id,
+        languageId: de.id,
+        title: `Internes Event ${suffix}`,
+        menuTitle: "Internes Event",
+        description: "Nur mit Link.",
+        shortDescription: "Nur mit Link.",
       }),
     );
 
@@ -201,10 +223,12 @@ describe("GET /event", () => {
     await eventTranslationRepository.delete({ eventn4dId: activeEvent.id });
     await eventTranslationRepository.delete({ eventn4dId: inactiveEvent.id });
     await eventTranslationRepository.delete({ eventn4dId: ongoingEvent.id });
+    await eventTranslationRepository.delete({ eventn4dId: unlistedEvent.id });
     await fastify.db.eventRepository.delete({ id: activeEvent.id });
     await fastify.db.eventRepository.delete({ id: inactiveEvent.id });
     await fastify.db.eventRepository.delete({ id: untranslatedEvent.id });
     await fastify.db.eventRepository.delete({ id: ongoingEvent.id });
+    await fastify.db.eventRepository.delete({ id: unlistedEvent.id });
     await fastify.db.userRepository.delete({ personId: coordinatorPerson.id });
     await fastify.db.personRepository.delete({ id: coordinatorPerson.id });
     await fastify.db.userRepository.delete({ personId: volunteerPerson.id });
@@ -227,6 +251,41 @@ describe("GET /event", () => {
     expect(ids).toContain(activeEvent.id);
     expect(ids).not.toContain(inactiveEvent.id);
     expect(ids).not.toContain(untranslatedEvent.id);
+  });
+
+  it("leaves an unlisted event off the list for an anonymous caller and a volunteer", async () => {
+    const anonymous = await fastify.inject({ method: "GET", url: "/event" });
+    const volunteer = await fastify.inject({
+      method: "GET",
+      url: "/event",
+      cookies: { [accessCookieName]: volunteerCookie },
+    });
+    for (const res of [anonymous, volunteer]) {
+      const ids = res.json().data.map((e: { id: number }) => e.id);
+      expect(ids).toContain(activeEvent.id);
+      expect(ids).not.toContain(unlistedEvent.id);
+    }
+  });
+
+  it("lists an unlisted event for a coordinator, marked as unlisted", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/event",
+      cookies: { [accessCookieName]: coordinatorCookie },
+    });
+    const byId = (id: number) =>
+      res.json().data.find((e: { id: number }) => e.id === id);
+    expect(byId(unlistedEvent.id).listed).toBe(false);
+    expect(byId(activeEvent.id).listed).toBe(true);
+  });
+
+  it("still serves an unlisted event's own page to anyone with the link", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: `/event/${unlistedEvent.id}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.listed).toBe(false);
   });
 
   it("lists each event's host name, null when it has none", async () => {

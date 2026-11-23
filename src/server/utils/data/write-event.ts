@@ -62,6 +62,7 @@ export async function createEvent(input: ApiEventN4DCreate): Promise<EventN4D> {
     const event = await eventRepository.save(
       new EventN4D({
         isActive: input.active ?? false,
+        isListed: input.listed ?? true,
         date: new Date(input.date),
         dateEnd: input.dateEnd ? new Date(input.dateEnd) : undefined,
         type: input.type,
@@ -121,6 +122,7 @@ export async function updateEvent(
 
     Object.assign(event, {
       isActive: input.active,
+      isListed: input.listed,
       date: input.date ? new Date(input.date) : undefined,
       dateEnd: input.dateEnd !== undefined ? effectiveDateEnd : undefined,
       type: input.type,

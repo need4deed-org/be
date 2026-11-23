@@ -36,6 +36,7 @@ export function dtoEventN4DGetList(
   return {
     id: event.id,
     active: event.isActive,
+    listed: event.isListed,
     title: translation?.title ?? "",
     subTitle: translation?.subtitle,
     menuTitle: translation?.menuTitle ?? "",

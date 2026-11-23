@@ -25,6 +25,9 @@ export default class EventN4D {
   @Column({ type: "boolean", default: false })
   isActive: boolean;
 
+  @Column({ type: "boolean", default: true })
+  isListed: boolean;
+
   @Column({ type: "timestamptz" })
   date: Date;
 

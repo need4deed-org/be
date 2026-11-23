@@ -7,6 +7,7 @@ export const eventItemSchema = {
   properties: {
     id: { type: "integer", minimum: 1 },
     active: { type: "boolean" },
+    listed: { type: "boolean" },
     title: { type: "string" },
     subTitle: { type: ["string", "null"] },
     menuTitle: { type: "string" },
@@ -30,6 +31,7 @@ export const eventItemSchema = {
   required: [
     "id",
     "active",
+    "listed",
     "title",
     "menuTitle",
     "date",
@@ -123,6 +125,7 @@ export const eventCreateBodySchema = {
     address: { type: "string", minLength: 1 },
     hostName: { type: ["string", "null"] },
     active: { type: "boolean" },
+    listed: { type: "boolean" },
     translations: {
       type: "array",
       items: eventTranslationInputSchema,
@@ -163,6 +166,7 @@ export const eventPatchBodySchema = {
     address: { type: "string", minLength: 1 },
     hostName: { type: ["string", "null"] },
     active: { type: "boolean" },
+    listed: { type: "boolean" },
     translations: {
       type: "array",
       items: eventTranslationInputSchema,
