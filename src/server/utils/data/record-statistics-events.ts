@@ -83,7 +83,7 @@ export async function recordVolunteerSnapshots(
 ): Promise<Record<string, number>> {
   const recorded: Record<string, number> = {};
   for (const { metric, status } of VOLUNTEER_SNAPSHOT_METRICS) {
-    const rows: unknown[] = await manager.query(
+    const rows: { valueKey: string }[] = await manager.query(
       `WITH bounds AS (
          SELECT date_trunc('month', ${atBerlin("$2::timestamptz")}) AS month_start,
            extract(day FROM ${atBerlin("$2::timestamptz")}) AS day
@@ -108,10 +108,10 @@ export async function recordVolunteerSnapshots(
              AND se.occurred_at >= ${atBerlin("b.month_start - interval '1 month'")}
              AND se.occurred_at < ${atBerlin("b.month_start")}
          )
-       RETURNING id`,
+       RETURNING value_key AS "valueKey"`,
       [metric, at, status, volunteerIds ?? null],
     );
-    recorded[metric] = rows.length;
+    recorded[metric] = new Set(rows.map(({ valueKey }) => valueKey)).size;
   }
   return recorded;
 }

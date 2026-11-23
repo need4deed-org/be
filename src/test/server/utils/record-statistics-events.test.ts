@@ -84,9 +84,10 @@ describe("recordOpportunityStatusEvents", () => {
   });
 
   afterAll(async () => {
-    await dataSource
-      .getRepository(StatisticsEvent)
-      .delete({ valueKey: In(ids.map(String)) });
+    await dataSource.getRepository(StatisticsEvent).delete({
+      metric: In([PAST_OPPORTUNITIES, VALIDATED_OPPORTUNITIES]),
+      valueKey: In(ids.map(String)),
+    });
     await dataSource.getRepository(Opportunity).delete({ id: In(ids) });
     await dataSource.getRepository(Agent).delete({ id: agent.id });
     await dataSource.getRepository(District).delete({ id: district.id });

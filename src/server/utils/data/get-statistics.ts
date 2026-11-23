@@ -90,18 +90,19 @@ const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
   },
 });
 
+// A period shows its last month-end, or the latest completed one while it runs.
 const volunteerSnapshots = (metric: StatisticsMetric): MetricSource => ({
   from: `(
     SELECT se.value_key AS id, se.occurred_at, se.district_id,
-      NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type,
-      max(se.occurred_at) OVER (
-        PARTITION BY date_trunc($1, ${atBerlin("se.occurred_at")})
-      ) AS latest_at
+      NULLIF(split_part(se.value_key, '${SNAPSHOT_KEY_SEPARATOR}', 1), '') AS volunteer_type
     FROM statistics_event se
     WHERE se.metric = '${metric}'
   ) r`,
   at: "r.occurred_at",
-  filter: "r.occurred_at = r.latest_at",
+  filter: `r.occurred_at = ${atBerlin(`LEAST(
+    date_trunc($1, ${atBerlin("r.occurred_at")}) + $4::interval,
+    date_trunc('month', ${atBerlin("now()")})
+  )`)} - interval '1 millisecond'`,
   keys: {
     [StatisticsGroupBy.NONE]: TOTAL_KEY_SQL,
     [StatisticsGroupBy.VOLUNTEER_TYPE]: { key: "r.volunteer_type" },

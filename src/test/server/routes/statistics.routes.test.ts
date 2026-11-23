@@ -295,6 +295,11 @@ describe("GET /statistics/:metric", () => {
       "1987-02-28T22:59:59.999Z",
       { districtId: Number(mitteId) },
     );
+    await createEvent(
+      ACTIVE_VOLUNTEERS,
+      `${ACCOMPANYING}#1`,
+      "1987-03-31T21:59:59.999Z",
+    );
   });
 
   afterAll(async () => {
@@ -559,12 +564,25 @@ describe("GET /statistics/:metric", () => {
     ]);
   });
 
-  it("shows a quarter's latest month-end snapshot", async () => {
+  it("shows a quarter's own month-end snapshot, none when it is missing", async () => {
     const data = await getData(
-      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-04-01",
+      "/statistics/active-volunteers?granularity=quarter&from=1987-01-01&to=1987-07-01&groupBy=volunteer-type",
     );
 
-    expect(data.periods[0]).toMatchObject({ period: "1987-Q1", total: 1 });
+    expect(
+      data.periods.map(({ period, counts, total }) => ({
+        period,
+        counts,
+        total,
+      })),
+    ).toEqual([
+      {
+        period: "1987-Q1",
+        counts: { [ProfileVolunteeringType.ACCOMPANYING]: 1 },
+        total: 1,
+      },
+      { period: "1987-Q2", counts: {}, total: 0 },
+    ]);
   });
 
   it("rejects a groupBy the metric does not support", async () => {
