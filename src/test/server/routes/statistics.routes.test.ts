@@ -270,7 +270,6 @@ describe("GET /statistics/:metric", () => {
     }
   });
 
-  // Status events and month-end snapshots live in 1987.
   beforeAll(async () => {
     const { PAST_OPPORTUNITIES, ACTIVE_VOLUNTEERS } = StatisticsMetric;
     const { REGULAR, ACCOMPANYING } = ProfileVolunteeringType;

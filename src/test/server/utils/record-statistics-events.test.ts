@@ -163,6 +163,7 @@ describe("recordVolunteerSnapshots", () => {
     statusEngagement: VolunteerStateEngagementType,
     statusType: ProfileVolunteeringType,
     districts: District[],
+    email?: string,
   ) {
     const deal = await dataSource
       .getRepository(Deal)
@@ -175,7 +176,7 @@ describe("recordVolunteerSnapshots", () => {
     }
     const person = await dataSource
       .getRepository(Person)
-      .save(new Person({ firstName: "Stats", lastName: "Snapshot" }));
+      .save(new Person({ firstName: "Stats", lastName: "Snapshot", email }));
     createdIds.persons.push(person.id);
     const volunteer = await dataSource.getRepository(Volunteer).save(
       new Volunteer({
@@ -204,10 +205,12 @@ describe("recordVolunteerSnapshots", () => {
 
     const { ACTIVE, AVAILABLE, INACTIVE } = VolunteerStateEngagementType;
     const { REGULAR, ACCOMPANYING } = ProfileVolunteeringType;
-    await createVolunteer(ACTIVE, REGULAR, [first, second]);
+    const email = `snapshot-${randomNumericSuffix()}@test.need4deed.org`;
+    await createVolunteer(ACTIVE, REGULAR, [first, second], email);
     await createVolunteer(ACTIVE, ACCOMPANYING, [first]);
     await createVolunteer(AVAILABLE, REGULAR, [second]);
     await createVolunteer(INACTIVE, REGULAR, [first, second]);
+    await createVolunteer(ACTIVE, ACCOMPANYING, [second], email.toUpperCase());
   });
 
   afterAll(async () => {
@@ -234,7 +237,7 @@ describe("recordVolunteerSnapshots", () => {
     expect(await mine(ACTIVE_VOLUNTEERS)).toEqual([]);
   });
 
-  it("writes the previous month-end snapshot once, one row per district", async () => {
+  it("writes the previous month-end snapshot once, one row per district, without repeat registrations", async () => {
     await recordVolunteerSnapshots(
       dataSource.manager,
       new Date("1988-03-01T05:00:00Z"),

@@ -88,12 +88,21 @@ export async function recordVolunteerSnapshots(
          SELECT date_trunc('month', ${atBerlin("$2::timestamptz")}) AS month_start,
            extract(day FROM ${atBerlin("$2::timestamptz")}) AS day
        ),
-       snapshot AS (
-         SELECT v.deal_id, COALESCE(v.status_type::text, '') || '${SNAPSHOT_KEY_SEPARATOR}'
-           || row_number() OVER (ORDER BY random()) AS value_key
+       in_status AS (
+         SELECT v.deal_id, v.status_type, row_number() OVER (
+           PARTITION BY COALESCE(lower(NULLIF(p.email, '')), v.id::text)
+           ORDER BY v.created_at, v.id
+         ) AS registration
          FROM volunteer v
+         LEFT JOIN person p ON p.id = v.person_id
          WHERE v.status_engagement::text = $3
            AND ($4::int[] IS NULL OR v.id = ANY($4))
+       ),
+       snapshot AS (
+         SELECT deal_id, COALESCE(status_type::text, '') || '${SNAPSHOT_KEY_SEPARATOR}'
+           || row_number() OVER (ORDER BY random()) AS value_key
+         FROM in_status
+         WHERE registration = 1
        )
        INSERT INTO statistics_event (metric, occurred_at, value_key, district_id)
        SELECT $1::varchar, ${atBerlin("b.month_start")} - interval '1 millisecond',

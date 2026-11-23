@@ -90,7 +90,6 @@ const opportunityStatusEvents = (metric: StatisticsMetric): MetricSource => ({
   },
 });
 
-// A period shows its last month-end, or the latest completed one while it runs.
 const volunteerSnapshots = (metric: StatisticsMetric): MetricSource => ({
   from: `(
     SELECT se.value_key AS id, se.occurred_at, se.district_id,

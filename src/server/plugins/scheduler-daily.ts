@@ -41,6 +41,10 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                   run: () => recordStatisticsSnapshots(fastify),
                 },
                 {
+                  name: "recordStatisticsStatusEvents",
+                  run: () => recordStatisticsStatusEvents(fastify),
+                },
+                {
                   name: "activateDueOnetimers",
                   run: () => activateDueOnetimers(fastify),
                 },
@@ -63,10 +67,6 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                 {
                   name: "scanRegularUpdate",
                   run: () => scanRegularUpdate(fastify),
-                },
-                {
-                  name: "recordStatisticsStatusEvents",
-                  run: () => recordStatisticsStatusEvents(fastify),
                 },
                 {
                   name: "pruneRefreshSessions",
@@ -105,12 +105,19 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
         }
         await runWithAdvisoryLock(
           () =>
-            runNamedCronJobs([
-              {
-                name: "scanAccompanyNotFound",
-                run: () => scanAccompanyNotFound(fastify),
-              },
-            ]),
+            runNamedCronJobs(
+              [
+                {
+                  name: "recordStatisticsStatusEvents",
+                  run: () => recordStatisticsStatusEvents(fastify),
+                },
+                {
+                  name: "scanAccompanyNotFound",
+                  run: () => scanAccompanyNotFound(fastify),
+                },
+              ],
+              { sequential: true },
+            ),
           ACCOMPANY_NOT_FOUND_LOCK_ID,
         );
       } catch (err) {
