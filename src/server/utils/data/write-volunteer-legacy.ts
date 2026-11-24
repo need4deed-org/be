@@ -1,3 +1,5 @@
+import { EntityManager } from "typeorm";
+import { DatabaseError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -11,14 +13,43 @@ import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-lo
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { patchOrReplaceAddress } from "./for-routes";
 
-export interface AddressReusePlan {
-  addressId: number;
-  postcodeId: number;
+async function applyExistingPersonAddress(
+  personId: number,
+  postcodeId: number,
+  manager: EntityManager,
+): Promise<Address> {
+  const personRepository = manager.getRepository(Person);
+  const addressRepository = manager.getRepository(Address);
+
+  const { addressId } = await personRepository.findOneOrFail({
+    select: { id: true, addressId: true },
+    where: { id: personId },
+    lock: { mode: "pessimistic_write" },
+  });
+
+  if (!addressId) {
+    const address = await addressRepository.save(new Address({ postcodeId }));
+    await personRepository.update({ id: personId }, { addressId: address.id });
+    return address;
+  }
+
+  const resultingId = await patchOrReplaceAddress(
+    personId,
+    { id: addressId },
+    { id: postcodeId },
+    manager,
+  );
+  if (!resultingId) {
+    throw new DatabaseError(
+      `Failed to apply postcode to Address ${addressId} of Person ${personId}.`,
+    );
+  }
+  return addressRepository.findOneByOrFail({ id: resultingId });
 }
 
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
-  addressReuse?: AddressReusePlan,
+  existingPersonPostcodeId?: number,
   auditEntry?: Pick<VolunteerAuditLog, "type" | "detail" | "actorUserId">,
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
@@ -39,30 +70,16 @@ export async function writeVolunteerLegacy(
       transactionalEntityManager.getRepository(Volunteer);
 
     const { person } = volunteer;
-    if (addressReuse) {
-      const patchedId = await patchOrReplaceAddress(
+    if (existingPersonPostcodeId === undefined) {
+      await addressRepository.save(person.address);
+      await personRepository.save(person);
+    } else {
+      person.address = await applyExistingPersonAddress(
         person.id,
-        { id: addressReuse.addressId },
-        { id: addressReuse.postcodeId },
+        existingPersonPostcodeId,
         transactionalEntityManager,
       );
-      person.address = patchedId
-        ? await addressRepository.findOneByOrFail({ id: patchedId })
-        : await addressRepository.save(
-            new Address({ postcodeId: addressReuse.postcodeId }),
-          );
-    } else {
-      await addressRepository.save(person.address);
-    }
-    person.addressId = person.address.id;
-
-    if (person.id) {
-      await personRepository.update(
-        { id: person.id },
-        { addressId: person.addressId },
-      );
-    } else {
-      await personRepository.save(person);
+      person.addressId = person.address.id;
     }
 
     await dealRepository.save(volunteer.deal);

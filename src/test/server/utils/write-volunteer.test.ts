@@ -11,11 +11,6 @@ import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { writeVolunteerLegacy } from "../../../server/utils/data";
 
 const txnManager: any = { getRepository: vi.fn() };
-const patchOrReplaceAddress = vi.fn();
-
-vi.mock("../../../server/utils/data/for-routes", () => ({
-  patchOrReplaceAddress: (...args: unknown[]) => patchOrReplaceAddress(...args),
-}));
 
 vi.mock("../../../data/data-source", () => ({
   dataSource: {
@@ -28,8 +23,6 @@ vi.mock("../../../data/data-source", () => ({
 describe("writeVolunteer", () => {
   const addrSave = vi.fn();
   const personSave = vi.fn();
-  const personUpdate = vi.fn();
-  const addrFindOneByOrFail = vi.fn();
   const dealActivitySave = vi.fn();
   const dealSkillSave = vi.fn();
   const dealLanguageSave = vi.fn();
@@ -44,9 +37,9 @@ describe("writeVolunteer", () => {
     txnManager.getRepository.mockImplementation((entity: any) => {
       switch (entity) {
         case Address:
-          return { save: addrSave, findOneByOrFail: addrFindOneByOrFail };
+          return { save: addrSave };
         case Person:
-          return { save: personSave, update: personUpdate };
+          return { save: personSave };
         case DealActivity:
           return { save: dealActivitySave };
         case DealSkill:
@@ -153,61 +146,5 @@ describe("writeVolunteer", () => {
     // deal id should have been set before trying to save the activity m2m
     expect(volunteer.deal.id).toBe(66);
     expect(volunteer.deal.dealActivity[0].dealId).toBe(66);
-  });
-
-  const emptyDeal = () => ({
-    id: undefined,
-    dealActivity: [],
-    dealSkill: [],
-    dealLanguage: [],
-    dealTimeslot: [],
-    dealDistrict: [],
-  });
-
-  it("writes only addressId for an existing Person instead of saving the whole entity", async () => {
-    const volunteer: any = {
-      person: { id: 5, name: "stale", address: { street: "s" } },
-      deal: emptyDeal(),
-    };
-
-    await writeVolunteerLegacy(volunteer as Volunteer);
-
-    expect(personSave).not.toHaveBeenCalled();
-    expect(personUpdate).toHaveBeenCalledWith({ id: 5 }, { addressId: 11 });
-    expect(volunteer.person.addressId).toBe(11);
-  });
-
-  it("points the Person at the reused Address and sets the relation", async () => {
-    const reused = { id: 33, postcodeId: 9 };
-    patchOrReplaceAddress.mockResolvedValue(33);
-    addrFindOneByOrFail.mockResolvedValue(reused);
-    const volunteer: any = { person: { id: 5 }, deal: emptyDeal() };
-
-    await writeVolunteerLegacy(volunteer as Volunteer, {
-      addressId: 33,
-      postcodeId: 9,
-    });
-
-    expect(addrSave).not.toHaveBeenCalled();
-    expect(volunteer.person.address).toBe(reused);
-    expect(volunteer.person.addressId).toBe(33);
-    expect(personUpdate).toHaveBeenCalledWith({ id: 5 }, { addressId: 33 });
-    expect(personSave).not.toHaveBeenCalled();
-  });
-
-  it("falls back to a fresh Address when the reuse fails", async () => {
-    patchOrReplaceAddress.mockResolvedValue(false);
-    const volunteer: any = { person: { id: 5 }, deal: emptyDeal() };
-
-    await writeVolunteerLegacy(volunteer as Volunteer, {
-      addressId: 33,
-      postcodeId: 9,
-    });
-
-    expect(addrSave).toHaveBeenCalledWith(
-      expect.objectContaining({ postcodeId: 9 }),
-    );
-    expect(volunteer.person.addressId).toBe(11);
-    expect(personUpdate).toHaveBeenCalledWith({ id: 5 }, { addressId: 11 });
   });
 });
