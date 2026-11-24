@@ -73,6 +73,15 @@ describe("GET /option", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("treats an empty language as the German default", async () => {
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/option?language=",
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it("returns only the requested list", async () => {
     const response = await fastify.inject({
       method: "GET",
