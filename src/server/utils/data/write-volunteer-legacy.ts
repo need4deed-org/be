@@ -1,4 +1,3 @@
-import { EntityManager } from "typeorm";
 import { DatabaseError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
@@ -11,41 +10,7 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { patchOrReplaceAddress } from "./for-routes";
-
-async function applyExistingPersonAddress(
-  personId: number,
-  postcodeId: number,
-  manager: EntityManager,
-): Promise<Address> {
-  const personRepository = manager.getRepository(Person);
-  const addressRepository = manager.getRepository(Address);
-
-  const { addressId } = await personRepository.findOneOrFail({
-    select: { id: true, addressId: true },
-    where: { id: personId },
-    lock: { mode: "pessimistic_write" },
-  });
-
-  if (!addressId) {
-    const address = await addressRepository.save(new Address({ postcodeId }));
-    await personRepository.update({ id: personId }, { addressId: address.id });
-    return address;
-  }
-
-  const resultingId = await patchOrReplaceAddress(
-    personId,
-    { id: addressId },
-    { id: postcodeId },
-    manager,
-  );
-  if (!resultingId) {
-    throw new DatabaseError(
-      `Failed to apply postcode to Address ${addressId} of Person ${personId}.`,
-    );
-  }
-  return addressRepository.findOneByOrFail({ id: resultingId });
-}
+import { updatePersonAddress } from "./update-person-address";
 
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
@@ -74,12 +39,18 @@ export async function writeVolunteerLegacy(
       await addressRepository.save(person.address);
       await personRepository.save(person);
     } else {
-      person.address = await applyExistingPersonAddress(
+      const addressId = await updatePersonAddress(
         person.id,
-        existingPersonPostcodeId,
+        { postcode: { id: existingPersonPostcodeId } },
         transactionalEntityManager,
       );
-      person.addressId = person.address.id;
+      if (!addressId) {
+        throw new DatabaseError(`Address not saved for Person ${person.id}.`);
+      }
+      person.address = await addressRepository.findOneByOrFail({
+        id: addressId,
+      });
+      person.addressId = addressId;
     }
 
     await dealRepository.save(volunteer.deal);

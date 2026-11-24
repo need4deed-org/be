@@ -486,6 +486,11 @@ export async function patchOrReplaceAddress(
     manager instanceof EntityManager &&
     manager.queryRunner?.isTransactionActive
   ) {
+    await manager.getRepository(Person).findOne({
+      select: { id: true },
+      where: { id: personId },
+      lock: { mode: "pessimistic_write" },
+    });
     await manager.getRepository(Address).findOne({
       where: { id: addressData.id },
       lock: { mode: "pessimistic_write" },

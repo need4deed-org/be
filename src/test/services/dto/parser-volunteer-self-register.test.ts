@@ -32,6 +32,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   const createdPostcodeIds: number[] = [];
   const createdDealIds: number[] = [];
   const createdVolunteerIds: number[] = [];
+  const createdPersonIds: number[] = [];
 
   const findPostcode10115 = () =>
     getRepository(dataSource, Postcode).findOneByOrFail({ value: "10115" });
@@ -49,10 +50,11 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     for (const id of createdDealIds) {
       await getRepository(dataSource, Deal).delete({ id });
     }
-    // Address.person has onDelete: CASCADE, so deleting the Address cascades
-    // away the Person row too — delete Address first, skip Person directly.
     for (const id of createdAddressIds) {
       await getRepository(dataSource, Address).delete({ id });
+    }
+    for (const id of createdPersonIds) {
+      await getRepository(dataSource, Person).delete({ id });
     }
     for (const id of createdPostcodeIds) {
       await getRepository(dataSource, Postcode).delete({ id });
@@ -81,10 +83,8 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
       person,
       body,
     );
+    expect(addressPostcodeId).toBe((await findPostcode10115()).id);
 
-    // Simulate a concurrent request legitimately editing this same Person's
-    // address street in the window between the read above and the write
-    // below (several awaited round-trips apart in the real request flow).
     await getRepository(dataSource, Address).update(
       { id: address.id },
       { street: "Concurrently Edited Street" },
@@ -134,8 +134,6 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
 
     expect(addressPostcodeId).toBe(postcode10115.id);
 
-    // Concurrent edit in the same window as above — this only touches
-    // street, which this flow never intends to change, so it must survive.
     await getRepository(dataSource, Address).update(
       { id: address.id },
       { street: "Concurrently Edited Street 2" },
@@ -177,11 +175,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
       person,
       body,
     );
-    // Simulate a concurrent flow (e.g. get-or-create-submitter-person)
-    // attaching a second Person to this same Address in the window between
-    // resolveAddress's decision and writeVolunteerLegacy's write — the
-    // Address is no longer exclusively this Person's by the time the write
-    // actually happens.
+    expect(addressPostcodeId).toBe((await findPostcode10115()).id);
     const otherPerson = await getRepository(dataSource, Person).save(
       new Person({
         firstName: "OtherOwner",
@@ -197,9 +191,6 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     createdVolunteerIds.push(volunteerId);
     createdDealIds.push(volunteer.dealId);
 
-    // The now-shared original row must be untouched — otherPerson's address
-    // (same row) must still show the original postcode/street, not this
-    // registration's postcode.
     const untouchedShared = await getRepository(
       dataSource,
       Address,
@@ -213,8 +204,6 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     ).findOneByOrFail({ id: otherPerson.id });
     expect(refreshedOther.addressId).toBe(address.id);
 
-    // This registration's Person must have been repointed to a brand-new,
-    // exclusively-owned Address carrying the postcode it asked for.
     const refreshedSelf = await getRepository(
       dataSource,
       Person,
@@ -227,8 +216,6 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     expect(newAddress.postcode.value).toBe("10115");
 
     createdAddressIds.push(newAddress.id);
-    // otherPerson deleted via cascade once address is deleted in afterAll;
-    // no separate person cleanup needed (matches the existing convention).
   });
 
   it("keeps a concurrent edit to the Person's own columns", async () => {
@@ -337,6 +324,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     const person = await getRepository(dataSource, Person).save(
       new Person({ firstName: "NoAddress", lastName: `Test-${suffix}` }),
     );
+    createdPersonIds.push(person.id);
 
     const { volunteer, addressPostcodeId } = await parserVolunteerSelfRegister(
       person,
@@ -349,6 +337,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
     );
     createdVolunteerIds.push(volunteerId);
     createdDealIds.push(volunteer.dealId);
+    createdAddressIds.push(volunteer.person.address.id);
 
     const refreshed = await getRepository(dataSource, Person).findOneByOrFail({
       id: person.id,
@@ -359,6 +348,5 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
       relations: ["postcode"],
     });
     expect(address.postcode.value).toBe("10115");
-    createdAddressIds.push(address.id);
   });
 });
