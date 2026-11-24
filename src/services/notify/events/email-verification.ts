@@ -1,18 +1,14 @@
 import type { JWT } from "@fastify/jwt";
-import { UserRole } from "need4deed-sdk";
+import { EmailTemplateName, UserRole } from "need4deed-sdk";
 import {
-  emailVerificationManifestUrl,
   urlEmailVerification,
   VERIFY_LIFESPAN_MS,
 } from "../../../config/constants";
 import type User from "../../../data/entity/user.entity";
 import logger from "../../../logger";
 import { VERIFICATION_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailMessage, EmailTransport } from "../types";
 
 export interface EmailVerificationDeps {
@@ -20,7 +16,7 @@ export interface EmailVerificationDeps {
   jwt: JWT;
 }
 
-const loader = createManifestLoader(emailVerificationManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.VERIFICATION];
 
 export function resetVerificationTemplateCache(): void {
   loader.resetCache();
@@ -55,7 +51,7 @@ export async function sendEmailVerification(
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, html, text } = fillTemplate(content, {
     verificationUrl: url,
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.VERIFICATION>);
 
   const message: EmailMessage = {
     to: user.email,

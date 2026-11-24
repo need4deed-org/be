@@ -1,8 +1,7 @@
-import { Lang } from "need4deed-sdk";
+import { EmailTemplateName, Lang } from "need4deed-sdk";
 import {
   cgcApplicationFormFileName,
   cgcApplicationFormUrl,
-  emailCgcApplicationManifestUrl,
   emailFromCommunity,
   emailFromNotify,
   urlApp,
@@ -10,15 +9,15 @@ import {
 import { CGC_APPLICATION_BUILTIN as BUILTIN } from "../builtin-content";
 import {
   createFileLoader,
-  createManifestLoader,
   LocalizedValue,
   renderEmail,
   resolveLocale,
 } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { EmailSendError, SuspendedEmailError } from "../transports/validating";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailCgcApplicationManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.CGC_APPLICATION];
 const formLoader = createFileLoader(cgcApplicationFormUrl, (file) =>
   file.subarray(0, 5).equals(Buffer.from("%PDF-")),
 );
@@ -79,7 +78,7 @@ export async function sendEmailCgcApplication(
       communityEmail: emailFromCommunity,
       dataPrivacyUrl: pageUrls("data-privacy"),
       agreementUrl: pageUrls("agreement"),
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.CGC_APPLICATION>,
     locale,
     { escapeHtmlValues: true, fallbackLocale: Lang.EN },
   );

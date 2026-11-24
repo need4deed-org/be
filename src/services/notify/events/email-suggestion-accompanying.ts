@@ -1,17 +1,18 @@
+import { EmailTemplateName } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromNotify,
-  emailSuggestionAccompanyingManifestUrl,
 } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { SUGGESTION_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmailWithNote } from "../email-template";
+import { renderEmailWithNote } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailSuggestionAccompanyingManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.SUGGESTION_ACCOMPANYING];
 
 export function resetSuggestionAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -57,7 +58,7 @@ export async function sendEmailSuggestionAccompanying(
       appointmentDate,
       appointmentTime,
       accompaniedpersonLanguage,
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.SUGGESTION_ACCOMPANYING>,
     emailNote,
   );
 

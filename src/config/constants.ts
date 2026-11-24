@@ -164,6 +164,15 @@ export const emailTemplateTtlMs =
   Number(process.env.EMAIL_TEMPLATE_TTL_MS) || 10 * 60 * 1000;
 
 export const emailTemplateRetryMs = 60 * 1000;
+
+export const cdnStorageConfig = {
+  endpoint: process.env.CDN_S3_ENDPOINT || "https://s3.pub2.infomaniak.cloud",
+  region: process.env.CDN_S3_REGION || "us-east-1",
+  bucket: process.env.CDN_S3_BUCKET || "n4d-cdn",
+  accessKeyId: process.env.CDN_S3_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.CDN_S3_SECRET_ACCESS_KEY || "",
+};
+export const cdnCacheSeconds = 5 * 60;
 export const emailTemplateFetchTimeoutMs =
   Number(process.env.EMAIL_TEMPLATE_FETCH_TIMEOUT_MS) || 5000;
 

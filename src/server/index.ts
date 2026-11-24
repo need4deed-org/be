@@ -20,6 +20,7 @@ import authRoutes from "./routes/auth";
 import commentRoutes from "./routes/comment";
 import communicationRoutes from "./routes/communication.routes";
 import districtGeometryRoutes from "./routes/district-geometry.routes";
+import emailTemplateRoutes from "./routes/email-template.routes";
 import eventN4DRegistrationRoutes from "./routes/event-n4d-registration.routes";
 import eventRoutes from "./routes/event.routes";
 import healthRoutes from "./routes/health";
@@ -242,6 +243,9 @@ export async function createServer({
   });
   await fastifyInstance.register(trustedDomainRoutes, {
     prefix: RoutePrefix.TRUSTED_DOMAIN,
+  });
+  await fastifyInstance.register(emailTemplateRoutes, {
+    prefix: RoutePrefix.ADMIN_EMAIL_TEMPLATE,
   });
   await fastifyInstance.register(eventN4DRegistrationRoutes, {
     prefix: RoutePrefix.EVENT_REGISTRATION,

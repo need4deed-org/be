@@ -1,18 +1,11 @@
 import type { JWT } from "@fastify/jwt";
-import {
-  emailPasswordResetManifestUrl,
-  RESET_LIFESPAN_MS,
-  urlPasswordReset,
-} from "../../../config/constants";
+import { EmailTemplateName } from "need4deed-sdk";
+import { RESET_LIFESPAN_MS, urlPasswordReset } from "../../../config/constants";
 import type User from "../../../data/entity/user.entity";
 import logger from "../../../logger";
 import { PASSWORD_RESET_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveContent,
-  resolveLocale,
-} from "../email-template";
+import { fillTemplate, resolveContent, resolveLocale } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailMessage, EmailTransport } from "../types";
 
 export interface PasswordResetDeps {
@@ -20,7 +13,7 @@ export interface PasswordResetDeps {
   jwt: JWT;
 }
 
-const loader = createManifestLoader(emailPasswordResetManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.PASSWORD_RESET];
 
 export function resetPasswordResetTemplateCache(): void {
   loader.resetCache();
@@ -54,7 +47,7 @@ export async function sendPasswordReset(
   );
   const { subject, html, text } = fillTemplate(content, {
     resetUrl: url,
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.PASSWORD_RESET>);
 
   const message: EmailMessage = {
     to: user.email,

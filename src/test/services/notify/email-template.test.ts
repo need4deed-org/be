@@ -10,6 +10,7 @@ import {
   resolveContent,
   resolveFlatContent,
   resolveLocale,
+  resolveManifestLabel,
   withEmailNote,
   type LocaleContent,
 } from "../../../services/notify/email-template";
@@ -296,9 +297,83 @@ describe("resolveFlatContent", () => {
     expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
   });
 
-  it("falls back to builtin when the manifest is unexpectedly locale-keyed", () => {
+  it("falls back to builtin when a locale-keyed manifest has neither the locale nor DE", () => {
     const manifest = { [Lang.EN]: { subject: "en", text: "en body" } };
     expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(flatBuiltin);
+  });
+
+  it("picks the locale's entry from a locale-keyed manifest", () => {
+    const manifest = {
+      [Lang.EN]: { subject: "en", text: "en body" },
+      [Lang.DE]: { subject: "de", text: "de body" },
+    };
+    expect(resolveFlatContent(manifest, flatBuiltin)).toEqual(
+      manifest[Lang.DE],
+    );
+    expect(resolveFlatContent(manifest, flatBuiltin, Lang.EN)).toEqual(
+      manifest[Lang.EN],
+    );
+  });
+});
+
+describe("renderEmail with a flat builtin and a locale-keyed manifest", () => {
+  const flatBuiltin: LocaleContent = { subject: "builtin", text: "builtin" };
+  const manifest = {
+    [Lang.EN]: { subject: "Hi {{ name }}", text: "{{ kind }} EN" },
+    [Lang.DE]: { subject: "Hallo {{ name }}", text: "{{ kind }} DE" },
+  };
+  const vars = { name: "Ada", kind: { en: "volunteer", de: "Freiwillige" } };
+
+  it("uses the German entry by default and fills localized values in German", () => {
+    expect(renderEmail(manifest, flatBuiltin, vars)).toEqual({
+      subject: "Hallo Ada",
+      text: "Freiwillige DE",
+    });
+  });
+
+  it("uses the requested locale's entry", () => {
+    expect(renderEmail(manifest, flatBuiltin, vars, Lang.EN)).toEqual({
+      subject: "Hi Ada",
+      text: "volunteer EN",
+    });
+  });
+});
+
+describe("resolveManifestLabel", () => {
+  const builtin = {
+    [Lang.EN]: { labels: { someone: "Someone" } },
+    [Lang.DE]: { labels: { someone: "Jemand" } },
+  };
+
+  it("reads labels of a flat manifest for every language", () => {
+    expect(
+      resolveManifestLabel(
+        {
+          subject: "s",
+          text: "t",
+          labels: { someone: "Eine Person" },
+        } as never,
+        builtin,
+        "someone",
+      ),
+    ).toEqual({ [Lang.EN]: "Eine Person", [Lang.DE]: "Eine Person" });
+  });
+
+  it("reads labels per language from a locale-keyed manifest", () => {
+    expect(
+      resolveManifestLabel(
+        {
+          [Lang.EN]: {
+            subject: "s",
+            text: "t",
+            labels: { someone: "A person" },
+          },
+          [Lang.DE]: { subject: "s", text: "t" },
+        } as never,
+        builtin,
+        "someone",
+      ),
+    ).toEqual({ [Lang.EN]: "A person", [Lang.DE]: "Jemand" });
   });
 });
 
@@ -457,6 +532,14 @@ describe("createManifestLoader", () => {
     await loader.load();
     await loader.load();
     expect(fetchJsonFromUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves a primed value without fetching", async () => {
+    const loader = createManifestLoader(url);
+    const primed = { subject: "Primed", text: "primed body" };
+    loader.prime(primed);
+    expect(await loader.load()).toEqual(primed);
+    expect(fetchJsonFromUrl).not.toHaveBeenCalled();
   });
 
   it("re-fetches after resetCache()", async () => {

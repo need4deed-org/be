@@ -25,9 +25,11 @@ export function resolveManifestLabel<K extends string>(
   key: K,
 ): LocalizedValue {
   const pick = (lang: Lang): string => {
-    const entry = (manifest as Record<string, unknown> | null)?.[lang] as
-      | { labels?: Record<string, unknown> }
-      | undefined;
+    const entry = (
+      manifest && isFlatContent(manifest)
+        ? manifest
+        : (manifest as Record<string, unknown> | null)?.[lang]
+    ) as { labels?: Record<string, unknown> } | undefined;
     const override = entry?.labels?.[key];
     return typeof override === "string" && override.trim()
       ? override
@@ -38,6 +40,15 @@ export function resolveManifestLabel<K extends string>(
 
 const DEFAULT_LOCALE = Lang.DE;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)(?:\.(\w+))?\s*\}\}/g;
+
+export function placeholdersIn(
+  source: string,
+): { key: string; lang?: string }[] {
+  return [...source.matchAll(PLACEHOLDER_RE)].map(([, key, lang]) => ({
+    key,
+    ...(lang !== undefined ? { lang } : {}),
+  }));
+}
 
 function isLocalizedValue(value: TemplateVar): value is LocalizedValue {
   return typeof value === "object" && value !== null;
@@ -254,10 +265,28 @@ export function resolveContent(
   return pickContent(manifest, locale, builtin).content;
 }
 
+function pickFlatBuiltinContent(
+  manifest: Manifest | null,
+  builtin: LocaleContent,
+  locale: Lang,
+): { content: LocaleContent; lang?: Lang } {
+  if (manifest && !isFlatContent(manifest)) {
+    return pickContent(manifest, locale, {
+      [Lang.EN]: builtin,
+      [Lang.DE]: builtin,
+    });
+  }
+  return { content: resolveFlatContent(manifest, builtin) };
+}
+
 export function resolveFlatContent(
   manifest: Manifest | null,
   builtin: LocaleContent,
+  locale: Lang = DEFAULT_LOCALE,
 ): LocaleContent {
+  if (manifest && !isFlatContent(manifest)) {
+    return pickFlatBuiltinContent(manifest, builtin, locale).content;
+  }
   return manifest && isFlatContent(manifest) && isValid(manifest)
     ? manifest
     : builtin;
@@ -285,7 +314,7 @@ export function renderEmail(
       : pickContent(null, locale, builtin, fallbackLocale);
 
   const picked = isFlatBuiltin(builtin)
-    ? { content: resolveFlatContent(manifest, builtin) }
+    ? pickFlatBuiltinContent(manifest, builtin, locale)
     : pickContent(manifest, locale, builtin, fallbackLocale);
 
   const { result, ambiguous } = fill(
@@ -354,17 +383,26 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   }
 }
 
+export interface CachedLoader<T> {
+  load(): Promise<T>;
+  resetCache(): void;
+  prime(value: T): void;
+}
+
 function createCachedLoader<T>(
   label: string,
   url: string,
   fetchValue: () => Promise<T>,
   onColdFailure: (err: unknown) => T,
-): { load(): Promise<T>; resetCache(): void } {
+): CachedLoader<T> {
   let cache: { value: T; expires: number } | null = null;
 
   return {
     resetCache() {
       cache = null;
+    },
+    prime(value: T) {
+      cache = { value, expires: Date.now() + emailTemplateTtlMs };
     },
     async load(): Promise<T> {
       const now = Date.now();
@@ -390,10 +428,9 @@ function createCachedLoader<T>(
   };
 }
 
-export function createManifestLoader(url: string): {
-  load(): Promise<Manifest | null>;
-  resetCache(): void;
-} {
+export function createManifestLoader(
+  url: string,
+): CachedLoader<Manifest | null> {
   return createCachedLoader<Manifest | null>(
     "manifest",
     url,
@@ -419,10 +456,7 @@ export class AttachmentUnavailableError extends Error {
 export function createFileLoader(
   url: string,
   isValidFile: (file: Buffer) => boolean = () => true,
-): {
-  load(): Promise<Buffer>;
-  resetCache(): void;
-} {
+): CachedLoader<Buffer> {
   return createCachedLoader(
     "attachment",
     url,

@@ -39,6 +39,7 @@ export const RoutePrefix = {
   SWAGGER: "/swagger",
   TRANSLATION: "/translation",
   STATISTICS: "/statistics",
+  ADMIN_EMAIL_TEMPLATE: "/admin/email-template",
   TRUSTED_DOMAIN: "/trusted-domain",
   USER: "/user",
   VERIFY_EMAIL: "/verify-email",

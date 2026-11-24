@@ -1,17 +1,11 @@
-import {
-  emailFromNotify,
-  emailFromVolunteer,
-  emailRegistrationManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName } from "need4deed-sdk";
+import { emailFromNotify, emailFromVolunteer } from "../../../config/constants";
 import { REGISTRATION_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailRegistrationManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.REGISTRATION];
 
 export function resetRegistrationTemplateCache(): void {
   loader.resetCache();
@@ -29,7 +23,7 @@ export async function sendEmailRegistration(
   const content = resolveFlatContent(await loader.load(), BUILTIN);
   const { subject, text, html } = fillTemplate(content, {
     volunteerName: volunteer.name,
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.REGISTRATION>);
 
   await email.send({
     to: volunteer.email,
