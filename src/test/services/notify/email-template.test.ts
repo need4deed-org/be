@@ -435,12 +435,21 @@ describe("renderEmail", () => {
     });
   });
 
-  it("falls back to the per-locale builtin when a flat manifest leaves a language open", () => {
+  it("fills a flat manifest in the recipient's language when it is known", () => {
     const result = renderEmail(
       { subject: "m flat", text: "{{ kind }}" },
       perLocaleBuiltin,
       { kind },
       Lang.DE,
+    );
+    expect(result).toEqual({ subject: "m flat", text: "Freiwillige*r" });
+  });
+
+  it("falls back to the per-locale builtin when a flat manifest leaves a language open and the recipient's language is unknown", () => {
+    const result = renderEmail(
+      { subject: "m flat", text: "{{ kind }}" },
+      perLocaleBuiltin,
+      { kind },
     );
     expect(result).toEqual({
       subject: "builtin de",
@@ -532,6 +541,22 @@ describe("createManifestLoader", () => {
     await loader.load();
     await loader.load();
     expect(fetchJsonFromUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a primed value over a fetch that started before it", async () => {
+    let resolveFetch: (value: unknown) => void = () => undefined;
+    vi.mocked(fetchJsonFromUrl).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    const loader = createManifestLoader(url);
+    const loading = loader.load();
+    const primed = { subject: "Primed", text: "primed body" };
+    loader.prime(primed);
+    resolveFetch(manifest);
+    expect(await loading).toEqual(primed);
+    expect(await loader.load()).toEqual(primed);
   });
 
   it("serves a primed value without fetching", async () => {

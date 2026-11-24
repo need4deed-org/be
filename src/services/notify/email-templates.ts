@@ -40,7 +40,9 @@ import {
 import {
   CachedLoader,
   createManifestLoader,
+  isFlatBuiltin,
   LocaleContent,
+  LocalizedValue,
   Manifest,
   TemplateVar,
 } from "./email-template";
@@ -163,10 +165,63 @@ const PLACEHOLDERS = {
   [EmailTemplateName.VERIFICATION]: ["verificationUrl"],
 } as const satisfies Record<EmailTemplateName, readonly string[]>;
 
+type PlaceholderLists = {
+  [N in EmailTemplateName]?: readonly (typeof PLACEHOLDERS)[N][number][];
+};
+
+const LOCALIZED = {
+  [EmailTemplateName.ACCOMPANY_MATCH_VOLUNTEER]: [
+    "appointmentTitle",
+    "accompaniedpersonLanguage",
+  ],
+  [EmailTemplateName.CGC_APPLICATION]: ["dataPrivacyUrl", "agreementUrl"],
+  [EmailTemplateName.SUGGESTION]: [
+    "opportunityName",
+    "opportunitySchedule",
+    "schedule",
+    "scheduleNote",
+  ],
+  [EmailTemplateName.SUGGESTION_ACCOMPANYING]: [
+    "appointmentTitle",
+    "accompaniedpersonLanguage",
+  ],
+  [EmailTemplateName.SUGGESTION_REQUEST]: ["link"],
+  [EmailTemplateName.TAGGED]: ["where", "link"],
+} as const satisfies PlaceholderLists;
+
+type SometimesLocalizedPlaceholders = {
+  [EmailTemplateName.CGC_APPLICATION]: "volunteerName" | "signature";
+  [EmailTemplateName.SUGGESTION_REQUEST]: "recipientName" | "requesterName";
+  [EmailTemplateName.TAGGED]: "recipientName" | "authorName";
+};
+
+const KNOWS_RECIPIENT_LOCALE = new Set<EmailTemplateName>([
+  EmailTemplateName.CGC_APPLICATION,
+  EmailTemplateName.PASSWORD_RESET,
+  EmailTemplateName.SUGGESTION_REQUEST,
+  EmailTemplateName.TAGGED,
+]);
+
+type ListedIn<
+  L extends PlaceholderLists,
+  N extends EmailTemplateName,
+> = N extends keyof L ? (L[N] extends readonly (infer P)[] ? P : never) : never;
+
+type Localized<N extends EmailTemplateName> = ListedIn<typeof LOCALIZED, N>;
+type SometimesLocalized<N extends EmailTemplateName> =
+  N extends keyof SometimesLocalizedPlaceholders
+    ? SometimesLocalizedPlaceholders[N]
+    : never;
+
 export type EmailTemplateVars<N extends EmailTemplateName> = Record<
-  (typeof PLACEHOLDERS)[N][number],
-  TemplateVar
->;
+  Exclude<
+    (typeof PLACEHOLDERS)[N][number],
+    Localized<N> | SometimesLocalized<N>
+  >,
+  Exclude<TemplateVar, LocalizedValue>
+> &
+  Record<Localized<N>, LocalizedValue> &
+  Record<SometimesLocalized<N>, TemplateVar>;
 
 export const EMAIL_NOTE_PLACEHOLDER = "emailNote";
 
@@ -181,7 +236,10 @@ type Builtin =
   | LocaleContent
   | Record<Lang, LocaleContent & { labels?: object }>;
 
-const SOURCES: Record<EmailTemplateName, { url: string; builtin: Builtin }> = {
+const SOURCES: Record<
+  EmailTemplateName,
+  { url: string; builtin: Builtin; fallbackLocale?: Lang }
+> = {
   [EmailTemplateName.ACCOMPANY_MATCH]: {
     url: emailAccompanyMatchManifestUrl,
     builtin: ACCOMPANY_MATCH_BUILTIN,
@@ -197,6 +255,7 @@ const SOURCES: Record<EmailTemplateName, { url: string; builtin: Builtin }> = {
   [EmailTemplateName.CGC_APPLICATION]: {
     url: emailCgcApplicationManifestUrl,
     builtin: CGC_APPLICATION_BUILTIN,
+    fallbackLocale: Lang.EN,
   },
   [EmailTemplateName.CHECKUP]: {
     url: emailPostMatchCheckupManifestUrl,
@@ -259,13 +318,14 @@ export interface EmailTemplateDefinition {
   loader: CachedLoader<Manifest | null>;
   builtin: Builtin;
   placeholders: readonly string[];
+  localizedPlaceholders: readonly string[];
+  knowsRecipientLocale: boolean;
   labelKeys: string[];
+  fallbackLocale: Lang;
 }
 
 function builtinContents(builtin: Builtin): LocaleContent[] {
-  return "subject" in builtin && typeof builtin.subject === "string"
-    ? [builtin as LocaleContent]
-    : Object.values(builtin as Record<Lang, LocaleContent>);
+  return isFlatBuiltin(builtin) ? [builtin] : Object.values(builtin);
 }
 
 function labelKeysOf(builtin: Builtin): string[] {
@@ -277,7 +337,11 @@ function labelKeysOf(builtin: Builtin): string[] {
 
 export const EMAIL_TEMPLATES = Object.fromEntries(
   Object.values(EmailTemplateName).map((name) => {
-    const { url, builtin } = SOURCES[name];
+    const { url, builtin, fallbackLocale = Lang.DE } = SOURCES[name];
+    const localized: readonly string[] =
+      (LOCALIZED as Partial<Record<EmailTemplateName, readonly string[]>>)[
+        name
+      ] ?? [];
     const definition: EmailTemplateDefinition = {
       name,
       url,
@@ -287,7 +351,12 @@ export const EMAIL_TEMPLATES = Object.fromEntries(
       placeholders: WITH_EMAIL_NOTE.has(name)
         ? [...PLACEHOLDERS[name], EMAIL_NOTE_PLACEHOLDER]
         : PLACEHOLDERS[name],
+      localizedPlaceholders: WITH_EMAIL_NOTE.has(name)
+        ? [...localized, EMAIL_NOTE_PLACEHOLDER]
+        : localized,
+      knowsRecipientLocale: KNOWS_RECIPIENT_LOCALE.has(name),
       labelKeys: labelKeysOf(builtin),
+      fallbackLocale,
     };
     return [name, definition];
   }),

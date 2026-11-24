@@ -16,10 +16,17 @@ import {
   emailTemplateFetchTimeoutMs,
   EmailTemplateSaveError,
 } from "../../config";
-import { fetchFileFromUrl } from "../../data/utils";
 import logger from "../../logger";
 import { getCdnStorage } from "../cdn-storage";
-import { LocaleContent, Manifest, placeholdersIn } from "./email-template";
+import {
+  isFlatBuiltin,
+  isFlatContent,
+  isValidContent,
+  LocaleContent,
+  malformedPlaceholdersIn,
+  Manifest,
+  placeholdersIn,
+} from "./email-template";
 import {
   builtinContentsOf,
   EMAIL_NOTE_PLACEHOLDER,
@@ -40,16 +47,44 @@ export function isEmailTemplateEditable(): boolean {
   return getCdnStorage() !== null;
 }
 
+async function readFromCdn(url: string): Promise<string | null> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(emailTemplateFetchTimeoutMs),
+  });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`fetch ${url} failed (${response.status})`);
+  }
+  return response.text();
+}
+
+function parseManifest(name: EmailTemplateName, raw: string): Manifest | null {
+  let manifest: unknown = null;
+  try {
+    manifest = JSON.parse(raw);
+  } catch {
+    manifest = null;
+  }
+  if (typeof manifest === "object" && manifest !== null) {
+    return manifest as Manifest;
+  }
+  logger.warn(`email template "${name}": stored file is not a JSON object`);
+  return null;
+}
+
 async function readStored(
   definition: EmailTemplateDefinition,
 ): Promise<StoredTemplate> {
   const storage = getCdnStorage();
   const raw = storage
     ? await storage.read(definition.storageKey)
-    : (
-        await fetchFileFromUrl(definition.url, emailTemplateFetchTimeoutMs)
-      ).toString("utf-8");
-  return { raw, manifest: raw ? (JSON.parse(raw) as Manifest) : null };
+    : await readFromCdn(definition.url);
+  return {
+    raw,
+    manifest: raw === null ? null : parseManifest(definition.name, raw),
+  };
 }
 
 function versionOf(raw: string | null): string {
@@ -58,69 +93,88 @@ function versionOf(raw: string | null): string {
     .digest("hex");
 }
 
-function isFlat(manifest: Manifest): manifest is ContentWithLabels {
-  return typeof (manifest as LocaleContent).subject === "string";
-}
-
 function builtinFor(
   definition: EmailTemplateDefinition,
   lang: Lang,
 ): ContentWithLabels {
   const { builtin } = definition;
-  return typeof (builtin as LocaleContent).subject === "string"
-    ? (builtin as LocaleContent)
-    : (builtin as Record<Lang, ContentWithLabels>)[lang];
+  return isFlatBuiltin(builtin)
+    ? builtin
+    : (builtin[lang] as ContentWithLabels);
 }
 
 function toText(
   definition: EmailTemplateDefinition,
-  stored: ContentWithLabels | undefined,
-  fallback: ContentWithLabels,
+  content: ContentWithLabels,
+  labelSource: ContentWithLabels | undefined,
+  builtin: ContentWithLabels,
 ): ApiEmailTemplateText {
-  const subject = stored?.subject || fallback.subject;
-  const text = stored?.text || fallback.text || "";
+  const { subject } = content;
+  const text = content.text || builtin.text || "";
   if (definition.labelKeys.length === 0) {
     return { subject, text };
   }
   const labels = Object.fromEntries(
     definition.labelKeys.map((key) => {
-      const value = stored?.labels?.[key];
+      const value = labelSource?.labels?.[key];
       return [
         key,
         typeof value === "string" && value.trim()
           ? value
-          : String(fallback.labels?.[key] ?? ""),
+          : String(builtin.labels?.[key] ?? ""),
       ];
     }),
   );
   return { subject, text, labels };
 }
 
+function sentContent(
+  definition: EmailTemplateDefinition,
+  stored: Partial<Record<Lang, ContentWithLabels>> | null,
+  lang: Lang,
+): ContentWithLabels {
+  const own = stored?.[lang];
+  if (isValidContent(own)) {
+    return own;
+  }
+  const fallback = stored?.[definition.fallbackLocale];
+  return isValidContent(fallback) ? fallback : builtinFor(definition, lang);
+}
+
 function toApiContent(
   definition: EmailTemplateDefinition,
   manifest: Manifest | null,
 ): ApiEmailTemplateContent {
-  const builtinIsFlat =
-    typeof (definition.builtin as LocaleContent).subject === "string";
-  if (manifest ? isFlat(manifest) : builtinIsFlat) {
+  const flat = manifest
+    ? isFlatContent(manifest)
+    : isFlatBuiltin(definition.builtin);
+  if (flat) {
+    const builtin = builtinFor(definition, Lang.DE);
+    const stored = manifest as ContentWithLabels | null;
     return {
       layout: EmailTemplateLayout.SINGLE,
       content: toText(
         definition,
-        (manifest as ContentWithLabels | null) ?? undefined,
-        builtinFor(definition, Lang.DE),
+        isValidContent(stored ?? undefined)
+          ? (stored as ContentWithLabels)
+          : builtin,
+        stored ?? undefined,
+        builtin,
       ),
     };
   }
-  const perLanguage = manifest as Partial<
-    Record<Lang, ContentWithLabels>
-  > | null;
+  const stored = manifest as Partial<Record<Lang, ContentWithLabels>> | null;
   return {
     layout: EmailTemplateLayout.PER_LANGUAGE,
     content: Object.fromEntries(
       LANGS.map((lang) => [
         lang,
-        toText(definition, perLanguage?.[lang], builtinFor(definition, lang)),
+        toText(
+          definition,
+          sentContent(definition, stored, lang),
+          stored?.[lang],
+          builtinFor(definition, lang),
+        ),
       ]),
     ) as Record<Lang, ApiEmailTemplateText>,
   };
@@ -130,7 +184,7 @@ function hasHtml(manifest: Manifest | null): boolean {
   if (!manifest) {
     return false;
   }
-  return isFlat(manifest)
+  return isFlatContent(manifest)
     ? Boolean(manifest.html)
     : LANGS.some((lang) => Boolean(manifest[lang]?.html));
 }
@@ -142,7 +196,7 @@ function storedContents(
   if (!manifest) {
     return builtinContentsOf(definition.name);
   }
-  return isFlat(manifest)
+  return isFlatContent(manifest)
     ? [manifest]
     : LANGS.flatMap((lang) => manifest[lang] ?? []);
 }
@@ -154,8 +208,10 @@ function requiredPlaceholders(
   const allowed = new Set(definition.placeholders);
   return new Set(
     storedContents(definition, manifest)
-      .flatMap(({ subject, text }) =>
-        placeholdersIn(`${subject}\n${text ?? ""}`).map(({ key }) => key),
+      .flatMap(({ subject, text, html }) =>
+        placeholdersIn(`${subject}\n${text ?? ""}\n${html ?? ""}`).map(
+          ({ key }) => key,
+        ),
       )
       .filter((key) => key !== EMAIL_NOTE_PLACEHOLDER && allowed.has(key)),
   );
@@ -246,6 +302,7 @@ function problemsOf(
   definition: EmailTemplateDefinition,
   required: Set<string>,
   { subject, text, labels = {} }: ApiEmailTemplateText,
+  languageOpen: boolean,
 ): Omit<ApiEmailTemplateSaveError, "lang"> | null {
   const blank = [
     ...(subject.trim() ? [] : (["subject"] as const)),
@@ -274,18 +331,46 @@ function problemsOf(
   }
 
   const allowed = new Set(definition.placeholders);
+  const localized = new Set(definition.localizedPlaceholders);
   const isUnknown = ({ key, lang }: { key: string; lang?: string }) =>
     !allowed.has(key) ||
-    (lang !== undefined && !(LANGS as string[]).includes(lang));
+    (lang !== undefined &&
+      (!localized.has(key) || !(LANGS as string[]).includes(lang)));
+  const needsLanguage = ({ key, lang }: { key: string; lang?: string }) =>
+    languageOpen &&
+    lang === undefined &&
+    localized.has(key) &&
+    key !== EMAIL_NOTE_PLACEHOLDER;
+  const body = `${subject}\n${text}`;
   const unknown = [
-    ...placeholdersIn(`${subject}\n${text}`).filter(isUnknown),
-    ...Object.values(labels).flatMap(placeholdersIn),
-  ].map(({ key, lang }) => (lang ? `${key}.${lang}` : key));
+    ...placeholdersIn(body)
+      .filter(isUnknown)
+      .map(({ key, lang }) => (lang ? `${key}.${lang}` : key)),
+    ...malformedPlaceholdersIn(body),
+    ...Object.values(labels).flatMap(
+      (label) => label.match(/\{\{[^{}]*\}\}/g) ?? [],
+    ),
+  ];
   if (unknown.length > 0) {
     return {
       code: "unknown_placeholder",
       message: `Unknown placeholder(s): ${[...new Set(unknown)].join(", ")}.`,
       placeholders: [...new Set(unknown)],
+    };
+  }
+
+  const withoutLanguage = [
+    ...new Set(
+      placeholdersIn(body)
+        .filter(needsLanguage)
+        .map(({ key }) => key),
+    ),
+  ];
+  if (withoutLanguage.length > 0) {
+    return {
+      code: "unknown_placeholder",
+      message: `Placeholder(s) ${withoutLanguage.join(", ")} need a language here, e.g. {{ ${withoutLanguage[0]}.de }}.`,
+      placeholders: withoutLanguage,
     };
   }
 
@@ -311,7 +396,12 @@ function validate(
   const texts = textsOf(template);
   const required = requiredPlaceholders(definition, current);
   for (const { lang, text } of texts) {
-    const problem = problemsOf(definition, required, text);
+    const problem = problemsOf(
+      definition,
+      required,
+      text,
+      lang === undefined && !definition.knowsRecipientLocale,
+    );
     if (problem) {
       throw new EmailTemplateSaveError({
         ...problem,
@@ -350,7 +440,28 @@ function historyKey(name: EmailTemplateName, at: Date): string {
   return `emails/_history/${name}/${at.toISOString().replace(/[:.]/g, "-")}.json`;
 }
 
-export async function saveEmailTemplate(
+const pendingSaves = new Map<EmailTemplateName, Promise<unknown>>();
+
+function oneAtATime<T>(
+  name: EmailTemplateName,
+  task: () => Promise<T>,
+): Promise<T> {
+  const run = (pendingSaves.get(name) ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(task);
+  pendingSaves.set(name, run);
+  return run;
+}
+
+export function saveEmailTemplate(
+  name: EmailTemplateName,
+  put: ApiEmailTemplatePut,
+  userId: number,
+): Promise<ApiEmailTemplateGet> {
+  return oneAtATime(name, () => save(name, put, userId));
+}
+
+async function save(
   name: EmailTemplateName,
   { version, template }: ApiEmailTemplatePut,
   userId: number,

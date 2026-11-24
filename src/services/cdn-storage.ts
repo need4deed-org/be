@@ -52,9 +52,11 @@ let storage: CdnStorage | null | undefined;
 
 export function getCdnStorage(): CdnStorage | null {
   if (storage === undefined) {
-    const { endpoint, accessKeyId, secretAccessKey } = cdnStorageConfig;
+    const { endpoint, bucket, accessKeyId, secretAccessKey } = cdnStorageConfig;
     storage =
-      endpoint && accessKeyId && secretAccessKey ? createS3CdnStorage() : null;
+      endpoint && bucket && accessKeyId && secretAccessKey
+        ? createS3CdnStorage()
+        : null;
   }
   return storage;
 }

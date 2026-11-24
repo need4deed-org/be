@@ -311,6 +311,119 @@ describe("admin email templates", () => {
     });
   });
 
+  it("shows the builtin for a missing or broken file and still saves over it", async () => {
+    bucket.files.delete(STALE_KEY);
+    const missing = await getStale();
+    expect(missing.template.layout).toBe(EmailTemplateLayout.SINGLE);
+    expect(missing.template.content.subject).toEqual(expect.any(String));
+
+    bucket.files.set(STALE_KEY, "{ not json");
+    const broken = await getStale();
+    expect(broken.template.content.subject).toBe(
+      missing.template.content.subject,
+    );
+    const res = await putStale(
+      {
+        layout: EmailTemplateLayout.SINGLE,
+        content: { subject: "Repariert", text: "Hallo {{ volunteerName }}" },
+      },
+      broken.version,
+    );
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("lets only one of two simultaneous saves through", async () => {
+    const { version } = await getStale();
+    const template = (subject: string) => ({
+      layout: EmailTemplateLayout.SINGLE,
+      content: { subject, text: "Hi {{ volunteerName }}" },
+    });
+    const results = await Promise.all([
+      putStale(template("first"), version),
+      putStale(template("second"), version),
+    ]);
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+  });
+
+  it("requires a placeholder that the stored file only has in its html", async () => {
+    bucket.files.set(
+      STALE_KEY,
+      JSON.stringify({
+        subject: "Hallo",
+        text: "Hallo",
+        html: "<p>{{ volunteerName }}</p>",
+      }),
+    );
+    const res = await putStale({
+      layout: EmailTemplateLayout.SINGLE,
+      content: { subject: "Hallo", text: "Hallo" },
+    });
+    expect(res.json()).toMatchObject({
+      code: "missing_placeholder",
+      placeholders: ["volunteerName"],
+    });
+  });
+
+  it("refuses a language on a plain value and malformed braces", async () => {
+    const res = await putStale({
+      layout: EmailTemplateLayout.SINGLE,
+      content: {
+        subject: "{{ volunteerName }}",
+        text: "{{ volunteerName.de }} {{ volunteer Name }}",
+      },
+    });
+    expect(res.json()).toMatchObject({
+      code: "unknown_placeholder",
+      placeholders: ["volunteerName.de", "{{ volunteer Name }}"],
+    });
+  });
+
+  it("asks for a language on two-language values where the recipient's language is unknown", async () => {
+    const name = EmailTemplateName.SUGGESTION;
+    bucket.files.set(
+      `emails/${name}.json`,
+      JSON.stringify({
+        subject: "Vorschlag",
+        text: "Hallo {{ volunteerName }}",
+      }),
+    );
+    const { version } = (await request("GET", `/${name}`)).json().data;
+    const put = (text: string) =>
+      request("PUT", `/${name}`, {
+        version,
+        template: {
+          layout: EmailTemplateLayout.SINGLE,
+          content: { subject: "Vorschlag", text },
+        },
+      });
+
+    const plain = await put("Hallo {{ volunteerName }}, {{ opportunityName }}");
+    expect(plain.json()).toMatchObject({
+      code: "unknown_placeholder",
+      placeholders: ["opportunityName"],
+    });
+    const withLanguage = await put(
+      "Hallo {{ volunteerName }}, {{ opportunityName.de }} {{ emailNote }}",
+    );
+    expect(withLanguage.statusCode).toBe(200);
+  });
+
+  it("shows the text that is sent for a language a per-language file lacks", async () => {
+    bucket.files.set(
+      TAGGED_KEY,
+      JSON.stringify({
+        de: { subject: "Markiert", text: "Hallo {{ recipientName }}" },
+      }),
+    );
+    const { data } = (
+      await request("GET", `/${EmailTemplateName.TAGGED}`)
+    ).json();
+    expect(data.template.content[Lang.EN]).toMatchObject({
+      subject: "Markiert",
+      text: "Hallo {{ recipientName }}",
+    });
+  });
+
   it("refuses to save without CDN write access", async () => {
     bucket.enabled = false;
     const res = await request("PUT", `/${EmailTemplateName.STALE}`, {
