@@ -10,5 +10,5 @@ export function isIssuedBeforeCutoff(
   if (typeof iat !== "number") {
     return true;
   }
-  return iat < Math.ceil(credentialsValidAfter.getTime() / 1000);
+  return iat <= Math.floor(credentialsValidAfter.getTime() / 1000);
 }
