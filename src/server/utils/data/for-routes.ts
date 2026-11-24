@@ -232,6 +232,16 @@ export async function getTimedEvents(volunteer: Volunteer) {
   return events;
 }
 
+const optionLists: EntityTableName[] = [
+  EntityTableName.LANGUAGE,
+  EntityTableName.DISTRICT,
+  EntityTableName.ACTIVITY,
+  EntityTableName.SKILL,
+  EntityTableName.LEAD,
+  EntityTableName.AGENT_TYPE,
+  EntityTableName.SERVICE,
+];
+
 export async function getOptions(
   list: EntityTableName | undefined,
   language: Lang,
@@ -311,22 +321,22 @@ export async function getOptions(
   }
 
   if (!list) {
-    return {
-      [EntityTableName.LANGUAGE]: await getList(EntityTableName.LANGUAGE),
-      [EntityTableName.DISTRICT]: await getList(EntityTableName.DISTRICT),
-      [EntityTableName.ACTIVITY]: await getList(EntityTableName.ACTIVITY),
-      [EntityTableName.SKILL]: await getList(EntityTableName.SKILL),
-      [EntityTableName.LEAD]: await getList(EntityTableName.LEAD),
-      [EntityTableName.AGENT_TYPE]: await getList(EntityTableName.AGENT_TYPE),
-      [EntityTableName.SERVICE]: await getList(EntityTableName.SERVICE),
-    };
+    const lists: ApiOptionLists = {};
+    for (const itemType of optionLists) {
+      lists[itemType] = await getList(itemType);
+    }
+    return lists;
   }
 
   if (!Object.values(EntityTableName).includes(list)) {
     throw new Error(`Unknown list: ${list}`);
   }
 
-  return await { [list]: await getList(list) };
+  if (!optionLists.includes(list)) {
+    return {};
+  }
+
+  return { [list]: await getList(list) };
 }
 
 export async function patchEntity<E extends { id: number }>(

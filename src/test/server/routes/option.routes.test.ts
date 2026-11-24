@@ -37,7 +37,7 @@ describe("GET /option", () => {
     expect(data[EntityTableName.SKILL].length).toBeGreaterThan(0);
   });
 
-  it("returns no category list when it's asked for by name", async () => {
+  it("returns an empty body for a table that isn't an option list", async () => {
     const response = await fastify.inject({
       method: "GET",
       url: `/option/${EntityTableName.CATEGORY}`,
@@ -45,5 +45,17 @@ describe("GET /option", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().data).toEqual({});
+  });
+
+  it("returns only the requested list", async () => {
+    const response = await fastify.inject({
+      method: "GET",
+      url: `/option/${EntityTableName.SKILL}?language=${Lang.DE}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const { data } = response.json();
+    expect(Object.keys(data)).toEqual([EntityTableName.SKILL]);
+    expect(data[EntityTableName.SKILL].length).toBeGreaterThan(0);
   });
 });

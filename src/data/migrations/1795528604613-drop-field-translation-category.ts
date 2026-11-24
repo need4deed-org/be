@@ -6,11 +6,10 @@ export class DropFieldTranslationCategory1795528604613
   name = "DropFieldTranslationCategory1795528604613";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Hand-added (be#1076): category translations have no consumer; delete them before the column goes.
     await queryRunner.query(
       `DELETE FROM "public"."field_translation" WHERE "category_id" IS NOT NULL`,
     );
-    // Hand-added: TypeORM doesn't diff @Check, and DROP COLUMN would silently drop this CHECK.
+    // TypeORM doesn't diff @Check; DROP COLUMN would otherwise drop it silently.
     await queryRunner.query(
       `ALTER TABLE "field_translation" DROP CONSTRAINT "CHK_field_translation_one_target"`,
     );
@@ -29,7 +28,6 @@ export class DropFieldTranslationCategory1795528604613
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // The deleted category translations are not restored.
     await queryRunner.query(
       `ALTER TABLE "field_translation" DROP CONSTRAINT "CHK_field_translation_one_target"`,
     );

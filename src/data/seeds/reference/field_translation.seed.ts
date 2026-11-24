@@ -63,7 +63,6 @@ interface ContentEnDe {
 interface OptionJSON {
   id: string;
   title: ContentEnDe;
-  description?: ContentEnDe;
 }
 
 async function seedLanguagesInUse(
