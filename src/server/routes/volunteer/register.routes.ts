@@ -27,6 +27,7 @@ import {
   verifyTokenOfType,
   writeVolunteerLegacy,
 } from "../../utils";
+import { isIssuedBeforeCutoff } from "../../utils/credentials-cutoff";
 import { findLinkableAgent } from "../../utils/data/ngo-registration-token";
 
 function isDuplicateVolunteerProfile(err: unknown): boolean {
@@ -45,6 +46,7 @@ async function authByVerifyToken(
     id: number;
     email: string;
     ownerAgentId?: number;
+    iat?: number;
   }>(
     fastify,
     token,
@@ -58,7 +60,7 @@ async function authByVerifyToken(
     relations: ["person"],
   });
 
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || isIssuedBeforeCutoff(user, payload.iat)) {
     throw new UnauthenticatedError("Account not found or not verified.");
   }
 

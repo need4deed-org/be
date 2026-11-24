@@ -95,13 +95,13 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthorizedError("User not found.");
         }
-        if (isIssuedBeforeCutoff(user, request.user.iat)) {
-          throw new UnauthenticatedError("Authorization failed.");
-        }
       }
 
       if (!user.isActive) {
         throw new UnauthenticatedError("Account is not active.");
+      }
+      if (!rawApiKey && isIssuedBeforeCutoff(user, request.user.iat)) {
+        throw new UnauthenticatedError("Authorization failed.");
       }
 
       request.authUser = user;
