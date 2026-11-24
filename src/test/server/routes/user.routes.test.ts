@@ -1683,6 +1683,7 @@ describe("DELETE /user/:id (be#583)", () => {
       });
       expect(updated.isActive).toBe(false);
       expect(updated.deactivatedAt).toBeInstanceOf(Date);
+      expect(updated.credentialsValidAfter).toEqual(updated.deactivatedAt);
     } finally {
       await fastify.db.userRepository.delete({ id: user.id });
     }

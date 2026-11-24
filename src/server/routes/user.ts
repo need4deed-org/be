@@ -67,6 +67,7 @@ import {
   assertActiveAdminRemains,
   eraseUserByAdmin,
   lockActiveAdminIds,
+  revokeApiKeys,
 } from "../utils/data/admin-account";
 import { deactivateVolunteerProfile } from "../utils/data/deactivate-volunteer-profile";
 import { getActiveAgentMemberships } from "../utils/data/get-agent-memberships";
@@ -75,6 +76,7 @@ import { getVolunteerIdByPersonId } from "../utils/data/get-volunteer-id-by-pers
 import { isAgentDomainAllowed } from "../utils/data/is-agent-domain-allowed";
 import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-token";
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
+import { revokeUserRefreshSessions } from "../utils/data/refresh-session";
 import { signLink } from "../utils/data/sign-link";
 
 export default async function userRoutes(
@@ -209,14 +211,17 @@ export default async function userRoutes(
         if (role === UserRole.VOLUNTEER && personId) {
           await deactivateVolunteerProfile(manager, personId, id);
         }
+        const now = new Date();
         const result = await manager.update(
           User,
           { id },
-          { isActive: false, deactivatedAt: new Date() },
+          { isActive: false, deactivatedAt: now, credentialsValidAfter: now },
         );
         if (!result.affected) {
           throw new NotFoundError(`User id:${id} not found.`);
         }
+        await revokeUserRefreshSessions(manager, id);
+        await revokeApiKeys(manager, [id], now);
       });
 
       return reply

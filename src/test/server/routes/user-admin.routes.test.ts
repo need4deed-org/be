@@ -1,10 +1,12 @@
 import { FastifyInstance } from "fastify";
-import { AgentMembershipStatus, UserRole } from "need4deed-sdk";
+import { AgentMembershipStatus, EventN4DType, UserRole } from "need4deed-sdk";
 import { IsNull } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { accessCookieName } from "../../../config/constants";
+import { accessCookieName, refreshCookieName } from "../../../config/constants";
 import ApiKey from "../../../data/entity/api-key.entity";
 import Deal from "../../../data/entity/deal.entity";
+import EventTranslation from "../../../data/entity/event/event_translation.entity";
+import EventN4D from "../../../data/entity/event/event.entity";
 import AgentPerson from "../../../data/entity/m2m/agent-person";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
@@ -45,19 +47,27 @@ describe("admin account actions", () => {
     return user;
   }
 
-  async function login(user: User): Promise<string> {
+  async function loginCookies(user: User) {
     const response = await fastify.inject({
       method: "POST",
       url: "/auth/login",
       payload: { email: user.email, password: PASSWORD },
     });
-    const cookie = response.cookies.find(
-      ({ name }) => name === accessCookieName,
-    );
-    if (!cookie) {
-      throw new Error("login failed");
-    }
-    return cookie.value;
+    const cookie = (cookieName: string) => {
+      const found = response.cookies.find(({ name }) => name === cookieName);
+      if (!found) {
+        throw new Error("login failed");
+      }
+      return found.value;
+    };
+    return {
+      access: cookie(accessCookieName),
+      refresh: cookie(refreshCookieName),
+    };
+  }
+
+  async function login(user: User): Promise<string> {
+    return (await loginCookies(user)).access;
   }
 
   function send(
@@ -121,8 +131,187 @@ describe("admin account actions", () => {
       isActive: false,
     });
     expect(response.json().data.deactivatedAt).toEqual(expect.any(String));
-    expect((await reload(target)).deactivatedAt).not.toBeNull();
+    const reloaded = await reload(target);
+    expect(reloaded.deactivatedAt).not.toBeNull();
+    expect(reloaded.credentialsValidAfter).toEqual(reloaded.deactivatedAt);
     expect(await openSessions(target)).toBe(0);
+  });
+
+  describe("credentials issued before a deactivation", () => {
+    function signReset(user: User) {
+      return fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        type: "reset",
+      });
+    }
+
+    function resetPassword(token: string) {
+      return fastify.inject({
+        method: "POST",
+        url: "/auth/password-reset",
+        payload: { token, newPassword: "new_test_password" },
+      });
+    }
+
+    function getMe(cookie: string) {
+      return fastify.inject({
+        method: "GET",
+        url: "/user/me",
+        cookies: { [accessCookieName]: cookie },
+      });
+    }
+
+    async function deactivateAndReactivate(user: User) {
+      for (const action of ["deactivate", "reactivate"]) {
+        const response = await send("POST", `/user/${user.id}/${action}`);
+        expect(response.statusCode, response.body).toBe(200);
+      }
+    }
+
+    it("refuses a reset link after reactivation", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const resetToken = signReset(target);
+      await deactivateAndReactivate(target);
+
+      const response = await resetPassword(resetToken);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toBe("Invalid reset token.");
+      expect(await (await reload(target)).checkPassword(PASSWORD)).toBe(true);
+    });
+
+    it("refuses an access token after reactivation", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const accessToken = await login(target);
+      expect((await getMe(accessToken)).statusCode).toBe(200);
+      await deactivateAndReactivate(target);
+
+      const response = await getMe(accessToken);
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it("accepts credentials issued after the cutoff", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      await deactivateAndReactivate(target);
+      await fastify.db.userRepository.update(target.id, {
+        credentialsValidAfter: new Date(Date.now() - 5_000),
+      });
+
+      expect((await getMe(await login(target))).statusCode).toBe(200);
+      expect((await resetPassword(signReset(target))).statusCode).toBe(200);
+    });
+
+    it("refuses an email-verify link after reactivation", async () => {
+      const target = await createAccount(UserRole.AGENT);
+      const verifyToken = fastify.jwt.sign({
+        id: target.id,
+        email: target.email,
+        type: "verify",
+      });
+      const getRegistration = () =>
+        fastify.inject({
+          method: "GET",
+          url: `/agent/register/status?token=${verifyToken}`,
+        });
+      const before = await getRegistration();
+      expect(before.statusCode, before.body).toBe(200);
+      await deactivateAndReactivate(target);
+
+      expect((await getRegistration()).statusCode).toBe(401);
+    });
+
+    it("refuses a refresh token issued before the cutoff", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const { refresh } = await loginCookies(target);
+      await fastify.db.userRepository.update(target.id, {
+        credentialsValidAfter: new Date(),
+      });
+
+      const response = await fastify.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        cookies: { [refreshCookieName]: refresh },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toBe("Invalid refresh token.");
+    });
+
+    it("treats an access token from before the cutoff as anonymous on optional-auth routes", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const de = await fastify.db.languageRepository.findOneOrFail({
+        where: { isoCode: "de" },
+      });
+      const draft = await fastify.db.eventRepository.save(
+        new EventN4D({
+          isActive: false,
+          date: new Date("2026-01-01T13:00:00Z"),
+          type: EventN4DType.WORKSHOP,
+          address: "Elsenstraße 87, Berlin",
+          languageId: de.id,
+        }),
+      );
+      await fastify.db.eventRepository.manager.save(
+        new EventTranslation({
+          eventn4dId: draft.id,
+          languageId: de.id,
+          title: `Entwurf ${randomNumericSuffix()}`,
+          menuTitle: "Entwurf",
+          description: "Noch nicht veröffentlicht.",
+          shortDescription: "Entwurf.",
+        }),
+      );
+      const getDraft = (cookie: string) =>
+        fastify.inject({
+          method: "GET",
+          url: `/event/${draft.id}`,
+          cookies: { [accessCookieName]: cookie },
+        });
+
+      try {
+        const accessToken = await login(target);
+        expect((await getDraft(accessToken)).statusCode).toBe(200);
+        await deactivateAndReactivate(target);
+
+        expect((await getDraft(accessToken)).statusCode).toBe(404);
+      } finally {
+        await fastify.db.eventRepository.manager.delete(EventTranslation, {
+          eventn4dId: draft.id,
+        });
+        await fastify.db.eventRepository.delete({ id: draft.id });
+      }
+    });
+
+    it("ends sessions and API keys when you delete your own account", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const accessToken = await login(target);
+      const apiKey = await fastify.db.apiKeyRepository.save(
+        new ApiKey({
+          label: `admin-actions-${randomNumericSuffix()}`,
+          keyHash: `hash-${randomNumericSuffix()}`,
+          userId: target.id,
+        }),
+      );
+
+      try {
+        const response = await send(
+          "DELETE",
+          `/user/${target.id}`,
+          accessToken,
+        );
+
+        expect(response.statusCode, response.body).toBe(200);
+        expect(await openSessions(target)).toBe(0);
+        const key = await fastify.db.apiKeyRepository.findOneByOrFail({
+          id: apiKey.id,
+        });
+        expect(key.revokedAt).not.toBeNull();
+      } finally {
+        await fastify.db.apiKeyRepository.delete({ id: apiKey.id });
+      }
+    });
   });
 
   it("revokes the account's API keys on deactivate", async () => {

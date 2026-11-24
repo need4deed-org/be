@@ -25,6 +25,7 @@ import {
   userLoginSchema,
 } from "../schema/user.schema";
 import { ReplyMessage, RoutePrefix } from "../types";
+import { isIssuedBeforeCutoff } from "../utils/credentials-cutoff";
 import {
   createRefreshSession,
   revokeRefreshSession,
@@ -211,6 +212,10 @@ async function authRoutes(
         clearAuthCookies(reply);
         return reply.status(403).send({ message: "User is not active." });
       }
+      if (isIssuedBeforeCutoff(user, decoded.iat)) {
+        clearAuthCookies(reply);
+        throw new BadRequestError("Invalid refresh token.");
+      }
 
       const rotation = await rotateRefreshSession(
         fastify.db.refreshSessionRepository.manager,
@@ -346,7 +351,7 @@ async function authRoutes(
       const { token, newPassword } = request.body;
       const TOKEN_ERROR_MESSAGE = "Invalid reset token.";
 
-      let payload: { id: number; email: string; type?: string };
+      let payload: { id: number; email: string; type?: string; iat?: number };
       try {
         payload = await fastify.jwt.verify(token);
       } catch {
@@ -360,7 +365,12 @@ async function authRoutes(
       const user = await fastify.db.userRepository.findOne({
         where: { id: payload.id },
       });
-      if (!user || user.email !== payload.email || user.deactivatedAt) {
+      if (
+        !user ||
+        user.email !== payload.email ||
+        user.deactivatedAt ||
+        isIssuedBeforeCutoff(user, payload.iat)
+      ) {
         return reply.status(400).send({ message: TOKEN_ERROR_MESSAGE });
       }
 

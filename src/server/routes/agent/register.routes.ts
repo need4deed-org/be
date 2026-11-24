@@ -41,6 +41,7 @@ import {
   searchAgentCandidates,
   verifyTokenOfType,
 } from "../../utils";
+import { isIssuedBeforeCutoff } from "../../utils/credentials-cutoff";
 import { listOrganizations } from "../../utils/data/list-organizations";
 
 async function authByVerifyToken(
@@ -50,7 +51,11 @@ async function authByVerifyToken(
 ) {
   const { token } = request.query as { token?: string };
 
-  const payload = await verifyTokenOfType<{ id: number; email: string }>(
+  const payload = await verifyTokenOfType<{
+    id: number;
+    email: string;
+    iat?: number;
+  }>(
     fastify,
     token,
     "verify",
@@ -63,7 +68,7 @@ async function authByVerifyToken(
     relations: ["person"],
   });
 
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || isIssuedBeforeCutoff(user, payload.iat)) {
     throw new UnauthenticatedError("Account not found or not verified.");
   }
 

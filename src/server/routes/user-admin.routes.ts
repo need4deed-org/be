@@ -56,7 +56,11 @@ export default async function userAdminRoutes(
         await manager.update(
           User,
           { id },
-          { isActive: false, deactivatedAt: user.deactivatedAt },
+          {
+            isActive: false,
+            deactivatedAt: user.deactivatedAt,
+            credentialsValidAfter: user.deactivatedAt,
+          },
         );
         await revokeUserRefreshSessions(manager, id);
         await revokeApiKeys(manager, [id], user.deactivatedAt);

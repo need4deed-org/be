@@ -123,6 +123,7 @@ export async function erasePersonPii(
     where: { personId, role: UserRole.VOLUNTEER },
     select: ["id"],
   });
+  const now = new Date();
   await Promise.all(
     volunteerLogins.map((user) =>
       manager.update(
@@ -130,7 +131,8 @@ export async function erasePersonPii(
         { id: user.id },
         {
           isActive: false,
-          deactivatedAt: new Date(),
+          deactivatedAt: now,
+          credentialsValidAfter: now,
           email: erasedEmailFor(user.id),
         },
       ),
