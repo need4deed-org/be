@@ -65,7 +65,7 @@ describe("GET /opportunity/legacy", () => {
       new Opportunity({
         title: `Test Opportunity (legacy-pii) ${suffix}`,
         type: OpportunityType.REGULAR,
-        status: OpportunityStatusType.NEW,
+        status: OpportunityStatusType.SEARCHING,
         agentId: agent.id,
         dealId: deal.id,
         accompanyingId: accompanying.id,
@@ -133,7 +133,7 @@ describe("GET /opportunity/legacy hides accompanying details", () => {
       new Opportunity({
         title: `Accompanying (legacy) ${suffix}`,
         type: OpportunityType.ACCOMPANYING,
-        status: OpportunityStatusType.NEW,
+        status: OpportunityStatusType.SEARCHING,
         agentId: agent.id,
         dealId: deal.id,
         accompanyingId: accompanying.id,
@@ -145,7 +145,7 @@ describe("GET /opportunity/legacy hides accompanying details", () => {
       new Opportunity({
         title: `Regular (legacy) ${suffix}`,
         type: OpportunityType.REGULAR,
-        status: OpportunityStatusType.NEW,
+        status: OpportunityStatusType.SEARCHING,
         agentId: agent.id,
         info: "Public volunteering description",
       }),
@@ -482,5 +482,79 @@ describe("POST /opportunity/legacy skips an inactive agent at the same address",
     } finally {
       arrival.mockRestore();
     }
+  });
+});
+
+// be#1058: the open website lists only opportunities looking for volunteers
+// (SEARCHING, ACTIVE), never NEW (unvalidated), INACTIVE or PAST ones.
+describe("GET /opportunity/legacy lists only SEARCHING and ACTIVE opportunities", () => {
+  let fastify: FastifyInstance;
+  const suffix = randomNumericSuffix();
+  const byStatus = new Map<OpportunityStatusType, Opportunity>();
+  const deals: Deal[] = [];
+
+  beforeAll(async () => {
+    fastify = await createServer();
+    await fastify.ready();
+
+    const postcode = await firstSeeded(fastify.db.postcodeRepository);
+    for (const status of Object.values(OpportunityStatusType)) {
+      const deal = await fastify.db.dealRepository.save(
+        new Deal({ type: DealType.OPPORTUNITY, postcodeId: postcode.id }),
+      );
+      deals.push(deal);
+      byStatus.set(
+        status,
+        await fastify.db.opportunityRepository.save(
+          new Opportunity({
+            title: `Status ${status} (legacy-1058) ${suffix}`,
+            type: OpportunityType.REGULAR,
+            status,
+            dealId: deal.id,
+          }),
+        ),
+      );
+    }
+  });
+
+  afterAll(async () => {
+    await fastify.db.opportunityRepository.delete({
+      id: In([...byStatus.values()].map(({ id }) => id)),
+    });
+    await fastify.db.dealRepository.delete({
+      id: In(deals.map(({ id }) => id)),
+    });
+    await fastify.close();
+  });
+
+  it("includes SEARCHING and ACTIVE, excludes NEW, INACTIVE and PAST", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/legacy",
+    });
+    expect(res.statusCode).toBe(200);
+    const listed = new Set(res.json().map((e: { id: number }) => e.id));
+
+    const visible = [...byStatus]
+      .filter(([, { id }]) => listed.has(id))
+      .map(([status]) => status)
+      .sort();
+    expect(visible).toEqual(
+      [OpportunityStatusType.ACTIVE, OpportunityStatusType.SEARCHING].sort(),
+    );
+  });
+
+  it("labels ACTIVE like SEARCHING, never with the raw enum value", async () => {
+    const res = await fastify.inject({
+      method: "GET",
+      url: "/opportunity/legacy",
+    });
+    const active = res
+      .json()
+      .find(
+        (e: { id: number }) =>
+          e.id === byStatus.get(OpportunityStatusType.ACTIVE)?.id,
+      );
+    expect(active?.status).toBe("Search in process");
   });
 });
