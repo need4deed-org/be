@@ -1,5 +1,6 @@
 import { Lang } from "need4deed-sdk";
 import {
+  cdnCacheSeconds,
   emailTemplateFetchTimeoutMs,
   emailTemplateRetryMs,
   emailTemplateTtlMs,
@@ -421,7 +422,11 @@ function createCachedLoader<T>(
     },
     prime(value: T) {
       generation += 1;
-      cache = { value, expires: Date.now() + emailTemplateTtlMs };
+      cache = {
+        value,
+        expires:
+          Date.now() + Math.max(emailTemplateTtlMs, cdnCacheSeconds * 1000),
+      };
     },
     async load(): Promise<T> {
       const now = Date.now();

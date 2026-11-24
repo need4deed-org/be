@@ -19,6 +19,8 @@ function createS3CdnStorage(): CdnStorage {
     region,
     forcePathStyle: true,
     credentials: { accessKeyId, secretAccessKey },
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
 
   return {
@@ -29,7 +31,11 @@ function createS3CdnStorage(): CdnStorage {
         );
         return Body ? await Body.transformToString("utf-8") : null;
       } catch (err) {
-        if (err instanceof NoSuchKey) {
+        if (
+          err instanceof NoSuchKey ||
+          (err as { $metadata?: { httpStatusCode?: number } }).$metadata
+            ?.httpStatusCode === 404
+        ) {
           return null;
         }
         throw err;

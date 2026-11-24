@@ -247,11 +247,21 @@ export async function listEmailTemplates(): Promise<
   ApiEmailTemplateListItem[]
 > {
   return Promise.all(
-    Object.values(EMAIL_TEMPLATES).map(async (definition) => ({
-      name: definition.name,
-      layout: toApiContent(definition, (await readStored(definition)).manifest)
-        .layout,
-    })),
+    Object.values(EMAIL_TEMPLATES).map(async (definition) => {
+      const manifest = await readStored(definition).then(
+        ({ manifest }) => manifest,
+        (err: unknown) => {
+          logger.warn(
+            `email template "${definition.name}" unreadable: ${err instanceof Error ? err.message : err}`,
+          );
+          return null;
+        },
+      );
+      return {
+        name: definition.name,
+        layout: toApiContent(definition, manifest).layout,
+      };
+    }),
   );
 }
 
