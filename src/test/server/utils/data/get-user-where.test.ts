@@ -38,6 +38,15 @@ describe("getUserWhere", () => {
     );
   });
 
+  it("uses at most the first 10 words", () => {
+    const where = getUserWhere(
+      Array.from({ length: 12 }, (_, i) => `w${i}`).join(" "),
+    );
+    const params = (where.id as FindOperator<unknown>).objectLiteralParameters;
+    expect(Object.keys(params ?? {})).toHaveLength(10);
+    expect(params?.userSearch9).toBe("%w9%");
+  });
+
   it("escapes LIKE wildcards", () => {
     const where = getUserWhere("a_b%c");
     expect((where.id as FindOperator<unknown>).objectLiteralParameters).toEqual(

@@ -2,11 +2,13 @@ import { UserRole } from "need4deed-sdk";
 import { Raw } from "typeorm";
 import { escapeLikePattern } from "./person-name-ilike";
 
+const MAX_SEARCH_WORDS = 10;
+
 const FULL_NAME =
   "CONCAT_WS(' ', NULLIF(p.first_name, ''), NULLIF(p.middle_name, ''), NULLIF(p.last_name, ''))";
 
 function searchUserIds(search: string) {
-  const words = search.trim().split(/\s+/).filter(Boolean);
+  const words = search.split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_WORDS);
   if (words.length === 0) {
     return undefined;
   }
