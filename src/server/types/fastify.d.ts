@@ -22,6 +22,7 @@ import PostReaction from "../../data/entity/m2m/post-reaction";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
 import Agent from "../../data/entity/opportunity/agent.entity";
 import Onetimer from "../../data/entity/opportunity/onetimer.entity";
+import OpportunityAuditLog from "../../data/entity/opportunity/opportunity-audit-log.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Option from "../../data/entity/option.entity";
 import Organization from "../../data/entity/organization.entity";
@@ -55,6 +56,7 @@ declare module "fastify" {
       activityLogRepository: Repository<ActivityLog>;
       appreciationRepository: Repository<Appreciation>;
       opportunityRepository: Repository<Opportunity>;
+      opportunityAuditLogRepository: Repository<OpportunityAuditLog>;
       opportunityVolunteerRepository: Repository<OpportunityVolunteer>;
       dealRepository: Repository<Deal>;
       agentRepository: Repository<Agent>;

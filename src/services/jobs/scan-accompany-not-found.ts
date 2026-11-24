@@ -9,9 +9,13 @@ import {
 import { And, In, LessThan, MoreThanOrEqual } from "typeorm";
 import Communication from "../../data/entity/communication.entity";
 import Opportunity from "../../data/entity/opportunity/opportunity.entity";
-import { AGENT_CONTACT_RELATIONS } from "../../data/utils";
+import {
+  AGENT_CONTACT_RELATIONS,
+  logOpportunityChanges,
+} from "../../data/utils";
 import logger from "../../logger";
 import type { EmailDelivery } from "../../server/plugins/notify";
+import { engagementChangeDetail } from "../../server/utils/data/engagement-change-detail";
 import { logEmailCommunication } from "../../server/utils/data/log-email-communication";
 import { NO_MATCH_FOUND_WORKING_DAYS } from "../../server/utils/data/no-match-found";
 import { SuspendedEmailError } from "../notify";
@@ -140,17 +144,37 @@ async function closeIfStillUnmatched(
     .andWhere("ov.status IN (:...matchedStatuses)")
     .getQuery();
 
-  await fastify.db.opportunityRepository
-    .createQueryBuilder()
-    .update()
-    .set({ status: OpportunityStatusType.INACTIVE })
-    .where("id = :opportunityId")
-    .andWhere("status IN (:...openStatuses)")
-    .andWhere(`NOT EXISTS (${matchedVolunteer})`)
-    .setParameters({
-      opportunityId,
-      openStatuses: OPEN_STATUSES,
-      matchedStatuses: MATCHED_STATUSES,
-    })
-    .execute();
+  await fastify.db.opportunityRepository.manager.transaction(
+    async (manager) => {
+      const before = await manager.findOne(Opportunity, {
+        select: { id: true, status: true },
+        where: { id: opportunityId },
+        lock: { mode: "pessimistic_write" },
+      });
+      const { affected } = await manager
+        .createQueryBuilder()
+        .update(Opportunity)
+        .set({ status: OpportunityStatusType.INACTIVE })
+        .where("id = :opportunityId")
+        .andWhere("status IN (:...openStatuses)")
+        .andWhere(`NOT EXISTS (${matchedVolunteer})`)
+        .setParameters({
+          opportunityId,
+          openStatuses: OPEN_STATUSES,
+          matchedStatuses: MATCHED_STATUSES,
+        })
+        .execute();
+      if (affected && before) {
+        await logOpportunityChanges(manager, opportunityId, [
+          {
+            type: "status-changed",
+            detail: engagementChangeDetail(
+              before.status,
+              OpportunityStatusType.INACTIVE,
+            ),
+          },
+        ]);
+      }
+    },
+  );
 }

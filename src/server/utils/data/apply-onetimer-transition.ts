@@ -7,7 +7,9 @@ import { EntityManager } from "typeorm";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { lockParents } from "../../../data/subscribers/opportunity-volunteer.subscriber";
+import { logOpportunityChanges } from "../../../data/utils/log-opportunity-change";
 import logger from "../../../logger";
+import { engagementChangeDetail } from "./engagement-change-detail";
 
 export type OnetimerSnapshot = {
   status: OpportunityStatusType;
@@ -87,6 +89,17 @@ export async function applyOnetimerTransition(
           { id: opportunityId },
           { status: transition.opportunityStatus },
         );
+        if (snapshot.status !== transition.opportunityStatus) {
+          await logOpportunityChanges(manager, opportunityId, [
+            {
+              type: "status-changed",
+              detail: engagementChangeDetail(
+                snapshot.status,
+                transition.opportunityStatus,
+              ),
+            },
+          ]);
+        }
         for (const { id, status } of matches) {
           await manager.save(OpportunityVolunteer, { id, status });
         }
