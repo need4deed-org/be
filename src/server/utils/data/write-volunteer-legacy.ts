@@ -14,7 +14,7 @@ import { updatePersonAddress } from "./update-person-address";
 
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
-  existingPersonPostcodeId?: number,
+  addressPostcodeId?: number,
   auditEntry?: Pick<VolunteerAuditLog, "type" | "detail" | "actorUserId">,
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
@@ -35,13 +35,13 @@ export async function writeVolunteerLegacy(
       transactionalEntityManager.getRepository(Volunteer);
 
     const { person } = volunteer;
-    if (existingPersonPostcodeId === undefined) {
+    if (addressPostcodeId === undefined) {
       await addressRepository.save(person.address);
       await personRepository.save(person);
     } else {
       const addressId = await updatePersonAddress(
         person.id,
-        { postcode: { id: existingPersonPostcodeId } },
+        { postcode: { id: addressPostcodeId } },
         transactionalEntityManager,
       );
       if (!addressId) {

@@ -62,7 +62,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("does not clobber a concurrent street edit while still applying the postcode change this flow asked for", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const originalPostcode = await getRepository(dataSource, Postcode).save(
       new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
@@ -107,7 +107,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("applies the postcode idempotently without disturbing a concurrent street edit when it already matches", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const postcode10115 = await getRepository(
       dataSource,
       Postcode,
@@ -154,7 +154,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("clones into a fresh Address instead of patching in place when the Address became shared in the meantime (be#1033 review)", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const originalPostcode = await getRepository(dataSource, Postcode).save(
       new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
@@ -219,7 +219,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("keeps a concurrent edit to the Person's own columns", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const address = await getRepository(dataSource, Address).save(
       new Address({
         street: "Own Column St",
@@ -262,7 +262,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("applies the postcode to the Person's current Address, not the one it had when the request started", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const originalPostcode = await getRepository(dataSource, Postcode).save(
       new Postcode({ value: `9${randomNumericSuffix()}` }),
     );
@@ -320,7 +320,7 @@ describe("parserVolunteerSelfRegister + writeVolunteerLegacy address handling (b
   });
 
   it("creates and links a fresh Address when the Person has none", async () => {
-    const suffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const suffix = randomNumericSuffix();
     const person = await getRepository(dataSource, Person).save(
       new Person({ firstName: "NoAddress", lastName: `Test-${suffix}` }),
     );
