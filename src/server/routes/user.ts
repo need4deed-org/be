@@ -209,10 +209,11 @@ export default async function userRoutes(
         if (role === UserRole.VOLUNTEER && personId) {
           await deactivateVolunteerProfile(manager, personId, id);
         }
+        const now = new Date();
         const result = await manager.update(
           User,
           { id },
-          { isActive: false, deactivatedAt: new Date() },
+          { isActive: false, deactivatedAt: now, credentialsValidAfter: now },
         );
         if (!result.affected) {
           throw new NotFoundError(`User id:${id} not found.`);

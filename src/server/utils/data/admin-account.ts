@@ -135,7 +135,12 @@ export async function eraseUserByAdmin(
     await manager.update(
       User,
       { id: loginId },
-      { isActive: false, deactivatedAt: now, email: erasedEmailFor(loginId) },
+      {
+        isActive: false,
+        deactivatedAt: now,
+        credentialsValidAfter: now,
+        email: erasedEmailFor(loginId),
+      },
     );
   }
   for (const loginId of [...loginIds, ...volunteerLoginIds]) {
