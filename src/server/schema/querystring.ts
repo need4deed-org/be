@@ -1,4 +1,5 @@
 import {
+  LanguageMatch,
   OpportunitySortField,
   QueryParamsKeys,
   RECOMMENDED_MATCHES_DEFAULT_LIMIT,
@@ -207,6 +208,10 @@ export const volunteerListQuerySchema = {
             { type: "string" },
             { type: "array", items: { type: "string" } },
           ],
+        },
+        [QueryParamsKeys.LANGUAGE_MATCH]: {
+          type: "string",
+          enum: Object.values(LanguageMatch),
         },
         activity: {
           anyOf: [

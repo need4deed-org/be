@@ -1,4 +1,4 @@
-import { UserRole } from "need4deed-sdk";
+import { LanguageMatch, QueryParamsKeys, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import { describe, expect, it } from "vitest";
 import {
@@ -102,6 +102,55 @@ describe("volunteer search", () => {
   it("keeps filters without a search on the deal", () => {
     expect(getVolunteerFilterWhere({ district: ["3"] })).toEqual({
       deal: { dealDistrict: { district: { id: In(["3"]) } } },
+    });
+  });
+});
+
+describe("volunteer language match", () => {
+  const filter = {
+    language: ["3", "5", "3"],
+    [QueryParamsKeys.LANGUAGE_MATCH]: LanguageMatch.ALL,
+  };
+
+  it("keeps the original any filter as the default", () => {
+    const expected = {
+      deal: { dealLanguage: { language: { id: In(filter.language) } } },
+    };
+    expect(getVolunteerFilterWhere({ language: filter.language })).toEqual(
+      expected,
+    );
+    expect(
+      getVolunteerFilterWhere({
+        ...filter,
+        [QueryParamsKeys.LANGUAGE_MATCH]: LanguageMatch.ANY,
+      }),
+    ).toEqual(expected);
+  });
+
+  it("does not filter on language match mode alone", () => {
+    expect(
+      getVolunteerWhere({
+        [QueryParamsKeys.LANGUAGE_MATCH]: LanguageMatch.ALL,
+      }),
+    ).toEqual({});
+  });
+
+  it("combines all-language matching with availability and other deal filters", () => {
+    const where = getVolunteerWhere({ ...filter, district: ["7"] }, null, [9]);
+    expect(where.deal).toEqual({
+      dealDistrict: { district: { id: In(["7"]) } },
+    });
+    expect(where.dealId).toMatchObject({
+      _type: "and",
+      _value: [
+        {
+          _objectLiteralParameters: {
+            selectedLanguageIds: [3, 5],
+            selectedLanguageCount: 2,
+          },
+        },
+        { _objectLiteralParameters: { availabilityDealIds: [9] } },
+      ],
     });
   });
 });

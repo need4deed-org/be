@@ -1,4 +1,6 @@
+import { LanguageMatch, QueryParamsKeys } from "need4deed-sdk";
 import { FindOptionsWhere, Raw } from "typeorm";
+import { BadRequestError } from "../../../config";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -31,7 +33,6 @@ export function getVolunteerWhere(
 
   const where: FindOptionsWhere<Volunteer> = {
     ...getVolunteerFilterWhere(filter),
-    ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
     ...(requested
       ? {
           ownerAgentId: Raw(
@@ -42,6 +43,9 @@ export function getVolunteerWhere(
         }
       : {}),
   };
+  if (availabilityDealIds) {
+    andIntoWhere(where, "dealId", dealIdIn(availabilityDealIds));
+  }
   if (filter?.search) {
     const { sql, params } = getVolunteerSearchFragment(
       filter.search,
@@ -74,7 +78,18 @@ export function getVolunteerFilterWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ): FindOptionsWhere<Volunteer> {
   const dealFilter: Record<string, unknown> = {};
-  if (filter?.language) {
+  const matchesAllLanguages =
+    filter?.[QueryParamsKeys.LANGUAGE_MATCH] === LanguageMatch.ALL;
+  const languageIds =
+    matchesAllLanguages && filter?.language
+      ? [...new Set([filter.language].flat().map(Number))]
+      : [];
+  if (
+    languageIds.some((id) => !Number.isInteger(id) || id < 1 || id > 2147483647)
+  ) {
+    throw new BadRequestError("Invalid language filter");
+  }
+  if (filter?.language && !matchesAllLanguages) {
     dealFilter.dealLanguage = {
       language: { id: normalizeStringArrayInput(filter.language) },
     };
@@ -96,6 +111,23 @@ export function getVolunteerFilterWhere(
   }
 
   return {
+    ...(languageIds.length
+      ? {
+          dealId: Raw(
+            (column) =>
+              `EXISTS (SELECT 1 FROM (
+                SELECT dl.deal_id FROM deal_language dl
+                WHERE dl.language_id = ANY(:selectedLanguageIds)
+                GROUP BY dl.deal_id
+                HAVING COUNT(DISTINCT dl.language_id) = :selectedLanguageCount
+              ) matching_deals WHERE matching_deals.deal_id = ${column})`,
+            {
+              selectedLanguageIds: languageIds,
+              selectedLanguageCount: languageIds.length,
+            },
+          ),
+        }
+      : {}),
     ...(filter?.type
       ? { statusType: normalizeStringArrayInput(filter.type) }
       : {}),
