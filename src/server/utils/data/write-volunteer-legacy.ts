@@ -1,3 +1,4 @@
+import { DatabaseError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
@@ -9,16 +10,11 @@ import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
-import { patchOrReplaceAddress } from "./for-routes";
-
-export interface AddressReusePlan {
-  addressId: number;
-  postcodeId: number;
-}
+import { updatePersonAddress } from "./update-person-address";
 
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
-  addressReuse?: AddressReusePlan,
+  addressPostcodeId?: number,
   auditEntry?: Pick<VolunteerAuditLog, "type" | "detail" | "actorUserId">,
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
@@ -38,24 +34,24 @@ export async function writeVolunteerLegacy(
     const volunteerRepository =
       transactionalEntityManager.getRepository(Volunteer);
 
-    if (addressReuse) {
-      const patched = await patchOrReplaceAddress(
-        volunteer.person.id,
-        { id: addressReuse.addressId },
-        { id: addressReuse.postcodeId },
+    const { person } = volunteer;
+    if (addressPostcodeId === undefined) {
+      await addressRepository.save(person.address);
+      await personRepository.save(person);
+    } else {
+      const addressId = await updatePersonAddress(
+        person.id,
+        { postcode: { id: addressPostcodeId } },
         transactionalEntityManager,
       );
-      if (!patched) {
-        throw new Error(
-          `Failed to reuse Address ${addressReuse.addressId} for Person ${volunteer.person.id}.`,
-        );
+      if (!addressId) {
+        throw new DatabaseError(`Address not saved for Person ${person.id}.`);
       }
-      volunteer.person.addressId = patched;
-    } else {
-      await addressRepository.save(volunteer.person.address);
+      person.address = await addressRepository.findOneByOrFail({
+        id: addressId,
+      });
+      person.addressId = addressId;
     }
-
-    await personRepository.save(volunteer.person);
 
     await dealRepository.save(volunteer.deal);
     const dealId = volunteer.deal.id;

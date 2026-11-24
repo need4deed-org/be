@@ -124,7 +124,7 @@ export default async function volunteerRegisterRoutes(
         );
       }
 
-      const { volunteer, leads, addressReuse } =
+      const { volunteer, leads, addressPostcodeId } =
         await parserVolunteerSelfRegister(person, request.body);
 
       const owner = request.ngoOwnerAgentId
@@ -138,7 +138,7 @@ export default async function volunteerRegisterRoutes(
       try {
         id = await writeVolunteerLegacy(
           volunteer,
-          addressReuse,
+          addressPostcodeId,
           owner
             ? {
                 type: "owner_changed",

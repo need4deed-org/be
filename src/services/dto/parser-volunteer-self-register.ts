@@ -11,9 +11,7 @@ import { BadRequestError } from "../../config";
 import { dataSource } from "../../data/data-source";
 import Deal from "../../data/entity/deal.entity";
 import LeadFrom from "../../data/entity/lead.entity";
-import Address from "../../data/entity/location/address.entity";
 import District from "../../data/entity/location/district.entity";
-import Postcode from "../../data/entity/location/postcode.entity";
 import DealActivity from "../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../data/entity/m2m/deal-district";
 import DealLanguage from "../../data/entity/m2m/deal-language";
@@ -25,7 +23,6 @@ import Skill from "../../data/entity/profile/skill.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
 import { DealType } from "../../data/types";
 import { getPostcode, getRepository } from "../../data/utils";
-import { AddressReusePlan } from "../../server/utils";
 import { buildDealTimeslots, WEEKDAYS } from "./build-deal-timeslots";
 import { resolveByIds, toIds } from "./parser-deal-opportunity-create";
 
@@ -103,25 +100,13 @@ async function resolveLeadFrom(
   return leadFromRepository.findBy({ id: In(uniqueIds) });
 }
 
-function resolveAddress(
-  person: Person,
-  postcode: Postcode,
-): { address?: Address; addressReuse?: AddressReusePlan } {
-  if (person.addressId) {
-    return {
-      addressReuse: { addressId: person.addressId, postcodeId: postcode.id },
-    };
-  }
-  return { address: new Address({ postcode }) };
-}
-
 export async function parserVolunteerSelfRegister(
   person: Person,
   body: VolunteerSelfRegisterBody,
 ): Promise<{
   volunteer: Volunteer;
   leads: LeadFrom[];
-  addressReuse?: AddressReusePlan;
+  addressPostcodeId: number;
 }> {
   const postcode = await getPostcode(String(body.addressPostcode));
 
@@ -143,11 +128,6 @@ export async function parserVolunteerSelfRegister(
       resolveDealLanguages(body.languages),
       buildDealTimeslots(availabilityToTimeslots(body.availability), null),
     ]);
-  const { address, addressReuse } = resolveAddress(person, postcode);
-  if (address) {
-    person.address = address;
-  }
-
   const deal = new Deal({
     type: DealType.VOLUNTEER,
     dealActivity,
@@ -168,5 +148,5 @@ export async function parserVolunteerSelfRegister(
 
   const leads = await resolveLeadFrom(body.leadFrom);
 
-  return { volunteer, leads, addressReuse };
+  return { volunteer, leads, addressPostcodeId: postcode.id };
 }

@@ -11,7 +11,10 @@ import {
   resolveAddressPostcode,
 } from "./for-routes";
 
-type PersonAddressPatch = NonNullable<ApiPersonPatch["address"]>;
+type SdkPersonAddressPatch = NonNullable<ApiPersonPatch["address"]>;
+type PersonAddressPatch = Omit<SdkPersonAddressPatch, "postcode"> & {
+  postcode?: Partial<NonNullable<SdkPersonAddressPatch["postcode"]>>;
+};
 
 async function resolvePostcode(
   postcode: PersonAddressPatch["postcode"],
@@ -33,7 +36,7 @@ export async function updatePersonAddress(
   personId: number,
   address: PersonAddressPatch,
   manager: EntityManager,
-): Promise<void> {
+): Promise<number | null> {
   const fields: Partial<Address> = {
     ...(address.street !== undefined && { street: address.street || null }),
     ...(address.city !== undefined && { city: address.city || null }),
@@ -47,7 +50,7 @@ export async function updatePersonAddress(
 
   if (person.addressId) {
     if (!Object.keys(fields).length && !postcodeData.id) {
-      return;
+      return person.addressId;
     }
     const addressId = await patchOrReplaceAddress(
       person.id,
@@ -58,11 +61,11 @@ export async function updatePersonAddress(
     if (!addressId) {
       throw new BadRequestError("Address not saved.");
     }
-    return;
+    return addressId;
   }
 
   if (!fields.street && !fields.city && !postcodeData.id) {
-    return;
+    return null;
   }
   const created = await createAddress(fields, postcodeData, manager);
   if (!created) {
@@ -72,4 +75,5 @@ export async function updatePersonAddress(
     { id: person.id },
     { addressId: created.id },
   );
+  return created.id;
 }
