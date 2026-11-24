@@ -261,7 +261,6 @@ export async function getOptions(
         EntityTableName.LANGUAGE,
         EntityTableName.SKILL,
         EntityTableName.LEAD,
-        EntityTableName.CATEGORY,
         EntityTableName.AGENT_TYPE,
         EntityTableName.SERVICE,
       ].includes(itemType)
@@ -315,7 +314,6 @@ export async function getOptions(
     return {
       [EntityTableName.LANGUAGE]: await getList(EntityTableName.LANGUAGE),
       [EntityTableName.DISTRICT]: await getList(EntityTableName.DISTRICT),
-      [EntityTableName.CATEGORY]: await getList(EntityTableName.CATEGORY),
       [EntityTableName.ACTIVITY]: await getList(EntityTableName.ACTIVITY),
       [EntityTableName.SKILL]: await getList(EntityTableName.SKILL),
       [EntityTableName.LEAD]: await getList(EntityTableName.LEAD),

@@ -21,7 +21,6 @@ import Opportunity from "./opportunity/opportunity.entity";
 import Organization from "./organization.entity";
 import Activity from "./profile/activity.entity";
 import AgentType from "./profile/agent-type.entity";
-import Category from "./profile/category.entity";
 import Language from "./profile/language.entity";
 import Service from "./profile/service.entity";
 import Skill from "./profile/skill.entity";
@@ -29,7 +28,7 @@ import Skill from "./profile/skill.entity";
 @Entity()
 @Check(
   "CHK_field_translation_one_target",
-  `num_nonnulls("opportunity_id", "translated_language_id", "category_id", "activity_id", "skill_id", "agent_type_id", "service_id", "lead_from_id", "organization_id") = 1`,
+  `num_nonnulls("opportunity_id", "translated_language_id", "activity_id", "skill_id", "agent_type_id", "service_id", "lead_from_id", "organization_id") = 1`,
 )
 @Index(
   "UQ_field_translation_opportunity",
@@ -40,11 +39,6 @@ import Skill from "./profile/skill.entity";
   "UQ_field_translation_translated_language",
   ["translatedLanguageId", "fieldName", "languageId"],
   { unique: true, where: `"translated_language_id" IS NOT NULL` },
-)
-@Index(
-  "UQ_field_translation_category",
-  ["categoryId", "fieldName", "languageId"],
-  { unique: true, where: `"category_id" IS NOT NULL` },
 )
 @Index(
   "UQ_field_translation_activity",
@@ -148,12 +142,6 @@ export default class FieldTranslation {
   translatedLanguage?: Language;
   @Column({ nullable: true })
   translatedLanguageId?: number;
-
-  @ManyToOne(() => Category, { nullable: true, onDelete: "CASCADE" })
-  @JoinColumn({ name: "category_id" })
-  category?: Category;
-  @Column({ nullable: true })
-  categoryId?: number;
 
   @ManyToOne(() => Activity, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "activity_id" })

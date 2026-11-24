@@ -41,6 +41,10 @@ describe("getTranslatedEntity", () => {
     expect(getTranslatedEntity(EntityTableName.SKILL).fk).toBe("skillId");
   });
 
+  it("no longer translates categories (be#1076)", () => {
+    expect(isTranslatedEntityType(EntityTableName.CATEGORY)).toBe(false);
+  });
+
   it("throws for a table without translations", () => {
     expect(isTranslatedEntityType(EntityTableName.VOLUNTEER)).toBe(false);
     expect(() => getTranslatedEntity(EntityTableName.VOLUNTEER)).toThrow(

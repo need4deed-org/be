@@ -14,10 +14,6 @@
           "type": "array",
           "items": { "$ref": "OptionItem#" }
         },
-        "category": {
-          "type": "array",
-          "items": { "$ref": "OptionItem#" }
-        },
         "language": {
           "type": "array",
           "items": { "$ref": "OptionItem#" }
