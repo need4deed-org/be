@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import logger from "../../../logger";
+import { htmlToText } from "../../../services/notify/html-to-text";
 import { DryRunSlackTransport } from "../../../services/notify/transports/dry-run";
 import {
-  htmlToText,
   SlackEmailTransport,
   splitText,
 } from "../../../services/notify/transports/slack-email";
@@ -128,5 +128,13 @@ describe("htmlToText", () => {
     expect(htmlToText("<style>p{color:red}</style>One<br/>Two<br>Three")).toBe(
       "One\nTwo\nThree",
     );
+  });
+
+  it("keeps link targets and decodes named and numeric entities", () => {
+    expect(
+      htmlToText(
+        '<p>F&uuml;r dich &#8211; <a href="https://x.org/a">hier</a></p><p>&#99999999;</p>',
+      ),
+    ).toBe("Für dich – hier (https://x.org/a)\n&#99999999;");
   });
 });

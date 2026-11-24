@@ -35,6 +35,7 @@ import {
   EMAIL_TEMPLATES,
   EmailTemplateDefinition,
 } from "./email-templates";
+import { htmlToText } from "./html-to-text";
 
 type ContentWithLabels = LocaleContent & { labels?: Record<string, unknown> };
 
@@ -92,9 +93,20 @@ async function readStored(
   definition: EmailTemplateDefinition,
 ): Promise<StoredTemplate> {
   const storage = getCdnStorage();
-  const raw = storage
-    ? await storage.read(definition.storageKey)
-    : await readFromCdn(definition.url);
+  let raw: string | null;
+  try {
+    raw = storage
+      ? await storage.read(definition.storageKey)
+      : await readFromCdn(definition.url);
+  } catch (err) {
+    if (err instanceof CdnUnavailableError) {
+      throw err;
+    }
+    logger.warn(
+      `email template "${definition.name}" read failed: ${err instanceof Error ? err.message : err}`,
+    );
+    throw new CdnUnavailableError();
+  }
   return {
     raw,
     manifest: raw === null ? null : parseManifest(definition.name, raw),
@@ -117,69 +129,6 @@ function builtinFor(
     : (builtin[lang] as ContentWithLabels);
 }
 
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  auml: "ä",
-  ouml: "ö",
-  uuml: "ü",
-  Auml: "Ä",
-  Ouml: "Ö",
-  Uuml: "Ü",
-  szlig: "ß",
-  euro: "€",
-  ndash: "–",
-  mdash: "—",
-  hellip: "…",
-  bdquo: "„",
-  ldquo: "“",
-  rdquo: "”",
-  lsquo: "‘",
-  rsquo: "’",
-  laquo: "«",
-  raquo: "»",
-};
-
-function decodeEntities(source: string): string {
-  return source.replace(
-    /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,
-    (entity, body: string) => {
-      if (body.startsWith("#")) {
-        const code =
-          body[1].toLowerCase() === "x"
-            ? parseInt(body.slice(2), 16)
-            : parseInt(body.slice(1), 10);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : entity;
-      }
-      return NAMED_ENTITIES[body] ?? entity;
-    },
-  );
-}
-
-function textFromHtml(html: string | undefined): string {
-  return decodeEntities(
-    (html ?? "")
-      .replace(/<(head|style|script)\b[\s\S]*?<\/\1\s*>/gi, "")
-      .replace(
-        /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a\s*>/gi,
-        (_match, _quote, href: string, label: string) => {
-          const text = label.replace(/<[^>]+>/g, "").trim();
-          return !text || text === href ? href : `${text} (${href})`;
-        },
-      )
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|div|li|h[1-6]|tr)\s*>/gi, "\n\n")
-      .replace(/<[^>]+>/g, ""),
-  )
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function toText(
   definition: EmailTemplateDefinition,
   content: ContentWithLabels,
@@ -187,7 +136,8 @@ function toText(
   builtin: ContentWithLabels,
 ): ApiEmailTemplateText {
   const { subject } = content;
-  const text = content.text || textFromHtml(content.html) || builtin.text || "";
+  const text =
+    content.text || htmlToText(content.html ?? "") || builtin.text || "";
   if (definition.labelKeys.length === 0) {
     return { subject, text };
   }

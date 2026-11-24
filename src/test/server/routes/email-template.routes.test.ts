@@ -515,7 +515,7 @@ describe("admin email templates", () => {
     const htmlOnly = await getStale();
     expect(htmlOnly.hasHtml).toBe(true);
     expect(htmlOnly.template.content.text).toBe(
-      "Hallo {{ volunteerName }} & Team\n\nBis bald",
+      "Hallo {{ volunteerName }} & Team\nBis bald",
     );
 
     bucket.files.set(
