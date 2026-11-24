@@ -38,24 +38,32 @@ export async function writeVolunteerLegacy(
     const volunteerRepository =
       transactionalEntityManager.getRepository(Volunteer);
 
+    const { person } = volunteer;
     if (addressReuse) {
-      const patched = await patchOrReplaceAddress(
-        volunteer.person.id,
+      const patchedId = await patchOrReplaceAddress(
+        person.id,
         { id: addressReuse.addressId },
         { id: addressReuse.postcodeId },
         transactionalEntityManager,
       );
-      if (!patched) {
-        throw new Error(
-          `Failed to reuse Address ${addressReuse.addressId} for Person ${volunteer.person.id}.`,
-        );
-      }
-      volunteer.person.addressId = patched;
+      person.address = patchedId
+        ? await addressRepository.findOneByOrFail({ id: patchedId })
+        : await addressRepository.save(
+            new Address({ postcodeId: addressReuse.postcodeId }),
+          );
     } else {
-      await addressRepository.save(volunteer.person.address);
+      await addressRepository.save(person.address);
     }
+    person.addressId = person.address.id;
 
-    await personRepository.save(volunteer.person);
+    if (person.id) {
+      await personRepository.update(
+        { id: person.id },
+        { addressId: person.addressId },
+      );
+    } else {
+      await personRepository.save(person);
+    }
 
     await dealRepository.save(volunteer.deal);
     const dealId = volunteer.deal.id;
