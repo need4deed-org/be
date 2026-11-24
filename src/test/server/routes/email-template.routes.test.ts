@@ -483,6 +483,51 @@ describe("admin email templates", () => {
     });
   });
 
+  it("checks the placeholders of each language against that language", async () => {
+    bucket.files.set(
+      TAGGED_KEY,
+      JSON.stringify({
+        en: {
+          subject: "Tagged",
+          text: "Hi {{ recipientName }}, see {{ link }}",
+        },
+        de: { subject: "Markiert", text: "Hallo {{ recipientName }}" },
+      }),
+    );
+    const { data } = (
+      await request("GET", `/${EmailTemplateName.TAGGED}`)
+    ).json();
+    const res = await request("PUT", `/${EmailTemplateName.TAGGED}`, {
+      version: data.version,
+      template: data.template,
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("shows the text of an html-only file and only warns about html that is sent", async () => {
+    bucket.files.set(
+      STALE_KEY,
+      JSON.stringify({
+        subject: "Noch dabei?",
+        html: "<p>Hallo {{ volunteerName }} &amp; Team</p><p>Bis bald</p>",
+      }),
+    );
+    const htmlOnly = await getStale();
+    expect(htmlOnly.hasHtml).toBe(true);
+    expect(htmlOnly.template.content.text).toBe(
+      "Hallo {{ volunteerName }} & Team\n\nBis bald",
+    );
+
+    bucket.files.set(
+      STALE_KEY,
+      JSON.stringify({
+        de: { subject: "Noch dabei?", text: "Hallo {{ volunteerName }}" },
+        en: { subject: "Still?", text: "Hi", html: "<p>Hi</p>" },
+      }),
+    );
+    expect((await getStale()).hasHtml).toBe(false);
+  });
+
   it("refuses to save without CDN write access", async () => {
     bucket.enabled = false;
     const res = await request("PUT", `/${EmailTemplateName.STALE}`, {

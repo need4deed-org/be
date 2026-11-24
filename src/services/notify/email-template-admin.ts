@@ -104,6 +104,25 @@ function builtinFor(
     : (builtin[lang] as ContentWithLabels);
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&nbsp;": " ",
+};
+
+function textFromHtml(html: string | undefined): string {
+  return (html ?? "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])\s*>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (entity) => HTML_ENTITIES[entity])
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function toText(
   definition: EmailTemplateDefinition,
   content: ContentWithLabels,
@@ -111,7 +130,7 @@ function toText(
   builtin: ContentWithLabels,
 ): ApiEmailTemplateText {
   const { subject } = content;
-  const text = content.text || builtin.text || "";
+  const text = content.text || textFromHtml(content.html) || builtin.text || "";
   if (definition.labelKeys.length === 0) {
     return { subject, text };
   }
@@ -162,13 +181,13 @@ function toApiContent(
     ? isFlatContent(manifest)
     : isFlatBuiltin(definition.builtin);
   if (!flat && !isPerLanguageAllowed(definition)) {
-    const stored = manifest as Partial<Record<Lang, ContentWithLabels>>;
+    const stored = manifest as Partial<Record<Lang, ContentWithLabels>> | null;
     return {
       layout: EmailTemplateLayout.SINGLE,
       content: toText(
         definition,
         sentContent(definition, stored, Lang.DE),
-        stored[Lang.DE],
+        stored?.[Lang.DE],
         builtinFor(definition, Lang.DE),
       ),
     };
@@ -205,13 +224,13 @@ function toApiContent(
   };
 }
 
-function hasHtml(manifest: Manifest | null): boolean {
-  if (!manifest) {
-    return false;
-  }
-  return isFlatContent(manifest)
-    ? Boolean(manifest.html)
-    : LANGS.some((lang) => Boolean(manifest[lang]?.html));
+function hasHtml(
+  definition: EmailTemplateDefinition,
+  manifest: Manifest | null,
+): boolean {
+  return manifest
+    ? storedContents(definition, manifest).some(({ html }) => Boolean(html))
+    : false;
 }
 
 function storedContents(
@@ -233,10 +252,18 @@ function storedContents(
 function requiredPlaceholders(
   definition: EmailTemplateDefinition,
   manifest: Manifest | null,
+  lang?: Lang,
 ): Set<string> {
   const allowed = new Set(definition.placeholders);
+  const contents =
+    lang &&
+    manifest &&
+    !isFlatContent(manifest) &&
+    isPerLanguageAllowed(definition)
+      ? [sentContent(definition, manifest, lang)]
+      : storedContents(definition, manifest);
   return new Set(
-    storedContents(definition, manifest)
+    contents
       .flatMap(({ subject, text, html }) =>
         placeholdersIn(`${subject}\n${text ?? ""}\n${html ?? ""}`).map(
           ({ key }) => key,
@@ -269,7 +296,7 @@ function toGet(
     allowedLayouts: allowedLayoutsOf(definition),
     placeholders: placeholdersOf(definition, stored.manifest),
     labelKeys: definition.labelKeys,
-    hasHtml: hasHtml(stored.manifest),
+    hasHtml: hasHtml(definition, stored.manifest),
   };
 }
 
@@ -444,11 +471,10 @@ function validate(
     });
   }
   const texts = textsOf(template);
-  const required = requiredPlaceholders(definition, current);
   for (const { lang, text } of texts) {
     const problem = problemsOf(
       definition,
-      required,
+      requiredPlaceholders(definition, current, lang),
       text,
       lang === undefined && !definition.knowsRecipientLocale,
     );

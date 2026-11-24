@@ -1,5 +1,6 @@
 import { EmailTemplateName, Lang } from "need4deed-sdk";
 import {
+  CDNBaseUrl,
   emailAccompanyMatchManifestUrl,
   emailAccompanyMatchVolunteerManifestUrl,
   emailAccompanyNotFoundManifestUrl,
@@ -345,7 +346,7 @@ export const EMAIL_TEMPLATES = Object.fromEntries(
     const definition: EmailTemplateDefinition = {
       name,
       url,
-      storageKey: `emails/${name}.json`,
+      storageKey: url.slice(CDNBaseUrl.length).replace(/^\/+/, ""),
       loader: createManifestLoader(url),
       builtin,
       placeholders: WITH_EMAIL_NOTE.has(name)

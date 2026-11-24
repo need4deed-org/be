@@ -448,6 +448,9 @@ function createCachedLoader<T>(
             err,
           ),
         );
+        if (startedAt !== generation && cache) {
+          return cache.value;
+        }
         const value = cache ? cache.value : onColdFailure(err);
         cache = { value, expires: now + emailTemplateRetryMs };
         return value;

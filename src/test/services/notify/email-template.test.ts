@@ -559,6 +559,25 @@ describe("createManifestLoader", () => {
     expect(await loader.load()).toEqual(primed);
   });
 
+  it("keeps a primed value over a fetch that started before it and failed", async () => {
+    let rejectFetch: (err: Error) => void = () => undefined;
+    vi.mocked(fetchJsonFromUrl).mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectFetch = reject;
+      }),
+    );
+    const loader = createManifestLoader(url);
+    const loading = loader.load();
+    const primed = { subject: "Primed", text: "primed body" };
+    loader.prime(primed);
+    rejectFetch(new Error("CDN down"));
+    expect(await loading).toEqual(primed);
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(2 * 60 * 1000);
+    expect(await loader.load()).toEqual(primed);
+    expect(fetchJsonFromUrl).toHaveBeenCalledTimes(1);
+  });
+
   it("serves a primed value without fetching", async () => {
     const loader = createManifestLoader(url);
     const primed = { subject: "Primed", text: "primed body" };
