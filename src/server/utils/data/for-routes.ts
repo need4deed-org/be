@@ -232,6 +232,16 @@ export async function getTimedEvents(volunteer: Volunteer) {
   return events;
 }
 
+export const optionLists: readonly EntityTableName[] = [
+  EntityTableName.LANGUAGE,
+  EntityTableName.DISTRICT,
+  EntityTableName.ACTIVITY,
+  EntityTableName.SKILL,
+  EntityTableName.LEAD,
+  EntityTableName.AGENT_TYPE,
+  EntityTableName.SERVICE,
+];
+
 export async function getOptions(
   list: EntityTableName | undefined,
   language: Lang,
@@ -255,17 +265,7 @@ export async function getOptions(
       where: { itemType },
     });
 
-    if (
-      [
-        EntityTableName.ACTIVITY,
-        EntityTableName.LANGUAGE,
-        EntityTableName.SKILL,
-        EntityTableName.LEAD,
-        EntityTableName.CATEGORY,
-        EntityTableName.AGENT_TYPE,
-        EntityTableName.SERVICE,
-      ].includes(itemType)
-    ) {
+    if (isTranslatedEntityType(itemType)) {
       const { fk } = getTranslatedEntity(itemType);
       const rows = await fieldTranslationRepository.find({
         where: {
@@ -312,23 +312,18 @@ export async function getOptions(
   }
 
   if (!list) {
-    return {
-      [EntityTableName.LANGUAGE]: await getList(EntityTableName.LANGUAGE),
-      [EntityTableName.DISTRICT]: await getList(EntityTableName.DISTRICT),
-      [EntityTableName.CATEGORY]: await getList(EntityTableName.CATEGORY),
-      [EntityTableName.ACTIVITY]: await getList(EntityTableName.ACTIVITY),
-      [EntityTableName.SKILL]: await getList(EntityTableName.SKILL),
-      [EntityTableName.LEAD]: await getList(EntityTableName.LEAD),
-      [EntityTableName.AGENT_TYPE]: await getList(EntityTableName.AGENT_TYPE),
-      [EntityTableName.SERVICE]: await getList(EntityTableName.SERVICE),
-    };
+    const lists: ApiOptionLists = {};
+    for (const itemType of optionLists) {
+      lists[itemType] = await getList(itemType);
+    }
+    return lists;
   }
 
-  if (!Object.values(EntityTableName).includes(list)) {
-    throw new Error(`Unknown list: ${list}`);
+  if (!optionLists.includes(list)) {
+    throw new BadRequestError(`Unknown option list: ${list}`);
   }
 
-  return await { [list]: await getList(list) };
+  return { [list]: await getList(list) };
 }
 
 export async function patchEntity<E extends { id: number }>(

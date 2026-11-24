@@ -9,7 +9,6 @@ import Opportunity from "../../data/entity/opportunity/opportunity.entity";
 import Organization from "../../data/entity/organization.entity";
 import Activity from "../../data/entity/profile/activity.entity";
 import AgentType from "../../data/entity/profile/agent-type.entity";
-import Category from "../../data/entity/profile/category.entity";
 import Language from "../../data/entity/profile/language.entity";
 import Service from "../../data/entity/profile/service.entity";
 import Skill from "../../data/entity/profile/skill.entity";
@@ -35,12 +34,6 @@ export const translatedEntities = {
     fk: "translatedLanguageId",
     entity: Language,
     fields: ["title"],
-    machine: false,
-  },
-  [EntityTableName.CATEGORY]: {
-    fk: "categoryId",
-    entity: Category,
-    fields: ["title", "description"],
     machine: false,
   },
   [EntityTableName.ACTIVITY]: {

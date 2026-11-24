@@ -1,7 +1,6 @@
 import { DataSource, IsNull, Not, Repository } from "typeorm";
 import {
   seedActivityFile,
-  seedCategoryFile,
   seedLanguageInUseFile,
   seedLeadFromFile,
   seedSkillFile,
@@ -11,7 +10,6 @@ import FieldTranslation from "../../entity/field_translation.entity";
 import LeadFrom from "../../entity/lead.entity";
 import Activity from "../../entity/profile/activity.entity";
 import AgentType from "../../entity/profile/agent-type.entity";
-import Category from "../../entity/profile/category.entity";
 import Language from "../../entity/profile/language.entity";
 import Service from "../../entity/profile/service.entity";
 import Skill from "../../entity/profile/skill.entity";
@@ -54,8 +52,6 @@ const SERVICE_TRANSLATIONS: Record<string, ContentEnDe> = {
   education: { en: "Education", de: "Bildung" },
 };
 
-const fieldNameTitle = "title";
-const fieldNameDescription = "description";
 const isoCodeEN = "en";
 const isoCodeDE = "de";
 
@@ -67,7 +63,6 @@ interface ContentEnDe {
 interface OptionJSON {
   id: string;
   title: ContentEnDe;
-  description?: ContentEnDe;
 }
 
 async function seedLanguagesInUse(
@@ -130,94 +125,6 @@ async function seedLanguagesInUse(
     await fieldTranslationRepository.insert(translationsForInsert);
   } catch (error) {
     throw new Error(`Error inserting language translations: ${error.message}`);
-  }
-}
-
-async function seedCategories(
-  fieldTranslationRepository: Repository<FieldTranslation>,
-  categoryRepository: Repository<Category>,
-  langEN: Language,
-  langDE: Language,
-) {
-  const categoryTranslations = (await fetchJsonFromUrl(
-    seedCategoryFile,
-  )) as OptionJSON[];
-
-  const categories = await categoryRepository.find();
-  if (!categories.length) {
-    throw new Error("Categories not loaded yet.");
-  }
-
-  const existingCategoryTranslations = await fieldTranslationRepository.find({
-    where: { categoryId: Not(IsNull()) },
-    relations: ["language"],
-  });
-
-  const existingCategoryTranslationsSet = new Set(
-    existingCategoryTranslations
-      ? existingCategoryTranslations.map(
-          (translation) =>
-            `${translation.language.isoCode}_${translation.categoryId}_${translation.fieldName}`,
-        )
-      : [],
-  );
-
-  const translationsForInsert: FieldTranslation[] = [];
-  for (const translation of categoryTranslations) {
-    const { id, title, description } = translation;
-    const category = categories.find((_category) => _category.title === id);
-    if (
-      !existingCategoryTranslationsSet.has(
-        `${isoCodeEN}_${category.id}_${fieldNameTitle}`,
-      )
-    ) {
-      const newTranslation = new FieldTranslation();
-      newTranslation.translation = title.en;
-      newTranslation.categoryId = category.id;
-      newTranslation.languageId = langEN.id;
-      translationsForInsert.push(newTranslation);
-    }
-    if (
-      !existingCategoryTranslationsSet.has(
-        `${isoCodeDE}_${category.id}_${fieldNameTitle}`,
-      )
-    ) {
-      const newTranslation = new FieldTranslation();
-      newTranslation.translation = title.de;
-      newTranslation.categoryId = category.id;
-      newTranslation.languageId = langDE.id;
-      translationsForInsert.push(newTranslation);
-    }
-    if (
-      !existingCategoryTranslationsSet.has(
-        `${isoCodeEN}_${category.id}_${fieldNameDescription}`,
-      )
-    ) {
-      const newTranslation = new FieldTranslation();
-      newTranslation.fieldName = fieldNameDescription;
-      newTranslation.translation = description.en;
-      newTranslation.categoryId = category.id;
-      newTranslation.languageId = langEN.id;
-      translationsForInsert.push(newTranslation);
-    }
-    if (
-      !existingCategoryTranslationsSet.has(
-        `${isoCodeDE}_${category.id}_${fieldNameDescription}`,
-      )
-    ) {
-      const newTranslation = new FieldTranslation();
-      newTranslation.fieldName = fieldNameDescription;
-      newTranslation.translation = description.de;
-      newTranslation.categoryId = category.id;
-      newTranslation.languageId = langDE.id;
-      translationsForInsert.push(newTranslation);
-    }
-  }
-
-  try {
-    await fieldTranslationRepository.insert(translationsForInsert);
-  } catch (error) {
-    throw new Error(`Error inserting category translations: ${error.message}`);
   }
 }
 
@@ -538,14 +445,6 @@ export async function seedFieldTranslation(
   await seedLanguagesInUse(
     fieldTranslationRepository,
     languageRepository,
-    langEN,
-    langDE,
-  );
-
-  const categoryRepository = getRepository(dataSource, Category);
-  await seedCategories(
-    fieldTranslationRepository,
-    categoryRepository,
     langEN,
     langDE,
   );
