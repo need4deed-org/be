@@ -217,6 +217,7 @@ export default async function opportunityLegacyRoutes(
         const STATUS_MAP = {
           "opp-new": "New",
           "opp-searching": "Search in process",
+          "opp-active": "Search in process",
           "opp-found": "Search completed",
           inactive: "Inactive",
         };
@@ -364,10 +365,11 @@ export default async function opportunityLegacyRoutes(
       const opportunityRepository = fastify.db.opportunityRepository;
       const opportunities = await opportunityRepository.find({
         where: {
+          // be#1058: the open website lists only validated opportunities
+          // that are looking for volunteers, never NEW (unvalidated) ones.
           status: In([
-            OpportunityStatusType.NEW,
-            OpportunityStatusType.ACTIVE,
             OpportunityStatusType.SEARCHING,
+            OpportunityStatusType.ACTIVE,
           ]),
         },
         take: 300,
