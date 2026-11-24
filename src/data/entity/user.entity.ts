@@ -50,6 +50,10 @@ export default class User {
   @IsOptional()
   deactivatedAt: Date | null;
 
+  @Column({ type: "timestamptz", nullable: true })
+  @IsOptional()
+  credentialsValidAfter: Date | null;
+
   @Column({ type: "enum", enum: UserRole, default: UserRole.USER })
   @IsEnum(UserRole)
   role: UserRole;
