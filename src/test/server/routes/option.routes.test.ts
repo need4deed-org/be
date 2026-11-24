@@ -37,15 +37,17 @@ describe("GET /option", () => {
     expect(data[EntityTableName.SKILL].length).toBeGreaterThan(0);
   });
 
-  it("returns an empty body for a table that isn't an option list", async () => {
-    const response = await fastify.inject({
-      method: "GET",
-      url: `/option/${EntityTableName.CATEGORY}`,
-    });
+  it.each([EntityTableName.CATEGORY, "not-a-table"])(
+    "rejects %s, which isn't an option list, with 400",
+    async (list) => {
+      const response = await fastify.inject({
+        method: "GET",
+        url: `/option/${list}`,
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().data).toEqual({});
-  });
+      expect(response.statusCode).toBe(400);
+    },
+  );
 
   it("returns only the requested list", async () => {
     const response = await fastify.inject({

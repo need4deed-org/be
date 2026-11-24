@@ -4,7 +4,7 @@ import { ApiOptionLists, EntityTableName, Lang } from "need4deed-sdk";
 import logger from "../../logger";
 import { responseErrors } from "../schema";
 import { RoutePrefix } from "../types";
-import { getOptions } from "../utils";
+import { getOptions, optionLists } from "../utils";
 
 async function optionRoutes(
   fastify: FastifyInstance,
@@ -26,7 +26,7 @@ async function optionRoutes(
         params: {
           type: "object",
           properties: {
-            list: { type: ["string"] },
+            list: { type: "string", enum: optionLists },
           },
         },
         response: {

@@ -232,7 +232,7 @@ export async function getTimedEvents(volunteer: Volunteer) {
   return events;
 }
 
-const optionLists: EntityTableName[] = [
+export const optionLists: EntityTableName[] = [
   EntityTableName.LANGUAGE,
   EntityTableName.DISTRICT,
   EntityTableName.ACTIVITY,
@@ -265,16 +265,7 @@ export async function getOptions(
       where: { itemType },
     });
 
-    if (
-      [
-        EntityTableName.ACTIVITY,
-        EntityTableName.LANGUAGE,
-        EntityTableName.SKILL,
-        EntityTableName.LEAD,
-        EntityTableName.AGENT_TYPE,
-        EntityTableName.SERVICE,
-      ].includes(itemType)
-    ) {
+    if (isTranslatedEntityType(itemType)) {
       const { fk } = getTranslatedEntity(itemType);
       const rows = await fieldTranslationRepository.find({
         where: {
@@ -328,12 +319,8 @@ export async function getOptions(
     return lists;
   }
 
-  if (!Object.values(EntityTableName).includes(list)) {
-    throw new Error(`Unknown list: ${list}`);
-  }
-
   if (!optionLists.includes(list)) {
-    return {};
+    throw new Error(`Unknown option list: ${list}`);
   }
 
   return { [list]: await getList(list) };
