@@ -100,6 +100,17 @@ async function findOrCreateAgent(
   });
 }
 
+// be#1058: the open website lists only validated opportunities that are
+// looking for volunteers, never NEW (unvalidated), INACTIVE or PAST ones.
+// The keys are both the list's status filter and its public labels.
+const PUBLIC_STATUS_LABEL: Partial<Record<OpportunityStatusType, string>> = {
+  [OpportunityStatusType.SEARCHING]: "Search in process",
+  [OpportunityStatusType.ACTIVE]: "Search in process",
+};
+const PUBLIC_STATUSES = Object.keys(
+  PUBLIC_STATUS_LABEL,
+) as OpportunityStatusType[];
+
 export default async function opportunityLegacyRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
@@ -214,13 +225,6 @@ export default async function opportunityLegacyRoutes(
       function parseOpportunityLegacyResponse(
         rawList: Opportunity[],
       ): OpportunityLegacyResponse[] {
-        const STATUS_MAP = {
-          "opp-new": "New",
-          "opp-searching": "Search in process",
-          "opp-found": "Search completed",
-          inactive: "Inactive",
-        };
-
         const TYPE_MAP = {
           regular: "volunteering",
           accompanying: "accompanying",
@@ -348,7 +352,7 @@ export default async function opportunityLegacyRoutes(
             activities,
             languages,
             skills,
-            status: STATUS_MAP[raw.status] ?? raw.status,
+            status: PUBLIC_STATUS_LABEL[raw.status] ?? raw.status,
             opportunity_type: TYPE_MAP[raw.type] ?? raw.type,
             created_at: raw.createdAt ?? null,
             updated_at: raw.updatedAt ?? null,
@@ -364,11 +368,7 @@ export default async function opportunityLegacyRoutes(
       const opportunityRepository = fastify.db.opportunityRepository;
       const opportunities = await opportunityRepository.find({
         where: {
-          status: In([
-            OpportunityStatusType.NEW,
-            OpportunityStatusType.ACTIVE,
-            OpportunityStatusType.SEARCHING,
-          ]),
+          status: In(PUBLIC_STATUSES),
         },
         take: 300,
         order: { id: "ASC" },

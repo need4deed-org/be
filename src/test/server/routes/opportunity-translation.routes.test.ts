@@ -415,6 +415,9 @@ describe("opportunity routes in the requested language", () => {
 
     it("public GET /opportunity/legacy: translates title and info", async () => {
       const opportunity = await germanOpportunity(english);
+      await dataSource.manager.update(Opportunity, opportunity.id, {
+        status: OpportunityStatusType.SEARCHING,
+      });
 
       const res = await fastify.inject({
         method: "GET",

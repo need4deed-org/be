@@ -10,6 +10,12 @@ const templateSchema = {
   },
 };
 
+const allowedLayoutsSchema = {
+  type: "array",
+  minItems: 1,
+  items: { type: "string", enum: Object.values(EmailTemplateLayout) },
+};
+
 const emailTemplateSchema = {
   type: "object",
   required: [
@@ -17,6 +23,7 @@ const emailTemplateSchema = {
     "editable",
     "version",
     "template",
+    "allowedLayouts",
     "placeholders",
     "labelKeys",
     "hasHtml",
@@ -26,6 +33,7 @@ const emailTemplateSchema = {
     editable: { type: "boolean" },
     version: { type: "string" },
     template: templateSchema,
+    allowedLayouts: allowedLayoutsSchema,
     placeholders: {
       type: "array",
       items: {
@@ -50,6 +58,7 @@ const saveErrorSchema = {
     message: { type: "string" },
     code: { type: "string" },
     lang: { type: "string" },
+    allowedLayouts: allowedLayoutsSchema,
     placeholders: { type: "array", items: { type: "string" } },
     fields: { type: "array", items: { type: "string" } },
   },
@@ -77,10 +86,11 @@ export const emailTemplateListResponseSchema = {
           type: "array",
           items: {
             type: "object",
-            required: ["name", "layout"],
+            required: ["name", "layout", "allowedLayouts"],
             properties: {
               name: { type: "string" },
               layout: { type: "string" },
+              allowedLayouts: allowedLayoutsSchema,
             },
           },
         },

@@ -149,10 +149,15 @@ describe("admin email templates", () => {
     expect(templates).toContainEqual({
       name: EmailTemplateName.STALE,
       layout: EmailTemplateLayout.SINGLE,
+      allowedLayouts: [EmailTemplateLayout.SINGLE],
     });
     expect(templates).toContainEqual({
       name: EmailTemplateName.TAGGED,
       layout: EmailTemplateLayout.PER_LANGUAGE,
+      allowedLayouts: [
+        EmailTemplateLayout.SINGLE,
+        EmailTemplateLayout.PER_LANGUAGE,
+      ],
     });
   });
 
@@ -219,23 +224,64 @@ describe("admin email templates", () => {
     ).toEqual(template.content);
   });
 
-  it("switches a single-language template to one text per language", async () => {
-    const content = {
-      [Lang.EN]: {
-        subject: "Hi {{ volunteerName }}",
-        text: "EN {{ volunteerName }}",
-      },
-      [Lang.DE]: {
-        subject: "Hallo {{ volunteerName }}",
-        text: "DE {{ volunteerName }}",
-      },
-    };
-    const res = await putStale({
+  it("splits a template per language only where the recipient's language is known", async () => {
+    const perLanguage = (text: (lang: Lang) => string) => ({
       layout: EmailTemplateLayout.PER_LANGUAGE,
-      content,
+      content: Object.fromEntries(
+        Object.values(Lang).map((lang) => [
+          lang,
+          { subject: `${lang} {{ volunteerName }}`, text: text(lang) },
+        ]),
+      ),
     });
+
+    const stale = await putStale(
+      perLanguage((lang) => `${lang} {{ volunteerName }}`),
+    );
+    expect(stale.statusCode).toBe(400);
+    expect(stale.json()).toMatchObject({
+      code: "layout_not_allowed",
+      allowedLayouts: [EmailTemplateLayout.SINGLE],
+    });
+
+    bucket.files.set(
+      TAGGED_KEY,
+      JSON.stringify({
+        subject: "Markiert",
+        text: "Hallo {{ recipientName }}",
+      }),
+    );
+    const { version } = (
+      await request("GET", `/${EmailTemplateName.TAGGED}`)
+    ).json().data;
+    const content = {
+      [Lang.EN]: { subject: "Tagged", text: "Hi {{ recipientName }}" },
+      [Lang.DE]: { subject: "Markiert", text: "Hallo {{ recipientName }}" },
+    };
+    const tagged = await request("PUT", `/${EmailTemplateName.TAGGED}`, {
+      version,
+      template: { layout: EmailTemplateLayout.PER_LANGUAGE, content },
+    });
+    expect(tagged.statusCode).toBe(200);
+    expect(JSON.parse(bucket.files.get(TAGGED_KEY) as string)).toEqual(content);
+  });
+
+  it("shows a per-language file of a one-text template as its German text", async () => {
+    bucket.files.set(
+      STALE_KEY,
+      JSON.stringify({
+        en: { subject: "Still there?", text: "Hi {{ volunteerName }}" },
+        de: { subject: "Noch dabei?", text: "Hallo {{ volunteerName }}" },
+      }),
+    );
+    const data = await getStale();
+    expect(data.allowedLayouts).toEqual([EmailTemplateLayout.SINGLE]);
+    expect(data.template).toEqual({
+      layout: EmailTemplateLayout.SINGLE,
+      content: { subject: "Noch dabei?", text: "Hallo {{ volunteerName }}" },
+    });
+    const res = await putStale(data.template, data.version);
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(bucket.files.get(STALE_KEY) as string)).toEqual(content);
   });
 
   it("refuses a save based on an outdated version", async () => {
@@ -272,18 +318,31 @@ describe("admin email templates", () => {
   });
 
   it("refuses dropping a placeholder the stored text uses, naming the language", async () => {
-    const res = await putStale({
-      layout: EmailTemplateLayout.PER_LANGUAGE,
-      content: {
-        [Lang.EN]: { subject: "Hi", text: "Hi {{ volunteerName }}" },
-        [Lang.DE]: { subject: "Hallo", text: "Hallo" },
+    bucket.files.set(
+      TAGGED_KEY,
+      JSON.stringify({
+        subject: "Markiert",
+        text: "Hallo {{ recipientName }}",
+      }),
+    );
+    const { version } = (
+      await request("GET", `/${EmailTemplateName.TAGGED}`)
+    ).json().data;
+    const res = await request("PUT", `/${EmailTemplateName.TAGGED}`, {
+      version,
+      template: {
+        layout: EmailTemplateLayout.PER_LANGUAGE,
+        content: {
+          [Lang.EN]: { subject: "Hi", text: "Hi {{ recipientName }}" },
+          [Lang.DE]: { subject: "Hallo", text: "Hallo" },
+        },
       },
     });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({
       code: "missing_placeholder",
       lang: Lang.DE,
-      placeholders: ["volunteerName"],
+      placeholders: ["recipientName"],
     });
   });
 

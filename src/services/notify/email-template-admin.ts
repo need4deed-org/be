@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   ApiEmailTemplateContent,
   ApiEmailTemplateGet,
+  ApiEmailTemplateLayouts,
   ApiEmailTemplateListItem,
   ApiEmailTemplatePlaceholder,
   ApiEmailTemplatePut,
@@ -141,6 +142,18 @@ function sentContent(
   return isValidContent(fallback) ? fallback : builtinFor(definition, lang);
 }
 
+function allowedLayoutsOf(
+  definition: EmailTemplateDefinition,
+): ApiEmailTemplateLayouts {
+  return definition.knowsRecipientLocale
+    ? [EmailTemplateLayout.SINGLE, EmailTemplateLayout.PER_LANGUAGE]
+    : [EmailTemplateLayout.SINGLE];
+}
+
+function isPerLanguageAllowed(definition: EmailTemplateDefinition): boolean {
+  return definition.knowsRecipientLocale;
+}
+
 function toApiContent(
   definition: EmailTemplateDefinition,
   manifest: Manifest | null,
@@ -148,6 +161,18 @@ function toApiContent(
   const flat = manifest
     ? isFlatContent(manifest)
     : isFlatBuiltin(definition.builtin);
+  if (!flat && !isPerLanguageAllowed(definition)) {
+    const stored = manifest as Partial<Record<Lang, ContentWithLabels>>;
+    return {
+      layout: EmailTemplateLayout.SINGLE,
+      content: toText(
+        definition,
+        sentContent(definition, stored, Lang.DE),
+        stored[Lang.DE],
+        builtinFor(definition, Lang.DE),
+      ),
+    };
+  }
   if (flat) {
     const builtin = builtinFor(definition, Lang.DE);
     const stored = manifest as ContentWithLabels | null;
@@ -196,9 +221,13 @@ function storedContents(
   if (!manifest) {
     return builtinContentsOf(definition.name);
   }
-  return isFlatContent(manifest)
-    ? [manifest]
-    : LANGS.flatMap((lang) => manifest[lang] ?? []);
+  if (isFlatContent(manifest)) {
+    return [manifest];
+  }
+  if (!isPerLanguageAllowed(definition)) {
+    return [sentContent(definition, manifest, Lang.DE)];
+  }
+  return LANGS.flatMap((lang) => manifest[lang] ?? []);
 }
 
 function requiredPlaceholders(
@@ -237,6 +266,7 @@ function toGet(
     editable: isEmailTemplateEditable(),
     version: versionOf(stored.raw),
     template: toApiContent(definition, stored.manifest),
+    allowedLayouts: allowedLayoutsOf(definition),
     placeholders: placeholdersOf(definition, stored.manifest),
     labelKeys: definition.labelKeys,
     hasHtml: hasHtml(stored.manifest),
@@ -260,6 +290,7 @@ export async function listEmailTemplates(): Promise<
       return {
         name: definition.name,
         layout: toApiContent(definition, manifest).layout,
+        allowedLayouts: allowedLayoutsOf(definition),
       };
     }),
   );
@@ -403,6 +434,15 @@ function validate(
   current: Manifest | null,
   template: ApiEmailTemplateContent,
 ): { lang?: Lang; text: ApiEmailTemplateText }[] {
+  const allowedLayouts = allowedLayoutsOf(definition);
+  if (!(allowedLayouts as EmailTemplateLayout[]).includes(template.layout)) {
+    throw new EmailTemplateSaveError({
+      code: "layout_not_allowed",
+      message:
+        "This email is sent without knowing the recipient's language, so it takes one text.",
+      allowedLayouts,
+    });
+  }
   const texts = textsOf(template);
   const required = requiredPlaceholders(definition, current);
   for (const { lang, text } of texts) {
