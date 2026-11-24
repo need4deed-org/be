@@ -1,6 +1,7 @@
 import { OpportunityVolunteerStatusType } from "need4deed-sdk";
 import { EntityManager } from "typeorm";
 import logger from "../../logger";
+import OpportunityAuditLog from "../entity/opportunity/opportunity-audit-log.entity";
 import Opportunity from "../entity/opportunity/opportunity.entity";
 import VolunteerAuditLog from "../entity/volunteer/volunteer-audit-log.entity";
 
@@ -13,6 +14,7 @@ type MatchChange = {
   actorUserId?: number;
   // Skips the lookup when the caller already has it.
   title?: string;
+  skipOpportunityLog?: boolean;
 };
 
 const linkedPrefix = (title: string) => `Linked to opportunity "${title}"`;
@@ -42,10 +44,37 @@ export const matchDetail = {
     `Opportunity "${title}" status changed${from ? ` from ${from}` : ""} to ${to}.`,
 };
 
-// One volunteer activity-log entry per match step.
+const volunteerLabel = (volunteerId: number) => `Volunteer #${volunteerId}`;
+
+export const opportunityMatchDetail = {
+  linked: (volunteerId: number, status?: OpportunityVolunteerStatusType) =>
+    `${volunteerLabel(volunteerId)} linked${status ? ` as ${status}` : ""}.`,
+  removed: (volunteerId: number, from: OpportunityVolunteerStatusType) =>
+    `${volunteerLabel(volunteerId)} removed (was ${from}).`,
+  statusChanged: (
+    volunteerId: number,
+    {
+      from,
+      to,
+    }: {
+      from?: OpportunityVolunteerStatusType;
+      to: OpportunityVolunteerStatusType;
+    },
+  ) =>
+    `${volunteerLabel(volunteerId)} match status changed${from ? ` from ${from}` : ""} to ${to}.`,
+};
+
 export async function logMatchChange(
   manager: EntityManager,
-  { volunteerId, opportunityId, from, to, actorUserId, ...known }: MatchChange,
+  {
+    volunteerId,
+    opportunityId,
+    from,
+    to,
+    actorUserId,
+    skipOpportunityLog,
+    ...known
+  }: MatchChange,
 ): Promise<void> {
   if (from === to) {
     return;
@@ -61,13 +90,21 @@ export async function logMatchChange(
   const title = matchDetail.title(opportunityTitle, opportunityId);
 
   let detail: string;
+  let opportunityDetail: string;
   if (from === undefined) {
     detail = matchDetail.linked(title, to);
+    opportunityDetail = opportunityMatchDetail.linked(volunteerId, to);
   } else if (to === undefined) {
     detail = matchDetail.removed(title, from);
+    opportunityDetail = opportunityMatchDetail.removed(volunteerId, from);
   } else {
     detail = matchDetail.statusChanged(title, { from, to });
+    opportunityDetail = opportunityMatchDetail.statusChanged(volunteerId, {
+      from,
+      to,
+    });
   }
+  const occurredAt = new Date();
 
   await manager.save(
     VolunteerAuditLog,
@@ -76,9 +113,21 @@ export async function logMatchChange(
       type: "opportunity_status_changed",
       detail,
       actorUserId,
-      occurredAt: new Date(),
+      occurredAt,
     }),
   );
+  if (!skipOpportunityLog) {
+    await manager.save(
+      OpportunityAuditLog,
+      new OpportunityAuditLog({
+        opportunityId,
+        type: "match-changed",
+        detail: opportunityDetail,
+        actorUserId,
+        occurredAt,
+      }),
+    );
+  }
 }
 
 // Inside a transaction a failed insert would abort the whole save, so the entry

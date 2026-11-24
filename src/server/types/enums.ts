@@ -3,6 +3,7 @@ export const RoutePrefix = {
   AGENT: "/agent",
   AUTH: "/auth",
   APPRECIATION: "/appreciation",
+  AUDIT_LOG: "/audit-log",
   COMMENT: "/comment",
   COMMUNICATION: "/communication",
   COMMUTE: "/commute",

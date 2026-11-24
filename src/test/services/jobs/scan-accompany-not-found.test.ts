@@ -165,6 +165,15 @@ describe("scanAccompanyNotFound", () => {
     expect(notifiedIds()).not.toContain(outOfWindow.id);
     expect(await loggedFor(inWindow)).toBe(1);
     expect(await statusOf(inWindow)).toBe(OpportunityStatusType.INACTIVE);
+    const auditEntries = await fastify.db.opportunityAuditLogRepository.find({
+      where: { opportunityId: inWindow.id },
+    });
+    expect(auditEntries).toHaveLength(1);
+    expect(auditEntries[0]).toMatchObject({
+      type: "status-changed",
+      actorUserId: null,
+    });
+    expect(auditEntries[0].detail).toContain(OpportunityStatusType.INACTIVE);
     expect(await loggedFor(outOfWindow)).toBe(0);
     expect(await statusOf(outOfWindow)).toBe(OpportunityStatusType.SEARCHING);
   });
@@ -329,6 +338,12 @@ describe("scanAccompanyNotFound", () => {
     await scanAccompanyNotFound(fastify, RUN_DAY);
 
     expect(await statusOf(opportunity)).toBe(OpportunityStatusType.PAST);
+    expect(
+      await fastify.db.opportunityAuditLogRepository.countBy({
+        opportunityId: opportunity.id,
+        type: "status-changed",
+      }),
+    ).toBe(0);
   });
 
   it("when the earlier-email lookup fails, alerts ops and carries on with the others", async () => {
