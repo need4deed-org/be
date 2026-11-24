@@ -1,18 +1,12 @@
-import {
-  emailFromNotify,
-  emailFromVolunteer,
-  emailStaleManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName } from "need4deed-sdk";
+import { emailFromNotify, emailFromVolunteer } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { STALE_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailStaleManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.STALE];
 
 export function resetStaleTemplateCache(): void {
   loader.resetCache();
@@ -31,7 +25,9 @@ export async function sendEmailStale(
 
   const volunteerName = ov.volunteer.person.name;
   const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, { volunteerName });
+  const { subject, text, html } = fillTemplate(content, {
+    volunteerName,
+  } satisfies EmailTemplateVars<EmailTemplateName.STALE>);
 
   await email.send({
     to: volunteerEmail,

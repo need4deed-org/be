@@ -1,5 +1,5 @@
+import { EmailTemplateName } from "need4deed-sdk";
 import {
-  emailAccompanyNotFoundManifestUrl,
   emailFromAccompanying,
   emailFromNotify,
 } from "../../../config/constants";
@@ -7,14 +7,11 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate } from "../../dto/utils";
 import { ACCOMPANY_NOT_FOUND_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailAccompanyNotFoundManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.ACCOMPANY_NOT_FOUND];
 
 export function resetAccompanyNotFoundTemplateCache(): void {
   loader.resetCache();
@@ -47,7 +44,7 @@ export async function sendEmailAccompanyNotFound(
     appointmentDate,
     appointmentDistrict,
     clientName,
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.ACCOMPANY_NOT_FOUND>);
 
   await email.send({
     to: contactPersonEmail,

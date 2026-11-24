@@ -1,24 +1,20 @@
-import { EntityTableName, Lang } from "need4deed-sdk";
-import {
-  emailFromNotify,
-  emailTaggedManifestUrl,
-  urlApp,
-} from "../../../config/constants";
+import { EmailTemplateName, EntityTableName, Lang } from "need4deed-sdk";
+import { emailFromNotify, urlApp } from "../../../config/constants";
 import {
   TAGGED_BUILTIN as BUILTIN,
   type TaggedLabels,
 } from "../builtin-content";
 import {
-  createManifestLoader,
   renderEmail,
   resolveLocale,
   resolveManifestLabel,
   type LocalizedValue,
   type Manifest,
 } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailTaggedManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.TAGGED];
 
 export function resetTaggedTemplateCache(): void {
   loader.resetCache();
@@ -107,7 +103,7 @@ export async function sendEmailTagged(
       tagText: neutralizeBraces(text),
       where: resolveLabel(manifest, whereLabel(where)),
       link: buildTaggedLink(where),
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.TAGGED>,
     resolveLocale(recipient.language),
     { escapeHtmlValues: true },
   );

@@ -1,14 +1,11 @@
-import { Lang } from "need4deed-sdk";
-import {
-  emailFromNotify,
-  emailFromVolunteer,
-  emailSuggestionManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName, Lang } from "need4deed-sdk";
+import { emailFromNotify, emailFromVolunteer } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityLocation } from "../../dto/dto-opportunity";
 import { formatScheduleLocalized } from "../../dto/utils";
 import { SUGGESTION_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmailWithNote } from "../email-template";
+import { renderEmailWithNote } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { localizedOpportunityTitle } from "../opportunity-title";
 import {
   OPPORTUNITY_SCHEDULE_LABELS,
@@ -16,7 +13,7 @@ import {
 } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailSuggestionManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.SUGGESTION];
 
 const SCHEDULE_FALLBACK = {
   [Lang.EN]: "to be confirmed",
@@ -75,7 +72,7 @@ export async function sendEmailSuggestion(
       opportunitySchedule,
       schedule: opportunitySchedule,
       scheduleNote,
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.SUGGESTION>,
     emailNote,
   );
 

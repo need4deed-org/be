@@ -1,21 +1,14 @@
-import { Lang } from "need4deed-sdk";
-import {
-  emailFromContact,
-  emailFromNotify,
-  emailNewRegularManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName, Lang } from "need4deed-sdk";
+import { emailFromContact, emailFromNotify } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { NEW_REGULAR_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { opportunityTitleIn } from "../opportunity-title";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailNewRegularManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.CONFIRMATION];
 
 export function resetNewRegularTemplateCache(): void {
   loader.resetCache();
@@ -43,7 +36,7 @@ export async function sendEmailNewRegular(
   const { subject, text, html } = fillTemplate(content, {
     contactpersonName,
     volunteeringopportunityName,
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.CONFIRMATION>);
 
   await email.send({
     to: contactPersonEmail,

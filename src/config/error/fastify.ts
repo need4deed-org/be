@@ -1,4 +1,8 @@
-import { AdminUserActionErrorCode } from "need4deed-sdk";
+import {
+  AdminUserActionErrorCode,
+  ApiEmailTemplateSaveError,
+  EmailTemplateSaveErrorCode,
+} from "need4deed-sdk";
 import { BaseError } from "./base";
 
 export class AdminActionError extends BaseError {
@@ -28,6 +32,12 @@ export class UnauthorizedError extends BaseError {
 export class EmailNotSentError extends BaseError {
   constructor(message = "Email not sent", details?: Record<string, unknown>) {
     super(message, 502, true, details);
+  }
+}
+
+export class CdnUnavailableError extends BaseError {
+  constructor(message = "The CDN is unavailable.") {
+    super(message, 502);
   }
 }
 
@@ -68,5 +78,18 @@ export class EmailAlreadySentError extends BaseError {
 export class DeactivatedVolunteerError extends BaseError {
   constructor(message = "Volunteer account has been deactivated.") {
     super(message, 409);
+  }
+}
+
+const EMAIL_TEMPLATE_SAVE_STATUS: Partial<
+  Record<EmailTemplateSaveErrorCode, number>
+> = { not_editable: 403, version_conflict: 409 };
+
+export class EmailTemplateSaveError extends BaseError {
+  constructor({ code, message, ...details }: ApiEmailTemplateSaveError) {
+    super(message, EMAIL_TEMPLATE_SAVE_STATUS[code] ?? 400, true, {
+      code,
+      ...details,
+    });
   }
 }

@@ -1,18 +1,12 @@
-import {
-  emailFromNotify,
-  emailFromVolunteer,
-  emailPostMatchCheckupManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName } from "need4deed-sdk";
+import { emailFromNotify, emailFromVolunteer } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { POST_MATCH_CHECKUP_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailPostMatchCheckupManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.CHECKUP];
 
 export function resetPostMatchCheckupTemplateCache(): void {
   loader.resetCache();
@@ -31,7 +25,9 @@ export async function sendEmailPostMatchCheckup(
 
   const volunteerName = ov.volunteer.person.name;
   const content = resolveFlatContent(await loader.load(), BUILTIN);
-  const { subject, text, html } = fillTemplate(content, { volunteerName });
+  const { subject, text, html } = fillTemplate(content, {
+    volunteerName,
+  } satisfies EmailTemplateVars<EmailTemplateName.CHECKUP>);
 
   await email.send({
     to: volunteerEmail,

@@ -1,9 +1,8 @@
-import { DocumentStatusType, Lang } from "need4deed-sdk";
+import { DocumentStatusType, EmailTemplateName, Lang } from "need4deed-sdk";
 import {
   emailFromContact,
   emailFromNotify,
   emailFromVolunteer,
-  emailIntroductionManifestUrl,
 } from "../../../config/constants";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
@@ -16,13 +15,14 @@ import {
   getOptionItems,
 } from "../../dto/utils";
 import { INTRODUCTION_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmailWithNote } from "../email-template";
+import { renderEmailWithNote } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { opportunityTitleIn } from "../opportunity-title";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import { resolveScheduleOrAlert } from "../resolve-schedule-or-alert";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailIntroductionManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.INTRODUCTION];
 
 export function resetIntroductionTemplateCache(): void {
   loader.resetCache();
@@ -171,7 +171,7 @@ export async function sendEmailIntroduction(
       agentTitle,
       opportunityAddress,
       statmentOnCertificates,
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.INTRODUCTION>,
     emailNote,
   );
 

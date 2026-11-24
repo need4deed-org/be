@@ -1,24 +1,20 @@
-import { Lang } from "need4deed-sdk";
+import { EmailTemplateName, Lang } from "need4deed-sdk";
 import {
   emailFromAccompanying,
   emailFromContact,
   emailFromNotify,
-  emailNewAccompanyingManifestUrl,
 } from "../../../config/constants";
 import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, formatOnetimerTime } from "../../dto/utils";
 import { NEW_ACCOMPANYING_BUILTIN as BUILTIN } from "../builtin-content";
-import {
-  createManifestLoader,
-  fillTemplate,
-  resolveFlatContent,
-} from "../email-template";
+import { fillTemplate, resolveFlatContent } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { opportunityTitleIn } from "../opportunity-title";
 import { resolveAccompaniedPersonLanguage } from "../resolve-accompanied-person-language";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailNewAccompanyingManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.CONFIRMATION_ACCOMPANYING];
 
 export function resetNewAccompanyingTemplateCache(): void {
   loader.resetCache();
@@ -74,7 +70,7 @@ export async function sendEmailNewAccompanying(
     accompaniedpersonPhone,
     appointmentComment,
     appointmentaLanguage: "",
-  });
+  } satisfies EmailTemplateVars<EmailTemplateName.CONFIRMATION_ACCOMPANYING>);
 
   await email.send({
     to: contactPersonEmail,

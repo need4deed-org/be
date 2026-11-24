@@ -1,17 +1,15 @@
-import {
-  emailAccompanyMatchManifestUrl,
-  emailFromContact,
-  emailFromNotify,
-} from "../../../config/constants";
+import { EmailTemplateName } from "need4deed-sdk";
+import { emailFromContact, emailFromNotify } from "../../../config/constants";
 import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer";
 import { getOpportunityRepresentativePerson } from "../../../data/utils";
 import { formatOnetimerDate, getLanguages } from "../../dto/utils";
 import { ACCOMPANY_MATCH_BUILTIN as BUILTIN } from "../builtin-content";
-import { createManifestLoader, renderEmailWithNote } from "../email-template";
+import { renderEmailWithNote } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { DEAL_LANGUAGE_LABELS, resolveOrAlert } from "../resolve-or-alert";
 import type { EmailTransport } from "../types";
 
-const loader = createManifestLoader(emailAccompanyMatchManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.ACCOMPANY_MATCH];
 
 export function resetAccompanyMatchTemplateCache(): void {
   loader.resetCache();
@@ -100,7 +98,7 @@ export async function sendEmailAccompanyMatch(
       volunteerEmail,
       volunteerPhone,
       contactSharing,
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.ACCOMPANY_MATCH>,
     emailNote,
   );
 

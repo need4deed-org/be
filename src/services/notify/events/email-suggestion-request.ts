@@ -1,25 +1,22 @@
-import { EntityTableName } from "need4deed-sdk";
-import {
-  emailFromNotify,
-  emailSuggestionRequestManifestUrl,
-} from "../../../config/constants";
+import { EmailTemplateName, EntityTableName } from "need4deed-sdk";
+import { emailFromNotify } from "../../../config/constants";
 import {
   SUGGESTION_REQUEST_BUILTIN as BUILTIN,
   type SuggestionRequestLabels,
 } from "../builtin-content";
 import {
-  createManifestLoader,
   renderEmail,
   resolveLocale,
   resolveManifestLabel,
   type LocalizedValue,
   type Manifest,
 } from "../email-template";
+import { EMAIL_TEMPLATES, EmailTemplateVars } from "../email-templates";
 import { opportunityTitleIn, type TitleSource } from "../opportunity-title";
 import type { EmailTransport } from "../types";
 import { buildTaggedLink, neutralizeBraces } from "./email-tagged";
 
-const loader = createManifestLoader(emailSuggestionRequestManifestUrl);
+const { loader } = EMAIL_TEMPLATES[EmailTemplateName.SUGGESTION_REQUEST];
 
 export function resetSuggestionRequestTemplateCache(): void {
   loader.resetCache();
@@ -79,7 +76,7 @@ export async function sendEmailSuggestionRequest(
         entityType: EntityTableName.VOLUNTEER,
         entityId: volunteerId,
       }),
-    },
+    } satisfies EmailTemplateVars<EmailTemplateName.SUGGESTION_REQUEST>,
     locale,
     { escapeHtmlValues: true },
   );

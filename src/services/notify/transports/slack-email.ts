@@ -1,3 +1,4 @@
+import { htmlToText } from "../html-to-text";
 import type { EmailMessage, EmailTransport, SlackTransport } from "../types";
 import { DRY_RUN_RECIPIENT } from "./dry-run";
 
@@ -80,25 +81,4 @@ export function splitText(text: string, limit: number): string[] {
     chunks.push(rest);
   }
   return chunks;
-}
-
-const ENTITIES: Record<string, string> = {
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-  "&nbsp;": " ",
-};
-
-export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (entity) => ENTITIES[entity])
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
