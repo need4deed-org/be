@@ -121,8 +121,75 @@ describe("admin account actions", () => {
       isActive: false,
     });
     expect(response.json().data.deactivatedAt).toEqual(expect.any(String));
-    expect((await reload(target)).deactivatedAt).not.toBeNull();
+    const reloaded = await reload(target);
+    expect(reloaded.deactivatedAt).not.toBeNull();
+    expect(reloaded.credentialsValidAfter).toEqual(reloaded.deactivatedAt);
     expect(await openSessions(target)).toBe(0);
+  });
+
+  describe("credentials issued before a deactivation", () => {
+    function signReset(user: User) {
+      return fastify.jwt.sign({
+        id: user.id,
+        email: user.email,
+        type: "reset",
+      });
+    }
+
+    function resetPassword(token: string) {
+      return fastify.inject({
+        method: "POST",
+        url: "/auth/password-reset",
+        payload: { token, newPassword: "new_test_password" },
+      });
+    }
+
+    function getMe(cookie: string) {
+      return fastify.inject({
+        method: "GET",
+        url: "/user/me",
+        cookies: { [accessCookieName]: cookie },
+      });
+    }
+
+    async function deactivateAndReactivate(user: User) {
+      await send("POST", `/user/${user.id}/deactivate`);
+      await send("POST", `/user/${user.id}/reactivate`);
+    }
+
+    it("refuses a reset link after reactivation", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const resetToken = signReset(target);
+      await deactivateAndReactivate(target);
+
+      const response = await resetPassword(resetToken);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toBe("Invalid reset token.");
+      expect(await (await reload(target)).checkPassword(PASSWORD)).toBe(true);
+    });
+
+    it("refuses an access token after reactivation", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      const accessToken = await login(target);
+      expect((await getMe(accessToken)).statusCode).toBe(200);
+      await deactivateAndReactivate(target);
+
+      const response = await getMe(accessToken);
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it("accepts credentials issued after the cutoff", async () => {
+      const target = await createAccount(UserRole.COORDINATOR);
+      await deactivateAndReactivate(target);
+      await fastify.db.userRepository.update(target.id, {
+        credentialsValidAfter: new Date(Date.now() - 5_000),
+      });
+
+      expect((await getMe(await login(target))).statusCode).toBe(200);
+      expect((await resetPassword(signReset(target))).statusCode).toBe(200);
+    });
   });
 
   it("revokes the account's API keys on deactivate", async () => {

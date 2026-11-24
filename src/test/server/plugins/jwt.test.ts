@@ -261,6 +261,40 @@ describe("X-API-Key authentication", () => {
     });
   });
 
+  it("tryAuthenticate treats an access token issued before the credentials cutoff as anonymous", async () => {
+    const accessToken = fastify.jwt.sign({
+      id: 42,
+      email: "coordinator@example.com",
+      role: UserRole.COORDINATOR,
+      type: "access",
+    });
+    vi.spyOn(fastify.db.userRepository, "findOne").mockResolvedValue({
+      ...coordinatorUser,
+      credentialsValidAfter: new Date(),
+    } as any);
+    const andWhere = vi.fn();
+    const qb = {
+      leftJoinAndSelect: () => qb,
+      orderBy: () => qb,
+      andWhere: andWhere.mockImplementation(() => qb),
+      getMany: async () => [],
+    };
+    vi.spyOn(fastify.db.eventRepository, "createQueryBuilder").mockReturnValue(
+      qb as any,
+    );
+
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/event",
+      cookies: { access: accessToken },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(andWhere).toHaveBeenCalledWith("event.isActive = :isActive", {
+      isActive: true,
+    });
+  });
+
   describe("tryAuthenticate with an API key", () => {
     const rawKey = "n4d_test-raw-key";
 
