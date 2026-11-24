@@ -232,7 +232,7 @@ export async function getTimedEvents(volunteer: Volunteer) {
   return events;
 }
 
-export const optionLists: EntityTableName[] = [
+export const optionLists: readonly EntityTableName[] = [
   EntityTableName.LANGUAGE,
   EntityTableName.DISTRICT,
   EntityTableName.ACTIVITY,
@@ -320,7 +320,7 @@ export async function getOptions(
   }
 
   if (!optionLists.includes(list)) {
-    throw new Error(`Unknown option list: ${list}`);
+    throw new BadRequestError(`Unknown option list: ${list}`);
   }
 
   return { [list]: await getList(list) };

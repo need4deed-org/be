@@ -2,6 +2,8 @@ import { FastifyInstance } from "fastify";
 import { EntityTableName, Lang } from "need4deed-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "../../../server";
+import optionListsSchema from "../../../server/schema/option-lists.json";
+import { optionLists } from "../../../server/utils";
 
 describe("GET /option", () => {
   let fastify: FastifyInstance;
@@ -48,6 +50,28 @@ describe("GET /option", () => {
       expect(response.statusCode).toBe(400);
     },
   );
+
+  it("serves every list in the response schema, and only those", () => {
+    expect([...optionLists].sort()).toEqual(
+      Object.keys(optionListsSchema.definitions.OptionLists.properties).sort(),
+    );
+  });
+
+  it("treats a trailing slash as all lists", async () => {
+    const response = await fastify.inject({ method: "GET", url: "/option/" });
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(response.json().data)).toHaveLength(optionLists.length);
+  });
+
+  it("rejects an unknown language with 400", async () => {
+    const response = await fastify.inject({
+      method: "GET",
+      url: "/option?language=xx",
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
 
   it("returns only the requested list", async () => {
     const response = await fastify.inject({

@@ -26,7 +26,13 @@ async function optionRoutes(
         params: {
           type: "object",
           properties: {
-            list: { type: "string", enum: optionLists },
+            list: { type: "string", enum: ["", ...optionLists] },
+          },
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            language: { type: "string", enum: Object.values(Lang) },
           },
         },
         response: {
@@ -46,7 +52,7 @@ async function optionRoutes(
       const { list } = request.params;
       const { language } = request.query;
       try {
-        const data = await getOptions(list, language || Lang.DE);
+        const data = await getOptions(list || undefined, language || Lang.DE);
 
         return reply.status(200).send({
           message: `Options for ${list ? list : "all lists"}.`,
