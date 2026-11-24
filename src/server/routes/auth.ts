@@ -212,6 +212,10 @@ async function authRoutes(
         clearAuthCookies(reply);
         return reply.status(403).send({ message: "User is not active." });
       }
+      if (isIssuedBeforeCutoff(user, decoded.iat)) {
+        clearAuthCookies(reply);
+        throw new BadRequestError("Invalid refresh token.");
+      }
 
       const rotation = await rotateRefreshSession(
         fastify.db.refreshSessionRepository.manager,

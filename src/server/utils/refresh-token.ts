@@ -9,6 +9,7 @@ export type RefreshPayload = {
   type: "refresh";
   sid: string;
   jti: string;
+  iat?: number;
 };
 
 // One source order for the rate limiter and the handler: a non-empty body
