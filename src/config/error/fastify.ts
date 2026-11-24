@@ -35,6 +35,12 @@ export class EmailNotSentError extends BaseError {
   }
 }
 
+export class CdnUnavailableError extends BaseError {
+  constructor(message = "The CDN is unavailable.") {
+    super(message, 502);
+  }
+}
+
 export class NotFoundError extends BaseError {
   constructor(message = "Resource not found") {
     super(message, 404);

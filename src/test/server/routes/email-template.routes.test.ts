@@ -125,7 +125,7 @@ describe("admin email templates", () => {
     bucket.enabled = true;
     bucket.files.clear();
     bucket.files.set(STALE_KEY, JSON.stringify(staleFile));
-    EMAIL_TEMPLATES[EmailTemplateName.STALE].loader.resetCache();
+    Object.values(EMAIL_TEMPLATES).forEach(({ loader }) => loader.resetCache());
   });
 
   it("is for admins only", async () => {
@@ -526,6 +526,61 @@ describe("admin email templates", () => {
       }),
     );
     expect((await getStale()).hasHtml).toBe(false);
+  });
+
+  it("keeps links, umlauts and no css when it takes the text from html", async () => {
+    bucket.files.set(
+      STALE_KEY,
+      JSON.stringify({
+        subject: "Noch dabei?",
+        html: '<html><head><style>p{color:red}</style></head><body><p>Vielen Dank f&uuml;r alles, {{ volunteerName }} &#8211; <a href="https://need4deed.org/x">hier</a></p></body></html>',
+      }),
+    );
+    expect((await getStale()).template.content.text).toBe(
+      "Vielen Dank für alles, {{ volunteerName }} – hier (https://need4deed.org/x)",
+    );
+  });
+
+  it("treats a stored file without usable content as missing", async () => {
+    bucket.files.set(STALE_KEY, "{}");
+    const data = await getStale();
+    expect(data.placeholders).toContainEqual({
+      name: "volunteerName",
+      required: true,
+    });
+  });
+
+  it("warns about html when the builtin that is sent has it", async () => {
+    const { data } = (
+      await request("GET", `/${EmailTemplateName.VERIFICATION}`)
+    ).json();
+    expect(data.hasHtml).toBe(true);
+  });
+
+  it("pins two-language placeholders to German when it shows an en/de file as one text", async () => {
+    const name = EmailTemplateName.SUGGESTION;
+    bucket.files.set(
+      `emails/${name}.json`,
+      JSON.stringify({
+        de: {
+          subject: "Vorschlag",
+          text: "Hallo {{ volunteerName }}: {{ opportunityName }}",
+        },
+        en: {
+          subject: "Suggestion",
+          text: "Hi {{ volunteerName }}: {{ opportunityName }}",
+        },
+      }),
+    );
+    const { data } = (await request("GET", `/${name}`)).json();
+    expect(data.template.content.text).toBe(
+      "Hallo {{ volunteerName }}: {{ opportunityName.de }}",
+    );
+    const res = await request("PUT", `/${name}`, {
+      version: data.version,
+      template: data.template,
+    });
+    expect(res.statusCode).toBe(200);
   });
 
   it("refuses to save without CDN write access", async () => {

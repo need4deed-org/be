@@ -14,6 +14,7 @@ import {
 } from "need4deed-sdk";
 import {
   BadRequestError,
+  CdnUnavailableError,
   emailTemplateFetchTimeoutMs,
   EmailTemplateSaveError,
 } from "../../config";
@@ -56,9 +57,21 @@ async function readFromCdn(url: string): Promise<string | null> {
     return null;
   }
   if (!response.ok) {
-    throw new Error(`fetch ${url} failed (${response.status})`);
+    throw new CdnUnavailableError(
+      `The CDN answered ${response.status} for this template.`,
+    );
   }
   return response.text();
+}
+
+function hasUsableContent(manifest: unknown): manifest is Manifest {
+  if (typeof manifest !== "object" || manifest === null) {
+    return false;
+  }
+  const candidate = manifest as Manifest;
+  return isFlatContent(candidate)
+    ? isValidContent(candidate)
+    : LANGS.some((lang) => isValidContent(candidate[lang]));
 }
 
 function parseManifest(name: EmailTemplateName, raw: string): Manifest | null {
@@ -68,10 +81,10 @@ function parseManifest(name: EmailTemplateName, raw: string): Manifest | null {
   } catch {
     manifest = null;
   }
-  if (typeof manifest === "object" && manifest !== null) {
-    return manifest as Manifest;
+  if (hasUsableContent(manifest)) {
+    return manifest;
   }
-  logger.warn(`email template "${name}": stored file is not a JSON object`);
+  logger.warn(`email template "${name}": stored file has no usable content`);
   return null;
 }
 
@@ -104,21 +117,65 @@ function builtinFor(
     : (builtin[lang] as ContentWithLabels);
 }
 
-const HTML_ENTITIES: Record<string, string> = {
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-  "&nbsp;": " ",
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  auml: "ä",
+  ouml: "ö",
+  uuml: "ü",
+  Auml: "Ä",
+  Ouml: "Ö",
+  Uuml: "Ü",
+  szlig: "ß",
+  euro: "€",
+  ndash: "–",
+  mdash: "—",
+  hellip: "…",
+  bdquo: "„",
+  ldquo: "“",
+  rdquo: "”",
+  lsquo: "‘",
+  rsquo: "’",
+  laquo: "«",
+  raquo: "»",
 };
 
+function decodeEntities(source: string): string {
+  return source.replace(
+    /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,
+    (entity, body: string) => {
+      if (body.startsWith("#")) {
+        const code =
+          body[1].toLowerCase() === "x"
+            ? parseInt(body.slice(2), 16)
+            : parseInt(body.slice(1), 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : entity;
+      }
+      return NAMED_ENTITIES[body] ?? entity;
+    },
+  );
+}
+
 function textFromHtml(html: string | undefined): string {
-  return (html ?? "")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|h[1-6])\s*>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (entity) => HTML_ENTITIES[entity])
+  return decodeEntities(
+    (html ?? "")
+      .replace(/<(head|style|script)\b[\s\S]*?<\/\1\s*>/gi, "")
+      .replace(
+        /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>([\s\S]*?)<\/a\s*>/gi,
+        (_match, _quote, href: string, label: string) => {
+          const text = label.replace(/<[^>]+>/g, "").trim();
+          return !text || text === href ? href : `${text} (${href})`;
+        },
+      )
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|h[1-6]|tr)\s*>/gi, "\n\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -173,6 +230,21 @@ function isPerLanguageAllowed(definition: EmailTemplateDefinition): boolean {
   return definition.knowsRecipientLocale;
 }
 
+function pinLanguage(
+  definition: EmailTemplateDefinition,
+  { subject, text, ...rest }: ApiEmailTemplateText,
+  lang: Lang,
+): ApiEmailTemplateText {
+  const pin = (source: string) =>
+    source.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
+      key !== EMAIL_NOTE_PLACEHOLDER &&
+      definition.localizedPlaceholders.includes(key)
+        ? `{{ ${key}.${lang} }}`
+        : match,
+    );
+  return { ...rest, subject: pin(subject), text: pin(text) };
+}
+
 function toApiContent(
   definition: EmailTemplateDefinition,
   manifest: Manifest | null,
@@ -184,11 +256,15 @@ function toApiContent(
     const stored = manifest as Partial<Record<Lang, ContentWithLabels>> | null;
     return {
       layout: EmailTemplateLayout.SINGLE,
-      content: toText(
+      content: pinLanguage(
         definition,
-        sentContent(definition, stored, Lang.DE),
-        stored?.[Lang.DE],
-        builtinFor(definition, Lang.DE),
+        toText(
+          definition,
+          sentContent(definition, stored, Lang.DE),
+          stored?.[Lang.DE],
+          builtinFor(definition, Lang.DE),
+        ),
+        Lang.DE,
       ),
     };
   }
@@ -228,9 +304,7 @@ function hasHtml(
   definition: EmailTemplateDefinition,
   manifest: Manifest | null,
 ): boolean {
-  return manifest
-    ? storedContents(definition, manifest).some(({ html }) => Boolean(html))
-    : false;
+  return storedContents(definition, manifest).some(({ html }) => Boolean(html));
 }
 
 function storedContents(
