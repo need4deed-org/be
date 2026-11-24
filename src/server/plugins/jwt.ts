@@ -13,6 +13,7 @@ import User from "../../data/entity/user.entity";
 import { sha256Hex } from "../../data/utils";
 import logger from "../../logger";
 import { AuthOptions } from "../types";
+import { isIssuedBeforeCutoff } from "../utils/credentials-cutoff";
 
 async function jwtPlugin(
   fastify: FastifyInstance,
@@ -94,6 +95,9 @@ async function jwtPlugin(
         if (!user) {
           throw new UnauthorizedError("User not found.");
         }
+        if (isIssuedBeforeCutoff(user, request.user.iat)) {
+          throw new UnauthenticatedError("Authorization failed.");
+        }
       }
 
       if (!user.isActive) {
@@ -148,7 +152,7 @@ async function jwtPlugin(
         const user = await fastify.db.userRepository.findOne({
           where: { id: request.user?.id },
         });
-        if (user?.isActive) {
+        if (user?.isActive && !isIssuedBeforeCutoff(user, request.user.iat)) {
           request.authUser = user;
         }
       } catch {
