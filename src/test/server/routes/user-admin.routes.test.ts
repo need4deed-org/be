@@ -163,8 +163,10 @@ describe("admin account actions", () => {
     }
 
     async function deactivateAndReactivate(user: User) {
-      await send("POST", `/user/${user.id}/deactivate`);
-      await send("POST", `/user/${user.id}/reactivate`);
+      for (const action of ["deactivate", "reactivate"]) {
+        const response = await send("POST", `/user/${user.id}/${action}`);
+        expect(response.statusCode, response.body).toBe(200);
+      }
     }
 
     it("refuses a reset link after reactivation", async () => {
@@ -199,6 +201,25 @@ describe("admin account actions", () => {
 
       expect((await getMe(await login(target))).statusCode).toBe(200);
       expect((await resetPassword(signReset(target))).statusCode).toBe(200);
+    });
+
+    it("refuses an email-verify link after reactivation", async () => {
+      const target = await createAccount(UserRole.AGENT);
+      const verifyToken = fastify.jwt.sign({
+        id: target.id,
+        email: target.email,
+        type: "verify",
+      });
+      const getRegistration = () =>
+        fastify.inject({
+          method: "GET",
+          url: `/agent/register/status?token=${verifyToken}`,
+        });
+      const before = await getRegistration();
+      expect(before.statusCode, before.body).toBe(200);
+      await deactivateAndReactivate(target);
+
+      expect((await getRegistration()).statusCode).toBe(401);
     });
 
     it("refuses a refresh token issued before the cutoff", async () => {
