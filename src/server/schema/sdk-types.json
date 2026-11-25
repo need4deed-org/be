@@ -1107,13 +1107,131 @@
       "$id": "ApiVolunteerImportRow",
       "type": "object",
       "properties": {
-        "firstName": { "type": "string" },
-        "lastName": { "type": "string" },
-        "email": { "type": "string" },
-        "phone": { "type": "string" },
-        "postcode": { "type": "string" }
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "postcode": {
+          "type": "string"
+        },
+        "languages": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "proficiency": {
+                "type": "string",
+                "maxLength": 50
+              }
+            },
+            "required": ["title"],
+            "additionalProperties": false
+          }
+        },
+        "activities": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "skills": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "districts": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "availability": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "string",
+                "maxLength": 50
+              },
+              "daytime": {
+                "type": "string",
+                "maxLength": 50
+              }
+            },
+            "required": ["day", "daytime"],
+            "additionalProperties": false
+          }
+        },
+        "statusTypes": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          }
+        },
+        "statusEngagement": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "goodConductCertificate": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "measlesVaccination": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "infoAbout": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "infoExperience": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "opportunities": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "status": {
+                "enum": ["opp-matched", "opp-active"]
+              }
+            },
+            "required": ["title", "status"],
+            "additionalProperties": false
+          }
+        }
       },
-      "required": ["firstName", "email", "postcode"],
+      "required": ["firstName", "email"],
       "additionalProperties": false
     },
     "ApiVolunteerImportPost": {
@@ -1135,12 +1253,33 @@
       "$id": "ApiVolunteerImportRowResult",
       "type": "object",
       "properties": {
-        "row": { "type": "integer" },
-        "email": { "type": "string" },
-        "outcome": { "enum": ["created", "skipped", "invalid"] },
-        "skipReason": { "enum": ["already-volunteer", "duplicate-in-import"] },
-        "errors": { "type": "array", "items": { "type": "string" } },
-        "volunteerId": { "type": "integer" }
+        "row": {
+          "type": "integer"
+        },
+        "email": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": ["created", "skipped", "invalid"]
+        },
+        "skipReason": {
+          "enum": ["email-in-use", "connected-existing", "duplicate-in-import"]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "volunteerId": {
+          "type": "integer"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       },
       "required": ["row", "email", "outcome"],
       "additionalProperties": false

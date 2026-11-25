@@ -33,18 +33,25 @@ export function getVolunteerWhere(
 
   const where: FindOptionsWhere<Volunteer> = {
     ...getVolunteerFilterWhere(filter),
-    ...(requested
-      ? {
-          ownerAgentId: Raw(
-            (column) =>
-              `(${requestsNoOwner ? `${column} IS NULL OR ` : ""}${column} = ANY(:requestedOwners))`,
-            { requestedOwners: requestedIds },
-          ),
-        }
-      : {}),
   };
   if (availabilityDealIds) {
     andIntoWhere(where, "dealId", dealIdIn(availabilityDealIds));
+  }
+  if (requested) {
+    andIntoWhere(
+      where,
+      "id",
+      Raw(
+        (column) =>
+          `${column} IN (SELECT id FROM volunteer WHERE ${requestsNoOwner ? "owner_agent_id IS NULL OR " : ""}owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))`,
+        {
+          requestedOwners: requestedIds,
+          requestedLinkAgents: visibility
+            ? requestedIds.filter((id) => visibility.agentIds.has(id))
+            : requestedIds,
+        },
+      ),
+    );
   }
   if (filter?.search) {
     const { sql, params } = getVolunteerSearchFragment(

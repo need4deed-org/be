@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { AssertSameStringValues } from "../../lib/assert-same-string-values";
 import User from "../user.entity";
 import Volunteer from "./volunteer.entity";
 
@@ -18,13 +19,6 @@ export const VOLUNTEER_AUDIT_LOG_TYPES = [
 ] as const;
 export type VolunteerAuditLogType = (typeof VOLUNTEER_AUDIT_LOG_TYPES)[number];
 
-type AssertSameStringValues<A extends string, B extends string> = [A] extends [
-  B,
-]
-  ? [B] extends [A]
-    ? true
-    : never
-  : never;
 type _AuditLogTypeInSyncWithSdk = AssertSameStringValues<
   VolunteerAuditLogType,
   `${SdkVolunteerAuditLogType}`

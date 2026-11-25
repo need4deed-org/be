@@ -37,6 +37,9 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import {
   hasActiveMembership,
   logMatchChangeSafely,
+  logOpportunityChanges,
+  OpportunityChange,
+  opportunityChangeDetail,
   updateVolunteerMatching,
 } from "../../../data/utils";
 import {
@@ -84,6 +87,7 @@ import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
   alertOnChange,
+  andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
@@ -101,9 +105,10 @@ import {
   getPostcode,
   getSkipTake,
   impliesAgentSearching,
+  intersectAgentIds,
   isActiveAgentMember,
   isStaffRole,
-  mergeIntoWhere,
+  parseAgentIdsFilter,
   patchEntity,
   setAgentSearching,
   syncOnetimeTimeslot,
@@ -112,6 +117,7 @@ import {
   upsertOnetimer,
   writeOpportunityLegacy,
 } from "../../utils";
+import { engagementChangeDetail } from "../../utils/data/engagement-change-detail";
 import {
   addTranslatedFields,
   createAddress,
@@ -145,6 +151,7 @@ import {
   resolveCallerMask,
 } from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
+import opportunityAuditLogRoutes from "./audit-log.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -290,6 +297,10 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityOpportunityVolunteerRoutes, {
     prefix: `:id${RoutePrefix.VOLUNTEER_LINKED}`,
+  });
+
+  await fastify.register(opportunityAuditLogRoutes, {
+    prefix: `:id${RoutePrefix.AUDIT_LOG}`,
   });
 
   await fastify.register(opportunityRecommendedVolunteerRoutes, {
@@ -487,10 +498,14 @@ export default async function opportunityRoutes(
 
       const message = `Opportunities page:${request.query.page}.`;
 
-      const agentIds =
+      const callerAgentIds =
         request.authUser?.role === UserRole.AGENT
           ? await getCallerAgentIds(request, request.authUser.personId)
           : null;
+      const requestedAgentIds = parseAgentIdsFilter(
+        request.query.filter?.agent,
+      );
+      const agentIds = intersectAgentIds(callerAgentIds, requestedAgentIds);
       if (agentIds?.length === 0) {
         return reply.status(200).send({
           message,
@@ -506,7 +521,7 @@ export default async function opportunityRoutes(
         isStaffRole(request.authUser?.role),
       );
       if (agentIds) {
-        mergeIntoWhere(where, { agentId: In(agentIds) });
+        andIntoWhere(where, "agentId", In(agentIds));
       }
       await applyVolunteerOpportunityScope(request, where);
 
@@ -911,6 +926,67 @@ export default async function opportunityRoutes(
         role === UserRole.AGENT && effectiveAgentId
           ? await takeSnapshot()
           : null;
+      const takeDetailsSnapshot = () =>
+        getEntitySnapshot(
+          Opportunity,
+          id,
+          snapshotRelations.filter((relation) => relation !== "agent"),
+          [
+            "status",
+            "statusMatch",
+            "agentId",
+            "contactPersonId",
+            "searchStatus",
+          ],
+        );
+      const detailsBefore = await takeDetailsSnapshot();
+
+      const nextContactPersonId =
+        contactLinkId !== undefined
+          ? contactLinkId
+          : agentLinkId !== undefined
+            ? request.authUser?.role === UserRole.AGENT
+              ? (request.authUser.personId ?? null)
+              : null
+            : opportunity.contactPersonId;
+      const changes: OpportunityChange[] = [];
+      if (
+        opportunityObj?.status !== undefined &&
+        opportunityObj.status !== opportunity.status
+      ) {
+        changes.push({
+          type: "status-changed",
+          detail: engagementChangeDetail(
+            opportunity.status,
+            opportunityObj.status,
+          ),
+        });
+      }
+      if (agentLinkId !== undefined && agentLinkId !== opportunity.agentId) {
+        const previousAgent = opportunity.agentId
+          ? await fastify.db.agentRepository.findOne({
+              select: { id: true, title: true },
+              where: { id: opportunity.agentId },
+            })
+          : null;
+        const agentLabel = (agent: Agent | null) =>
+          agent ? `${agent.title} (id:${agent.id})` : "none";
+        changes.push({
+          type: "ngo-changed",
+          detail: opportunityChangeDetail.ngo(
+            agentLabel(previousAgent),
+            agentLabel(linkedAgent),
+          ),
+        });
+      }
+      if (
+        (nextContactPersonId ?? null) !== (opportunity.contactPersonId ?? null)
+      ) {
+        changes.push({
+          type: "contact-changed",
+          detail: opportunityChangeDetail.contact,
+        });
+      }
       let translatedEdits = 0;
 
       try {
@@ -1026,6 +1102,12 @@ export default async function opportunityRoutes(
             ) {
               await removeOwnAddress(manager, opportunity);
             }
+            await logOpportunityChanges(
+              manager,
+              opportunity.id,
+              changes,
+              request.authUser?.id,
+            );
             return written;
           },
         );
@@ -1209,6 +1291,23 @@ export default async function opportunityRoutes(
             );
           }
         }
+
+        if (
+          translatedEdits > 0 ||
+          detailsBefore !== (await takeDetailsSnapshot())
+        ) {
+          await logOpportunityChanges(
+            dataSource.manager,
+            opportunity.id,
+            [
+              {
+                type: "details-changed",
+                detail: opportunityChangeDetail.details,
+              },
+            ],
+            request.authUser?.id,
+          );
+        }
       } finally {
         if (snapshotBefore !== null && effectiveAgentId) {
           await alertOnChange(
@@ -1295,6 +1394,7 @@ export default async function opportunityRoutes(
             from: link.status,
             actorUserId: request.authUser?.id,
             title: opportunity.title,
+            skipOpportunityLog: true,
           });
         }
       });

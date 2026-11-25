@@ -12,6 +12,7 @@ export * from "./getStartEndDates";
 export * from "./hash-token";
 export * from "./is-unique-violation";
 export * from "./log-match-change";
+export * from "./log-opportunity-change";
 export * from "./passwd";
 export * from "./remove-data";
 export * from "./update-opportunity-matching";

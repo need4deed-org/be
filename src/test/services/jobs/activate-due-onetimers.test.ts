@@ -44,6 +44,13 @@ describe("activateDueOnetimers", () => {
     expect(ctx.loggerInfo).toHaveBeenCalledWith(
       expect.stringContaining("activateDueOnetimers: 1 candidates, 1 applied"),
     );
+    const statusEntries =
+      await ctx.fastify.db.opportunityAuditLogRepository.find({
+        where: { opportunityId: opportunity.id, type: "status-changed" },
+      });
+    expect(statusEntries).toHaveLength(1);
+    expect(statusEntries[0].actorUserId).toBeNull();
+    expect(statusEntries[0].detail).toContain(OpportunityStatusType.ACTIVE);
   });
 
   it("catches up on an opportunity due on an earlier day, so a missed run is not lost", async () => {

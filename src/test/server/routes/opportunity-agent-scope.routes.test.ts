@@ -386,7 +386,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
     }
   });
 
-  it("keeps an AGENT scoped to their own agent even when filter[agentId] names another", async () => {
+  it("returns nothing to an AGENT whose filter[agentId] names another agent", async () => {
     const res = await listOpportunities(
       agentCookie,
       `&filter[agentId]=${otherAgentId}`,
@@ -394,7 +394,7 @@ describe("GET /opportunity is scoped to an AGENT caller's own agent(s)", () => {
 
     expect(res.statusCode).toBe(200);
     const { data, count } = res.json();
-    expect(count).toBe(OWN_AGENT_OPPORTUNITY_COUNT);
+    expect(count).toBe(0);
     expect(
       data.every((o: { agentId: number }) => o.agentId !== otherAgentId),
     ).toBe(true);

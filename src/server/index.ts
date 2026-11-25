@@ -81,12 +81,14 @@ const decodeTrustProxyEnv = (
   return normalized;
 };
 
+const QS_ARRAY_LIMIT = 200;
+
 export async function createServer({
   scheduler = !isTest,
 }: { scheduler?: boolean } = {}): Promise<FastifyInstance> {
   const fastifyInstance: FastifyInstance = Fastify({
     pluginTimeout,
-    querystringParser: (str) => qs.parse(str),
+    querystringParser: (str) => qs.parse(str, { arrayLimit: QS_ARRAY_LIMIT }),
     loggerInstance: logger,
     trustProxy: decodeTrustProxyEnv(process.env.TRUST_PROXY),
     ajv: {

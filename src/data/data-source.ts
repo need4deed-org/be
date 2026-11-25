@@ -35,6 +35,7 @@ import NotionRelation from "./entity/notion-relation.entity";
 import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Onetimer from "./entity/opportunity/onetimer.entity";
+import OpportunityAuditLog from "./entity/opportunity/opportunity-audit-log.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
 import Option from "./entity/option.entity";
 import Organization from "./entity/organization.entity";
@@ -54,6 +55,7 @@ import Timeline from "./entity/timeline.entity";
 import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
+import VolunteerAgentLink from "./entity/volunteer/volunteer-agent-link.entity";
 import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
@@ -126,6 +128,8 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
     VolunteerAuditLog,
+    VolunteerAgentLink,
+    OpportunityAuditLog,
     StatisticsEvent,
   ],
   ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),

@@ -24,6 +24,7 @@ describe("dtoCommunication", () => {
       date: mockCommunication.date,
       agentId: "agent-007",
       userId: "user-99",
+      remindOn: null,
     });
   });
 

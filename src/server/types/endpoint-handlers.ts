@@ -62,6 +62,7 @@ export interface QuerystringOpportunityFiltering {
     type?: string | string[];
     status?: string | string[];
     agentId?: number | number[];
+    agent?: string | string[];
     match?: string | string[];
     search?: string;
     language?: string | string[];

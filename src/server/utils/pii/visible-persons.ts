@@ -128,7 +128,11 @@ export async function resolveCallerVisibility(
 
   const owned: { person_id: number | null }[] =
     await agentPersonRepository.manager.query(
-      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)`,
+      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)
+       UNION
+       SELECT v.person_id FROM volunteer v
+         JOIN volunteer_agent_link l ON l.volunteer_id = v.id
+        WHERE l.agent_id = ANY($1)`,
       [[...agentIds]],
     );
   owned.forEach((r) => {
