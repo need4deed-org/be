@@ -1,6 +1,7 @@
 import {
   ApiPostListQuery,
   Lang,
+  LanguageMatch,
   OpportunitySortField,
   QueryParamsKeys,
   SortOrder,
@@ -109,6 +110,7 @@ export interface QuerystringVolunteerFiltering {
     type?: string | string[];
     search?: string;
     language?: string | string[];
+    [QueryParamsKeys.LANGUAGE_MATCH]?: LanguageMatch;
     activity?: string | string[];
     skill?: string | string[];
     availability?: string | string[];

@@ -1,4 +1,5 @@
-import { FindOptionsWhere, Raw } from "typeorm";
+import { LanguageMatch, QueryParamsKeys } from "need4deed-sdk";
+import { FindOptionsWhere, In, Raw } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -31,8 +32,10 @@ export function getVolunteerWhere(
 
   const where: FindOptionsWhere<Volunteer> = {
     ...getVolunteerFilterWhere(filter),
-    ...(availabilityDealIds ? { dealId: dealIdIn(availabilityDealIds) } : {}),
   };
+  if (availabilityDealIds) {
+    andIntoWhere(where, "dealId", dealIdIn(availabilityDealIds));
+  }
   if (requested) {
     andIntoWhere(
       where,
@@ -81,10 +84,14 @@ export function getVolunteerFilterWhere(
   filter: QuerystringVolunteerFiltering["filter"],
 ): FindOptionsWhere<Volunteer> {
   const dealFilter: Record<string, unknown> = {};
-  if (filter?.language) {
-    dealFilter.dealLanguage = {
-      language: { id: normalizeStringArrayInput(filter.language) },
-    };
+  const matchesAllLanguages =
+    filter?.[QueryParamsKeys.LANGUAGE_MATCH] === LanguageMatch.ALL;
+  const languages = [filter?.language ?? []].flat().filter(Boolean);
+  const languageIds = matchesAllLanguages
+    ? [...new Set(languages.map(Number))]
+    : [];
+  if (languages.length && !matchesAllLanguages) {
+    dealFilter.dealLanguage = { language: { id: In(languages) } };
   }
   if (filter?.activity) {
     dealFilter.dealActivity = {
@@ -103,6 +110,19 @@ export function getVolunteerFilterWhere(
   }
 
   return {
+    ...(languageIds.length
+      ? {
+          dealId: Raw(
+            (column) =>
+              // TypeORM expands ${column} only when a space, "=", ")" or "," follows
+              `(SELECT COUNT(DISTINCT dl.language_id) FROM deal_language dl WHERE dl.language_id = ANY(:selectedLanguageIds) AND dl.deal_id = ${column} ) = :selectedLanguageCount`,
+            {
+              selectedLanguageIds: languageIds,
+              selectedLanguageCount: languageIds.length,
+            },
+          ),
+        }
+      : {}),
     ...(filter?.type
       ? { statusType: normalizeStringArrayInput(filter.type) }
       : {}),
