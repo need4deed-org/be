@@ -241,10 +241,75 @@ describe("GET /volunteer language match", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it("rejects malformed language identifiers in all mode", async () => {
-    const res = await list(
-      `filter[language]=invalid&${mode(LanguageMatch.ALL)}`,
-    );
-    expect(res.statusCode).toBe(400);
+  it.each([LanguageMatch.ALL, LanguageMatch.ANY])(
+    "rejects malformed language identifiers in %s mode",
+    async (value) => {
+      for (const id of ["invalid", "0", "1234567890"]) {
+        const res = await list(`filter[language]=${id}&${mode(value)}`);
+        expect(res.statusCode).toBe(400);
+      }
+    },
+  );
+
+  describe("GET /volunteer/districts", () => {
+    const get = (url: string) =>
+      fastify.inject({
+        method: "GET",
+        url,
+        cookies: { [accessCookieName]: cookie },
+      });
+
+    async function aggregateTotal(query: string) {
+      const res = await get(`/volunteer/districts?${query}`);
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json<{
+        data: {
+          districts: { count: number }[];
+          unassignedBerlin: number;
+          outsideBerlin: number;
+          remote: number;
+        };
+      }>();
+      return (
+        data.districts.reduce((sum, { count }) => sum + count, 0) +
+        data.unassignedBerlin +
+        data.outsideBerlin +
+        data.remote
+      );
+    }
+
+    async function listCount(query: string) {
+      const res = await get(`/volunteer?${query}`);
+      expect(res.statusCode).toBe(200);
+      return res.json<{ count: number }>().count;
+    }
+
+    it("applies the language match mode like the list does", async () => {
+      const languages = language(germanId, englishId);
+      const all = `${languages}&${mode(LanguageMatch.ALL)}`;
+      const any = `${languages}&${mode(LanguageMatch.ANY)}`;
+
+      const [allTotal, allCount, anyTotal, anyCount] = await Promise.all([
+        aggregateTotal(all),
+        listCount(all),
+        aggregateTotal(any),
+        listCount(any),
+      ]);
+
+      expect(allTotal).toBe(allCount);
+      expect(anyTotal).toBe(anyCount);
+      // germanOnly and englishOnly match ANY but not ALL
+      expect(anyTotal - allTotal).toBeGreaterThanOrEqual(2);
+    });
+
+    it("rejects invalid language match modes and identifiers", async () => {
+      for (const query of [
+        `filter[${QueryParamsKeys.LANGUAGE_MATCH}]=invalid`,
+        `filter[language]=invalid`,
+      ]) {
+        const res = await get(`/volunteer/districts?${query}`);
+        expect(res.statusCode).toBe(400);
+      }
+    });
   });
 });

@@ -1,3 +1,5 @@
+import { LanguageMatch, QueryParamsKeys } from "need4deed-sdk";
+import { LANGUAGE_ID_PATTERN } from "./querystring";
 import { responseErrors } from "./responseErrors";
 
 const filterValueSchema = {
@@ -41,9 +43,25 @@ const opportunityFilterProperties = {
   availability: filterValueSchema,
 };
 
+const languageIdValueSchema = {
+  anyOf: [
+    { type: "integer", minimum: 1, maximum: 999999999 },
+    { type: "string", pattern: LANGUAGE_ID_PATTERN },
+  ],
+};
+
 const volunteerFilterProperties = {
   type: filterValueSchema,
-  language: filterValueSchema,
+  language: {
+    anyOf: [
+      languageIdValueSchema,
+      { type: "array", items: languageIdValueSchema },
+    ],
+  },
+  [QueryParamsKeys.LANGUAGE_MATCH]: {
+    type: "string",
+    enum: Object.values(LanguageMatch),
+  },
   activity: filterValueSchema,
   skill: filterValueSchema,
   availability: filterValueSchema,

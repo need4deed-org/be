@@ -13,6 +13,7 @@ import {
   ApiVolunteerDistrictMarkerQuery,
   EntityTableName,
   OpportunityType,
+  QueryParamsKeys,
   UserRole,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
@@ -145,6 +146,7 @@ function normalizeVolunteerFilter(
   return {
     type: toStringFilter(filter?.type),
     language: toStringFilter(filter?.language),
+    [QueryParamsKeys.LANGUAGE_MATCH]: filter?.[QueryParamsKeys.LANGUAGE_MATCH],
     activity: toStringFilter(filter?.activity),
     skill: toStringFilter(filter?.skill),
     availability: toStringFilter(filter?.availability),

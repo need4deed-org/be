@@ -201,6 +201,7 @@ export const agentListQuerySchema = {
 };
 
 const OWNER_AGENT_PATTERN = `^(none|${AGENT_ID_DIGITS})$`;
+export const LANGUAGE_ID_PATTERN = `^${AGENT_ID_DIGITS}$`;
 
 export const volunteerListQuerySchema = {
   type: "object",
@@ -221,8 +222,11 @@ export const volunteerListQuerySchema = {
         search: { type: "string" },
         language: {
           anyOf: [
-            { type: "string" },
-            { type: "array", items: { type: "string" } },
+            { type: "string", pattern: LANGUAGE_ID_PATTERN },
+            {
+              type: "array",
+              items: { type: "string", pattern: LANGUAGE_ID_PATTERN },
+            },
           ],
         },
         [QueryParamsKeys.LANGUAGE_MATCH]: {
