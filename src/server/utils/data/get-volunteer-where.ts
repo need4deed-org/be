@@ -1,5 +1,5 @@
 import { LanguageMatch, QueryParamsKeys } from "need4deed-sdk";
-import { FindOptionsWhere, Raw } from "typeorm";
+import { FindOptionsWhere, In, Raw } from "typeorm";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
@@ -86,14 +86,12 @@ export function getVolunteerFilterWhere(
   const dealFilter: Record<string, unknown> = {};
   const matchesAllLanguages =
     filter?.[QueryParamsKeys.LANGUAGE_MATCH] === LanguageMatch.ALL;
-  const languageIds =
-    matchesAllLanguages && filter?.language
-      ? [...new Set([filter.language].flat().map(Number))]
-      : [];
-  if (filter?.language && !matchesAllLanguages) {
-    dealFilter.dealLanguage = {
-      language: { id: normalizeStringArrayInput(filter.language) },
-    };
+  const languages = [filter?.language ?? []].flat().filter(Boolean);
+  const languageIds = matchesAllLanguages
+    ? [...new Set(languages.map(Number))]
+    : [];
+  if (languages.length && !matchesAllLanguages) {
+    dealFilter.dealLanguage = { language: { id: In(languages) } };
   }
   if (filter?.activity) {
     dealFilter.dealActivity = {
@@ -116,8 +114,7 @@ export function getVolunteerFilterWhere(
       ? {
           dealId: Raw(
             (column) =>
-              // keep a space after ${column}: TypeORM only expands the alias
-              // when it's followed by a space, "=", ")" or ","
+              // TypeORM expands ${column} only when a space, "=", ")" or "," follows
               `(SELECT COUNT(DISTINCT dl.language_id) FROM deal_language dl WHERE dl.language_id = ANY(:selectedLanguageIds) AND dl.deal_id = ${column} ) = :selectedLanguageCount`,
             {
               selectedLanguageIds: languageIds,

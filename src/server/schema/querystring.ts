@@ -201,7 +201,7 @@ export const agentListQuerySchema = {
 };
 
 const OWNER_AGENT_PATTERN = `^(none|${AGENT_ID_DIGITS})$`;
-export const LANGUAGE_ID_PATTERN = `^${AGENT_ID_DIGITS}$`;
+export const LANGUAGE_ID_PATTERN = `^(|${AGENT_ID_DIGITS})$`;
 
 export const volunteerListQuerySchema = {
   type: "object",

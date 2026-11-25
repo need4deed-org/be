@@ -11,8 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import Address from "../../../data/entity/location/address.entity";
+import Postcode from "../../../data/entity/location/postcode.entity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
+import DistrictPostcode from "../../../data/entity/m2m/district-postcode";
 import Person from "../../../data/entity/person.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import User from "../../../data/entity/user.entity";
@@ -33,6 +36,10 @@ describe("GET /volunteer language match", () => {
   let englishId: number;
   let frenchId: number;
   let mondaySlot: Timeslot;
+  let districtId: number;
+  let mapPostcode: Postcode;
+  let mapDistrictPostcode: DistrictPostcode;
+  let mapAddress: Address;
   const suffix = randomNumericSuffix();
   const search = `LanguageMatch${suffix}`;
   const volunteers = {} as Record<Key, Volunteer>;
@@ -72,6 +79,25 @@ describe("GET /volunteer language match", () => {
       }),
     );
 
+    [{ districtId }] = await fastify.db.districtRepository.manager.query(
+      `SELECT dp.district_id AS "districtId"
+         FROM district_postcode dp
+         JOIN postcode p ON p.id = dp.postcode_id
+        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+        ORDER BY dp.id
+        LIMIT 1`,
+    );
+    mapPostcode = await fastify.db.postcodeRepository.save(
+      new Postcode({ value: `8${suffix}` }),
+    );
+    mapDistrictPostcode = await getRepository(
+      dataSource,
+      DistrictPostcode,
+    ).save(new DistrictPostcode({ districtId, postcodeId: mapPostcode.id }));
+    mapAddress = await getRepository(dataSource, Address).save(
+      new Address({ postcodeId: mapPostcode.id }),
+    );
+
     const languages: Record<Key, number[]> = {
       both: [germanId, englishId, frenchId],
       germanOnly: [germanId, germanId],
@@ -80,7 +106,11 @@ describe("GET /volunteer language match", () => {
     };
     for (const key of Object.keys(languages) as Key[]) {
       const person = await fastify.db.personRepository.save(
-        new Person({ firstName: key, lastName: search }),
+        new Person({
+          firstName: key,
+          lastName: search,
+          addressId: mapAddress.id,
+        }),
       );
       persons.push(person);
       const deal = await fastify.db.dealRepository.save(
@@ -156,6 +186,17 @@ describe("GET /volunteer language match", () => {
     for (const person of persons) {
       await fastify.db.userRepository.delete({ personId: person.id });
       await fastify.db.personRepository.delete({ id: person.id });
+    }
+    if (mapAddress) {
+      await getRepository(dataSource, Address).delete({ id: mapAddress.id });
+    }
+    if (mapDistrictPostcode) {
+      await getRepository(dataSource, DistrictPostcode).delete({
+        id: mapDistrictPostcode.id,
+      });
+    }
+    if (mapPostcode) {
+      await fastify.db.postcodeRepository.delete({ id: mapPostcode.id });
     }
     await fastify.close();
   });
@@ -242,6 +283,15 @@ describe("GET /volunteer language match", () => {
   });
 
   it.each([LanguageMatch.ALL, LanguageMatch.ANY])(
+    "ignores an empty language selection in %s mode",
+    async (value) => {
+      const all: Key[] = ["both", "germanOnly", "englishOnly", "none"];
+      await expectMatches(`filter[language]=&${mode(value)}`, all);
+      await expectMatches(`filter[language][]=&${mode(value)}`, all);
+    },
+  );
+
+  it.each([LanguageMatch.ALL, LanguageMatch.ANY])(
     "rejects malformed language identifiers in %s mode",
     async (value) => {
       for (const id of ["invalid", "0", "1234567890"]) {
@@ -251,7 +301,7 @@ describe("GET /volunteer language match", () => {
     },
   );
 
-  describe("GET /volunteer/districts", () => {
+  describe("district map", () => {
     const get = (url: string) =>
       fastify.inject({
         method: "GET",
@@ -259,57 +309,41 @@ describe("GET /volunteer language match", () => {
         cookies: { [accessCookieName]: cookie },
       });
 
-    async function aggregateTotal(query: string) {
-      const res = await get(`/volunteer/districts?${query}`);
-      expect(res.statusCode).toBe(200);
-      const { data } = res.json<{
-        data: {
-          districts: { count: number }[];
-          unassignedBerlin: number;
-          outsideBerlin: number;
-          remote: number;
-        };
-      }>();
-      return (
-        data.districts.reduce((sum, { count }) => sum + count, 0) +
-        data.unassignedBerlin +
-        data.outsideBerlin +
-        data.remote
+    async function expectMarkers(query: string, keys: Key[]) {
+      const res = await get(
+        `/volunteer/map?districtId=${districtId}&language=de&${query}`,
       );
-    }
-
-    async function listCount(query: string) {
-      const res = await get(`/volunteer?${query}`);
       expect(res.statusCode).toBe(200);
-      return res.json<{ count: number }>().count;
+      const ours = new Set(Object.values(volunteers).map(({ id }) => id));
+      const ids = res
+        .json<{ data: { markers: { children: { id: number }[] }[] } }>()
+        .data.markers.flatMap(({ children }) => children.map(({ id }) => id))
+        .filter((id) => ours.has(id));
+      expect(ids.sort()).toEqual(keys.map((key) => volunteers[key].id).sort());
     }
 
-    it("applies the language match mode like the list does", async () => {
+    it("applies the language match mode to markers", async () => {
       const languages = language(germanId, englishId);
-      const all = `${languages}&${mode(LanguageMatch.ALL)}`;
-      const any = `${languages}&${mode(LanguageMatch.ANY)}`;
-
-      const [allTotal, allCount, anyTotal, anyCount] = await Promise.all([
-        aggregateTotal(all),
-        listCount(all),
-        aggregateTotal(any),
-        listCount(any),
+      await expectMarkers(`${languages}&${mode(LanguageMatch.ALL)}`, ["both"]);
+      await expectMarkers(`${languages}&${mode(LanguageMatch.ANY)}`, [
+        "both",
+        "germanOnly",
+        "englishOnly",
       ]);
-
-      expect(allTotal).toBe(allCount);
-      expect(anyTotal).toBe(anyCount);
-      // germanOnly and englishOnly match ANY but not ALL
-      expect(anyTotal - allTotal).toBeGreaterThanOrEqual(2);
     });
 
-    it("rejects invalid language match modes and identifiers", async () => {
-      for (const query of [
-        `filter[${QueryParamsKeys.LANGUAGE_MATCH}]=invalid`,
-        `filter[language]=invalid`,
-      ]) {
-        const res = await get(`/volunteer/districts?${query}`);
-        expect(res.statusCode).toBe(400);
-      }
-    });
+    it.each(["districts", `map?districtId=1&language=de`])(
+      "rejects invalid language match modes and identifiers on /volunteer/%s",
+      async (path) => {
+        const separator = path.includes("?") ? "&" : "?";
+        for (const query of [
+          `filter[${QueryParamsKeys.LANGUAGE_MATCH}]=invalid`,
+          `filter[language]=invalid`,
+        ]) {
+          const res = await get(`/volunteer/${path}${separator}${query}`);
+          expect(res.statusCode).toBe(400);
+        }
+      },
+    );
   });
 });
