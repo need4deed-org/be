@@ -347,7 +347,9 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
     ]);
     expect(await ownedVolunteers()).toEqual([]);
     expect(await links()).toEqual([]);
-    expect(fastify.notify.activity).not.toHaveBeenCalled();
+    const notice = vi.mocked(fastify.notify.activity).mock.calls[0][0];
+    expect(notice).toContain("Dry-run import");
+    expect(notice).toContain(mail("unmatched"));
   });
 
   it("imports the valid rows and reports the invalid ones", async () => {
@@ -529,6 +531,7 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
     const again = await importRows([row("matched")]);
     expect(report(again).rows[0].skipReason).toBe("connected-existing");
     expect(await links()).toHaveLength(1);
+    expect(fastify.notify.activity).toHaveBeenCalledTimes(1);
   });
 
   it("reuses a person without a profile when the first name matches", async () => {
@@ -547,6 +550,15 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
     const ids = (list.json().data as { id: number }[]).map(({ id }) => id);
     expect(ids).toContain(matchedVolunteer.id);
     expect(ids).not.toContain(unmatchedVolunteer.id);
+
+    const foreign = await fastify.inject({
+      method: "GET",
+      url: `/volunteer?filter[ownerAgent]=${agent.id}&limit=120`,
+      cookies: { [accessCookieName]: cookies.outsider },
+    });
+    expect(
+      (foreign.json().data as { id: number }[]).map(({ id }) => id),
+    ).not.toContain(matchedVolunteer.id);
 
     for (const as of ["admin", "ngo"] as const) {
       const res = await fastify.inject({

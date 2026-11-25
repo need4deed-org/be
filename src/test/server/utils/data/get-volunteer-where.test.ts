@@ -124,7 +124,7 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
     expect(condition(where, "ownerAgentId")).toBeUndefined();
     const owner = condition(where, "id");
     expect(owner?._getSql("Volunteer.id")).toBe(
-      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedOwners))",
+      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))",
     );
     expect(owner?._objectLiteralParameters.requestedOwners).toEqual([4]);
   });

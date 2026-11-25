@@ -95,6 +95,7 @@ type Lookups = {
   registered: Set<string>;
   existing: Map<string, ExistingPerson>;
   matchedVolunteerIds: Set<number>;
+  linkedVolunteerIds: Set<number>;
   postcodeIds: Map<string, number>;
   languages: Map<string, number>;
   activities: Map<string, number>;
@@ -149,7 +150,9 @@ const findOccasionalType = enumLookup(Object.values(OccasionalType));
 function toStatusType(
   types: ProfileVolunteeringType[],
 ): ProfileVolunteeringType | undefined {
-  const distinct = uniq(types);
+  const distinct = Object.values(ProfileVolunteeringType).filter((type) =>
+    types.includes(type),
+  );
   const regular = distinct.includes(ProfileVolunteeringType.REGULAR);
   const accompanying = distinct.includes(ProfileVolunteeringType.ACCOMPANYING);
   if (
@@ -226,27 +229,33 @@ async function findExistingPersons(
   return byEmail;
 }
 
-async function findMatchedVolunteerIds(
+async function findAgentVolunteerIds(
   manager: EntityManager,
   agentId: number,
   volunteerIds: number[],
-): Promise<Set<number>> {
+): Promise<Pick<Lookups, "matchedVolunteerIds" | "linkedVolunteerIds">> {
   if (volunteerIds.length === 0) {
-    return new Set();
+    return { matchedVolunteerIds: new Set(), linkedVolunteerIds: new Set() };
   }
-  const rows: { volunteer_id: number }[] = await manager.query(
-    `SELECT DISTINCT ov.volunteer_id
+  const rows: { volunteer_id: number; linked: boolean }[] = await manager.query(
+    `SELECT DISTINCT ov.volunteer_id, false AS linked
        FROM "public"."opportunity_volunteer" ov
        JOIN "public"."opportunity" o ON o.id = ov.opportunity_id
       WHERE o.agent_id = $1
         AND ov.status = ANY($2)
         AND ov.volunteer_id = ANY($3)
      UNION
-     SELECT volunteer_id FROM "public"."volunteer_agent_link"
+     SELECT volunteer_id, true FROM "public"."volunteer_agent_link"
       WHERE agent_id = $1 AND volunteer_id = ANY($3)`,
     [agentId, VISIBLE_MATCH_STATUSES, volunteerIds],
   );
-  return new Set(rows.map(({ volunteer_id }) => Number(volunteer_id)));
+  const ids = (linked: boolean) =>
+    new Set(
+      rows
+        .filter((row) => row.linked === linked)
+        .map(({ volunteer_id }) => Number(volunteer_id)),
+    );
+  return { matchedVolunteerIds: ids(false), linkedVolunteerIds: ids(true) };
 }
 
 async function findPostcodeIds(
@@ -384,7 +393,7 @@ async function loadLookups(
   const volunteerIds = [...existing.values()]
     .map(({ volunteerId }) => volunteerId)
     .filter((id): id is number => id !== null);
-  const matchedVolunteerIds = await findMatchedVolunteerIds(
+  const agentVolunteerIds = await findAgentVolunteerIds(
     manager,
     agentId,
     volunteerIds,
@@ -392,7 +401,7 @@ async function loadLookups(
   return {
     registered,
     existing,
-    matchedVolunteerIds,
+    ...agentVolunteerIds,
     postcodeIds,
     languages,
     activities,
@@ -541,7 +550,10 @@ function classifyExisting(
   canReusePerson: boolean,
 ): Pick<Plan, "link" | "inUse"> | "connected" | "new" {
   if (person?.volunteerId) {
-    if (person.ownerAgentId === agentId) {
+    if (
+      person.ownerAgentId === agentId ||
+      lookups.linkedVolunteerIds.has(person.volunteerId)
+    ) {
       return "connected";
     }
     if (person.ownerAgentId !== null) {
@@ -952,6 +964,14 @@ function slackNotice(
     }
     return [];
   });
+  if (report.dryRun) {
+    return existing.length > 0
+      ? [
+          `🔎 Dry-run import for *${escapeSlack(agent.title)}* (id:${agent.id}) checked emails already in need4deed:`,
+          ...existing,
+        ].join("\n")
+      : undefined;
+  }
   if (report.created === 0 && existing.length === 0) {
     return undefined;
   }
@@ -1013,7 +1033,7 @@ export async function importOwnedVolunteers(
     },
   );
 
-  const notice = !report.dryRun && slackNotice(agent, report, plans);
+  const notice = slackNotice(agent, report, plans);
   if (notice) {
     notify
       .activity(notice)
