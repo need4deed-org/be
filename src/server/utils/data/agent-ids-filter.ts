@@ -5,7 +5,7 @@ export function parseAgentIdsFilter(
     return null;
   }
   const values = Array.isArray(value) ? value : [value];
-  return [...new Set(values.map(Number))];
+  return [...new Set(values.map(Number).filter(Number.isInteger))];
 }
 
 export function intersectAgentIds(

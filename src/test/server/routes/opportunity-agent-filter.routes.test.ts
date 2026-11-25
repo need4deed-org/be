@@ -173,6 +173,23 @@ describe("GET /opportunity?filter[agent]=", () => {
     );
   });
 
+  it("accepts more than 20 ids", async () => {
+    const unknownIds = Array.from({ length: 30 }, (_, i) => 999000000 + i);
+    const query = [agents.ownA.id, agents.foreign.id, ...unknownIds]
+      .map((id) => `filter[agent]=${id}`)
+      .join("&");
+    const res = await list("coordinator", query);
+    expect(res.statusCode).toBe(200);
+    expect(
+      (res.json().data as { id: number }[]).map((o) => o.id).sort(),
+    ).toEqual(idsOf(["ownA", "foreign"]));
+  });
+
+  it("rejects an out-of-range filter[agentId]", async () => {
+    const res = await list("coordinator", "filter[agentId]=9999999999");
+    expect(res.statusCode).toBe(400);
+  });
+
   it.each(["abc", "0", "9999999999"])(
     "rejects filter[agent]=%s",
     async (value) => {

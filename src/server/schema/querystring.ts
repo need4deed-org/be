@@ -108,6 +108,7 @@ const sortByProps = {
 };
 
 const AGENT_ID_PATTERN = "^[1-9][0-9]{0,8}$";
+const MAX_INT4 = 2147483647;
 
 export const opportunityListQuerySchema = {
   type: "object",
@@ -137,8 +138,11 @@ export const opportunityListQuerySchema = {
         },
         agentId: {
           anyOf: [
-            { type: "integer", minimum: 1 },
-            { type: "array", items: { type: "integer", minimum: 1 } },
+            { type: "integer", minimum: 1, maximum: MAX_INT4 },
+            {
+              type: "array",
+              items: { type: "integer", minimum: 1, maximum: MAX_INT4 },
+            },
           ],
         },
         [QueryParamsKeys.AGENT]: {
