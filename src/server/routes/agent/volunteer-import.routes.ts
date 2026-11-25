@@ -37,6 +37,7 @@ export default async function agentVolunteerImportRoutes(
           ...responseErrors,
           200: reportSchema,
           201: reportSchema,
+          400: reportSchema,
         },
       },
     },
@@ -44,6 +45,11 @@ export default async function agentVolunteerImportRoutes(
       const { id } = request.params;
       await assertAgentMemberOrStaffOr404(request, id);
       const report = await importOwnedVolunteers(request, id, request.body);
+      if (report.invalid > 0 && report.invalid === report.rows.length) {
+        return reply
+          .status(400)
+          .send({ message: "Every row is invalid.", data: report });
+      }
       if (report.dryRun) {
         return reply
           .status(200)

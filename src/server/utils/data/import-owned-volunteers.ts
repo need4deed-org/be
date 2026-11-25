@@ -30,7 +30,6 @@ import OpportunityVolunteer from "../../../data/entity/m2m/opportunity-volunteer
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import Person from "../../../data/entity/person.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
-import VolunteerAgentLink from "../../../data/entity/volunteer/volunteer-agent-link.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { normalizeEmail } from "../../../data/lib/email-transformer";
@@ -46,6 +45,7 @@ import {
 } from "../../../services/dto/build-deal-timeslots";
 import { VISIBLE_MATCH_STATUSES } from "../pii/visible-persons";
 import { FALLBACK_PLZ } from "./get-or-create-submitter-person";
+import { isStaffRole } from "./is-staff-role";
 
 type ExistingPerson = {
   id: number;
@@ -59,7 +59,8 @@ type InUseReason =
   | "volunteer owned by another NGO"
   | "volunteer not matched with this NGO"
   | "registered account"
-  | "person with another name";
+  | "person with another name"
+  | "person without a volunteer profile";
 
 type Profile = {
   languages: { languageId: number; proficiency?: LangProficiency }[];
@@ -479,6 +480,23 @@ function resolveProfile(
     opportunities.set(ids[0], status);
   }
 
+  const statusType = toStatusType(types);
+  const keptTypes =
+    statusType === ProfileVolunteeringType.REGULAR_ACCOMPANYING
+      ? [
+          ProfileVolunteeringType.REGULAR,
+          ProfileVolunteeringType.ACCOMPANYING,
+          ProfileVolunteeringType.REGULAR_ACCOMPANYING,
+        ]
+      : [statusType];
+  uniq(types)
+    .filter((type) => !keptTypes.includes(type))
+    .forEach((type) =>
+      warnings.push(
+        `volunteer type "${type}" dropped: only ${statusType} kept`,
+      ),
+    );
+
   return {
     languages: [...languages].map(([languageId, proficiency]) => ({
       languageId,
@@ -488,7 +506,7 @@ function resolveProfile(
     skillIds: options("skill", row.skills, lookups.skills),
     districtIds: options("district", row.districts, lookups.districts),
     timeslots: [...timeslots.values()],
-    statusType: toStatusType(types),
+    statusType,
     statusEngagement: enumValue(
       "engagement status",
       row.statusEngagement,
@@ -513,13 +531,14 @@ function resolveProfile(
   };
 }
 
-// Never reveal to the NGO that an email is already in need4deed.
+// The NGO only learns "email in use"; the reason goes to coordinators.
 function classifyExisting(
   agentId: number,
   row: ApiVolunteerImportRow,
   email: string,
   person: ExistingPerson | undefined,
   lookups: Lookups,
+  canReusePerson: boolean,
 ): Pick<Plan, "link" | "inUse"> | "connected" | "new" {
   if (person?.volunteerId) {
     if (person.ownerAgentId === agentId) {
@@ -535,6 +554,9 @@ function classifyExisting(
   if (lookups.registered.has(email)) {
     return { inUse: "registered account" };
   }
+  if (person && !canReusePerson) {
+    return { inUse: "person without a volunteer profile" };
+  }
   if (person && !sameName(person.firstName ?? "", row.firstName)) {
     return { inUse: "person with another name" };
   }
@@ -549,6 +571,7 @@ function planRow(
   postcode: string,
   lookups: Lookups,
   seen: Set<string>,
+  canReusePerson: boolean,
 ): Plan {
   const result: ApiVolunteerImportRowResult = {
     row: index,
@@ -579,7 +602,14 @@ function planRow(
   seen.add(email);
 
   const person = lookups.existing.get(email);
-  const existing = classifyExisting(agentId, row, email, person, lookups);
+  const existing = classifyExisting(
+    agentId,
+    row,
+    email,
+    person,
+    lookups,
+    canReusePerson,
+  );
   if (existing !== "new") {
     const connected = existing === "connected" || existing.link === true;
     return {
@@ -730,18 +760,28 @@ async function writeImport(
     ({ link, person }) => link && person?.volunteerId,
   );
   if (toLink.length > 0) {
-    await manager
-      .createQueryBuilder()
-      .insert()
-      .into(VolunteerAgentLink)
-      .values(
-        toLink.map(({ person }) => ({
-          volunteerId: person!.volunteerId!,
-          agentId: agent.id,
-        })),
-      )
-      .orIgnore()
-      .execute();
+    const linked: { volunteer_id: number }[] = await manager.query(
+      `INSERT INTO "public"."volunteer_agent_link" (volunteer_id, agent_id)
+       SELECT unnest($1::int[]), $2
+       ON CONFLICT DO NOTHING
+       RETURNING volunteer_id`,
+      [toLink.map(({ person }) => person?.volunteerId), agent.id],
+    );
+    const occurredAt = new Date();
+    await insertRows(
+      manager,
+      VolunteerAuditLog,
+      linked.map(
+        ({ volunteer_id }) =>
+          new VolunteerAuditLog({
+            volunteerId: Number(volunteer_id),
+            type: "owner_changed",
+            detail: `Connected to ${agent.title} (id:${agent.id}) by an import; the owner stays need4deed.`,
+            actorUserId,
+            occurredAt,
+          }),
+      ),
+    );
   }
 
   const toCreate = plans.filter(({ result }) => result.outcome === "created");
@@ -858,6 +898,37 @@ async function writeImport(
   toCreate.forEach((plan, i) => {
     plan.result.volunteerId = volunteerIds[i];
   });
+  await warnOverriddenEngagement(manager, toCreate, volunteerIds);
+}
+
+async function warnOverriddenEngagement(
+  manager: EntityManager,
+  plans: Plan[],
+  volunteerIds: number[],
+): Promise<void> {
+  const requested = new Map(
+    plans.flatMap(({ profile, result }, i) =>
+      profile?.statusEngagement && profile.opportunities.length > 0
+        ? [[volunteerIds[i], { wanted: profile.statusEngagement, result }]]
+        : [],
+    ),
+  );
+  if (requested.size === 0) {
+    return;
+  }
+  const stored = await manager.find(Volunteer, {
+    select: { id: true, statusEngagement: true },
+    where: { id: In([...requested.keys()]) },
+  });
+  for (const { id, statusEngagement } of stored) {
+    const { wanted, result } = requested.get(id)!;
+    if (statusEngagement !== wanted) {
+      result.warnings = [
+        ...(result.warnings ?? []),
+        `engagement status "${wanted}" replaced by "${statusEngagement}" from the opportunity matches`,
+      ];
+    }
+  }
 }
 
 function slackNotice(
@@ -904,6 +975,7 @@ export async function importOwnedVolunteers(
     throw new NotFoundError(`Agent (id:${agentId}) not found.`);
   }
 
+  const canReusePerson = isStaffRole(request.authUser?.role);
   const emails = rows.map(({ email }) => normalizeEmail(email ?? ""));
   const postcodes = rows.map(({ postcode }) =>
     postcode?.trim() ? normalizePostcode(postcode) : "",
@@ -931,6 +1003,7 @@ export async function importOwnedVolunteers(
           postcodes[index],
           lookups,
           seen,
+          canReusePerson,
         ),
       );
       if (!dryRun) {

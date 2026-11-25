@@ -406,7 +406,7 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
           { day: "Occasionally" as never, daytime: "Weekends" as never },
           { day: "Funday" as never, daytime: "08-11" as never },
         ],
-        statusTypes: ["Regular", "accompanying"] as never,
+        statusTypes: ["Regular", "accompanying", "EVENTS"] as never,
         statusEngagement: "available" as never,
         goodConductCertificate: "YES" as never,
         measlesVaccination: "maybe" as never,
@@ -436,6 +436,8 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
           suffix +
           "\" is not one of this NGO's opportunities",
         'skill "Juggling" is unknown',
+        'volunteer type "events" dropped: only regular-accompanying kept',
+        'engagement status "vol-available" replaced by "vol-active" from the opportunity matches',
       ].sort(),
     );
 
@@ -508,6 +510,12 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
       id: matchedVolunteer.id,
     });
     expect(unchanged.ownerAgentId).toBeNull();
+    const audit = await fastify.db.volunteerAuditLogRepository.find({
+      where: { volunteerId: matchedVolunteer.id },
+    });
+    expect(
+      audit.filter(({ detail }) => detail.startsWith("Connected to")),
+    ).toHaveLength(1);
 
     const notice = vi.mocked(fastify.notify.activity).mock.calls[0][0];
     expect(notice).toContain(agent.title);
@@ -566,6 +574,26 @@ describe("POST /agent/:id/volunteer-import (be#1332, be#1454)", () => {
     expect(report(res)).toMatchObject({ created: 0, skipped: 2 });
     expect(fastify.notify.activity).not.toHaveBeenCalled();
     expect(await ownedVolunteers()).toHaveLength(before);
+  });
+
+  it("rejects an import where every row is invalid", async () => {
+    const res = await importRows([row("bad", { email: "nope" })]);
+    expect(res.statusCode).toBe(400);
+    expect(report(res)).toMatchObject({ created: 0, invalid: 1 });
+  });
+
+  it("never lets an NGO member take over an existing person", async () => {
+    await fastify.db.personRepository.save(
+      new Person({ firstName: "Solo", email: mail("solo") }),
+    );
+    const res = await importRows([row("solo", { firstName: "Solo" })], {
+      as: "ngo",
+    });
+    expect(report(res).rows[0].skipReason).toBe("email-in-use");
+    expect(await ownedByEmail("solo")).toBeNull();
+    expect(vi.mocked(fastify.notify.activity).mock.calls[0][0]).toContain(
+      "person without a volunteer profile",
+    );
   });
 
   it("lets an NGO member import for its own NGO only", async () => {

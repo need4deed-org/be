@@ -14,7 +14,6 @@ import {
   SortOrder,
   TranslatedIntoType,
   TranslationOrigin,
-  UserRole,
 } from "need4deed-sdk";
 import {
   DataSource,
@@ -827,10 +826,7 @@ async function findLinkedAgents(
   );
   return rows
     .map(({ id, title }) => ({ id: Number(id), title }))
-    .filter(
-      ({ id }) =>
-        maskContext?.role !== UserRole.AGENT || maskContext.agentIds.has(id),
-    );
+    .filter(({ id }) => !maskContext || maskContext.agentIds.has(id));
 }
 
 export async function getGerman(): Promise<Language> {
