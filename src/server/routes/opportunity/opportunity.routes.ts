@@ -87,6 +87,7 @@ import {
   addAgentTypeServiceTranslations,
   addComments2Entity,
   alertOnChange,
+  andIntoWhere,
   assertAgentMemberOrStaffOr403,
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
@@ -104,9 +105,10 @@ import {
   getPostcode,
   getSkipTake,
   impliesAgentSearching,
+  intersectAgentIds,
   isActiveAgentMember,
   isStaffRole,
-  mergeIntoWhere,
+  parseAgentIdsFilter,
   patchEntity,
   setAgentSearching,
   syncOnetimeTimeslot,
@@ -496,10 +498,14 @@ export default async function opportunityRoutes(
 
       const message = `Opportunities page:${request.query.page}.`;
 
-      const agentIds =
+      const callerAgentIds =
         request.authUser?.role === UserRole.AGENT
           ? await getCallerAgentIds(request, request.authUser.personId)
           : null;
+      const requestedAgentIds = parseAgentIdsFilter(
+        request.query.filter?.agent,
+      );
+      const agentIds = intersectAgentIds(callerAgentIds, requestedAgentIds);
       if (agentIds?.length === 0) {
         return reply.status(200).send({
           message,
@@ -515,7 +521,7 @@ export default async function opportunityRoutes(
         isStaffRole(request.authUser?.role),
       );
       if (agentIds) {
-        mergeIntoWhere(where, { agentId: In(agentIds) });
+        andIntoWhere(where, "agentId", In(agentIds));
       }
       await applyVolunteerOpportunityScope(request, where);
 

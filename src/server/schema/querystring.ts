@@ -107,6 +107,10 @@ const sortByProps = {
   },
 };
 
+const AGENT_ID_DIGITS = "[1-9][0-9]{0,8}";
+const AGENT_ID_PATTERN = `^${AGENT_ID_DIGITS}$`;
+const MAX_INT4 = 2147483647;
+
 export const opportunityListQuerySchema = {
   type: "object",
   properties: {
@@ -135,8 +139,20 @@ export const opportunityListQuerySchema = {
         },
         agentId: {
           anyOf: [
-            { type: "integer", minimum: 1 },
-            { type: "array", items: { type: "integer", minimum: 1 } },
+            { type: "integer", minimum: 1, maximum: MAX_INT4 },
+            {
+              type: "array",
+              items: { type: "integer", minimum: 1, maximum: MAX_INT4 },
+            },
+          ],
+        },
+        [QueryParamsKeys.AGENT]: {
+          anyOf: [
+            { type: "string", pattern: AGENT_ID_PATTERN },
+            {
+              type: "array",
+              items: { type: "string", pattern: AGENT_ID_PATTERN },
+            },
           ],
         },
         status: {
@@ -183,7 +199,7 @@ export const agentListQuerySchema = {
   additionalProperties: false,
 };
 
-const OWNER_AGENT_PATTERN = "^(none|[1-9][0-9]{0,8})$";
+const OWNER_AGENT_PATTERN = `^(none|${AGENT_ID_DIGITS})$`;
 
 export const volunteerListQuerySchema = {
   type: "object",
