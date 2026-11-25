@@ -107,6 +107,8 @@ const sortByProps = {
   },
 };
 
+const AGENT_ID_PATTERN = "^[1-9][0-9]{0,8}$";
+
 export const opportunityListQuerySchema = {
   type: "object",
   properties: {
@@ -137,6 +139,15 @@ export const opportunityListQuerySchema = {
           anyOf: [
             { type: "integer", minimum: 1 },
             { type: "array", items: { type: "integer", minimum: 1 } },
+          ],
+        },
+        [QueryParamsKeys.AGENT]: {
+          anyOf: [
+            { type: "string", pattern: AGENT_ID_PATTERN },
+            {
+              type: "array",
+              items: { type: "string", pattern: AGENT_ID_PATTERN },
+            },
           ],
         },
         status: {
