@@ -55,6 +55,7 @@ import Timeline from "./entity/timeline.entity";
 import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
+import VolunteerAgentLink from "./entity/volunteer/volunteer-agent-link.entity";
 import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
@@ -127,6 +128,7 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
     VolunteerAuditLog,
+    VolunteerAgentLink,
     OpportunityAuditLog,
     StatisticsEvent,
   ],

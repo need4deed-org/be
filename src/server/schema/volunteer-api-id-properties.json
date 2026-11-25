@@ -120,6 +120,12 @@
           "items": {
             "$ref": "Option#"
           }
+        },
+        "linkedAgents": {
+          "type": "array",
+          "items": {
+            "$ref": "OptionItem#"
+          }
         }
       }
     }

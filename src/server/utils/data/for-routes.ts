@@ -790,13 +790,15 @@ export async function fetchVolunteerById(
 
   await addTranslatedFields([volunteer], isoCode);
 
-  const [timedEvents, comments, activeFromOnetimer] = await Promise.all([
-    getTimedEvents(volunteer),
-    getVolunteerComments(volunteer),
-    findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, [
-      volunteer.id,
-    ]),
-  ]);
+  const [timedEvents, comments, activeFromOnetimer, linkedAgents] =
+    await Promise.all([
+      getTimedEvents(volunteer),
+      getVolunteerComments(volunteer),
+      findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, [
+        volunteer.id,
+      ]),
+      findLinkedAgents(volunteerRepository.manager, volunteer.id, maskContext),
+    ]);
 
   if (maskContext) {
     maskPii(volunteer, maskContext);
@@ -806,7 +808,25 @@ export async function fetchVolunteerById(
   return {
     ...volunteerSerializer(volunteer, comments, timedEvents),
     activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
+    linkedAgents,
   };
+}
+
+async function findLinkedAgents(
+  manager: EntityManager,
+  volunteerId: number,
+  maskContext: CallerVisibility | null | undefined,
+): Promise<OptionItem[]> {
+  const rows: { id: number; title: string }[] = await manager.query(
+    `SELECT a.id, a.title FROM volunteer_agent_link l
+       JOIN agent a ON a.id = l.agent_id
+      WHERE l.volunteer_id = $1
+      ORDER BY a.title, a.id`,
+    [volunteerId],
+  );
+  return rows
+    .map(({ id, title }) => ({ id: Number(id), title }))
+    .filter(({ id }) => !maskContext || maskContext.agentIds.has(id));
 }
 
 export async function getGerman(): Promise<Language> {
