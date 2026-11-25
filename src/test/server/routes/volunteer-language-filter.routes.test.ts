@@ -12,6 +12,7 @@ import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
 import Address from "../../../data/entity/location/address.entity";
+import District from "../../../data/entity/location/district.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
@@ -36,7 +37,7 @@ describe("GET /volunteer language match", () => {
   let englishId: number;
   let frenchId: number;
   let mondaySlot: Timeslot;
-  let districtId: number;
+  let district: District;
   let mapPostcode: Postcode;
   let mapDistrictPostcode: DistrictPostcode;
   let mapAddress: Address;
@@ -79,21 +80,21 @@ describe("GET /volunteer language match", () => {
       }),
     );
 
-    [{ districtId }] = await fastify.db.districtRepository.manager.query(
-      `SELECT dp.district_id AS "districtId"
-         FROM district_postcode dp
-         JOIN postcode p ON p.id = dp.postcode_id
-        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
-        ORDER BY dp.id
-        LIMIT 1`,
+    district = await getRepository(dataSource, District).save(
+      new District({ title: `LanguageMatch ${suffix}` }),
     );
     mapPostcode = await fastify.db.postcodeRepository.save(
-      new Postcode({ value: `8${suffix}` }),
+      new Postcode({ value: `8${suffix}`, latitude: 52.52, longitude: 13.4 }),
     );
     mapDistrictPostcode = await getRepository(
       dataSource,
       DistrictPostcode,
-    ).save(new DistrictPostcode({ districtId, postcodeId: mapPostcode.id }));
+    ).save(
+      new DistrictPostcode({
+        districtId: district.id,
+        postcodeId: mapPostcode.id,
+      }),
+    );
     mapAddress = await getRepository(dataSource, Address).save(
       new Address({ postcodeId: mapPostcode.id }),
     );
@@ -197,6 +198,9 @@ describe("GET /volunteer language match", () => {
     }
     if (mapPostcode) {
       await fastify.db.postcodeRepository.delete({ id: mapPostcode.id });
+    }
+    if (district) {
+      await getRepository(dataSource, District).delete({ id: district.id });
     }
     await fastify.close();
   });
@@ -311,14 +315,12 @@ describe("GET /volunteer language match", () => {
 
     async function expectMarkers(query: string, keys: Key[]) {
       const res = await get(
-        `/volunteer/map?districtId=${districtId}&language=de&${query}`,
+        `/volunteer/map?districtId=${district.id}&language=de&${query}`,
       );
       expect(res.statusCode).toBe(200);
-      const ours = new Set(Object.values(volunteers).map(({ id }) => id));
       const ids = res
         .json<{ data: { markers: { children: { id: number }[] }[] } }>()
-        .data.markers.flatMap(({ children }) => children.map(({ id }) => id))
-        .filter((id) => ours.has(id));
+        .data.markers.flatMap(({ children }) => children.map(({ id }) => id));
       expect(ids.sort()).toEqual(keys.map((key) => volunteers[key].id).sort());
     }
 
