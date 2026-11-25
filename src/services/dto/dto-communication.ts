@@ -14,5 +14,6 @@ export function dtoCommunication(
     opportunityId: communication.opportunityId ?? undefined,
     agentId: communication.agentId ?? undefined,
     userId: communication.userId,
+    remindOn: null,
   };
 }

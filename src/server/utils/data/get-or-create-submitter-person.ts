@@ -21,7 +21,7 @@ type SubmitterFields = Pick<
 > &
   Partial<Pick<OpportunityLegacyFormData, "rac_address" | "rac_plz">>;
 
-const FALLBACK_PLZ = "12345";
+export const FALLBACK_PLZ = "12345";
 
 export const DUMMY_ADDRESS_TITLE = "Dummy";
 

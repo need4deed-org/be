@@ -114,19 +114,17 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
   };
   const condition = (where: object, key: "ownerAgentId" | "id") =>
     (where as Record<string, RawCondition | undefined>)[key];
-  const COLUMN = "Volunteer.ownerAgentId";
 
   it("adds no owner condition for a privileged caller without a filter", () => {
     expect(getVolunteerWhere({}, null)).toEqual({});
   });
 
-  it("filters a privileged caller by ownerAgent, incl. none", () => {
-    const owner = condition(
-      getVolunteerWhere({ ownerAgent: ["4", "none"] }, null),
-      "ownerAgentId",
-    );
-    expect(owner?._getSql(COLUMN)).toBe(
-      `(${COLUMN} IS NULL OR ${COLUMN} = ANY(:requestedOwners))`,
+  it("filters a privileged caller by ownerAgent, incl. none and linked volunteers", () => {
+    const where = getVolunteerWhere({ ownerAgent: ["4", "none"] }, null);
+    expect(condition(where, "ownerAgentId")).toBeUndefined();
+    const owner = condition(where, "id");
+    expect(owner?._getSql("Volunteer.id")).toBe(
+      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedOwners))",
     );
     expect(owner?._objectLiteralParameters.requestedOwners).toEqual([4]);
   });
@@ -146,11 +144,14 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
 
   it("ANDs a requested owner with the caller's visibility", () => {
     const where = getVolunteerWhere({ ownerAgent: "9" }, visibility([], [4]));
-    expect(
-      condition(where, "ownerAgentId")?._objectLiteralParameters
-        .requestedOwners,
-    ).toEqual([9]);
-    expect(condition(where, "id")?._objectLiteralParameters).toMatchObject({
+    const id = condition(where, "id") as unknown as {
+      _type: string;
+      _value: RawCondition[];
+    };
+    expect(id._type).toBe("and");
+    const [owner, scope] = id._value;
+    expect(owner._objectLiteralParameters.requestedOwners).toEqual([9]);
+    expect(scope._objectLiteralParameters).toMatchObject({
       visibleOwners: [4],
     });
   });
