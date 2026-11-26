@@ -1,12 +1,20 @@
 import { FastifyInstance } from "fastify";
-import { UserRole } from "need4deed-sdk";
+import { EntityTableName, UserRole } from "need4deed-sdk";
+import { In } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { accessCookieName } from "../../../config/constants";
 import { dataSource } from "../../../data/data-source";
+import LeadFrom from "../../../data/entity/lead.entity";
 import Address from "../../../data/entity/location/address.entity";
 import Postcode from "../../../data/entity/location/postcode.entity";
 import Person from "../../../data/entity/person.entity";
+import StatisticsEvent, {
+  LEAD_FROM_METRIC,
+} from "../../../data/entity/statistics-event.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
+import Timeline from "../../../data/entity/timeline.entity";
 import User from "../../../data/entity/user.entity";
+import VolunteerLeadFrom from "../../../data/entity/volunteer/volunteer-lead-from.entity";
 import {
   getRepository,
   getRRULE,
@@ -30,6 +38,7 @@ describe("POST /volunteer/register", () => {
   const createdDealIds: number[] = [];
   const createdAddressIds: number[] = [];
   const createdPostcodeIds: number[] = [];
+  const createdLeadIds: number[] = [];
 
   async function makeRegistrant(role: UserRole = UserRole.VOLUNTEER): Promise<{
     person: Person;
@@ -67,6 +76,11 @@ describe("POST /volunteer/register", () => {
   afterAll(async () => {
     for (const id of createdVolunteerIds) {
       await fastify.db.volunteerRepository.delete({ id });
+      await dataSource.manager.delete(Timeline, {
+        targetEntityType: EntityTableName.VOLUNTEER,
+        targetEntityId: id,
+        contentEntityType: EntityTableName.LEAD,
+      });
     }
     for (const id of createdDealIds) {
       await fastify.db.dealRepository.delete({ id });
@@ -83,6 +97,11 @@ describe("POST /volunteer/register", () => {
     for (const id of createdPostcodeIds) {
       await getRepository(dataSource, Postcode).delete({ id });
     }
+    await dataSource.manager.delete(StatisticsEvent, {
+      metric: LEAD_FROM_METRIC,
+      valueKey: In(createdLeadIds.map(String)),
+    });
+    await dataSource.manager.delete(LeadFrom, { id: In(createdLeadIds) });
     await fastify.close();
   });
 
@@ -154,6 +173,96 @@ describe("POST /volunteer/register", () => {
     createdDealIds.push(volunteer.dealId);
     expect(volunteer.personId).toBe(person.id);
     expect(volunteer.infoAbout).toBe("test comment");
+  });
+
+  it("stores multiple lead sources and restricts detail and edits to staff", async () => {
+    const { user, token } = await makeRegistrant();
+    const { user: coordinator } = await makeRegistrant(UserRole.COORDINATOR);
+    const suffix = randomNumericSuffix();
+    const [first, second] = await dataSource.manager.save([
+      new LeadFrom({ title: `Source A ${suffix}` }),
+      new LeadFrom({ title: `Source B ${suffix}` }),
+    ]);
+    createdLeadIds.push(first.id, second.id);
+    const registration = await fastify.inject({
+      method: "POST",
+      url: `/volunteer/register?token=${token}`,
+      payload: {
+        addressPostcode: "10115",
+        leadFrom: [first, second].map(({ id, title }) => ({ id, title })),
+      },
+    });
+    expect(registration.statusCode).toBe(201);
+    const volunteerId = registration.json().data.id;
+    createdVolunteerIds.push(volunteerId);
+    const volunteer = await fastify.db.volunteerRepository.findOneByOrFail({
+      id: volunteerId,
+    });
+    createdDealIds.push(volunteer.dealId);
+    const answers = await dataSource.manager.findBy(VolunteerLeadFrom, {
+      volunteerId,
+    });
+    expect(answers.map(({ leadFromId }) => leadFromId).sort()).toEqual(
+      [first.id, second.id].sort(),
+    );
+    const cookiesFor = async (email: string) => {
+      const login = await fastify.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email, password },
+      });
+      const cookie = login.cookies.find(
+        ({ name }) => name === accessCookieName,
+      );
+      expect(cookie).toBeDefined();
+      return { [accessCookieName]: cookie!.value };
+    };
+    const staffCookies = await cookiesFor(coordinator.email);
+    const volunteerCookies = await cookiesFor(user.email);
+    const url = `/volunteer/${volunteerId}?language=en`;
+    const detail = await fastify.inject({ url, cookies: staffCookies });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json().data.leadFrom).toEqual([
+      { id: first.id, title: first.title },
+      { id: second.id, title: second.title },
+    ]);
+    const payload = {
+      leadFromChanges: [{ action: "remove", optionId: first.id }],
+    };
+    const forbidden = await fastify.inject({
+      method: "PATCH",
+      url,
+      cookies: volunteerCookies,
+      payload,
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const invalidProfileEdit = await fastify.inject({
+      method: "PATCH",
+      url,
+      cookies: staffCookies,
+      payload: {
+        ...payload,
+        activities: [{ id: 2147483647, title: "Missing activity" }],
+      },
+    });
+    expect(invalidProfileEdit.statusCode).toBe(400);
+    expect(
+      await dataSource.manager.findBy(VolunteerLeadFrom, { volunteerId }),
+    ).toHaveLength(2);
+    const removed = await fastify.inject({
+      method: "PATCH",
+      url,
+      cookies: staffCookies,
+      payload,
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(
+      await dataSource.manager.findBy(VolunteerLeadFrom, { volunteerId }),
+    ).toEqual([expect.objectContaining({ leadFromId: second.id })]);
+    const ownDetail = await fastify.inject({ url, cookies: volunteerCookies });
+    expect(ownDetail.statusCode).toBe(200);
+    expect(ownDetail.json().data).not.toHaveProperty("leadFrom");
+    expect(ownDetail.json().data.timelineLogs).toEqual([]);
   });
 
   it("400s a second submission once a Volunteer profile already exists", async () => {

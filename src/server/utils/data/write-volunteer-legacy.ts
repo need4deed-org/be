@@ -1,6 +1,7 @@
 import { DatabaseError } from "../../../config";
 import { dataSource } from "../../../data/data-source";
 import Deal from "../../../data/entity/deal.entity";
+import LeadFrom from "../../../data/entity/lead.entity";
 import Address from "../../../data/entity/location/address.entity";
 import DealActivity from "../../../data/entity/m2m/deal-activity";
 import DealDistrict from "../../../data/entity/m2m/deal-district";
@@ -11,11 +12,13 @@ import Person from "../../../data/entity/person.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { updatePersonAddress } from "./update-person-address";
+import { saveVolunteerLeadFrom } from "./volunteer-lead-from";
 
 export async function writeVolunteerLegacy(
   volunteer: Volunteer,
   addressPostcodeId?: number,
   auditEntry?: Pick<VolunteerAuditLog, "type" | "detail" | "actorUserId">,
+  leads: LeadFrom[] = [],
 ): Promise<number> {
   await dataSource.manager.transaction(async (transactionalEntityManager) => {
     const addressRepository = transactionalEntityManager.getRepository(Address);
@@ -82,6 +85,17 @@ export async function writeVolunteerLegacy(
     await dealDistrictRepository.save(volunteer.deal.dealDistrict);
 
     await volunteerRepository.save(volunteer);
+    const leadIds = [...new Set(leads.map(({ id }) => id))].sort(
+      (a, b) => a - b,
+    );
+    for (const leadId of leadIds) {
+      await saveVolunteerLeadFrom(
+        transactionalEntityManager,
+        volunteer,
+        leadId,
+        true,
+      );
+    }
     if (auditEntry) {
       await transactionalEntityManager.save(
         new VolunteerAuditLog({

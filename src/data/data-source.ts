@@ -58,6 +58,7 @@ import User from "./entity/user.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
 import VolunteerAgentLink from "./entity/volunteer/volunteer-agent-link.entity";
 import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
+import VolunteerLeadFrom from "./entity/volunteer/volunteer-lead-from.entity";
 import Volunteer from "./entity/volunteer/volunteer.entity";
 import SnakeCaseNamingStrategy from "./lib/snake-case";
 import { OpportunityVolunteerSubscriber } from "./subscribers/opportunity-volunteer.subscriber";
@@ -129,6 +130,7 @@ export const dataSource = new DataSource({
     User,
     Volunteer,
     VolunteerAuditLog,
+    VolunteerLeadFrom,
     VolunteerAgentLink,
     OpportunityAuditLog,
     OpportunityFeedback,

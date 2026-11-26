@@ -19,7 +19,6 @@ import {
   getVolunteerNotificationText,
   writeVolunteerLegacy,
 } from "../../utils";
-import { updateLeads } from "../../utils/data/update-leads";
 
 export default async function volunteerLegacyRoutes(
   fastify: FastifyInstance,
@@ -41,10 +40,13 @@ export default async function volunteerLegacyRoutes(
         leadFromParser,
       );
 
-      const id = await writeVolunteerLegacy(volunteer);
+      const id = await writeVolunteerLegacy(
+        volunteer,
+        undefined,
+        undefined,
+        leads,
+      );
       if (id) {
-        await updateLeads(leads);
-
         if (request.body.origin_opportunity) {
           const opportunityVolunteerRepository =
             fastify.db.opportunityVolunteerRepository;

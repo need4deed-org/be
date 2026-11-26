@@ -45,6 +45,7 @@ import Person from "../../../data/entity/person.entity";
 import Language from "../../../data/entity/profile/language.entity";
 import Timeslot from "../../../data/entity/time/timeslot.entity";
 import Timeline from "../../../data/entity/timeline.entity";
+import VolunteerLeadFrom from "../../../data/entity/volunteer/volunteer-lead-from.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import {
   getPostcode,
@@ -219,12 +220,18 @@ export async function getVolunteerComments(volunteer: Volunteer) {
   return comments;
 }
 
-export async function getTimedEvents(volunteer: Volunteer) {
+export async function getTimedEvents(
+  volunteer: Volunteer,
+  includeLeadFrom = false,
+) {
   const timelineRepository = getRepository(dataSource, Timeline);
   const events = await timelineRepository.find({
     where: {
       targetEntityType: EntityTableName.VOLUNTEER,
       targetEntityId: volunteer.id,
+      ...(includeLeadFrom
+        ? {}
+        : { contentEntityType: Not(EntityTableName.LEAD) }),
     },
     order: { timestamp: "DESC" },
   });
@@ -625,6 +632,7 @@ function getDealRelationsAndIdFieldName(m2mEntityName: string) {
 
 export async function getOrCreateTimeslot(
   availabilityObject: ApiAvailability,
+  manager = dataSource.manager,
 ): Promise<Timeslot> {
   const errorMsg = "Invalid availability object to get or create timeslot";
 
@@ -658,7 +666,7 @@ export async function getOrCreateTimeslot(
     throw new BadRequestError(errorMsg);
   }
 
-  const repositoryTimeslot = getRepository(dataSource, Timeslot);
+  const repositoryTimeslot = getRepository(manager, Timeslot);
   let timeslot = await repositoryTimeslot.findOne({ where: payload });
 
   if (timeslot) {
@@ -695,6 +703,7 @@ export async function updateOptionList<
   m2mEntity: new (_args?: any) => M,
   list: L[],
   rootEntity: string = "deal",
+  entityManager = dataSource.manager,
 ): Promise<boolean> {
   const {
     relations,
@@ -702,7 +711,7 @@ export async function updateOptionList<
   } = getDealRelationsAndIdFieldName(m2mEntity.name);
 
   try {
-    await dataSource.transaction(async (manager) => {
+    await entityManager.transaction(async (manager) => {
       const rootRepository = getRepository(
         manager as unknown as DataSource,
         rootEntity,
@@ -775,6 +784,7 @@ export async function fetchVolunteerById(
   isoCode: Lang,
   relations: string[],
   maskContext?: CallerVisibility | null,
+  includeLeadFrom = false,
 ): Promise<ApiVolunteerGet | null> {
   const volunteerRepository = getRepository(dataSource, Volunteer);
 
@@ -790,14 +800,15 @@ export async function fetchVolunteerById(
 
   await addTranslatedFields([volunteer], isoCode);
 
-  const [timedEvents, comments, activeFromOnetimer, linkedAgents] =
+  const [timedEvents, comments, activeFromOnetimer, linkedAgents, leadFrom] =
     await Promise.all([
-      getTimedEvents(volunteer),
+      getTimedEvents(volunteer, includeLeadFrom),
       getVolunteerComments(volunteer),
       findVolunteerIdsActiveFromOnetimer(volunteerRepository.manager, [
         volunteer.id,
       ]),
       findLinkedAgents(volunteerRepository.manager, volunteer.id, maskContext),
+      includeLeadFrom ? getVolunteerLeadFrom(volunteer.id, isoCode) : undefined,
     ]);
 
   if (maskContext) {
@@ -809,7 +820,30 @@ export async function fetchVolunteerById(
     ...volunteerSerializer(volunteer, comments, timedEvents),
     activeFromOnetimer: activeFromOnetimer.has(volunteer.id),
     linkedAgents,
+    ...(leadFrom === undefined ? {} : { leadFrom }),
   };
+}
+
+async function getVolunteerLeadFrom(
+  volunteerId: number,
+  isoCode: Lang,
+): Promise<OptionItem[]> {
+  const answers = await dataSource.getRepository(VolunteerLeadFrom).find({
+    where: { volunteerId },
+    relations: { leadFrom: true },
+    order: { leadFromId: "ASC" },
+  });
+  if (!answers.length) {
+    return [];
+  }
+  const options = await getOptions(EntityTableName.LEAD, isoCode);
+  const titles = new Map(
+    options[EntityTableName.LEAD]?.map(({ id, title }) => [id, title]),
+  );
+  return answers.map(({ leadFrom }) => ({
+    id: leadFrom.id,
+    title: titles.get(leadFrom.id) ?? leadFrom.title,
+  }));
 }
 
 async function findLinkedAgents(

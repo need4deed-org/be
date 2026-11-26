@@ -4,7 +4,30 @@
   "definitions": {
     "ApiVolunteerBodyPart": {
       "$id": "ApiVolunteerBodyPart",
-      "$ref": "ApiVolunteerProperties#"
+      "allOf": [
+        { "$ref": "ApiVolunteerProperties#" },
+        {
+          "type": "object",
+          "properties": {
+            "leadFromChanges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["action", "optionId"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": { "enum": ["add", "correct", "remove"] },
+                  "optionId": { "type": "integer", "minimum": 1 },
+                  "previousOptionId": { "type": "integer", "minimum": 1 }
+                },
+                "if": { "properties": { "action": { "const": "correct" } } },
+                "then": { "required": ["previousOptionId"] },
+                "else": { "not": { "required": ["previousOptionId"] } }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
