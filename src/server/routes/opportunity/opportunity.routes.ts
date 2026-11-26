@@ -152,6 +152,7 @@ import {
 } from "../../utils/pii/pre-serialization";
 import { opportunityDistrictRoutes } from "../district-map.routes";
 import opportunityAuditLogRoutes from "./audit-log.routes";
+import opportunityFeedbackRoutes from "./feedback.routes";
 import opportunityLegacyRoutes from "./legacy.routes";
 import opportunityRecommendedVolunteerRoutes from "./opportunity-recommended-volunteer.routes";
 import opportunityOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
@@ -301,6 +302,10 @@ export default async function opportunityRoutes(
 
   await fastify.register(opportunityAuditLogRoutes, {
     prefix: `:id${RoutePrefix.AUDIT_LOG}`,
+  });
+
+  await fastify.register(opportunityFeedbackRoutes, {
+    prefix: `:id${RoutePrefix.FEEDBACK}`,
   });
 
   await fastify.register(opportunityRecommendedVolunteerRoutes, {

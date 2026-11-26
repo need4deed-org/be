@@ -15,6 +15,7 @@ export * from "./statistics.schema";
 export * from "./trusted-domain.schema";
 export * from "./user.schema";
 export * from "./opportunity-audit-log.schema";
+export * from "./opportunity-feedback.schema";
 export * from "./volunteer-audit-log.schema";
 export * from "./volunteer-doc.schema";
 export * from "./volunteer-register.schema";

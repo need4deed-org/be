@@ -29,6 +29,7 @@ export const RoutePrefix = {
   REGISTRATION_LINK: "/registration-link",
   REGISTRATIONS: "/registrations",
   EVENTS: "/events",
+  FEEDBACK: "/feedback",
   POST: "/post",
   RECOMMENDED_OPPORTUNITIES: "/recommended-opportunities",
   RECOMMENDED_VOLUNTEERS: "/recommended-volunteers",
