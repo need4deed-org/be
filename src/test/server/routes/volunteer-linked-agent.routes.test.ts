@@ -165,6 +165,7 @@ describe("DELETE /volunteer/:id/linked-agent/:agentId", () => {
   it("removes the link: the NGO loses the personal data and the listing", async () => {
     const res = await unlink();
     expect(res.statusCode, res.body).toBe(200);
+    expect((await unlink()).statusCode).toBe(404);
     const after = await ngoSees();
     expect(after.listed).toBe(false);
     expect(after.email).not.toBe(mail("volunteer"));
@@ -181,7 +182,6 @@ describe("DELETE /volunteer/:id/linked-agent/:agentId", () => {
   });
 
   it("answers 404 for a link that doesn't exist", async () => {
-    expect((await unlink()).statusCode).toBe(404);
     expect((await unlink("coordinator", agent.id + 1_000_000)).statusCode).toBe(
       404,
     );
