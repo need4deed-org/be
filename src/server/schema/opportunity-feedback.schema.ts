@@ -57,7 +57,7 @@ export const opportunityFeedbackSchemaGet200 = {
   required: ["message", "data"],
 };
 
-export const opportunityFeedbackSchemaWrite200 = {
+export const opportunityFeedbackSchemaWrite = {
   type: "object",
   properties: {
     message: { type: "string" },

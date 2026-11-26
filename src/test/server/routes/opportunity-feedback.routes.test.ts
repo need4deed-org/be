@@ -312,6 +312,10 @@ describe("opportunity feedback", () => {
     });
 
     it("lets the author edit their own feedback", async () => {
+      const before =
+        await fastify.db.opportunityFeedbackRepository.findOneByOrFail({
+          id: volunteerFeedback.id,
+        });
       const res = await patch(
         "volunteer",
         opportunity,
@@ -326,8 +330,8 @@ describe("opportunity feedback", () => {
           id: volunteerFeedback.id,
         });
       expect(stored.text).toBe("Edited");
-      expect(stored.updatedAt.getTime()).toBeGreaterThanOrEqual(
-        stored.createdAt.getTime(),
+      expect(stored.updatedAt.getTime()).toBeGreaterThan(
+        before.updatedAt.getTime(),
       );
     });
 
@@ -418,7 +422,13 @@ describe("opportunity feedback", () => {
 
     it("masks volunteer names for NGO members of an inactive agent", async () => {
       await post("volunteer", inactiveOpportunity, "From volunteer");
-      await post("member", inactiveOpportunity, "From member");
+      await fastify.db.opportunityFeedbackRepository.save(
+        new OpportunityFeedback({
+          opportunityId: inactiveOpportunity.id,
+          authorUserId: users.member.id,
+          text: "From member",
+        }),
+      );
 
       const res = await get("member", inactiveOpportunity);
       expect(res.statusCode).toBe(200);
@@ -431,6 +441,30 @@ describe("opportunity feedback", () => {
       const staffView = await get("coordinator", inactiveOpportunity);
       const staffNames = listOf(staffView).map((f) => f.authorName);
       expect(staffNames).toContain("Feedback volunteer");
+    });
+  });
+
+  describe("inactive NGO", () => {
+    it("forbids its members writing feedback", async () => {
+      const res = await post("member", inactiveOpportunity, "Inactive");
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("forbids its members editing their own feedback", async () => {
+      const own = await fastify.db.opportunityFeedbackRepository.save(
+        new OpportunityFeedback({
+          opportunityId: inactiveOpportunity.id,
+          authorUserId: users.member.id,
+          text: "Before inactive",
+        }),
+      );
+      const res = await patch("member", inactiveOpportunity, own.id, "Edit");
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("still lets a matched volunteer write feedback", async () => {
+      const res = await post("volunteer", inactiveOpportunity, "Still here");
+      expect(res.statusCode).toBe(201);
     });
   });
 
