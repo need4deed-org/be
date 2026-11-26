@@ -10,6 +10,10 @@
         },
         {
           "properties": {
+            "leadFrom": {
+              "type": "array",
+              "items": { "$ref": "OptionItem#" }
+            },
             "statusTypes": {
               "type": "array",
               "items": { "$ref": "OpportunityType#" }

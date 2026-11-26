@@ -23,7 +23,6 @@ import {
 } from "../../schema";
 import {
   notifyNewVolunteer,
-  updateLeads,
   verifyTokenOfType,
   writeVolunteerLegacy,
 } from "../../utils";
@@ -146,6 +145,7 @@ export default async function volunteerRegisterRoutes(
                 actorUserId: user?.id,
               }
             : undefined,
+          leads,
         );
       } catch (err) {
         if (isDuplicateVolunteerProfile(err)) {
@@ -154,11 +154,6 @@ export default async function volunteerRegisterRoutes(
           );
         }
         throw err;
-      }
-      if (leads.length) {
-        updateLeads(leads).catch((error) => {
-          logger.warn(`Failed to update lead counts: ${error}`);
-        });
       }
 
       notifyNewVolunteer(fastify, {

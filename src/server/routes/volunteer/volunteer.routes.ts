@@ -9,7 +9,7 @@ import {
   UserRole,
   VolunteerPatchBodyData,
 } from "need4deed-sdk";
-import { FindOptionsOrder, In } from "typeorm";
+import { EntityManager, FindOptionsOrder, In } from "typeorm";
 import {
   BadRequestError,
   NotFoundError,
@@ -26,6 +26,7 @@ import DealLanguage from "../../../data/entity/m2m/deal-language";
 import DealSkill from "../../../data/entity/m2m/deal-skill";
 import DealTimeslot from "../../../data/entity/m2m/deal-timeslot";
 import Person from "../../../data/entity/person.entity";
+import Timeline from "../../../data/entity/timeline.entity";
 import VolunteerAuditLog from "../../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { updateOpportunityMatching } from "../../../data/utils";
@@ -72,6 +73,7 @@ import {
 } from "../../utils";
 import { engagementChangeDetail } from "../../utils/data/engagement-change-detail";
 import { findVolunteerIdsActiveFromOnetimer } from "../../utils/data/onetimer-active-period";
+import { changeVolunteerLeadFrom } from "../../utils/data/volunteer-lead-from";
 import { volunteerListRelations } from "../../utils/data/volunteer-list";
 import { maskPii } from "../../utils/pii/mask";
 import {
@@ -206,6 +208,7 @@ export default async function volunteerRoutes(
         isoCode,
         relations,
         await resolveCallerMask(request),
+        isStaffRole(request.authUser?.role),
       );
       if (!data) {
         throw new NotFoundError(`Volunteer (id:${id}) not found.`);
@@ -350,6 +353,10 @@ export default async function volunteerRoutes(
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
       if (!isStaffRole(role) && !isSelf) {
+        throw new UnauthorizedError();
+      }
+      const { leadFromChanges } = request.body;
+      if (leadFromChanges !== undefined && !isStaffRole(role)) {
         throw new UnauthorizedError();
       }
 
@@ -515,22 +522,38 @@ export default async function volunteerRoutes(
         });
       }
 
-      try {
+      const applyProfilePatch = async (manager: EntityManager) => {
+        if (leadFromChanges?.length) {
+          await changeVolunteerLeadFrom(
+            id,
+            request.authUser!.id,
+            leadFromChanges,
+            manager,
+          );
+        }
         if (volunteerData) {
-          const success = await patchEntity(Volunteer, volunteerData, id);
+          const success = await patchEntity(
+            Volunteer,
+            volunteerData,
+            id,
+            manager,
+          );
           if (!success) {
-            return reply.status(400).send({
-              message: `Volunteer (id=${id}) not updated.`,
-            });
+            throw new BadRequestError(`Volunteer (id=${id}) not updated.`);
           }
         }
 
         if (personData) {
-          const success = await patchEntity(Person, personData);
+          const success = await patchEntity(
+            Person,
+            personData,
+            undefined,
+            manager,
+          );
           if (!success) {
-            return reply.status(400).send({
-              message: `Person (id=${personData.id}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Person (id=${personData.id}) not updated.`,
+            );
           }
         }
 
@@ -539,32 +562,32 @@ export default async function volunteerRoutes(
             volunteer.personId,
             addressData as Partial<Address> & { id: number },
             resolvedPostcode ?? {},
+            manager,
           );
           if (!success) {
-            return reply.status(400).send({
-              message: `Address (id=${addressData.id}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Address (id=${addressData.id}) not updated.`,
+            );
           }
         } else if (addressData) {
           const { id: _id, ...newAddress } = addressData;
           const address = await createAddress(
             newAddress,
             resolvedPostcode ?? {},
+            manager,
           );
           if (!address) {
             throw new BadRequestError("Address not saved: unknown postcode.");
           }
-          await fastify.db.personRepository.update(
-            { id: volunteer.personId },
-            { addressId: address.id },
-          );
+          await manager
+            .getRepository(Person)
+            .update({ id: volunteer.personId }, { addressId: address.id });
         }
 
         if (resolvedPostcode?.id) {
-          await fastify.db.dealRepository.update(
-            { id: dealId },
-            { postcodeId: resolvedPostcode.id },
-          );
+          await manager
+            .getRepository(Deal)
+            .update({ id: dealId }, { postcodeId: resolvedPostcode.id });
         }
 
         if (languages) {
@@ -572,11 +595,13 @@ export default async function volunteerRoutes(
             dealId,
             DealLanguage,
             languages,
+            "deal",
+            manager,
           );
           if (!success) {
-            return reply.status(400).send({
-              message: `Languages for volunteer (deal_id:${dealId}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Languages for volunteer (deal_id:${dealId}) not updated.`,
+            );
           }
         }
 
@@ -589,14 +614,16 @@ export default async function volunteerRoutes(
                 if (availabilityObject.id) {
                   return { id: availabilityObject.id };
                 }
-                return getOrCreateTimeslot(availabilityObject);
+                return getOrCreateTimeslot(availabilityObject, manager);
               }),
             ),
+            "deal",
+            manager,
           );
           if (!success) {
-            return reply.status(400).send({
-              message: `Availability for volunteer (deal_id:${dealId}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Availability for volunteer (deal_id:${dealId}) not updated.`,
+            );
           }
         }
 
@@ -605,20 +632,28 @@ export default async function volunteerRoutes(
             dealId,
             DealActivity,
             activities,
+            "deal",
+            manager,
           );
           if (!success) {
-            return reply.status(400).send({
-              message: `Activities for volunteer (deal_id:${dealId}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Activities for volunteer (deal_id:${dealId}) not updated.`,
+            );
           }
         }
 
         if (skills) {
-          const success = await updateOptionList(dealId, DealSkill, skills);
+          const success = await updateOptionList(
+            dealId,
+            DealSkill,
+            skills,
+            "deal",
+            manager,
+          );
           if (!success) {
-            return reply.status(400).send({
-              message: `Skills for volunteer (deal_id:${dealId}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Skills for volunteer (deal_id:${dealId}) not updated.`,
+            );
           }
         }
 
@@ -627,12 +662,36 @@ export default async function volunteerRoutes(
             dealId,
             DealDistrict,
             locations,
+            "deal",
+            manager,
           );
           if (!success) {
-            return reply.status(400).send({
-              message: `Locations for volunteer (deal_id:${dealId}) not updated.`,
-            });
+            throw new BadRequestError(
+              `Locations for volunteer (deal_id:${dealId}) not updated.`,
+            );
           }
+        }
+        if (auditLogEntries.length) {
+          const occurredAt = new Date();
+          await manager.save(
+            auditLogEntries.map(
+              (entry) =>
+                new VolunteerAuditLog({
+                  ...entry,
+                  volunteerId: id,
+                  actorUserId: request.authUser?.id,
+                  occurredAt,
+                }),
+            ),
+          );
+        }
+      };
+
+      try {
+        if (leadFromChanges?.length) {
+          await dataSource.transaction(applyProfilePatch);
+        } else {
+          await applyProfilePatch(dataSource.manager);
         }
       } catch (error) {
         logger.error(`Error patching volunteer data (id=${dealId}): ${error}`);
@@ -653,21 +712,6 @@ export default async function volunteerRoutes(
             },
           );
         }
-      }
-
-      if (auditLogEntries.length) {
-        const occurredAt = new Date();
-        await fastify.db.volunteerAuditLogRepository.save(
-          auditLogEntries.map(
-            (entry) =>
-              new VolunteerAuditLog({
-                ...entry,
-                volunteerId: id,
-                actorUserId: request.authUser?.id,
-                occurredAt,
-              }),
-          ),
-        );
       }
 
       const isoCode = getLanguageCode(request.query.language) || Lang.DE;
@@ -724,11 +768,16 @@ export default async function volunteerRoutes(
       let eraseSummary: ErasePersonPiiSummary | undefined;
 
       await dataSource.manager.transaction(async (manager) => {
+        await manager.delete(Volunteer, { id });
+        await manager.delete(Timeline, {
+          targetEntityType: EntityTableName.VOLUNTEER,
+          targetEntityId: id,
+          contentEntityType: EntityTableName.LEAD,
+        });
         await manager.delete(Comment, {
           entityType: EntityTableName.VOLUNTEER,
           entityId: id,
         });
-        await manager.delete(Volunteer, { id });
         if (dealId) {
           await manager.delete(Deal, { id: dealId });
         }
