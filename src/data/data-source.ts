@@ -36,6 +36,7 @@ import Accompanying from "./entity/opportunity/accompanying.entity";
 import Agent from "./entity/opportunity/agent.entity";
 import Onetimer from "./entity/opportunity/onetimer.entity";
 import OpportunityAuditLog from "./entity/opportunity/opportunity-audit-log.entity";
+import OpportunityFeedback from "./entity/opportunity/opportunity-feedback.entity";
 import Opportunity from "./entity/opportunity/opportunity.entity";
 import Option from "./entity/option.entity";
 import Organization from "./entity/organization.entity";
@@ -130,6 +131,7 @@ export const dataSource = new DataSource({
     VolunteerAuditLog,
     VolunteerAgentLink,
     OpportunityAuditLog,
+    OpportunityFeedback,
     StatisticsEvent,
   ],
   ssl: getSslForDataSource(process.env.NODE_ENV, process.env.DB_SSL_CA_PATH),
