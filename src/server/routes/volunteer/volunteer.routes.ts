@@ -90,6 +90,7 @@ import volunteerCommuteRoutes from "./commute.routes";
 import volunteerDocRoutes from "./doc.routes";
 import volunteerEventsRoutes from "./events.routes";
 import volunteerLegacyRoutes from "./legacy.routes";
+import volunteerLinkedAgentRoutes from "./linked-agent.routes";
 import volunteerOpportunityVolunteerRoutes from "./opportunity-volunteer.routes";
 import volunteerRegisterRoutes from "./register.routes";
 import volunteerSuggestionRequestRoutes from "./suggestion-request.routes";
@@ -162,6 +163,9 @@ export default async function volunteerRoutes(
     prefix: `/:id${RoutePrefix.OPPORTUNITY_LINKED}`,
   });
 
+  await fastify.register(volunteerLinkedAgentRoutes, {
+    prefix: `/:id${RoutePrefix.LINKED_AGENT}`,
+  });
   await fastify.register(volunteerLegacyRoutes, {
     prefix: `${RoutePrefix.LEGACY}`,
   });

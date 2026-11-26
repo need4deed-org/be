@@ -14,6 +14,7 @@ export const RoutePrefix = {
   EVENT_REGISTRATION: "/event-registration",
   HEALTH_CHECK: "/health-check",
   LEGACY: "/legacy",
+  LINKED_AGENT: "/linked-agent",
   LOGIN: "/login",
   LOGOUT: "/logout",
   ME: "/me",
