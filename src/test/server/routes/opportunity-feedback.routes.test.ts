@@ -339,6 +339,25 @@ describe("opportunity feedback", () => {
       );
     });
 
+    it("keeps updatedAt when the text is unchanged", async () => {
+      const before =
+        await fastify.db.opportunityFeedbackRepository.findOneByOrFail({
+          id: volunteerFeedback.id,
+        });
+      const res = await patch(
+        "volunteer",
+        opportunity,
+        volunteerFeedback.id,
+        ` ${before.text} `,
+      );
+      expect(res.statusCode).toBe(200);
+      const stored =
+        await fastify.db.opportunityFeedbackRepository.findOneByOrFail({
+          id: volunteerFeedback.id,
+        });
+      expect(stored.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+    });
+
     it.each(["coordinator", "member", "past-volunteer"])(
       "forbids %s editing someone else's feedback",
       async (who) => {
@@ -437,10 +456,14 @@ describe("opportunity feedback", () => {
       const res = await get("member", inactiveOpportunity);
       expect(res.statusCode).toBe(200);
       const byRole = Object.fromEntries(
-        listOf(res).map((f) => [f.authorRole, f.authorName]),
+        listOf(res).map((f) => [f.authorRole, f]),
       );
-      expect(byRole[UserRole.VOLUNTEER]).not.toContain("volunteer");
-      expect(byRole[UserRole.AGENT]).toBe("Feedback Member");
+      expect(byRole[UserRole.VOLUNTEER].authorName).not.toContain("volunteer");
+      expect(byRole[UserRole.VOLUNTEER].text).not.toBe("From volunteer");
+      expect(byRole[UserRole.AGENT]).toMatchObject({
+        authorName: "Feedback Member",
+        text: "From member",
+      });
 
       const staffView = await get("coordinator", inactiveOpportunity);
       const staffNames = listOf(staffView).map((f) => f.authorName);
@@ -481,16 +504,22 @@ describe("opportunity feedback", () => {
         agentId: agent.id,
       }),
     );
-    const saved = await fastify.db.opportunityFeedbackRepository.save(
-      new OpportunityFeedback({
-        opportunityId: opp.id,
-        authorUserId: users.coordinator.id,
-        text: "Cascade",
-      }),
-    );
-    await fastify.db.opportunityRepository.delete({ id: opp.id });
-    expect(
-      await fastify.db.opportunityFeedbackRepository.existsBy({ id: saved.id }),
-    ).toBe(false);
+    try {
+      const saved = await fastify.db.opportunityFeedbackRepository.save(
+        new OpportunityFeedback({
+          opportunityId: opp.id,
+          authorUserId: users.coordinator.id,
+          text: "Cascade",
+        }),
+      );
+      await fastify.db.opportunityRepository.delete({ id: opp.id });
+      expect(
+        await fastify.db.opportunityFeedbackRepository.existsBy({
+          id: saved.id,
+        }),
+      ).toBe(false);
+    } finally {
+      await fastify.db.opportunityRepository.delete({ id: opp.id });
+    }
   });
 });

@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import {
-  AgentEngagementStatusType,
   ApiOpportunityFeedbackPatch,
   ApiOpportunityFeedbackPost,
   OpportunityVolunteerStatusType,
@@ -17,7 +16,12 @@ import {
   opportunityFeedbackSchemaGet200,
   opportunityFeedbackSchemaWrite,
 } from "../../schema";
-import { assertRoleIn, isActiveAgentMember, isStaffRole } from "../../utils";
+import {
+  assertRoleIn,
+  isActiveAgentMember,
+  isStaffRole,
+  shouldMaskInactiveAgentData,
+} from "../../utils";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
 import { maskFields, PERSON_PII_FIELDS } from "../../utils/pii/mask";
 
@@ -39,6 +43,8 @@ const NGO_SIDE_ROLES: readonly UserRole[] = [
   UserRole.ADMIN,
   UserRole.AGENT,
 ];
+
+const FEEDBACK_PII_FIELDS = ["text"] as const;
 
 const FEEDBACK_SELECT: FindOptionsSelect<OpportunityFeedback> = {
   id: true,
@@ -94,8 +100,8 @@ async function assertFeedbackAccess(
       callerUserId,
       seesAll: true,
       isInactiveNgo:
-        opportunity.agent?.engagementStatus ===
-        AgentEngagementStatusType.INACTIVE,
+        !!opportunity.agent &&
+        shouldMaskInactiveAgentData(opportunity.agent, role),
     };
   }
   if (role === UserRole.VOLUNTEER) {
@@ -154,10 +160,17 @@ export default function opportunityFeedbackRoutes(
       });
 
       if (access.isInactiveNgo) {
-        for (const { authorUser } of feedback) {
-          if (!NGO_SIDE_ROLES.includes(authorUser.role) && authorUser.person) {
+        for (const entry of feedback) {
+          if (NGO_SIDE_ROLES.includes(entry.authorUser.role)) {
+            continue;
+          }
+          maskFields(
+            entry as unknown as Record<string, unknown>,
+            FEEDBACK_PII_FIELDS,
+          );
+          if (entry.authorUser.person) {
             maskFields(
-              authorUser.person as unknown as Record<string, unknown>,
+              entry.authorUser.person as unknown as Record<string, unknown>,
               PERSON_PII_FIELDS,
             );
           }
@@ -216,7 +229,7 @@ export default function opportunityFeedbackRoutes(
       const access = await assertFeedbackWriteAccess(request, opportunityId);
 
       const feedback = await fastify.db.opportunityFeedbackRepository.findOne({
-        select: { id: true, authorUserId: true },
+        select: { id: true, authorUserId: true, text: true },
         where: { id: feedbackId, opportunityId },
       });
       if (!feedback) {
@@ -226,10 +239,13 @@ export default function opportunityFeedbackRoutes(
         throw new UnauthorizedError("Only the author can edit this feedback.");
       }
 
-      await fastify.db.opportunityFeedbackRepository.update(
-        { id: feedbackId },
-        { text: request.body.text.trim() },
-      );
+      const text = request.body.text.trim();
+      if (text !== feedback.text) {
+        await fastify.db.opportunityFeedbackRepository.update(
+          { id: feedbackId },
+          { text },
+        );
+      }
 
       return reply.send({
         message: `Feedback ${feedbackId} updated`,
