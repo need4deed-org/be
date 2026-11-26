@@ -6,6 +6,7 @@ import {
   OpportunityVolunteerStatusType,
   UserRole,
 } from "need4deed-sdk";
+import { FindOptionsSelect } from "typeorm";
 import { NotFoundError, UnauthorizedError } from "../../../config";
 import OpportunityFeedback from "../../../data/entity/opportunity/opportunity-feedback.entity";
 import { dtoOpportunityFeedback } from "../../../services/dto/dto-opportunity-feedback";
@@ -32,6 +33,26 @@ const FEEDBACK_MATCH_STATUSES: readonly OpportunityVolunteerStatusType[] = [
   OpportunityVolunteerStatusType.ACTIVE,
   OpportunityVolunteerStatusType.PAST,
 ];
+
+const NGO_SIDE_ROLES: readonly UserRole[] = [
+  UserRole.COORDINATOR,
+  UserRole.ADMIN,
+  UserRole.AGENT,
+];
+
+const FEEDBACK_SELECT: FindOptionsSelect<OpportunityFeedback> = {
+  id: true,
+  opportunityId: true,
+  authorUserId: true,
+  text: true,
+  createdAt: true,
+  updatedAt: true,
+  authorUser: {
+    id: true,
+    role: true,
+    person: { id: true, firstName: true, middleName: true, lastName: true },
+  },
+};
 
 type FeedbackAccess = {
   callerUserId: number;
@@ -105,6 +126,7 @@ export default function opportunityFeedbackRoutes(
 ) {
   const loadWithAuthor = (id: number) =>
     fastify.db.opportunityFeedbackRepository.findOneOrFail({
+      select: FEEDBACK_SELECT,
       where: { id },
       relations: { authorUser: { person: true } },
     });
@@ -126,13 +148,14 @@ export default function opportunityFeedbackRoutes(
           opportunityId,
           ...(access.seesAll ? {} : { authorUserId: access.callerUserId }),
         },
+        select: FEEDBACK_SELECT,
         relations: { authorUser: { person: true } },
         order: { createdAt: "ASC", id: "ASC" },
       });
 
       if (access.isInactiveNgo) {
         for (const { authorUser } of feedback) {
-          if (authorUser.role === UserRole.VOLUNTEER && authorUser.person) {
+          if (!NGO_SIDE_ROLES.includes(authorUser.role) && authorUser.person) {
             maskFields(
               authorUser.person as unknown as Record<string, unknown>,
               PERSON_PII_FIELDS,

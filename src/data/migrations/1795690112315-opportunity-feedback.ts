@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class OpportunityFeedback1795689599009 implements MigrationInterface {
-  name = "OpportunityFeedback1795689599009";
+export class OpportunityFeedback1795690112315 implements MigrationInterface {
+  name = "OpportunityFeedback1795690112315";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -9,6 +9,9 @@ export class OpportunityFeedback1795689599009 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_086a529cfe4e38865f5689aebb" ON "opportunity_feedback" ("opportunity_id") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_734b595415709cf5a6bbe25a8f" ON "opportunity_feedback" ("author_user_id") `,
     );
     await queryRunner.query(
       `ALTER TABLE "opportunity_feedback" ADD CONSTRAINT "FK_086a529cfe4e38865f5689aebbb" FOREIGN KEY ("opportunity_id") REFERENCES "opportunity"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -24,6 +27,9 @@ export class OpportunityFeedback1795689599009 implements MigrationInterface {
     );
     await queryRunner.query(
       `ALTER TABLE "opportunity_feedback" DROP CONSTRAINT "FK_086a529cfe4e38865f5689aebbb"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_734b595415709cf5a6bbe25a8f"`,
     );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_086a529cfe4e38865f5689aebb"`,

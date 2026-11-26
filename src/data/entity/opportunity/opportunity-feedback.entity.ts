@@ -40,6 +40,7 @@ export default class OpportunityFeedback {
   @JoinColumn({ name: "author_user_id" })
   authorUser: User;
 
+  @Index()
   @Column()
   authorUserId: number;
 

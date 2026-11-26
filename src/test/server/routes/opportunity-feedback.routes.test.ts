@@ -312,6 +312,10 @@ describe("opportunity feedback", () => {
     });
 
     it("lets the author edit their own feedback", async () => {
+      await fastify.db.opportunityFeedbackRepository.query(
+        `UPDATE "public"."opportunity_feedback" SET "updated_at" = now() - interval '1 hour' WHERE "id" = $1`,
+        [volunteerFeedback.id],
+      );
       const before =
         await fastify.db.opportunityFeedbackRepository.findOneByOrFail({
           id: volunteerFeedback.id,
