@@ -28,3 +28,13 @@ export const idmM2mIdParamSchema = {
   required: ["id", "m2mId"],
 };
 export type IdM2mIdParam = { id: number; m2mId: number };
+
+export const idAgentIdParamSchema = {
+  type: "object",
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    agentId: { type: "integer", minimum: 1 },
+  },
+  required: ["id", "agentId"],
+};
+export type IdAgentIdParam = { id: number; agentId: number };
