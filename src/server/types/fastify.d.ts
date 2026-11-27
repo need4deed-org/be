@@ -17,6 +17,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import OrganizationPerson from "../../data/entity/m2m/organization-person";
 import PostBookmark from "../../data/entity/m2m/post-bookmark";
 import PostReaction from "../../data/entity/m2m/post-reaction";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -33,8 +34,10 @@ import Language from "../../data/entity/profile/language.entity";
 import RefreshSession from "../../data/entity/refresh-session.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
+import VolunteerGroup from "../../data/entity/volunteer-group.entity";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
+import { GroupCoordinatorScope } from "../utils/data/group-scope";
 import { OwnedVolunteerScope } from "../utils/data/owned-volunteer-scope";
 import { CallerVisibility } from "../utils/pii/visible-persons";
 import { AuthOptions, CoordinatorInvitePerson } from "./auth";
@@ -66,6 +69,8 @@ declare module "fastify" {
       accompanyingRepository: Repository<Accompanying>;
       onetimerRepository: Repository<Onetimer>;
       organizationRepository: Repository<Organization>;
+      organizationPersonRepository: Repository<OrganizationPerson>;
+      volunteerGroupRepository: Repository<VolunteerGroup>;
       postcodeRepository: Repository<Postcode>;
       postRepository: Repository<Post>;
       postReactionRepository: Repository<PostReaction>;
@@ -89,6 +94,7 @@ declare module "fastify" {
     callerVisibility?: CallerVisibility | null;
     ngoOwnerAgentId?: number;
     ownedVolunteerScope?: OwnedVolunteerScope | null;
+    groupCoordinatorScope?: GroupCoordinatorScope | null;
   }
 }
 

@@ -15,6 +15,7 @@ import Postcode from "../../data/entity/location/postcode.entity";
 import ActivityLog from "../../data/entity/m2m/activity-log.entity";
 import AgentPerson from "../../data/entity/m2m/agent-person";
 import OpportunityVolunteer from "../../data/entity/m2m/opportunity-volunteer";
+import OrganizationPerson from "../../data/entity/m2m/organization-person";
 import PostBookmark from "../../data/entity/m2m/post-bookmark";
 import PostReaction from "../../data/entity/m2m/post-reaction";
 import Accompanying from "../../data/entity/opportunity/accompanying.entity";
@@ -31,6 +32,7 @@ import Language from "../../data/entity/profile/language.entity";
 import RefreshSession from "../../data/entity/refresh-session.entity";
 import TrustedDomain from "../../data/entity/trusted-domain.entity";
 import User from "../../data/entity/user.entity";
+import VolunteerGroup from "../../data/entity/volunteer-group.entity";
 import Appreciation from "../../data/entity/volunteer/appreciation.entity";
 import VolunteerAuditLog from "../../data/entity/volunteer/volunteer-audit-log.entity";
 import Volunteer from "../../data/entity/volunteer/volunteer.entity";
@@ -73,6 +75,9 @@ const typeormPlugin: FastifyPluginAsync = async (fastify) => {
       accompanyingRepository: dataSource.getRepository(Accompanying),
       onetimerRepository: dataSource.getRepository(Onetimer),
       organizationRepository: dataSource.getRepository(Organization),
+      organizationPersonRepository:
+        dataSource.getRepository(OrganizationPerson),
+      volunteerGroupRepository: dataSource.getRepository(VolunteerGroup),
       postcodeRepository: dataSource.getRepository(Postcode),
       postRepository: dataSource.getRepository(Post),
       postReactionRepository: dataSource.getRepository(PostReaction),

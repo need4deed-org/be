@@ -33,6 +33,7 @@ export * from "./get-volunteer-clones";
 export * from "./get-volunteer-form-data";
 export * from "./get-volunteer-patch-data";
 export * from "./get-volunteer-where";
+export * from "./group-scope";
 export * from "./is-person-referenced";
 export * from "./is-staff-role";
 export * from "./open-opportunity-statuses";

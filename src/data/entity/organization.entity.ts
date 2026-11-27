@@ -11,10 +11,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
 import Address from "./location/address.entity";
+import OrganizationPerson from "./m2m/organization-person";
 import Person from "./person.entity";
 import Language from "./profile/language.entity";
 
@@ -84,4 +86,10 @@ export default class Organization {
   originalLanguage?: Language;
   @Column({ nullable: true })
   originalLanguageId?: number;
+
+  @OneToMany(
+    () => OrganizationPerson,
+    (organizationPerson) => organizationPerson.organization,
+  )
+  organizationPerson: OrganizationPerson[];
 }

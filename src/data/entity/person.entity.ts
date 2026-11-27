@@ -17,6 +17,7 @@ import {
 import Address from "./location/address.entity";
 import AgentPerson from "./m2m/agent-person";
 import CommentPerson from "./m2m/comment-person";
+import OrganizationPerson from "./m2m/organization-person";
 import Organization from "./organization.entity";
 import Testimonial from "./testimonial.entity";
 import User from "./user.entity";
@@ -110,6 +111,12 @@ export default class Person {
 
   @OneToMany(() => AgentPerson, (agentPerson) => agentPerson.person)
   agentPerson: AgentPerson[];
+
+  @OneToMany(
+    () => OrganizationPerson,
+    (organizationPerson) => organizationPerson.person,
+  )
+  organizationPerson: OrganizationPerson[];
 
   @OneToMany(() => CommentPerson, (commentPerson) => commentPerson.person)
   commentPerson: CommentPerson[];

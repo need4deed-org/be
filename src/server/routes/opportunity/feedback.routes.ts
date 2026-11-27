@@ -19,7 +19,9 @@ import {
 import {
   assertRoleIn,
   isActiveAgentMember,
+  isAgentInGroupScope,
   isStaffRole,
+  resolveGroupCoordinatorScope,
   shouldMaskInactiveAgentData,
 } from "../../utils";
 import { getCallerMatchStatus } from "../../utils/data/get-caller-match-status";
@@ -89,6 +91,15 @@ async function assertFeedbackAccess(
   }
 
   const role = request.authUser?.role;
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    if (isAgentInGroupScope(groupScope, opportunity.agentId)) {
+      return { callerUserId, seesAll: true, isInactiveNgo: false };
+    }
+    throw new UnauthorizedError(
+      "Only matched volunteers, the opportunity's NGO and staff can access its feedback.",
+    );
+  }
   if (isStaffRole(role)) {
     return { callerUserId, seesAll: true, isInactiveNgo: false };
   }

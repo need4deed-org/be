@@ -48,6 +48,7 @@ import {
   alertOnChange,
   andIntoWhere,
   assertCommuteFilterAccess,
+  assertCoordinatorOrGroupCoordinator,
   buildEraseSummaryMessage,
   createAddress,
   erasePersonPii,
@@ -61,12 +62,13 @@ import {
   getVolunteerPatchData,
   getVolunteerSelfEditNotificationText,
   getVolunteerWhere,
-  isStaffRole,
+  isCoordinatorOrGroupCoordinator,
   normalizeVolunteerStatusFilter,
   patchEntity,
   patchOrReplaceAddress,
   resolveAddressPostcode,
   resolveCommuteFilter,
+  resolveGroupCoordinatorScope,
   updateOptionList,
   volunteerCommuteIdWhere,
 } from "../../utils";
@@ -246,12 +248,19 @@ export default async function volunteerRoutes(
       assertCommuteFilterAccess(filter, request.authUser?.role);
       const [skip, take] = getSkipTake({ page, limit });
 
-      const [visibility, availabilityDealIds, commute] = await Promise.all([
-        resolveVolunteerVisibility(request),
-        findAvailabilityDealIds(filter?.availability),
-        resolveCommuteFilter(filter, QueryParamsKeys.COMMUTE_OPPORTUNITY_ID),
-      ]);
-      const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
+      const [visibility, groupScope, availabilityDealIds, commute] =
+        await Promise.all([
+          resolveVolunteerVisibility(request),
+          resolveGroupCoordinatorScope(request),
+          findAvailabilityDealIds(filter?.availability),
+          resolveCommuteFilter(filter, QueryParamsKeys.COMMUTE_OPPORTUNITY_ID),
+        ]);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+        availabilityDealIds,
+        groupScope?.agentIds ?? null,
+      );
       if (commute) {
         andIntoWhere(where, "id", volunteerCommuteIdWhere(commute));
       }
@@ -349,7 +358,7 @@ export default async function volunteerRoutes(
         request.authUser?.personId !== undefined &&
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
-      if (!isStaffRole(role) && !isSelf) {
+      if (!(await isCoordinatorOrGroupCoordinator(request)) && !isSelf) {
         throw new UnauthorizedError();
       }
 
@@ -698,13 +707,13 @@ export default async function volunteerRoutes(
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: responseSchema(""),
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const volunteerRepository = fastify.db.volunteerRepository;
       const volunteer = await volunteerRepository.findOneBy({ id });

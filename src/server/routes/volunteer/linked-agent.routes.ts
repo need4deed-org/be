@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { UserRole, VolunteerAuditLogType } from "need4deed-sdk";
+import { VolunteerAuditLogType } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import Agent from "../../../data/entity/opportunity/agent.entity";
 import VolunteerAgentLink from "../../../data/entity/volunteer/volunteer-agent-link.entity";
@@ -10,6 +10,7 @@ import {
   responseSchema,
 } from "../../schema";
 import { ReplyMessage } from "../../types";
+import { assertCoordinatorOrGroupCoordinator } from "../../utils";
 
 export default function volunteerLinkedAgentRoutes(
   fastify: FastifyInstance,
@@ -18,13 +19,13 @@ export default function volunteerLinkedAgentRoutes(
   fastify.delete<{ Params: IdAgentIdParam; Reply: ReplyMessage }>(
     "/:agentId",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idAgentIdParamSchema,
         response: responseSchema(""),
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id: volunteerId, agentId } = request.params;
 
       await fastify.db.volunteerRepository.manager.transaction(

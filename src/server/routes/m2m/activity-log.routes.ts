@@ -9,6 +9,10 @@ import {
 import { idParamSchema } from "../../schema";
 import { ParamsId } from "../../types";
 import { assertAgentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
+import {
+  isAgentInGroupScope,
+  resolveGroupCoordinatorScope,
+} from "../../utils/data/group-scope";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 
 async function assertCanAccessMatchLog(
@@ -18,7 +22,8 @@ async function assertCanAccessMatchLog(
   access: "read" | "write",
 ): Promise<void> {
   const { role, personId } = request.authUser ?? {};
-  const isStaff = isStaffRole(role);
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  const isStaff = isStaffRole(role) && groupScope === null;
   const ov = await fastify.db.opportunityVolunteerRepository.findOne({
     where: { id },
     ...(isStaff
@@ -29,13 +34,22 @@ async function assertCanAccessMatchLog(
             id: true,
             opportunityId: true,
             opportunity: { id: true, agentId: true },
-            volunteer: { id: true, personId: true },
+            volunteer: { id: true, personId: true, ownerAgentId: true },
           },
         }),
   });
   const notFound = new NotFoundError(`OpportunityVolunteer id:${id} not found`);
   if (!ov) {
     throw notFound;
+  }
+  if (groupScope !== null) {
+    if (
+      !isAgentInGroupScope(groupScope, ov.opportunity?.agentId) ||
+      !isAgentInGroupScope(groupScope, ov.volunteer?.ownerAgentId)
+    ) {
+      throw notFound;
+    }
+    return;
   }
   if (isStaff) {
     return;

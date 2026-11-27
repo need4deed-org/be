@@ -3,7 +3,10 @@ import { ApiVolunteerCommunicationPost, UserRole } from "need4deed-sdk";
 import { UnauthorizedError } from "../../../config";
 import { dtoCommunication } from "../../../services/dto/dto-communication";
 import { idParamSchema } from "../../schema";
-import { isStaffRole } from "../../utils";
+import {
+  assertCoordinatorOrGroupCoordinator,
+  isCoordinatorOrGroupCoordinator,
+} from "../../utils";
 
 export default function volunteerCommunicationRoutes(
   fastify: FastifyInstance,
@@ -40,7 +43,7 @@ export default function volunteerCommunicationRoutes(
         request.authUser?.personId !== undefined &&
         request.authUser?.personId !== null &&
         request.authUser.personId === volunteer.personId;
-      if (!isStaffRole(role) && !isSelf) {
+      if (!(await isCoordinatorOrGroupCoordinator(request)) && !isSelf) {
         throw new UnauthorizedError();
       }
 
@@ -58,7 +61,6 @@ export default function volunteerCommunicationRoutes(
   fastify.post<{ Params: { id: number }; Body: ApiVolunteerCommunicationPost }>(
     "/",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         body: { $ref: "ApiCommunicationPost#" },
@@ -75,6 +77,7 @@ export default function volunteerCommunicationRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const volunteerId = Number(request.params.id);
 
       const communication = await fastify.db.communicationRepository.save({

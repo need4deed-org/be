@@ -25,6 +25,7 @@ export function getVolunteerWhere(
   filter: QuerystringVolunteerFiltering["filter"],
   visibility: CallerVisibility | null = null,
   availabilityDealIds: number[] | null = null,
+  groupScopeAgentIds: number[] | null = null,
 ): FindOptionsWhere<Volunteer> {
   const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
   const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
@@ -63,7 +64,17 @@ export function getVolunteerWhere(
       Raw((column) => `${column} IN (${sql})`, params),
     );
   }
-  if (visibility) {
+  if (groupScopeAgentIds !== null) {
+    andIntoWhere(
+      where,
+      "id",
+      Raw(
+        (column) =>
+          `${column} IN (SELECT id FROM volunteer WHERE owner_agent_id = ANY(:groupScopeAgentIds))`,
+        { groupScopeAgentIds },
+      ),
+    );
+  } else if (visibility) {
     andIntoWhere(
       where,
       "id",

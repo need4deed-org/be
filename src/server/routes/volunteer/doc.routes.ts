@@ -35,8 +35,9 @@ import {
   volunteerDocSchemaUploadMeta,
 } from "../../schema";
 import {
+  assertCoordinatorOrGroupCoordinator,
   getVolunteerDocuments,
-  isStaffRole,
+  isCoordinatorOrGroupCoordinator,
   runWithAdvisoryLock,
 } from "../../utils";
 import {
@@ -81,7 +82,7 @@ export default async function volunteerDocRoutes(
     async (request, reply) => {
       const id = request.params.id;
       const role = request.authUser?.role;
-      if (!isStaffRole(role)) {
+      if (!(await isCoordinatorOrGroupCoordinator(request))) {
         if (role !== UserRole.VOLUNTEER) {
           throw new UnauthorizedError();
         }
@@ -109,7 +110,6 @@ export default async function volunteerDocRoutes(
   fastify.post<{ Params: { id: number } }>(
     "/application-email",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -120,6 +120,7 @@ export default async function volunteerDocRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const coordinatorPersonId = request.authUser?.personId;
       const [volunteer, coordinator] = await Promise.all([
@@ -194,31 +195,28 @@ export default async function volunteerDocRoutes(
     },
   );
 
-  fastify.get(
-    "/download",
-    { onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }) },
-    async (request, reply) => {
-      const { url } = request.query as { url: string };
-      const fileName = "test_pdf.pdf";
+  fastify.get("/download", async (request, reply) => {
+    await assertCoordinatorOrGroupCoordinator(request);
+    const { url } = request.query as { url: string };
+    const fileName = "test_pdf.pdf";
 
-      const [urlObj, error] = await tryCatch(fetch(url));
+    const [urlObj, error] = await tryCatch(fetch(url));
 
-      if (error) {
-        logger.error(`Error fetching document from URL ${url}: ${error}`);
-        return reply.status(400).send({
-          message: `Error fetching document from URL: ${error}`,
-        });
-      }
-
-      reply.raw.writeHead(200, {
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Content-Type": "application/pdf",
-        "Content-Length": urlObj.headers.get("Content-Length") || "",
+    if (error) {
+      logger.error(`Error fetching document from URL ${url}: ${error}`);
+      return reply.status(400).send({
+        message: `Error fetching document from URL: ${error}`,
       });
+    }
 
-      Readable.fromWeb(urlObj.body).pipe(reply.raw);
-    },
-  );
+    reply.raw.writeHead(200, {
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+      "Content-Type": "application/pdf",
+      "Content-Length": urlObj.headers.get("Content-Length") || "",
+    });
+
+    Readable.fromWeb(urlObj.body).pipe(reply.raw);
+  });
 
   fastify.get<{
     Params: { id: number };
@@ -226,7 +224,6 @@ export default async function volunteerDocRoutes(
   }>(
     "/upload-meta",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         querystring: volunteerDocSchemaUploadMeta,
@@ -234,6 +231,7 @@ export default async function volunteerDocRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const { mimeType, originalName, type } = request.query;
       const bucket = process.env.AWS_S3_BUCKET_NAME || "need4deed-images";
@@ -269,64 +267,60 @@ export default async function volunteerDocRoutes(
       id: number;
       Body: {};
     };
-  }>(
-    "/s3-upload-mock",
-    { onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }) },
-    async (request, reply) => {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+  }>("/s3-upload-mock", async (request, reply) => {
+    await assertCoordinatorOrGroupCoordinator(request);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      const {
-        "x-amz-meta-original-name": originalName,
-        "x-amz-meta-mime-type": mimeType,
-        "x-amz-meta-document-type": type,
-        "x-amz-meta-volunteer-id": volunteerId,
-        "x-amz-meta-s3-key": s3Key,
-      } = request.body as {
-        "x-amz-meta-volunteer-id": string;
-        "x-amz-meta-original-name": string;
-        "x-amz-meta-document-type": DocumentType;
-        "x-amz-meta-mime-type": string;
-        "x-amz-meta-s3-key": string;
-      };
-      const document = new Document({
-        volunteerId: Number(volunteerId),
-        originalName,
-        mimeType,
-        s3Key,
-        type,
-      });
-      const [, error] = await tryCatch(
-        fastify.db.documentRepository.save(document),
+    const {
+      "x-amz-meta-original-name": originalName,
+      "x-amz-meta-mime-type": mimeType,
+      "x-amz-meta-document-type": type,
+      "x-amz-meta-volunteer-id": volunteerId,
+      "x-amz-meta-s3-key": s3Key,
+    } = request.body as {
+      "x-amz-meta-volunteer-id": string;
+      "x-amz-meta-original-name": string;
+      "x-amz-meta-document-type": DocumentType;
+      "x-amz-meta-mime-type": string;
+      "x-amz-meta-s3-key": string;
+    };
+    const document = new Document({
+      volunteerId: Number(volunteerId),
+      originalName,
+      mimeType,
+      s3Key,
+      type,
+    });
+    const [, error] = await tryCatch(
+      fastify.db.documentRepository.save(document),
+    );
+
+    if (error) {
+      logger.error(
+        `Error saving document for volunteer ${volunteerId}: ${error}`,
       );
+      return reply.status(400).send({
+        message: `Error saving document: ${error}`,
+      });
+    }
 
-      if (error) {
-        logger.error(
-          `Error saving document for volunteer ${volunteerId}: ${error}`,
-        );
-        return reply.status(400).send({
-          message: `Error saving document: ${error}`,
-        });
-      }
-
-      return reply
-        .code(201)
-        .type("application/xml")
-        .send(
-          `<?xml version="1.0" encoding="UTF-8"?>
+    return reply
+      .code(201)
+      .type("application/xml")
+      .send(
+        `<?xml version="1.0" encoding="UTF-8"?>
         <PostResponse>
           <Location>http://vmpub:5000/uploads/test.png</Location>
           <Bucket>mock-bucket</Bucket>
           <Key>test.png</Key>
           <ETag>"mock-etag-123"</ETag>
         </PostResponse>`,
-        );
-    },
-  );
+      );
+  });
 
   fastify.delete<{ Params: { id: number } }>(
     "/",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: {
@@ -340,6 +334,7 @@ export default async function volunteerDocRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const documentRepository = fastify.db.documentRepository;
 
@@ -371,7 +366,6 @@ export default async function volunteerDocRoutes(
   fastify.delete<{ Params: { id: number; type: DocumentType } }>(
     "/:type",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idTypeParamSchema,
         response: {
@@ -385,6 +379,7 @@ export default async function volunteerDocRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id, type } = request.params;
       const documentRepository = fastify.db.documentRepository;
 

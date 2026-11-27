@@ -9,6 +9,7 @@ import {
   commuteFor,
   loadCommuteRangesForCaller,
   maskVolunteerIdentities,
+  resolveGroupCoordinatorScope,
   shouldMaskInactiveAgentData,
 } from "../../utils";
 import { maskForCaller } from "../../utils/pii/pre-serialization";
@@ -32,7 +33,8 @@ export default function opportunityOpportunityVolunteerRoutes(
       assertRoleIn(request);
       const opportunityId = request.params.id;
 
-      if (request.authUser?.role === UserRole.AGENT) {
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      if (request.authUser?.role === UserRole.AGENT || groupScope !== null) {
         const opportunity = await fastify.db.opportunityRepository.findOne({
           where: { id: opportunityId },
           select: { id: true, agentId: true },

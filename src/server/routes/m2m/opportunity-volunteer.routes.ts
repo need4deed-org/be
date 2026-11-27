@@ -34,6 +34,11 @@ import {
 } from "../../utils/data/assert-agent-can-suggest";
 import { agentOwnsOpportunity } from "../../utils/data/assert-agent-owns-opportunity";
 import { addTranslatedFields } from "../../utils/data/for-routes";
+import {
+  GroupCoordinatorScope,
+  isAgentInGroupScope,
+  resolveGroupCoordinatorScope,
+} from "../../utils/data/group-scope";
 import { isStaffRole } from "../../utils/data/is-staff-role";
 import {
   claimEmailCommunication,
@@ -278,12 +283,46 @@ function assertCoordinator(request: FastifyRequest): void {
   }
 }
 
+async function assertMatchInGroupScope(
+  fastify: FastifyInstance,
+  groupScope: GroupCoordinatorScope,
+  opportunityId: number,
+  volunteerId: number,
+): Promise<void> {
+  const [opportunity, volunteer] = await Promise.all([
+    fastify.db.opportunityRepository.findOne({
+      select: { id: true, agentId: true },
+      where: { id: opportunityId },
+    }),
+    fastify.db.volunteerRepository.findOne({
+      select: { id: true, ownerAgentId: true },
+      where: { id: volunteerId },
+    }),
+  ]);
+  if (!opportunity || !isAgentInGroupScope(groupScope, opportunity.agentId)) {
+    throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
+  }
+  if (!volunteer || !isAgentInGroupScope(groupScope, volunteer.ownerAgentId)) {
+    throw new NotFoundError(`Volunteer (id:${volunteerId}) not found.`);
+  }
+}
+
 async function assertCanChangeMatch(
   fastify: FastifyInstance,
   request: FastifyRequest,
   ov: OpportunityVolunteer,
   change: OpportunityVolunteerStatusType | "remove" | undefined,
 ): Promise<void> {
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    await assertMatchInGroupScope(
+      fastify,
+      groupScope,
+      ov.opportunityId,
+      ov.volunteerId,
+    );
+    return;
+  }
   if (request.authUser?.role !== UserRole.AGENT) {
     assertCoordinator(request);
     return;
@@ -348,7 +387,15 @@ export default async function m2mOpportunityVolunteerRoutes(
       const { emailNote, ...body } = request.body;
       const { opportunityId, volunteerId } = body;
 
-      if (request.authUser?.role === UserRole.AGENT) {
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      if (groupScope !== null) {
+        await assertMatchInGroupScope(
+          fastify,
+          groupScope,
+          opportunityId,
+          volunteerId,
+        );
+      } else if (request.authUser?.role === UserRole.AGENT) {
         await assertAgentCanSuggest(request, request.body);
       }
 
