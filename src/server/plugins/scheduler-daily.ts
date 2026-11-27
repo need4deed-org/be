@@ -5,6 +5,7 @@ import cron from "node-cron";
 import { berlinTimeZone } from "../../config";
 import logger from "../../logger";
 import { activateDueOnetimers } from "../../services/jobs/activate-due-onetimers";
+import { eraseAccompaniedContact } from "../../services/jobs/erase-accompanied-contact";
 import { pruneRefreshSessions } from "../../services/jobs/prune-refresh-sessions";
 import {
   recordStatisticsSnapshots,
@@ -71,6 +72,10 @@ async function schedulerDailyPlugin(fastify: FastifyInstance): Promise<void> {
                 {
                   name: "pruneRefreshSessions",
                   run: () => pruneRefreshSessions(fastify),
+                },
+                {
+                  name: "eraseAccompaniedContact",
+                  run: () => eraseAccompaniedContact(fastify),
                 },
               ],
               { sequential: true },
