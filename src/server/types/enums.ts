@@ -12,6 +12,7 @@ export const RoutePrefix = {
   DOC: "/doc",
   EVENT: "/event",
   EVENT_REGISTRATION: "/event-registration",
+  GROUP: "/group",
   HEALTH_CHECK: "/health-check",
   LEGACY: "/legacy",
   LINKED_AGENT: "/linked-agent",

@@ -3,6 +3,7 @@ export * from "./agent-membership.schema";
 export * from "./agent-register.schema";
 export * from "./email-note.schema";
 export * from "./event.schema";
+export * from "./group.schema";
 export * from "./param";
 export * from "./person.schema";
 export * from "./querystring";

@@ -29,6 +29,7 @@ import DealSkill from "./entity/m2m/deal-skill";
 import DealTimeslot from "./entity/m2m/deal-timeslot";
 import DistrictPostcode from "./entity/m2m/district-postcode";
 import OpportunityVolunteer from "./entity/m2m/opportunity-volunteer";
+import OrganizationPerson from "./entity/m2m/organization-person";
 import PostBookmark from "./entity/m2m/post-bookmark";
 import PostReaction from "./entity/m2m/post-reaction";
 import NotionRelation from "./entity/notion-relation.entity";
@@ -55,6 +56,7 @@ import Timeslot from "./entity/time/timeslot.entity";
 import Timeline from "./entity/timeline.entity";
 import TrustedDomain from "./entity/trusted-domain.entity";
 import User from "./entity/user.entity";
+import VolunteerGroup from "./entity/volunteer-group.entity";
 import Appreciation from "./entity/volunteer/appreciation.entity";
 import VolunteerAgentLink from "./entity/volunteer/volunteer-agent-link.entity";
 import VolunteerAuditLog from "./entity/volunteer/volunteer-audit-log.entity";
@@ -112,6 +114,7 @@ export const dataSource = new DataSource({
     EventN4DRegistration,
     OpportunityVolunteer,
     Organization,
+    OrganizationPerson,
     Person,
     Post,
     Postcode,
@@ -128,6 +131,7 @@ export const dataSource = new DataSource({
     TrustedDomain,
     User,
     Volunteer,
+    VolunteerGroup,
     VolunteerAuditLog,
     VolunteerAgentLink,
     OpportunityAuditLog,

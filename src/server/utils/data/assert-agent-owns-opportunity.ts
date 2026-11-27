@@ -2,11 +2,19 @@ import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
+import {
+  isAgentInGroupScope,
+  resolveGroupCoordinatorScope,
+} from "./group-scope";
 
 export async function agentOwnsOpportunity(
   request: FastifyRequest,
   opportunityAgentId: number | null | undefined,
 ): Promise<boolean> {
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    return isAgentInGroupScope(groupScope, opportunityAgentId);
+  }
   const agentIds = await getCallerAgentIds(request, request.authUser?.personId);
   return !!opportunityAgentId && agentIds.includes(opportunityAgentId);
 }
@@ -16,6 +24,13 @@ export async function assertAgentOwnsOpportunity(
   opportunityId: number,
   opportunityAgentId: number | null | undefined,
 ): Promise<void> {
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    if (!isAgentInGroupScope(groupScope, opportunityAgentId)) {
+      throw new NotFoundError(`Opportunity (id:${opportunityId}) not found.`);
+    }
+    return;
+  }
   if (request.authUser?.role !== UserRole.AGENT) {
     return;
   }

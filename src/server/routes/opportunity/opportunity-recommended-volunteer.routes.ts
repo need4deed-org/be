@@ -23,6 +23,7 @@ import {
   commuteOf,
   getVolunteerWhere,
   loadCommuteRangesForCaller,
+  resolveGroupCoordinatorScope,
 } from "../../utils";
 import { closedForVolunteersIdWhere } from "../../utils/data/no-match-found";
 import { orderByIds } from "../../utils/data/order-by-ids";
@@ -80,8 +81,16 @@ export default function opportunityRecommendedVolunteerRoutes(
         return reply.status(200).send({ message, data: [] });
       }
 
-      const visibility = await resolveVolunteerVisibility(request);
-      const where = getVolunteerWhere(undefined, visibility);
+      const [visibility, groupScope] = await Promise.all([
+        resolveVolunteerVisibility(request),
+        resolveGroupCoordinatorScope(request),
+      ]);
+      const where = getVolunteerWhere(
+        undefined,
+        visibility,
+        null,
+        groupScope?.agentIds ?? null,
+      );
       Object.assign(where, {
         statusEngagement: VolunteerStateEngagementType.AVAILABLE,
         statusType: In(volunteerStatusTypesFor(opportunity.type)),
@@ -89,7 +98,7 @@ export default function opportunityRecommendedVolunteerRoutes(
       andIntoWhere(
         where,
         "id",
-        request.authUser?.role === UserRole.AGENT
+        request.authUser?.role === UserRole.AGENT && groupScope === null
           ? Raw(
               (column) =>
                 `${column} NOT IN (SELECT volunteer_id FROM opportunity_volunteer)`,

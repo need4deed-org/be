@@ -72,6 +72,7 @@ import {
   getVolunteerWhere,
   normalizeVolunteerStatusFilter,
 } from "../utils/data/get-volunteer-where";
+import { resolveGroupCoordinatorScope } from "../utils/data/group-scope";
 import { isStaffRole } from "../utils/data/is-staff-role";
 import { mergeIntoWhere } from "../utils/data/merge-into-where";
 import { applyVolunteerOpportunityScope } from "../utils/data/owned-volunteer-scope";
@@ -628,18 +629,18 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
       const availabilityDealIds = await findOpportunityAvailabilityDealIds(
         filter.availability,
       );
+      const groupScope = await resolveGroupCoordinatorScope(request);
       const where = getOpportunityWhere(
         filter,
         undefined,
         undefined,
         availabilityDealIds,
-        isStaffRole(request.authUser?.role),
+        isStaffRole(request.authUser?.role) || groupScope !== null,
       );
-      if (request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          request,
-          request.authUser.personId,
-        );
+      if (groupScope !== null || request.authUser?.role === UserRole.AGENT) {
+        const agentIds = groupScope
+          ? groupScope.agentIds
+          : await getCallerAgentIds(request, request.authUser!.personId);
         if (agentIds.length === 0) {
           return reply.status(200).send({
             message: "Opportunity district aggregates",
@@ -703,18 +704,18 @@ export async function opportunityDistrictRoutes(fastify: FastifyInstance) {
       const availabilityDealIds = await findOpportunityAvailabilityDealIds(
         filter.availability,
       );
+      const groupScope = await resolveGroupCoordinatorScope(request);
       const baseWhere = getOpportunityWhere(
         filter,
         undefined,
         undefined,
         availabilityDealIds,
-        isStaffRole(request.authUser?.role),
+        isStaffRole(request.authUser?.role) || groupScope !== null,
       );
-      if (request.authUser?.role === UserRole.AGENT) {
-        const agentIds = await getCallerAgentIds(
-          request,
-          request.authUser.personId,
-        );
+      if (groupScope !== null || request.authUser?.role === UserRole.AGENT) {
+        const agentIds = groupScope
+          ? groupScope.agentIds
+          : await getCallerAgentIds(request, request.authUser!.personId);
         if (agentIds.length === 0) {
           return reply.status(200).send({
             message: "Opportunity district markers",
@@ -818,11 +819,17 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const filter = normalizeVolunteerFilter(request.query.filter);
-      const [visibility, availabilityDealIds] = await Promise.all([
+      const [visibility, groupScope, availabilityDealIds] = await Promise.all([
         resolveVolunteerVisibility(request),
+        resolveGroupCoordinatorScope(request),
         findAvailabilityDealIds(filter.availability),
       ]);
-      const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+        availabilityDealIds,
+        groupScope?.agentIds ?? null,
+      );
       const [volunteers, districts] = await Promise.all([
         fastify.db.volunteerRepository.find({
           where,
@@ -880,7 +887,8 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      if (request.authUser?.role === UserRole.AGENT) {
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      if (request.authUser?.role === UserRole.AGENT && groupScope === null) {
         throw new UnauthorizedError(
           "Agent users cannot access individual volunteer markers.",
         );
@@ -890,7 +898,12 @@ export async function volunteerDistrictRoutes(fastify: FastifyInstance) {
         resolveVolunteerVisibility(request),
         findAvailabilityDealIds(filter.availability),
       ]);
-      const where = getVolunteerWhere(filter, visibility, availabilityDealIds);
+      const where = getVolunteerWhere(
+        filter,
+        visibility,
+        availabilityDealIds,
+        groupScope?.agentIds ?? null,
+      );
       const [[volunteers, total], centroids] = await Promise.all([
         fastify.db.volunteerRepository.findAndCount({
           where: getVolunteerDistrictWhere(where, request.query.districtId),

@@ -23,6 +23,7 @@ import districtGeometryRoutes from "./routes/district-geometry.routes";
 import emailTemplateRoutes from "./routes/email-template.routes";
 import eventN4DRegistrationRoutes from "./routes/event-n4d-registration.routes";
 import eventRoutes from "./routes/event.routes";
+import groupRoutes from "./routes/group.routes";
 import healthRoutes from "./routes/health";
 import activityLogCollectionRoutes from "./routes/m2m/activity-log.routes";
 import m2mOpportunityVolunteerRoutes from "./routes/m2m/opportunity-volunteer.routes";
@@ -251,6 +252,9 @@ export async function createServer({
   });
   await fastifyInstance.register(eventN4DRegistrationRoutes, {
     prefix: RoutePrefix.EVENT_REGISTRATION,
+  });
+  await fastifyInstance.register(groupRoutes, {
+    prefix: RoutePrefix.GROUP,
   });
   await fastifyInstance.register(districtGeometryRoutes, {
     prefix: RoutePrefix.DISTRICT_GEOMETRY,

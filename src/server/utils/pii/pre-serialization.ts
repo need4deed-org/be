@@ -29,6 +29,7 @@ export async function resolveCallerMask(
 export function resetCallerMask(request: FastifyRequest): void {
   request.callerVisibility = undefined;
   request.ownedVolunteerScope = undefined;
+  request.groupCoordinatorScope = undefined;
 }
 
 export async function maskForCaller(

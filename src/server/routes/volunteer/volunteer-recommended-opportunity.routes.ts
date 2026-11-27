@@ -3,7 +3,6 @@ import {
   ApiRecommendedMatchesQuery,
   ApiRecommendedOpportunity,
   OpportunityStatusType,
-  UserRole,
   VolunteerStateEngagementType,
   volunteerTypesFromStatusType,
 } from "need4deed-sdk";
@@ -18,6 +17,7 @@ import {
 import { ParamsId, ReplyData } from "../../types";
 import {
   andIntoWhere,
+  assertCoordinatorOrGroupCoordinator,
   commuteOf,
   loadCommuteRangesForCaller,
 } from "../../utils";
@@ -47,7 +47,6 @@ export default function volunteerRecommendedOpportunityRoutes(
   }>(
     "/",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         querystring: recommendedOpportunitiesQuerySchema,
@@ -55,6 +54,7 @@ export default function volunteerRecommendedOpportunityRoutes(
       },
     },
     async (request, reply) => {
+      const groupScope = await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
 
       const volunteer = await fastify.db.volunteerRepository.findOne({
@@ -67,7 +67,8 @@ export default function volunteerRecommendedOpportunityRoutes(
       }
       const message = `Recommended opportunities for volunteer (id:${id}).`;
       if (
-        volunteer.statusEngagement !== VolunteerStateEngagementType.AVAILABLE
+        volunteer.statusEngagement !== VolunteerStateEngagementType.AVAILABLE ||
+        (groupScope !== null && groupScope.agentIds.length === 0)
       ) {
         return reply.status(200).send({ message, data: [] });
       }
@@ -76,6 +77,7 @@ export default function volunteerRecommendedOpportunityRoutes(
       const where: FindOptionsWhere<Opportunity> = {
         status: OpportunityStatusType.SEARCHING,
         type: In(types),
+        ...(groupScope !== null ? { agentId: In(groupScope.agentIds) } : {}),
         id: Raw(
           (column) =>
             `${column} NOT IN (SELECT opportunity_id FROM opportunity_volunteer WHERE volunteer_id = :volunteerId)`,

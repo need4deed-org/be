@@ -3,7 +3,7 @@ import { UserRole } from "need4deed-sdk";
 import { UnauthorizedError } from "../../../config";
 import { dtoVolunteerAuditLog } from "../../../services/dto/dto-volunteer-audit-log";
 import { idParamSchema, volunteerAuditLogSchemaGet200 } from "../../schema";
-import { isStaffRole } from "../../utils";
+import { isCoordinatorOrGroupCoordinator } from "../../utils";
 
 export default function volunteerAuditLogRoutes(
   fastify: FastifyInstance,
@@ -23,7 +23,7 @@ export default function volunteerAuditLogRoutes(
       const id = request.params.id;
       const role = request.authUser?.role;
 
-      if (!isStaffRole(role)) {
+      if (!(await isCoordinatorOrGroupCoordinator(request))) {
         if (role !== UserRole.VOLUNTEER) {
           throw new UnauthorizedError();
         }

@@ -2,6 +2,10 @@ import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError, UnauthorizedError } from "../../../config";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
+import {
+  isAgentInGroupScope,
+  resolveGroupCoordinatorScope,
+} from "./group-scope";
 import { isStaffRole } from "./is-staff-role";
 
 const AGENT_SCOPED_ROLES: readonly UserRole[] = [
@@ -27,6 +31,10 @@ export async function isActiveAgentMember(
   if (agentId === null || agentId === undefined) {
     return false;
   }
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    return isAgentInGroupScope(groupScope, agentId);
+  }
   const agentIds = await getCallerAgentIds(request, request.authUser?.personId);
   return agentIds.includes(agentId);
 }
@@ -35,6 +43,10 @@ async function isAgentMemberOrStaff(
   request: FastifyRequest,
   agentId: number | null | undefined,
 ): Promise<boolean> {
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  if (groupScope !== null) {
+    return isAgentInGroupScope(groupScope, agentId);
+  }
   const role = request.authUser?.role;
   if (isStaffRole(role)) {
     return true;

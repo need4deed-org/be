@@ -7,6 +7,7 @@ import {
 import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
 import { getCallerAgentIds } from "../data/get-caller-agent-ids";
+import { resolveGroupCoordinatorScope } from "../data/group-scope";
 import { resolveOwnedVolunteerScope } from "../data/owned-volunteer-scope";
 
 export interface CallerVisibility {
@@ -93,8 +94,23 @@ export async function resolveCallerVisibility(
   }
 
   const agentPersonRepository = request.server.db.agentPersonRepository;
-  const callerAgentIds = await getCallerAgentIds(request, personId);
+  const groupScope = await resolveGroupCoordinatorScope(request);
+  const callerAgentIds = groupScope
+    ? groupScope.agentIds
+    : await getCallerAgentIds(request, personId);
   callerAgentIds.forEach((id) => agentIds.add(id));
+
+  if (groupScope && groupScope.groupIds.length > 0) {
+    const orgMembers: { person_id: number }[] =
+      await agentPersonRepository.manager.query(
+        `SELECT DISTINCT op.person_id
+           FROM organization_person op
+           JOIN volunteer_group vg ON vg.organization_id = op.organization_id
+          WHERE vg.id = ANY($1) AND op.status = $2`,
+        [groupScope.groupIds, AgentMembershipStatus.ACTIVE],
+      );
+    orgMembers.forEach((m) => personIds.add(Number(m.person_id)));
+  }
 
   if (agentIds.size === 0) {
     return visibility;

@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   ApiOpportunityVolunteerGet,
   OpportunityVolunteerStatusType,
-  UserRole,
 } from "need4deed-sdk";
 import { BadRequestError, NotFoundError } from "../../../config/error/fastify";
 import {
@@ -17,7 +16,12 @@ import {
   responseErrors,
   responseSchema,
 } from "../../schema";
-import { commuteFor, loadCommuteRangesForCaller } from "../../utils";
+import {
+  assertCoordinatorOrGroupCoordinator,
+  commuteFor,
+  isAgentInGroupScope,
+  loadCommuteRangesForCaller,
+} from "../../utils";
 import { requestLanguage } from "../../utils/data/request-language";
 import { deleteMatch } from "../../utils/data/sync-volunteer-engagement";
 import { translateOpportunities } from "../../utils/data/translate-opportunities";
@@ -101,7 +105,6 @@ export default function volunteerOpportunityVolunteerRoutes(
   }>(
     "/:m2mId",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
         body: opportunityVolunteerPatchSchema,
@@ -109,6 +112,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       },
     },
     async (request, reply) => {
+      const groupScope = await assertCoordinatorOrGroupCoordinator(request);
       const { id: volunteerId, m2mId } = request.params;
       if (volunteerId <= 0 || m2mId <= 0) {
         throw new BadRequestError(msg400);
@@ -122,7 +126,12 @@ export default function volunteerOpportunityVolunteerRoutes(
         relations: ["opportunity"],
       });
 
-      if (!opportunity) {
+      if (
+        !opportunity ||
+        (groupScope !== null &&
+          (opportunity.volunteerId !== volunteerId ||
+            !isAgentInGroupScope(groupScope, opportunity.opportunity?.agentId)))
+      ) {
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 
@@ -152,7 +161,6 @@ export default function volunteerOpportunityVolunteerRoutes(
   }>(
     "/:m2mId",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idmM2mIdParamSchema,
         response: {
@@ -168,6 +176,7 @@ export default function volunteerOpportunityVolunteerRoutes(
       },
     },
     async (request, reply) => {
+      const groupScope = await assertCoordinatorOrGroupCoordinator(request);
       const { id: volunteerId, m2mId } = request.params;
       if (volunteerId <= 0 || m2mId <= 0) {
         throw new BadRequestError("Param id must ba a positive number");
@@ -178,9 +187,15 @@ export default function volunteerOpportunityVolunteerRoutes(
 
       const opportunity = await opportunityVolunteerRepository.findOne({
         where: { id: m2mId },
+        relations: groupScope !== null ? ["opportunity"] : [],
       });
 
-      if (!opportunity) {
+      if (
+        !opportunity ||
+        (groupScope !== null &&
+          (opportunity.volunteerId !== volunteerId ||
+            !isAgentInGroupScope(groupScope, opportunity.opportunity?.agentId)))
+      ) {
         throw new NotFoundError(msg404(m2mId, volunteerId));
       }
 

@@ -92,6 +92,7 @@ import {
   assertAgentOwnsOpportunity,
   assertAppointmentNotTooSoon,
   assertCommuteFilterAccess,
+  assertCoordinatorOrGroupCoordinator,
   assertRoleIn,
   getAgentOpportunityEditNotificationText,
   getCallerAgentIds,
@@ -107,9 +108,11 @@ import {
   impliesAgentSearching,
   intersectAgentIds,
   isActiveAgentMember,
+  isAgentInGroupScope,
   isStaffRole,
   parseAgentIdsFilter,
   patchEntity,
+  resolveGroupCoordinatorScope,
   setAgentSearching,
   syncOnetimeTimeslot,
   updateBackfilledColumn,
@@ -332,6 +335,11 @@ export default async function opportunityRoutes(
       if (request.authUser?.role !== UserRole.AGENT) {
         throw new UnauthorizedError();
       }
+      if ((await resolveGroupCoordinatorScope(request)) !== null) {
+        return reply
+          .status(200)
+          .send({ message: "Other opportunities.", data: [], count: 0 });
+      }
       const [skip, take] = getSkipTake({
         page: request.query.page,
         limit: request.query.limit,
@@ -503,8 +511,10 @@ export default async function opportunityRoutes(
 
       const message = `Opportunities page:${request.query.page}.`;
 
-      const callerAgentIds =
-        request.authUser?.role === UserRole.AGENT
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      const callerAgentIds = groupScope
+        ? groupScope.agentIds
+        : request.authUser?.role === UserRole.AGENT
           ? await getCallerAgentIds(request, request.authUser.personId)
           : null;
       const requestedAgentIds = parseAgentIdsFilter(
@@ -523,7 +533,7 @@ export default async function opportunityRoutes(
         request.query.filter,
         requestLanguage(request.query),
         request.query,
-        isStaffRole(request.authUser?.role),
+        isStaffRole(request.authUser?.role) || groupScope !== null,
       );
       if (agentIds) {
         andIntoWhere(where, "agentId", In(agentIds));
@@ -764,7 +774,23 @@ export default async function opportunityRoutes(
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
 
-      if (role === UserRole.AGENT) {
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      if (groupScope !== null) {
+        if (!isAgentInGroupScope(groupScope, opportunity.agentId)) {
+          throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+        }
+        const body = request.body as Record<string, unknown>;
+        const agentBody = body.agent as { id?: number } | undefined;
+        if (
+          agentBody?.id !== undefined &&
+          agentBody.id !== opportunity.agentId &&
+          !isAgentInGroupScope(groupScope, agentBody.id)
+        ) {
+          throw new UnauthorizedError(
+            "Group coordinators can only move an opportunity within their group.",
+          );
+        }
+      } else if (role === UserRole.AGENT) {
         if (!(await isActiveAgentMember(request, opportunity.agentId))) {
           throw new UnauthorizedError(
             "Agents can only update opportunities belonging to their own agent.",
@@ -1344,18 +1370,24 @@ export default async function opportunityRoutes(
   fastify.delete<{ Params: ParamsId; Reply: ReplyMessage }>(
     "/:id",
     {
-      onRequest: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         response: responseSchema(""),
       },
     },
     async (request, reply) => {
+      const groupScope = await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const opportunityRepository = fastify.db.opportunityRepository;
       const opportunity = await opportunityRepository.findOneBy({ id });
 
       if (!opportunity) {
+        throw new NotFoundError(`Opportunity (id:${id}) not found.`);
+      }
+      if (
+        groupScope !== null &&
+        !isAgentInGroupScope(groupScope, opportunity.agentId)
+      ) {
         throw new NotFoundError(`Opportunity (id:${id}) not found.`);
       }
 

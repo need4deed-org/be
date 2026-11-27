@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { ApiVolunteerEventN4DGet, Lang, UserRole } from "need4deed-sdk";
+import { ApiVolunteerEventN4DGet, Lang } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import { dtoVolunteerEventN4D } from "../../../services";
 import {
@@ -8,7 +8,10 @@ import {
   volunteerEventN4DListResponseSchema,
 } from "../../schema";
 import { ParamsId, QuerystringEventGet, ReplyData } from "../../types";
-import { getLanguageCode } from "../../utils";
+import {
+  assertCoordinatorOrGroupCoordinator,
+  getLanguageCode,
+} from "../../utils";
 
 export default async function volunteerEventsRoutes(
   fastify: FastifyInstance,
@@ -21,7 +24,6 @@ export default async function volunteerEventsRoutes(
   }>(
     "/",
     {
-      preHandler: fastify.authenticate({ role: UserRole.COORDINATOR }),
       schema: {
         params: idParamSchema,
         querystring: langQuerySchema,
@@ -29,6 +31,7 @@ export default async function volunteerEventsRoutes(
       },
     },
     async (request, reply) => {
+      await assertCoordinatorOrGroupCoordinator(request);
       const { id } = request.params;
       const language = getLanguageCode(request.query.language) || Lang.DE;
 

@@ -16,7 +16,9 @@ import {
   getCategoryToDealHandler,
   getOpportunityListWhere,
   getSkipTake,
+  intersectAgentIds,
   mergeIntoWhere,
+  resolveGroupCoordinatorScope,
   updateBackfilledColumn,
 } from "../../utils";
 import { requestLanguage } from "../../utils/data/request-language";
@@ -53,13 +55,31 @@ export default async function volunteerOpportunityRoutes(
 
       const [skip, take] = getSkipTake({ page, limit });
 
+      const groupScope = await resolveGroupCoordinatorScope(request);
+      const requestedAgentIds = agentId
+        ? Array.isArray(agentId)
+          ? agentId
+          : [agentId]
+        : null;
+      const scopedAgentIds = intersectAgentIds(
+        groupScope ? groupScope.agentIds : null,
+        requestedAgentIds,
+      );
+      if (scopedAgentIds?.length === 0) {
+        return reply.status(200).send({
+          message: `Opportunities for a volunteer.`,
+          data: [],
+          count: 0,
+        });
+      }
+
       const where = await getOpportunityListWhere(
         filter,
         requestLanguage({ language }),
       );
-      if (agentId) {
+      if (scopedAgentIds) {
         mergeIntoWhere<Opportunity>(where, {
-          agentId: Array.isArray(agentId) ? In(agentId) : agentId,
+          agentId: In(scopedAgentIds),
         });
       }
       await applyOwnedVolunteerScope(request, where);
