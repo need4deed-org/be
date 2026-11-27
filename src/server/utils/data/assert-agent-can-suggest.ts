@@ -13,6 +13,7 @@ import Agent from "../../../data/entity/opportunity/agent.entity";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { getLiveSharingAgentIds } from "./live-sharing-agents";
 import { OPEN_OPPORTUNITY_STATUSES } from "./open-opportunity-statuses";
+import { ngoOwnerId } from "./platform-pool";
 
 type Suggestion = Pick<
   ApiOpportunityVolunteerPost,
@@ -40,8 +41,8 @@ async function findOwnedVolunteer(
       where: { id: volunteerId },
     }),
   ]);
-  const ownerAgentId = volunteer?.ownerAgentId;
-  if (!ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
+  const ownerAgentId = ngoOwnerId(volunteer?.ownerAgentId);
+  if (!volunteer || !ownerAgentId || !callerAgentIds.includes(ownerAgentId)) {
     return null;
   }
   if (isInactive(volunteer.ownerAgent)) {

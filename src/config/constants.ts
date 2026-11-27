@@ -107,6 +107,8 @@ export const urlCoordinatorInvite =
 export const urlNgoRegistration =
   process.env.URL_NGO_REGISTRATION || `${urlApp}/register/volunteer`;
 
+export const PLATFORM_AGENT_ID = Number(process.env.PLATFORM_AGENT_ID) || 106;
+
 export const emailVerificationManifestUrl =
   CDNBaseUrl + "/emails/verification.json";
 

@@ -17,6 +17,7 @@ import User from "../../../data/entity/user.entity";
 import logger from "../../../logger";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { OPEN_OPPORTUNITY_STATUSES } from "./open-opportunity-statuses";
+import { ngoOwnerId } from "./platform-pool";
 import { syncCommentTags } from "./sync-comment-tags";
 
 export const SUGGESTION_REQUEST_MARKER = "📩";
@@ -93,7 +94,8 @@ export async function requestVolunteerSuggestion(
   if (!volunteer) {
     throw new NotFoundError(`Volunteer (id:${volunteerId}) not found.`);
   }
-  const { ownerAgentId, ownerAgent } = volunteer;
+  const ownerAgentId = ngoOwnerId(volunteer.ownerAgentId);
+  const { ownerAgent } = volunteer;
   if (!ownerAgentId || !ownerAgent) {
     throw new BadRequestError(
       "This volunteer isn't owned by an NGO: ask need4deed for a suggestion.",

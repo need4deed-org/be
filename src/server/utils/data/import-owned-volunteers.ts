@@ -46,6 +46,7 @@ import {
 import { VISIBLE_MATCH_STATUSES } from "../pii/visible-persons";
 import { FALLBACK_PLZ } from "./get-or-create-submitter-person";
 import { isStaffRole } from "./is-staff-role";
+import { isPlatformPool } from "./platform-pool";
 
 type ExistingPerson = {
   id: number;
@@ -556,7 +557,7 @@ function classifyExisting(
     ) {
       return "connected";
     }
-    if (person.ownerAgentId !== null) {
+    if (!isPlatformPool(person.ownerAgentId)) {
       return { inUse: "volunteer owned by another NGO" };
     }
     return lookups.matchedVolunteerIds.has(person.volunteerId)

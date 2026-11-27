@@ -1,11 +1,13 @@
 import { LanguageMatch, QueryParamsKeys } from "need4deed-sdk";
 import { FindOptionsWhere, In, Raw } from "typeorm";
+import { PLATFORM_AGENT_ID } from "../../../config";
 import Volunteer from "../../../data/entity/volunteer/volunteer.entity";
 import { QuerystringVolunteerFiltering } from "../../types";
 import { CallerVisibility } from "../pii/visible-persons";
 import { normalizeStringArrayInput } from "./for-routes";
 import { dealIdIn } from "./get-availability-deal-ids";
 import { andIntoWhere } from "./merge-into-where";
+import { platformPoolSql } from "./platform-pool";
 import { getVolunteerSearchFragment } from "./volunteer-search";
 
 const NO_OWNER = "none";
@@ -28,7 +30,10 @@ export function getVolunteerWhere(
 ): FindOptionsWhere<Volunteer> {
   const requested = filter?.ownerAgent ? [filter.ownerAgent].flat() : null;
   const requestedIds = (requested ?? []).map(Number).filter(Number.isInteger);
-  const requestsNoOwner = requested?.includes(NO_OWNER) ?? false;
+  const requestsPool =
+    requested?.some(
+      (owner) => owner === NO_OWNER || Number(owner) === PLATFORM_AGENT_ID,
+    ) ?? false;
 
   const where: FindOptionsWhere<Volunteer> = {
     ...getVolunteerFilterWhere(filter),
@@ -42,7 +47,7 @@ export function getVolunteerWhere(
       "id",
       Raw(
         (column) =>
-          `${column} IN (SELECT id FROM volunteer WHERE ${requestsNoOwner ? "owner_agent_id IS NULL OR " : ""}owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))`,
+          `${column} IN (SELECT id FROM volunteer WHERE ${requestsPool ? `${platformPoolSql("owner_agent_id")} OR ` : ""}owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))`,
         {
           requestedOwners: requestedIds,
           requestedLinkAgents: visibility
@@ -69,7 +74,7 @@ export function getVolunteerWhere(
       "id",
       Raw(
         (column) =>
-          `${column} IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
+          `${column} IN (SELECT id FROM volunteer WHERE ${platformPoolSql("owner_agent_id")} OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
         {
           visibleOwners: [...visibility.ownerAgentIds],
           visiblePersons: [...visibility.personIds],

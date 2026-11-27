@@ -2,6 +2,7 @@ import { FastifyRequest } from "fastify";
 import { UserRole } from "need4deed-sdk";
 import { NotFoundError } from "../../../config";
 import { getSharingPeerAgentIds } from "../data/live-sharing-agents";
+import { ngoOwnerId } from "../data/platform-pool";
 import { resolveCallerMask } from "./pre-serialization";
 import { CallerVisibility } from "./visible-persons";
 
@@ -36,11 +37,12 @@ export function isVolunteerVisible(
   volunteer: VolunteerOwnership,
   visibility: CallerVisibility | null,
 ): boolean {
-  if (!visibility || volunteer.ownerAgentId === null) {
+  const ownerAgentId = ngoOwnerId(volunteer.ownerAgentId);
+  if (!visibility || !ownerAgentId) {
     return true;
   }
   return (
-    visibility.ownerAgentIds.has(volunteer.ownerAgentId) ||
+    visibility.ownerAgentIds.has(ownerAgentId) ||
     (volunteer.personId !== null &&
       visibility.personIds.has(volunteer.personId))
   );

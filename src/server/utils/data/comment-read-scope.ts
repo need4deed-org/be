@@ -5,6 +5,7 @@ import Comment from "../../../data/entity/comment.entity";
 import { getCallerAgentIds } from "./get-caller-agent-ids";
 import { isStaffRole } from "./is-staff-role";
 import { andIntoWhere } from "./merge-into-where";
+import { withoutPlatformAgent } from "./platform-pool";
 
 type AgentReadScope = {
   userId: number;
@@ -26,7 +27,9 @@ export async function resolveCommentReadScope(
   return {
     userId: authUser.id,
     personId: authUser.personId ?? null,
-    ownerAgentIds: await getCallerAgentIds(request, authUser.personId),
+    ownerAgentIds: withoutPlatformAgent(
+      await getCallerAgentIds(request, authUser.personId),
+    ),
   };
 }
 

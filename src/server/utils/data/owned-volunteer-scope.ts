@@ -6,6 +6,7 @@ import Opportunity from "../../../data/entity/opportunity/opportunity.entity";
 import User from "../../../data/entity/user.entity";
 import { andIntoWhere } from "./merge-into-where";
 import { closedForVolunteersIdWhere } from "./no-match-found";
+import { ngoOwnerId } from "./platform-pool";
 
 export type OwnedVolunteerScope = { volunteerId: number; ownerAgentId: number };
 
@@ -23,10 +24,11 @@ export async function resolveOwnedVolunteerScope(
       select: { id: true, ownerAgentId: true },
       where: { personId: user.personId },
     });
-    if (volunteer?.ownerAgentId) {
+    const ownerAgentId = ngoOwnerId(volunteer?.ownerAgentId);
+    if (volunteer && ownerAgentId) {
       scope = {
         volunteerId: volunteer.id,
-        ownerAgentId: volunteer.ownerAgentId,
+        ownerAgentId,
       };
     }
   }

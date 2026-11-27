@@ -5,6 +5,7 @@ import {
   UserRole,
 } from "need4deed-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PLATFORM_AGENT_ID } from "../../../../config";
 import type User from "../../../../data/entity/user.entity";
 import { getActiveAgentMemberships } from "../../../../server/utils/data/get-agent-memberships";
 import { resolveOwnedVolunteerScope } from "../../../../server/utils/data/owned-volunteer-scope";
@@ -158,6 +159,31 @@ describe("resolveCallerVisibility", () => {
       expect(query.mock.calls[0][1]).toEqual([
         [42, 43],
         VISIBLE_MATCH_STATUSES,
+        [42, 43],
+      ]);
+    });
+
+    it("gives a member of the need4deed agent no owner rights over the pool (be#1468)", async () => {
+      mockMemberships.mockResolvedValueOnce([
+        { agentId: 42 },
+        { agentId: PLATFORM_AGENT_ID },
+      ] as unknown as Awaited<ReturnType<typeof getActiveAgentMemberships>>);
+      find.mockResolvedValueOnce([]);
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const v = await resolveCallerVisibility(
+        request,
+        makeUser(UserRole.AGENT, 1),
+      );
+
+      expect(sorted(v.agentIds)).toEqual(
+        [42, PLATFORM_AGENT_ID].sort((a, b) => a - b),
+      );
+      expect(sorted(v.ownerAgentIds)).toEqual([42]);
+      expect(query.mock.calls[0][1][2]).toEqual([42]);
+      expect(query.mock.calls[1][1]).toEqual([
+        expect.arrayContaining([42, PLATFORM_AGENT_ID]),
+        [42],
       ]);
     });
 

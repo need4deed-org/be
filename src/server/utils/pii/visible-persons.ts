@@ -8,6 +8,7 @@ import { In } from "typeorm";
 import User from "../../../data/entity/user.entity";
 import { getCallerAgentIds } from "../data/get-caller-agent-ids";
 import { resolveOwnedVolunteerScope } from "../data/owned-volunteer-scope";
+import { platformPoolSql, withoutPlatformAgent } from "../data/platform-pool";
 
 export interface CallerVisibility {
   userId: number;
@@ -105,7 +106,8 @@ export async function resolveCallerVisibility(
   });
   members.forEach((m) => personIds.add(m.personId));
 
-  agentIds.forEach((id) => ownerAgentIds.add(id));
+  const ownedAgentIds = withoutPlatformAgent(agentIds);
+  ownedAgentIds.forEach((id) => ownerAgentIds.add(id));
 
   const rows: { id: number; person_id: number | null }[] =
     await agentPersonRepository.manager.query(
@@ -113,11 +115,11 @@ export async function resolveCallerVisibility(
          FROM opportunity o
          LEFT JOIN opportunity_volunteer ov ON ov.opportunity_id = o.id
          LEFT JOIN volunteer v ON v.id = ov.volunteer_id
-          AND (v.owner_agent_id IS NULL
-               OR v.owner_agent_id = ANY($1)
+          AND (${platformPoolSql("v.owner_agent_id")}
+               OR v.owner_agent_id = ANY($3)
                OR ov.status = ANY($2))
         WHERE o.agent_id = ANY($1)`,
-      [[...agentIds], VISIBLE_MATCH_STATUSES],
+      [[...agentIds], VISIBLE_MATCH_STATUSES, ownedAgentIds],
     );
   rows.forEach((r) => {
     opportunityIds.add(Number(r.id));
@@ -128,12 +130,12 @@ export async function resolveCallerVisibility(
 
   const owned: { person_id: number | null }[] =
     await agentPersonRepository.manager.query(
-      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($1)
+      `SELECT person_id FROM volunteer WHERE owner_agent_id = ANY($2)
        UNION
        SELECT v.person_id FROM volunteer v
          JOIN volunteer_agent_link l ON l.volunteer_id = v.id
         WHERE l.agent_id = ANY($1)`,
-      [[...agentIds]],
+      [[...agentIds], ownedAgentIds],
     );
   owned.forEach((r) => {
     if (r.person_id !== null) {

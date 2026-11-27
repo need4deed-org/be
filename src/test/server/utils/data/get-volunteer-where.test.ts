@@ -1,6 +1,7 @@
 import { LanguageMatch, QueryParamsKeys, UserRole } from "need4deed-sdk";
 import { In } from "typeorm";
 import { describe, expect, it } from "vitest";
+import { PLATFORM_AGENT_ID } from "../../../../config";
 import {
   getVolunteerFilterWhere,
   getVolunteerWhere,
@@ -173,7 +174,7 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
     expect(condition(where, "ownerAgentId")).toBeUndefined();
     const owner = condition(where, "id");
     expect(owner?._getSql("Volunteer.id")).toBe(
-      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))",
+      `Volunteer.id IN (SELECT id FROM volunteer WHERE (owner_agent_id IS NULL OR owner_agent_id = ${PLATFORM_AGENT_ID}) OR owner_agent_id = ANY(:requestedOwners) UNION SELECT volunteer_id FROM volunteer_agent_link WHERE agent_id = ANY(:requestedLinkAgents))`,
     );
     expect(owner?._objectLiteralParameters.requestedOwners).toEqual([4]);
   });
@@ -183,12 +184,22 @@ describe("getVolunteerWhere owner scoping (be#1056)", () => {
     expect(condition(where, "ownerAgentId")).toBeUndefined();
     const scope = condition(where, "id");
     expect(scope?._getSql("Volunteer.id")).toBe(
-      "Volunteer.id IN (SELECT id FROM volunteer WHERE owner_agent_id IS NULL OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))",
+      `Volunteer.id IN (SELECT id FROM volunteer WHERE (owner_agent_id IS NULL OR owner_agent_id = ${PLATFORM_AGENT_ID}) OR owner_agent_id = ANY(:visibleOwners) OR person_id = ANY(:visiblePersons))`,
     );
     expect(scope?._objectLiteralParameters).toEqual({
       visibleOwners: [4, 5],
       visiblePersons: [7],
     });
+  });
+
+  it("treats the need4deed agent as the pool, same as none (be#1468)", () => {
+    const where = getVolunteerWhere(
+      { ownerAgent: String(PLATFORM_AGENT_ID) },
+      null,
+    );
+    expect(condition(where, "id")?._getSql("Volunteer.id")).toContain(
+      `(owner_agent_id IS NULL OR owner_agent_id = ${PLATFORM_AGENT_ID}) OR`,
+    );
   });
 
   it("ANDs a requested owner with the caller's visibility", () => {
