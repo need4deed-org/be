@@ -33,6 +33,11 @@ import {
 } from "../../data/match-fixtures";
 import { randomNumericSuffix } from "../../random";
 
+async function personIdOf(fastify: FastifyInstance, userId: number) {
+  const user = await fastify.db.userRepository.findOneByOrFail({ id: userId });
+  return user.personId;
+}
+
 // Regression coverage for two things landed together:
 // 1. POST /user's AGENT email-domain gate rejects with InvalidOrganizationEmailError
 //    (400), not the old bare NotFoundError (404, "Resource not found").
@@ -218,7 +223,8 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    expect(res.json().person.id).toBe(existingPerson.id);
+    expect(res.json()).toEqual({ id: res.json().id, isActive: false });
+    expect(await personIdOf(fastify, res.json().id)).toBe(existingPerson.id);
 
     const personCount = await fastify.db.personRepository.count({
       where: { email },
@@ -249,8 +255,10 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    createdPersonIds.push(res.json().person.id);
-    expect(res.json().person.id).not.toBe(lookalikePerson.id);
+    createdPersonIds.push(await personIdOf(fastify, res.json().id));
+    expect(await personIdOf(fastify, res.json().id)).not.toBe(
+      lookalikePerson.id,
+    );
   });
 
   it("rejects (400, PersonAlreadyRegisteredError) when the matched Person already has a User of any role", async () => {
@@ -307,7 +315,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    createdPersonIds.push(res.json().person.id);
+    createdPersonIds.push(await personIdOf(fastify, res.json().id));
     expect(logged).toContain(
       `Password set for user ${res.json().id} via register`,
     );
@@ -386,6 +394,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     emails.push(email);
     const first = await register(email, "squatter_password", "Squatter");
     expect(first.statusCode).toBe(201);
+    const firstPersonId = await personIdOf(fastify, first.json().id);
 
     const second = await register(email, "owner_password", "Owner");
 
@@ -396,7 +405,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     expect(await users[0].checkPassword("owner_password")).toBe(true);
     const persons = await fastify.db.personRepository.findBy({ email });
     expect(persons).toHaveLength(1);
-    expect(persons[0].id).not.toBe(first.json().person.id);
+    expect(persons[0].id).not.toBe(firstPersonId);
     expect(persons[0].firstName).toBe("Owner");
   });
 
@@ -428,12 +437,12 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     );
     try {
       const first = await register(email, "squatter_password");
-      expect(first.json().person.id).toBe(legacyPerson.id);
+      expect(await personIdOf(fastify, first.json().id)).toBe(legacyPerson.id);
 
       const second = await register(email, "owner_password");
 
       expect(second.statusCode).toBe(201);
-      expect(second.json().person.id).toBe(legacyPerson.id);
+      expect(await personIdOf(fastify, second.json().id)).toBe(legacyPerson.id);
       const reloaded = await fastify.db.personRepository.findOneByOrFail({
         id: legacyPerson.id,
       });
@@ -452,12 +461,12 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
       new Person({ firstName: "Curated", lastName: "Person", email }),
     );
     const first = await register(email, "squatter_password");
-    expect(first.json().person.id).toBe(curated.id);
+    expect(await personIdOf(fastify, first.json().id)).toBe(curated.id);
 
     const second = await register(email, "owner_password");
 
     expect(second.statusCode).toBe(201);
-    expect(second.json().person.id).toBe(curated.id);
+    expect(await personIdOf(fastify, second.json().id)).toBe(curated.id);
     const reloaded = await fastify.db.personRepository.findOneByOrFail({
       id: curated.id,
     });
@@ -1584,7 +1593,7 @@ describe("POST /user/register-with-invite", () => {
     });
     expect(squat.statusCode).toBe(201);
     createdUserIds.push(squat.json().id);
-    createdPersonIds.push(squat.json().person.id);
+    createdPersonIds.push(await personIdOf(fastify, squat.json().id));
 
     const token = makeInviteToken(email);
     const res = await fastify.inject({

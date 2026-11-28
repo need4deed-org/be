@@ -41,6 +41,7 @@ import {
   registerWithInviteQuerySchema,
   selfRegisterUserBodySchema,
   signedLinkResponseSchema,
+  userRegisterResponseSchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
@@ -399,14 +400,14 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | ApiErrorReply;
+    Reply: Pick<User, "id" | "isActive"> | ApiErrorReply;
   }>(
     "/",
     {
       schema: {
         body: selfRegisterUserBodySchema,
         response: {
-          201: userResponseSchemaIncludePerson,
+          201: userRegisterResponseSchema,
           ...responseErrors,
         },
       },
@@ -497,7 +498,8 @@ export default async function userRoutes(
           );
         });
 
-      return reply.status(201).send(result.user);
+      const { id, isActive } = result.user;
+      return reply.status(201).send({ id, isActive });
     },
   );
 
