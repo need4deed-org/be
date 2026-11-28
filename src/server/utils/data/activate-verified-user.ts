@@ -7,7 +7,7 @@ import { hashPassword } from "../../../data/utils";
 import logger from "../../../logger";
 import { isPersonReferenced } from "./is-person-referenced";
 import {
-  findPersonByEmail,
+  findPersonsByEmail,
   isUnclaimedPerson,
 } from "./resolve-person-by-email";
 
@@ -20,16 +20,32 @@ async function claimUnclaimedPerson(
   tx: EntityManager,
   email: string,
 ): Promise<Person | null> {
-  const match = await findPersonByEmail(tx.getRepository(Person), email);
-  if (!isUnclaimedPerson(match)) {
-    return null;
+  const candidates = await findPersonsByEmail(tx.getRepository(Person), email);
+  for (const candidate of candidates.filter(isUnclaimedPerson)) {
+    const locked = await tx.findOne(Person, {
+      where: { id: candidate.id },
+      lock: { mode: "pessimistic_write" },
+    });
+    if (locked && !(await tx.countBy(User, { personId: locked.id }))) {
+      return locked;
+    }
   }
-  const locked = await tx.findOne(Person, {
-    where: { id: match.id },
-    lock: { mode: "pessimistic_write" },
-  });
-  const claimed = locked && (await tx.countBy(User, { personId: locked.id }));
-  return locked && !claimed ? locked : null;
+  return null;
+}
+
+async function deleteIfCreatedWithUser(
+  tx: EntityManager,
+  personId: number,
+  user: User,
+): Promise<void> {
+  const person = await tx.findOneBy(Person, { id: personId });
+  if (
+    person &&
+    person.createdAt >= user.createdAt &&
+    !(await isPersonReferenced(tx, personId))
+  ) {
+    await tx.delete(Person, { id: personId });
+  }
 }
 
 async function swapInUnclaimedPerson(
@@ -50,11 +66,8 @@ async function swapInUnclaimedPerson(
   const registrationPersonId = user.personId;
   user.personId = unclaimed.id;
   await tx.update(User, { id: user.id }, { personId: unclaimed.id });
-  if (
-    registrationPersonId &&
-    !(await isPersonReferenced(tx, registrationPersonId))
-  ) {
-    await tx.delete(Person, { id: registrationPersonId });
+  if (registrationPersonId) {
+    await deleteIfCreatedWithUser(tx, registrationPersonId, user);
   }
   return true;
 }
@@ -76,6 +89,7 @@ export async function activateVerifiedUser(
   manager: EntityManager,
   userId: number,
 ): Promise<ActivateVerifiedUserResult> {
+  const discardedPassword = await hashPassword(randomBytes(32).toString("hex"));
   return manager.transaction(async (tx) => {
     const user = await tx.findOne(User, {
       where: { id: userId },
@@ -95,7 +109,7 @@ export async function activateVerifiedUser(
       (await swapInUnclaimedPerson(tx, user)) ||
       (await holdsOlderPerson(tx, user));
     if (linkedExistingPerson) {
-      user.password = await hashPassword(randomBytes(32).toString("hex"));
+      user.password = discardedPassword;
       logger.info(
         `Existing person ${user.personId} linked to user ${user.id}; registration password discarded`,
       );

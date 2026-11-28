@@ -388,14 +388,6 @@ export default async function userRoutes(
         found.id,
       );
 
-      if (linkedExistingPerson) {
-        fastify.notify.passwordReset(user).catch((err) => {
-          logger.error(
-            `Failed to send password reset for user ${user.id}: ${err instanceof Error ? err.message : err}`,
-          );
-        });
-      }
-
       let hasVolunteerProfile: boolean | undefined;
       if (user.role === UserRole.VOLUNTEER && user.personId) {
         hasVolunteerProfile =

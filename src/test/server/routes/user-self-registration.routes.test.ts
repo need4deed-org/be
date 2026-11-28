@@ -121,7 +121,6 @@ describe("POST /user → verify-email → login", () => {
     fastify = await createServer();
     await fastify.ready();
     vi.spyOn(fastify.notify, "emailVerification").mockResolvedValue(undefined);
-    vi.spyOn(fastify.notify, "passwordReset").mockResolvedValue(undefined);
     await fastify.db.trustedDomainRepository.save(
       new TrustedDomain({ domain }),
     );
@@ -192,9 +191,6 @@ describe("POST /user → verify-email → login", () => {
     expect(activated.isActive).toBe(true);
     expect(activated.personId).toBe(legacy.id);
     expect(activated.credentialsValidAfter).toBeNull();
-    expect(fastify.notify.passwordReset).toHaveBeenCalledWith(
-      expect.objectContaining({ id: pending.id }),
-    );
 
     expect((await login("legacy-volunteer", PASSWORD)).statusCode).toBe(401);
 
@@ -336,6 +332,29 @@ describe("POST /user → verify-email → login", () => {
     expect(verified.statusCode).toBe(200);
     expect(verified.json()).toMatchObject({ setPassword: true });
     expect((await login("linked-before", PASSWORD)).statusCode).toBe(401);
+  });
+
+  it("never deletes an older Person a pending user held when verify moves it to another", async () => {
+    const held = await savePerson("held-older");
+    const pendingUser = await fastify.db.userRepository.save(
+      new User({
+        email: mail("held-older"),
+        password: await hashPassword(PASSWORD),
+        role: UserRole.VOLUNTEER,
+        isActive: false,
+        language: "en",
+        timezone: "CET",
+        personId: held.id,
+      }),
+    );
+    emails.push(mail("held-older"));
+    const duplicate = await savePerson("held-older");
+
+    const verified = await verify(verifyToken(pendingUser.id, "held-older"));
+
+    expect(verified.statusCode).toBe(200);
+    expect((await userOf("held-older")).personId).toBe(duplicate.id);
+    expect(await fastify.db.personRepository.countBy({ id: held.id })).toBe(1);
   });
 
   it("links the unclaimed Person when a claimed one shares the email", async () => {
