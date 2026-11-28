@@ -129,6 +129,10 @@ describe("POST /user → verify-email → login", () => {
 
   afterAll(async () => {
     vi.restoreAllMocks();
+    const users = await fastify.db.userRepository.findBy({
+      email: In(emails),
+    });
+    personIds.push(...users.map((user) => user.personId));
     await fastify.db.userRepository.delete({ email: In(emails) });
     await fastify.db.volunteerRepository.delete({ id: In(volunteerIds) });
     await fastify.db.dealRepository.delete({ id: In(dealIds) });
@@ -146,6 +150,13 @@ describe("POST /user → verify-email → login", () => {
     expect(res.json()).toEqual({ id: res.json().id, isActive: false });
     const pending = await userOf("new-volunteer");
     expect(pending.personId).toBeTruthy();
+    const personEmail = async () =>
+      (
+        await fastify.db.personRepository.findOneByOrFail({
+          id: pending.personId,
+        })
+      ).email;
+    expect(await personEmail()).toBeNull();
 
     const verified = await verify(verifyToken(pending.id, "new-volunteer"));
     expect(verified.statusCode).toBe(200);
@@ -155,6 +166,7 @@ describe("POST /user → verify-email → login", () => {
     });
     expect(verified.json()).not.toHaveProperty("setPassword");
     expect(verified.json()).not.toHaveProperty("resetToken");
+    expect(await personEmail()).toBe(mail("new-volunteer"));
 
     expect((await login("new-volunteer", PASSWORD)).statusCode).toBe(200);
   });
@@ -300,6 +312,7 @@ describe("POST /user → verify-email → login", () => {
     expect(person).toMatchObject({
       firstName: "Registration",
       lastName: "claimed-meanwhile",
+      email: mail("claimed-meanwhile"),
     });
     expect((await login("claimed-meanwhile", PASSWORD)).statusCode).toBe(200);
   });

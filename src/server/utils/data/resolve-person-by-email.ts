@@ -23,7 +23,7 @@ export function isUnclaimedPerson(person: Person | null): person is Person {
 
 async function buildNewPerson(
   newPersonData: Partial<Person>,
-  email: string,
+  email: string | null,
 ): Promise<Person> {
   const newPerson = new Person({ ...newPersonData, email });
   const errors = await validate(newPerson, {
@@ -59,7 +59,7 @@ export async function resolvePersonByEmail(
   return buildNewPerson(newPersonData, email);
 }
 
-// the email is unproven until verify-email, which swaps in an unclaimed Person
+// no email on the Person until verify-email proves it, so email lookups can't pick this copy
 export async function resolveSelfRegistrationPerson(
   personRepository: Repository<Person>,
   email: string,
@@ -69,5 +69,5 @@ export async function resolveSelfRegistrationPerson(
   if (existingPerson && !isUnclaimedPerson(existingPerson)) {
     throw new PersonAlreadyRegisteredError();
   }
-  return buildNewPerson(newPersonData, email);
+  return buildNewPerson(newPersonData, null);
 }

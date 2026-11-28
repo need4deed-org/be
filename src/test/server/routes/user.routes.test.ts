@@ -26,6 +26,7 @@ import { DealType } from "../../../data/types";
 import { getPostcode, hashPassword } from "../../../data/utils";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
+import { isPersonReferenced } from "../../../server/utils/data/is-person-referenced";
 import {
   createOpportunity,
   createVolunteer,
@@ -409,7 +410,19 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
 
   afterAll(async () => {
     for (const email of emails) {
+      const users = await fastify.db.userRepository.findBy({ email });
       await fastify.db.userRepository.delete({ email });
+      for (const { personId } of users) {
+        if (
+          personId &&
+          !(await isPersonReferenced(
+            fastify.db.userRepository.manager,
+            personId,
+          ))
+        ) {
+          await fastify.db.personRepository.delete({ id: personId });
+        }
+      }
       await fastify.db.personRepository.delete({ email });
     }
     await fastify.close();
@@ -429,10 +442,13 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([second.json().id]);
     expect(await users[0].checkPassword("owner_password")).toBe(true);
-    const persons = await fastify.db.personRepository.findBy({ email });
-    expect(persons).toHaveLength(1);
-    expect(persons[0].id).not.toBe(firstPersonId);
-    expect(persons[0].firstName).toBe("Owner");
+    expect(
+      await fastify.db.personRepository.countBy({ id: firstPersonId }),
+    ).toBe(0);
+    const person = await fastify.db.personRepository.findOneByOrFail({
+      id: users[0].personId,
+    });
+    expect(person.firstName).toBe("Owner");
   });
 
   it("reclaims when the new signup uses a different case", async () => {
@@ -515,10 +531,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
 
     const second = await register(email, "another_password");
 
-    expect(second.statusCode).toBe(400);
-    expect(second.json()).toMatchObject({
-      error: "PersonAlreadyRegisteredError",
-    });
+    expect(second.statusCode).toBe(409);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([first.json().id]);
   });

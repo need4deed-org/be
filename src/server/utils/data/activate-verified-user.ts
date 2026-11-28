@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { EntityManager } from "typeorm";
+import { EntityManager, IsNull } from "typeorm";
 import { AlreadyUsedTokenError, BadRequestError } from "../../../config";
 import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
@@ -16,15 +16,35 @@ export interface ActivateVerifiedUserResult {
   linkedExistingPerson: boolean;
 }
 
+async function claimUnclaimedPerson(
+  tx: EntityManager,
+  email: string,
+): Promise<Person | null> {
+  const match = await findPersonByEmail(tx.getRepository(Person), email);
+  if (!isUnclaimedPerson(match)) {
+    return null;
+  }
+  const locked = await tx.findOne(Person, {
+    where: { id: match.id },
+    lock: { mode: "pessimistic_write" },
+  });
+  const claimed = locked && (await tx.countBy(User, { personId: locked.id }));
+  return locked && !claimed ? locked : null;
+}
+
 async function swapInUnclaimedPerson(
   tx: EntityManager,
   user: User,
 ): Promise<boolean> {
-  const unclaimed = await findPersonByEmail(
-    tx.getRepository(Person),
-    user.email,
-  );
-  if (!isUnclaimedPerson(unclaimed) || unclaimed.id === user.personId) {
+  const unclaimed = await claimUnclaimedPerson(tx, user.email);
+  if (!unclaimed || unclaimed.id === user.personId) {
+    if (user.personId) {
+      await tx.update(
+        Person,
+        { id: user.personId, email: IsNull() },
+        { email: user.email },
+      );
+    }
     return false;
   }
   const registrationPersonId = user.personId;
