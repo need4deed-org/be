@@ -44,12 +44,19 @@ export async function reclaimPendingUser(
     deactivatedAt: IsNull(),
   });
   const person = existing.person;
+  if (affected && person && person.id !== keepPersonId) {
+    await deletePersonIfCreatedWith(manager, person, existing);
+  }
+}
+
+export async function deletePersonIfCreatedWith(
+  manager: EntityManager,
+  person: Person,
+  user: Pick<User, "createdAt">,
+): Promise<void> {
   if (
-    affected &&
-    person &&
-    person.id !== keepPersonId &&
-    // an older Person was reused by the pending User, not created with it
-    person.createdAt >= existing.createdAt &&
+    // an older Person was reused by the User, not created with it
+    person.createdAt >= user.createdAt &&
     !(await isPersonReferenced(manager, person.id))
   ) {
     await manager.delete(Person, { id: person.id });

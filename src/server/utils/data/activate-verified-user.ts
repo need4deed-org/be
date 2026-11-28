@@ -5,7 +5,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import logger from "../../../logger";
-import { isPersonReferenced } from "./is-person-referenced";
+import { deletePersonIfCreatedWith } from "./assert-email-available";
 import {
   findPersonsByEmail,
   isUnclaimedPerson,
@@ -15,6 +15,13 @@ export interface ActivateVerifiedUserResult {
   user: User;
   linkedExistingPerson: boolean;
 }
+
+const FILLABLE_PERSON_FIELDS = [
+  "middleName",
+  "lastName",
+  "phone",
+  "landline",
+] as const;
 
 async function claimUnclaimedPerson(
   tx: EntityManager,
@@ -33,55 +40,44 @@ async function claimUnclaimedPerson(
   return null;
 }
 
-async function deleteIfCreatedWithUser(
+async function fillEmptyFields(
   tx: EntityManager,
-  personId: number,
-  user: User,
+  target: Person,
+  source: Person,
 ): Promise<void> {
-  const person = await tx.findOneBy(Person, { id: personId });
-  if (
-    person &&
-    person.createdAt >= user.createdAt &&
-    !(await isPersonReferenced(tx, personId))
-  ) {
-    await tx.delete(Person, { id: personId });
+  const filled = Object.fromEntries(
+    FILLABLE_PERSON_FIELDS.filter(
+      (field) => !target[field] && source[field],
+    ).map((field) => [field, source[field]]),
+  );
+  if (Object.keys(filled).length) {
+    await tx.update(Person, { id: target.id }, filled);
   }
 }
 
 async function swapInUnclaimedPerson(
   tx: EntityManager,
   user: User,
+  registrationPerson: Person | null,
 ): Promise<boolean> {
   const unclaimed = await claimUnclaimedPerson(tx, user.email);
-  if (!unclaimed || unclaimed.id === user.personId) {
-    if (user.personId) {
+  if (!unclaimed) {
+    if (registrationPerson) {
       await tx.update(
         Person,
-        { id: user.personId, email: IsNull() },
+        { id: registrationPerson.id, email: IsNull() },
         { email: user.email },
       );
     }
     return false;
   }
-  const registrationPersonId = user.personId;
   user.personId = unclaimed.id;
   await tx.update(User, { id: user.id }, { personId: unclaimed.id });
-  if (registrationPersonId) {
-    await deleteIfCreatedWithUser(tx, registrationPersonId, user);
+  if (registrationPerson) {
+    await fillEmptyFields(tx, unclaimed, registrationPerson);
+    await deletePersonIfCreatedWith(tx, registrationPerson, user);
   }
   return true;
-}
-
-// a pending user from before verify-time linking may already hold an older Person
-async function holdsOlderPerson(
-  tx: EntityManager,
-  user: User,
-): Promise<boolean> {
-  if (!user.personId) {
-    return false;
-  }
-  const person = await tx.findOneBy(Person, { id: user.personId });
-  return !!person && person.createdAt < user.createdAt;
 }
 
 // keep credentialsValidAfter: the registration "complete" step authenticates with the verify token
@@ -89,7 +85,6 @@ export async function activateVerifiedUser(
   manager: EntityManager,
   userId: number,
 ): Promise<ActivateVerifiedUserResult> {
-  const discardedPassword = await hashPassword(randomBytes(32).toString("hex"));
   return manager.transaction(async (tx) => {
     const user = await tx.findOne(User, {
       where: { id: userId },
@@ -105,11 +100,16 @@ export async function activateVerifiedUser(
       throw new BadRequestError("Account has been deactivated.");
     }
 
+    const person = user.personId
+      ? await tx.findOneBy(Person, { id: user.personId })
+      : null;
+    // a pending user from before verify-time linking may already hold an older Person
+    const holdsOlderPerson = !!person && person.createdAt < user.createdAt;
     const linkedExistingPerson =
-      (await swapInUnclaimedPerson(tx, user)) ||
-      (await holdsOlderPerson(tx, user));
+      holdsOlderPerson || (await swapInUnclaimedPerson(tx, user, person));
+
     if (linkedExistingPerson) {
-      user.password = discardedPassword;
+      user.password = await hashPassword(randomBytes(32).toString("hex"));
       logger.info(
         `Existing person ${user.personId} linked to user ${user.id}; registration password discarded`,
       );

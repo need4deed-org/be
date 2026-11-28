@@ -334,7 +334,7 @@ describe("POST /user → verify-email → login", () => {
     expect((await login("linked-before", PASSWORD)).statusCode).toBe(401);
   });
 
-  it("never deletes an older Person a pending user held when verify moves it to another", async () => {
+  it("keeps the older Person a pending user already held, even with an unclaimed duplicate", async () => {
     const held = await savePerson("held-older");
     const pendingUser = await fastify.db.userRepository.save(
       new User({
@@ -353,8 +353,29 @@ describe("POST /user → verify-email → login", () => {
     const verified = await verify(verifyToken(pendingUser.id, "held-older"));
 
     expect(verified.statusCode).toBe(200);
-    expect((await userOf("held-older")).personId).toBe(duplicate.id);
-    expect(await fastify.db.personRepository.countBy({ id: held.id })).toBe(1);
+    expect(verified.json()).toMatchObject({ setPassword: true });
+    expect((await userOf("held-older")).personId).toBe(held.id);
+    expect(
+      await fastify.db.personRepository.countBy({ id: duplicate.id }),
+    ).toBe(1);
+  });
+
+  it("fills a sparse legacy Person's empty fields from the registration", async () => {
+    const sparse = await fastify.db.personRepository.save(
+      new Person({ firstName: "Sparse", email: mail("sparse") }),
+    );
+    personIds.push(sparse.id);
+    expect((await register("sparse")).statusCode).toBe(201);
+
+    const verified = await verify(
+      verifyToken((await userOf("sparse")).id, "sparse"),
+    );
+
+    expect(verified.statusCode).toBe(200);
+    const reloaded = await fastify.db.personRepository.findOneByOrFail({
+      id: sparse.id,
+    });
+    expect(reloaded).toMatchObject({ firstName: "Sparse", lastName: "sparse" });
   });
 
   it("links the unclaimed Person when a claimed one shares the email", async () => {
