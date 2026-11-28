@@ -121,6 +121,7 @@ describe("POST /user → verify-email → login", () => {
     fastify = await createServer();
     await fastify.ready();
     vi.spyOn(fastify.notify, "emailVerification").mockResolvedValue(undefined);
+    vi.spyOn(fastify.notify, "passwordReset").mockResolvedValue(undefined);
     await fastify.db.trustedDomainRepository.save(
       new TrustedDomain({ domain }),
     );
@@ -191,6 +192,9 @@ describe("POST /user → verify-email → login", () => {
     expect(activated.isActive).toBe(true);
     expect(activated.personId).toBe(legacy.id);
     expect(activated.credentialsValidAfter).toBeNull();
+    expect(fastify.notify.passwordReset).toHaveBeenCalledWith(
+      expect.objectContaining({ id: pending.id }),
+    );
 
     expect((await login("legacy-volunteer", PASSWORD)).statusCode).toBe(401);
 
@@ -358,24 +362,6 @@ describe("POST /user → verify-email → login", () => {
     expect(
       await fastify.db.personRepository.countBy({ id: duplicate.id }),
     ).toBe(1);
-  });
-
-  it("fills a sparse legacy Person's empty fields from the registration", async () => {
-    const sparse = await fastify.db.personRepository.save(
-      new Person({ firstName: "Sparse", email: mail("sparse") }),
-    );
-    personIds.push(sparse.id);
-    expect((await register("sparse")).statusCode).toBe(201);
-
-    const verified = await verify(
-      verifyToken((await userOf("sparse")).id, "sparse"),
-    );
-
-    expect(verified.statusCode).toBe(200);
-    const reloaded = await fastify.db.personRepository.findOneByOrFail({
-      id: sparse.id,
-    });
-    expect(reloaded).toMatchObject({ firstName: "Sparse", lastName: "sparse" });
   });
 
   it("links the unclaimed Person when a claimed one shares the email", async () => {

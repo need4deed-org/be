@@ -16,13 +16,6 @@ export interface ActivateVerifiedUserResult {
   linkedExistingPerson: boolean;
 }
 
-const FILLABLE_PERSON_FIELDS = [
-  "middleName",
-  "lastName",
-  "phone",
-  "landline",
-] as const;
-
 async function claimUnclaimedPerson(
   tx: EntityManager,
   email: string,
@@ -38,21 +31,6 @@ async function claimUnclaimedPerson(
     }
   }
   return null;
-}
-
-async function fillEmptyFields(
-  tx: EntityManager,
-  target: Person,
-  source: Person,
-): Promise<void> {
-  const filled = Object.fromEntries(
-    FILLABLE_PERSON_FIELDS.filter(
-      (field) => !target[field] && source[field],
-    ).map((field) => [field, source[field]]),
-  );
-  if (Object.keys(filled).length) {
-    await tx.update(Person, { id: target.id }, filled);
-  }
 }
 
 async function swapInUnclaimedPerson(
@@ -74,7 +52,6 @@ async function swapInUnclaimedPerson(
   user.personId = unclaimed.id;
   await tx.update(User, { id: user.id }, { personId: unclaimed.id });
   if (registrationPerson) {
-    await fillEmptyFields(tx, unclaimed, registrationPerson);
     await deletePersonIfCreatedWith(tx, registrationPerson, user);
   }
   return true;
@@ -103,8 +80,11 @@ export async function activateVerifiedUser(
     const person = user.personId
       ? await tx.findOneBy(Person, { id: user.personId })
       : null;
-    // a pending user from before verify-time linking may already hold an older Person
-    const holdsOlderPerson = !!person && person.createdAt < user.createdAt;
+    // a Person older than the user and holding its email was reused, not created with it
+    const holdsOlderPerson =
+      !!person &&
+      person.createdAt < user.createdAt &&
+      person.email?.toLowerCase() === user.email.toLowerCase();
     const linkedExistingPerson =
       holdsOlderPerson || (await swapInUnclaimedPerson(tx, user, person));
 
