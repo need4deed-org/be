@@ -32,7 +32,10 @@ import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
-import { serializeUserToMeDTO } from "../../services/dto/dto-user";
+import {
+  dtoUserPostReply,
+  serializeUserToMeDTO,
+} from "../../services/dto/dto-user";
 import { signPasswordResetToken } from "../../services/notify";
 import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { ApiErrorReply, responseErrors } from "../schema/responseErrors";
@@ -503,7 +506,7 @@ export default async function userRoutes(
             isActive: false,
             language: language ?? Lang.EN,
             timezone: "CET",
-            ...(person ? { person } : {}),
+            person,
           });
         },
       );
@@ -523,8 +526,7 @@ export default async function userRoutes(
           );
         });
 
-      const { id, isActive } = result.user;
-      return reply.status(201).send({ id, isActive });
+      return reply.status(201).send(dtoUserPostReply(result.user));
     },
   );
 

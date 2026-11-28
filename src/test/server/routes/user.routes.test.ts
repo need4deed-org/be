@@ -229,7 +229,9 @@ describe("POST /user — links existing Person by email instead of duplicating (
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
     expect(res.json()).toEqual({ id: res.json().id, isActive: false });
-    expect(await personIdOf(fastify, res.json().id)).toBeNull();
+    expect(await personIdOf(fastify, res.json().id)).not.toBe(
+      existingPerson.id,
+    );
 
     const verified = await fastify.inject({
       method: "POST",
@@ -461,12 +463,16 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     );
     try {
       const first = await register(email, "squatter_password");
-      expect(await personIdOf(fastify, first.json().id)).toBeNull();
+      expect(await personIdOf(fastify, first.json().id)).not.toBe(
+        legacyPerson.id,
+      );
 
       const second = await register(email, "owner_password");
 
       expect(second.statusCode).toBe(201);
-      expect(await personIdOf(fastify, second.json().id)).toBeNull();
+      expect(await personIdOf(fastify, second.json().id)).not.toBe(
+        legacyPerson.id,
+      );
       const reloaded = await fastify.db.personRepository.findOneByOrFail({
         id: legacyPerson.id,
       });
@@ -485,12 +491,12 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
       new Person({ firstName: "Curated", lastName: "Person", email }),
     );
     const first = await register(email, "squatter_password");
-    expect(await personIdOf(fastify, first.json().id)).toBeNull();
+    expect(await personIdOf(fastify, first.json().id)).not.toBe(curated.id);
 
     const second = await register(email, "owner_password");
 
     expect(second.statusCode).toBe(201);
-    expect(await personIdOf(fastify, second.json().id)).toBeNull();
+    expect(await personIdOf(fastify, second.json().id)).not.toBe(curated.id);
     const reloaded = await fastify.db.personRepository.findOneByOrFail({
       id: curated.id,
     });

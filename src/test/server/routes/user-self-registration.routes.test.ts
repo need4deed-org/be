@@ -167,7 +167,7 @@ describe("POST /user → verify-email → login", () => {
     expect(res.statusCode).toBe(201);
     expect(res.json()).toEqual({ id: res.json().id, isActive: false });
     const pending = await userOf("legacy-volunteer");
-    expect(pending.personId).toBeNull();
+    expect(pending.personId).not.toBe(legacy.id);
 
     const verified = await verify(verifyToken(pending.id, "legacy-volunteer"));
     expect(verified.statusCode).toBe(200);
@@ -250,7 +250,7 @@ describe("POST /user → verify-email → login", () => {
       (await register("ngo-contact", { role: UserRole.AGENT })).statusCode,
     ).toBe(201);
     const pending = await userOf("ngo-contact");
-    expect(pending.personId).toBeNull();
+    expect(pending.personId).not.toBe(contact.id);
 
     const token = verifyToken(pending.id, "ngo-contact");
     const verified = await verify(token);
@@ -269,11 +269,11 @@ describe("POST /user → verify-email → login", () => {
     expect((await login("ngo-contact", NEW_PASSWORD)).statusCode).toBe(200);
   });
 
-  it("creates an empty Person at verify when the matched one was claimed meanwhile", async () => {
+  it("keeps the registration Person when the matched one was claimed meanwhile", async () => {
     const legacy = await savePerson("claimed-meanwhile");
     expect((await register("claimed-meanwhile")).statusCode).toBe(201);
     const pending = await userOf("claimed-meanwhile");
-    expect(pending.personId).toBeNull();
+    expect(pending.personId).not.toBe(legacy.id);
 
     const otherEmail = `other-${mail("claimed-meanwhile")}`;
     emails.push(otherEmail);
@@ -293,9 +293,14 @@ describe("POST /user → verify-email → login", () => {
     expect(verified.statusCode).toBe(200);
     expect(verified.json()).not.toHaveProperty("setPassword");
     const activated = await userOf("claimed-meanwhile");
-    expect(activated.personId).toBeTruthy();
-    expect(activated.personId).not.toBe(legacy.id);
-    personIds.push(activated.personId);
+    expect(activated.personId).toBe(pending.personId);
+    const person = await fastify.db.personRepository.findOneByOrFail({
+      id: activated.personId,
+    });
+    expect(person).toMatchObject({
+      firstName: "Registration",
+      lastName: "claimed-meanwhile",
+    });
     expect((await login("claimed-meanwhile", PASSWORD)).statusCode).toBe(200);
   });
 
@@ -339,7 +344,7 @@ describe("POST /user → verify-email → login", () => {
 
     expect((await register("shared-email")).statusCode).toBe(201);
     const pending = await userOf("shared-email");
-    expect(pending.personId).toBeNull();
+    expect(pending.personId).not.toBe(unclaimed.id);
 
     expect(
       (await verify(verifyToken(pending.id, "shared-email"))).statusCode,

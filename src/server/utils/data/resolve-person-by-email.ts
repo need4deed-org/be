@@ -59,17 +59,14 @@ export async function resolvePersonByEmail(
   return buildNewPerson(newPersonData, email);
 }
 
-// the email is unproven until verify-email, which links an unclaimed Person
+// the email is unproven until verify-email, which swaps in an unclaimed Person
 export async function resolveSelfRegistrationPerson(
   personRepository: Repository<Person>,
   email: string,
   newPersonData: Partial<Person>,
-): Promise<Person | null> {
+): Promise<Person> {
   const existingPerson = await findPersonByEmail(personRepository, email);
-  if (isUnclaimedPerson(existingPerson)) {
-    return null;
-  }
-  if (existingPerson) {
+  if (existingPerson && !isUnclaimedPerson(existingPerson)) {
     throw new PersonAlreadyRegisteredError();
   }
   return buildNewPerson(newPersonData, email);
