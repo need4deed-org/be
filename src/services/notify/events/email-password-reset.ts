@@ -19,6 +19,20 @@ export function resetPasswordResetTemplateCache(): void {
   loader.resetCache();
 }
 
+export function signPasswordResetToken(
+  jwt: JWT,
+  user: Pick<User, "id" | "email">,
+): string {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      type: "reset",
+    },
+    { expiresIn: `${RESET_LIFESPAN_MS}` },
+  );
+}
+
 export async function sendPasswordReset(
   { email, jwt }: PasswordResetDeps,
   user: User,
@@ -27,14 +41,7 @@ export async function sendPasswordReset(
     throw new Error("User email is required for password reset");
   }
 
-  const token = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      type: "reset",
-    },
-    { expiresIn: `${RESET_LIFESPAN_MS}` },
-  );
+  const token = signPasswordResetToken(jwt, user);
 
   const url = `${urlPasswordReset}?token=${encodeURIComponent(token)}`;
 

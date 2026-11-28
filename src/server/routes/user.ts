@@ -10,6 +10,7 @@ import {
   ApiCoordinatorRegisterWithInvite,
   ApiUserGet,
   ApiUserPost,
+  ApiUserVerifyEmail,
   Lang,
   SortOrder,
   UserRole,
@@ -32,6 +33,7 @@ import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
 import { serializeUserToMeDTO } from "../../services/dto/dto-user";
+import { signPasswordResetToken } from "../../services/notify";
 import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { ApiErrorReply, responseErrors } from "../schema/responseErrors";
 import {
@@ -55,12 +57,14 @@ import {
   RoutePrefix,
 } from "../types";
 import {
+  activateVerifiedUser,
   assertEmailAvailable,
   createUserReclaimingEmail,
   getSkipTake,
   getUserWhere,
   isStaffRole,
   resolvePersonByEmail,
+  resolveSelfRegistrationPerson,
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
@@ -79,11 +83,17 @@ import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-toke
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
 import { revokeUserRefreshSessions } from "../utils/data/refresh-session";
 import { signLink } from "../utils/data/sign-link";
+import {
+  createRegisterEmailCap,
+  REGISTER_IP_RATE_LIMIT,
+} from "../utils/login-rate-limit";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
+  const registerEmailCap = createRegisterEmailCap();
+
   fastify.get<{
     Querystring: QuerystringUserList;
     Reply: ReplyDataCount<ApiUserGet[]>;
@@ -310,7 +320,10 @@ export default async function userRoutes(
     },
   );
 
-  fastify.post<{ Body: { token: string } }>(
+  fastify.post<{
+    Body: { token: string };
+    Reply: ApiUserVerifyEmail | ApiErrorReply;
+  }>(
     RoutePrefix.VERIFY_EMAIL,
     {
       schema: {
@@ -322,6 +335,8 @@ export default async function userRoutes(
               message: { type: "string" },
               verified: { type: "boolean" },
               hasVolunteerProfile: { type: "boolean" },
+              setPassword: { type: "boolean" },
+              resetToken: { type: "string" },
             },
             required: ["message", "verified"],
           },
@@ -370,6 +385,19 @@ export default async function userRoutes(
         throw new BadRequestError("Invalid token.");
       }
 
+      if (user.isActive) {
+        throw new AlreadyUsedTokenError();
+      }
+
+      if (user.deactivatedAt) {
+        throw new BadRequestError("Account has been deactivated.");
+      }
+
+      const { linkedExistingPerson } = await activateVerifiedUser(
+        userRepository.manager,
+        user,
+      );
+
       let hasVolunteerProfile: boolean | undefined;
       if (user.role === UserRole.VOLUNTEER && user.personId) {
         hasVolunteerProfile =
@@ -379,21 +407,18 @@ export default async function userRoutes(
       const volunteerProfileFields =
         hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
 
-      if (user.isActive) {
-        throw new AlreadyUsedTokenError();
-      }
-
-      if (user.deactivatedAt) {
-        throw new BadRequestError("Account has been deactivated.");
-      }
-
-      user.isActive = true;
-      await userRepository.save(user);
+      const setPasswordFields = linkedExistingPerson
+        ? {
+            setPassword: true,
+            resetToken: signPasswordResetToken(fastify.jwt, user),
+          }
+        : {};
 
       return reply.status(200).send({
         message: "Email verified successfully.",
         verified: true,
         ...volunteerProfileFields,
+        ...setPasswordFields,
       });
     },
   );
@@ -404,6 +429,7 @@ export default async function userRoutes(
   }>(
     "/",
     {
+      config: { rateLimit: REGISTER_IP_RATE_LIMIT },
       schema: {
         body: selfRegisterUserBodySchema,
         response: {
@@ -411,48 +437,53 @@ export default async function userRoutes(
           ...responseErrors,
         },
       },
-      preHandler: async (request) => {
-        const { person: personData, email, role, ngoToken } = request.body;
+      preHandler: [
+        registerEmailCap,
+        async (request) => {
+          const { person: personData, email, role, ngoToken } = request.body;
 
-        if (isStaffRole(role)) {
-          throw new UnauthorizedError();
-        }
-
-        if (role === UserRole.AGENT) {
-          const allowed = await isAgentDomainAllowed(email, (domain) =>
-            fastify.db.agentRepository
-              .findOne({
-                where: {
-                  agentPerson: {
-                    person: { email: ILike(`%@${escapeLikePattern(domain)}`) },
-                  },
-                },
-              })
-              .then((agent) => !!agent),
-          );
-          if (!allowed) {
-            throw new InvalidOrganizationEmailError();
+          if (isStaffRole(role)) {
+            throw new UnauthorizedError();
           }
-        }
 
-        if (personData.id) {
-          throw new BadRequestError(
-            "Linking to an existing person by id is not allowed on self-registration.",
-          );
-        }
+          if (role === UserRole.AGENT) {
+            const allowed = await isAgentDomainAllowed(email, (domain) =>
+              fastify.db.agentRepository
+                .findOne({
+                  where: {
+                    agentPerson: {
+                      person: {
+                        email: ILike(`%@${escapeLikePattern(domain)}`),
+                      },
+                    },
+                  },
+                })
+                .then((agent) => !!agent),
+            );
+            if (!allowed) {
+              throw new InvalidOrganizationEmailError();
+            }
+          }
 
-        if (ngoToken !== undefined) {
-          if (role !== UserRole.VOLUNTEER) {
+          if (personData.id) {
             throw new BadRequestError(
-              "An NGO registration link is only for volunteers.",
+              "Linking to an existing person by id is not allowed on self-registration.",
             );
           }
-          request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
-            request,
-            ngoToken,
-          );
-        }
-      },
+
+          if (ngoToken !== undefined) {
+            if (role !== UserRole.VOLUNTEER) {
+              throw new BadRequestError(
+                "An NGO registration link is only for volunteers.",
+              );
+            }
+            request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
+              request,
+              ngoToken,
+            );
+          }
+        },
+      ],
     },
     async (request, reply) => {
       const {
@@ -467,20 +498,22 @@ export default async function userRoutes(
       const result = await createUserReclaimingEmail(
         fastify.db.userRepository.manager,
         email,
-        async (manager) =>
-          new User({
+        async (manager) => {
+          const person = await resolveSelfRegistrationPerson(
+            manager.getRepository(Person),
+            email,
+            personData,
+          );
+          return new User({
             email,
             password,
             role,
             isActive: false,
             language: language ?? Lang.EN,
             timezone: "CET",
-            person: await resolvePersonByEmail(
-              manager.getRepository(Person),
-              email,
-              personData,
-            ),
-          }),
+            ...(person ? { person } : {}),
+          });
+        },
       );
       if (result.status === "error") {
         return reply.status(400).send({

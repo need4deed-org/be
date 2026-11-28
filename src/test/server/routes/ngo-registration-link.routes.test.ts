@@ -15,7 +15,7 @@ import Person from "../../../data/entity/person.entity";
 import User from "../../../data/entity/user.entity";
 import { hashPassword } from "../../../data/utils";
 import { createServer } from "../../../server";
-import { randomNumericSuffix } from "../../random";
+import { randomNumericSuffix, uniqueRemoteAddress } from "../../random";
 
 const PASSWORD = "test_password";
 
@@ -54,6 +54,7 @@ describe("NGO registration link (be#1318)", () => {
   const signUp = (name: string, ngoToken: string, role = UserRole.VOLUNTEER) =>
     fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: mail(name),

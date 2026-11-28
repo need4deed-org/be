@@ -101,7 +101,6 @@ export const userResponseSchema = {
   ],
 };
 
-// Self-registration is public: reply with nothing a caller didn't already know.
 export const userRegisterResponseSchema = {
   type: "object",
   properties: {
