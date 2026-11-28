@@ -45,6 +45,7 @@ export * from "./min-appointment-date";
 export * from "./notify-new-volunteer";
 export * from "./notify-tagged-by-email";
 export * from "./resolve-person-by-email";
+export * from "./activate-verified-user";
 export * from "./run-named-cron-jobs";
 export * from "./run-w-advisory-lock";
 export * from "./sync-comment-tags";

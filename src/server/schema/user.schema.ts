@@ -86,7 +86,7 @@ export const userResponseSchema = {
   type: "object",
   properties: {
     ...userAttrs,
-    personId: { type: "number", minimum: 1 },
+    personId: { type: ["number", "null"], minimum: 1 },
   },
   required: [
     "id",
@@ -99,6 +99,15 @@ export const userResponseSchema = {
     "updatedAt",
     "personId",
   ],
+};
+
+export const userRegisterResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "number", minimum: 1 },
+    isActive: { type: "boolean" },
+  },
+  required: ["id", "isActive"],
 };
 
 export const userResponseSchemaIncludePerson = {

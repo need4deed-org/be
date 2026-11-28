@@ -31,3 +31,10 @@ export function randomNonReferencePostcode(prefix = ""): string {
   }
   throw new Error(`No non-reference postcode found for prefix "${prefix}"`);
 }
+
+let ipCounter = 0;
+
+export function uniqueRemoteAddress(): string {
+  ipCounter += 1;
+  return `10.${Math.floor(Math.random() * 256)}.${(ipCounter >> 8) & 255}.${ipCounter & 255}`;
+}

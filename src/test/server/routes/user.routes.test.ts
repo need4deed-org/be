@@ -26,12 +26,18 @@ import { DealType } from "../../../data/types";
 import { getPostcode, hashPassword } from "../../../data/utils";
 import logger from "../../../logger";
 import { createServer } from "../../../server";
+import { isPersonReferenced } from "../../../server/utils/data/is-person-referenced";
 import {
   createOpportunity,
   createVolunteer,
   deleteFixtures,
 } from "../../data/match-fixtures";
-import { randomNumericSuffix } from "../../random";
+import { randomNumericSuffix, uniqueRemoteAddress } from "../../random";
+
+async function personIdOf(fastify: FastifyInstance, userId: number) {
+  const user = await fastify.db.userRepository.findOneByOrFail({ id: userId });
+  return user.personId;
+}
 
 // Regression coverage for two things landed together:
 // 1. POST /user's AGENT email-domain gate rejects with InvalidOrganizationEmailError
@@ -100,6 +106,7 @@ describe("POST /user — AGENT email-domain gate", () => {
   it("rejects an unrecognized/untrusted organization email domain with a distinguishable 400", async () => {
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: `agent-${suffix}@totally-unknown-domain-${suffix}.example`,
@@ -119,6 +126,7 @@ describe("POST /user — AGENT email-domain gate", () => {
   it("allows AGENT registration when the email domain is on the trusted allowlist", async () => {
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: `agent-${suffix}@${trustedDomain}`,
@@ -135,6 +143,7 @@ describe("POST /user — AGENT email-domain gate", () => {
   it("be#1001: rejects a free-email-domain signup even though an existing agent already uses that domain", async () => {
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: `agent-${suffix}@${freeEmailDomain}`,
@@ -157,6 +166,7 @@ describe("POST /user — AGENT email-domain gate", () => {
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: `agent-trusted-${suffix}@${freeEmailDomain}`,
@@ -196,7 +206,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
     await fastify.close();
   });
 
-  it("links to an existing Person by email (case-insensitive) instead of creating a duplicate", async () => {
+  it("links an existing Person by email (case-insensitive) at verification, not at registration", async () => {
     const email = `existing-person-${suffix}@example.com`;
     const existingPerson = await fastify.db.personRepository.save(
       new Person({ firstName: "Existing", lastName: "Volunteer" }),
@@ -207,6 +217,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: email.toUpperCase(),
@@ -218,7 +229,24 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    expect(res.json().person.id).toBe(existingPerson.id);
+    expect(res.json()).toEqual({ id: res.json().id, isActive: false });
+    expect(await personIdOf(fastify, res.json().id)).not.toBe(
+      existingPerson.id,
+    );
+
+    const verified = await fastify.inject({
+      method: "POST",
+      url: "/user/verify-email",
+      payload: {
+        token: fastify.jwt.sign({
+          id: res.json().id,
+          email: email.toUpperCase(),
+          type: "verify",
+        }),
+      },
+    });
+    expect(verified.statusCode).toBe(200);
+    expect(await personIdOf(fastify, res.json().id)).toBe(existingPerson.id);
 
     const personCount = await fastify.db.personRepository.count({
       where: { email },
@@ -238,6 +266,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email: `wild_card-${suffix}@example.com`,
@@ -249,8 +278,10 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    createdPersonIds.push(res.json().person.id);
-    expect(res.json().person.id).not.toBe(lookalikePerson.id);
+    createdPersonIds.push(await personIdOf(fastify, res.json().id));
+    expect(await personIdOf(fastify, res.json().id)).not.toBe(
+      lookalikePerson.id,
+    );
   });
 
   it("rejects (400, PersonAlreadyRegisteredError) when the matched Person already has a User of any role", async () => {
@@ -275,6 +306,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email,
@@ -294,6 +326,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email,
@@ -307,7 +340,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     expect(res.statusCode).toBe(201);
     createdUserIds.push(res.json().id);
-    createdPersonIds.push(res.json().person.id);
+    createdPersonIds.push(await personIdOf(fastify, res.json().id));
     expect(logged).toContain(
       `Password set for user ${res.json().id} via register`,
     );
@@ -324,6 +357,7 @@ describe("POST /user — links existing Person by email instead of duplicating (
 
     const res = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email,
@@ -350,6 +384,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
   function register(email: string, password: string, firstName = "Pending") {
     return fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email,
@@ -375,7 +410,19 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
 
   afterAll(async () => {
     for (const email of emails) {
+      const users = await fastify.db.userRepository.findBy({ email });
       await fastify.db.userRepository.delete({ email });
+      for (const { personId } of users) {
+        if (
+          personId &&
+          !(await isPersonReferenced(
+            fastify.db.userRepository.manager,
+            personId,
+          ))
+        ) {
+          await fastify.db.personRepository.delete({ id: personId });
+        }
+      }
       await fastify.db.personRepository.delete({ email });
     }
     await fastify.close();
@@ -386,6 +433,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     emails.push(email);
     const first = await register(email, "squatter_password", "Squatter");
     expect(first.statusCode).toBe(201);
+    const firstPersonId = await personIdOf(fastify, first.json().id);
 
     const second = await register(email, "owner_password", "Owner");
 
@@ -394,10 +442,13 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([second.json().id]);
     expect(await users[0].checkPassword("owner_password")).toBe(true);
-    const persons = await fastify.db.personRepository.findBy({ email });
-    expect(persons).toHaveLength(1);
-    expect(persons[0].id).not.toBe(first.json().person.id);
-    expect(persons[0].firstName).toBe("Owner");
+    expect(
+      await fastify.db.personRepository.countBy({ id: firstPersonId }),
+    ).toBe(0);
+    const person = await fastify.db.personRepository.findOneByOrFail({
+      id: users[0].personId,
+    });
+    expect(person.firstName).toBe("Owner");
   });
 
   it("reclaims when the new signup uses a different case", async () => {
@@ -428,12 +479,16 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
     );
     try {
       const first = await register(email, "squatter_password");
-      expect(first.json().person.id).toBe(legacyPerson.id);
+      expect(await personIdOf(fastify, first.json().id)).not.toBe(
+        legacyPerson.id,
+      );
 
       const second = await register(email, "owner_password");
 
       expect(second.statusCode).toBe(201);
-      expect(second.json().person.id).toBe(legacyPerson.id);
+      expect(await personIdOf(fastify, second.json().id)).not.toBe(
+        legacyPerson.id,
+      );
       const reloaded = await fastify.db.personRepository.findOneByOrFail({
         id: legacyPerson.id,
       });
@@ -452,12 +507,12 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
       new Person({ firstName: "Curated", lastName: "Person", email }),
     );
     const first = await register(email, "squatter_password");
-    expect(first.json().person.id).toBe(curated.id);
+    expect(await personIdOf(fastify, first.json().id)).not.toBe(curated.id);
 
     const second = await register(email, "owner_password");
 
     expect(second.statusCode).toBe(201);
-    expect(second.json().person.id).toBe(curated.id);
+    expect(await personIdOf(fastify, second.json().id)).not.toBe(curated.id);
     const reloaded = await fastify.db.personRepository.findOneByOrFail({
       id: curated.id,
     });
@@ -476,10 +531,7 @@ describe("POST /user — reclaims a pending (never-verified) User (be#1012)", ()
 
     const second = await register(email, "another_password");
 
-    expect(second.statusCode).toBe(400);
-    expect(second.json()).toMatchObject({
-      error: "PersonAlreadyRegisteredError",
-    });
+    expect(second.statusCode).toBe(409);
     const users = await fastify.db.userRepository.findBy({ email });
     expect(users.map((u) => u.id)).toEqual([first.json().id]);
   });
@@ -1574,6 +1626,7 @@ describe("POST /user/register-with-invite", () => {
     const email = `squatted-invite-${suffix}@example.com`;
     const squat = await fastify.inject({
       method: "POST",
+      remoteAddress: uniqueRemoteAddress(),
       url: "/user",
       payload: {
         email,
@@ -1584,7 +1637,7 @@ describe("POST /user/register-with-invite", () => {
     });
     expect(squat.statusCode).toBe(201);
     createdUserIds.push(squat.json().id);
-    createdPersonIds.push(squat.json().person.id);
+    createdPersonIds.push(await personIdOf(fastify, squat.json().id));
 
     const token = makeInviteToken(email);
     const res = await fastify.inject({

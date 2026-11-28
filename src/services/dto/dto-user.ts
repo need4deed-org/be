@@ -1,4 +1,8 @@
-import { ApiAgentMembershipSummary, ApiUserGet } from "need4deed-sdk";
+import {
+  ApiAgentMembershipSummary,
+  ApiUserGet,
+  ApiUserPostReply,
+} from "need4deed-sdk";
 import User from "../../data/entity/user.entity";
 
 export function serializeUserToMeDTO(
@@ -23,4 +27,8 @@ export function serializeUserToMeDTO(
     volunteerId,
     deactivatedAt: user.deactivatedAt ?? null,
   };
+}
+
+export function dtoUserPostReply(user: User): ApiUserPostReply {
+  return { id: user.id, isActive: user.isActive };
 }

@@ -10,13 +10,14 @@ import {
   ApiCoordinatorRegisterWithInvite,
   ApiUserGet,
   ApiUserPost,
+  ApiUserPostReply,
+  ApiUserVerifyEmail,
   Lang,
   SortOrder,
   UserRole,
 } from "need4deed-sdk";
 import { EntityManager, FindOptionsWhere, ILike, In } from "typeorm";
 import {
-  AlreadyUsedTokenError,
   BadRequestError,
   InvalidOrganizationEmailError,
   NotFoundError,
@@ -31,7 +32,11 @@ import Person from "../../data/entity/person.entity";
 import User from "../../data/entity/user.entity";
 import { hashPassword } from "../../data/utils";
 import logger from "../../logger";
-import { serializeUserToMeDTO } from "../../services/dto/dto-user";
+import {
+  dtoUserPostReply,
+  serializeUserToMeDTO,
+} from "../../services/dto/dto-user";
+import { signPasswordResetToken } from "../../services/notify";
 import { idParamSchema, responseSchema, userListQuerySchema } from "../schema";
 import { ApiErrorReply, responseErrors } from "../schema/responseErrors";
 import {
@@ -41,6 +46,7 @@ import {
   registerWithInviteQuerySchema,
   selfRegisterUserBodySchema,
   signedLinkResponseSchema,
+  userRegisterResponseSchema,
   userResponseSchema,
   userResponseSchemaIncludePerson,
   userVerifyEmailSchema,
@@ -54,12 +60,14 @@ import {
   RoutePrefix,
 } from "../types";
 import {
+  activateVerifiedUser,
   assertEmailAvailable,
   createUserReclaimingEmail,
   getSkipTake,
   getUserWhere,
   isStaffRole,
   resolvePersonByEmail,
+  resolveSelfRegistrationPerson,
   STAFF_ROLES,
   verifyTokenOfType,
 } from "../utils";
@@ -78,6 +86,7 @@ import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-toke
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
 import { revokeUserRefreshSessions } from "../utils/data/refresh-session";
 import { signLink } from "../utils/data/sign-link";
+import { REGISTER_IP_RATE_LIMIT } from "../utils/login-rate-limit";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
@@ -309,7 +318,10 @@ export default async function userRoutes(
     },
   );
 
-  fastify.post<{ Body: { token: string } }>(
+  fastify.post<{
+    Body: { token: string };
+    Reply: ApiUserVerifyEmail | ApiErrorReply;
+  }>(
     RoutePrefix.VERIFY_EMAIL,
     {
       schema: {
@@ -321,6 +333,8 @@ export default async function userRoutes(
               message: { type: "string" },
               verified: { type: "boolean" },
               hasVolunteerProfile: { type: "boolean" },
+              setPassword: { type: "boolean" },
+              resetToken: { type: "string" },
             },
             required: ["message", "verified"],
           },
@@ -358,15 +372,28 @@ export default async function userRoutes(
       }
 
       // a reclaimed email's new User must not be activated by the old User's link
-      const user = decodedToken.id
+      const found = decodedToken.id
         ? await userRepository.findOne({
             where: { id: decodedToken.id, email },
           })
         : null;
 
-      if (!user) {
+      if (!found) {
         logger.warn("User not found for login attempt.");
         throw new BadRequestError("Invalid token.");
+      }
+
+      const { user, linkedExistingPerson } = await activateVerifiedUser(
+        userRepository.manager,
+        found.id,
+      );
+
+      if (linkedExistingPerson) {
+        fastify.notify.passwordReset(user).catch((err) => {
+          logger.error(
+            `Failed to send password reset for user ${user.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
       }
 
       let hasVolunteerProfile: boolean | undefined;
@@ -378,35 +405,33 @@ export default async function userRoutes(
       const volunteerProfileFields =
         hasVolunteerProfile !== undefined ? { hasVolunteerProfile } : {};
 
-      if (user.isActive) {
-        throw new AlreadyUsedTokenError();
-      }
-
-      if (user.deactivatedAt) {
-        throw new BadRequestError("Account has been deactivated.");
-      }
-
-      user.isActive = true;
-      await userRepository.save(user);
+      const setPasswordFields = linkedExistingPerson
+        ? {
+            setPassword: true,
+            resetToken: signPasswordResetToken(fastify.jwt, user),
+          }
+        : {};
 
       return reply.status(200).send({
         message: "Email verified successfully.",
         verified: true,
         ...volunteerProfileFields,
+        ...setPasswordFields,
       });
     },
   );
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: User | ApiErrorReply;
+    Reply: ApiUserPostReply | ApiErrorReply;
   }>(
     "/",
     {
+      config: { rateLimit: REGISTER_IP_RATE_LIMIT },
       schema: {
         body: selfRegisterUserBodySchema,
         response: {
-          201: userResponseSchemaIncludePerson,
+          201: userRegisterResponseSchema,
           ...responseErrors,
         },
       },
@@ -423,7 +448,9 @@ export default async function userRoutes(
               .findOne({
                 where: {
                   agentPerson: {
-                    person: { email: ILike(`%@${escapeLikePattern(domain)}`) },
+                    person: {
+                      email: ILike(`%@${escapeLikePattern(domain)}`),
+                    },
                   },
                 },
               })
@@ -466,20 +493,22 @@ export default async function userRoutes(
       const result = await createUserReclaimingEmail(
         fastify.db.userRepository.manager,
         email,
-        async (manager) =>
-          new User({
+        async (manager) => {
+          const person = await resolveSelfRegistrationPerson(
+            manager.getRepository(Person),
+            email,
+            personData,
+          );
+          return new User({
             email,
             password,
             role,
             isActive: false,
             language: language ?? Lang.EN,
             timezone: "CET",
-            person: await resolvePersonByEmail(
-              manager.getRepository(Person),
-              email,
-              personData,
-            ),
-          }),
+            person,
+          });
+        },
       );
       if (result.status === "error") {
         return reply.status(400).send({
@@ -497,7 +526,7 @@ export default async function userRoutes(
           );
         });
 
-      return reply.status(201).send(result.user);
+      return reply.status(201).send(dtoUserPostReply(result.user));
     },
   );
 

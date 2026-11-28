@@ -68,3 +68,10 @@ export const createLoginIpCap = () =>
 
 export const createLoginAccountCap = () =>
   createLoginCap(LOGIN_ACCOUNT_MAX, loginEmail, "rate-limited-account");
+
+export const REGISTER_IP_RATE_LIMIT = {
+  max: 20,
+  timeWindow: 15 * 60 * 1000,
+  keyGenerator: (request: FastifyRequest) => `register-ip:${clientIp(request)}`,
+  onExceeded: () => logger.warn("Register failed: rate-limited-ip"),
+};
