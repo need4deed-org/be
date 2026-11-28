@@ -46,7 +46,7 @@
     "class-validator": "^0.14.2",
     "fastify": "^5.3.3",
     "fastify-plugin": "^5.0.1",
-    "need4deed-sdk": "0.0.237",
+    "need4deed-sdk": "0.0.238",
     "node-cron": "^4.5.0",
     "nodemailer": "^9.0.3",
     "pg": "^8.14.1",

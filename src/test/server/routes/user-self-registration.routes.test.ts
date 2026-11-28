@@ -121,6 +121,7 @@ describe("POST /user → verify-email → login", () => {
     fastify = await createServer();
     await fastify.ready();
     vi.spyOn(fastify.notify, "emailVerification").mockResolvedValue(undefined);
+    vi.spyOn(fastify.notify, "passwordReset").mockResolvedValue(undefined);
     await fastify.db.trustedDomainRepository.save(
       new TrustedDomain({ domain }),
     );
@@ -179,6 +180,9 @@ describe("POST /user → verify-email → login", () => {
     expect(activated.isActive).toBe(true);
     expect(activated.personId).toBe(legacy.id);
     expect(activated.credentialsValidAfter).toBeNull();
+    expect(fastify.notify.passwordReset).toHaveBeenCalledWith(
+      expect.objectContaining({ id: pending.id }),
+    );
 
     expect((await login("legacy-volunteer", PASSWORD)).statusCode).toBe(401);
 
@@ -295,18 +299,74 @@ describe("POST /user → verify-email → login", () => {
     expect((await login("claimed-meanwhile", PASSWORD)).statusCode).toBe(200);
   });
 
-  it("429s the sixth registration from one IP within the window", async () => {
-    const ip = uniqueRemoteAddress();
-    for (let i = 0; i < 5; i++) {
-      expect((await register(`ip-limit-${i}`, { ip })).statusCode).toBe(201);
-    }
-    expect((await register("ip-limit-5", { ip })).statusCode).toBe(429);
+  it("discards the registration password of a pending user linked to an older Person before verification existed", async () => {
+    const legacy = await savePerson("linked-before");
+    const pendingUser = await fastify.db.userRepository.save(
+      new User({
+        email: mail("linked-before"),
+        password: await hashPassword(PASSWORD),
+        role: UserRole.VOLUNTEER,
+        isActive: false,
+        language: "en",
+        timezone: "CET",
+        personId: legacy.id,
+      }),
+    );
+    emails.push(mail("linked-before"));
+
+    const verified = await verify(verifyToken(pendingUser.id, "linked-before"));
+    expect(verified.statusCode).toBe(200);
+    expect(verified.json()).toMatchObject({ setPassword: true });
+    expect((await login("linked-before", PASSWORD)).statusCode).toBe(401);
   });
 
-  it("429s the sixth registration for one email within the window, across IPs", async () => {
-    for (let i = 0; i < 5; i++) {
-      expect((await register("email-limit")).statusCode).toBe(201);
+  it("links the unclaimed Person when a claimed one shares the email", async () => {
+    const claimed = await savePerson("shared-email");
+    const otherEmail = `claimer-${mail("shared-email")}`;
+    emails.push(otherEmail);
+    await fastify.db.userRepository.save(
+      new User({
+        email: otherEmail,
+        password: await hashPassword(PASSWORD),
+        role: UserRole.VOLUNTEER,
+        isActive: true,
+        language: "en",
+        timezone: "CET",
+        personId: claimed.id,
+      }),
+    );
+    const unclaimed = await savePerson("shared-email");
+
+    expect((await register("shared-email")).statusCode).toBe(201);
+    const pending = await userOf("shared-email");
+    expect(pending.personId).toBeNull();
+
+    expect(
+      (await verify(verifyToken(pending.id, "shared-email"))).statusCode,
+    ).toBe(200);
+    expect((await userOf("shared-email")).personId).toBe(unclaimed.id);
+  });
+
+  it("activates once when the verify link is opened twice at the same time", async () => {
+    await savePerson("double-verify");
+    expect((await register("double-verify")).statusCode).toBe(201);
+    const token = verifyToken(
+      (await userOf("double-verify")).id,
+      "double-verify",
+    );
+
+    const statuses = (await Promise.all([verify(token), verify(token)]))
+      .map((res) => res.statusCode)
+      .sort();
+
+    expect(statuses).toEqual([200, 409]);
+  });
+
+  it("429s the 21st registration from one IP within the window", async () => {
+    const ip = uniqueRemoteAddress();
+    for (let i = 0; i < 20; i++) {
+      expect((await register(`ip-limit-${i}`, { ip })).statusCode).toBe(201);
     }
-    expect((await register("email-limit")).statusCode).toBe(429);
+    expect((await register("ip-limit-20", { ip })).statusCode).toBe(429);
   });
 });

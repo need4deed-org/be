@@ -86,7 +86,7 @@ export const userResponseSchema = {
   type: "object",
   properties: {
     ...userAttrs,
-    personId: { type: "number", minimum: 1 },
+    personId: { type: ["number", "null"], minimum: 1 },
   },
   required: [
     "id",

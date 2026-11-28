@@ -10,6 +10,7 @@ import {
   ApiCoordinatorRegisterWithInvite,
   ApiUserGet,
   ApiUserPost,
+  ApiUserPostReply,
   ApiUserVerifyEmail,
   Lang,
   SortOrder,
@@ -17,7 +18,6 @@ import {
 } from "need4deed-sdk";
 import { EntityManager, FindOptionsWhere, ILike, In } from "typeorm";
 import {
-  AlreadyUsedTokenError,
   BadRequestError,
   InvalidOrganizationEmailError,
   NotFoundError,
@@ -83,17 +83,12 @@ import { resolveNgoRegistrationOwner } from "../utils/data/ngo-registration-toke
 import { escapeLikePattern } from "../utils/data/person-name-ilike";
 import { revokeUserRefreshSessions } from "../utils/data/refresh-session";
 import { signLink } from "../utils/data/sign-link";
-import {
-  createRegisterEmailCap,
-  REGISTER_IP_RATE_LIMIT,
-} from "../utils/login-rate-limit";
+import { REGISTER_IP_RATE_LIMIT } from "../utils/login-rate-limit";
 
 export default async function userRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions,
 ) {
-  const registerEmailCap = createRegisterEmailCap();
-
   fastify.get<{
     Querystring: QuerystringUserList;
     Reply: ReplyDataCount<ApiUserGet[]>;
@@ -374,29 +369,29 @@ export default async function userRoutes(
       }
 
       // a reclaimed email's new User must not be activated by the old User's link
-      const user = decodedToken.id
+      const found = decodedToken.id
         ? await userRepository.findOne({
             where: { id: decodedToken.id, email },
           })
         : null;
 
-      if (!user) {
+      if (!found) {
         logger.warn("User not found for login attempt.");
         throw new BadRequestError("Invalid token.");
       }
 
-      if (user.isActive) {
-        throw new AlreadyUsedTokenError();
-      }
-
-      if (user.deactivatedAt) {
-        throw new BadRequestError("Account has been deactivated.");
-      }
-
-      const { linkedExistingPerson } = await activateVerifiedUser(
+      const { user, linkedExistingPerson } = await activateVerifiedUser(
         userRepository.manager,
-        user,
+        found.id,
       );
+
+      if (linkedExistingPerson) {
+        fastify.notify.passwordReset(user).catch((err) => {
+          logger.error(
+            `Failed to send password reset for user ${user.id}: ${err instanceof Error ? err.message : err}`,
+          );
+        });
+      }
 
       let hasVolunteerProfile: boolean | undefined;
       if (user.role === UserRole.VOLUNTEER && user.personId) {
@@ -425,7 +420,7 @@ export default async function userRoutes(
 
   fastify.post<{
     Body: ApiUserPost;
-    Reply: Pick<User, "id" | "isActive"> | ApiErrorReply;
+    Reply: ApiUserPostReply | ApiErrorReply;
   }>(
     "/",
     {
@@ -437,53 +432,50 @@ export default async function userRoutes(
           ...responseErrors,
         },
       },
-      preHandler: [
-        registerEmailCap,
-        async (request) => {
-          const { person: personData, email, role, ngoToken } = request.body;
+      preHandler: async (request) => {
+        const { person: personData, email, role, ngoToken } = request.body;
 
-          if (isStaffRole(role)) {
-            throw new UnauthorizedError();
-          }
+        if (isStaffRole(role)) {
+          throw new UnauthorizedError();
+        }
 
-          if (role === UserRole.AGENT) {
-            const allowed = await isAgentDomainAllowed(email, (domain) =>
-              fastify.db.agentRepository
-                .findOne({
-                  where: {
-                    agentPerson: {
-                      person: {
-                        email: ILike(`%@${escapeLikePattern(domain)}`),
-                      },
+        if (role === UserRole.AGENT) {
+          const allowed = await isAgentDomainAllowed(email, (domain) =>
+            fastify.db.agentRepository
+              .findOne({
+                where: {
+                  agentPerson: {
+                    person: {
+                      email: ILike(`%@${escapeLikePattern(domain)}`),
                     },
                   },
-                })
-                .then((agent) => !!agent),
-            );
-            if (!allowed) {
-              throw new InvalidOrganizationEmailError();
-            }
+                },
+              })
+              .then((agent) => !!agent),
+          );
+          if (!allowed) {
+            throw new InvalidOrganizationEmailError();
           }
+        }
 
-          if (personData.id) {
+        if (personData.id) {
+          throw new BadRequestError(
+            "Linking to an existing person by id is not allowed on self-registration.",
+          );
+        }
+
+        if (ngoToken !== undefined) {
+          if (role !== UserRole.VOLUNTEER) {
             throw new BadRequestError(
-              "Linking to an existing person by id is not allowed on self-registration.",
+              "An NGO registration link is only for volunteers.",
             );
           }
-
-          if (ngoToken !== undefined) {
-            if (role !== UserRole.VOLUNTEER) {
-              throw new BadRequestError(
-                "An NGO registration link is only for volunteers.",
-              );
-            }
-            request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
-              request,
-              ngoToken,
-            );
-          }
-        },
-      ],
+          request.ngoOwnerAgentId = await resolveNgoRegistrationOwner(
+            request,
+            ngoToken,
+          );
+        }
+      },
     },
     async (request, reply) => {
       const {

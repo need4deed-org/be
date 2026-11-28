@@ -5,14 +5,16 @@ import Person from "../../../data/entity/person.entity";
 import logger from "../../../logger";
 import { escapeLikePattern } from "./person-name-ilike";
 
-export function findPersonByEmail(
+export async function findPersonByEmail(
   personRepository: Repository<Person>,
   email: string,
 ): Promise<Person | null> {
-  return personRepository.findOne({
+  const persons = await personRepository.find({
     where: { email: ILike(escapeLikePattern(email)) },
     relations: ["users"],
+    order: { id: "ASC" },
   });
+  return persons.find((person) => !person.users?.length) ?? persons[0] ?? null;
 }
 
 export function isUnclaimedPerson(person: Person | null): person is Person {

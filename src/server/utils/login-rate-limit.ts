@@ -23,25 +23,21 @@ export function loginRateLimitKey(request: FastifyRequest): string {
 }
 
 // @fastify/rate-limit runs only one limiter per request, so these caps count separately.
-export function createWindowCap(
+function createLoginCap(
   max: number,
-  windowMs: number,
   keyOf: (request: FastifyRequest) => string | undefined,
-  logMessage: string,
+  reason: string,
 ) {
   const windows = new Map<string, { count: number; startedAt: number }>();
 
-  return async function windowCap(
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ) {
+  return async function loginCap(request: FastifyRequest, reply: FastifyReply) {
     const key = keyOf(request);
     if (key === undefined) {
       return;
     }
     const now = Date.now();
     const window = windows.get(key);
-    if (!window || now - window.startedAt >= windowMs) {
+    if (!window || now - window.startedAt >= LOGIN_WINDOW_MS) {
       windows.delete(key);
       if (windows.size >= LOGIN_MAX_TRACKED) {
         windows.delete(windows.keys().next().value!);
@@ -53,8 +49,8 @@ export function createWindowCap(
     windows.set(key, window);
     window.count += 1;
     if (window.count > max) {
-      logger.warn(logMessage);
-      const retryAfterMs = window.startedAt + windowMs - now;
+      logger.warn(`Login failed: ${reason}`);
+      const retryAfterMs = window.startedAt + LOGIN_WINDOW_MS - now;
       return reply
         .header("retry-after", Math.ceil(retryAfterMs / 1000))
         .status(429)
@@ -68,35 +64,14 @@ export function createWindowCap(
 }
 
 export const createLoginIpCap = () =>
-  createWindowCap(
-    LOGIN_IP_MAX,
-    LOGIN_WINDOW_MS,
-    clientIp,
-    "Login failed: rate-limited-ip",
-  );
+  createLoginCap(LOGIN_IP_MAX, clientIp, "rate-limited-ip");
 
 export const createLoginAccountCap = () =>
-  createWindowCap(
-    LOGIN_ACCOUNT_MAX,
-    LOGIN_WINDOW_MS,
-    loginEmail,
-    "Login failed: rate-limited-account",
-  );
-
-const REGISTER_MAX = 5;
-const REGISTER_WINDOW_MS = 15 * 60 * 1000;
+  createLoginCap(LOGIN_ACCOUNT_MAX, loginEmail, "rate-limited-account");
 
 export const REGISTER_IP_RATE_LIMIT = {
-  max: REGISTER_MAX,
-  timeWindow: REGISTER_WINDOW_MS,
+  max: 20,
+  timeWindow: 15 * 60 * 1000,
   keyGenerator: (request: FastifyRequest) => `register-ip:${clientIp(request)}`,
   onExceeded: () => logger.warn("Register failed: rate-limited-ip"),
 };
-
-export const createRegisterEmailCap = () =>
-  createWindowCap(
-    REGISTER_MAX,
-    REGISTER_WINDOW_MS,
-    loginEmail,
-    "Register failed: rate-limited-email",
-  );
